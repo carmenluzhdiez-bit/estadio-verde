@@ -30,15 +30,20 @@ const ESTACIONES = {
 
 // ─── FRECUENCIAS DISPONIBLES ─────────────────────────────────────────────────
 const FRECUENCIAS = [
-  { value:"diario",      label:"Diario",           dias:1  },
-  { value:"cada2dias",   label:"Cada 2 días",       dias:2  },
-  { value:"cada3dias",   label:"Cada 3 días",       dias:3  },
-  { value:"cada5dias",   label:"Cada 5 días",       dias:5  },
-  { value:"semanal",     label:"Semanal",           dias:7  },
-  { value:"quincenal",   label:"Quincenal",         dias:15 },
-  { value:"mensual",     label:"Mensual",           dias:30 },
-  { value:"bimestral",   label:"Bimestral",         dias:60 },
-  { value:"noaplica",    label:"No aplica",         dias:0  },
+  { value:"diario",      label:"Diario",             dias:1   },
+  { value:"cada2dias",   label:"Cada 2 días",         dias:2   },
+  { value:"cada3dias",   label:"Cada 3 días",         dias:3   },
+  { value:"cada5dias",   label:"Cada 5 días",         dias:5   },
+  { value:"semanal",     label:"Semanal",             dias:7   },
+  { value:"quincenal",   label:"Quincenal",           dias:15  },
+  { value:"mensual",     label:"Mensual",             dias:30  },
+  { value:"bimestral",   label:"Bimestral",           dias:60  },
+  { value:"trimestral",  label:"Trimestral",          dias:90  },
+  { value:"semestral",   label:"Semestral",           dias:180 },
+  { value:"anual",       label:"Anual",               dias:365 },
+  { value:"unavez",      label:"Una sola vez",        dias:null },
+  { value:"segunecesidad", label:"Según necesidad",   dias:null },
+  { value:"noaplica",    label:"No aplica",           dias:0   },
 ];
 
 // ─── TAREAS PREDEFINIDAS POR SUBCATEGORÍA ────────────────────────────────────
@@ -1351,7 +1356,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
       return "primavera";
     };
     const est = estSig(fechaVer);
-    const FREC_ORDER = ["diario","cada2dias","cada3dias","cada5dias","semanal","quincenal","mensual","bimestral","noaplica"];
+    const FREC_ORDER = ["diario","cada2dias","cada3dias","cada5dias","semanal","quincenal","mensual","bimestral","trimestral","semestral","anual","unavez","segunecesidad","noaplica"];
     // bump frequency 2 steps down (less frequent) for this element+tarea
     const frecsActuales = getFrecs(zonaBase.id, null, null, false, t.elemento, t.tarea);
     if (frecsActuales) {
@@ -1635,7 +1640,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           if(!frecVal || frecVal==="noaplica") return;
           const key = z.nombre+"_"+e.nombre+"_"+f.tarea;
           if(existentes.includes(key)) return;
-          propuestas.push({ id: Date.now()+Math.random(), fecha, zona:z.nombre, elemento:e.nombre, tarea:f.tarea, responsable:"", estado:"por_designar", notas:"", frecuencia:frecVal, estacion:est, auto:true });
+          propuestas.push({ id: Date.now()+Math.random(), fecha, zona:z.nombre, elemento:e.nombre, tarea:f.tarea, responsable:"", estado:"por_designar", notas:f.obs||"", frecuencia:frecVal, estacion:est, auto:true });
         });
       });
     });
@@ -2195,47 +2200,120 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
   const ESTACIONES_LIST = ["verano","otono","invierno","primavera"];
   const frecuencias = getFrecs(zid, eid, tipo, isCustom);
   const updateFila = (idx, campo, valor) => { const arr = frecuencias.map((f,i)=>i===idx?{...f,[campo]:valor}:f); setFrecs(zid,eid,isCustom,arr); };
-  const addFila = () => { setFrecs(zid,eid,isCustom,[...frecuencias,{id:eid+"_"+Date.now(),tarea:"",verano:"semanal",otono:"semanal",invierno:"noaplica",primavera:"semanal"}]); };
+  const addFila = () => { setFrecs(zid,eid,isCustom,[...frecuencias,{id:eid+"_"+Date.now(),tarea:"",verano:"semanal",otono:"semanal",invierno:"noaplica",primavera:"semanal",ultimaVez:""}]); };
   const removeFila = (idx) => { setFrecs(zid,eid,isCustom,frecuencias.filter((_,i)=>i!==idx)); };
+
+  // Convierte frecuencia a días
+  const frecToDias = (frec) => {
+    const map = {diario:1,cada2dias:2,cada3dias:3,cada5dias:5,semanal:7,quincenal:15,mensual:30,bimestral:60,trimestral:90,semestral:180,anual:365,unavez:null,segunecesidad:null};
+    return map[frec]||null;
+  };
+
+  // Estación actual (hemisferio sur)
+  const mes = new Date().getMonth()+1;
+  const estActual = [12,1,2].includes(mes)?"verano":[3,4,5].includes(mes)?"otono":[6,7,8].includes(mes)?"invierno":"primavera";
+
+  // Calcula próxima fecha y días
+  const calcProxima = (f) => {
+    const frecVal = f[estActual];
+    if(!frecVal||frecVal==="noaplica"||frecVal==="unavez"||frecVal==="segunecesidad") return null;
+    if(!f.ultimaVez) return null;
+    const dias = frecToDias(frecVal);
+    if(!dias) return null;
+    const ultima = new Date(f.ultimaVez+"T12:00:00");
+    const proxima = new Date(ultima.getTime() + dias*24*60*60*1000);
+    const hoy = new Date(); hoy.setHours(12,0,0,0);
+    const diff = Math.round((proxima-hoy)/(24*60*60*1000));
+    return { fecha: proxima.toISOString().slice(0,10), diff };
+  };
+  const esSinFrecuencia = (f) => ["unavez","segunecesidad"].includes(f[estActual]);
+
   return (
     <div style={{marginTop:14,borderTop:"1px solid rgba(255,255,255,0.08)",paddingTop:14}}>
       <div style={{fontFamily:"'Playfair Display',serif",fontSize:13,fontWeight:700,marginBottom:10,color:"#a0d8b0"}}>📅 Frecuencias de Mantención</div>
       <div style={{overflowX:"auto",marginBottom:10}}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,fontFamily:"'Georgia',serif",minWidth:420}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,fontFamily:"'Georgia',serif",minWidth:560}}>
           <thead>
             <tr style={{background:"rgba(61,122,82,0.15)"}}>
-              <th style={{padding:"7px 8px",textAlign:"left",color:"#6aaa7a",fontWeight:600,fontSize:11,letterSpacing:"0.5px",minWidth:120}}>TAREA</th>
+              <th style={{padding:"7px 8px",textAlign:"left",color:"#6aaa7a",fontWeight:600,fontSize:11,letterSpacing:"0.5px",minWidth:110}}>TAREA</th>
               {ESTACIONES_LIST.map(est=>(
                 <th key={est} style={{padding:"7px 8px",textAlign:"center",color:ESTACIONES[est].color,fontWeight:600,fontSize:11,whiteSpace:"nowrap"}}>{ESTACIONES[est].icon} {ESTACIONES[est].label}</th>
               ))}
+              <th style={{padding:"7px 8px",textAlign:"center",color:"#a0c8e0",fontWeight:600,fontSize:11,whiteSpace:"nowrap",minWidth:100}}>📅 Última vez</th>
+              <th style={{padding:"7px 8px",textAlign:"center",color:"#c084fc",fontWeight:600,fontSize:11,whiteSpace:"nowrap",minWidth:90}}>🗓 Próxima</th>
+              <th style={{padding:"7px 8px",textAlign:"center",color:"#fcd34d",fontWeight:600,fontSize:11,whiteSpace:"nowrap",minWidth:70}}>Días</th>
+              <th style={{padding:"7px 8px",textAlign:"left",color:"#fbbf24",fontWeight:600,fontSize:11,whiteSpace:"nowrap",minWidth:160}}>📝 Observaciones / Especificaciones</th>
               <th style={{padding:"7px 4px",width:24}}></th>
             </tr>
           </thead>
           <tbody>
-            {frecuencias.length===0&&(<tr><td colSpan={6} style={{padding:"16px 8px",textAlign:"center",color:"#4a8a5a",fontSize:12}}>Sin tareas. Agrega una abajo.</td></tr>)}
-            {frecuencias.map((f,idx)=>(
-              <tr key={idx} style={{borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
-                <td style={{padding:"5px 6px"}}>
-                  <input style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:6,color:"#ede9e0",padding:"4px 7px",fontFamily:"'Georgia',serif",fontSize:12,width:"100%",outline:"none"}} value={f.tarea} onChange={e=>updateFila(idx,"tarea",e.target.value)} placeholder="Nombre tarea..."/>
-                </td>
-                {ESTACIONES_LIST.map(est=>{
-                  const esNA=f[est]==="noaplica";
-                  return (
-                    <td key={est} style={{padding:"5px 6px",textAlign:"center"}}>
-                      <select value={f[est]||"noaplica"} onChange={e=>updateFila(idx,est,e.target.value)}
-                        style={{background:esNA?"rgba(255,255,255,0.04)":`${ESTACIONES[est].color}18`,border:`1px solid ${esNA?"rgba(255,255,255,0.08)":ESTACIONES[est].color+"40"}`,borderRadius:6,color:esNA?"#4a7a6a":ESTACIONES[est].color,padding:"4px 5px",fontFamily:"'Georgia',serif",fontSize:11,outline:"none",cursor:"pointer",width:"100%"}}>
-                        {FRECUENCIAS.map(fr=><option key={fr.value} value={fr.value}>{fr.label}</option>)}
-                      </select>
-                    </td>
-                  );
-                })}
-                <td style={{padding:"5px 4px",textAlign:"center"}}>
-                  <button onClick={()=>removeFila(idx)} style={{background:"transparent",border:"none",color:"#7a5a5a",cursor:"pointer",fontSize:14,padding:"2px 4px",borderRadius:4}}>✕</button>
-                </td>
-              </tr>
-            ))}
+            {frecuencias.length===0&&(<tr><td colSpan={10} style={{padding:"16px 8px",textAlign:"center",color:"#4a8a5a",fontSize:12}}>Sin tareas. Agrega una abajo.</td></tr>)}
+            {frecuencias.map((f,idx)=>{
+              const prox = calcProxima(f);
+              const diasColor = prox===null?"#5a8a7a":prox.diff<0?"#ef4444":prox.diff<=7?"#f59e0b":prox.diff<=30?"#fcd34d":"#22c55e";
+              const diasLabel = prox===null?"—":prox.diff===0?"Hoy":prox.diff<0?`${Math.abs(prox.diff)}d atrás`:`${prox.diff}d`;
+              return (
+                <tr key={idx} style={{borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                  <td style={{padding:"5px 6px"}}>
+                    <input style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:6,color:"#ede9e0",padding:"4px 7px",fontFamily:"'Georgia',serif",fontSize:12,width:"100%",outline:"none"}} value={f.tarea} onChange={e=>updateFila(idx,"tarea",e.target.value)} placeholder="Nombre tarea..."/>
+                  </td>
+                  {ESTACIONES_LIST.map(est=>{
+                    const esNA=f[est]==="noaplica";
+                    return (
+                      <td key={est} style={{padding:"5px 6px",textAlign:"center"}}>
+                        <select value={f[est]||"noaplica"} onChange={e=>updateFila(idx,est,e.target.value)}
+                          style={{background:esNA?"rgba(255,255,255,0.04)":`${ESTACIONES[est].color}18`,border:`1px solid ${esNA?"rgba(255,255,255,0.08)":ESTACIONES[est].color+"40"}`,borderRadius:6,color:esNA?"#4a7a6a":ESTACIONES[est].color,padding:"4px 5px",fontFamily:"'Georgia',serif",fontSize:11,outline:"none",cursor:"pointer",width:"100%"}}>
+                          {FRECUENCIAS.map(fr=><option key={fr.value} value={fr.value}>{fr.label}</option>)}
+                        </select>
+                      </td>
+                    );
+                  })}
+                  {/* Última vez */}
+                  <td style={{padding:"5px 6px",textAlign:"center"}}>
+                    <input type="date" value={f.ultimaVez||""} onChange={e=>updateFila(idx,"ultimaVez",e.target.value)}
+                      style={{background:"rgba(160,200,224,0.08)",border:"1px solid rgba(160,200,224,0.2)",borderRadius:6,color:"#a0c8e0",padding:"3px 5px",fontFamily:"'Georgia',serif",fontSize:11,outline:"none",width:"100%",cursor:"pointer"}}/>
+                  </td>
+                  {/* Próxima fecha */}
+                  <td style={{padding:"5px 6px",textAlign:"center",fontSize:11,color:"#c084fc",fontWeight:prox?"600":"400"}}>
+                    {esSinFrecuencia(f)
+                      ? <span style={{fontSize:10,color:"#a78bfa",fontStyle:"italic"}}>{f[estActual]==="unavez"?"Solo si se indica":"Según necesidad"}</span>
+                      : prox ? new Date(prox.fecha+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"short",year:"2-digit"}) : "—"}
+                  </td>
+                  {/* Días */}
+                  <td style={{padding:"5px 6px",textAlign:"center"}}>
+                    {esSinFrecuencia(f) ? (
+                      <span style={{fontSize:10,color:"#c084fc",background:"rgba(192,132,252,0.12)",padding:"2px 7px",borderRadius:8,whiteSpace:"nowrap",border:"1px solid rgba(192,132,252,0.25)"}}>
+                        {f[estActual]==="unavez"?"1 vez":"S/frecuencia"}
+                      </span>
+                    ) : (
+                      <span style={{fontSize:11,fontWeight:700,color:diasColor,background:`${diasColor}18`,padding:"2px 7px",borderRadius:8,whiteSpace:"nowrap"}}>
+                        {diasLabel}
+                      </span>
+                    )}
+                  </td>
+                  {/* Observaciones */}
+                  <td style={{padding:"5px 6px"}}>
+                    <input
+                      value={f.obs||""}
+                      onChange={e=>updateFila(idx,"obs",e.target.value)}
+                      placeholder="Ej: Cortar a 3&quot; de altura..."
+                      style={{background:"rgba(251,191,36,0.07)",border:"1px solid rgba(251,191,36,0.2)",borderRadius:6,color:"#fde68a",padding:"4px 7px",fontFamily:"'Georgia',serif",fontSize:11,width:"100%",outline:"none"}}/>
+                  </td>
+                  <td style={{padding:"5px 4px",textAlign:"center"}}>
+                    <button onClick={()=>removeFila(idx)} style={{background:"transparent",border:"none",color:"#7a5a5a",cursor:"pointer",fontSize:14,padding:"2px 4px",borderRadius:4}}>✕</button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
+      </div>
+      <div style={{fontSize:11,color:"#5a8a6a",marginBottom:8}}>
+        💡 La columna <b style={{color:"#fcd34d"}}>Días</b> calcula desde la última vez usando la frecuencia de <b style={{color:ESTACIONES[estActual].color}}>{ESTACIONES[estActual].icon} {ESTACIONES[estActual].label}</b> (estación actual).
+        <span style={{marginLeft:8,color:"#ef4444"}}>■</span> Vencida &nbsp;
+        <span style={{color:"#f59e0b"}}>■</span> ≤7 días &nbsp;
+        <span style={{color:"#fcd34d"}}>■</span> ≤30 días &nbsp;
+        <span style={{color:"#22c55e"}}>■</span> Al día
       </div>
       <button onClick={addFila} style={{background:"rgba(61,122,82,0.2)",border:"1px solid rgba(61,122,82,0.3)",borderRadius:7,color:"#80c890",padding:"5px 12px",fontFamily:"'Georgia',serif",fontSize:12,cursor:"pointer"}}>＋ Agregar tarea</button>
     </div>
@@ -2752,14 +2830,14 @@ export default function App() {
   const S = {
     app: { fontFamily:"'Georgia',serif", minHeight:"100vh", background:"linear-gradient(150deg,#0a1f10 0%,#122d1a 50%,#0d2414 100%)", color:"#ede9e0" },
     header: { background:"rgba(0,0,0,0.45)", borderBottom:"1px solid rgba(160,200,140,0.15)" },
-    headerTop: { maxWidth:1280, margin:"0 auto", display:"flex", alignItems:"center", padding:"10px 16px", gap:10 },
+    headerTop: { maxWidth:1600, margin:"0 auto", display:"flex", alignItems:"center", padding:"10px 20px", gap:10 },
     headerNav: { background:"rgba(0,0,0,0.3)", borderTop:"1px solid rgba(160,200,140,0.08)", display:"flex", overflowX:"auto", padding:"0 8px", gap:2, scrollbarWidth:"none" },
     logo: { display:"flex", alignItems:"center", gap:10, flex:1 },
     logoCircle: { width:34, height:34, borderRadius:"50%", background:"linear-gradient(135deg,#3d7a52,#1e4d30)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, flexShrink:0 },
     logoTitle: { fontFamily:"'Playfair Display',serif", fontSize:16, fontWeight:700 },
     logoSub: { fontSize:9, color:"#6aaa7a", letterSpacing:"1.5px", textTransform:"uppercase" },
     nav: { display:"flex", gap:2 },
-    main: { maxWidth:1280, margin:"0 auto", padding:"20px 16px" },
+    main: { maxWidth:1600, margin:"0 auto", padding:"20px 20px" },
     card: { background:"rgba(255,255,255,0.055)", border:"1px solid rgba(255,255,255,0.10)", borderRadius:14 },
     btn: { cursor:"pointer", border:"none", borderRadius:8, padding:"8px 18px", fontFamily:"'Georgia',serif", fontSize:14, transition:"all .15s" },
     chip: { display:"inline-flex", alignItems:"center", gap:4, padding:"3px 10px", borderRadius:20, fontSize:12, fontFamily:"'Georgia',serif" },
@@ -2791,7 +2869,7 @@ export default function App() {
           return <div style={{marginTop:4,display:"flex",gap:6,flexWrap:"wrap"}}>
             {tareasActivas.slice(0,3).map(f=>(
               <span key={f.tarea||f.id} style={{fontSize:10,color:"#5a9a7a",background:"rgba(61,122,82,0.12)",padding:"1px 6px",borderRadius:8,border:"1px solid rgba(61,122,82,0.2)"}}>
-                {f.tarea}: {f[est]}
+                {f.tarea}: {f[est]}{f.obs?<span style={{color:"#fde68a",marginLeft:3}}>· {f.obs}</span>:""}
               </span>
             ))}
           </div>;
@@ -3198,7 +3276,6 @@ export default function App() {
               </div>
               <button
                 onClick={()=>{
-                  const win = window.open("","_blank","width=900,height=700");
                   const zonaRows = [...MACROZONAS_BASE].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(z=>{
                     const d=getZD(z.id);
                     const allE=getAllElems(z.id);
@@ -3206,43 +3283,46 @@ export default function App() {
                     const pend=(d.tareas||[]).filter(t=>!t.completada).length;
                     const COLORES={bueno:"#166534",regular:"#92400e",critico:"#991b1b",mantenimiento:"#1e40af"};
                     const LABELS={bueno:"Bueno",regular:"Regular",critico:"Crítico",mantenimiento:"En Mantenimiento"};
-                    return `<tr>
-                      <td>${z.icono} ${z.nombre}</td>
-                      <td>${z.categoria}</td>
-                      <td style="color:${COLORES[d.estadoGeneral||"bueno"]};font-weight:600">${LABELS[d.estadoGeneral||"bueno"]}</td>
-                      <td style="text-align:center">${allE.length}</td>
-                      <td style="text-align:center;color:${crit>0?"#991b1b":"#166534"}">${crit>0?"🔴 "+crit:"—"}</td>
-                      <td>${d.ultimoMant||"—"}</td>
-                      <td>${d.proximoMant||"—"}</td>
-                      <td style="text-align:center;color:${pend>0?"#92400e":"#166534"}">${pend>0?"⚠️ "+pend:"✅ 0"}</td>
-                    </tr>`;
+                    return "<tr>"
+                      +"<td>"+z.icono+" "+z.nombre+"</td>"
+                      +"<td>"+z.categoria+"</td>"
+                      +"<td style='color:"+COLORES[d.estadoGeneral||"bueno"]+";font-weight:600'>"+LABELS[d.estadoGeneral||"bueno"]+"</td>"
+                      +"<td style='text-align:center'>"+allE.length+"</td>"
+                      +"<td style='text-align:center;color:"+(crit>0?"#991b1b":"#166534")+"'>"+(crit>0?"🔴 "+crit:"—")+"</td>"
+                      +"<td>"+(d.ultimoMant||"—")+"</td>"
+                      +"<td>"+(d.proximoMant||"—")+"</td>"
+                      +"<td style='text-align:center;color:"+(pend>0?"#92400e":"#166534")+"'>"+(pend>0?"⚠️ "+pend:"✅ 0")+"</td>"
+                      +"</tr>";
                   }).join("");
                   const estadoStats = Object.entries({bueno:{label:"Bueno",color:"#166534"},regular:{label:"Regular",color:"#92400e"},critico:{label:"Crítico",color:"#991b1b"},mantenimiento:{label:"En Mant.",color:"#1e40af"}}).map(([k,v])=>{
                     const c=MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral===k).length;
-                    return `<span style="color:${v.color};font-weight:700">${v.label}: ${c}</span>`;
+                    return "<span style='color:"+v.color+";font-weight:700'>"+v.label+": "+c+"</span>";
                   }).join(" &nbsp;·&nbsp; ");
-                  win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-                  <title>Reporte Áreas Verdes — Estadio Español</title>
-                  <style>
-                    body{font-family:Georgia,serif;color:#1a2e1a;padding:32px;max-width:900px;margin:0 auto}
-                    h1{font-size:22px;color:#0d3320;margin-bottom:4px}
-                    .sub{font-size:13px;color:#4a7a4a;margin-bottom:6px}
-                    .stats{font-size:13px;margin-bottom:20px;padding:10px 14px;background:#f0f7f0;border-radius:8px}
-                    table{width:100%;border-collapse:collapse;font-size:12px}
-                    th{text-align:left;padding:8px 10px;background:#1a4a2e;color:#fff;font-size:10px;letter-spacing:0.8px;text-transform:uppercase;white-space:nowrap}
-                    tr:nth-child(even){background:#f5fbf5}
-                    td{padding:7px 10px;border-bottom:1px solid #dce8dc;vertical-align:top}
-                    .pie{margin-top:24px;font-size:11px;color:#6b7280;border-top:1px solid #dce8dc;padding-top:12px;display:flex;justify-content:space-between}
-                    @media print{body{padding:16px}}
-                  </style></head><body>
-                  <h1>📋 Reporte General de Áreas Verdes — Estadio Español</h1>
-                  <div class="sub">Fecha del reporte: ${new Date(fechaReporte+"T12:00:00").toLocaleDateString("es-CL",{weekday:"long",year:"numeric",month:"long",day:"numeric"})} · Generado: ${new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"})}</div>
-                  <div class="stats">${estadoStats} &nbsp;·&nbsp; <b>Total zonas: ${MACROZONAS_BASE.length}</b></div>
-                  <table><thead><tr><th>Zona</th><th>Categoría</th><th>Estado</th><th>Elementos</th><th>Críticos</th><th>Últ. Mant.</th><th>Próx. Mant.</th><th>Tareas Pend.</th></tr></thead><tbody>${zonaRows}</tbody></table>
-                  <div class="pie"><span>Estadio Español de Las Condes · Departamento de Áreas Verdes</span><span>${new Date().getFullYear()}</span></div>
-                  <script>window.onload=()=>{window.print();}<\/script>
-                  </body></html>`);
-                  win.document.close();
+                  const html = "<!DOCTYPE html><html lang='es'><head><meta charset='UTF-8'>"
+                    +"<title>Reporte Áreas Verdes — Estadio Español</title>"
+                    +"<style>"
+                    +"body{font-family:Georgia,serif;color:#1a2e1a;padding:32px;max-width:900px;margin:0 auto}"
+                    +"h1{font-size:22px;color:#0d3320;margin-bottom:4px}"
+                    +".sub{font-size:13px;color:#4a7a4a;margin-bottom:6px}"
+                    +".stats{font-size:13px;margin-bottom:20px;padding:10px 14px;background:#f0f7f0;border-radius:8px}"
+                    +"table{width:100%;border-collapse:collapse;font-size:12px}"
+                    +"th{text-align:left;padding:8px 10px;background:#1a4a2e;color:#fff;font-size:10px;letter-spacing:0.8px;text-transform:uppercase;white-space:nowrap}"
+                    +"tr:nth-child(even){background:#f5fbf5}"
+                    +"td{padding:7px 10px;border-bottom:1px solid #dce8dc;vertical-align:top}"
+                    +".pie{margin-top:24px;font-size:11px;color:#6b7280;border-top:1px solid #dce8dc;padding-top:12px;display:flex;justify-content:space-between}"
+                    +"@media print{body{padding:16px}}"
+                    +"</style></head><body>"
+                    +"<h1>📋 Reporte General de Áreas Verdes — Estadio Español</h1>"
+                    +"<div class='sub'>Fecha del reporte: "+new Date(fechaReporte+"T12:00:00").toLocaleDateString("es-CL",{weekday:"long",year:"numeric",month:"long",day:"numeric"})+" · Generado: "+new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"})+"</div>"
+                    +"<div class='stats'>"+estadoStats+" &nbsp;·&nbsp; <b>Total zonas: "+MACROZONAS_BASE.length+"</b></div>"
+                    +"<table><thead><tr><th>Zona</th><th>Categoría</th><th>Estado</th><th>Elementos</th><th>Críticos</th><th>Últ. Mant.</th><th>Próx. Mant.</th><th>Tareas Pend.</th></tr></thead><tbody>"+zonaRows+"</tbody></table>"
+                    +"<div class='pie'><span>Estadio Español de Las Condes · Departamento de Áreas Verdes</span><span>"+new Date().getFullYear()+"</span></div>"
+                    +"</body></html>";
+                  const blob = new Blob([html], {type:"text/html;charset=utf-8"});
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url; a.target = "_blank"; a.click();
+                  setTimeout(()=>URL.revokeObjectURL(url), 10000);
                 }}
                 style={{...S.btn,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)",fontSize:13,flexShrink:0}}
               >🖨️ Imprimir Reporte</button>
