@@ -2782,6 +2782,20 @@ export default function App() {
           <span style={{...S.chip,background:est.bg,color:est.color,border:`1px solid ${est.color}35`,flexShrink:0,fontSize:11}}>{est.label}</span>
         </div>
         {e.edData.notas&&<div style={{fontSize:12,color:"#7aaa80",fontStyle:"italic"}}>{e.edData.notas}</div>}
+        {(()=>{
+          const frecs=getElemFrecs(zonaId,e.id,e.tipo,e.isCustom);
+          const mes=new Date().getMonth()+1;
+          const est=[12,1,2].includes(mes)?"verano":[3,4,5].includes(mes)?"otono":[6,7,8].includes(mes)?"invierno":"primavera";
+          const tareasActivas=frecs.filter(f=>f[est]&&f[est]!=="noaplica");
+          if(tareasActivas.length===0) return null;
+          return <div style={{marginTop:4,display:"flex",gap:6,flexWrap:"wrap"}}>
+            {tareasActivas.slice(0,3).map(f=>(
+              <span key={f.tarea||f.id} style={{fontSize:10,color:"#5a9a7a",background:"rgba(61,122,82,0.12)",padding:"1px 6px",borderRadius:8,border:"1px solid rgba(61,122,82,0.2)"}}>
+                {f.tarea}: {f[est]}
+              </span>
+            ))}
+          </div>;
+        })()}
         {editElem?.eid===e.id&&(
           <div style={{marginTop:12,borderTop:"1px solid rgba(255,255,255,0.08)",paddingTop:12}} onClick={ev=>ev.stopPropagation()}>
             <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:8,marginBottom:10}}>
@@ -3018,6 +3032,12 @@ export default function App() {
                         const subMeta=CATEGORIAS_ELEM[subKey];
                         const subElems=vegeElems.filter(e=>e.tipo===subKey);
                         if(subElems.length===0) return null;
+                        // Solo mostrar si al menos un elemento tiene frecuencias definidas
+                        const tieneFrecs = subElems.some(e=>{
+                          const frecs = getElemFrecs(zonaId, e.id, e.tipo, e.isCustom);
+                          return frecs && frecs.length > 0;
+                        });
+                        if(!tieneFrecs) return null;
                         return (
                           <div key={subKey} style={{marginBottom:18,paddingLeft:14,borderLeft:`2px solid ${subMeta.color}30`}}>
                             <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10}}>
@@ -3038,6 +3058,8 @@ export default function App() {
                   const tipoMeta=CATEGORIAS_ELEM[tipoKey];
                   const elems=getAllElems(zonaId).filter(e=>e.tipo===tipoKey);
                   if(elems.length===0) return null;
+                  const tieneFrecs2=elems.some(e=>{const f=getElemFrecs(zonaId,e.id,e.tipo,e.isCustom);return f&&f.length>0;});
+                  if(!tieneFrecs2) return null;
                   return (
                     <div key={tipoKey} style={{marginBottom:22}}>
                       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
@@ -3216,9 +3238,7 @@ export default function App() {
                   <h1>📋 Reporte General de Áreas Verdes — Estadio Español</h1>
                   <div class="sub">Fecha del reporte: ${new Date(fechaReporte+"T12:00:00").toLocaleDateString("es-CL",{weekday:"long",year:"numeric",month:"long",day:"numeric"})} · Generado: ${new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"})}</div>
                   <div class="stats">${estadoStats} &nbsp;·&nbsp; <b>Total zonas: ${MACROZONAS_BASE.length}</b></div>
-                  ${noActivity
-                    ? "<p style=\'color:#4a7a4a;text-align:center;padding:20px\'>Sin actividad registrada para esta fecha.</p>"
-                    : "<table><thead><tr><th>Tarea / Elemento</th><th>Estado</th><th>Responsable</th><th>Observaci\u00f3n</th></tr></thead><tbody>" + zonaRows + "</tbody></table>"}
+                  <table><thead><tr><th>Zona</th><th>Categoría</th><th>Estado</th><th>Elementos</th><th>Críticos</th><th>Últ. Mant.</th><th>Próx. Mant.</th><th>Tareas Pend.</th></tr></thead><tbody>${zonaRows}</tbody></table>
                   <div class="pie"><span>Estadio Español de Las Condes · Departamento de Áreas Verdes</span><span>${new Date().getFullYear()}</span></div>
                   <script>window.onload=()=>{window.print();}<\/script>
                   </body></html>`);
@@ -3355,7 +3375,7 @@ export default function App() {
 
         {/* PROGRAMACIÓN */}
         {vista==="programacion"&&(
-          <ProgramacionDiaria S={S} zonas={zonas} data={data} personal={personal} getZD={getZD} getAllElems={getAllElems} MACROZONAS_BASE={MACROZONAS_BASE} tareas={tareasProg} setTareas={setTareasProg}
+          <ProgramacionDiaria key="prog" S={S} zonas={zonas} data={data} personal={personal} getZD={getZD} getAllElems={getAllElems} MACROZONAS_BASE={MACROZONAS_BASE} tareas={tareasProg} setTareas={setTareasProg}
             tareasZonaHoy={(tareasProg[new Date().toISOString().slice(0,10)]||[]).filter(t=>t.origenZona&&t.estado==="por_designar").length}
           />
         )}
