@@ -1,0 +1,35 @@
+<svg width="512" height="512" viewBox="0 0 680 680" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>Gestión Áreas Verdes — Estadio Español</title>
+  <circle cx="340" cy="340" r="310" fill="#0d2e18"/>
+  <circle cx="340" cy="340" r="302" fill="none" stroke="#4a9a64" stroke-width="6"/>
+  <circle cx="340" cy="340" r="290" fill="none" stroke="#2a6a42" stroke-width="1.5"/>
+  <!-- Copa oscura base -->
+  <ellipse cx="340" cy="218" rx="88" ry="74" fill="#22c55e"/>
+  <ellipse cx="284" cy="242" rx="64" ry="55" fill="#22c55e"/>
+  <ellipse cx="396" cy="242" rx="64" ry="55" fill="#22c55e"/>
+  <!-- Copa clara -->
+  <ellipse cx="340" cy="204" rx="73" ry="62" fill="#4ade80"/>
+  <ellipse cx="292" cy="226" rx="53" ry="46" fill="#4ade80"/>
+  <ellipse cx="388" cy="226" rx="53" ry="46" fill="#4ade80"/>
+  <ellipse cx="340" cy="194" rx="52" ry="44" fill="#86efac" opacity="0.5"/>
+  <!-- Tronco -->
+  <rect x="329" y="284" width="22" height="54" rx="4" fill="#86efac"/>
+  <!-- Raíces -->
+  <path d="M329 334 Q308 346 292 350" fill="none" stroke="#86efac" stroke-width="3" stroke-linecap="round"/>
+  <path d="M351 334 Q372 346 388 350" fill="none" stroke="#86efac" stroke-width="3" stroke-linecap="round"/>
+  <path d="M340 336 Q340 350 340 356"  fill="none" stroke="#86efac" stroke-width="3" stroke-linecap="round"/>
+  <!-- Línea superior -->
+  <line x1="145" y1="378" x2="535" y2="378" stroke="#4a9a64" stroke-width="1.5"/>
+  <circle cx="137" cy="378" r="3" fill="#4a9a64"/>
+  <circle cx="543" cy="378" r="3" fill="#4a9a64"/>
+  <!-- Textos -->
+  <text x="340" y="418" fill="#ffffff" font-family="Georgia,serif" font-size="33" font-weight="500" text-anchor="middle" letter-spacing="2">GESTIÓN</text>
+  <text x="340" y="456" fill="#4ade80" font-family="Georgia,serif" font-size="27" font-weight="500" text-anchor="middle" letter-spacing="1">ÁREAS VERDES</text>
+  <line x1="175" y1="470" x2="505" y2="470" stroke="#4a9a64" stroke-width="1.5"/>
+  <text x="340" y="502" fill="#86efac" font-family="Georgia,serif" font-size="18" text-anchor="middle" letter-spacing="3">ESTADIO ESPAÑOL</text>
+  <text x="340" y="526" fill="#86efac" font-family="Georgia,serif" font-size="12" text-anchor="middle" letter-spacing="5">LAS CONDES</text>
+  <line x1="218" y1="540" x2="462" y2="540" stroke="#4a9a64" stroke-width="1.5"/>
+  <circle cx="340" cy="558" r="3" fill="#4a9a64"/>
+  <circle cx="323" cy="556" r="2" fill="#4a9a64"/>
+  <circle cx="357" cy="556" r="2" fill="#4a9a64"/>
+</svg>
