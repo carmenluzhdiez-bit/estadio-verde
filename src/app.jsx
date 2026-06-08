@@ -2237,10 +2237,10 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
         <div style={{fontFamily:"'Playfair Display',serif",fontSize:13,fontWeight:700,color:"#a0d8b0"}}>📅 Frecuencias de Mantención</div>
         <div style={{fontSize:11,color:"#5a8a6a"}}>
           Estación actual: <b style={{color:ESTACIONES[estActual].color}}>{ESTACIONES[estActual].icon} {ESTACIONES[estActual].label}</b>
-          <span style={{marginLeft:10,color:"#ef4444"}}>■</span><span style={{color:"#5a6a5a"}}> vencida </span>
-          <span style={{color:"#f59e0b"}}>■</span><span style={{color:"#5a6a5a"}}> ≤7d </span>
-          <span style={{color:"#fcd34d"}}>■</span><span style={{color:"#5a6a5a"}}> ≤30d </span>
-          <span style={{color:"#22c55e"}}>■</span><span style={{color:"#5a6a5a"}}> ok</span>
+          <span style={{marginLeft:8,color:"#ef4444",fontSize:10}}>■ vencida</span>
+          <span style={{marginLeft:6,color:"#f59e0b",fontSize:10}}>■ ≤7d</span>
+          <span style={{marginLeft:6,color:"#fcd34d",fontSize:10}}>■ ≤30d</span>
+          <span style={{marginLeft:6,color:"#22c55e",fontSize:10}}>■ ok</span>
         </div>
       </div>
 
@@ -2256,7 +2256,7 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
           const diasColor = prox===null?"#5a8a7a":prox.diff<0?"#ef4444":prox.diff<=7?"#f59e0b":prox.diff<=30?"#fcd34d":"#22c55e";
           const diasLabel = prox===null?"—":prox.diff===0?"Hoy":prox.diff<0?`${Math.abs(prox.diff)}d atrás`:`${prox.diff}d`;
           return (
-            <div key={idx} style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:10,padding:"12px 14px",borderLeft:`3px solid ${prox&&prox.diff<0?"#ef4444":prox&&prox.diff<=7?"#f59e0b":"rgba(61,122,82,0.4)"}`}}>
+            <div key={idx} style={{background:"rgba(255,255,255,0.04)",border:`1px solid ${prox&&prox.diff<0?"rgba(239,68,68,0.3)":prox&&prox.diff<=7?"rgba(245,158,11,0.3)":"rgba(255,255,255,0.08)"}`,borderRadius:10,padding:"12px 14px",borderLeft:`3px solid ${prox&&prox.diff<0?"#ef4444":prox&&prox.diff<=7?"#f59e0b":"rgba(61,122,82,0.4)"}`}}>
               {/* Fila 1: Nombre tarea + badge días + botón eliminar */}
               <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:10}}>
                 <div style={{flex:1}}>
@@ -3229,13 +3229,27 @@ export default function App() {
               <div className="ein">
                 {(zd.historial||[]).length===0?<div style={{textAlign:"center",color:"#4a8a5a",padding:40,fontSize:15}}>Sin registros aún.</div>:(
                   <div style={{display:"flex",flexDirection:"column",gap:7}}>
+                    {rolLogueado==="jefa"&&(
+                      <div style={{display:"flex",justifyContent:"flex-end",marginBottom:8}}>
+                        <button onClick={()=>{if(window.confirm("¿Borrar todo el historial de esta zona?"))updateZona(zonaId,{historial:[]});}}
+                          style={{...S.btn,background:"rgba(239,68,68,0.12)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.25)",fontSize:12,padding:"5px 12px"}}>
+                          🗑 Borrar todo el historial
+                        </button>
+                      </div>
+                    )}
                     {(zd.historial||[]).map((h,i)=>(
                       <div key={i} style={{...S.card,padding:"11px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
                         <div style={{display:"flex",alignItems:"center",gap:10}}>
                           <span style={{fontSize:16,flexShrink:0}}>📌</span>
                           <span style={{fontSize:14}}>{h.txt}</span>
                         </div>
-                        <div style={{fontSize:11,color:"#4a8a5a",whiteSpace:"nowrap"}}>{h.fecha} {h.hora}</div>
+                        <div style={{display:"flex",alignItems:"center",gap:8}}>
+                          <div style={{fontSize:11,color:"#4a8a5a",whiteSpace:"nowrap"}}>{h.fecha} {h.hora}</div>
+                          {rolLogueado==="jefa"&&(
+                            <button onClick={()=>updateZona(zonaId,{historial:(zd.historial||[]).filter((_,j)=>j!==i)})}
+                              style={{background:"transparent",border:"none",color:"#7a5a5a",cursor:"pointer",fontSize:13,padding:"2px 4px",flexShrink:0}}>🗑</button>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
