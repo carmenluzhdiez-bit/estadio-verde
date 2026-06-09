@@ -3079,48 +3079,127 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
       </div>
 
       {tab==="ficha"&&(
-        <div className="ein" style={{...S.card,padding:22}}>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
-            {[["Nombre completo","nombre","text"],["RUT","rut","text"],["Teléfono","telefono","tel"],["Email","email","email"],["Fecha de ingreso","fechaIngreso","date"]].map(([lbl,key,type])=>(
-              <div key={key}>
-                <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>{lbl.toUpperCase()}</label>
-                <input type={type} style={S.input} value={t[key]||""} onChange={e=>onUpdate({[key]:e.target.value})}/>
+        <div className="ein">
+          {/* ── SECCIÓN 1: DATOS PERSONALES ── */}
+          <div style={{...S.card,padding:18,marginBottom:12}}>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:12,color:"#a0d8b0",borderBottom:"1px solid rgba(255,255,255,0.08)",paddingBottom:8}}>👤 Datos Personales</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+              <div style={{gridColumn:"1/-1"}}>
+                <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>NOMBRE COMPLETO</label>
+                <input style={S.input} value={t.nombre||""} onChange={e=>onUpdate({nombre:e.target.value})}/>
               </div>
-            ))}
-            {/* PIN en fila propia al final */}
-            <div style={{gridColumn:"1/-1",background:"rgba(61,122,82,0.08)",border:"1px solid rgba(61,122,82,0.2)",borderRadius:10,padding:"12px 14px"}}>
-              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:6,letterSpacing:"0.5px"}}>🔐 PIN DE ACCESO (4 DÍGITOS)</label>
-              <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
-                <input type="password" maxLength={4} placeholder="••••"
-                  style={{...S.input,maxWidth:140,fontSize:20,letterSpacing:"0.5em",textAlign:"center"}}
-                  value={t.pin||""} onChange={e=>onUpdate({pin:e.target.value})}/>
-                <div style={{fontSize:12,color:"#5a8a6a"}}>El trabajador usa este PIN para acceder a sus tareas en 🌿 Mi Turno</div>
-              </div>
-            </div>
-            <div>
-              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>CARGO</label>
-              <select style={S.input} value={t.cargo||""} onChange={e=>onUpdate({cargo:e.target.value})}>
-                <option value="">Seleccionar...</option>
-                {CARGOS.map(c=><option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>MACROZONA ASIGNADA</label>
-              <select style={S.input} value={t.zona||""} onChange={e=>onUpdate({zona:e.target.value})}>
-                <option value="">Sin zona</option>
-                {[...MACROZONAS_BASE].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(z=><option key={z.id} value={z.nombre}>{z.icono} {z.nombre}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>TIPO DE CONTRATO</label>
-              <select style={S.input} value={t.contrato||"indefinido"} onChange={e=>onUpdate({contrato:e.target.value})}>
-                {CONTRATOS.map(c=><option key={c} value={c}>{c}</option>)}
-              </select>
+              <div><label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>RUT</label><input style={S.input} value={t.rut||""} onChange={e=>onUpdate({rut:e.target.value})}/></div>
+              <div><label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>FECHA DE NACIMIENTO</label><input type="date" style={S.input} value={t.fechaNacimiento||""} onChange={e=>onUpdate({fechaNacimiento:e.target.value})}/></div>
+              <div><label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>NACIONALIDAD</label><input style={S.input} value={t.nacionalidad||""} onChange={e=>onUpdate({nacionalidad:e.target.value})} placeholder="Chileno/a, Peruano/a..."/></div>
+              <div><label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>TELÉFONO / CELULAR</label><input type="tel" style={S.input} value={t.telefono||""} onChange={e=>onUpdate({telefono:e.target.value})}/></div>
+              <div><label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>EMAIL</label><input type="email" style={S.input} value={t.email||""} onChange={e=>onUpdate({email:e.target.value})}/></div>
+              <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>DIRECCIÓN</label><input style={S.input} value={t.direccion||""} onChange={e=>onUpdate({direccion:e.target.value})} placeholder="Calle, número, comuna..."/></div>
             </div>
           </div>
-          <div>
-            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>OBSERVACIONES</label>
-            <textarea rows={3} style={{...S.input,resize:"vertical"}} value={t.notas||""} onChange={e=>onUpdate({notas:e.target.value})}/>
+
+          {/* ── SECCIÓN 2: DATOS LABORALES ── */}
+          <div style={{...S.card,padding:18,marginBottom:12}}>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:12,color:"#a0d8b0",borderBottom:"1px solid rgba(255,255,255,0.08)",paddingBottom:8}}>💼 Datos Laborales</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+              <div>
+                <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>CARGO</label>
+                <select style={S.input} value={t.cargo||""} onChange={e=>onUpdate({cargo:e.target.value})}>
+                  <option value="">Seleccionar...</option>
+                  {CARGOS.map(c=><option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>TIPO DE CONTRATO</label>
+                <select style={S.input} value={t.contrato||"indefinido"} onChange={e=>onUpdate({contrato:e.target.value})}>
+                  {CONTRATOS.map(c=><option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div><label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>FECHA DE INGRESO</label><input type="date" style={S.input} value={t.fechaIngreso||""} onChange={e=>onUpdate({fechaIngreso:e.target.value})}/></div>
+              <div><label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>ESTADO</label>
+                <select style={S.input} value={t.estado||"vigente"} onChange={e=>onUpdate({estado:e.target.value})}>
+                  {["vigente","vacaciones","licencia","desvinculado"].map(s=><option key={s} value={s}>{s.charAt(0).toUpperCase()+s.slice(1)}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* ── SECCIÓN 3: HORARIO DE TRABAJO ── */}
+          <div style={{...S.card,padding:18,marginBottom:12}}>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:12,color:"#a0d8b0",borderBottom:"1px solid rgba(255,255,255,0.08)",paddingBottom:8}}>🕐 Horario de Trabajo</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+              <div><label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>DÍAS DE TRABAJO</label>
+                <input style={S.input} value={t.diasTrabajo||""} onChange={e=>onUpdate({diasTrabajo:e.target.value})} placeholder="Ej: Lun-Sáb"/>
+              </div>
+              <div><label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>HORAS / SEMANA</label>
+                <input type="number" style={S.input} value={t.horasSemana||""} onChange={e=>onUpdate({horasSemana:e.target.value})} placeholder="42"/>
+              </div>
+            </div>
+            {/* Tabla horaria */}
+            <div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,fontFamily:"'Georgia',serif",minWidth:380}}>
+                <thead>
+                  <tr style={{background:"rgba(61,122,82,0.15)"}}>
+                    {["Jornada","Entrada","Alm. inicio","Alm. término","Salida","Hrs/día"].map(h=>(
+                      <th key={h} style={{padding:"6px 8px",textAlign:"left",color:"#6aaa7a",fontSize:10,letterSpacing:"0.5px",fontWeight:600,whiteSpace:"nowrap"}}>{h.toUpperCase()}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {(t.horario||[{dias:"Lun · Mar · Mié",entrada:"",almInicio:"",almTermino:"",salida:"",hrsDia:""}]).map((fila,i)=>(
+                    <tr key={i} style={{borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                      {[["dias","Lun · Mar · Mié"],["entrada","08:00"],["almInicio","13:00"],["almTermino","14:00"],["salida","17:00"],["hrsDia","8"]].map(([k,ph])=>(
+                        <td key={k} style={{padding:"4px 4px"}}>
+                          <input style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:5,color:"#ede9e0",padding:"4px 6px",fontFamily:"'Georgia',serif",fontSize:11,width:"100%",outline:"none"}}
+                            value={fila[k]||""} placeholder={ph}
+                            onChange={e=>{const h=[...(t.horario||[{dias:"",entrada:"",almInicio:"",almTermino:"",salida:"",hrsDia:""}])];h[i]={...h[i],[k]:e.target.value};onUpdate({horario:h});}}/>
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{display:"flex",gap:8,marginTop:8}}>
+              <button onClick={()=>{const h=[...(t.horario||[])];h.push({dias:"",entrada:"",almInicio:"",almTermino:"",salida:"",hrsDia:""});onUpdate({horario:h});}}
+                style={{...S.btn,fontSize:11,padding:"4px 12px",background:"rgba(61,122,82,0.2)",color:"#80c890",border:"1px solid rgba(61,122,82,0.3)",cursor:"pointer"}}>+ Fila</button>
+              {(t.horario||[]).length>1&&(
+                <button onClick={()=>{const h=[...(t.horario||[])];h.pop();onUpdate({horario:h});}}
+                  style={{...S.btn,fontSize:11,padding:"4px 12px",background:"rgba(239,68,68,0.1)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.2)",cursor:"pointer"}}>- Fila</button>
+              )}
+            </div>
+          </div>
+
+          {/* ── SECCIÓN 4: UNIFORMES ── */}
+          <div style={{...S.card,padding:18,marginBottom:12}}>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:12,color:"#a0d8b0",borderBottom:"1px solid rgba(255,255,255,0.08)",paddingBottom:8}}>👕 Tallas de Uniformes</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
+              {[["Polera","tallaPolera"],["Polerón","tallaPoleron"],["Pantalón","tallaPantalon"],["Zapato","tallaZapato"]].map(([lbl,k])=>(
+                <div key={k}>
+                  <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>{lbl.toUpperCase()}</label>
+                  <input style={S.input} value={t[k]||""} onChange={e=>onUpdate({[k]:e.target.value})} placeholder="XS/S/M/L/XL o número"/>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ── SECCIÓN 5: ACCESO ── */}
+          <div style={{...S.card,padding:18,marginBottom:12}}>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:12,color:"#a0d8b0",borderBottom:"1px solid rgba(255,255,255,0.08)",paddingBottom:8}}>🔐 Acceso al Sistema</div>
+            <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+              <div style={{flex:"0 0 auto"}}>
+                <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>PIN (4 DÍGITOS)</label>
+                <input type="password" maxLength={4} placeholder="••••"
+                  style={{...S.input,maxWidth:120,fontSize:20,letterSpacing:"0.5em",textAlign:"center"}}
+                  value={t.pin||""} onChange={e=>onUpdate({pin:e.target.value})}/>
+              </div>
+              <div style={{fontSize:12,color:"#5a8a6a",flex:1}}>El trabajador usa este PIN para acceder a 🌿 Mi Turno y ver sus tareas del día.</div>
+            </div>
+          </div>
+
+          {/* ── SECCIÓN 6: OBSERVACIONES ── */}
+          <div style={{...S.card,padding:18}}>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:10,color:"#a0d8b0",borderBottom:"1px solid rgba(255,255,255,0.08)",paddingBottom:8}}>📝 Observaciones</div>
+            <textarea rows={3} style={{...S.input,resize:"vertical"}} value={t.notas||""} onChange={e=>onUpdate({notas:e.target.value})} placeholder="Anotaciones generales del trabajador..."/>
           </div>
         </div>
       )}
@@ -3363,6 +3442,98 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
   );
 }
 
+const PERSONAL_INICIAL = [
+  {
+    id: 1001,
+    nombre: "Carmen Luz Hermosilla Diez",
+    rut: "—",
+    cargo: "Jefa de Áreas Verdes",
+    contrato: "indefinido",
+    telefono: "",
+    email: "",
+    fechaIngreso: "",
+    zona: "",
+    notas: "Jornada: Lun 08-18h · Mar-Jue 09-18h · Vie 08-18h · 42h/semana",
+    pin: "",
+    eventos: [],
+  },
+  {
+    id: 1002, nombre:"Juber Leopoldo Juárez Burgos", rut:"22.052.327-6",
+    cargo:"Supervisor de Áreas Verdes", contrato:"indefinido",
+    telefono:"+56 9 5959 9594", email:"juberjuarez1234@gmail.com",
+    fechaIngreso:"2016-11-10", fechaNacimiento:"1987-08-31",
+    nacionalidad:"Peruano", direccion:"Pantaleón Vélez Silva 862, Independencia",
+    tallaPolera:"M", tallaPoleron:"M", tallaPantalon:"44", tallaZapato:"39",
+    diasTrabajo:"Lun-Sáb", horasSemana:42,
+    horario:[
+      {dias:"Lun · Mar · Mié",entrada:"08:00",almInicio:"13:00",almTermino:"14:00",salida:"17:00",hrsDia:"8"},
+      {dias:"Jue · Vie",entrada:"08:00",almInicio:"13:00",almTermino:"14:00",salida:"16:00",hrsDia:"7"},
+      {dias:"Sáb",entrada:"08:00",almInicio:"—",almTermino:"—",salida:"12:00",hrsDia:"4"},
+    ],
+    estado:"vigente", pin:"", notas:"", eventos:[],
+  },
+  {
+    id: 1003, nombre:"Andrés Astorga Guzmán", rut:"17.879.479-5",
+    cargo:"Jardinero", contrato:"indefinido",
+    telefono:"+56 9 7834 6909", email:"astorga.guzman@gmail.com",
+    fechaIngreso:"2023-09-25", fechaNacimiento:"1991-09-16",
+    nacionalidad:"Chileno", direccion:"San Agustín 9122, Pudahuel",
+    tallaPolera:"M", tallaPoleron:"M", tallaPantalon:"44", tallaZapato:"42",
+    diasTrabajo:"Lun-Sáb", horasSemana:42,
+    horario:[
+      {dias:"Lun · Mar · Mié",entrada:"08:00",almInicio:"13:00",almTermino:"14:00",salida:"17:00",hrsDia:"8"},
+      {dias:"Jue · Vie",entrada:"08:00",almInicio:"13:00",almTermino:"14:00",salida:"16:00",hrsDia:"7"},
+      {dias:"Sáb",entrada:"08:00",almInicio:"—",almTermino:"—",salida:"12:00",hrsDia:"4"},
+    ],
+    estado:"vigente", pin:"", notas:"Ingreso anterior: 30-08-2021", eventos:[],
+  },
+  {
+    id: 1004, nombre:"Osmar Bhalú Armijo Zúñiga", rut:"15.065.268-5",
+    cargo:"Jardinero", contrato:"indefinido",
+    telefono:"+56 9 6756 0322", email:"bhalu.armijo@gmail.com",
+    fechaIngreso:"2021-08-30", fechaNacimiento:"1996-11-22",
+    nacionalidad:"Chileno", direccion:"Mar de Drake 402, Pudahuel",
+    tallaPolera:"L", tallaPoleron:"L", tallaPantalon:"44", tallaZapato:"43",
+    diasTrabajo:"Lun-Sáb", horasSemana:42,
+    horario:[
+      {dias:"Lun · Mar · Mié",entrada:"08:00",almInicio:"13:00",almTermino:"14:00",salida:"17:00",hrsDia:"8"},
+      {dias:"Jue · Vie",entrada:"08:00",almInicio:"13:00",almTermino:"14:00",salida:"16:00",hrsDia:"7"},
+      {dias:"Sáb",entrada:"08:00",almInicio:"—",almTermino:"—",salida:"12:00",hrsDia:"4"},
+    ],
+    estado:"vigente", pin:"", notas:"", eventos:[],
+  },
+  {
+    id: 1005, nombre:"Sergio Esteban Peña Quintanilla", rut:"13.682.102-4",
+    cargo:"Jardinero", contrato:"indefinido",
+    telefono:"+56 9 7541 9199", email:"bandiiiixx@gmail.com",
+    fechaIngreso:"2015-06-04", fechaNacimiento:"1979-07-19",
+    nacionalidad:"Chileno", direccion:"Santa Teresa 1902, Estación Central",
+    tallaPolera:"M", tallaPoleron:"M", tallaPantalon:"48", tallaZapato:"40",
+    diasTrabajo:"Lun-Sáb", horasSemana:42,
+    horario:[
+      {dias:"Lun · Mar · Mié",entrada:"08:00",almInicio:"13:00",almTermino:"14:00",salida:"17:00",hrsDia:"8"},
+      {dias:"Jue · Vie",entrada:"08:00",almInicio:"13:00",almTermino:"14:00",salida:"16:00",hrsDia:"7"},
+      {dias:"Sáb",entrada:"08:00",almInicio:"—",almTermino:"—",salida:"12:00",hrsDia:"4"},
+    ],
+    estado:"vigente", pin:"", notas:"", eventos:[],
+  },
+  {
+    id: 1006, nombre:"Saúl Molina Escalera", rut:"28.444.223-7",
+    cargo:"Jardinero", contrato:"indefinido",
+    telefono:"+56 9 5922 6281", email:"marcelopolancopavez@gmail.com",
+    fechaIngreso:"2024-10-01", fechaNacimiento:"2002-06-29",
+    nacionalidad:"Boliviano", direccion:"Los Loros 6720, Cerro Navia",
+    tallaPolera:"XL", tallaPoleron:"L", tallaPantalon:"50", tallaZapato:"43",
+    diasTrabajo:"Lun-Sáb", horasSemana:42,
+    horario:[
+      {dias:"Lun · Mar · Mié",entrada:"08:00",almInicio:"13:00",almTermino:"14:00",salida:"17:00",hrsDia:"8"},
+      {dias:"Jue · Vie",entrada:"08:00",almInicio:"13:00",almTermino:"14:00",salida:"16:00",hrsDia:"7"},
+      {dias:"Sáb",entrada:"08:00",almInicio:"—",almTermino:"—",salida:"12:00",hrsDia:"4"},
+    ],
+    estado:"vigente", pin:"", notas:"", eventos:[],
+  },
+];
+
 export default function App() {
   const [data, setData] = useState(initData);
   const [zonas, setZonas] = useState(MACROZONAS_BASE);
@@ -3386,7 +3557,7 @@ export default function App() {
     d.setDate(d.getDate()+diff); return d.toISOString().slice(0,10);
   });
 
-  const initPersonal = () => { try { const s=localStorage.getItem("ev2-personal"); if(s) return JSON.parse(s); } catch {} return []; };
+  const initPersonal = () => { try { const s=localStorage.getItem("ev2-personal"); if(s){ const p=JSON.parse(s); if(p.length>0) return p; } } catch {} return PERSONAL_INICIAL; };
   const [personal, setPersonal] = useState(initPersonal);
 
   const initTareasProg = () => { try { const s=localStorage.getItem("ev2-prog"); return s?JSON.parse(s):{}; } catch { return {}; } };
