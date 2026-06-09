@@ -1260,6 +1260,13 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false }) 
                   style={{...S.btn,padding:"5px 12px",fontSize:12,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}}>
                   🖨️ Imprimir
                 </button>
+                {esJefa&&(
+                  <button
+                    onClick={()=>{if(window.confirm("¿Eliminar todas las tareas del día "+dia+"?"))setTareas(prev=>{const n={...prev};delete n[dia];return n;});}}
+                    style={{cursor:"pointer",border:"1px solid rgba(239,68,68,0.3)",borderRadius:8,padding:"5px 12px",fontSize:12,background:"rgba(239,68,68,0.12)",color:"#fca5a5",fontFamily:"'Georgia',serif"}}>
+                    🗑 Borrar día
+                  </button>
+                )}
               </div>
             </div>
             <div style={{background:"rgba(255,255,255,0.07)",borderRadius:4,height:6,marginBottom:12,overflow:"hidden"}}>
