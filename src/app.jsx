@@ -1091,7 +1091,7 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
 }
 
 // ─── HISTORIAL DE PROGRAMACIÓN ───────────────────────────────────────────────
-function HistorialProg({ tareas, MACROZONAS_BASE, S }) {
+function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false }) {
   const [filtroDia,    setFiltroDia]    = React.useState("");
   const [filtroEstado, setFiltroEstado] = React.useState("todos");
   const [filtroTarea,  setFiltroTarea]  = React.useState("");
@@ -1598,7 +1598,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   );
 }
 
-function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACROZONAS_BASE, tareas, setTareas, tareasZonaHoy=0 }) {
+function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACROZONAS_BASE, tareas, setTareas, tareasZonaHoy=0, esJefa=false }) {
   const hoy = new Date().toISOString().slice(0,10);
   const [fecha, setFecha] = React.useState(hoy);
   const [tabProg, setTabProg] = React.useState("programa");
@@ -1633,11 +1633,12 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
       const zdat = getZD(z.id);
       const elems = getAllElems(z.id);
       elems.forEach(e => {
-        const zdatElem = zdat.elementos?.[e.id];
-        const frecs = zdatElem?.frecuencias || (TAREAS_DEFAULT[e.tipo] ? TAREAS_DEFAULT[e.tipo].map(t=>({...t})) : []);
+        const zdatElem = zdat.elementos?.[e.id] || (zdat.elementosCustom||[]).find(x=>x.id===e.id);
+        const frecs = zdatElem?.frecuencias || [];
+        if(frecs.length===0) return; // solo proponer si hay frecuencias definidas manualmente
         frecs.forEach(f => {
           const frecVal = f[est];
-          if(!frecVal || frecVal==="noaplica") return;
+          if(!frecVal || frecVal==="noaplica" || frecVal==="unavez" || frecVal==="segunecesidad") return;
           const key = z.nombre+"_"+e.nombre+"_"+f.tarea;
           if(existentes.includes(key)) return;
           propuestas.push({ id: Date.now()+Math.random(), fecha, zona:z.nombre, elemento:e.nombre, tarea:f.tarea, responsable:"", estado:"por_designar", notas:f.obs||"", frecuencia:frecVal, estacion:est, auto:true });
@@ -1704,7 +1705,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
 
       {/* ── HISTORIAL ── */}
       {tabProg==="historial" && (
-        <HistorialProg tareas={tareas} MACROZONAS_BASE={MACROZONAS_BASE} S={S}/>
+        <HistorialProg tareas={tareas} setTareas={setTareas} MACROZONAS_BASE={MACROZONAS_BASE} S={S} esJefa={esJefa}/>
       )}
 
       {/* ── PROGRAMAR ── */}
@@ -2194,6 +2195,689 @@ function VistaDesignacion({ S, tareasProg, setTareasProg, personal, MACROZONAS_B
     </div>
   );
 }
+
+// ─── GESTIÓN DE RECURSOS (BODEGA) ────────────────────────────────────────────
+function GestionRecursos({ zonaId, S, personal, recursos, setRecursos, esJefa }) {
+  const [subTab, setSubTab] = React.useState("maquinaria");
+  const [showForm, setShowForm] = React.useState(false);
+  const [editId, setEditId] = React.useState(null);
+  const [showMovimiento, setShowMovimiento] = React.useState(null); // id de material
+  const [movForm, setMovForm] = React.useState({tipo:"entrada",cantidad:"",responsable:"",motivo:"",fecha:new Date().toISOString().slice(0,10)});
+
+  const maquinaria  = recursos.maquinaria  || [];
+  const herramientas= recursos.herramientas|| [];
+  const materiales  = recursos.materiales  || [];
+
+  const set = (key, arr) => setRecursos({...recursos,[key]:arr});
+
+  // ── MAQUINARIA ──────────────────────────────────────────────────────────────
+  const ESTADOS_MAQ = {
+    operativo:    {label:"Operativo",      color:"#22c55e", bg:"rgba(34,197,94,0.12)"},
+    mantencion:   {label:"En Mantención",  color:"#f59e0b", bg:"rgba(245,158,11,0.12)"},
+    fuera:        {label:"Fuera de Servicio",color:"#ef4444",bg:"rgba(239,68,68,0.12)"},
+  };
+  const emptyMaq = {nombre:"",modelo:"",numeroSerie:"",estado:"operativo",ultimoServicio:"",proximoServicio:"",operador:"",horasUso:0,nivelAceite:"ok",filtroAire:"ok",filtroAceite:"ok",correa:"ok",obs:"",revisiones:[],reparaciones:[]};
+  const [maqForm, setMaqForm] = React.useState(emptyMaq);
+
+  const saveMaq = () => {
+    if(!maqForm.nombre.trim()) return;
+    if(editId) {
+      set("maquinaria", maquinaria.map(m=>m.id===editId?{...maqForm,id:editId}:m));
+    } else {
+      set("maquinaria", [...maquinaria,{...maqForm,id:Date.now()}]);
+    }
+    setMaqForm(emptyMaq); setShowForm(false); setEditId(null);
+  };
+
+  // ── HERRAMIENTAS ────────────────────────────────────────────────────────────
+  const emptyHerr = {nombre:"",cantidad:1,disponible:1,estado:"bueno",ubicacion:"",obs:"",prestamos:[],mantenimientos:[],reparaciones:[]};
+  const [herrForm, setHerrForm] = React.useState(emptyHerr);
+  const [showPrestamo, setShowPrestamo] = React.useState(null);
+  const [prestForm, setPrestForm] = React.useState({responsable:"",fecha:new Date().toISOString().slice(0,10),fechaDevolucion:"",obs:""});
+  const [showRevision, setShowRevision] = React.useState(null);
+  const [showReparacion, setShowReparacion] = React.useState(null);
+  const [showMantHerr, setShowMantHerr] = React.useState(null);
+  const [showTareasMat, setShowTareasMat] = React.useState(null);
+  const [revForm, setRevForm] = React.useState({fecha:new Date().toISOString().slice(0,10),horasUso:"",nivelAceite:"ok",filtroAire:"ok",filtroAceite:"ok",correa:"ok",responsable:"",obs:""});
+  const [repForm, setRepForm] = React.useState({fecha:new Date().toISOString().slice(0,10),descripcion:"",responsable:"",costo:"",estado:"pendiente"});
+  const [mantHerrForm, setMantHerrForm] = React.useState({fecha:new Date().toISOString().slice(0,10),tipo:"Afilado",responsable:"",obs:""});
+  const [tareaMatForm, setTareaMatForm] = React.useState({descripcion:"",responsable:"",fechaLimite:"",completada:false});
+  const ESTADO_REV = {ok:{label:"OK",color:"#22c55e"},bajo:{label:"Bajo",color:"#f59e0b"},critico:{label:"Crítico",color:"#ef4444"},cambiar:{label:"Cambiar",color:"#ef4444"}};
+  const TIPO_MANT_HERR = ["Afilado","Limpieza","Engrase","Reemplazo pieza","Revisión general","Otro"];
+
+  const saveHerr = () => {
+    if(!herrForm.nombre.trim()) return;
+    if(editId) {
+      set("herramientas", herramientas.map(h=>h.id===editId?{...herrForm,id:editId,prestamos:herramientas.find(x=>x.id===editId)?.prestamos||[]}:h));
+    } else {
+      set("herramientas", [...herramientas,{...herrForm,id:Date.now(),prestamos:[]}]);
+    }
+    setHerrForm(emptyHerr); setShowForm(false); setEditId(null);
+  };
+
+  const registrarPrestamo = (hid) => {
+    if(!prestForm.responsable.trim()) return;
+    const arr = herramientas.map(h=>h.id===hid?{...h,prestamos:[...(h.prestamos||[]),{...prestForm,id:Date.now(),devuelta:false}]}:h);
+    set("herramientas",arr); setShowPrestamo(null); setPrestForm({responsable:"",fecha:new Date().toISOString().slice(0,10),fechaDevolucion:"",obs:""});
+  };
+  const marcarDevuelta = (hid,pid) => {
+    const arr = herramientas.map(h=>h.id===hid?{...h,prestamos:(h.prestamos||[]).map(p=>p.id===pid?{...p,devuelta:true,fechaDevolucion:new Date().toISOString().slice(0,10)}:p)}:h);
+    set("herramientas",arr);
+  };
+
+  // ── MATERIALES ──────────────────────────────────────────────────────────────
+  const UNIDADES = ["kg","g","L","ml","sacos","unidades","rollos","metros","m²","cajas","bolsas"];
+  const emptyMat = {nombre:"",unidad:"kg",stockActual:0,stockMinimo:0,obs:"",movimientos:[],tareas:[]};
+  const [matForm, setMatForm] = React.useState(emptyMat);
+
+  const saveMat = () => {
+    if(!matForm.nombre.trim()) return;
+    if(editId) {
+      set("materiales", materiales.map(m=>m.id===editId?{...matForm,id:editId,movimientos:materiales.find(x=>x.id===editId)?.movimientos||[]}:m));
+    } else {
+      set("materiales", [...materiales,{...matForm,id:Date.now(),movimientos:[]}]);
+    }
+    setMatForm(emptyMat); setShowForm(false); setEditId(null);
+  };
+
+  const registrarMovimiento = (mid) => {
+    if(!movForm.cantidad||!movForm.responsable) return;
+    const mat = materiales.find(m=>m.id===mid);
+    const delta = movForm.tipo==="entrada" ? Number(movForm.cantidad) : -Number(movForm.cantidad);
+    const nuevoStock = Math.max(0, (mat.stockActual||0)+delta);
+    const arr = materiales.map(m=>m.id===mid?{...m,stockActual:nuevoStock,movimientos:[{...movForm,id:Date.now(),delta},...(m.movimientos||[])].slice(0,50)}:m);
+    set("materiales",arr); setShowMovimiento(null); setMovForm({tipo:"entrada",cantidad:"",responsable:"",motivo:"",fecha:new Date().toISOString().slice(0,10)});
+  };
+
+  const listaPersonal = [...personal].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+  const inputSt = {background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:7,color:"#ede9e0",padding:"7px 10px",fontFamily:"'Georgia',serif",fontSize:13,width:"100%",outline:"none"};
+  const labelSt = {fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
+
+  return (
+    <div className="ein">
+      {/* Sub-pestañas */}
+      <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
+        {[["maquinaria","🚜 Maquinaria"],["herramientas","🔧 Herramientas"],["materiales","📦 Materiales"]].map(([t,l])=>(
+          <button key={t} className={`tab${subTab===t?" on":""}`} onClick={()=>{setSubTab(t);setShowForm(false);setEditId(null);}}>{l}</button>
+        ))}
+      </div>
+
+      {/* ══ MAQUINARIA ══ */}
+      {subTab==="maquinaria"&&(
+        <div className="ein">
+          {esJefa&&!showForm&&(
+            <button onClick={()=>{setShowForm(true);setMaqForm(emptyMaq);setEditId(null);}} style={{...S.btn,background:"rgba(61,122,82,0.25)",color:"#90d0a0",border:"1px solid rgba(61,122,82,0.35)",marginBottom:14}}>
+              ➕ Agregar equipo
+            </button>
+          )}
+          {showForm&&subTab==="maquinaria"&&(
+            <div style={{...S.card,padding:18,marginBottom:16}} className="ein">
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:14,color:"#a0d8b0"}}>{editId?"Editar":"Nuevo"} Equipo</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                {[["Nombre del equipo","nombre"],["Modelo / Marca","modelo"],["Operador asignado","operador"]].map(([lbl,k])=>(
+                  <div key={k} style={{gridColumn:k==="nombre"?"1/-1":"auto"}}>
+                    <label style={labelSt}>{lbl}</label>
+                    {k==="operador"
+                      ? <select style={inputSt} value={maqForm[k]} onChange={e=>setMaqForm(p=>({...p,[k]:e.target.value}))}>
+                          <option value="">Sin asignar</option>
+                          {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                        </select>
+                      : <input style={inputSt} value={maqForm[k]} onChange={e=>setMaqForm(p=>({...p,[k]:e.target.value}))}/>
+                    }
+                  </div>
+                ))}
+                <div>
+                  <label style={labelSt}>Estado</label>
+                  <select style={inputSt} value={maqForm.estado} onChange={e=>setMaqForm(p=>({...p,estado:e.target.value}))}>
+                    {Object.entries(ESTADOS_MAQ).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={labelSt}>Último servicio</label>
+                  <input type="date" style={inputSt} value={maqForm.ultimoServicio} onChange={e=>setMaqForm(p=>({...p,ultimoServicio:e.target.value}))}/>
+                </div>
+                <div>
+                  <label style={labelSt}>Próximo servicio</label>
+                  <input type="date" style={inputSt} value={maqForm.proximoServicio} onChange={e=>setMaqForm(p=>({...p,proximoServicio:e.target.value}))}/>
+                </div>
+                <div style={{gridColumn:"1/-1"}}>
+                  <label style={labelSt}>Observaciones</label>
+                  <textarea rows={2} style={{...inputSt,resize:"vertical"}} value={maqForm.obs} onChange={e=>setMaqForm(p=>({...p,obs:e.target.value}))}/>
+                </div>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button className="btn-p" style={S.btn} onClick={saveMaq}>✓ Guardar</button>
+                <button className="btn-g" style={S.btn} onClick={()=>{setShowForm(false);setEditId(null);}}>Cancelar</button>
+              </div>
+            </div>
+          )}
+          {maquinaria.length===0&&!showForm&&(
+            <div style={{...S.card,padding:32,textAlign:"center",color:"#4a8a5a"}}>
+              <div style={{fontSize:32,marginBottom:8}}>🚜</div>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15}}>Sin equipos registrados</div>
+            </div>
+          )}
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {maquinaria.map(m=>{
+              const est=ESTADOS_MAQ[m.estado]||ESTADOS_MAQ.operativo;
+              const hoy=new Date(); hoy.setHours(12,0,0,0);
+              const proxServ=m.proximoServicio?new Date(m.proximoServicio+"T12:00:00"):null;
+              const diasServ=proxServ?Math.round((proxServ-hoy)/(24*60*60*1000)):null;
+              return (
+                <div key={m.id} style={{...S.card,padding:16,borderLeft:`3px solid ${diasServ!==null&&diasServ<=0?"#ef4444":diasServ!==null&&diasServ<=15?"#f59e0b":est.color}`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",gap:10,flexWrap:"wrap",marginBottom:8}}>
+                    <div>
+                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700}}>{m.nombre}</div>
+                      {m.modelo&&<div style={{fontSize:12,color:"#6aaa7a"}}>{m.modelo}</div>}
+                    </div>
+                    <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                      <span style={{fontSize:12,fontWeight:600,color:est.color,background:est.bg,padding:"3px 10px",borderRadius:12}}>{est.label}</span>
+                      {esJefa&&<button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>{setMaqForm({nombre:m.nombre,modelo:m.modelo||"",estado:m.estado,ultimoServicio:m.ultimoServicio||"",proximoServicio:m.proximoServicio||"",operador:m.operador||"",obs:m.obs||""});setEditId(m.id);setShowForm(true);}}>✏️</button>}
+                      {esJefa&&<button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>set("maquinaria",maquinaria.filter(x=>x.id!==m.id))}>🗑</button>}
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:12}}>
+                    {m.operador&&<span style={{color:"#7a9a8a"}}>👤 {m.operador}</span>}
+                    {m.ultimoServicio&&<span style={{color:"#5a8a6a"}}>🔧 Último: {m.ultimoServicio}</span>}
+                    {diasServ!==null&&(
+                      <span style={{color:diasServ<=0?"#ef4444":diasServ<=15?"#f59e0b":"#22c55e",fontWeight:600}}>
+                        📅 Próx. servicio: {m.proximoServicio} {diasServ<=0?`(⚠️ ${Math.abs(diasServ)}d vencido)`:diasServ<=15?`(${diasServ}d)`:""}
+                      </span>
+                    )}
+                  </div>
+                  {m.obs&&<div style={{fontSize:11,color:"#6aaa7a",marginTop:6,fontStyle:"italic"}}>{m.obs}</div>}
+                  {/* Revisiones y Reparaciones */}
+                  <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap"}}>
+                    <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)",cursor:"pointer"}}
+                      onClick={()=>{setShowRevision(m.id);setShowReparacion(null);setRevForm({fecha:new Date().toISOString().slice(0,10),horasUso:"",nivelAceite:"ok",filtroAire:"ok",filtroAceite:"ok",correa:"ok",responsable:"",obs:""});}}>
+                      🔍 Revisión
+                    </button>
+                    <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(245,158,11,0.15)",color:"#fcd34d",border:"1px solid rgba(245,158,11,0.3)",cursor:"pointer"}}
+                      onClick={()=>{setShowReparacion({tipo:"maquinaria",id:m.id});setShowRevision(null);setRepForm({fecha:new Date().toISOString().slice(0,10),descripcion:"",responsable:"",costo:"",estado:"pendiente"});}}>
+                      🔨 Reparación
+                    </button>
+                  </div>
+                  {/* Panel revisión inline */}
+                  {showRevision===m.id&&(
+                    <div style={{marginTop:10,background:"rgba(59,130,246,0.06)",border:"1px solid rgba(59,130,246,0.2)",borderRadius:10,padding:14}} className="ein">
+                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:13,fontWeight:700,marginBottom:10,color:"#93c5fd"}}>🔍 Nueva Revisión</div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
+                        <div><label style={labelSt}>Fecha</label><input type="date" style={inputSt} value={revForm.fecha} onChange={e=>setRevForm(p=>({...p,fecha:e.target.value}))}/></div>
+                        <div><label style={labelSt}>Horas de uso acumuladas</label><input type="number" min="0" style={inputSt} value={revForm.horasUso} onChange={e=>setRevForm(p=>({...p,horasUso:e.target.value}))} placeholder="0"/></div>
+                        <div><label style={labelSt}>Responsable</label>
+                          <select style={inputSt} value={revForm.responsable} onChange={e=>setRevForm(p=>({...p,responsable:e.target.value}))}>
+                            <option value="">Seleccionar...</option>
+                            {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                          </select>
+                        </div>
+                        {[["nivelAceite","🛢️ Nivel de aceite"],["filtroAire","💨 Filtro de aire"],["filtroAceite","🔩 Filtro de aceite"],["correa","⚙️ Correa / transmisión"]].map(([k,lbl])=>(
+                          <div key={k}>
+                            <label style={labelSt}>{lbl}</label>
+                            <select style={inputSt} value={revForm[k]} onChange={e=>setRevForm(p=>({...p,[k]:e.target.value}))}>
+                              {Object.entries(ESTADO_REV).map(([v,d])=><option key={v} value={v}>{d.label}</option>)}
+                            </select>
+                          </div>
+                        ))}
+                        <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observaciones</label><textarea rows={2} style={{...inputSt,resize:"vertical"}} value={revForm.obs} onChange={e=>setRevForm(p=>({...p,obs:e.target.value}))}/></div>
+                      </div>
+                      <div style={{display:"flex",gap:8}}>
+                        <button style={{...S.btn,background:"rgba(59,130,246,0.2)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)",cursor:"pointer"}} onClick={()=>{
+                          const rev={...revForm,id:Date.now()};
+                          set("maquinaria",maquinaria.map(x=>x.id===m.id?{...x,revisiones:[rev,...(x.revisiones||[])].slice(0,30),horasUso:revForm.horasUso||x.horasUso,nivelAceite:revForm.nivelAceite,filtroAire:revForm.filtroAire,filtroAceite:revForm.filtroAceite,correa:revForm.correa}:x));
+                          setShowRevision(null);
+                        }}>✓ Guardar revisión</button>
+                        <button className="btn-g" style={S.btn} onClick={()=>setShowRevision(null)}>Cancelar</button>
+                      </div>
+                      {/* Historial revisiones */}
+                      {(m.revisiones||[]).length>0&&(
+                        <div style={{marginTop:10,borderTop:"1px solid rgba(255,255,255,0.06)",paddingTop:8}}>
+                          <div style={{fontSize:10,color:"#5a8a6a",marginBottom:6,letterSpacing:"0.5px"}}>ÚLTIMAS REVISIONES</div>
+                          {(m.revisiones||[]).slice(0,3).map(r=>(
+                            <div key={r.id} style={{fontSize:11,padding:"5px 0",borderBottom:"1px solid rgba(255,255,255,0.04)",display:"flex",gap:8,flexWrap:"wrap"}}>
+                              <span style={{color:"#a0c8e0"}}>{r.fecha}</span>
+                              {r.horasUso&&<span style={{color:"#7aaa80"}}>⏱ {r.horasUso}h</span>}
+                              {[["nivelAceite","🛢️"],["filtroAire","💨"],["filtroAceite","🔩"],["correa","⚙️"]].map(([k,ico])=>(
+                                r[k]&&r[k]!=="ok"&&<span key={k} style={{color:ESTADO_REV[r[k]]?.color||"#f59e0b"}}>{ico} {ESTADO_REV[r[k]]?.label}</span>
+                              ))}
+                              {r.responsable&&<span style={{color:"#6a9a8a"}}>👤 {r.responsable}</span>}
+                              {r.obs&&<span style={{color:"#5a8a6a",fontStyle:"italic",width:"100%"}}>{r.obs}</span>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {/* Panel reparación inline */}
+                  {showReparacion?.tipo==="maquinaria"&&showReparacion?.id===m.id&&(
+                    <div style={{marginTop:10,background:"rgba(245,158,11,0.06)",border:"1px solid rgba(245,158,11,0.25)",borderRadius:10,padding:14}} className="ein">
+                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:13,fontWeight:700,marginBottom:10,color:"#fcd34d"}}>🔨 Reparación</div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
+                        <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Descripción del problema / trabajo</label><textarea rows={2} style={{...inputSt,resize:"vertical"}} value={repForm.descripcion} onChange={e=>setRepForm(p=>({...p,descripcion:e.target.value}))}/></div>
+                        <div><label style={labelSt}>Fecha</label><input type="date" style={inputSt} value={repForm.fecha} onChange={e=>setRepForm(p=>({...p,fecha:e.target.value}))}/></div>
+                        <div><label style={labelSt}>Responsable / Técnico</label><input style={inputSt} value={repForm.responsable} onChange={e=>setRepForm(p=>({...p,responsable:e.target.value}))} placeholder="Nombre o empresa..."/></div>
+                        <div><label style={labelSt}>Costo estimado ($)</label><input type="number" min="0" style={inputSt} value={repForm.costo} onChange={e=>setRepForm(p=>({...p,costo:e.target.value}))}/></div>
+                        <div><label style={labelSt}>Estado</label>
+                          <select style={inputSt} value={repForm.estado} onChange={e=>setRepForm(p=>({...p,estado:e.target.value}))}>
+                            {["pendiente","en curso","completada"].map(s=><option key={s} value={s}>{s.charAt(0).toUpperCase()+s.slice(1)}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      <div style={{display:"flex",gap:8}}>
+                        <button style={{...S.btn,background:"rgba(245,158,11,0.2)",color:"#fcd34d",border:"1px solid rgba(245,158,11,0.3)",cursor:"pointer"}} onClick={()=>{
+                          const rep={...repForm,id:Date.now()};
+                          set("maquinaria",maquinaria.map(x=>x.id===m.id?{...x,reparaciones:[rep,...(x.reparaciones||[])].slice(0,20)}:x));
+                          setShowReparacion(null);
+                        }}>✓ Registrar</button>
+                        <button className="btn-g" style={S.btn} onClick={()=>setShowReparacion(null)}>Cancelar</button>
+                      </div>
+                      {(m.reparaciones||[]).length>0&&(
+                        <div style={{marginTop:8,borderTop:"1px solid rgba(255,255,255,0.06)",paddingTop:8}}>
+                          {(m.reparaciones||[]).slice(0,3).map(r=>(
+                            <div key={r.id} style={{fontSize:11,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,0.04)",display:"flex",gap:8,flexWrap:"wrap"}}>
+                              <span style={{color:"#fcd34d"}}>{r.fecha}</span>
+                              <span style={{color:"#e0c080",flex:1}}>{r.descripcion}</span>
+                              <span style={{color:r.estado==="completada"?"#22c55e":r.estado==="en curso"?"#3b82f6":"#f59e0b"}}>{r.estado}</span>
+                              {r.costo&&<span style={{color:"#6aaa7a"}}>${r.costo}</span>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ══ HERRAMIENTAS ══ */}
+      {subTab==="herramientas"&&(
+        <div className="ein">
+          {esJefa&&!showForm&&!showPrestamo&&(
+            <button onClick={()=>{setShowForm(true);setHerrForm(emptyHerr);setEditId(null);}} style={{...S.btn,background:"rgba(61,122,82,0.25)",color:"#90d0a0",border:"1px solid rgba(61,122,82,0.35)",marginBottom:14}}>
+              ➕ Agregar herramienta
+            </button>
+          )}
+          {showForm&&subTab==="herramientas"&&(
+            <div style={{...S.card,padding:18,marginBottom:16}} className="ein">
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:14,color:"#a0d8b0"}}>{editId?"Editar":"Nueva"} Herramienta</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                <div style={{gridColumn:"1/-1"}}>
+                  <label style={labelSt}>Nombre</label>
+                  <input style={inputSt} value={herrForm.nombre} onChange={e=>setHerrForm(p=>({...p,nombre:e.target.value}))} placeholder="Ej: Pala ancha, Tijeras de poda..."/>
+                </div>
+                <div><label style={labelSt}>Cantidad total</label><input type="number" min="0" style={inputSt} value={herrForm.cantidad} onChange={e=>setHerrForm(p=>({...p,cantidad:Number(e.target.value)}))}/></div>
+                <div><label style={labelSt}>Disponible</label><input type="number" min="0" style={inputSt} value={herrForm.disponible} onChange={e=>setHerrForm(p=>({...p,disponible:Number(e.target.value)}))}/></div>
+                <div>
+                  <label style={labelSt}>Estado</label>
+                  <select style={inputSt} value={herrForm.estado} onChange={e=>setHerrForm(p=>({...p,estado:e.target.value}))}>
+                    {["bueno","regular","deteriorado","baja"].map(s=><option key={s} value={s}>{s.charAt(0).toUpperCase()+s.slice(1)}</option>)}
+                  </select>
+                </div>
+                <div><label style={labelSt}>Ubicación en bodega</label><input style={inputSt} value={herrForm.ubicacion} onChange={e=>setHerrForm(p=>({...p,ubicacion:e.target.value}))} placeholder="Ej: Estante A, Gancho 3..."/></div>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observaciones</label><textarea rows={2} style={{...inputSt,resize:"vertical"}} value={herrForm.obs} onChange={e=>setHerrForm(p=>({...p,obs:e.target.value}))}/></div>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button className="btn-p" style={S.btn} onClick={saveHerr}>✓ Guardar</button>
+                <button className="btn-g" style={S.btn} onClick={()=>{setShowForm(false);setEditId(null);}}>Cancelar</button>
+              </div>
+            </div>
+          )}
+          {showPrestamo&&(
+            <div style={{...S.card,padding:18,marginBottom:16,border:"1px solid rgba(59,130,246,0.3)"}} className="ein">
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,marginBottom:12,color:"#93c5fd"}}>🔧 Registrar Préstamo</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                <div><label style={labelSt}>Responsable</label>
+                  <select style={inputSt} value={prestForm.responsable} onChange={e=>setPrestForm(p=>({...p,responsable:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                  </select>
+                </div>
+                <div><label style={labelSt}>Fecha salida</label><input type="date" style={inputSt} value={prestForm.fecha} onChange={e=>setPrestForm(p=>({...p,fecha:e.target.value}))}/></div>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observaciones</label><input style={inputSt} value={prestForm.obs} onChange={e=>setPrestForm(p=>({...p,obs:e.target.value}))} placeholder="Para qué zona / trabajo..."/></div>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button style={{...S.btn,background:"rgba(59,130,246,0.2)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)",cursor:"pointer"}} onClick={()=>registrarPrestamo(showPrestamo)}>✓ Registrar</button>
+                <button className="btn-g" style={S.btn} onClick={()=>setShowPrestamo(null)}>Cancelar</button>
+              </div>
+            </div>
+          )}
+          {herramientas.length===0&&!showForm&&(
+            <div style={{...S.card,padding:32,textAlign:"center",color:"#4a8a5a"}}>
+              <div style={{fontSize:32,marginBottom:8}}>🔧</div>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15}}>Sin herramientas registradas</div>
+            </div>
+          )}
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {herramientas.map(h=>{
+              const ECOL={bueno:"#22c55e",regular:"#f59e0b",deteriorado:"#ef4444",baja:"#94a3b8"};
+              const prestActivos=(h.prestamos||[]).filter(p=>!p.devuelta);
+              return (
+                <div key={h.id} style={{...S.card,padding:16}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",gap:10,flexWrap:"wrap",marginBottom:8}}>
+                    <div>
+                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700}}>{h.nombre}</div>
+                      {h.ubicacion&&<div style={{fontSize:11,color:"#5a8a6a"}}>📍 {h.ubicacion}</div>}
+                    </div>
+                    <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                      <span style={{fontSize:12,color:ECOL[h.estado]||"#94a3b8",background:`${ECOL[h.estado]||"#94a3b8"}18`,padding:"3px 10px",borderRadius:12,fontWeight:600}}>
+                        {h.estado}
+                      </span>
+                      <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)",cursor:"pointer"}} onClick={()=>{setShowPrestamo(h.id);setShowForm(false);}}>📤 Préstamo</button>
+                      {esJefa&&<button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>{setHerrForm({nombre:h.nombre,cantidad:h.cantidad,disponible:h.disponible,estado:h.estado,ubicacion:h.ubicacion||"",obs:h.obs||""});setEditId(h.id);setShowForm(true);}}>✏️</button>}
+                      {esJefa&&<button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>set("herramientas",herramientas.filter(x=>x.id!==h.id))}>🗑</button>}
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:12,fontSize:12,flexWrap:"wrap"}}>
+                    <span style={{color:"#6aaa7a"}}>Total: <b>{h.cantidad}</b></span>
+                    <span style={{color:h.disponible<h.cantidad?"#f59e0b":"#22c55e"}}>Disponible: <b>{h.disponible}</b></span>
+                    {prestActivos.length>0&&<span style={{color:"#f59e0b"}}>📤 {prestActivos.length} en préstamo</span>}
+                  </div>
+                  {prestActivos.length>0&&(
+                    <div style={{marginTop:8,display:"flex",flexDirection:"column",gap:4}}>
+                      {prestActivos.map(p=>(
+                        <div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 10px",background:"rgba(245,158,11,0.08)",borderRadius:8,gap:8,flexWrap:"wrap"}}>
+                          <span style={{fontSize:12}}>👤 {p.responsable} · {p.fecha}{p.obs?" · "+p.obs:""}</span>
+                          <button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(34,197,94,0.15)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)",cursor:"pointer"}} onClick={()=>marcarDevuelta(h.id,p.id)}>✓ Devuelta</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {/* Botones mantenimiento y reparación */}
+                  <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap"}}>
+                    <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(34,197,94,0.12)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)",cursor:"pointer"}}
+                      onClick={()=>{setShowMantHerr(h.id);setShowReparacion(null);setMantHerrForm({fecha:new Date().toISOString().slice(0,10),tipo:"Afilado",responsable:"",obs:""});}}>
+                      🔧 Mantención
+                    </button>
+                    <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(245,158,11,0.12)",color:"#fcd34d",border:"1px solid rgba(245,158,11,0.25)",cursor:"pointer"}}
+                      onClick={()=>{setShowReparacion({tipo:"herramienta",id:h.id});setShowMantHerr(null);setRepForm({fecha:new Date().toISOString().slice(0,10),descripcion:"",responsable:"",costo:"",estado:"pendiente"});}}>
+                      🔨 Reparación
+                    </button>
+                  </div>
+                  {showMantHerr===h.id&&(
+                    <div style={{marginTop:10,background:"rgba(34,197,94,0.06)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:10,padding:14}} className="ein">
+                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:13,fontWeight:700,marginBottom:10,color:"#86efac"}}>🔧 Mantención</div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
+                        <div><label style={labelSt}>Tipo de mantención</label>
+                          <select style={inputSt} value={mantHerrForm.tipo} onChange={e=>setMantHerrForm(p=>({...p,tipo:e.target.value}))}>
+                            {TIPO_MANT_HERR.map(t=><option key={t} value={t}>{t}</option>)}
+                          </select>
+                        </div>
+                        <div><label style={labelSt}>Fecha</label><input type="date" style={inputSt} value={mantHerrForm.fecha} onChange={e=>setMantHerrForm(p=>({...p,fecha:e.target.value}))}/></div>
+                        <div><label style={labelSt}>Responsable</label>
+                          <select style={inputSt} value={mantHerrForm.responsable} onChange={e=>setMantHerrForm(p=>({...p,responsable:e.target.value}))}>
+                            <option value="">Seleccionar...</option>
+                            {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                          </select>
+                        </div>
+                        <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observaciones</label><input style={inputSt} value={mantHerrForm.obs} onChange={e=>setMantHerrForm(p=>({...p,obs:e.target.value}))}/></div>
+                      </div>
+                      <div style={{display:"flex",gap:8}}>
+                        <button style={{...S.btn,background:"rgba(34,197,94,0.2)",color:"#86efac",border:"1px solid rgba(34,197,94,0.3)",cursor:"pointer"}} onClick={()=>{
+                          const mant={...mantHerrForm,id:Date.now()};
+                          set("herramientas",herramientas.map(x=>x.id===h.id?{...x,mantenimientos:[mant,...(x.mantenimientos||[])].slice(0,20)}:x));
+                          setShowMantHerr(null);
+                        }}>✓ Registrar</button>
+                        <button className="btn-g" style={S.btn} onClick={()=>setShowMantHerr(null)}>Cancelar</button>
+                      </div>
+                      {(h.mantenimientos||[]).length>0&&(
+                        <div style={{marginTop:8,borderTop:"1px solid rgba(255,255,255,0.06)",paddingTop:8}}>
+                          {(h.mantenimientos||[]).slice(0,3).map(m=>(
+                            <div key={m.id} style={{fontSize:11,padding:"3px 0",borderBottom:"1px solid rgba(255,255,255,0.04)",display:"flex",gap:8,flexWrap:"wrap"}}>
+                              <span style={{color:"#86efac"}}>{m.fecha}</span>
+                              <span style={{color:"#a0c8a0"}}>{m.tipo}</span>
+                              {m.responsable&&<span style={{color:"#6a9a8a"}}>👤 {m.responsable}</span>}
+                              {m.obs&&<span style={{color:"#5a8a6a",fontStyle:"italic"}}>{m.obs}</span>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {showReparacion?.tipo==="herramienta"&&showReparacion?.id===h.id&&(
+                    <div style={{marginTop:10,background:"rgba(245,158,11,0.06)",border:"1px solid rgba(245,158,11,0.25)",borderRadius:10,padding:14}} className="ein">
+                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:13,fontWeight:700,marginBottom:10,color:"#fcd34d"}}>🔨 Reparación</div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
+                        <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Descripción</label><textarea rows={2} style={{...inputSt,resize:"vertical"}} value={repForm.descripcion} onChange={e=>setRepForm(p=>({...p,descripcion:e.target.value}))}/></div>
+                        <div><label style={labelSt}>Fecha</label><input type="date" style={inputSt} value={repForm.fecha} onChange={e=>setRepForm(p=>({...p,fecha:e.target.value}))}/></div>
+                        <div><label style={labelSt}>Responsable</label><input style={inputSt} value={repForm.responsable} onChange={e=>setRepForm(p=>({...p,responsable:e.target.value}))}/></div>
+                        <div><label style={labelSt}>Costo ($)</label><input type="number" min="0" style={inputSt} value={repForm.costo} onChange={e=>setRepForm(p=>({...p,costo:e.target.value}))}/></div>
+                        <div><label style={labelSt}>Estado</label>
+                          <select style={inputSt} value={repForm.estado} onChange={e=>setRepForm(p=>({...p,estado:e.target.value}))}>
+                            {["pendiente","en curso","completada"].map(s=><option key={s} value={s}>{s.charAt(0).toUpperCase()+s.slice(1)}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      <div style={{display:"flex",gap:8}}>
+                        <button style={{...S.btn,background:"rgba(245,158,11,0.2)",color:"#fcd34d",border:"1px solid rgba(245,158,11,0.3)",cursor:"pointer"}} onClick={()=>{
+                          set("herramientas",herramientas.map(x=>x.id===h.id?{...x,reparaciones:[{...repForm,id:Date.now()},...(x.reparaciones||[])].slice(0,20)}:x));
+                          setShowReparacion(null);
+                        }}>✓ Registrar</button>
+                        <button className="btn-g" style={S.btn} onClick={()=>setShowReparacion(null)}>Cancelar</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ══ MATERIALES ══ */}
+      {subTab==="materiales"&&(
+        <div className="ein">
+          {esJefa&&!showForm&&!showMovimiento&&(
+            <button onClick={()=>{setShowForm(true);setMatForm(emptyMat);setEditId(null);}} style={{...S.btn,background:"rgba(61,122,82,0.25)",color:"#90d0a0",border:"1px solid rgba(61,122,82,0.35)",marginBottom:14}}>
+              ➕ Agregar material/insumo
+            </button>
+          )}
+          {showForm&&subTab==="materiales"&&(
+            <div style={{...S.card,padding:18,marginBottom:16}} className="ein">
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:14,color:"#a0d8b0"}}>{editId?"Editar":"Nuevo"} Material / Insumo</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Nombre</label><input style={inputSt} value={matForm.nombre} onChange={e=>setMatForm(p=>({...p,nombre:e.target.value}))} placeholder="Ej: Fertilizante NPK, Tierra de hoja..."/></div>
+                <div>
+                  <label style={labelSt}>Unidad</label>
+                  <select style={inputSt} value={matForm.unidad} onChange={e=>setMatForm(p=>({...p,unidad:e.target.value}))}>
+                    {UNIDADES.map(u=><option key={u} value={u}>{u}</option>)}
+                  </select>
+                </div>
+                <div><label style={labelSt}>Stock actual</label><input type="number" min="0" step="0.1" style={inputSt} value={matForm.stockActual} onChange={e=>setMatForm(p=>({...p,stockActual:Number(e.target.value)}))}/></div>
+                <div><label style={labelSt}>Stock mínimo (alerta)</label><input type="number" min="0" step="0.1" style={inputSt} value={matForm.stockMinimo} onChange={e=>setMatForm(p=>({...p,stockMinimo:Number(e.target.value)}))}/></div>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observaciones</label><textarea rows={2} style={{...inputSt,resize:"vertical"}} value={matForm.obs} onChange={e=>setMatForm(p=>({...p,obs:e.target.value}))}/></div>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button className="btn-p" style={S.btn} onClick={saveMat}>✓ Guardar</button>
+                <button className="btn-g" style={S.btn} onClick={()=>{setShowForm(false);setEditId(null);}}>Cancelar</button>
+              </div>
+            </div>
+          )}
+          {showMovimiento&&(
+            <div style={{...S.card,padding:18,marginBottom:16,border:`1px solid ${movForm.tipo==="entrada"?"rgba(34,197,94,0.3)":"rgba(239,68,68,0.3)"}`}} className="ein">
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,marginBottom:12,color:movForm.tipo==="entrada"?"#86efac":"#fca5a5"}}>
+                {movForm.tipo==="entrada"?"📥 Registrar Entrada":"📤 Registrar Salida"}
+              </div>
+              <div style={{display:"flex",gap:6,marginBottom:12}}>
+                {["entrada","salida"].map(t=>(
+                  <button key={t} onClick={()=>setMovForm(p=>({...p,tipo:t}))}
+                    style={{...S.btn,padding:"6px 16px",fontSize:13,background:movForm.tipo===t?(t==="entrada"?"rgba(34,197,94,0.2)":"rgba(239,68,68,0.2)"):"rgba(255,255,255,0.05)",color:movForm.tipo===t?(t==="entrada"?"#86efac":"#fca5a5"):"#7aaa80",border:`1px solid ${movForm.tipo===t?(t==="entrada"?"rgba(34,197,94,0.4)":"rgba(239,68,68,0.4)"):"rgba(255,255,255,0.1)"}`,cursor:"pointer"}}>
+                    {t==="entrada"?"📥 Entrada":"📤 Salida"}
+                  </button>
+                ))}
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                <div><label style={labelSt}>Cantidad ({materiales.find(m=>m.id===showMovimiento)?.unidad})</label><input type="number" min="0" step="0.1" style={inputSt} value={movForm.cantidad} onChange={e=>setMovForm(p=>({...p,cantidad:e.target.value}))}/></div>
+                <div><label style={labelSt}>Fecha</label><input type="date" style={inputSt} value={movForm.fecha} onChange={e=>setMovForm(p=>({...p,fecha:e.target.value}))}/></div>
+                <div><label style={labelSt}>Responsable</label>
+                  <select style={inputSt} value={movForm.responsable} onChange={e=>setMovForm(p=>({...p,responsable:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                  </select>
+                </div>
+                <div><label style={labelSt}>Motivo / Zona destino</label><input style={inputSt} value={movForm.motivo} onChange={e=>setMovForm(p=>({...p,motivo:e.target.value}))} placeholder="Ej: Aplicación Alameda Central..."/></div>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button style={{...S.btn,background:movForm.tipo==="entrada"?"rgba(34,197,94,0.2)":"rgba(239,68,68,0.2)",color:movForm.tipo==="entrada"?"#86efac":"#fca5a5",border:`1px solid ${movForm.tipo==="entrada"?"rgba(34,197,94,0.3)":"rgba(239,68,68,0.3)"}`,cursor:"pointer"}} onClick={()=>registrarMovimiento(showMovimiento)}>✓ Registrar</button>
+                <button className="btn-g" style={S.btn} onClick={()=>setShowMovimiento(null)}>Cancelar</button>
+              </div>
+            </div>
+          )}
+          {/* Alerta stock bajo */}
+          {materiales.filter(m=>m.stockActual<=m.stockMinimo&&m.stockMinimo>0).length>0&&(
+            <div style={{background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:13}}>
+              <b style={{color:"#fca5a5"}}>⚠️ Stock bajo:</b>{" "}
+              {materiales.filter(m=>m.stockActual<=m.stockMinimo&&m.stockMinimo>0).map(m=>(
+                <span key={m.id} style={{color:"#fca5a5",marginLeft:8}}>{m.nombre} ({m.stockActual} {m.unidad})</span>
+              ))}
+            </div>
+          )}
+          {materiales.length===0&&!showForm&&(
+            <div style={{...S.card,padding:32,textAlign:"center",color:"#4a8a5a"}}>
+              <div style={{fontSize:32,marginBottom:8}}>📦</div>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15}}>Sin materiales registrados</div>
+            </div>
+          )}
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {materiales.map(m=>{
+              const bajStock=m.stockActual<=m.stockMinimo&&m.stockMinimo>0;
+              const movs=(m.movimientos||[]).slice(0,5);
+              return (
+                <div key={m.id} style={{...S.card,padding:16,borderLeft:`3px solid ${bajStock?"#ef4444":"rgba(61,122,82,0.4)"}`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",gap:10,flexWrap:"wrap",marginBottom:8}}>
+                    <div>
+                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700}}>{m.nombre}</div>
+                      {m.obs&&<div style={{fontSize:11,color:"#5a8a6a",fontStyle:"italic"}}>{m.obs}</div>}
+                    </div>
+                    <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                      {bajStock&&<span style={{fontSize:11,color:"#fca5a5",background:"rgba(239,68,68,0.12)",padding:"3px 8px",borderRadius:8,border:"1px solid rgba(239,68,68,0.25)"}}>⚠️ Stock bajo</span>}
+                      <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(34,197,94,0.15)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)",cursor:"pointer"}} onClick={()=>{setShowMovimiento(m.id);setShowForm(false);setMovForm({tipo:"entrada",cantidad:"",responsable:"",motivo:"",fecha:new Date().toISOString().slice(0,10)});}}>📥📤 Movimiento</button>
+                      {esJefa&&<button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>{setMatForm({nombre:m.nombre,unidad:m.unidad,stockActual:m.stockActual,stockMinimo:m.stockMinimo,obs:m.obs||""});setEditId(m.id);setShowForm(true);}}>✏️</button>}
+                      {esJefa&&<button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>set("materiales",materiales.filter(x=>x.id!==m.id))}>🗑</button>}
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:14,fontSize:13,marginBottom:movs.length>0?10:0,flexWrap:"wrap"}}>
+                    <span style={{color:bajStock?"#ef4444":"#22c55e",fontWeight:700}}>Stock: {m.stockActual} {m.unidad}</span>
+                    {m.stockMinimo>0&&<span style={{color:"#6aaa7a",fontSize:12}}>Mínimo: {m.stockMinimo} {m.unidad}</span>}
+                  </div>
+                  {movs.length>0&&(
+                    <div style={{borderTop:"1px solid rgba(255,255,255,0.06)",paddingTop:8}}>
+                      <div style={{fontSize:10,color:"#5a8a6a",marginBottom:5,letterSpacing:"0.5px"}}>ÚLTIMOS MOVIMIENTOS</div>
+                      {movs.map(mv=>(
+                        <div key={mv.id} style={{display:"flex",justifyContent:"space-between",fontSize:11,padding:"3px 0",borderBottom:"1px solid rgba(255,255,255,0.04)",flexWrap:"wrap",gap:6}}>
+                          <span style={{color:mv.tipo==="entrada"?"#86efac":"#fca5a5"}}>{mv.tipo==="entrada"?"📥":"📤"} {mv.tipo==="entrada"?"+":"-"}{mv.cantidad} {m.unidad}</span>
+                          <span style={{color:"#6a9a8a"}}>{mv.responsable}</span>
+                          <span style={{color:"#5a8a6a"}}>{mv.fecha}</span>
+                          {mv.motivo&&<span style={{color:"#4a7a6a",fontStyle:"italic",width:"100%"}}>{mv.motivo}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {/* Tareas / Inventario */}
+                  <div style={{display:"flex",gap:6,marginTop:10}}>
+                    <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(124,58,237,0.12)",color:"#c4b5fd",border:"1px solid rgba(124,58,237,0.25)",cursor:"pointer"}}
+                      onClick={()=>{setShowTareasMat(showTareasMat===m.id?null:m.id);setTareaMatForm({descripcion:"",responsable:"",fechaLimite:"",completada:false});}}>
+                      📋 Tareas / Inventario
+                    </button>
+                  </div>
+                  {showTareasMat===m.id&&(
+                    <div style={{marginTop:10,background:"rgba(124,58,237,0.05)",border:"1px solid rgba(124,58,237,0.2)",borderRadius:10,padding:14}} className="ein">
+                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:13,fontWeight:700,marginBottom:10,color:"#c4b5fd"}}>📋 Tareas del Material</div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
+                        <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Tarea (ej: Inventario, Revisar vencimiento, Reabastecer)</label><input style={inputSt} value={tareaMatForm.descripcion} onChange={e=>setTareaMatForm(p=>({...p,descripcion:e.target.value}))} placeholder="Ej: Hacer inventario · Revisar fecha vencimiento..."/></div>
+                        <div><label style={labelSt}>Responsable</label>
+                          <select style={inputSt} value={tareaMatForm.responsable} onChange={e=>setTareaMatForm(p=>({...p,responsable:e.target.value}))}>
+                            <option value="">Seleccionar...</option>
+                            {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                          </select>
+                        </div>
+                        <div><label style={labelSt}>Fecha límite</label><input type="date" style={inputSt} value={tareaMatForm.fechaLimite} onChange={e=>setTareaMatForm(p=>({...p,fechaLimite:e.target.value}))}/></div>
+                      </div>
+                      <div style={{display:"flex",gap:8,marginBottom:12}}>
+                        <button style={{...S.btn,background:"rgba(124,58,237,0.2)",color:"#c4b5fd",border:"1px solid rgba(124,58,237,0.3)",cursor:"pointer"}} onClick={()=>{
+                          if(!tareaMatForm.descripcion.trim()) return;
+                          set("materiales",materiales.map(x=>x.id===m.id?{...x,tareas:[...(x.tareas||[]),{...tareaMatForm,id:Date.now()}]}:x));
+                          setTareaMatForm({descripcion:"",responsable:"",fechaLimite:"",completada:false});
+                        }}>➕ Agregar tarea</button>
+                      </div>
+                      <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                        {(m.tareas||[]).map(t=>(
+                          <div key={t.id} style={{display:"flex",gap:8,alignItems:"center",padding:"6px 10px",background:"rgba(255,255,255,0.04)",borderRadius:8,borderLeft:`3px solid ${t.completada?"#22c55e":"#c084fc"}`}}>
+                            <input type="checkbox" checked={t.completada} onChange={()=>set("materiales",materiales.map(x=>x.id===m.id?{...x,tareas:(x.tareas||[]).map(tt=>tt.id===t.id?{...tt,completada:!tt.completada}:tt)}:x))}
+                              style={{width:15,height:15,accentColor:"#7c3aed",cursor:"pointer",flexShrink:0}}/>
+                            <div style={{flex:1}}>
+                              <div style={{fontSize:12,textDecoration:t.completada?"line-through":"none",color:t.completada?"#5a8a6a":"#ede9e0"}}>{t.descripcion}</div>
+                              <div style={{fontSize:10,color:"#5a8a6a",display:"flex",gap:8}}>
+                                {t.responsable&&<span>👤 {t.responsable}</span>}
+                                {t.fechaLimite&&<span>📅 {t.fechaLimite}</span>}
+                              </div>
+                            </div>
+                            <button onClick={()=>set("materiales",materiales.map(x=>x.id===m.id?{...x,tareas:(x.tareas||[]).filter(tt=>tt.id!==t.id)}:x))}
+                              style={{background:"transparent",border:"none",color:"#7a5a5a",cursor:"pointer",fontSize:12,padding:"2px 4px"}}>🗑</button>
+                          </div>
+                        ))}
+                        {(m.tareas||[]).length===0&&<div style={{fontSize:12,color:"#4a8a5a",textAlign:"center",padding:8}}>Sin tareas. Agrega una arriba.</div>}
+                      </div>
+                    </div>
+                  )}
+                  {/* Tareas / Inventario */}
+                  <div style={{display:"flex",gap:6,marginTop:10}}>
+                    <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(124,58,237,0.12)",color:"#c4b5fd",border:"1px solid rgba(124,58,237,0.25)",cursor:"pointer"}}
+                      onClick={()=>{setShowTareasMat(showTareasMat===m.id?null:m.id);setTareaMatForm({descripcion:"",responsable:"",fechaLimite:"",completada:false});}}>
+                      📋 Tareas / Inventario {(m.tareas||[]).filter(t=>!t.completada).length>0&&<span style={{fontSize:10,background:"rgba(124,58,237,0.3)",borderRadius:10,padding:"1px 5px",marginLeft:4}}>{(m.tareas||[]).filter(t=>!t.completada).length}</span>}
+                    </button>
+                  </div>
+                  {showTareasMat===m.id&&(
+                    <div style={{marginTop:10,background:"rgba(124,58,237,0.05)",border:"1px solid rgba(124,58,237,0.2)",borderRadius:10,padding:14}} className="ein">
+                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:13,fontWeight:700,marginBottom:10,color:"#c4b5fd"}}>📋 Tareas del Material</div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
+                        <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Tarea</label><input style={inputSt} value={tareaMatForm.descripcion} onChange={e=>setTareaMatForm(p=>({...p,descripcion:e.target.value}))} placeholder="Ej: Hacer inventario · Revisar vencimiento · Reabastecer..."/></div>
+                        <div><label style={labelSt}>Responsable</label>
+                          <select style={inputSt} value={tareaMatForm.responsable} onChange={e=>setTareaMatForm(p=>({...p,responsable:e.target.value}))}>
+                            <option value="">Seleccionar...</option>
+                            {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                          </select>
+                        </div>
+                        <div><label style={labelSt}>Fecha límite</label><input type="date" style={inputSt} value={tareaMatForm.fechaLimite} onChange={e=>setTareaMatForm(p=>({...p,fechaLimite:e.target.value}))}/></div>
+                      </div>
+                      <div style={{display:"flex",gap:8,marginBottom:12}}>
+                        <button style={{...S.btn,background:"rgba(124,58,237,0.2)",color:"#c4b5fd",border:"1px solid rgba(124,58,237,0.3)",cursor:"pointer"}} onClick={()=>{
+                          if(!tareaMatForm.descripcion.trim()) return;
+                          set("materiales",materiales.map(x=>x.id===m.id?{...x,tareas:[...(x.tareas||[]),{...tareaMatForm,id:Date.now()}]}:x));
+                          setTareaMatForm({descripcion:"",responsable:"",fechaLimite:"",completada:false});
+                        }}>➕ Agregar</button>
+                      </div>
+                      <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                        {(m.tareas||[]).map(t=>(
+                          <div key={t.id} style={{display:"flex",gap:8,alignItems:"center",padding:"6px 10px",background:"rgba(255,255,255,0.04)",borderRadius:8,borderLeft:`3px solid ${t.completada?"#22c55e":"#c084fc"}`}}>
+                            <input type="checkbox" checked={t.completada} onChange={()=>set("materiales",materiales.map(x=>x.id===m.id?{...x,tareas:(x.tareas||[]).map(tt=>tt.id===t.id?{...tt,completada:!tt.completada}:tt)}:x))}
+                              style={{width:15,height:15,accentColor:"#7c3aed",cursor:"pointer",flexShrink:0}}/>
+                            <div style={{flex:1}}>
+                              <div style={{fontSize:12,textDecoration:t.completada?"line-through":"none",color:t.completada?"#5a8a6a":"#ede9e0"}}>{t.descripcion}</div>
+                              <div style={{fontSize:10,color:"#5a8a6a",display:"flex",gap:8}}>
+                                {t.responsable&&<span>👤 {t.responsable}</span>}
+                                {t.fechaLimite&&<span>📅 {t.fechaLimite}</span>}
+                              </div>
+                            </div>
+                            <button onClick={()=>set("materiales",materiales.map(x=>x.id===m.id?{...x,tareas:(x.tareas||[]).filter(tt=>tt.id!==t.id)}:x))}
+                              style={{background:"transparent",border:"none",color:"#7a5a5a",cursor:"pointer",fontSize:12,padding:"2px 4px"}}>🗑</button>
+                          </div>
+                        ))}
+                        {(m.tareas||[]).length===0&&<div style={{fontSize:12,color:"#4a8a5a",textAlign:"center",padding:8}}>Sin tareas. Agrega una arriba.</div>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 // ─── PANEL DE FRECUENCIAS DE MANTENCIÓN ─────────────────────────────────────
 function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
@@ -2952,6 +3636,15 @@ export default function App() {
               <div style={S.logoSub}>Gestión · Áreas Verdes</div>
             </div>
           </div>
+          {rolLogueado==="jefa"&&(
+            <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+              <span style={{fontSize:11,color:"#86efac",background:"rgba(34,197,94,0.1)",padding:"4px 10px",borderRadius:20,border:"1px solid rgba(34,197,94,0.25)"}}>🌿 Jefa AV</span>
+              <button onClick={()=>{setRolLogueado(null);setWorkerPinInput("");setVista("miturno");}}
+                style={{background:"transparent",border:"1px solid rgba(255,255,255,0.1)",borderRadius:7,color:"#7aaa80",padding:"4px 10px",fontFamily:"'Georgia',serif",fontSize:11,cursor:"pointer"}}>
+                Salir
+              </button>
+            </div>
+          )}
         </div>
         <div style={S.headerNav} className="headerNav">
           {[["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["personal","👷","Personal"],["miturno","🌿","Mi Turno"]].map(([v,ico,lbl])=>(
@@ -3089,7 +3782,7 @@ export default function App() {
               </div>
             )}
             <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
-              {[["elementos","🌿 Elementos"],["info","📝 Info"],["tareas","✅ Tareas"],["historial","📜 Historial"]].map(([t,l])=>(
+              {[["elementos","🌿 Elementos"],["info","📝 Info"],["tareas","✅ Tareas"],["historial","📜 Historial"],...(zona?.categoria==="Bodegas"?[["recursos","🏗️ Recursos"]]:[])].map(([t,l])=>(
                 <button key={t} className={`tab${tab===t?" on":""}`} onClick={()=>setTab(t)}>{l}</button>
               ))}
             </div>
@@ -3471,6 +4164,7 @@ export default function App() {
         {vista==="programacion"&&(
           <ProgramacionDiaria key="prog" S={S} zonas={zonas} data={data} personal={personal} getZD={getZD} getAllElems={getAllElems} MACROZONAS_BASE={MACROZONAS_BASE} tareas={tareasProg} setTareas={setTareasProg}
             tareasZonaHoy={(tareasProg[new Date().toISOString().slice(0,10)]||[]).filter(t=>t.origenZona&&t.estado==="por_designar").length}
+            esJefa={rolLogueado==="jefa"}
           />
         )}
 
@@ -3617,9 +4311,9 @@ export default function App() {
                 <div style={{fontSize:48,marginBottom:16}}>🌿</div>
                 <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:900,marginBottom:8}}>Bienvenida, Jefa de Áreas Verdes</h2>
                 <p style={{color:"#6aaa7a",fontSize:14,marginBottom:24}}>Usa el menú de navegación para acceder a todas las secciones.</p>
-                <button onClick={()=>{setRolLogueado(null);setVista("programacion");}} style={{...S.btn,background:"#3d7a52",color:"#fff",fontSize:15,padding:"12px 28px"}}>📆 Ir a Programación →</button>
+                <button onClick={()=>setVista("programacion")} style={{...S.btn,background:"#3d7a52",color:"#fff",fontSize:15,padding:"12px 28px"}}>📆 Ir a Programación →</button>
                 <div style={{marginTop:12}}>
-                  <button onClick={()=>{setRolLogueado(null);setWorkerPinInput("");}} style={{...S.btn,background:"transparent",color:"#6aaa7a",border:"1px solid rgba(255,255,255,0.1)",fontSize:13}}>← Volver al login</button>
+                  <button onClick={()=>{setRolLogueado(null);setWorkerPinInput("");}} style={{...S.btn,background:"transparent",color:"#6aaa7a",border:"1px solid rgba(255,255,255,0.1)",fontSize:13}}>← Cerrar sesión</button>
 
                 <div style={{maxWidth:380,margin:"24px auto 0"}}>
                   <PinConfig getPines={getPines} setPinRol={setPinRol} S={S}/>
