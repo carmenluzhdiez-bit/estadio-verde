@@ -770,7 +770,7 @@ function ResponsableSelector({ value, personal, onChange, S, fontSize=14, inline
 }
 
 // ─── REPORTE SEMANAL ─────────────────────────────────────────────────────────
-function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_BASE, personal }) {
+function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_BASE, personal, incidenciasFito=[] }) {
 
   // Calcular días lunes-domingo de la semana elegida
   const getDiasSemana = (lunesStr) => {
@@ -889,6 +889,31 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
           <td style="color:#991b1b;font-style:italic">${t.notaWorker||"Sin observación"}</td>
         </tr>`).join("");
 
+    // Incidencias fitosanitarias de la semana
+    const incFitoSemana = incidenciasFito.filter(inc=>{
+      const f=inc.fechaObservacion||inc.fechaAplicacion||"";
+      return f>=semanaBase&&f<=domingo;
+    });
+    const TIPO_LABEL_PDF = {fitosanitario:"🦠 Fitosanitario",mantenimiento:"🔧 Mantenimiento",clima:"🌧️ Clima"};
+    const incFitoRows = incFitoSemana.length===0
+      ? "<tr><td colspan='6' style='text-align:center;color:#6b7280;padding:12px'>Sin incidencias fitosanitarias esta semana</td></tr>"
+      : incFitoSemana.map(inc=>{
+          const sectObs=(inc.sectoresObservados||[]).join(", ")||"—";
+          const sectCerr=(inc.sectoresCerrados||[]).join(", ")||"—";
+          const reap=inc.fechaReaperturaISO?new Date(inc.fechaReaperturaISO).toLocaleDateString("es-CL",{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}):"—";
+          const estLabel=inc.estado==="cerrada"?"🚫 Cerrada":inc.estado==="reabierta"?"✅ Reabierta":"⚠️ En obs.";
+          return `<tr>
+            <td style="white-space:nowrap">${inc.fechaObservacion||"—"}</td>
+            <td>${TIPO_LABEL_PDF[inc.tipoCierre]||"🚨"}</td>
+            <td style="font-weight:600">${inc.agenteCausal||inc.diagnostico||"—"}</td>
+            <td>${sectObs}</td>
+            <td style="color:#991b1b">${sectCerr}</td>
+            <td>${inc.productoAplicar||"—"}<br><small style="color:#6b7280">${inc.fechaAplicacion||""} ${inc.horaAplicacion||""}</small></td>
+            <td style="color:#166534">${reap}</td>
+            <td>${estLabel}</td>
+          </tr>`;
+        }).join("");
+
     const win = window.open("","_blank","width=900,height=700");
     win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
     <title>Informe Semanal Áreas Verdes — Estadio Español</title>
@@ -944,6 +969,10 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
     <h2>⚠️ Incidencias — Tareas No Realizadas</h2>
     <table><thead><tr><th>Día</th><th>Tarea</th><th>Zona</th><th>Responsable</th><th>Motivo</th></tr></thead>
     <tbody>${incidenciasRows}</tbody></table>
+
+    <h2>🚨 Incidencias Fitosanitarias y Cierres de Cancha</h2>
+    <table><thead><tr><th>Fecha</th><th>Tipo</th><th>Agente / Causa</th><th>Sectores observados</th><th>Sectores cerrados</th><th>Producto / Aplicación</th><th>Reapertura estimada</th><th>Estado</th></tr></thead>
+    <tbody>${incFitoRows}</tbody></table>
 
     <div class="pie">
       <span>Estadio Español de Las Condes · Departamento de Áreas Verdes · Jefa Carmen Luz Hermosilla</span>
@@ -1064,7 +1093,7 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
             </table>
           </div>
 
-          {/* Incidencias */}
+          {/* Incidencias de tareas */}
           {incidencias.length>0&&(
             <>
               <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,marginBottom:12,color:"#fca5a5"}}>⚠️ Incidencias — No se pudo realizar</div>
@@ -1084,6 +1113,98 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
               </div>
             </>
           )}
+
+          {/* ── INCIDENCIAS FITOSANITARIAS Y CIERRES DE CANCHA ── */}
+          {(()=>{
+            // Filtrar incidencias fitosanitarias de la semana actual
+            const incSemana = incidenciasFito.filter(inc => {
+              const f = inc.fechaObservacion||inc.fechaAplicacion||"";
+              return f >= semanaBase && f <= domingo;
+            });
+            if(!incSemana.length) return null;
+            const TIPO_ICON = {fitosanitario:"🦠",mantenimiento:"🔧",clima:"🌧️"};
+            const SEV_COLOR = {leve:"#f59e0b",media:"#f97316",alta:"#ef4444",critica:"#7c3aed"};
+            return (
+              <>
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,marginBottom:12,color:"#fb923c"}}>
+                  🚨 Incidencias Fitosanitarias y Cierres de Cancha
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:22}}>
+                  {incSemana.map(inc=>{
+                    const sevColor = SEV_COLOR[inc.severidad]||"#f59e0b";
+                    const ESTADO_COLOR = {observacion:"#f59e0b",cerrada:"#ef4444",reabierta:"#22c55e"};
+                    const estColor = ESTADO_COLOR[inc.estado]||"#f59e0b";
+                    return (
+                      <div key={inc.id} style={{...S.card,padding:16,borderLeft:`3px solid ${estColor}`}}>
+                        {/* Cabecera */}
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:8,marginBottom:10}}>
+                          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                            <span style={{fontSize:20}}>{TIPO_ICON[inc.tipoCierre]||"🚨"}</span>
+                            <div>
+                              <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:"#ede9e0"}}>
+                                {inc.agenteCausal||inc.diagnostico||"Incidencia registrada"}
+                              </div>
+                              <div style={{fontSize:11,color:"#7aaa80",marginTop:2}}>
+                                📅 {inc.fechaObservacion} {inc.horaObservacion} · 👤 Observado por: {inc.observador}
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                            <span style={{...S.chip,background:`${sevColor}18`,color:sevColor,border:`1px solid ${sevColor}40`,fontSize:11}}>
+                              ⚡ {inc.severidad||"media"}
+                            </span>
+                            <span style={{...S.chip,background:`${estColor}18`,color:estColor,border:`1px solid ${estColor}40`,fontSize:11}}>
+                              {inc.estado==="cerrada"?"🚫 Cerrada":inc.estado==="reabierta"?"✅ Reabierta":"⚠️ En observación"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Observación */}
+                        {inc.observacion&&(
+                          <div style={{fontSize:12,color:"#a0c0a0",fontStyle:"italic",background:"rgba(255,255,255,0.04)",borderRadius:8,padding:"8px 12px",marginBottom:8}}>
+                            "{inc.observacion}"
+                          </div>
+                        )}
+
+                        {/* Sectores */}
+                        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
+                          {(inc.sectoresObservados||[]).map(s=>(
+                            <span key={s} style={{...S.chip,background:"rgba(249,115,22,0.1)",color:"#fb923c",border:"1px solid rgba(249,115,22,0.25)",fontSize:10}}>⚠️ {s}</span>
+                          ))}
+                          {(inc.sectoresCerrados||[]).map(s=>(
+                            <span key={s} style={{...S.chip,background:"rgba(239,68,68,0.12)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.25)",fontSize:10}}>🚫 {s}</span>
+                          ))}
+                        </div>
+
+                        {/* Diagnóstico y tratamiento */}
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,fontSize:12}}>
+                          {inc.diagnosticadoPor&&<div style={{color:"#7aaa80"}}>🩺 Diagnóstico: <span style={{color:"#c0e0c0"}}>{inc.diagnosticadoPor}</span></div>}
+                          {inc.productoAplicar&&<div style={{color:"#7aaa80"}}>🧪 Producto: <span style={{color:"#c0e0c0"}}>{inc.productoAplicar}</span></div>}
+                          {inc.fechaAplicacion&&<div style={{color:"#7aaa80"}}>💉 Aplicación: <span style={{color:"#c0e0c0"}}>{inc.fechaAplicacion} {inc.horaAplicacion}</span></div>}
+                          {inc.tratamiento&&<div style={{color:"#7aaa80"}}>📋 Alcance: <span style={{color:"#c0e0c0"}}>{inc.tratamiento==="completo"?"Fumigación completa":inc.tratamiento==="sectores"?"Sectores afectados":inc.tratamiento}</span></div>}
+                        </div>
+
+                        {/* Reapertura */}
+                        {inc.fechaReaperturaISO&&(
+                          <div style={{marginTop:8,background:"rgba(34,197,94,0.08)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:8,padding:"8px 12px"}}>
+                            <span style={{fontSize:12,color:"#86efac",fontWeight:600}}>📅 Reapertura estimada: </span>
+                            <span style={{fontSize:12,color:"#4ade80"}}>{new Date(inc.fechaReaperturaISO).toLocaleDateString("es-CL",{weekday:"long",day:"numeric",month:"long"})} a las {new Date(inc.fechaReaperturaISO).toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"})}</span>
+                            {inc.notaReingreso&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:3,fontStyle:"italic"}}>{inc.notaReingreso}</div>}
+                          </div>
+                        )}
+
+                        {inc.motivoCierre&&(
+                          <div style={{marginTop:8,fontSize:12,color:"#fcd34d",background:"rgba(252,211,77,0.06)",borderRadius:6,padding:"6px 10px"}}>
+                            📢 {inc.motivoCierre}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            );
+          })()}
         </>
       )}
     </div>
@@ -3534,6 +3655,1228 @@ const PERSONAL_INICIAL = [
   },
 ];
 
+// ─── PROGRAMA ANUAL DE FUNGICIDAS ────────────────────────────────────────────
+const PROGRAMA_FUNGICIDAS = [
+  // INVIERNO Jun-Ago
+  { mes:6,  estacion:"invierno",  superficie:"Agrostis stolonifera", producto:"Benomil + Mancozeb",    dosis:"400 g/ha + 2,5 kg/ha", objetivo:"Contener Microdochium nivale",      prioridad:"alta",  tipo:"mezcla"    },
+  { mes:7,  estacion:"invierno",  superficie:"Agrostis / General",   producto:"Mancozeb 80% WP",       dosis:"2,5 kg/ha",            objetivo:"Protectante invernal",              prioridad:"media", tipo:"simple"    },
+  { mes:8,  estacion:"invierno",  superficie:"Agrostis stolonifera", producto:"Apolo 25 EW (tebuconazol)", dosis:"1,0 L/ha",         objetivo:"Triazol pre-rebrote",               prioridad:"alta",  tipo:"simple"    },
+  // PRIMAVERA Sep-Nov
+  { mes:9,  estacion:"primavera", superficie:"Agrostis stolonifera", producto:"Amistar TOP",            dosis:"0,75 L/ha",           objetivo:"Protección al rebrote",             prioridad:"alta",  tipo:"simple"    },
+  { mes:10, estacion:"primavera", superficie:"General",              producto:"Mancozeb 80% WP",        dosis:"2,5 kg/ha",           objetivo:"Rotación multisitio",               prioridad:"media", tipo:"simple"    },
+  { mes:11, estacion:"primavera", superficie:"Agrostis stolonifera", producto:"Score 250 EC (difenoconazol)", dosis:"0,5 L/ha",      objetivo:"Si hay presión de enfermedad",      prioridad:"baja",  tipo:"condicional"},
+  // VERANO Dic-Feb
+  { mes:12, estacion:"verano",    superficie:"General",              producto:"—",                      dosis:"—",                   objetivo:"Monitoreo solamente",               prioridad:"baja",  tipo:"monitoreo" },
+  { mes:1,  estacion:"verano",    superficie:"General",              producto:"Mancozeb 80% WP",        dosis:"2,5 kg/ha",           objetivo:"Preventivo si hay humedad alta",    prioridad:"baja",  tipo:"condicional"},
+  { mes:2,  estacion:"verano",    superficie:"Agrostis stolonifera", producto:"Amistar TOP",            dosis:"0,75 L/ha",           objetivo:"Aplicación pre-otoño",              prioridad:"media", tipo:"simple"    },
+  // OTOÑO Mar-May
+  { mes:3,  estacion:"otono",     superficie:"Agrostis stolonifera", producto:"Amistar TOP",            dosis:"1,0 L/ha",            objetivo:"Aplicación clave pre-otoño",        prioridad:"alta",  tipo:"simple"    },
+  { mes:4,  estacion:"otono",     superficie:"General",              producto:"Mancozeb + Apolo 25 EW", dosis:"2,5 kg/ha + 1,0 L/ha",objetivo:"Máxima cobertura otoñal",           prioridad:"alta",  tipo:"mezcla"    },
+  { mes:5,  estacion:"otono",     superficie:"Agrostis stolonifera", producto:"Score 250 EC",           dosis:"0,5 L/ha",            objetivo:"Curativo si hay parches activos",   prioridad:"media", tipo:"condicional"},
+];
+
+const MESES_ES = ["","Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+const ESTACION_CONFIG = {
+  verano:    { color:"#f59e0b", bg:"rgba(245,158,11,0.12)",  icon:"☀️"  },
+  otono:     { color:"#f97316", bg:"rgba(249,115,22,0.12)",  icon:"🍂"  },
+  invierno:  { color:"#60a5fa", bg:"rgba(96,165,250,0.12)",  icon:"❄️"  },
+  primavera: { color:"#4ade80", bg:"rgba(74,222,128,0.12)",  icon:"🌸"  },
+};
+const PRIORIDAD_CONFIG = {
+  alta:      { color:"#ef4444", bg:"rgba(239,68,68,0.12)",   label:"Alta"       },
+  media:     { color:"#f59e0b", bg:"rgba(245,158,11,0.12)",  label:"Media"      },
+  baja:      { color:"#6aaa7a", bg:"rgba(106,170,122,0.12)", label:"Baja/Cond." },
+};
+
+// ─── PROVEEDOR Y STOCK ───────────────────────────────────────────────────────
+const PROVEEDOR_PRINCIPAL = {
+  nombre: "Brigitte Elena Pardo Contreras",
+  empresa: "Copargo Agro",
+  rut: "10.831.211-4",
+  giro: "Venta de Semillas / Agroquímicos",
+  direccion: "La Paz 419, Recoleta, Santiago",
+  telefono: "+56 232 637 700",
+  email: "agrobrisol@yahoo.es",
+  vendedor: "Marlene Pino Zapata",
+  telefonoVendedor: "+56 9 9907 1213",
+  condicion: "Crédito 30 días",
+};
+
+const STOCK_INICIAL = [
+  { id:"s1", producto:"Amistar TOP x 1 lt. (Azoxistrobina + Difenoconazol)", codigo:"350610381", unidad:"L",  stockActual:2, stockMinimo:1, precioUnitario:82000, grupo:"Estrobilurina + Triazol" },
+  { id:"s2", producto:"Score 250 EC x 1 lt. (Difenoconazol)",                codigo:"350612657", unidad:"L",  stockActual:2, stockMinimo:1, precioUnitario:55500, grupo:"Triazol" },
+  { id:"s3", producto:"Fungizeb 800 WP x 1 kg. (Mancozeb)",                  codigo:"350481354", unidad:"kg", stockActual:5, stockMinimo:2, precioUnitario:8824,  grupo:"Multisitio" },
+  { id:"s4", producto:"Apolo 25 EW x 1 lt. (Tebuconazol)",                   codigo:"350111398", unidad:"L",  stockActual:2, stockMinimo:1, precioUnitario:25210, grupo:"Triazol" },
+];
+
+const PEDIDO_INICIAL = [{
+  id: 7609,
+  fecha: "2026-06-10",
+  proveedor: "Copargo Agro",
+  vendedor: "Marlene Pino Zapata",
+  condicion: "Crédito 30 días",
+  vencimiento: "2026-07-10",
+  total: 439753,
+  items: [
+    { codigo:"350610381", descripcion:"Fung. Amistar Top x 1 lt. SYN",             cantidad:2, precio:82000,  total:164000 },
+    { codigo:"350612657", descripcion:"Fung. Score 250 EC x 1 lt. SYN",            cantidad:2, precio:55500,  total:111000 },
+    { codigo:"350481354", descripcion:"Fung. Fungizeb 800 WP x 1 kg. (Mancozeb)",  cantidad:5, precio:8824,   total:44120  },
+    { codigo:"350111398", descripcion:"Fung. Apolo 25 EW (Tebuconazol) x 1 lt.",   cantidad:2, precio:25210,  total:50420  },
+  ],
+}];
+
+// ─── SECTORES DE APLICACIÓN ──────────────────────────────────────────────────
+const SECTORES_APLICACION = {
+  "Greens": [
+    "Green 01","Green 02","Green 03","Green 04","Green 05","Green 06",
+    "Green 07","Green 08","Green 09","Green 10","Green 11","Green 12",
+    "Green 13","Green 14","Green 15","Green 16","Green 17","Green 18",
+    "Todos los greens",
+  ],
+  "Fairways": [
+    "Fairway 01","Fairway 02","Fairway 03","Fairway 04","Fairway 05",
+    "Fairway 06","Fairway 07","Fairway 08","Fairway 09","Fairway 10",
+    "Fairway 11","Fairway 12","Fairway 13","Fairway 14","Fairway 15",
+    "Fairway 16","Fairway 17","Fairway 18","Todos los fairways",
+  ],
+  "Tees": [
+    "Tee 01","Tee 02","Tee 03","Tee 04","Tee 05","Tee 06",
+    "Tee 07","Tee 08","Tee 09","Tee 10","Tee 11","Tee 12",
+    "Todos los tees",
+  ],
+  "Otras zonas": [
+    "Alameda Central (Agrostis)","Chépica peruana (general)",
+    "Canchas fútbol","Zonas ornamentales","Completo (todo el campo)",
+    "Otro",
+  ],
+};
+
+// ─── REINGRESO POR PRODUCTO (días desde ficha técnica SAG) ───────────────────
+const REINGRESO_DIAS = {
+  "Amistar TOP (Azoxistrobina + Difenoconazol)": { dias:1,  nota:"No cosechar en 7 días. Reingreso 24 hrs post-aplicación (Reg SAG 2595)" },
+  "Score 250 EC (Difenoconazol)":                { dias:1,  nota:"Reingreso 24 hrs. No aplicar con viento >15 km/h (Reg SAG 2343)" },
+  "Apolo 25 EW (Tebuconazol)":                   { dias:1,  nota:"Reingreso 24 hrs post-aplicación seca (Reg SAG Anasac)" },
+  "Fungizeb 800 WP (Mancozeb)":                  { dias:1,  nota:"Reingreso 24 hrs. Usar EPP completo durante aplicación (Reg SAG 2797)" },
+  "Benomil 50% WP":                              { dias:1,  nota:"Reingreso 24 hrs. Benzimidazol, evitar contacto con piel" },
+  "Poliben (Carbendazim)":                       { dias:1,  nota:"Reingreso 24 hrs post-aplicación" },
+  "Benomil + Mancozeb (mezcla)":                 { dias:2,  nota:"Mezcla: reingreso 48 hrs por precaución" },
+  "Mancozeb + Apolo 25 EW (mezcla)":             { dias:2,  nota:"Mezcla: reingreso 48 hrs por precaución" },
+  "Otro":                                        { dias:2,  nota:"Consultar ficha técnica del producto" },
+};
+
+// ─── INCIDENCIAS FITOSANITARIAS Y CIERRES ───────────────────────────────────
+// Estado inicial vacío — se inicializa desde localStorage
+const INCIDENCIAS_INICIAL = [];
+
+function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, tareasProg, setTareasProg, incidenciasFito, setIncidenciasFito }) {
+  const hoy = new Date();
+  const mesActual = hoy.getMonth() + 1;
+  const [subTab, setSubTab] = React.useState("alerta");
+  const [showForm, setShowForm] = React.useState(false);
+  const [form, setForm] = React.useState({
+    fecha: hoy.toISOString().slice(0,10),
+    producto:"", dosis:"", cantidadUsada:"", unidadUsada:"L",
+    superficie:"", sectorGrupo:"", sectorDetalle:"", sectorCustom:"",
+    responsable:"", obs:"", clima:"", volAgua:"",
+    costoUnitario:"", costoTotal:"", cuentaImputar:"", enviarProg:true,
+  });
+
+  // usar alias local para compatibilidad con el resto del código
+  const incidencias = incidenciasFito;
+  const setIncidencias = setIncidenciasFito;
+
+  // ── Stock (inicializa desde localStorage o desde STOCK_INICIAL) ──────────────
+  const initStock = () => { try { const s=localStorage.getItem("ev2-fung-stock"); return s?JSON.parse(s):STOCK_INICIAL; } catch { return STOCK_INICIAL; } };
+  const [stock, setStock] = React.useState(initStock);
+  React.useEffect(() => { try { localStorage.setItem("ev2-fung-stock", JSON.stringify(stock)); } catch {} }, [stock]);
+
+  // ── Pedidos (inicializa con el pedido 7609) ──────────────────────────────────
+  const initPedidos = () => { try { const s=localStorage.getItem("ev2-fung-pedidos"); return s?JSON.parse(s):PEDIDO_INICIAL; } catch { return PEDIDO_INICIAL; } };
+  const [pedidos, setPedidos] = React.useState(initPedidos);
+  React.useEffect(() => { try { localStorage.setItem("ev2-fung-pedidos", JSON.stringify(pedidos)); } catch {} }, [pedidos]);
+
+  const [showStockEdit, setShowStockEdit] = React.useState(null); // id de producto en edición
+  const [showPedidoDetalle, setShowPedidoDetalle] = React.useState(null);
+
+  // ── Incidencias / Cierres ────────────────────────────────────────────────────
+  // (estado manejado desde App vía props incidenciasFito / setIncidenciasFito)
+  const [showIncidForm, setShowIncidForm] = React.useState(false);
+  const [incidPaso, setIncidPaso] = React.useState(1);
+  const [expandIncid, setExpandIncid] = React.useState(null);
+
+  const emptyIncid = {
+    fechaObservacion: hoy.toISOString().slice(0,10), horaObservacion: hoy.toTimeString().slice(0,5),
+    observador:"Osmar Bhalú Armijo Zúñiga", observacion:"", sectoresObservados:[],
+    tipoCierre:"fitosanitario", diagnostico:"", agenteCausal:"", severidad:"media",
+    diagnosticadoPor:"", otrosDiagnosticos:"",
+    tratamiento:"completo", productoAplicar:"", fechaAplicacion: hoy.toISOString().slice(0,10), horaAplicacion:"14:00",
+    sectoresCerrados:[], motivoCierre:"", obs:"",
+    estado:"observacion", fechaReaperturaISO:"", notaReingreso:"",
+  };
+  const [incidForm, setIncidForm] = React.useState(emptyIncid);
+
+  const todosSectoresGolf = [
+    ...Array.from({length:18},(_,i)=>`Green ${String(i+1).padStart(2,"0")}`),
+    ...Array.from({length:18},(_,i)=>`Fairway ${String(i+1).padStart(2,"0")}`),
+    ...Array.from({length:18},(_,i)=>`Tee ${String(i+1).padStart(2,"0")}`),
+    "Cancha completa","Todos los greens","Todos los fairways",
+  ];
+
+  const calcReapertura = (producto, fechaAplic, horaAplic) => {
+    const info = REINGRESO_DIAS[producto];
+    if(!info||!fechaAplic) return { fechaISO:"", label:"", nota:"" };
+    const base = new Date(`${fechaAplic}T${horaAplic||"14:00"}:00`);
+    base.setHours(base.getHours() + info.dias*24);
+    return {
+      fechaISO: base.toISOString().slice(0,16),
+      label: base.toLocaleDateString("es-CL",{weekday:"long",day:"numeric",month:"long"})+" a las "+base.toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"}),
+      nota: info.nota,
+    };
+  };
+
+  const guardarIncidencia = () => {
+    if(!incidForm.observacion.trim()) return;
+    const reap = calcReapertura(incidForm.productoAplicar, incidForm.fechaAplicacion, incidForm.horaAplicacion);
+    const nueva = { ...incidForm, id:Date.now(), fechaReaperturaISO:reap.fechaISO, notaReingreso:reap.nota, estado: incidForm.sectoresCerrados.length>0?"cerrada":"observacion" };
+    setIncidencias(prev=>[nueva,...prev].slice(0,100));
+
+    // Tareas al programa del día
+    const fp = incidForm.fechaAplicacion;
+    if(fp && incidForm.productoAplicar) {
+      const sectLabel = incidForm.sectoresCerrados.join(", ") || "Cancha golf";
+      setTareasProg(prev=>({ ...prev, [fp]: [...(prev[fp]||[]), {
+        id:Date.now()+Math.random(), fecha:fp,
+        zona: sectLabel, elemento:"",
+        tarea:`🧪 Fumigación: ${incidForm.productoAplicar} — ${incidForm.agenteCausal||incidForm.diagnostico}`,
+        responsable: incidForm.diagnosticadoPor||"", estado:"por_designar",
+        notas:`Reingreso estimado: ${reap.label}. ${reap.nota}`, auto:false, origenFungicida:true,
+      }]}));
+    }
+    // Cierre de cancha al programa
+    if(incidForm.sectoresCerrados.length>0) {
+      const fc = incidForm.fechaObservacion;
+      setTareasProg(prev=>({ ...prev, [fc]: [...(prev[fc]||[]), {
+        id:Date.now()+Math.random()+1, fecha:fc,
+        zona: incidForm.sectoresCerrados.join(", "), elemento:"",
+        tarea:`🚫 CIERRE: ${incidForm.sectoresCerrados.join(", ")} — ${incidForm.tipoCierre==="fitosanitario"?"Tratamiento fitosanitario":incidForm.tipoCierre==="clima"?"Condición climática adversa":"Mantenimiento"}`,
+        responsable:"", estado:"por_designar",
+        notas:`Reapertura estimada: ${reap.label||"por determinar"}`, auto:false, origenCierre:true,
+      }]}));
+    }
+    setIncidForm(emptyIncid); setShowIncidForm(false); setIncidPaso(1);
+  };
+
+  const progMes = PROGRAMA_FUNGICIDAS.filter(p => p.mes === mesActual);
+  const progAll = [...PROGRAMA_FUNGICIDAS].sort((a,b)=>a.mes-b.mes);
+  const listaPersonal = [...personal].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+
+  const sectorFinal = form.sectorDetalle==="Otro" ? form.sectorCustom : form.sectorDetalle;
+
+  const guardarAplicacion = () => {
+    if(!form.producto.trim()||!form.fecha) return;
+    const nueva = { ...form, id:Date.now(), mes:mesActual, sectorFinal };
+    setAplicaciones(prev=>[nueva, ...prev].slice(0,200));
+
+    // Enviar a programa del día si está marcado
+    if(form.enviarProg && form.fecha) {
+      const tareaProgDia = {
+        id: Date.now() + Math.random(),
+        fecha: form.fecha,
+        zona: sectorFinal || form.superficie || "Fungicidas",
+        elemento: "",
+        tarea: `🧪 Aplicación fungicida: ${form.producto}${form.dosis ? " · "+form.dosis : ""}${sectorFinal ? " → "+sectorFinal : ""}`,
+        responsable: form.responsable || "",
+        estado: "por_designar",
+        notas: form.obs || "",
+        auto: false,
+        origenFungicida: true,
+      };
+      setTareasProg(prev => ({
+        ...prev,
+        [form.fecha]: [...(prev[form.fecha]||[]), tareaProgDia],
+      }));
+    }
+
+    setForm({ fecha:hoy.toISOString().slice(0,10), producto:"", dosis:"", cantidadUsada:"", unidadUsada:"L", superficie:"", sectorGrupo:"", sectorDetalle:"", sectorCustom:"", responsable:"", obs:"", clima:"", volAgua:"", costoUnitario:"", costoTotal:"", cuentaImputar:"", enviarProg:true });
+    setShowForm(false);
+  };
+
+  const labelSt = { fontSize:10, color:"#6aaa7a", letterSpacing:"0.6px", display:"block", marginBottom:3, textTransform:"uppercase" };
+
+  return (
+    <div className="ein">
+      <div style={{marginBottom:22}}>
+        <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:24,fontWeight:900,marginBottom:4}}>🧪 Programa de Fungicidas</h1>
+        <p style={{color:"#6aaa7a",fontSize:14}}>Temporada 2026–2027 · Áreas Verdes Estadio Español</p>
+      </div>
+
+      {/* Alerta del mes actual */}
+      {progMes.length > 0 && (
+        <div style={{background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.3)",borderRadius:14,padding:18,marginBottom:20}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
+            <span style={{fontSize:20}}>🔔</span>
+            <span style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#fcd34d"}}>
+              Aplicaciones de {MESES_ES[mesActual]}
+            </span>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {progMes.map((p,i)=>{
+              const est = ESTACION_CONFIG[p.estacion]||ESTACION_CONFIG.invierno;
+              const pri = PRIORIDAD_CONFIG[p.prioridad]||PRIORIDAD_CONFIG.media;
+              const yaAplicado = aplicaciones.some(a => {
+                const aFecha = new Date(a.fecha);
+                return aFecha.getMonth()+1 === mesActual && aFecha.getFullYear() === hoy.getFullYear() &&
+                  a.producto.toLowerCase().includes(p.producto.split(" ")[0].toLowerCase());
+              });
+              return (
+                <div key={i} style={{...S.card,padding:14,borderLeft:`3px solid ${yaAplicado?"#22c55e":pri.color}`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:8}}>
+                    <div style={{flex:1}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,flexWrap:"wrap"}}>
+                        <span style={{fontWeight:700,fontSize:14,color:"#ede9e0"}}>{p.producto}</span>
+                        <span style={{...S.chip,background:pri.bg,color:pri.color,border:`1px solid ${pri.color}40`,fontSize:11}}>
+                          {pri.label}
+                        </span>
+                        {yaAplicado && <span style={{...S.chip,background:"rgba(34,197,94,0.12)",color:"#22c55e",border:"1px solid rgba(34,197,94,0.25)",fontSize:11}}>✅ Registrado</span>}
+                      </div>
+                      <div style={{fontSize:13,color:"#a0c8a0",marginBottom:4}}>📍 {p.superficie} · 💧 {p.dosis}</div>
+                      <div style={{fontSize:12,color:"#6aaa7a",fontStyle:"italic"}}>{p.objetivo}</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Sub-tabs */}
+      <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
+        {[["alerta","📅 Programa"],["incidencias","🚨 Incidencias"],["stock","📦 Stock"],["proveedor","🏪 Proveedor"],["registro","📝 Registrar"],["historial","🗂️ Historial"]].map(([t,l])=>{
+          const hayAlerta = t==="incidencias" && incidencias.some(i=>i.estado==="cerrada"||i.estado==="observacion");
+          return (
+            <button key={t} className={`tab${subTab===t?" on":""}`} onClick={()=>{setSubTab(t);setShowForm(false);}} style={{position:"relative"}}>
+              {l}
+              {hayAlerta&&<span style={{position:"absolute",top:2,right:2,width:7,height:7,borderRadius:"50%",background:"#ef4444"}}/>}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── INCIDENCIAS FITOSANITARIAS Y CIERRES ── */}
+      {subTab==="incidencias"&&(
+        <div className="ein">
+          {/* Badges de estado actual de cancha */}
+          {(()=>{
+            const cerradas = incidencias.filter(i=>i.estado==="cerrada");
+            const abiertas = incidencias.filter(i=>i.estado==="observacion");
+            if(!cerradas.length&&!abiertas.length) return null;
+            return (
+              <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:16}}>
+                {cerradas.flatMap(i=>i.sectoresCerrados).filter((v,i,a)=>a.indexOf(v)===i).map(sec=>(
+                  <span key={sec} style={{...S.chip,background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)",fontSize:12,padding:"5px 12px"}}>
+                    🚫 {sec} — CERRADO
+                  </span>
+                ))}
+                {abiertas.length>0&&<span style={{...S.chip,background:"rgba(245,158,11,0.12)",color:"#fcd34d",border:"1px solid rgba(245,158,11,0.3)",fontSize:12,padding:"5px 12px"}}>⚠️ {abiertas.length} observación pendiente de diagnóstico</span>}
+              </div>
+            );
+          })()}
+
+          <button className="btn-p" style={{...S.btn,marginBottom:16}} onClick={()=>{setShowIncidForm(true);setIncidPaso(1);setIncidForm(emptyIncid);}}>
+            🚨 Nueva incidencia / Cierre de cancha
+          </button>
+
+          {/* ── FORMULARIO PASO A PASO ── */}
+          {showIncidForm&&(
+            <div style={{...S.card,padding:20,marginBottom:20}} className="ein">
+              {/* Indicador de pasos */}
+              <div style={{display:"flex",gap:6,marginBottom:20,alignItems:"center"}}>
+                {[["1","🔍 Observación"],["2","🩺 Diagnóstico"],["3","🧪 Tratamiento"],["4","🚫 Cierre y reapertura"]].map(([n,lbl])=>(
+                  <React.Fragment key={n}>
+                    <div style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer"}} onClick={()=>Number(n)<incidPaso&&setIncidPaso(Number(n))}>
+                      <div style={{width:26,height:26,borderRadius:"50%",background:incidPaso>=Number(n)?"#3d7a52":"rgba(255,255,255,0.1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:incidPaso>=Number(n)?"#fff":"#5a8a6a",flexShrink:0}}>
+                        {incidPaso>Number(n)?"✓":n}
+                      </div>
+                      <span style={{fontSize:11,color:incidPaso===Number(n)?"#a0d8b0":"#5a8a6a",display:"none"}} className="paso-lbl">{lbl}</span>
+                    </div>
+                    {Number(n)<4&&<div style={{flex:1,height:2,background:incidPaso>Number(n)?"#3d7a52":"rgba(255,255,255,0.1)",borderRadius:1,maxWidth:30}}/>}
+                  </React.Fragment>
+                ))}
+                <span style={{fontSize:13,color:"#a0d8b0",marginLeft:8,fontFamily:"'Playfair Display',serif"}}>
+                  {["","🔍 Observación","🩺 Diagnóstico","🧪 Tratamiento","🚫 Cierre y reapertura"][incidPaso]}
+                </span>
+              </div>
+
+              {/* PASO 1 — OBSERVACIÓN */}
+              {incidPaso===1&&(
+                <div className="ein">
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+                    <div>
+                      <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>Fecha</label>
+                      <input type="date" style={S.input} value={incidForm.fechaObservacion} onChange={e=>setIncidForm(p=>({...p,fechaObservacion:e.target.value}))}/>
+                    </div>
+                    <div>
+                      <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>Hora</label>
+                      <input type="time" style={S.input} value={incidForm.horaObservacion} onChange={e=>setIncidForm(p=>({...p,horaObservacion:e.target.value}))}/>
+                    </div>
+                    <div style={{gridColumn:"1/-1"}}>
+                      <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>Observado por</label>
+                      <select style={S.input} value={incidForm.observador} onChange={e=>setIncidForm(p=>({...p,observador:e.target.value}))}>
+                        {listaPersonal.map(t=><option key={t.id} value={t.nombre}>{t.nombre}</option>)}
+                      </select>
+                    </div>
+                    <div style={{gridColumn:"1/-1"}}>
+                      <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>Descripción de la observación</label>
+                      <textarea rows={3} style={{...S.input,resize:"vertical"}} placeholder="Ej: Se observan manchas irregulares amarillo-pardas en Green 02, 06 y 08. Parches difusos en fairway del Green 01..." value={incidForm.observacion} onChange={e=>setIncidForm(p=>({...p,observacion:e.target.value}))}/>
+                    </div>
+                    <div style={{gridColumn:"1/-1"}}>
+                      <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:6,textTransform:"uppercase"}}>Sectores con síntomas observados</label>
+                      <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                        {Array.from({length:18},(_,i)=>`Green ${String(i+1).padStart(2,"0")}`).map(s=>{
+                          const sel = incidForm.sectoresObservados.includes(s);
+                          return <button key={s} style={{...S.btn,fontSize:11,padding:"4px 10px",background:sel?"rgba(239,68,68,0.2)":"rgba(255,255,255,0.06)",color:sel?"#fca5a5":"#7aaa80",border:`1px solid ${sel?"rgba(239,68,68,0.4)":"rgba(255,255,255,0.1)"}`}} onClick={()=>setIncidForm(p=>({...p,sectoresObservados:sel?p.sectoresObservados.filter(x=>x!==s):[...p.sectoresObservados,s]}))}>
+                            {s}
+                          </button>;
+                        })}
+                        {Array.from({length:18},(_,i)=>`Fairway ${String(i+1).padStart(2,"0")}`).map(s=>{
+                          const sel = incidForm.sectoresObservados.includes(s);
+                          return <button key={s} style={{...S.btn,fontSize:11,padding:"4px 10px",background:sel?"rgba(249,115,22,0.2)":"rgba(255,255,255,0.06)",color:sel?"#fb923c":"#7aaa80",border:`1px solid ${sel?"rgba(249,115,22,0.4)":"rgba(255,255,255,0.1)"}`}} onClick={()=>setIncidForm(p=>({...p,sectoresObservados:sel?p.sectoresObservados.filter(x=>x!==s):[...p.sectoresObservados,s]}))}>
+                            {s}
+                          </button>;
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:10}}>
+                    <button className="btn-p" style={S.btn} onClick={()=>incidForm.observacion.trim()&&setIncidPaso(2)}>Siguiente → Diagnóstico</button>
+                    <button className="btn-g" style={S.btn} onClick={()=>{setShowIncidForm(false);setIncidPaso(1);}}>Cancelar</button>
+                  </div>
+                </div>
+              )}
+
+              {/* PASO 2 — DIAGNÓSTICO */}
+              {incidPaso===2&&(
+                <div className="ein">
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+                    <div>
+                      <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>Tipo de cierre</label>
+                      <select style={S.input} value={incidForm.tipoCierre} onChange={e=>setIncidForm(p=>({...p,tipoCierre:e.target.value}))}>
+                        <option value="fitosanitario">🦠 Fitosanitario (plaga / enfermedad)</option>
+                        <option value="mantenimiento">🔧 Mantenimiento programado</option>
+                        <option value="clima">🌧️ Condición climática adversa</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>Severidad</label>
+                      <select style={S.input} value={incidForm.severidad} onChange={e=>setIncidForm(p=>({...p,severidad:e.target.value}))}>
+                        <option value="leve">🟡 Leve — monitoreo</option>
+                        <option value="media">🟠 Media — tratamiento preventivo</option>
+                        <option value="alta">🔴 Alta — tratamiento curativo urgente</option>
+                        <option value="critica">⛔ Crítica — cierre inmediato</option>
+                      </select>
+                    </div>
+                    {incidForm.tipoCierre==="fitosanitario"&&(<>
+                      <div>
+                        <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>Agente causal</label>
+                        <select style={S.input} value={incidForm.agenteCausal} onChange={e=>setIncidForm(p=>({...p,agenteCausal:e.target.value}))}>
+                          <option value="">Seleccionar...</option>
+                          {["Fusarium patch (Microdochium nivale)","Fusarium spp.","Rhizoctonia solani (Large Patch)","Dollar Spot (Clarireedia jacksonii)","Pythium spp.","Helminthosporium / Drechslera","Antracnosis (Colletotrichum)","Gusano blanco (larva coleóptero)","Trips","Pulgones","Otro patógeno"].map(a=><option key={a} value={a}>{a}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>Diagnóstico / descripción</label>
+                        <input style={S.input} placeholder="ej: Fusarium en greens 02, 06, 08 + Microdochium en fairway G01" value={incidForm.diagnostico} onChange={e=>setIncidForm(p=>({...p,diagnostico:e.target.value}))}/>
+                      </div>
+                    </>)}
+                    {incidForm.tipoCierre==="clima"&&(
+                      <div style={{gridColumn:"1/-1"}}>
+                        <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>Condición climática</label>
+                        <select style={S.input} value={incidForm.diagnostico} onChange={e=>setIncidForm(p=>({...p,diagnostico:e.target.value}))}>
+                          <option value="">Seleccionar...</option>
+                          {["Helada — riesgo daño mecánico por pisadas","Lluvia intensa — suelo saturado","Post-lluvia — suelo blando (>24 hrs)","Viento extremo (>60 km/h)","Calor extremo — estrés hídrico","Granizo — daño mecánico al césped"].map(c=><option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </div>
+                    )}
+                    {incidForm.tipoCierre==="mantenimiento"&&(
+                      <div style={{gridColumn:"1/-1"}}>
+                        <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>Tipo de mantenimiento</label>
+                        <select style={S.input} value={incidForm.diagnostico} onChange={e=>setIncidForm(p=>({...p,diagnostico:e.target.value}))}>
+                          <option value="">Seleccionar...</option>
+                          {["Aireado y resiembra","Fertilización — reingreso 24 hrs","Corte y perfilado","Reconstrucción de bunkers","Reparación sistema riego","Preparación torneo","Otro mantenimiento"].map(m=><option key={m} value={m}>{m}</option>)}
+                        </select>
+                      </div>
+                    )}
+                    <div style={{gridColumn:"1/-1"}}>
+                      <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>Diagnosticado / evaluado por</label>
+                      <select style={S.input} value={incidForm.diagnosticadoPor} onChange={e=>setIncidForm(p=>({...p,diagnosticadoPor:e.target.value}))}>
+                        <option value="">Seleccionar...</option>
+                        {listaPersonal.map(t=><option key={t.id} value={t.nombre}>{t.nombre}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:10}}>
+                    <button className="btn-g" style={S.btn} onClick={()=>setIncidPaso(1)}>← Volver</button>
+                    <button className="btn-p" style={S.btn} onClick={()=>setIncidPaso(3)}>Siguiente → Tratamiento</button>
+                  </div>
+                </div>
+              )}
+
+              {/* PASO 3 — TRATAMIENTO */}
+              {incidPaso===3&&(
+                <div className="ein">
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+                    <div style={{gridColumn:"1/-1"}}>
+                      <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>Alcance del tratamiento</label>
+                      <select style={S.input} value={incidForm.tratamiento} onChange={e=>setIncidForm(p=>({...p,tratamiento:e.target.value}))}>
+                        <option value="completo">Fumigación completa de cancha</option>
+                        <option value="sectores">Sectores afectados únicamente</option>
+                        <option value="preventivo">Preventivo — sectores aledaños</option>
+                        <option value="ninguno">Sin tratamiento químico</option>
+                      </select>
+                    </div>
+                    {incidForm.tratamiento!=="ninguno"&&(<>
+                      <div style={{gridColumn:"1/-1"}}>
+                        <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>Producto a aplicar</label>
+                        <select style={S.input} value={incidForm.productoAplicar} onChange={e=>setIncidForm(p=>({...p,productoAplicar:e.target.value}))}>
+                          <option value="">Seleccionar producto...</option>
+                          {Object.keys(REINGRESO_DIAS).filter(k=>k!=="Otro").map(p=><option key={p} value={p}>{p}</option>)}
+                          <option value="Otro">Otro</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>Fecha aplicación</label>
+                        <input type="date" style={S.input} value={incidForm.fechaAplicacion} onChange={e=>setIncidForm(p=>({...p,fechaAplicacion:e.target.value}))}/>
+                      </div>
+                      <div>
+                        <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>Hora aplicación</label>
+                        <input type="time" style={S.input} value={incidForm.horaAplicacion} onChange={e=>setIncidForm(p=>({...p,horaAplicacion:e.target.value}))}/>
+                      </div>
+                      {incidForm.productoAplicar&&(()=>{
+                        const r = calcReapertura(incidForm.productoAplicar, incidForm.fechaAplicacion, incidForm.horaAplicacion);
+                        if(!r.label) return null;
+                        return (
+                          <div style={{gridColumn:"1/-1",background:"rgba(34,197,94,0.08)",border:"1px solid rgba(34,197,94,0.25)",borderRadius:10,padding:"10px 14px"}}>
+                            <div style={{fontSize:12,color:"#86efac",fontWeight:600,marginBottom:4}}>📅 Reapertura estimada según ficha técnica</div>
+                            <div style={{fontSize:15,color:"#4ade80",fontWeight:700,marginBottom:4}}>{r.label}</div>
+                            <div style={{fontSize:11,color:"#5a9a7a",fontStyle:"italic"}}>{r.nota}</div>
+                          </div>
+                        );
+                      })()}
+                    </>)}
+                    <div style={{gridColumn:"1/-1"}}>
+                      <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>Observaciones adicionales</label>
+                      <textarea rows={2} style={{...S.input,resize:"vertical"}} placeholder="Notas del tratamiento..." value={incidForm.obs} onChange={e=>setIncidForm(p=>({...p,obs:e.target.value}))}/>
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:10}}>
+                    <button className="btn-g" style={S.btn} onClick={()=>setIncidPaso(2)}>← Volver</button>
+                    <button className="btn-p" style={S.btn} onClick={()=>setIncidPaso(4)}>Siguiente → Cierre</button>
+                  </div>
+                </div>
+              )}
+
+              {/* PASO 4 — CIERRE Y REAPERTURA */}
+              {incidPaso===4&&(
+                <div className="ein">
+                  <div style={{marginBottom:12}}>
+                    <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:8,textTransform:"uppercase"}}>Sectores a cerrar</label>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}}>
+                      {["Cancha completa","Todos los greens","Todos los fairways"].map(s=>{
+                        const sel=incidForm.sectoresCerrados.includes(s);
+                        return <button key={s} style={{...S.btn,fontSize:12,padding:"5px 14px",background:sel?"rgba(239,68,68,0.2)":"rgba(255,255,255,0.06)",color:sel?"#fca5a5":"#7aaa80",border:`1px solid ${sel?"rgba(239,68,68,0.4)":"rgba(255,255,255,0.1)"}`}} onClick={()=>setIncidForm(p=>({...p,sectoresCerrados:sel?p.sectoresCerrados.filter(x=>x!==s):[...p.sectoresCerrados,s]}))}>
+                          {sel?"🚫 ":""}{s}
+                        </button>;
+                      })}
+                    </div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                      {Array.from({length:18},(_,i)=>`Green ${String(i+1).padStart(2,"0")}`).map(s=>{
+                        const sel=incidForm.sectoresCerrados.includes(s)||incidForm.sectoresObservados.includes(s);
+                        const forzado=incidForm.sectoresObservados.includes(s);
+                        return <button key={s} style={{...S.btn,fontSize:11,padding:"3px 9px",background:sel?"rgba(239,68,68,0.2)":"rgba(255,255,255,0.05)",color:sel?"#fca5a5":"#7aaa80",border:`1px solid ${sel?"rgba(239,68,68,0.35)":"rgba(255,255,255,0.08)"}`,opacity:forzado?0.7:1}} onClick={()=>!forzado&&setIncidForm(p=>({...p,sectoresCerrados:sel?p.sectoresCerrados.filter(x=>x!==s):[...p.sectoresCerrados,s]}))}>
+                          {sel?"🚫 ":""}{s}
+                        </button>;
+                      })}
+                    </div>
+                    {incidForm.sectoresObservados.length>0&&(
+                      <div style={{fontSize:11,color:"#f59e0b",marginTop:6}}>⚠️ Sectores con síntomas observados se sugieren automáticamente</div>
+                    )}
+                  </div>
+                  {(()=>{
+                    const r = calcReapertura(incidForm.productoAplicar, incidForm.fechaAplicacion, incidForm.horaAplicacion);
+                    if(!r.label) return null;
+                    return (
+                      <div style={{...S.card,padding:14,marginBottom:12,background:"rgba(34,197,94,0.08)",borderColor:"rgba(34,197,94,0.25)"}}>
+                        <div style={{fontSize:12,color:"#86efac",fontWeight:600,marginBottom:3}}>✅ Reapertura estimada</div>
+                        <div style={{fontSize:16,color:"#4ade80",fontWeight:700}}>{r.label}</div>
+                        <div style={{fontSize:11,color:"#5a9a7a",marginTop:4,fontStyle:"italic"}}>{r.nota}</div>
+                      </div>
+                    );
+                  })()}
+                  <div style={{marginBottom:12}}>
+                    <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>Motivo del cierre (para comunicar)</label>
+                    <input style={S.input} placeholder="ej: Cancha cerrada por tratamiento fitosanitario. Reapertura estimada mañana." value={incidForm.motivoCierre} onChange={e=>setIncidForm(p=>({...p,motivoCierre:e.target.value}))}/>
+                  </div>
+                  <div style={{display:"flex",gap:10}}>
+                    <button className="btn-g" style={S.btn} onClick={()=>setIncidPaso(3)}>← Volver</button>
+                    <button className="btn-p" style={{...S.btn,background:"#3d7a52"}} onClick={guardarIncidencia}>✓ Registrar incidencia y cerrar cancha</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── LISTADO DE INCIDENCIAS ── */}
+          {!showIncidForm&&incidencias.length===0&&(
+            <div style={{...S.card,padding:40,textAlign:"center",color:"#4a8a5a"}}>
+              <div style={{fontSize:36,marginBottom:10}}>🏌️</div>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:16}}>Sin incidencias registradas</div>
+              <div style={{fontSize:13,color:"#4a7a5a",marginTop:6}}>Registra observaciones, diagnósticos y cierres de cancha</div>
+            </div>
+          )}
+          <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:8}}>
+            {incidencias.map(inc=>{
+              const ESTADO_INC = {
+                observacion:{label:"⚠️ Observación pendiente",color:"#f59e0b",bg:"rgba(245,158,11,0.12)"},
+                cerrada:     {label:"🚫 Cancha cerrada",      color:"#ef4444",bg:"rgba(239,68,68,0.12)"},
+                reabierta:   {label:"✅ Reabierta",           color:"#22c55e",bg:"rgba(34,197,94,0.12)"},
+              };
+              const TIPO_INC = {fitosanitario:"🦠",mantenimiento:"🔧",clima:"🌧️"};
+              const est = ESTADO_INC[inc.estado]||ESTADO_INC.observacion;
+              const r = calcReapertura(inc.productoAplicar, inc.fechaAplicacion, inc.horaAplicacion);
+              return (
+                <div key={inc.id} style={{...S.card,padding:16,borderLeft:`3px solid ${est.color}`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:10}}>
+                    <div style={{flex:1}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,flexWrap:"wrap"}}>
+                        <span style={{fontSize:18}}>{TIPO_INC[inc.tipoCierre]||"🚨"}</span>
+                        <span style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700}}>{inc.agenteCausal||inc.diagnostico||"Incidencia registrada"}</span>
+                        <span style={{...S.chip,background:est.bg,color:est.color,border:`1px solid ${est.color}40`,fontSize:11}}>{est.label}</span>
+                      </div>
+                      <div style={{fontSize:12,color:"#7aaa80",marginBottom:4}}>
+                        📅 {inc.fechaObservacion} {inc.horaObservacion&&`${inc.horaObservacion}`} · 👤 {inc.observador}
+                      </div>
+                      {inc.sectoresObservados?.length>0&&(
+                        <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:4}}>
+                          {inc.sectoresObservados.map(s=><span key={s} style={{...S.chip,background:"rgba(249,115,22,0.1)",color:"#fb923c",border:"1px solid rgba(249,115,22,0.25)",fontSize:10}}>{s}</span>)}
+                        </div>
+                      )}
+                      {inc.sectoresCerrados?.length>0&&(
+                        <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:4}}>
+                          {inc.sectoresCerrados.map(s=><span key={s} style={{...S.chip,background:"rgba(239,68,68,0.12)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.25)",fontSize:10}}>🚫 {s}</span>)}
+                        </div>
+                      )}
+                      {r.label&&<div style={{fontSize:12,color:"#4ade80",marginBottom:2}}>📅 Reapertura estimada: <strong>{r.label}</strong></div>}
+                      {r.nota&&<div style={{fontSize:11,color:"#5a9a7a",fontStyle:"italic",marginBottom:4}}>{r.nota}</div>}
+                      {inc.productoAplicar&&<div style={{fontSize:12,color:"#a0c8a0"}}>🧪 {inc.productoAplicar}</div>}
+                    </div>
+                    <div style={{display:"flex",flexDirection:"column",gap:6,alignItems:"flex-end",flexShrink:0}}>
+                      {inc.estado==="cerrada"&&(
+                        <button style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(34,197,94,0.15)",color:"#86efac",border:"1px solid rgba(34,197,94,0.3)"}}
+                          onClick={()=>setIncidencias(prev=>prev.map(x=>x.id===inc.id?{...x,estado:"reabierta"}:x))}>
+                          ✅ Marcar reabierta
+                        </button>
+                      )}
+                      <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>setExpandIncid(expandIncid===inc.id?null:inc.id)}>
+                        {expandIncid===inc.id?"▲":"▼"}
+                      </button>
+                      {esJefa&&<button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>setIncidencias(prev=>prev.filter(x=>x.id!==inc.id))}>🗑</button>}
+                    </div>
+                  </div>
+                  {expandIncid===inc.id&&(
+                    <div style={{borderTop:"1px solid rgba(255,255,255,0.08)",paddingTop:12,marginTop:10,fontSize:12,color:"#7aaa80",display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                      {inc.observacion&&<div style={{gridColumn:"1/-1",fontStyle:"italic",color:"#a0c0a0"}}>"{inc.observacion}"</div>}
+                      {inc.diagnosticadoPor&&<div>🩺 Diagnóstico por: {inc.diagnosticadoPor}</div>}
+                      {inc.severidad&&<div>⚡ Severidad: {inc.severidad}</div>}
+                      {inc.tratamiento&&<div>💊 Tratamiento: {inc.tratamiento}</div>}
+                      {inc.fechaAplicacion&&<div>🗓️ Aplicación: {inc.fechaAplicacion} {inc.horaAplicacion}</div>}
+                      {inc.motivoCierre&&<div style={{gridColumn:"1/-1",color:"#fcd34d"}}>📢 {inc.motivoCierre}</div>}
+                      {inc.obs&&<div style={{gridColumn:"1/-1",fontStyle:"italic"}}>{inc.obs}</div>}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── PROGRAMA ANUAL ── */}
+      {subTab==="alerta"&&(
+        <div className="ein">
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {progAll.map((p,i)=>{
+              const est = ESTACION_CONFIG[p.estacion]||ESTACION_CONFIG.invierno;
+              const pri = PRIORIDAD_CONFIG[p.prioridad]||PRIORIDAD_CONFIG.media;
+              const esMesActual = p.mes === mesActual;
+              return (
+                <div key={i} style={{...S.card,padding:14,borderLeft:`3px solid ${esMesActual?"#fcd34d":est.color}`,opacity:esMesActual?1:0.8}}>
+                  <div style={{display:"flex",alignItems:"start",gap:12,flexWrap:"wrap"}}>
+                    <div style={{minWidth:90,textAlign:"center",background:esMesActual?"rgba(252,211,77,0.1)":est.bg,borderRadius:8,padding:"6px 10px",flexShrink:0}}>
+                      <div style={{fontSize:18}}>{est.icon}</div>
+                      <div style={{fontSize:13,fontWeight:700,color:esMesActual?"#fcd34d":est.color}}>{MESES_ES[p.mes]}</div>
+                      <div style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase"}}>{p.estacion}</div>
+                    </div>
+                    <div style={{flex:1,minWidth:180}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5,flexWrap:"wrap"}}>
+                        <span style={{fontFamily:"'Playfair Display',serif",fontWeight:700,fontSize:15}}>{p.producto}</span>
+                        <span style={{...S.chip,background:pri.bg,color:pri.color,border:`1px solid ${pri.color}40`,fontSize:11}}>{pri.label}</span>
+                        {esMesActual&&<span style={{...S.chip,background:"rgba(252,211,77,0.15)",color:"#fcd34d",border:"1px solid rgba(252,211,77,0.3)",fontSize:11}}>← Este mes</span>}
+                      </div>
+                      <div style={{fontSize:13,color:"#a0c8a0",marginBottom:3}}>📍 {p.superficie}</div>
+                      <div style={{fontSize:13,color:"#7aaa80",marginBottom:3}}>💧 {p.dosis}</div>
+                      <div style={{fontSize:12,color:"#5a8a6a",fontStyle:"italic"}}>{p.objetivo}</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{...S.card,padding:16,marginTop:18,background:"rgba(59,130,246,0.06)",borderColor:"rgba(59,130,246,0.2)"}}>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#93c5fd",marginBottom:10}}>📐 Reglas de rotación anti-resistencia</div>
+            <div style={{fontSize:12,color:"#7a9ab0",lineHeight:1.8}}>
+              🔵 Grupo 11 (Estrobilurina: Amistar TOP) → máx. 2 aplicaciones/temporada<br/>
+              🟡 Grupo 3 (Triazol: Score, Apolo) → máx. 3 aplicaciones/temporada<br/>
+              🟠 Grupo 1 (Benzimidazol: Benomil/Poliben) → solo invierno, vigilar resistencia<br/>
+              ⚪ Grupo M3 (Mancozeb) → libre, siempre en mezcla o rotación
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── REGISTRAR APLICACIÓN ── */}
+      {subTab==="registro"&&(
+        <div className="ein">
+          {!showForm&&(
+            <button className="btn-p" style={{...S.btn,marginBottom:16}} onClick={()=>setShowForm(true)}>
+              ➕ Nueva aplicación
+            </button>
+          )}
+          {showForm&&(
+            <div style={{...S.card,padding:20,marginBottom:16}} className="ein">
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,marginBottom:16,color:"#a0d8b0"}}>Registrar Aplicación de Fungicida</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+
+                {/* Fecha y responsable */}
+                <div>
+                  <label style={labelSt}>Fecha</label>
+                  <input type="date" style={S.input} value={form.fecha} onChange={e=>setForm(p=>({...p,fecha:e.target.value}))}/>
+                </div>
+                <div>
+                  <label style={labelSt}>Responsable</label>
+                  <select style={S.input} value={form.responsable} onChange={e=>setForm(p=>({...p,responsable:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    {listaPersonal.map(t=><option key={t.id} value={t.nombre}>{t.nombre}</option>)}
+                  </select>
+                </div>
+
+                {/* Producto */}
+                <div style={{gridColumn:"1/-1"}}>
+                  <label style={labelSt}>Producto aplicado</label>
+                  <select style={S.input} value={form.producto} onChange={e=>{
+                    const pu = stock.find(s=>s.producto.toLowerCase().includes(e.target.value.split(" ")[0].toLowerCase()))?.precioUnitario||"";
+                    setForm(p=>({...p,producto:e.target.value,costoUnitario:pu?String(pu):""}));
+                  }}>
+                    <option value="">Seleccionar producto...</option>
+                    {["Amistar TOP (Azoxistrobina + Difenoconazol)","Score 250 EC (Difenoconazol)","Apolo 25 EW (Tebuconazol)","Fungizeb 800 WP (Mancozeb)","Benomil 50% WP","Poliben (Carbendazim)","Benomil + Mancozeb (mezcla)","Mancozeb + Apolo 25 EW (mezcla)","Otro"].map(p=><option key={p} value={p}>{p}</option>)}
+                  </select>
+                </div>
+
+                {/* Dosis y cantidad */}
+                <div>
+                  <label style={labelSt}>Dosis (por ha)</label>
+                  <input style={S.input} placeholder="ej: 0,75 L/ha" value={form.dosis} onChange={e=>setForm(p=>({...p,dosis:e.target.value}))}/>
+                </div>
+                <div style={{display:"flex",gap:6}}>
+                  <div style={{flex:2}}>
+                    <label style={labelSt}>Cantidad utilizada</label>
+                    <input type="number" min={0} step={0.01} style={S.input} placeholder="ej: 0,5" value={form.cantidadUsada}
+                      onChange={e=>{
+                        const cant=Number(e.target.value);
+                        const cu=Number(form.costoUnitario)||0;
+                        setForm(p=>({...p,cantidadUsada:e.target.value,costoTotal:cu&&cant?String(Math.round(cant*cu)):""}));
+                      }}/>
+                  </div>
+                  <div style={{flex:1}}>
+                    <label style={labelSt}>Unidad</label>
+                    <select style={S.input} value={form.unidadUsada} onChange={e=>setForm(p=>({...p,unidadUsada:e.target.value}))}>
+                      {["L","ml","kg","g","unidad"].map(u=><option key={u} value={u}>{u}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label style={labelSt}>Volumen agua (L/ha)</label>
+                  <input style={S.input} placeholder="ej: 400 L/ha" value={form.volAgua} onChange={e=>setForm(p=>({...p,volAgua:e.target.value}))}/>
+                </div>
+                <div>
+                  <label style={labelSt}>Condición climática</label>
+                  <select style={S.input} value={form.clima} onChange={e=>setForm(p=>({...p,clima:e.target.value}))}>
+                    <option value="">—</option>
+                    {["Soleado","Nublado","Parcialmente nublado","Sin viento","Viento leve","Post-lluvia (suelo húmedo)"].map(c=><option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+
+                {/* ── SECTOR DE APLICACIÓN ── */}
+                <div style={{gridColumn:"1/-1",background:"rgba(61,122,82,0.08)",border:"1px solid rgba(61,122,82,0.2)",borderRadius:10,padding:"12px 14px"}}>
+                  <div style={{fontSize:11,color:"#6aaa7a",letterSpacing:"0.6px",marginBottom:8,textTransform:"uppercase"}}>📍 Sector de aplicación</div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                    <div>
+                      <label style={labelSt}>Grupo</label>
+                      <select style={S.input} value={form.sectorGrupo} onChange={e=>setForm(p=>({...p,sectorGrupo:e.target.value,sectorDetalle:""}))}>
+                        <option value="">Seleccionar grupo...</option>
+                        {Object.keys(SECTORES_APLICACION).map(g=><option key={g} value={g}>{g}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={labelSt}>Sector específico</label>
+                      <select style={S.input} value={form.sectorDetalle} onChange={e=>setForm(p=>({...p,sectorDetalle:e.target.value}))} disabled={!form.sectorGrupo}>
+                        <option value="">{form.sectorGrupo?"Seleccionar...":"— elige grupo primero —"}</option>
+                        {(SECTORES_APLICACION[form.sectorGrupo]||[]).map(s=><option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                    {form.sectorDetalle==="Otro"&&(
+                      <div style={{gridColumn:"1/-1"}}>
+                        <label style={labelSt}>Especificar sector</label>
+                        <input style={S.input} placeholder="Nombre del sector..." value={form.sectorCustom} onChange={e=>setForm(p=>({...p,sectorCustom:e.target.value}))}/>
+                      </div>
+                    )}
+                  </div>
+                  {sectorFinal&&(
+                    <div style={{marginTop:8,fontSize:12,color:"#86efac"}}>✅ Sector seleccionado: <strong>{sectorFinal}</strong></div>
+                  )}
+                </div>
+
+                {/* ── COSTO Y RENDICIÓN ── */}
+                <div style={{gridColumn:"1/-1",background:"rgba(59,130,246,0.06)",border:"1px solid rgba(59,130,246,0.2)",borderRadius:10,padding:"12px 14px"}}>
+                  <div style={{fontSize:11,color:"#93c5fd",letterSpacing:"0.6px",marginBottom:8,textTransform:"uppercase"}}>💰 Costo para rendición</div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+                    <div>
+                      <label style={labelSt}>Precio unitario ($)</label>
+                      <input type="number" min={0} style={S.input} placeholder="ej: 82000" value={form.costoUnitario}
+                        onChange={e=>{
+                          const cu=Number(e.target.value);
+                          const cant=Number(form.cantidadUsada)||0;
+                          setForm(p=>({...p,costoUnitario:e.target.value,costoTotal:cu&&cant?String(Math.round(cant*cu)):""}));
+                        }}/>
+                    </div>
+                    <div>
+                      <label style={labelSt}>Costo total ($)</label>
+                      <input type="number" min={0} style={{...S.input,background:"rgba(59,130,246,0.1)",fontWeight:600}} placeholder="Auto-calculado" value={form.costoTotal}
+                        onChange={e=>setForm(p=>({...p,costoTotal:e.target.value}))}/>
+                    </div>
+                    <div>
+                      <label style={labelSt}>Cuenta / Ítem presupuesto</label>
+                      <select style={S.input} value={form.cuentaImputar} onChange={e=>setForm(p=>({...p,cuentaImputar:e.target.value}))}>
+                        <option value="">Sin imputar</option>
+                        {["Insumos Áreas Verdes","Mantenimiento Canchas","Rama Golf","Mantenimiento Ornamental","Fitosanitarios General","Presupuesto Emergencia","Otro"].map(c=><option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  {form.costoTotal&&(
+                    <div style={{marginTop:8,fontSize:13,color:"#93c5fd",fontWeight:600}}>
+                      Total a rendir: ${Number(form.costoTotal).toLocaleString("es-CL")}
+                      {form.cuentaImputar&&<span style={{fontSize:11,fontWeight:400,color:"#6a9abf",marginLeft:8}}>→ {form.cuentaImputar}</span>}
+                    </div>
+                  )}
+                </div>
+
+                {/* Observaciones y enviar a programa */}
+                <div style={{gridColumn:"1/-1"}}>
+                  <label style={labelSt}>Observaciones</label>
+                  <input style={S.input} placeholder="Notas adicionales..." value={form.obs} onChange={e=>setForm(p=>({...p,obs:e.target.value}))}/>
+                </div>
+                <div style={{gridColumn:"1/-1",display:"flex",alignItems:"center",gap:10,background:"rgba(61,122,82,0.08)",borderRadius:8,padding:"10px 14px",cursor:"pointer"}} onClick={()=>setForm(p=>({...p,enviarProg:!p.enviarProg}))}>
+                  <div style={{width:20,height:20,borderRadius:5,border:"2px solid #3d7a52",background:form.enviarProg?"#3d7a52":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    {form.enviarProg&&<span style={{color:"#fff",fontSize:13}}>✓</span>}
+                  </div>
+                  <div>
+                    <div style={{fontSize:13,color:"#a0d8b0",fontWeight:600}}>📆 Enviar a Programa del Día</div>
+                    <div style={{fontSize:11,color:"#5a8a6a"}}>Aparecerá en la vista Programación para asignar al equipo</div>
+                  </div>
+                </div>
+              </div>
+              <div style={{display:"flex",gap:10}}>
+                <button className="btn-p" style={S.btn} onClick={guardarAplicacion}>✓ Guardar registro</button>
+                <button className="btn-g" style={S.btn} onClick={()=>setShowForm(false)}>Cancelar</button>
+              </div>
+            </div>
+          )}
+          {!showForm&&aplicaciones.length===0&&(
+            <div style={{...S.card,padding:40,textAlign:"center",color:"#4a8a5a"}}>
+              <div style={{fontSize:36,marginBottom:10}}>🧪</div>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:16}}>Sin aplicaciones registradas</div>
+              <div style={{fontSize:13,color:"#4a7a5a",marginTop:6}}>Registra aquí cada aplicación de fungicida</div>
+            </div>
+          )}
+          {/* Resumen de costos */}
+          {!showForm&&aplicaciones.length>0&&(()=>{
+            const totalRendir = aplicaciones.reduce((a,x)=>a+Number(x.costoTotal||0),0);
+            const porCuenta = aplicaciones.reduce((acc,x)=>{
+              if(x.costoTotal&&x.cuentaImputar){acc[x.cuentaImputar]=(acc[x.cuentaImputar]||0)+Number(x.costoTotal);}
+              return acc;
+            },{});
+            if(!totalRendir) return null;
+            return (
+              <div style={{...S.card,padding:16,marginTop:16,background:"rgba(59,130,246,0.06)",borderColor:"rgba(59,130,246,0.2)"}}>
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#93c5fd",marginBottom:10}}>💰 Resumen de costos registrados</div>
+                <div style={{fontSize:20,fontWeight:700,color:"#93c5fd",marginBottom:8}}>${totalRendir.toLocaleString("es-CL")}</div>
+                {Object.entries(porCuenta).map(([cuenta,monto])=>(
+                  <div key={cuenta} style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#7a9ab0",borderTop:"1px solid rgba(59,130,246,0.1)",padding:"5px 0"}}>
+                    <span>{cuenta}</span><span style={{fontWeight:600}}>${monto.toLocaleString("es-CL")}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* ── HISTORIAL ── */}
+      {subTab==="historial"&&(
+        <div className="ein">
+          {aplicaciones.length===0?(
+            <div style={{...S.card,padding:40,textAlign:"center",color:"#4a8a5a"}}>
+              <div style={{fontSize:36,marginBottom:10}}>🗂️</div>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:16}}>Sin registros aún</div>
+            </div>
+          ):(
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {aplicaciones.map((a)=>(
+                <div key={a.id} style={{...S.card,padding:14}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:8}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:4}}>{a.producto}</div>
+                      <div style={{display:"flex",gap:14,flexWrap:"wrap",fontSize:12,color:"#7aaa80",marginBottom:4}}>
+                        <span>📅 {a.fecha}</span>
+                        {a.responsable&&<span>👤 {a.responsable}</span>}
+                        {a.dosis&&<span>💧 {a.dosis}</span>}
+                        {(a.cantidadUsada)&&<span>📦 {a.cantidadUsada} {a.unidadUsada}</span>}
+                        {a.volAgua&&<span>🪣 {a.volAgua}</span>}
+                        {a.clima&&<span>🌤️ {a.clima}</span>}
+                      </div>
+                      {(a.sectorFinal||a.sectorDetalle)&&(
+                        <div style={{fontSize:12,color:"#86efac",marginBottom:3}}>📍 {a.sectorFinal||a.sectorDetalle}</div>
+                      )}
+                      {a.costoTotal&&(
+                        <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:3}}>
+                          <span style={{fontSize:12,color:"#93c5fd",fontWeight:600}}>💰 ${Number(a.costoTotal).toLocaleString("es-CL")}</span>
+                          {a.cuentaImputar&&<span style={{fontSize:11,color:"#6a9abf",background:"rgba(59,130,246,0.1)",padding:"1px 8px",borderRadius:8}}>{a.cuentaImputar}</span>}
+                        </div>
+                      )}
+                      {a.obs&&<div style={{fontSize:12,color:"#6aaa7a",fontStyle:"italic",marginTop:2}}>{a.obs}</div>}
+                      {a.enviarProg&&<span style={{fontSize:10,color:"#4ade80",background:"rgba(74,222,128,0.08)",padding:"1px 8px",borderRadius:8,border:"1px solid rgba(74,222,128,0.2)"}}>📆 En programa del día</span>}
+                    </div>
+                    {esJefa&&(
+                      <button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>setAplicaciones(prev=>prev.filter(x=>x.id!==a.id))}>🗑</button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── STOCK ── */}
+      {subTab==="stock"&&(
+        <div className="ein">
+          <div style={{marginBottom:14,fontFamily:"'Playfair Display',serif",fontSize:16,color:"#a0d8b0"}}>Stock actual de fungicidas</div>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {stock.map(item=>{
+              const bajo = item.stockActual <= item.stockMinimo;
+              const agotado = item.stockActual === 0;
+              const color = agotado?"#ef4444":bajo?"#f59e0b":"#22c55e";
+              const bg = agotado?"rgba(239,68,68,0.1)":bajo?"rgba(245,158,11,0.1)":"rgba(34,197,94,0.08)";
+              return (
+                <div key={item.id} style={{...S.card,padding:16,borderLeft:`3px solid ${color}`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:10}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:4}}>{item.producto}</div>
+                      <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:12,color:"#7aaa80",marginBottom:6}}>
+                        <span>📦 Cód: {item.codigo}</span>
+                        <span style={{fontSize:11,color:"#5a8a6a",background:"rgba(255,255,255,0.06)",padding:"1px 8px",borderRadius:8,border:"1px solid rgba(255,255,255,0.1)"}}>{item.grupo}</span>
+                        <span>💰 ${item.precioUnitario.toLocaleString("es-CL")} / {item.unidad}</span>
+                      </div>
+                      <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                        <span style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:900,color}}>
+                          {item.stockActual} <span style={{fontSize:13,fontWeight:400}}>{item.unidad}</span>
+                        </span>
+                        <span style={{...S.chip,background:bg,color,border:`1px solid ${color}40`,fontSize:11}}>
+                          {agotado?"⛔ Agotado":bajo?"⚠️ Stock bajo":"✅ OK"}
+                        </span>
+                        <span style={{fontSize:11,color:"#5a8a6a"}}>Mín: {item.stockMinimo} {item.unidad}</span>
+                      </div>
+                    </div>
+                    {esJefa&&(
+                      <div style={{display:"flex",gap:8,alignItems:"center",flexShrink:0}}>
+                        <button style={{...S.btn,fontSize:13,padding:"5px 12px",background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}}
+                          onClick={()=>setStock(prev=>prev.map(s=>s.id===item.id?{...s,stockActual:Math.max(0,s.stockActual-1)}:s))}>−</button>
+                        <button style={{...S.btn,fontSize:13,padding:"5px 12px",background:"rgba(61,122,82,0.25)",color:"#a0d8b0",border:"1px solid rgba(61,122,82,0.35)"}}
+                          onClick={()=>setStock(prev=>prev.map(s=>s.id===item.id?{...s,stockActual:s.stockActual+1}:s))}>+</button>
+                        {showStockEdit===item.id?(
+                          <input type="number" min={0} autoFocus style={{...S.input,width:70,fontSize:13,padding:"4px 8px"}}
+                            defaultValue={item.stockActual}
+                            onBlur={e=>{ setStock(prev=>prev.map(s=>s.id===item.id?{...s,stockActual:Math.max(0,Number(e.target.value))}:s)); setShowStockEdit(null); }}/>
+                        ):(
+                          <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>setShowStockEdit(item.id)}>✏️</button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {stock.some(s=>s.stockActual<=s.stockMinimo)&&(
+            <div style={{...S.card,padding:14,marginTop:16,background:"rgba(245,158,11,0.07)",borderColor:"rgba(245,158,11,0.25)"}}>
+              <div style={{fontSize:13,color:"#fcd34d",fontWeight:600,marginBottom:4}}>⚠️ Productos con stock bajo — considerar reorden a Copargo Agro</div>
+              <div style={{fontSize:12,color:"#a08050"}}>Vendedora: Marlene Pino · {PROVEEDOR_PRINCIPAL.email} · {PROVEEDOR_PRINCIPAL.telefono}</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── PROVEEDOR + PEDIDOS ── */}
+      {subTab==="proveedor"&&(
+        <div className="ein">
+          <div style={{...S.card,padding:20,marginBottom:18}}>
+            <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:16}}>
+              <div style={{width:48,height:48,borderRadius:"50%",background:"linear-gradient(135deg,#3b82f6,#1e40af)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>🏪</div>
+              <div>
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700}}>{PROVEEDOR_PRINCIPAL.empresa}</div>
+                <div style={{fontSize:12,color:"#6aaa7a"}}>{PROVEEDOR_PRINCIPAL.giro}</div>
+              </div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,fontSize:13}}>
+              {[
+                ["👤 Titular",  PROVEEDOR_PRINCIPAL.nombre],
+                ["🪪 RUT",       PROVEEDOR_PRINCIPAL.rut],
+                ["📍 Dirección", PROVEEDOR_PRINCIPAL.direccion],
+                ["📞 Teléfono",  PROVEEDOR_PRINCIPAL.telefono],
+                ["✉️ Email",     PROVEEDOR_PRINCIPAL.email],
+                ["🛒 Vendedora",  PROVEEDOR_PRINCIPAL.vendedor],
+                ["📱 Tel. vendedora", PROVEEDOR_PRINCIPAL.telefonoVendedor],
+                ["💳 Condición", PROVEEDOR_PRINCIPAL.condicion],
+              ].map(([lbl,val])=>(
+                <div key={lbl} style={{background:"rgba(255,255,255,0.04)",borderRadius:8,padding:"8px 12px"}}>
+                  <div style={{fontSize:10,color:"#5a8a6a",letterSpacing:"0.5px",marginBottom:2}}>{lbl}</div>
+                  <div style={{color:"#ede9e0"}}>{val}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,marginBottom:12,color:"#a0d8b0"}}>Pedidos realizados</div>
+          {pedidos.map(p=>(
+            <div key={p.id} style={{...S.card,padding:16,marginBottom:10}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:10}}>
+                <div>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
+                    <span style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700}}>Pedido N° {p.id}</span>
+                    <span style={{...S.chip,background:"rgba(34,197,94,0.1)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)",fontSize:11}}>✅ Recibido</span>
+                  </div>
+                  <div style={{display:"flex",gap:14,flexWrap:"wrap",fontSize:12,color:"#7aaa80"}}>
+                    <span>📅 {p.fecha}</span>
+                    <span>🏪 {p.proveedor}</span>
+                    <span>👤 {p.vendedor}</span>
+                    <span style={{color:"#f59e0b"}}>⏰ Vence: {p.vencimiento}</span>
+                  </div>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <span style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color:"#86efac"}}>${p.total.toLocaleString("es-CL")}</span>
+                  <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}}
+                    onClick={()=>setShowPedidoDetalle(showPedidoDetalle===p.id?null:p.id)}>
+                    {showPedidoDetalle===p.id?"▲ Cerrar":"▼ Detalle"}
+                  </button>
+                </div>
+              </div>
+              {showPedidoDetalle===p.id&&(
+                <div style={{borderTop:"1px solid rgba(255,255,255,0.08)",paddingTop:12,marginTop:12}}>
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                    <thead>
+                      <tr style={{color:"#6aaa7a",borderBottom:"1px solid rgba(255,255,255,0.1)"}}>
+                        <th style={{textAlign:"left",padding:"4px 8px"}}>Código</th>
+                        <th style={{textAlign:"left",padding:"4px 8px"}}>Descripción</th>
+                        <th style={{textAlign:"center",padding:"4px 8px"}}>Cant.</th>
+                        <th style={{textAlign:"right",padding:"4px 8px"}}>P. Unit.</th>
+                        <th style={{textAlign:"right",padding:"4px 8px"}}>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {p.items.map((it,i)=>(
+                        <tr key={i} style={{borderBottom:"1px solid rgba(255,255,255,0.05)",color:"#c8e0c8"}}>
+                          <td style={{padding:"5px 8px",color:"#6aaa7a",fontFamily:"monospace"}}>{it.codigo}</td>
+                          <td style={{padding:"5px 8px"}}>{it.descripcion}</td>
+                          <td style={{padding:"5px 8px",textAlign:"center"}}>{it.cantidad}</td>
+                          <td style={{padding:"5px 8px",textAlign:"right"}}>${it.precio.toLocaleString("es-CL")}</td>
+                          <td style={{padding:"5px 8px",textAlign:"right",fontWeight:600}}>${it.total.toLocaleString("es-CL")}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{borderTop:"1px solid rgba(255,255,255,0.15)",color:"#ede9e0"}}>
+                        <td colSpan={4} style={{padding:"6px 8px",textAlign:"right",color:"#7aaa80"}}>Afecto</td>
+                        <td style={{padding:"6px 8px",textAlign:"right"}}>$369.540</td>
+                      </tr>
+                      <tr style={{color:"#ede9e0"}}>
+                        <td colSpan={4} style={{padding:"4px 8px",textAlign:"right",color:"#7aaa80"}}>IVA 19%</td>
+                        <td style={{padding:"4px 8px",textAlign:"right"}}>$70.213</td>
+                      </tr>
+                      <tr style={{color:"#86efac",fontFamily:"'Playfair Display',serif",fontWeight:700}}>
+                        <td colSpan={4} style={{padding:"6px 8px",textAlign:"right",fontSize:14}}>TOTAL</td>
+                        <td style={{padding:"6px 8px",textAlign:"right",fontSize:15}}>${p.total.toLocaleString("es-CL")}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+// ─── ACTIVIDAD DEL DÍA — VISTA COMPACTA COLAPSABLE ──────────────────────────
+function ActividadDelDia({ zonas, MACROZONAS_BASE, S, EC, tareasDelDia }) {
+  const [expandidas, setExpandidas] = React.useState({});
+  const [vistaCompacta, setVistaCompacta] = React.useState(true);
+
+  const toggle = (zona) => setExpandidas(p=>({...p,[zona]:!p[zona]}));
+  const expandirTodas = () => { const e={}; zonas.forEach(([z])=>{e[z]=true;}); setExpandidas(e); };
+  const colapsarTodas = () => setExpandidas({});
+
+  const totalHechas = tareasDelDia.filter(t=>["hecha","completada"].includes(t.estado)).length;
+  const totalNoPudo = tareasDelDia.filter(t=>t.estado==="no_pudo").length;
+  const totalPend   = tareasDelDia.filter(t=>["pendiente","por_designar"].includes(t.estado)).length;
+
+  return (
+    <div>
+      {/* Barra de control */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:8}}>
+        <div style={{display:"flex",gap:14,fontSize:12,flexWrap:"wrap"}}>
+          <span style={{color:"#22c55e"}}>✅ {totalHechas} hechas</span>
+          {totalNoPudo>0&&<span style={{color:"#ef4444"}}>🔴 {totalNoPudo} no pudieron</span>}
+          <span style={{color:"#f59e0b"}}>⏳ {totalPend} pendientes</span>
+        </div>
+        <div style={{display:"flex",gap:6}}>
+          <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={expandirTodas}>▼ Todas</button>
+          <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={colapsarTodas}>▲ Colapsar</button>
+          <button className={`tab${!vistaCompacta?" on":""}`} style={{fontSize:11,padding:"4px 10px"}} onClick={()=>setVistaCompacta(p=>!p)}>
+            {vistaCompacta?"📋 Detalle":"📊 Compacto"}
+          </button>
+        </div>
+      </div>
+
+      {vistaCompacta ? (
+        /* ── VISTA COMPACTA: tabla una fila por zona ── */
+        <div style={{...S.card,overflow:"hidden"}}>
+          {zonas.map(([nombreZona, tareasZona], idx)=>{
+            const zonaInfo = MACROZONAS_BASE.find(z=>z.nombre===nombreZona);
+            const hechas   = tareasZona.filter(t=>["hecha","completada"].includes(t.estado)).length;
+            const noPudo   = tareasZona.filter(t=>t.estado==="no_pudo").length;
+            const pend     = tareasZona.filter(t=>["pendiente","por_designar"].includes(t.estado)).length;
+            const pct      = Math.round((hechas/tareasZona.length)*100);
+            const abierta  = expandidas[nombreZona];
+            const barColor = pct===100?"#22c55e":pct>60?"#4ade80":pct>30?"#f59e0b":"#ef4444";
+            const hayAlerta = noPudo>0;
+
+            return (
+              <div key={nombreZona}>
+                {/* Fila resumen — siempre visible */}
+                <div
+                  style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",cursor:"pointer",borderBottom:"1px solid rgba(255,255,255,0.06)",background:idx%2===0?"transparent":"rgba(255,255,255,0.018)",borderLeft:`3px solid ${hayAlerta?"#ef4444":pct===100?"#22c55e":"rgba(255,255,255,0.1)"}`}}
+                  onClick={()=>toggle(nombreZona)}
+                >
+                  <span style={{fontSize:16,flexShrink:0}}>{zonaInfo?.icono||"📍"}</span>
+                  <span style={{flex:1,fontSize:13,fontWeight:600,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{nombreZona}</span>
+                  {/* Mini barra de progreso */}
+                  <div style={{width:60,height:5,background:"rgba(255,255,255,0.08)",borderRadius:3,overflow:"hidden",flexShrink:0}}>
+                    <div style={{width:`${pct}%`,height:"100%",background:barColor,borderRadius:3}}/>
+                  </div>
+                  <span style={{fontSize:12,fontWeight:700,color:barColor,width:32,textAlign:"right",flexShrink:0}}>{pct}%</span>
+                  <div style={{display:"flex",gap:5,flexShrink:0}}>
+                    <span style={{fontSize:11,color:"#22c55e",background:"rgba(34,197,94,0.1)",padding:"1px 7px",borderRadius:8}}>✅{hechas}</span>
+                    {noPudo>0&&<span style={{fontSize:11,color:"#ef4444",background:"rgba(239,68,68,0.1)",padding:"1px 7px",borderRadius:8}}>🔴{noPudo}</span>}
+                    {pend>0&&<span style={{fontSize:11,color:"#f59e0b",background:"rgba(245,158,11,0.08)",padding:"1px 7px",borderRadius:8}}>⏳{pend}</span>}
+                  </div>
+                  <span style={{fontSize:11,color:"#4a7a5a",flexShrink:0}}>{abierta?"▲":"▼"}</span>
+                </div>
+
+                {/* Detalle colapsable */}
+                {abierta&&(
+                  <div style={{background:"rgba(0,0,0,0.15)",padding:"8px 14px 10px 44px",borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
+                    {tareasZona.map(t=>{
+                      const est = EC[t.estado]||EC.pendiente;
+                      return (
+                        <div key={t.id} style={{display:"flex",gap:8,padding:"5px 0",borderBottom:"1px solid rgba(255,255,255,0.04)",alignItems:"start"}}>
+                          <span style={{flexShrink:0,fontSize:12,color:est.color,width:16}}>{est.icon}</span>
+                          <div style={{flex:1,minWidth:0}}>
+                            <span style={{fontSize:12,fontWeight:600}}>{t.tarea}</span>
+                            {t.elemento&&<span style={{fontSize:11,color:"#5a7a6a",marginLeft:6}}>{t.elemento}</span>}
+                            {t.responsable&&<span style={{fontSize:11,color:"#6a9a7a",marginLeft:6}}>· 👤 {t.responsable}</span>}
+                            {t.notaWorker&&<div style={{fontSize:11,color:t.estado==="no_pudo"?"#fca5a5":"#7aaa80",fontStyle:"italic",marginTop:2}}>⚠️ {t.notaWorker}</div>}
+                          </div>
+                          <span style={{fontSize:10,color:est.color,flexShrink:0}}>{est.label}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        /* ── VISTA DETALLE: cards completas ── */
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {zonas.map(([nombreZona, tareasZona])=>{
+            const zonaInfo=MACROZONAS_BASE.find(z=>z.nombre===nombreZona);
+            const hechas=tareasZona.filter(t=>["hecha","completada"].includes(t.estado)).length;
+            const noPudo=tareasZona.filter(t=>t.estado==="no_pudo").length;
+            const pct=Math.round((hechas/tareasZona.length)*100);
+            return (
+              <div key={nombreZona} style={{...S.card,padding:16,borderLeft:`3px solid ${noPudo>0?"#ef4444":pct===100?"#22c55e":"rgba(255,255,255,0.1)"}`}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:6}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{fontSize:18}}>{zonaInfo?.icono||"📍"}</span>
+                    <span style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700}}>{nombreZona}</span>
+                    <span style={{fontSize:11,color:"#5a8a6a"}}>{zonaInfo?.categoria||""}</span>
+                  </div>
+                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                    <span style={{fontSize:11,color:"#22c55e"}}>✅ {hechas}</span>
+                    {noPudo>0&&<span style={{fontSize:11,color:"#ef4444"}}>🔴 {noPudo}</span>}
+                    <span style={{fontSize:12,fontWeight:700,color:pct===100?"#22c55e":pct>50?"#f59e0b":"#ef4444"}}>{pct}%</span>
+                  </div>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:5}}>
+                  {tareasZona.map(t=>{
+                    const est=EC[t.estado]||EC.pendiente;
+                    return (
+                      <div key={t.id} style={{display:"flex",gap:8,padding:"6px 10px",borderRadius:7,background:"rgba(255,255,255,0.04)",borderLeft:`2px solid ${est.color}40`,alignItems:"start"}}>
+                        <span style={{flexShrink:0,fontSize:13}}>{est.icon}</span>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:13,fontWeight:600}}>{t.tarea}{t.elemento&&<span style={{fontWeight:400,color:"#5a8a6a",marginLeft:6,fontSize:11}}>{t.elemento}</span>}</div>
+                          <div style={{display:"flex",gap:8,marginTop:2,flexWrap:"wrap",fontSize:11}}>
+                            <span style={{color:est.color}}>{est.label}</span>
+                            {t.responsable&&<span style={{color:"#6a9a8a"}}>👤 {t.responsable}</span>}
+                          </div>
+                          {t.notaWorker&&<div style={{fontSize:11,color:t.estado==="no_pudo"?"#fca5a5":"#7aaa80",marginTop:2,fontStyle:"italic"}}>⚠️ {t.notaWorker}</div>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [data, setData] = useState(initData);
   const [zonas, setZonas] = useState(MACROZONAS_BASE);
@@ -3576,6 +4919,15 @@ export default function App() {
   const [workerPinInput, setWorkerPinInput] = useState("");
   const [rolSeleccionado, setRolSeleccionado] = useState("trabajador");
   const [rolLogueado, setRolLogueado] = useState(null);
+
+  // ─── FUNGICIDAS ──────────────────────────────────────────────────────────────
+  const initFungicidas = () => { try { const s=localStorage.getItem("ev2-fungicidas"); return s?JSON.parse(s):[]; } catch { return []; } };
+  const [aplicaciones, setAplicaciones] = useState(initFungicidas);
+  useEffect(() => { try { localStorage.setItem("ev2-fungicidas", JSON.stringify(aplicaciones)); } catch {} }, [aplicaciones]);
+
+  const initIncidenciasFito = () => { try { const s=localStorage.getItem("ev2-fung-incid"); return s?JSON.parse(s):[]; } catch { return []; } };
+  const [incidenciasFito, setIncidenciasFito] = useState(initIncidenciasFito);
+  useEffect(() => { try { localStorage.setItem("ev2-fung-incid", JSON.stringify(incidenciasFito)); } catch {} }, [incidenciasFito]);
   const getPines = () => { try { return JSON.parse(localStorage.getItem("ev2-pines")||"{}"); } catch { return {}; } };
   const setPinRol = (rol, pin) => { const p=getPines(); p[rol]=pin; localStorage.setItem("ev2-pines", JSON.stringify(p)); };
   const checkPin = (rol, pin) => { const p=getPines(); return p[rol] && String(p[rol])===String(pin); };
@@ -3825,7 +5177,7 @@ export default function App() {
           )}
         </div>
         <div style={S.headerNav} className="headerNav">
-          {[["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["personal","👷","Personal"],["miturno","🌿","Mi Turno"]].map(([v,ico,lbl])=>(
+          {[["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["fungicidas","🧪","Fungicidas"],["personal","👷","Personal"],["miturno","🌿","Mi Turno"]].map(([v,ico,lbl])=>(
             <button key={v} onClick={()=>{setVista(v);setZonaId(null);setAiText("");}} style={{cursor:"pointer",border:"none",background:"transparent",color:vista===v?"#fff":"#7aaa80",fontFamily:"'Georgia',serif",fontSize:12,padding:"10px 14px",borderBottom:vista===v?"2px solid #4a9a64":"2px solid transparent",transition:"all .15s",whiteSpace:"nowrap",display:"flex",flexDirection:"column",alignItems:"center",gap:2,flexShrink:0}}>
               <span style={{fontSize:16}}>{ico}</span>
               <span>{lbl}</span>
@@ -4213,7 +5565,7 @@ export default function App() {
               >🖨️ Imprimir Reporte</button>
             </div>
             {tabReporte==="semanal" && (
-              <ReporteSemanal S={S} tareasProg={tareasProg} semanaBase={semanaBase} setSemanaBase={setSemanaBase} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal}/>
+              <ReporteSemanal S={S} tareasProg={tareasProg} semanaBase={semanaBase} setSemanaBase={setSemanaBase} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} incidenciasFito={incidenciasFito}/>
             )}
             {tabReporte==="general" && <>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(270px,1fr))",gap:18,marginBottom:26}}>
@@ -4280,56 +5632,7 @@ export default function App() {
                       <div style={{fontSize:13}}>Las tareas programadas en 📆 Programación aparecerán aquí.</div>
                     </div>
                   ) : (
-                    <div style={{display:"flex",flexDirection:"column",gap:12}}>
-                      {zonasConActividad.map(([nombreZona, tareasZona])=>{
-                        const zonaInfo=MACROZONAS_BASE.find(z=>z.nombre===nombreZona);
-                        const hechas=tareasZona.filter(t=>["hecha","completada"].includes(t.estado)).length;
-                        const noPudo=tareasZona.filter(t=>t.estado==="no_pudo").length;
-                        const pct=Math.round((hechas/tareasZona.length)*100);
-                        return (
-                          <div key={nombreZona} style={{...S.card,padding:16}}>
-                            {/* Cabecera zona */}
-                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
-                              <div style={{display:"flex",alignItems:"center",gap:8}}>
-                                <span style={{fontSize:20}}>{zonaInfo?.icono||"📍"}</span>
-                                <div>
-                                  <span style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700}}>{nombreZona}</span>
-                                  <span style={{fontSize:11,color:"#5a8a6a",marginLeft:8}}>{zonaInfo?.categoria||""}</span>
-                                </div>
-                              </div>
-                              <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                                <span style={{fontSize:12,color:"#22c55e"}}>✅ {hechas}</span>
-                                {noPudo>0&&<span style={{fontSize:12,color:"#ef4444"}}>🔴 {noPudo}</span>}
-                                <span style={{fontSize:12,fontWeight:700,color:pct===100?"#22c55e":pct>50?"#f59e0b":"#ef4444"}}>{pct}%</span>
-                              </div>
-                            </div>
-                            {/* Lista de tareas */}
-                            <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                              {tareasZona.map(t=>{
-                                const est=EC[t.estado]||EC.pendiente;
-                                return (
-                                  <div key={t.id} style={{display:"flex",gap:10,padding:"8px 10px",borderRadius:8,background:"rgba(255,255,255,0.04)",borderLeft:`3px solid ${est.color}40`,alignItems:"start"}}>
-                                    <span style={{flexShrink:0,fontSize:14}}>{est.icon}</span>
-                                    <div style={{flex:1,minWidth:0}}>
-                                      <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
-                                        <span style={{fontSize:13,fontWeight:600}}>{t.tarea}</span>
-                                        {t.elemento&&<span style={{fontSize:11,color:"#5a8a6a",background:"rgba(255,255,255,0.05)",padding:"1px 6px",borderRadius:8}}>{t.elemento}</span>}
-                                        {t.emergente&&<span style={{fontSize:10,color:"#f59e0b",background:"rgba(245,158,11,0.1)",padding:"1px 6px",borderRadius:8}}>🆕</span>}
-                                      </div>
-                                      <div style={{display:"flex",gap:8,marginTop:2,flexWrap:"wrap"}}>
-                                        <span style={{fontSize:11,color:est.color}}>{est.label}</span>
-                                        {t.responsable&&<span style={{fontSize:11,color:"#6a9a8a"}}>👤 {t.responsable}</span>}
-                                      </div>
-                                      {t.notaWorker&&<div style={{fontSize:11,color:t.estado==="no_pudo"?"#fca5a5":"#7aaa80",marginTop:3,fontStyle:"italic",padding:"3px 8px",background:"rgba(255,255,255,0.04)",borderRadius:6}}>{t.estado==="no_pudo"?"⚠️ ":""}{t.notaWorker}</div>}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                    <ActividadDelDia zonas={zonasConActividad} MACROZONAS_BASE={MACROZONAS_BASE} S={S} EC={EC} tareasDelDia={tareasDelDia} />
                   )}
                 </>
               );
@@ -4502,6 +5805,11 @@ export default function App() {
           </div>
         )}
 
+
+        {/* FUNGICIDAS */}
+        {vista==="fungicidas"&&(
+          <PanelFungicidas S={S} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} personal={personal} esJefa={rolLogueado==="jefa"||rolLogueado==="supervisor"} tareasProg={tareasProg} setTareasProg={setTareasProg} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} />
+        )}
 
         {/* PERSONAL */}
         {vista==="personal"&&personalVista==="lista"&&(
