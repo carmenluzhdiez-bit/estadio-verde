@@ -4920,6 +4920,10 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   const [editId, setEditId] = React.useState(null);
   const [filtroCuenta, setFiltroCuenta] = React.useState("todas");
   const [filtroMes, setFiltroMes] = React.useState("todos");
+  const [fotoBase64, setFotoBase64] = React.useState(null);
+  const [fotoAnalizando, setFotoAnalizando] = React.useState(false);
+  const [fotoError, setFotoError] = React.useState(null);
+  const fotoInputRef = React.useRef(null);
   const [seleccionadas, setSeleccionadas] = React.useState([]);
   const [rendForm, setRendForm] = React.useState({fecha:hoy.toISOString().slice(0,10), obs:""});
   const [reembolsoForm, setReembolsoForm] = React.useState({fecha:hoy.toISOString().slice(0,10), monto:"", banco:"", nTransferencia:"", obs:""});
@@ -5152,7 +5156,79 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
       {subTab==="lista"&&(
         <div className="ein">
           <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
-            <button className="btn-p" style={S.btn} onClick={()=>{setForm(emptyForm);setEditId(null);setShowForm(true);}}>➕ Nueva compra</button>
+            <button className="btn-p" style={S.btn} onClick={()=>{setForm(emptyForm);setEditId(null);setShowForm(true);setFotoBase64(null);setFotoError(null);}}>➕ Nueva compra</button>
+            <button style={{...S.btn,background:"rgba(139,92,246,0.2)",color:"#c4b5fd",border:"1px solid rgba(139,92,246,0.35)",fontSize:12,display:"flex",alignItems:"center",gap:6}}
+              onClick={()=>fotoInputRef.current?.click()}>
+              📷 Foto / Archivo
+            </button>
+            <input ref={fotoInputRef} type="file" accept="image/*,application/pdf" style={{display:"none"}}
+              onChange={async(e)=>{
+                const file=e.target.files?.[0]; if(!file) return;
+                setFotoAnalizando(true); setFotoError(null); setFotoBase64(null);
+                setEditId(null); setShowForm(false);
+                try {
+                  const isPdf = file.type==="application/pdf";
+                  const b64 = await new Promise((res,rej)=>{
+                    const r=new FileReader();
+                    r.onload=()=>res(r.result.split(",")[1]);
+                    r.onerror=()=>rej(new Error("Error leyendo archivo"));
+                    r.readAsDataURL(file);
+                  });
+                  const mediaType = isPdf?"application/pdf":(file.type||"image/jpeg");
+                  const contentBlock = isPdf
+                    ? {type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}}
+                    : {type:"image",source:{type:"base64",media_type:mediaType,data:b64}};
+                  const resp = await fetch("https://api.anthropic.com/v1/messages",{
+                    method:"POST",
+                    headers:{"Content-Type":"application/json"},
+                    body: JSON.stringify({
+                      model:"claude-sonnet-4-20250514",
+                      max_tokens:1000,
+                      messages:[{role:"user",content:[
+                        contentBlock,
+                        {type:"text",text:`Eres un asistente que extrae datos de documentos de compra chilenos (facturas, boletas, pedidos, cotizaciones).
+Analiza este documento y devuelve SOLO un objeto JSON válido, sin texto adicional, sin markdown, sin backticks.
+Campos a extraer:
+{
+  "tipoDoc": "Factura|Boleta|Nota de Pedido|Cotización|Orden de Compra|Otro",
+  "nDocumento": "número del documento",
+  "fecha": "YYYY-MM-DD (si no hay año claro usa ${new Date().getFullYear()})",
+  "proveedor": "nombre empresa o persona",
+  "rut": "RUT del proveedor con puntos y guión",
+  "descripcion": "descripción principal del producto o servicio",
+  "categoria": "tipo de producto (ej: Fungicida, Herramienta, Semilla, Fertilizante, etc)",
+  "cantidad": número,
+  "unidad": "unidad|kg|L|ml|g|m²|m|hora|servicio",
+  "precioUnitario": número sin puntos ni símbolos (precio neto unitario),
+  "totalNeto": número sin puntos ni símbolos,
+  "iva": número sin puntos ni símbolos,
+  "totalBruto": número sin puntos ni símbolos,
+  "obs": "cualquier observación relevante del documento"
+}
+Si hay múltiples productos, describe el principal en "descripcion" y lista los demás en "obs".
+Si un campo no está visible o no aplica, usa cadena vacía "" o 0 para números.`}
+                      ]}]}),
+                  });
+                  const d = await resp.json();
+                  const txt = (d.content||[]).map(i=>i.text||"").join("").trim();
+                  const parsed = JSON.parse(txt.replace(/```json|```/g,"").trim());
+                  const neto = parsed.totalNeto||Math.round((parsed.cantidad||1)*(parsed.precioUnitario||0));
+                  const iva  = parsed.iva||(parsed.tipoDoc==="Boleta"?0:Math.round(neto*0.19));
+                  const bruto= parsed.totalBruto||(neto+iva);
+                  setForm({...emptyForm,...parsed,
+                    totalNeto:neto||"", iva:iva||"", totalBruto:bruto||"",
+                    cantidad:parsed.cantidad||1,
+                  });
+                  setFotoBase64(isPdf ? null : `data:${mediaType};base64,${b64}`);
+                  setShowForm(true);
+                } catch(err) {
+                  setFotoError("No se pudo leer el documento. Verifica que sea una imagen clara o un PDF legible.");
+                } finally {
+                  setFotoAnalizando(false);
+                  e.target.value="";
+                }
+              }}
+            />
             {seleccionadas.length>0&&(
               <button style={{...S.btn,background:"rgba(167,139,250,0.2)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.35)",fontSize:12}}
                 onClick={()=>setShowRendForm(true)}>
@@ -5168,6 +5244,21 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
               {mesesUnicos.map(m=><option key={m} value={m}>{m}</option>)}
             </select>
           </div>
+
+          {/* Analizando foto */}
+          {fotoAnalizando&&(
+            <div style={{...S.card,padding:24,textAlign:"center",marginBottom:14,background:"rgba(139,92,246,0.08)",borderColor:"rgba(139,92,246,0.25)"}}>
+              <div style={{fontSize:28,marginBottom:8}}>🔍</div>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#c4b5fd",marginBottom:4}}>Analizando documento...</div>
+              <div style={{fontSize:12,color:"#7a6a9a"}}>Claude está leyendo los datos del documento</div>
+            </div>
+          )}
+          {fotoError&&(
+            <div style={{...S.card,padding:14,marginBottom:14,background:"rgba(239,68,68,0.08)",borderColor:"rgba(239,68,68,0.25)"}}>
+              <div style={{fontSize:13,color:"#fca5a5"}}>⚠️ {fotoError}</div>
+              <button className="btn-g" style={{...S.btn,fontSize:11,marginTop:8}} onClick={()=>setFotoError(null)}>Cerrar</button>
+            </div>
+          )}
 
           {/* Form rendición */}
           {showRendForm&&(
@@ -5189,7 +5280,17 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
           {/* Formulario nueva compra */}
           {showForm&&(
             <div style={{...S.card,padding:20,marginBottom:16}} className="ein">
-              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:16,color:"#a0d8b0"}}>{editId?"✏️ Editar":"➕ Nueva"} compra</div>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:16,color:"#a0d8b0"}}>{editId?"✏️ Editar":"➕ Nueva"} compra
+                {fotoBase64&&!editId&&<span style={{fontSize:11,color:"#c4b5fd",marginLeft:8,fontFamily:"sans-serif"}}>📷 Datos extraídos del documento — revisa y confirma</span>}
+              </div>
+              {fotoBase64&&!editId&&(
+                <div style={{marginBottom:14,display:"flex",gap:12,alignItems:"start"}}>
+                  <img src={fotoBase64} alt="Documento" style={{width:80,height:100,objectFit:"cover",borderRadius:8,border:"1px solid rgba(139,92,246,0.3)",flexShrink:0}}/>
+                  <div style={{fontSize:12,color:"#7a6a9a",background:"rgba(139,92,246,0.06)",borderRadius:8,padding:"8px 12px",flex:1}}>
+                    ✅ Documento analizado. Revisa los campos y corrige lo que sea necesario antes de guardar.
+                  </div>
+                </div>
+              )}
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
                 <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={form.fecha} onChange={e=>updateForm({fecha:e.target.value})}/></div>
                 <div><label style={labelSt}>Tipo documento</label>
