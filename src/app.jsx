@@ -5607,7 +5607,6 @@ Si un campo no está visible o no aplica, usa cadena vacía "" o 0 para números
   );
 }
 export default function App() {
-  const [data, setData] = useState(initData);
   const [zonas, setZonas] = useState(MACROZONAS_BASE);
   const [vista, setVista] = useState("dashboard");
   const [zonaId, setZonaId] = useState(null);
@@ -5622,14 +5621,14 @@ export default function App() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiText, setAiText] = useState("");
   const [fechaReporte, setFechaReporte] = useState(new Date().toISOString().slice(0,10));
-  const [tabReporte, setTabReporte] = useState("general"); // "general" | "semanal"
+  const [tabReporte, setTabReporte] = useState("general");
   const [semanaBase, setSemanaBase] = useState(()=>{
-    // Default: lunes de la semana actual
     const d = new Date(); const day = d.getDay(); const diff = (day===0?-6:1-day);
     d.setDate(d.getDate()+diff); return d.toISOString().slice(0,10);
   });
 
   // ─── ESTADO SINCRONIZADO CON FIREBASE ────────────────────────────────────────
+  const CUENTAS_DEFAULT = ["Rama Golf","Mantenimiento Jardines","Obras","Insumos Generales","Maquinaria y Equipos","Fitosanitarios","Semillas y Plantas","Uniformes y EPP"];
   const [data,           setData,           dataReady]     = useFirebaseState("data",           initData());
   const [personal,       setPersonal,       personalReady] = useFirebaseState("personal",       PERSONAL_INICIAL);
   const [tareasProg,     setTareasProg,     progReady]     = useFirebaseState("prog",           {});
@@ -5656,7 +5655,6 @@ export default function App() {
   const [rolLogueado, setRolLogueado] = useState(null);
 
   // ─── FUNGICIDAS ──────────────────────────────────────────────────────────────
-  const CUENTAS_DEFAULT = ["Rama Golf","Mantenimiento Jardines","Obras","Insumos Generales","Maquinaria y Equipos","Fitosanitarios","Semillas y Plantas","Uniformes y EPP"];
   const checkPin = (rol, pin) => { const p=getPines(); return p[rol] && String(p[rol])===String(pin); };
 
   // updateZona — actualiza una zona en el estado data
