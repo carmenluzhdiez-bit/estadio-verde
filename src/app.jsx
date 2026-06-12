@@ -4939,8 +4939,11 @@ function ActividadDelDia({ zonas, MACROZONAS_BASE, S, EC, tareasDelDia }) {
 const MESES_COMPRAS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 
 function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={}, updateZona=()=>{}, MACROZONAS_BASE=[] }) {
-  const { compras, rendiciones=[], fondo=3000000 } = comprasData;
+  const { compras, rendiciones=[], fondo=3000000, saldoAnterior=0 } = comprasData;
   const set = (patch) => setComprasData(p=>({...p,...patch}));
+
+  // ── Categorías predefinidas ───────────────────────────────────────────────
+  const CATEGORIAS = ["Caja chica","Combustible","Decoración Interior","Difusión/Educación","EPP / Uniforme","Fertilizante","Fletes","Herramienta","Maceteros","Maicillo","Maquinaria/Equipos","Material de construcción","Material de riego","Materiales/Herramientas","Mulch","Plaguicida","Planta","Repuesto maquinaria","Semilla","Servicio externo","Sustratos/Enmiendas","Otro"];
 
   // ── Cuentas a imputar según organigrama ──────────────────────────────────
   const CUENTAS_INTERNAS = ["Mantenimiento Áreas Verdes","Obras Áreas Verdes"];
@@ -4954,6 +4957,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   const [showForm, setShowForm] = React.useState(false);
   const [showRendForm, setShowRendForm] = React.useState(false);
   const [showReembolsoForm, setShowReembolsoForm] = React.useState(false);
+  const [showSaldoAnt, setShowSaldoAnt] = React.useState(false);
   const [editId, setEditId] = React.useState(null);
   const [filtroCuenta, setFiltroCuenta] = React.useState("todas");
   const [filtroMes, setFiltroMes] = React.useState("todos");
@@ -5097,11 +5101,12 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
 
   // ── Resumen por cuenta ────────────────────────────────────────────────────
   const totalGeneral = compras.reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
-  const gastadoPendiente = compras.filter(c=>["pendiente","pagada","pagada_efectivo","pagada_debito"].includes(c.estado)).reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
-  const totalReembolsado = rendiciones.reduce((a,r)=>a+(r.reembolso?Number(r.montoReembolso||0):0),0);
-  const saldoDisponible  = fondo - gastadoPendiente;
-  const pctUsado = fondo?Math.round((gastadoPendiente/fondo)*100):0;
-  const colorSaldo = saldoDisponible>fondo*0.4?"#22c55e":saldoDisponible>fondo*0.15?"#f59e0b":"#ef4444";
+  const totalReembolsado  = rendiciones.reduce((a,r)=>a+(r.reembolso?Number(r.montoReembolso||0):0),0);
+  const gastadoPendiente  = compras.filter(c=>["pendiente","pagada","pagada_efectivo","pagada_debito","en_rendicion"].includes(c.estado)).reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
+  const fondoReal         = fondo + Number(saldoAnterior||0) + totalReembolsado;
+  const saldoDisponible   = fondoReal - gastadoPendiente;
+  const pctUsado          = fondoReal?Math.round((gastadoPendiente/fondoReal)*100):0;
+  const colorSaldo        = saldoDisponible>fondoReal*0.4?"#22c55e":saldoDisponible>fondoReal*0.15?"#f59e0b":"#ef4444";
 
   const porCuenta = TODAS_CUENTAS.map(cu=>{
     const items=compras.filter(c=>c.cuenta===cu);
@@ -5145,15 +5150,15 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
           <div>
             <div style={{fontSize:11,color:"#6aaa7a",letterSpacing:"0.6px",marginBottom:4,textTransform:"uppercase"}}>💼 Fondo disponible</div>
             <div style={{fontFamily:"'Playfair Display',serif",fontSize:32,fontWeight:900,color:colorSaldo}}>${saldoDisponible.toLocaleString("es-CL")}</div>
-            <div style={{fontSize:12,color:"#5a8a6a",marginTop:2}}>de ${fondo.toLocaleString("es-CL")} total</div>
+            <div style={{fontSize:12,color:"#5a8a6a",marginTop:2}}>de ${fondoReal.toLocaleString("es-CL")} total{Number(saldoAnterior)>0&&<span style={{color:"#f59e0b"}}> (incluye ${Number(saldoAnterior).toLocaleString("es-CL")} saldo anterior)</span>}</div>
           </div>
           <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
             <div style={{textAlign:"center",background:"rgba(255,255,255,0.04)",borderRadius:10,padding:"10px 16px"}}>
-              <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:700,color:"#f59e0b"}}>${gastadoPendiente.toLocaleString("es-CL")}</div>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color:"#f59e0b"}}>${gastadoPendiente.toLocaleString("es-CL")}</div>
               <div style={{fontSize:10,color:"#a08050"}}>Comprometido</div>
             </div>
             <div style={{textAlign:"center",background:"rgba(255,255,255,0.04)",borderRadius:10,padding:"10px 16px"}}>
-              <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:700,color:"#22c55e"}}>${totalReembolsado.toLocaleString("es-CL")}</div>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color:"#22c55e"}}>${totalReembolsado.toLocaleString("es-CL")}</div>
               <div style={{fontSize:10,color:"#4a8a5a"}}>Reembolsado</div>
             </div>
           </div>
@@ -5163,8 +5168,16 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
         </div>
         <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#5a8a6a"}}>
           <span>{pctUsado}% comprometido</span>
-          {esJefa&&<button style={{...S.btn,fontSize:10,padding:"2px 8px",background:"rgba(255,255,255,0.06)",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)"}}
-            onClick={()=>{const v=prompt("Monto del fondo ($):",fondo);if(v&&!isNaN(Number(v)))set({fondo:Number(v)});}}>⚙️ Ajustar fondo</button>}
+          {esJefa&&<div style={{display:"flex",gap:6}}>
+            <button style={{...S.btn,fontSize:10,padding:"2px 8px",background:"rgba(245,158,11,0.1)",color:"#fcd34d",border:"1px solid rgba(245,158,11,0.2)"}}
+              onClick={()=>{const v=prompt(`Saldo remanente del período anterior ($):`,saldoAnterior||0);if(v!==null&&!isNaN(Number(v)))set({saldoAnterior:Number(v)});}}>
+              💰 Saldo anterior
+            </button>
+            <button style={{...S.btn,fontSize:10,padding:"2px 8px",background:"rgba(255,255,255,0.06)",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)"}}
+              onClick={()=>{const v=prompt("Monto del fondo base ($):",fondo);if(v&&!isNaN(Number(v)))set({fondo:Number(v)});}}>
+              ⚙️ Ajustar fondo
+            </button>
+          </div>}
         </div>
       </div>
 
@@ -5318,7 +5331,12 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                     </div>
                     <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:8,marginBottom:8}}>
                       <div><label style={labelSt}>Descripción</label><input style={S.input} placeholder="Nombre del producto" value={item.descripcion} onChange={e=>updateItem(idx,{descripcion:e.target.value})}/></div>
-                      <div><label style={labelSt}>Categoría</label><input style={S.input} placeholder="ej: Fungicida" value={item.categoria||""} onChange={e=>updateItem(idx,{categoria:e.target.value})}/></div>
+                      <div><label style={labelSt}>Categoría</label>
+                        <select style={S.input} value={item.categoria||""} onChange={e=>updateItem(idx,{categoria:e.target.value})}>
+                          <option value="">Seleccionar...</option>
+                          {CATEGORIAS.map(c=><option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </div>
                     </div>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8}}>
                       <div><label style={labelSt}>Cantidad</label><input type="number" min={1} step={0.01} style={S.input} value={item.cantidad} onChange={e=>updateItem(idx,{cantidad:e.target.value})}/></div>
