@@ -18,18 +18,3 @@
     "vite": "^5.1.0"
   }
 }
-firebase/auth ya viene incluido en el paquete firebase — no necesita línea separada. El problema debe ser otro.
-
-¿El workflow de GitHub Actions pasó en verde ✅ después de subir el app.jsx?
-
-si... ¿El workflow de GitHub Actions pasó en verde ✅ después de subir el app.jsx?
-
-13:07
-Bien, el build está correcto. El problema es que Firebase guardó la sesión del intento anterior y entra automáticamente sin verificar bien el rol.
-
-Abre la app y haz clic en "Salir" en el header. Luego intenta entrar de nuevo con carmenluzhdiez@gmail.com y Jefe4971.
-
-¿Qué pasa ahora — se queda esperando o entra?
-
-
-
