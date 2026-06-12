@@ -5236,17 +5236,9 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                   const contentBlock = isPdf
                     ? {type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}}
                     : {type:"image",source:{type:"base64",media_type:mediaType,data:b64}};
-                  const controller = new AbortController();
-                  const timeout = setTimeout(()=>controller.abort(), 30000);
-                  const resp = await fetch("https://api.anthropic.com/v1/messages",{
+                  const resp = await fetch("https://estadioespaol.carmenluzhdiez.workers.dev",{
                     method:"POST",
-                    signal: controller.signal,
-                    headers:{
-                      "Content-Type":"application/json",
-                      "x-api-key":"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",
-                      "anthropic-version":"2023-06-01",
-                      "anthropic-dangerous-direct-browser-access":"true",
-                    },
+                    headers:{"Content-Type":"application/json"},
                     body: JSON.stringify({
                       model:"claude-sonnet-4-6",
                       max_tokens:1000,
@@ -5275,7 +5267,6 @@ Si hay múltiples productos, describe el principal en "descripcion" y lista los 
 Si un campo no está visible o no aplica, usa cadena vacía "" o 0 para números.`}
                       ]}]}),
                   });
-                  clearTimeout(timeout);
                   const d = await resp.json();
                   const txt = (d.content||[]).map(i=>i.text||"").join("").trim();
                   const parsed = JSON.parse(txt.replace(/```json|```/g,"").trim());
@@ -5816,7 +5807,7 @@ export default function App() {
     const elems=getAllElems(zona.id).map(e=>`${e.nombre} (${ESTADOS_ELEM[e.edData.estado]?.label||"Bueno"})`).join(", ");
     const prompt=`Eres experto en mantenimiento de parques y jardines de un club español en Chile. Analiza la macrozona "${zona.nombre}" con estos elementos: ${elems}. Estado general: ${ESTADOS_ZONA[zd?.estadoGeneral]?.label}. Notas: ${zd?.notas||"Ninguna"}. Da recomendaciones específicas de mantenimiento para cada elemento en estado regular o crítico, y un plan de acción priorizado. Responde en español con viñetas y secciones claras.`;
     try {
-      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":"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","anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:prompt}]})});
+      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":"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","anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:prompt}]})});
       const json=await res.json();
       setAiText(json.content?.[0]?.text||"Sin respuesta.");
     } catch { setAiText("Error al conectar con el asistente IA."); }
