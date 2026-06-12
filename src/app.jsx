@@ -4939,7 +4939,7 @@ function ActividadDelDia({ zonas, MACROZONAS_BASE, S, EC, tareasDelDia }) {
 const MESES_COMPRAS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 
 function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={}, updateZona=()=>{}, MACROZONAS_BASE=[] }) {
-  const { compras, rendiciones=[], fondo=3000000, saldoAnterior=0 } = comprasData;
+  const { compras, rendiciones=[], fondo=3000000, saldoAnterior=0, periodoAnterior="" } = comprasData;
   const set = (patch) => setComprasData(p=>({...p,...patch}));
 
   // ── Categorías predefinidas ───────────────────────────────────────────────
@@ -5046,6 +5046,16 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     setShowReembolsoForm(false);
   };
 
+  const deshacerRendicion = (rendId) => {
+    if(!window.confirm("¿Deshacer esta rendición? Las compras volverán al estado anterior.")) return;
+    const rend = rendiciones.find(r=>r.id===rendId);
+    if(!rend) return;
+    set({
+      rendiciones: rendiciones.filter(r=>r.id!==rendId),
+      compras: compras.map(c=>rend.items?.includes(c.id)?{...c,estado:"pagada"}:c),
+    });
+  };
+
   // ── Informe de rendición ──────────────────────────────────────────────────
   const imprimirRendicion = (r) => {
     const itemsRend = compras.filter(c=>r.items?.includes(c.id));
@@ -5150,7 +5160,10 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
           <div>
             <div style={{fontSize:11,color:"#6aaa7a",letterSpacing:"0.6px",marginBottom:4,textTransform:"uppercase"}}>💼 Fondo disponible</div>
             <div style={{fontFamily:"'Playfair Display',serif",fontSize:32,fontWeight:900,color:colorSaldo}}>${saldoDisponible.toLocaleString("es-CL")}</div>
-            <div style={{fontSize:12,color:"#5a8a6a",marginTop:2}}>de ${fondoReal.toLocaleString("es-CL")} total{Number(saldoAnterior)>0&&<span style={{color:"#f59e0b"}}> (incluye ${Number(saldoAnterior).toLocaleString("es-CL")} saldo anterior)</span>}</div>
+            <div style={{fontSize:12,color:"#5a8a6a",marginTop:2}}>
+              de ${fondoReal.toLocaleString("es-CL")} total
+              {Number(saldoAnterior)>0&&<span style={{color:"#f59e0b"}}> · incluye ${Number(saldoAnterior).toLocaleString("es-CL")} remanente{periodoAnterior?` de ${periodoAnterior}`:""}</span>}
+            </div>
           </div>
           <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
             <div style={{textAlign:"center",background:"rgba(255,255,255,0.04)",borderRadius:10,padding:"10px 16px"}}>
@@ -5170,7 +5183,12 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
           <span>{pctUsado}% comprometido</span>
           {esJefa&&<div style={{display:"flex",gap:6}}>
             <button style={{...S.btn,fontSize:10,padding:"2px 8px",background:"rgba(245,158,11,0.1)",color:"#fcd34d",border:"1px solid rgba(245,158,11,0.2)"}}
-              onClick={()=>{const v=prompt(`Saldo remanente del período anterior ($):`,saldoAnterior||0);if(v!==null&&!isNaN(Number(v)))set({saldoAnterior:Number(v)});}}>
+              onClick={()=>{
+                const monto=prompt(`Saldo remanente del período anterior ($):`,saldoAnterior||0);
+                if(monto===null||isNaN(Number(monto))) return;
+                const periodo=prompt("Período al que corresponde (ej: Mayo 2026):",periodoAnterior||"");
+                set({saldoAnterior:Number(monto), periodoAnterior:periodo||""});
+              }}>
               💰 Saldo anterior
             </button>
             <button style={{...S.btn,fontSize:10,padding:"2px 8px",background:"rgba(255,255,255,0.06)",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)"}}
@@ -5490,6 +5508,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                       <div style={{display:"flex",alignItems:"center",gap:8}}>
                         <span style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:700,color:"#93c5fd"}}>${r.total.toLocaleString("es-CL")}</span>
                         <button style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}} onClick={()=>imprimirRendicion(r)}>🖨️ Imprimir</button>
+                        {!r.reembolso&&esJefa&&<button className="btn-d" style={{...S.btn,fontSize:11,padding:"5px 10px"}} onClick={()=>deshacerRendicion(r.id)}>↩️ Deshacer</button>}
                       </div>
                     </div>
                     <div style={{borderTop:"1px solid rgba(255,255,255,0.07)",paddingTop:10,marginBottom:10}}>
