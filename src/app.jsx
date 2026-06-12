@@ -4939,7 +4939,595 @@ function ActividadDelDia({ zonas, MACROZONAS_BASE, S, EC, tareasDelDia }) {
 const MESES_COMPRAS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 
 function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={}, updateZona=()=>{}, MACROZONAS_BASE=[] }) {
-  const { compras, cuentas, rendiciones=[], fondo=3000000 } = comprasData;
+  const { compras, rendiciones=[], fondo=3000000 } = comprasData;
+  const set = (patch) => setComprasData(p=>({...p,...patch}));
+
+  // ── Cuentas a imputar según organigrama ──────────────────────────────────
+  const CUENTAS_INTERNAS = ["Mantenimiento Áreas Verdes","Obras Áreas Verdes"];
+  const CUENTAS_EXTERNAS = ["Rama de Fútbol","Rama de Golf","Taller Depto. Social y Cultural","Rama de Tenis","Jardín Infantil"];
+  const TODAS_CUENTAS = [...CUENTAS_INTERNAS,...CUENTAS_EXTERNAS];
+
+  const PIE_PAGINA = "Jefe de Departamento de Áreas Verdes · Carmen Luz Hermosilla Diez";
+
+  const hoy = new Date();
+  const [subTab, setSubTab] = React.useState("fondo");
+  const [showForm, setShowForm] = React.useState(false);
+  const [showRendForm, setShowRendForm] = React.useState(false);
+  const [showReembolsoForm, setShowReembolsoForm] = React.useState(false);
+  const [editId, setEditId] = React.useState(null);
+  const [filtroCuenta, setFiltroCuenta] = React.useState("todas");
+  const [filtroMes, setFiltroMes] = React.useState("todos");
+  const [seleccionadas, setSeleccionadas] = React.useState([]);
+  const [rendForm, setRendForm] = React.useState({fecha:hoy.toISOString().slice(0,10),obs:""});
+  const [reembolsoForm, setReembolsoForm] = React.useState({fecha:hoy.toISOString().slice(0,10),monto:"",banco:"",nTransferencia:"",obs:""});
+  const [expandDetalle, setExpandDetalle] = React.useState(null);
+
+  const labelSt = {fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
+
+  // ── Formulario cabecera + ítems ───────────────────────────────────────────
+  const emptyItem = {id:Date.now(), descripcion:"", categoria:"", cantidad:1, unidad:"unidad", precioUnitario:"", totalNeto:"", iva:"", totalBruto:""};
+  const emptyForm = {
+    fecha:hoy.toISOString().slice(0,10),
+    proveedor:"", rut:"", nDocumento:"", tipoDoc:"Factura",
+    cuenta:"", responsable:"",
+    fechaPago:"", formaPago:"transferencia", bancoPago:"", nTransferencia:"",
+    estado:"pendiente", obs:"",
+    items:[{...emptyItem, id:1}],
+    totalNetoDoc:"", ivaDoc:"", totalBrutoDoc:"",
+  };
+  const [form, setForm] = React.useState(emptyForm);
+
+  // ── Cálculo automático por ítem ───────────────────────────────────────────
+  const calcItem = (item) => {
+    const cant = Number(item.cantidad)||1;
+    const pu   = Number(item.precioUnitario)||0;
+    const neto = Math.round(cant*pu);
+    const iva  = form.tipoDoc==="Boleta"?0:Math.round(neto*0.19);
+    return {...item, totalNeto:neto||"", iva:iva||"", totalBruto:(neto+iva)||""};
+  };
+
+  const updateItem = (idx, patch) => {
+    const items = form.items.map((it,i)=>{
+      if(i!==idx) return it;
+      const next = {...it,...patch};
+      if(patch.cantidad!==undefined||patch.precioUnitario!==undefined) return calcItem(next);
+      return next;
+    });
+    const totalNeto  = items.reduce((a,it)=>a+Number(it.totalNeto||0),0);
+    const ivaTotal   = items.reduce((a,it)=>a+Number(it.iva||0),0);
+    const totalBruto = items.reduce((a,it)=>a+Number(it.totalBruto||0),0);
+    setForm(p=>({...p, items, totalNetoDoc:totalNeto||"", ivaDoc:ivaTotal||"", totalBrutoDoc:totalBruto||""}));
+  };
+
+  const addItem = () => setForm(p=>({...p, items:[...p.items,{...emptyItem,id:Date.now()}]}));
+  const removeItem = (idx) => {
+    if(form.items.length===1) return;
+    const items = form.items.filter((_,i)=>i!==idx);
+    const totalNeto  = items.reduce((a,it)=>a+Number(it.totalNeto||0),0);
+    const ivaTotal   = items.reduce((a,it)=>a+Number(it.iva||0),0);
+    const totalBruto = items.reduce((a,it)=>a+Number(it.totalBruto||0),0);
+    setForm(p=>({...p,items,totalNetoDoc:totalNeto||"",ivaDoc:ivaTotal||"",totalBrutoDoc:totalBruto||""}));
+  };
+
+  // ── CRUD ──────────────────────────────────────────────────────────────────
+  const guardar = () => {
+    if(!form.proveedor.trim()||!form.cuenta||!form.items[0].descripcion.trim()) return;
+    const doc = {...form, id:editId||Date.now()};
+    if(editId) { set({compras:compras.map(c=>c.id===editId?doc:c)}); setEditId(null); }
+    else        { set({compras:[doc,...compras]}); }
+    setForm(emptyForm); setShowForm(false);
+  };
+
+  const eliminar = (id) => set({compras:compras.filter(c=>c.id!==id)});
+  const editar   = (c)  => { setForm({...c,items:c.items||[{...emptyItem,descripcion:c.descripcion||"",cantidad:c.cantidad||1,precioUnitario:c.precioUnitario||"",totalNeto:c.totalNeto||"",iva:c.iva||"",totalBruto:c.totalBruto||""}]}); setEditId(c.id); setShowForm(true); setSubTab("lista"); };
+  const marcarPagada = (id,forma) => set({compras:compras.map(c=>c.id===id?{...c,estado:"pagada",formaPago:forma,fechaPago:c.fechaPago||hoy.toISOString().slice(0,10)}:c)});
+
+  // ── Rendición ─────────────────────────────────────────────────────────────
+  const crearRendicion = () => {
+    if(!seleccionadas.length) return;
+    const items = compras.filter(c=>seleccionadas.includes(c.id));
+    const total = items.reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
+    const nueva = {id:Date.now(),fecha:rendForm.fecha,obs:rendForm.obs,items:seleccionadas,total,estado:"presentada",reembolso:false,montoReembolso:0,fechaReembolso:"",nTransReembolso:""};
+    set({compras:compras.map(c=>seleccionadas.includes(c.id)?{...c,estado:"en_rendicion"}:c),rendiciones:[nueva,...rendiciones]});
+    setSeleccionadas([]); setRendForm({fecha:hoy.toISOString().slice(0,10),obs:""}); setShowRendForm(false);
+  };
+
+  const registrarReembolso = (rendId) => {
+    if(!reembolsoForm.monto) return;
+    set({
+      rendiciones:rendiciones.map(r=>r.id===rendId?{...r,reembolso:true,estado:"reembolsada",montoReembolso:Number(reembolsoForm.monto),fechaReembolso:reembolsoForm.fecha,nTransReembolso:reembolsoForm.nTransferencia,bancoReembolso:reembolsoForm.banco,obsReembolso:reembolsoForm.obs}:r),
+      compras:compras.map(c=>rendiciones.find(r=>r.id===rendId)?.items?.includes(c.id)?{...c,estado:"rendida"}:c),
+    });
+    setReembolsoForm({fecha:hoy.toISOString().slice(0,10),monto:"",banco:"",nTransferencia:"",obs:""});
+    setShowReembolsoForm(false);
+  };
+
+  // ── Informe de rendición ──────────────────────────────────────────────────
+  const imprimirRendicion = (r) => {
+    const itemsRend = compras.filter(c=>r.items?.includes(c.id));
+    const fechaRend = new Date(r.fecha+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"});
+    const rows = itemsRend.map(c=>{
+      const items = c.items||[{descripcion:c.descripcion,cantidad:c.cantidad,precioUnitario:c.precioUnitario,totalNeto:c.totalNeto,iva:c.iva,totalBruto:c.totalBruto}];
+      return items.map((it,i)=>`
+        <tr>
+          ${i===0?`<td rowspan="${items.length}" style="vertical-align:top;padding:6px 10px;border:1px solid #ddd;font-size:12px">${c.fecha}<br><small>${c.tipoDoc} ${c.nDocumento||""}</small><br><small>${c.proveedor||""}</small></td>`:""}
+          <td style="padding:6px 10px;border:1px solid #ddd;font-size:12px">${it.descripcion||""}</td>
+          <td style="padding:6px 10px;border:1px solid #ddd;font-size:12px;text-align:center">${it.cantidad||1} ${it.unidad||""}</td>
+          <td style="padding:6px 10px;border:1px solid #ddd;font-size:12px;text-align:right">$${Number(it.precioUnitario||0).toLocaleString("es-CL")}</td>
+          <td style="padding:6px 10px;border:1px solid #ddd;font-size:12px;text-align:right">$${Number(it.totalNeto||0).toLocaleString("es-CL")}</td>
+          <td style="padding:6px 10px;border:1px solid #ddd;font-size:12px;text-align:right">$${Number(it.iva||0).toLocaleString("es-CL")}</td>
+          <td style="padding:6px 10px;border:1px solid #ddd;font-size:12px;text-align:right;font-weight:bold">$${Number(it.totalBruto||0).toLocaleString("es-CL")}</td>
+          ${i===0?`<td rowspan="${items.length}" style="vertical-align:top;padding:6px 10px;border:1px solid #ddd;font-size:12px">${c.cuenta||""}</td>`:""}
+        </tr>`).join("");
+    }).join("");
+    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+    <title>Rendición ${r.id} — ${fechaRend}</title>
+    <style>body{font-family:Arial,sans-serif;margin:30px;color:#1a1a1a}h1{font-size:20px;color:#1a5c2a}h2{font-size:14px;color:#333}table{width:100%;border-collapse:collapse;margin-bottom:20px}th{background:#1a5c2a;color:#fff;padding:8px 10px;font-size:12px;text-align:left}tr:nth-child(even){background:#f5f5f5}.total-row{background:#e8f5e9;font-weight:bold}.firma{margin-top:60px;display:flex;justify-content:space-between}.firma-bloque{text-align:center;width:45%}.firma-linea{border-top:1px solid #333;margin-bottom:8px;padding-top:8px}.footer{margin-top:30px;border-top:1px solid #ccc;padding-top:10px;font-size:10px;color:#666;text-align:center}@media print{button{display:none}}</style>
+    </head><body>
+    <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:20px">
+      <div><h1>Informe de Rendición de Gastos</h1><h2>Departamento de Áreas Verdes · Estadio Español de Las Condes</h2></div>
+      <div style="text-align:right;font-size:12px;color:#555"><strong>Fecha rendición:</strong> ${fechaRend}<br><strong>N° Rendición:</strong> ${r.id}<br><strong>Total:</strong> <span style="font-size:16px;color:#1a5c2a;font-weight:bold">$${r.total.toLocaleString("es-CL")}</span></div>
+    </div>
+    ${r.obs?`<p style="font-size:13px;color:#444;margin-bottom:16px"><strong>Observación:</strong> ${r.obs}</p>`:""}
+    <table>
+      <thead><tr><th>Fecha / Documento</th><th>Descripción</th><th>Cantidad</th><th>P. Unitario</th><th>Neto</th><th>IVA</th><th>Total</th><th>Cuenta</th></tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot>
+        <tr class="total-row"><td colspan="4" style="padding:8px 10px;border:1px solid #ddd;text-align:right">TOTALES</td>
+          <td style="padding:8px 10px;border:1px solid #ddd;text-align:right">$${itemsRend.reduce((a,c)=>a+Number(c.totalNetoDoc||c.totalNeto||0),0).toLocaleString("es-CL")}</td>
+          <td style="padding:8px 10px;border:1px solid #ddd;text-align:right">$${itemsRend.reduce((a,c)=>a+Number(c.ivaDoc||c.iva||0),0).toLocaleString("es-CL")}</td>
+          <td style="padding:8px 10px;border:1px solid #ddd;text-align:right">$${r.total.toLocaleString("es-CL")}</td>
+          <td style="padding:8px 10px;border:1px solid #ddd"></td>
+        </tr>
+      </tfoot>
+    </table>
+    ${r.reembolso?`<p style="font-size:13px"><strong>Reembolsado por Estadio Español:</strong> $${Number(r.montoReembolso).toLocaleString("es-CL")} — ${r.fechaReembolso} ${r.bancoReembolso?`· ${r.bancoReembolso}`:""} ${r.nTransReembolso?`· Trans: ${r.nTransReembolso}`:""}</p>`:""}
+    <div class="firma">
+      <div class="firma-bloque"><div class="firma-linea"></div><div style="font-size:12px">Firma Jefa Departamento</div></div>
+      <div class="firma-bloque"><div class="firma-linea"></div><div style="font-size:12px">Firma Gerencia / VB°</div></div>
+    </div>
+    <div class="footer">
+      Estadio Español de Las Condes · Departamento de Áreas Verdes<br>
+      ${PIE_PAGINA} · Documento generado el ${new Date().toLocaleDateString("es-CL")}
+    </div>
+    <div style="text-align:center;margin-top:20px"><button onclick="window.print()" style="background:#1a5c2a;color:#fff;border:none;padding:10px 30px;border-radius:8px;font-size:14px;cursor:pointer">🖨️ Imprimir</button></div>
+    </body></html>`;
+    const w = window.open("","_blank"); w.document.write(html); w.document.close();
+  };
+
+  // ── Resumen por cuenta ────────────────────────────────────────────────────
+  const totalGeneral = compras.reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
+  const gastadoPendiente = compras.filter(c=>["pendiente","pagada","pagada_efectivo","pagada_debito"].includes(c.estado)).reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
+  const totalReembolsado = rendiciones.reduce((a,r)=>a+(r.reembolso?Number(r.montoReembolso||0):0),0);
+  const saldoDisponible  = fondo - gastadoPendiente;
+  const pctUsado = fondo?Math.round((gastadoPendiente/fondo)*100):0;
+  const colorSaldo = saldoDisponible>fondo*0.4?"#22c55e":saldoDisponible>fondo*0.15?"#f59e0b":"#ef4444";
+
+  const porCuenta = TODAS_CUENTAS.map(cu=>{
+    const items=compras.filter(c=>c.cuenta===cu);
+    const total=items.reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
+    return {cuenta:cu,total,n:items.length,esInterna:CUENTAS_INTERNAS.includes(cu)};
+  }).filter(x=>x.total>0).sort((a,b)=>b.total-a.total);
+
+  const mesesDisp=[];
+  for(let i=5;i>=0;i--){const d=new Date(hoy.getFullYear(),hoy.getMonth()-i,1);mesesDisp.push({key:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`,label:`${MESES_COMPRAS[d.getMonth()]} ${d.getFullYear()}`});}
+  const porMes=mesesDisp.map(m=>({...m,total:compras.filter(c=>(c.fecha||"").startsWith(m.key)).reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0)}));
+  const maxMes=Math.max(...porMes.map(m=>m.total),1);
+  const mesesUnicos=[...new Set(compras.map(c=>(c.fecha||"").slice(0,7)).filter(Boolean))].sort((a,b)=>b.localeCompare(a));
+  const listaPersonal=[...personal].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+
+  const ESTADO_C={
+    pendiente:      {color:"#f59e0b",bg:"rgba(245,158,11,0.1)",   label:"⏳ Pendiente pago"},
+    pagada:         {color:"#3b82f6",bg:"rgba(59,130,246,0.1)",   label:"💳 Pagada (transferencia)"},
+    pagada_efectivo:{color:"#8b5cf6",bg:"rgba(139,92,246,0.1)",   label:"💵 Pagada (efectivo/débito)"},
+    nota_credito:   {color:"#f97316",bg:"rgba(249,115,22,0.1)",   label:"📝 Nota de crédito"},
+    en_rendicion:   {color:"#a78bfa",bg:"rgba(167,139,250,0.1)",  label:"📤 En rendición"},
+    rendida:        {color:"#22c55e",bg:"rgba(34,197,94,0.1)",    label:"✅ Rendida"},
+    rechazada:      {color:"#ef4444",bg:"rgba(239,68,68,0.1)",    label:"❌ Rechazada"},
+  };
+
+  const comprasFilt = compras.filter(c=>{
+    const mc=filtroCuenta==="todas"||c.cuenta===filtroCuenta;
+    const mm=filtroMes==="todos"||(c.fecha||"").slice(0,7)===filtroMes;
+    return mc&&mm;
+  });
+
+  return (
+    <div className="ein">
+      <div style={{marginBottom:16}}>
+        <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:24,fontWeight:900,marginBottom:4}}>🛒 Compras y Rendición</h1>
+        <p style={{color:"#6aaa7a",fontSize:14}}>Fondo fijo rotativo · Departamento de Áreas Verdes · Estadio Español</p>
+      </div>
+
+      {/* Panel fondo */}
+      <div style={{...S.card,padding:18,marginBottom:18,borderColor:colorSaldo+"40"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:12,marginBottom:14}}>
+          <div>
+            <div style={{fontSize:11,color:"#6aaa7a",letterSpacing:"0.6px",marginBottom:4,textTransform:"uppercase"}}>💼 Fondo disponible</div>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:32,fontWeight:900,color:colorSaldo}}>${saldoDisponible.toLocaleString("es-CL")}</div>
+            <div style={{fontSize:12,color:"#5a8a6a",marginTop:2}}>de ${fondo.toLocaleString("es-CL")} total</div>
+          </div>
+          <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+            <div style={{textAlign:"center",background:"rgba(255,255,255,0.04)",borderRadius:10,padding:"10px 16px"}}>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:700,color:"#f59e0b"}}>${gastadoPendiente.toLocaleString("es-CL")}</div>
+              <div style={{fontSize:10,color:"#a08050"}}>Comprometido</div>
+            </div>
+            <div style={{textAlign:"center",background:"rgba(255,255,255,0.04)",borderRadius:10,padding:"10px 16px"}}>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:700,color:"#22c55e"}}>${totalReembolsado.toLocaleString("es-CL")}</div>
+              <div style={{fontSize:10,color:"#4a8a5a"}}>Reembolsado</div>
+            </div>
+          </div>
+        </div>
+        <div style={{background:"rgba(255,255,255,0.07)",borderRadius:6,height:10,overflow:"hidden",marginBottom:6}}>
+          <div style={{width:`${Math.min(pctUsado,100)}%`,height:"100%",background:colorSaldo,borderRadius:6}}/>
+        </div>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#5a8a6a"}}>
+          <span>{pctUsado}% comprometido</span>
+          {esJefa&&<button style={{...S.btn,fontSize:10,padding:"2px 8px",background:"rgba(255,255,255,0.06)",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)"}}
+            onClick={()=>{const v=prompt("Monto del fondo ($):",fondo);if(v&&!isNaN(Number(v)))set({fondo:Number(v)});}}>⚙️ Ajustar fondo</button>}
+        </div>
+      </div>
+
+      {/* Sub-tabs */}
+      <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
+        {[["fondo","📊 Resumen"],["lista","📋 Compras"],["rendiciones","📤 Rendiciones"]].map(([t,l])=>{
+          const badge=t==="lista"?compras.filter(c=>c.estado==="pendiente").length:t==="rendiciones"?rendiciones.filter(r=>!r.reembolso).length:0;
+          return <button key={t} className={`tab${subTab===t?" on":""}`} onClick={()=>{setSubTab(t);setShowForm(false);}} style={{position:"relative"}}>
+            {l}{badge>0&&<span style={{position:"absolute",top:1,right:1,background:"#ef4444",color:"#fff",borderRadius:"50%",width:14,height:14,fontSize:9,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>{badge}</span>}
+          </button>;
+        })}
+      </div>
+
+      {/* ── RESUMEN ── */}
+      {subTab==="fondo"&&(
+        <div className="ein">
+          {compras.length===0?(
+            <div style={{...S.card,padding:40,textAlign:"center",color:"#4a8a5a"}}>
+              <div style={{fontSize:36,marginBottom:10}}>🛒</div>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:16}}>Sin compras registradas</div>
+            </div>
+          ):(
+            <>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,marginBottom:10}}>💰 Gasto por cuenta</div>
+              {[{grupo:"Internas (Beneficio general socios)",cuentas:CUENTAS_INTERNAS},{grupo:"Externas (Beneficio área específica)",cuentas:CUENTAS_EXTERNAS}].map(g=>{
+                const itemsG = porCuenta.filter(c=>g.cuentas.includes(c.cuenta));
+                if(!itemsG.length) return null;
+                return (
+                  <div key={g.grupo} style={{marginBottom:16}}>
+                    <div style={{fontSize:11,color:"#6aaa7a",letterSpacing:"0.5px",marginBottom:6,textTransform:"uppercase"}}>{g.grupo}</div>
+                    <div style={{...S.card,padding:0,overflow:"hidden"}}>
+                      {itemsG.map((c,i)=>{
+                        const pct=totalGeneral?Math.round((c.total/totalGeneral)*100):0;
+                        return <div key={c.cuenta} style={{padding:"10px 16px",borderBottom:"1px solid rgba(255,255,255,0.06)",background:i%2===0?"transparent":"rgba(255,255,255,0.018)",cursor:"pointer"}} onClick={()=>{setFiltroCuenta(c.cuenta);setSubTab("lista");}}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                            <span style={{fontSize:13,fontWeight:600}}>{c.cuenta}</span>
+                            <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                              <span style={{fontSize:11,color:"#6aaa7a"}}>{c.n} compra{c.n!==1?"s":""}</span>
+                              <span style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:"#93c5fd"}}>${c.total.toLocaleString("es-CL")}</span>
+                              <span style={{fontSize:10,color:"#4a7a6a"}}>{pct}%</span>
+                            </div>
+                          </div>
+                          <div style={{background:"rgba(255,255,255,0.07)",borderRadius:3,height:4,overflow:"hidden"}}>
+                            <div style={{width:`${pct}%`,height:"100%",background:"#3b82f6",borderRadius:3}}/>
+                          </div>
+                        </div>;
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+              <div style={{...S.card,padding:"12px 16px",display:"flex",justifyContent:"space-between",background:"rgba(59,130,246,0.08)",borderColor:"rgba(59,130,246,0.2)",marginBottom:20}}>
+                <span style={{fontWeight:700,fontSize:13}}>TOTAL GENERAL</span>
+                <span style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#93c5fd"}}>${totalGeneral.toLocaleString("es-CL")}</span>
+              </div>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,marginBottom:10}}>📅 Gasto mensual</div>
+              <div style={{...S.card,padding:18,marginBottom:20}}>
+                <div style={{display:"flex",alignItems:"flex-end",gap:6,height:100,justifyContent:"space-around"}}>
+                  {porMes.map(m=>{
+                    const h=Math.round((m.total/maxMes)*100);
+                    const esActual=m.key===`${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,"0")}`;
+                    return <div key={m.key} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,flex:1}}>
+                      {m.total>0&&<div style={{fontSize:9,color:"#93c5fd",textAlign:"center"}}>${Math.round(m.total/1000)}k</div>}
+                      <div style={{width:"100%",background:esActual?"rgba(59,130,246,0.4)":"rgba(59,130,246,0.15)",borderRadius:"3px 3px 0 0",height:`${Math.max(h,m.total>0?4:0)}%`,border:esActual?"1px solid rgba(59,130,246,0.5)":"none"}}/>
+                      <div style={{fontSize:9,color:esActual?"#93c5fd":"#5a8a6a",fontWeight:esActual?700:400,textAlign:"center"}}>{m.label.split(" ")[0]}</div>
+                    </div>;
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── LISTA COMPRAS ── */}
+      {subTab==="lista"&&(
+        <div className="ein">
+          <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
+            <button className="btn-p" style={S.btn} onClick={()=>{setForm(emptyForm);setEditId(null);setShowForm(true);}}>➕ Nueva compra</button>
+            {seleccionadas.length>0&&<button style={{...S.btn,background:"rgba(167,139,250,0.2)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.35)",fontSize:12}} onClick={()=>setShowRendForm(true)}>📤 Rendir ({seleccionadas.length})</button>}
+            <select style={{...S.input,flex:1,minWidth:120,fontSize:12}} value={filtroCuenta} onChange={e=>setFiltroCuenta(e.target.value)}>
+              <option value="todas">Todas las cuentas</option>
+              <optgroup label="── Internas ──">{CUENTAS_INTERNAS.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>
+              <optgroup label="── Externas ──">{CUENTAS_EXTERNAS.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>
+            </select>
+            <select style={{...S.input,flex:1,minWidth:100,fontSize:12}} value={filtroMes} onChange={e=>setFiltroMes(e.target.value)}>
+              <option value="todos">Todos los meses</option>
+              {mesesUnicos.map(m=><option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
+
+          {/* Form rendición */}
+          {showRendForm&&(
+            <div style={{...S.card,padding:16,marginBottom:14,background:"rgba(167,139,250,0.06)",borderColor:"rgba(167,139,250,0.25)"}}>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,marginBottom:12,color:"#c4b5fd"}}>
+                📤 Crear rendición — {seleccionadas.length} compra{seleccionadas.length!==1?"s":""} · ${compras.filter(c=>seleccionadas.includes(c.id)).reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0).toLocaleString("es-CL")}
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                <div><label style={labelSt}>Fecha presentación</label><input type="date" style={S.input} value={rendForm.fecha} onChange={e=>setRendForm(p=>({...p,fecha:e.target.value}))}/></div>
+                <div><label style={labelSt}>Observaciones</label><input style={S.input} placeholder="ej: Rendición junio 2026" value={rendForm.obs} onChange={e=>setRendForm(p=>({...p,obs:e.target.value}))}/></div>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button className="btn-p" style={S.btn} onClick={crearRendicion}>✓ Crear rendición</button>
+                <button className="btn-g" style={S.btn} onClick={()=>setShowRendForm(false)}>Cancelar</button>
+              </div>
+            </div>
+          )}
+
+          {/* Formulario nueva compra */}
+          {showForm&&(
+            <div style={{...S.card,padding:20,marginBottom:16}} className="ein">
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:16,color:"#a0d8b0"}}>{editId?"✏️ Editar":"➕ Nueva"} compra</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}}>
+                <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={form.fecha} onChange={e=>setForm(p=>({...p,fecha:e.target.value}))}/></div>
+                <div><label style={labelSt}>Tipo documento</label>
+                  <select style={S.input} value={form.tipoDoc} onChange={e=>setForm(p=>({...p,tipoDoc:e.target.value}))}>
+                    {["Factura","Boleta","Nota de Pedido","Cotización","Orden de Compra","Otro"].map(t=><option key={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div><label style={labelSt}>Proveedor</label><input style={S.input} placeholder="Nombre empresa / persona" value={form.proveedor} onChange={e=>setForm(p=>({...p,proveedor:e.target.value}))}/></div>
+                <div><label style={labelSt}>RUT proveedor</label><input style={S.input} placeholder="12.345.678-9" value={form.rut} onChange={e=>setForm(p=>({...p,rut:e.target.value}))}/></div>
+                <div><label style={labelSt}>N° Documento</label><input style={S.input} placeholder="ej: 7609" value={form.nDocumento} onChange={e=>setForm(p=>({...p,nDocumento:e.target.value}))}/></div>
+                <div><label style={labelSt}>Responsable compra</label>
+                  <select style={S.input} value={form.responsable} onChange={e=>setForm(p=>({...p,responsable:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                    <option value="Carmen Luz Hermosilla Diez">Carmen Luz Hermosilla Diez (Jefa)</option>
+                  </select>
+                </div>
+                <div style={{gridColumn:"1/-1"}}>
+                  <label style={labelSt}>Cuenta a imputar</label>
+                  <select style={S.input} value={form.cuenta} onChange={e=>setForm(p=>({...p,cuenta:e.target.value}))}>
+                    <option value="">Seleccionar cuenta...</option>
+                    <optgroup label="── Internas (beneficio general socios) ──">{CUENTAS_INTERNAS.map(c=><option key={c}>{c}</option>)}</optgroup>
+                    <optgroup label="── Externas (beneficio área específica) ──">{CUENTAS_EXTERNAS.map(c=><option key={c}>{c}</option>)}</optgroup>
+                  </select>
+                </div>
+              </div>
+
+              {/* ── ÍTEMS DE LA FACTURA ── */}
+              <div style={{background:"rgba(61,122,82,0.06)",border:"1px solid rgba(61,122,82,0.2)",borderRadius:10,padding:"14px",marginBottom:12}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                  <div style={{fontSize:11,color:"#6aaa7a",letterSpacing:"0.6px",textTransform:"uppercase"}}>📦 Ítems del documento</div>
+                  <button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(61,122,82,0.2)",color:"#86efac",border:"1px solid rgba(61,122,82,0.3)"}} onClick={addItem}>+ Agregar ítem</button>
+                </div>
+                {form.items.map((item,idx)=>(
+                  <div key={item.id} style={{background:"rgba(255,255,255,0.04)",borderRadius:8,padding:"10px 12px",marginBottom:8,border:"1px solid rgba(255,255,255,0.06)"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                      <span style={{fontSize:11,color:"#6aaa7a"}}>Ítem {idx+1}</span>
+                      {form.items.length>1&&<button className="btn-d" style={{...S.btn,fontSize:10,padding:"2px 8px"}} onClick={()=>removeItem(idx)}>✕</button>}
+                    </div>
+                    <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:8,marginBottom:8}}>
+                      <div><label style={labelSt}>Descripción</label><input style={S.input} placeholder="Nombre del producto" value={item.descripcion} onChange={e=>updateItem(idx,{descripcion:e.target.value})}/></div>
+                      <div><label style={labelSt}>Categoría</label><input style={S.input} placeholder="ej: Fungicida" value={item.categoria||""} onChange={e=>updateItem(idx,{categoria:e.target.value})}/></div>
+                    </div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8}}>
+                      <div><label style={labelSt}>Cantidad</label><input type="number" min={1} step={0.01} style={S.input} value={item.cantidad} onChange={e=>updateItem(idx,{cantidad:e.target.value})}/></div>
+                      <div><label style={labelSt}>Unidad</label>
+                        <select style={S.input} value={item.unidad} onChange={e=>updateItem(idx,{unidad:e.target.value})}>
+                          {["unidad","kg","L","ml","g","m²","m","hora","servicio","saco","caja"].map(u=><option key={u}>{u}</option>)}
+                        </select>
+                      </div>
+                      <div><label style={labelSt}>P. unitario neto</label><input type="number" min={0} style={S.input} value={item.precioUnitario} onChange={e=>updateItem(idx,{precioUnitario:e.target.value})}/></div>
+                      <div><label style={labelSt}>Total bruto</label><input type="number" style={{...S.input,background:"rgba(59,130,246,0.08)",fontWeight:600}} value={item.totalBruto} readOnly/></div>
+                    </div>
+                  </div>
+                ))}
+                {/* Totales documento */}
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginTop:10,background:"rgba(59,130,246,0.06)",borderRadius:8,padding:"10px 12px",border:"1px solid rgba(59,130,246,0.15)"}}>
+                  <div><label style={labelSt}>Total neto</label><input type="number" style={{...S.input,background:"rgba(59,130,246,0.08)"}} value={form.totalNetoDoc} readOnly/></div>
+                  <div><label style={labelSt}>IVA 19%</label><input type="number" style={{...S.input,background:"rgba(59,130,246,0.08)"}} value={form.ivaDoc} readOnly/></div>
+                  <div><label style={labelSt}>Total bruto</label><input type="number" style={{...S.input,background:"rgba(59,130,246,0.12)",fontWeight:700,color:"#93c5fd"}} value={form.totalBrutoDoc} readOnly/></div>
+                </div>
+              </div>
+
+              {/* Pago */}
+              <div style={{background:"rgba(34,197,94,0.05)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:10,padding:"12px 14px",marginBottom:12}}>
+                <div style={{fontSize:11,color:"#86efac",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.5px"}}>💳 Pago</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                  <div><label style={labelSt}>Forma de pago</label>
+                    <select style={S.input} value={form.formaPago} onChange={e=>setForm(p=>({...p,formaPago:e.target.value}))}>
+                      <option value="transferencia">Transferencia bancaria</option>
+                      <option value="efectivo">Efectivo</option>
+                      <option value="debito">Tarjeta de débito</option>
+                      <option value="nota_credito">Nota de crédito</option>
+                    </select>
+                  </div>
+                  <div><label style={labelSt}>Fecha pago</label><input type="date" style={S.input} value={form.fechaPago} onChange={e=>setForm(p=>({...p,fechaPago:e.target.value}))}/></div>
+                  {["transferencia"].includes(form.formaPago)&&<>
+                    <div><label style={labelSt}>Banco origen</label><input style={S.input} placeholder="ej: BancoEstado" value={form.bancoPago} onChange={e=>setForm(p=>({...p,bancoPago:e.target.value}))}/></div>
+                    <div><label style={labelSt}>N° Transferencia</label><input style={S.input} placeholder="ej: 000123456" value={form.nTransferencia} onChange={e=>setForm(p=>({...p,nTransferencia:e.target.value}))}/></div>
+                  </>}
+                </div>
+              </div>
+
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+                <div><label style={labelSt}>Estado</label>
+                  <select style={S.input} value={form.estado} onChange={e=>setForm(p=>({...p,estado:e.target.value}))}>
+                    <option value="pendiente">⏳ Pendiente pago</option>
+                    <option value="pagada">💳 Pagada (transferencia)</option>
+                    <option value="pagada_efectivo">💵 Pagada (efectivo/débito)</option>
+                    <option value="nota_credito">📝 Nota de crédito</option>
+                    <option value="rendida">✅ Rendida</option>
+                    <option value="rechazada">❌ Rechazada</option>
+                  </select>
+                </div>
+                <div><label style={labelSt}>Observaciones</label><input style={S.input} value={form.obs} onChange={e=>setForm(p=>({...p,obs:e.target.value}))}/></div>
+              </div>
+              <div style={{display:"flex",gap:10}}>
+                <button className="btn-p" style={S.btn} onClick={guardar}>✓ {editId?"Actualizar":"Guardar"}</button>
+                <button className="btn-g" style={S.btn} onClick={()=>{setShowForm(false);setEditId(null);setForm(emptyForm);}}>Cancelar</button>
+              </div>
+            </div>
+          )}
+
+          {/* Lista */}
+          {comprasFilt.length===0&&!showForm?(
+            <div style={{...S.card,padding:36,textAlign:"center",color:"#4a8a5a"}}><div style={{fontSize:32,marginBottom:8}}>🛒</div><div>Sin compras registradas</div></div>
+          ):(
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {comprasFilt.map(c=>{
+                const est=ESTADO_C[c.estado]||ESTADO_C.pendiente;
+                const sel=seleccionadas.includes(c.id);
+                const selectable=["pendiente","pagada","pagada_efectivo"].includes(c.estado);
+                const totalDoc = Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
+                const items = c.items||[{descripcion:c.descripcion,cantidad:c.cantidad,unidad:c.unidad}];
+                return (
+                  <div key={c.id} style={{...S.card,padding:14,borderLeft:`3px solid ${sel?"#a78bfa":est.color}40`,background:sel?"rgba(167,139,250,0.06)":"transparent"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:8}}>
+                      <div style={{display:"flex",gap:10,alignItems:"start",flex:1,minWidth:0}}>
+                        {selectable&&<div style={{width:18,height:18,borderRadius:4,border:`2px solid ${sel?"#a78bfa":"rgba(255,255,255,0.2)"}`,background:sel?"#a78bfa":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,cursor:"pointer",marginTop:2}} onClick={()=>setSeleccionadas(p=>sel?p.filter(x=>x!==c.id):[...p,c.id])}>{sel&&<span style={{color:"#fff",fontSize:11}}>✓</span>}</div>}
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginBottom:4}}>
+                            <span style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700}}>{c.proveedor||"Sin proveedor"}</span>
+                            <span style={{...S.chip,background:est.bg,color:est.color,border:`1px solid ${est.color}40`,fontSize:10}}>{est.label}</span>
+                            {c.cuenta&&<span style={{...S.chip,background:"rgba(59,130,246,0.1)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.2)",fontSize:10}}>🏷️ {c.cuenta}</span>}
+                          </div>
+                          <div style={{fontSize:11,color:"#7aaa80",marginBottom:4}}>
+                            📅 {c.fecha} · 📄 {c.tipoDoc} {c.nDocumento} {c.responsable&&`· 👤 ${c.responsable}`}
+                            {c.fechaPago&&<span style={{color:"#86efac"}}> · 💳 Pagado {c.fechaPago}</span>}
+                          </div>
+                          {/* Ítems */}
+                          <div style={{fontSize:12,color:"#5a8a6a",cursor:"pointer"}} onClick={()=>setExpandDetalle(expandDetalle===c.id?null:c.id)}>
+                            {items.length===1?items[0].descripcion:`${items.length} productos — clic para ver detalle`} {items.length>1&&(expandDetalle===c.id?"▲":"▼")}
+                          </div>
+                          {expandDetalle===c.id&&items.length>1&&(
+                            <div style={{marginTop:6,background:"rgba(255,255,255,0.04)",borderRadius:6,padding:"6px 10px"}}>
+                              {items.map((it,i)=>(
+                                <div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#7aaa80",padding:"3px 0",borderBottom:i<items.length-1?"1px solid rgba(255,255,255,0.05)":"none"}}>
+                                  <span>{it.descripcion} — {it.cantidad} {it.unidad}</span>
+                                  <span style={{fontWeight:600,color:"#93c5fd"}}>${Number(it.totalBruto||0).toLocaleString("es-CL")}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:5,flexShrink:0}}>
+                        <span style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#93c5fd"}}>${totalDoc.toLocaleString("es-CL")}</span>
+                        <div style={{display:"flex",gap:5,flexWrap:"wrap",justifyContent:"flex-end"}}>
+                          {c.estado==="pendiente"&&<>
+                            <button style={{...S.btn,fontSize:10,padding:"3px 8px",background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}} onClick={()=>marcarPagada(c.id,"transferencia")}>💳 Trans.</button>
+                            <button style={{...S.btn,fontSize:10,padding:"3px 8px",background:"rgba(139,92,246,0.15)",color:"#c4b5fd",border:"1px solid rgba(139,92,246,0.3)"}} onClick={()=>marcarPagada(c.id,"efectivo")}>💵 Efect.</button>
+                          </>}
+                          {esJefa&&<button className="btn-g" style={{...S.btn,fontSize:10,padding:"3px 8px"}} onClick={()=>editar(c)}>✏️</button>}
+                          {esJefa&&<button className="btn-d" style={{...S.btn,fontSize:10,padding:"3px 8px"}} onClick={()=>eliminar(c.id)}>🗑</button>}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── RENDICIONES ── */}
+      {subTab==="rendiciones"&&(
+        <div className="ein">
+          {rendiciones.length===0?(
+            <div style={{...S.card,padding:40,textAlign:"center",color:"#4a8a5a"}}>
+              <div style={{fontSize:36,marginBottom:10}}>📤</div>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:16}}>Sin rendiciones</div>
+              <div style={{fontSize:13,marginTop:6}}>Selecciona compras en 📋 Compras y crea una rendición</div>
+            </div>
+          ):(
+            <div style={{display:"flex",flexDirection:"column",gap:14}}>
+              {rendiciones.map(r=>{
+                const itemsRend=compras.filter(c=>r.items?.includes(c.id));
+                return (
+                  <div key={r.id} style={{...S.card,padding:16,borderLeft:`3px solid ${r.reembolso?"#22c55e":"#a78bfa"}`}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:8,marginBottom:10}}>
+                      <div>
+                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                          <span style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700}}>
+                            Rendición {new Date(r.fecha+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"})}
+                          </span>
+                          <span style={{...S.chip,background:r.reembolso?"rgba(34,197,94,0.12)":"rgba(167,139,250,0.12)",color:r.reembolso?"#86efac":"#c4b5fd",border:`1px solid ${r.reembolso?"rgba(34,197,94,0.25)":"rgba(167,139,250,0.25)"}`,fontSize:10}}>
+                            {r.reembolso?"✅ Reembolsada":"📤 Presentada — pendiente reembolso"}
+                          </span>
+                        </div>
+                        <div style={{fontSize:12,color:"#7aaa80"}}>{r.items?.length} compra{r.items?.length!==1?"s":""}{r.obs&&` · ${r.obs}`}</div>
+                      </div>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <span style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:700,color:"#93c5fd"}}>${r.total.toLocaleString("es-CL")}</span>
+                        <button style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}} onClick={()=>imprimirRendicion(r)}>🖨️ Imprimir</button>
+                      </div>
+                    </div>
+                    <div style={{borderTop:"1px solid rgba(255,255,255,0.07)",paddingTop:10,marginBottom:10}}>
+                      {itemsRend.map(c=>{
+                        const items=c.items||[{descripcion:c.descripcion}];
+                        return <div key={c.id} style={{fontSize:12,color:"#7aaa80",padding:"3px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                          <div style={{display:"flex",justifyContent:"space-between"}}>
+                            <span>{c.proveedor} · {c.tipoDoc} {c.nDocumento} ({items.length} ítem{items.length!==1?"s":""})</span>
+                            <span style={{fontWeight:600,color:"#93c5fd"}}>${Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0).toLocaleString("es-CL")}</span>
+                          </div>
+                        </div>;
+                      })}
+                    </div>
+                    {r.reembolso&&(
+                      <div style={{background:"rgba(34,197,94,0.08)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:8,padding:"10px 14px"}}>
+                        <div style={{fontSize:12,color:"#86efac",fontWeight:600,marginBottom:4}}>💳 Reembolso del Estadio</div>
+                        <div style={{display:"flex",gap:14,flexWrap:"wrap",fontSize:12,color:"#5aaa7a"}}>
+                          <span>📅 {r.fechaReembolso}</span>
+                          <span style={{color:"#4ade80",fontWeight:700}}>${Number(r.montoReembolso).toLocaleString("es-CL")}</span>
+                          {r.bancoReembolso&&<span>🏦 {r.bancoReembolso}</span>}
+                          {r.nTransReembolso&&<span>🔢 Trans: {r.nTransReembolso}</span>}
+                        </div>
+                      </div>
+                    )}
+                    {!r.reembolso&&esJefa&&(
+                      showReembolsoForm===r.id?(
+                        <div style={{background:"rgba(34,197,94,0.05)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:8,padding:"12px 14px",marginTop:10}}>
+                          <div style={{fontSize:12,color:"#86efac",fontWeight:600,marginBottom:10}}>💳 Registrar reembolso del Estadio</div>
+                          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                            <div><label style={labelSt}>Fecha transferencia</label><input type="date" style={S.input} value={reembolsoForm.fecha} onChange={e=>setReembolsoForm(p=>({...p,fecha:e.target.value}))}/></div>
+                            <div><label style={labelSt}>Monto ($)</label><input type="number" style={S.input} placeholder={r.total} value={reembolsoForm.monto} onChange={e=>setReembolsoForm(p=>({...p,monto:e.target.value}))}/></div>
+                            <div><label style={labelSt}>Banco (Estadio)</label><input style={S.input} value={reembolsoForm.banco} onChange={e=>setReembolsoForm(p=>({...p,banco:e.target.value}))}/></div>
+                            <div><label style={labelSt}>N° Transferencia</label><input style={S.input} value={reembolsoForm.nTransferencia} onChange={e=>setReembolsoForm(p=>({...p,nTransferencia:e.target.value}))}/></div>
+                          </div>
+                          <div style={{display:"flex",gap:8}}>
+                            <button className="btn-p" style={{...S.btn,background:"#166534",color:"#86efac"}} onClick={()=>registrarReembolso(r.id)}>✓ Confirmar</button>
+                            <button className="btn-g" style={S.btn} onClick={()=>setShowReembolsoForm(false)}>Cancelar</button>
+                          </div>
+                        </div>
+                      ):(
+                        <button style={{...S.btn,marginTop:10,background:"rgba(34,197,94,0.12)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)",fontSize:12,width:"100%"}}
+                          onClick={()=>{setShowReembolsoForm(r.id);setReembolsoForm({fecha:hoy.toISOString().slice(0,10),monto:String(r.total),banco:"",nTransferencia:"",obs:""});}}>
+                          💳 Registrar reembolso del Estadio → fondo
+                        </button>
+                      )
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
   const set = (patch) => setComprasData(p=>({...p,...patch}));
 
   // Bodega Macrozona 39
