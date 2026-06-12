@@ -4,6 +4,7 @@ import * as React from "react";
 // ─── FIREBASE ────────────────────────────────────────────────────────────────
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, onValue, set as fbSet } from "firebase/database";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBgxVOk_OAh2XTouD9gLw5rycaNF-OWlnU",
@@ -17,7 +18,20 @@ const firebaseConfig = {
 
 const fbApp = initializeApp(firebaseConfig, "estadio-verde");
 const db    = getDatabase(fbApp);
+const auth  = getAuth(fbApp);
 const ROOT  = "estadio-verde-data";
+
+// ─── ROLES POR EMAIL ─────────────────────────────────────────────────────────
+const ROLES_EMAIL = {
+  "carmenluzhdiez@gmail.com":    "jefa",
+  "juberjuarez1234@gmail.com":   "supervisor",
+  "astorga.guzman@gmail.com":    "trabajador",
+  "bhalu.armijo@gmail.com":      "trabajador",
+  "bandiiiixx@gmail.com":        "trabajador",
+  "saulmolina@gmail.com":        "trabajador",
+};
+
+const getRolByEmail = (email) => ROLES_EMAIL[email?.toLowerCase()] || "trabajador";
 
 // Hook genérico Firebase ↔ React state
 // Sincroniza un nodo de Firebase con un estado local.
@@ -5640,7 +5654,35 @@ export default function App() {
     d.setDate(d.getDate()+diff); return d.toISOString().slice(0,10);
   });
 
-  // ─── ESTADO SINCRONIZADO CON FIREBASE ────────────────────────────────────────
+  // ─── AUTENTICACIÓN FIREBASE ──────────────────────────────────────────────────
+  const [fbUser,    setFbUser]    = useState(null);
+  const [fbRol,     setFbRol]     = useState(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPass,  setLoginPass]  = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      setFbUser(user);
+      setFbRol(user ? getRolByEmail(user.email) : null);
+      setAuthReady(true);
+    });
+    return () => unsub();
+  }, []);
+
+  const handleLogin = async (e) => {
+    e && e.preventDefault();
+    setLoginError(""); setLoginLoading(true);
+    try {
+      await signInWithEmailAndPassword(auth, loginEmail.trim(), loginPass);
+    } catch(err) {
+      setLoginError("Email o contraseña incorrectos.");
+    } finally { setLoginLoading(false); }
+  };
+
+  const handleLogout = () => signOut(auth);
   const CUENTAS_DEFAULT = ["Rama Golf","Mantenimiento Jardines","Obras","Insumos Generales","Maquinaria y Equipos","Fitosanitarios","Semillas y Plantas","Uniformes y EPP"];
   const [data,           setData,           dataReady]     = useFirebaseState("data",           initData());
   const [personal,       setPersonal,       personalReady] = useFirebaseState("personal",       PERSONAL_INICIAL);
@@ -5665,7 +5707,10 @@ export default function App() {
   const [workerPinError, setWorkerPinError] = useState(false);
   const [workerPinInput, setWorkerPinInput] = useState("");
   const [rolSeleccionado, setRolSeleccionado] = useState("trabajador");
-  const [rolLogueado, setRolLogueado] = useState(null);
+  const rolLogueado = fbRol;
+  const esJefa = fbRol === "jefa";
+  const esSupervisor = fbRol === "supervisor";
+  const esTrabajador = fbRol === "trabajador";
 
   // ─── FUNGICIDAS ──────────────────────────────────────────────────────────────
   const checkPin = (rol, pin) => { const p=getPines(); return p[rol] && String(p[rol])===String(pin); };
@@ -5873,6 +5918,52 @@ export default function App() {
     );
   };
 
+  // ── Esperando Firebase Auth ───────────────────────────────────────────────
+  if (!authReady) return (
+    <div style={{minHeight:"100vh",background:"#0d1f13",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
+      <div style={{fontSize:48}}>🌿</div>
+      <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,color:"#a0d8b0",fontWeight:700}}>Estadio Español</div>
+      <div style={{width:40,height:40,border:"3px solid #1a3a22",borderTop:"3px solid #4a9a64",borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  );
+
+  // ── Login ─────────────────────────────────────────────────────────────────
+  if (!fbUser) return (
+    <div style={{minHeight:"100vh",background:"#0d1f13",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&display=swap');*{box-sizing:border-box;margin:0;padding:0}`}</style>
+      <div style={{background:"#0f2517",border:"1px solid #1e3a22",borderRadius:20,padding:40,width:"100%",maxWidth:380,boxShadow:"0 20px 60px rgba(0,0,0,0.5)"}}>
+        <div style={{textAlign:"center",marginBottom:32}}>
+          <div style={{fontSize:52,marginBottom:12}}>🌿</div>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:26,fontWeight:900,color:"#ede9e0",marginBottom:4}}>Estadio Español</div>
+          <div style={{fontSize:12,color:"#4a8a5a",letterSpacing:"2px",textTransform:"uppercase"}}>Gestión · Áreas Verdes</div>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:14}}>
+          <div>
+            <label style={{fontSize:11,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:6,textTransform:"uppercase"}}>Correo electrónico</label>
+            <input type="email" autoComplete="email" style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"12px 14px",color:"#ede9e0",fontSize:14,outline:"none"}}
+              value={loginEmail} onChange={e=>setLoginEmail(e.target.value)}
+              onKeyDown={e=>e.key==="Enter"&&handleLogin()}
+              placeholder="tu@email.com"/>
+          </div>
+          <div>
+            <label style={{fontSize:11,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:6,textTransform:"uppercase"}}>Contraseña</label>
+            <input type="password" autoComplete="current-password" style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"12px 14px",color:"#ede9e0",fontSize:14,outline:"none"}}
+              value={loginPass} onChange={e=>setLoginPass(e.target.value)}
+              onKeyDown={e=>e.key==="Enter"&&handleLogin()}
+              placeholder="••••••••"/>
+          </div>
+          {loginError&&<div style={{fontSize:13,color:"#fca5a5",background:"rgba(239,68,68,0.1)",borderRadius:8,padding:"8px 12px",textAlign:"center"}}>{loginError}</div>}
+          <button onClick={handleLogin} disabled={loginLoading}
+            style={{background:"#2d6a3f",color:"#fff",border:"none",borderRadius:10,padding:"14px",fontSize:15,fontWeight:700,cursor:"pointer",marginTop:6,opacity:loginLoading?0.7:1}}>
+            {loginLoading?"Ingresando...":"Ingresar →"}
+          </button>
+        </div>
+        <div style={{textAlign:"center",marginTop:20,fontSize:11,color:"#2a5a35"}}>Acceso restringido · Personal autorizado</div>
+      </div>
+    </div>
+  );
+
   // ── Pantalla de carga Firebase ────────────────────────────────────────────
   if (!appReady) return (
     <div style={{minHeight:"100vh",background:"#0d1f13",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
@@ -5914,18 +6005,23 @@ export default function App() {
               <div style={S.logoSub}>Gestión · Áreas Verdes</div>
             </div>
           </div>
-          {rolLogueado==="jefa"&&(
-            <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-              <span style={{fontSize:11,color:"#86efac",background:"rgba(34,197,94,0.1)",padding:"4px 10px",borderRadius:20,border:"1px solid rgba(34,197,94,0.25)"}}>🌿 Jefa AV</span>
-              <button onClick={()=>{setRolLogueado(null);setWorkerPinInput("");setVista("miturno");}}
-                style={{background:"transparent",border:"1px solid rgba(255,255,255,0.1)",borderRadius:7,color:"#7aaa80",padding:"4px 10px",fontFamily:"'Georgia',serif",fontSize:11,cursor:"pointer"}}>
-                Salir
-              </button>
-            </div>
-          )}
+          <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+            <span style={{fontSize:11,color:fbRol==="jefa"?"#86efac":fbRol==="supervisor"?"#93c5fd":"#fcd34d",background:fbRol==="jefa"?"rgba(34,197,94,0.1)":fbRol==="supervisor"?"rgba(59,130,246,0.1)":"rgba(252,211,77,0.1)",padding:"4px 10px",borderRadius:20,border:`1px solid ${fbRol==="jefa"?"rgba(34,197,94,0.25)":fbRol==="supervisor"?"rgba(59,130,246,0.25)":"rgba(252,211,77,0.25)"}`}}>
+              {fbRol==="jefa"?"🌿 Jefa AV":fbRol==="supervisor"?"👷 Supervisor":"🌱 Jardinero"}
+            </span>
+            <button onClick={handleLogout}
+              style={{background:"transparent",border:"1px solid rgba(255,255,255,0.1)",borderRadius:7,color:"#7aaa80",padding:"4px 10px",fontFamily:"'Georgia',serif",fontSize:11,cursor:"pointer"}}>
+              Salir
+            </button>
+          </div>
         </div>
         <div style={S.headerNav} className="headerNav">
-          {[["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["fungicidas","🧪","Fungicidas"],["compras","🛒","Compras"],["personal","👷","Personal"],["miturno","🌿","Mi Turno"]].map(([v,ico,lbl])=>(
+          {(fbRol==="jefa"
+            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["fungicidas","🧪","Fungicidas"],["compras","🛒","Compras"],["personal","👷","Personal"]]
+            : fbRol==="supervisor"
+            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["fungicidas","🧪","Fungicidas"],["miturno","🌿","Mi Turno"]]
+            : [["miturno","🌿","Mi Turno"]]
+          ).map(([v,ico,lbl])=>(
             <button key={v} onClick={()=>{setVista(v);setZonaId(null);setAiText("");}} style={{cursor:"pointer",border:"none",background:"transparent",color:vista===v?"#fff":"#7aaa80",fontFamily:"'Georgia',serif",fontSize:12,padding:"10px 14px",borderBottom:vista===v?"2px solid #4a9a64":"2px solid transparent",transition:"all .15s",whiteSpace:"nowrap",display:"flex",flexDirection:"column",alignItems:"center",gap:2,flexShrink:0}}>
               <span style={{fontSize:16}}>{ico}</span>
               <span>{lbl}</span>
