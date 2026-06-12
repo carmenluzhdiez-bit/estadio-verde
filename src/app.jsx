@@ -4958,6 +4958,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   const [showRendForm, setShowRendForm] = React.useState(false);
   const [showReembolsoForm, setShowReembolsoForm] = React.useState(false);
   const [showSaldoAnt, setShowSaldoAnt] = React.useState(false);
+  const [saldoForm, setSaldoForm] = React.useState({monto:"", periodo:""});
   const [editId, setEditId] = React.useState(null);
   const [filtroCuenta, setFiltroCuenta] = React.useState("todas");
   const [filtroMes, setFiltroMes] = React.useState("todos");
@@ -5014,17 +5015,44 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   };
 
   // ── CRUD ──────────────────────────────────────────────────────────────────
+  const [alertaDuplicado, setAlertaDuplicado] = React.useState(null);
+
   const guardar = () => {
     if(!form.proveedor.trim()||!form.cuenta||!form.items[0].descripcion.trim()) return;
+    // Verificar factura duplicada (mismo proveedor + mismo N° documento)
+    if(!editId && form.nDocumento.trim()) {
+      const duplicado = compras.find(c=>
+        c.nDocumento?.trim()===form.nDocumento.trim() &&
+        c.proveedor?.trim().toLowerCase()===form.proveedor.trim().toLowerCase()
+      );
+      if(duplicado) {
+        setAlertaDuplicado(`⚠️ Ya existe una ${duplicado.tipoDoc} N° ${duplicado.nDocumento} de ${duplicado.proveedor} ingresada el ${duplicado.fecha}. ¿Deseas guardar igual?`);
+        return;
+      }
+    }
     const doc = {...form, id:editId||Date.now()};
     if(editId) { set({compras:compras.map(c=>c.id===editId?doc:c)}); setEditId(null); }
     else        { set({compras:[doc,...compras]}); }
-    setForm(emptyForm); setShowForm(false);
+    setForm(emptyForm); setShowForm(false); setAlertaDuplicado(null);
+  };
+
+  const guardarIgual = () => {
+    const doc = {...form, id:Date.now()};
+    set({compras:[doc,...compras]});
+    setForm(emptyForm); setShowForm(false); setAlertaDuplicado(null);
   };
 
   const eliminar = (id) => set({compras:compras.filter(c=>c.id!==id)});
   const editar   = (c)  => { setForm({...c,items:c.items||[{...emptyItem,descripcion:c.descripcion||"",cantidad:c.cantidad||1,precioUnitario:c.precioUnitario||"",totalNeto:c.totalNeto||"",iva:c.iva||"",totalBruto:c.totalBruto||""}]}); setEditId(c.id); setShowForm(true); setSubTab("lista"); };
-  const marcarPagada = (id,forma) => set({compras:compras.map(c=>c.id===id?{...c,estado:"pagada",formaPago:forma,fechaPago:c.fechaPago||hoy.toISOString().slice(0,10)}:c)});
+
+  const marcarPagada = (id, forma) => {
+    const compra = compras.find(c=>c.id===id);
+    if(compra && ["pagada","pagada_efectivo","pagada_debito","rendida","en_rendicion"].includes(compra.estado)) {
+      const estadoLabel = compra.estado==="pagada"?"ya fue pagada por transferencia":compra.estado==="pagada_efectivo"?"ya fue pagada en efectivo":compra.estado==="rendida"?"ya fue rendida":"está en proceso de rendición";
+      if(!window.confirm(`⚠️ Esta factura ${estadoLabel}. ¿Deseas marcarla como pagada de todas formas?`)) return;
+    }
+    set({compras:compras.map(c=>c.id===id?{...c,estado:"pagada",formaPago:forma,fechaPago:c.fechaPago||hoy.toISOString().slice(0,10)}:c)});
+  };
 
   // ── Rendición ─────────────────────────────────────────────────────────────
   const crearRendicion = () => {
@@ -5183,12 +5211,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
           <span>{pctUsado}% comprometido</span>
           {esJefa&&<div style={{display:"flex",gap:6}}>
             <button style={{...S.btn,fontSize:10,padding:"2px 8px",background:"rgba(245,158,11,0.1)",color:"#fcd34d",border:"1px solid rgba(245,158,11,0.2)"}}
-              onClick={()=>{
-                const monto=prompt(`Saldo remanente del período anterior ($):`,saldoAnterior||0);
-                if(monto===null||isNaN(Number(monto))) return;
-                const periodo=prompt("Período al que corresponde (ej: Mayo 2026):",periodoAnterior||"");
-                set({saldoAnterior:Number(monto), periodoAnterior:periodo||""});
-              }}>
+              onClick={()=>{setSaldoForm({monto:String(saldoAnterior||""),periodo:periodoAnterior||""});setShowSaldoAnt(true);}}>
               💰 Saldo anterior
             </button>
             <button style={{...S.btn,fontSize:10,padding:"2px 8px",background:"rgba(255,255,255,0.06)",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)"}}
@@ -5199,6 +5222,27 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
         </div>
       </div>
 
+      {/* Formulario saldo anterior */}
+      {showSaldoAnt&&(
+        <div style={{...S.card,padding:16,marginBottom:16,background:"rgba(245,158,11,0.07)",borderColor:"rgba(245,158,11,0.3)"}}>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#fcd34d",marginBottom:12}}>💰 Saldo remanente del período anterior</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+            <div>
+              <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>Monto ($)</label>
+              <input type="number" min={0} style={S.input} placeholder="ej: 200000" value={saldoForm.monto} onChange={e=>setSaldoForm(p=>({...p,monto:e.target.value}))}/>
+            </div>
+            <div>
+              <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>Período (ej: Mayo 2026)</label>
+              <input style={S.input} placeholder="ej: Mayo 2026" value={saldoForm.periodo} onChange={e=>setSaldoForm(p=>({...p,periodo:e.target.value}))}/>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button className="btn-p" style={S.btn} onClick={()=>{set({saldoAnterior:Number(saldoForm.monto)||0,periodoAnterior:saldoForm.periodo});setShowSaldoAnt(false);}}>✓ Guardar</button>
+            <button className="btn-g" style={S.btn} onClick={()=>setShowSaldoAnt(false)}>Cancelar</button>
+          </div>
+        </div>
+      )}
+
       {/* Sub-tabs */}
       <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
         {[["fondo","📊 Resumen"],["lista","📋 Compras"],["rendiciones","📤 Rendiciones"]].map(([t,l])=>{
@@ -5208,8 +5252,6 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
           </button>;
         })}
       </div>
-
-      {/* ── RESUMEN ── */}
       {subTab==="fondo"&&(
         <div className="ein">
           {compras.length===0?(
@@ -5409,9 +5451,18 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                 </div>
                 <div><label style={labelSt}>Observaciones</label><input style={S.input} value={form.obs} onChange={e=>setForm(p=>({...p,obs:e.target.value}))}/></div>
               </div>
-              <div style={{display:"flex",gap:10}}>
+              {alertaDuplicado&&(
+                <div style={{gridColumn:"1/-1",background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:10,padding:"12px 14px"}}>
+                  <div style={{fontSize:13,color:"#fca5a5",marginBottom:10}}>{alertaDuplicado}</div>
+                  <div style={{display:"flex",gap:8}}>
+                    <button style={{...S.btn,background:"rgba(239,68,68,0.2)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.35)",fontSize:12}} onClick={guardarIgual}>Sí, guardar igual</button>
+                    <button className="btn-g" style={S.btn} onClick={()=>setAlertaDuplicado(null)}>Cancelar</button>
+                  </div>
+                </div>
+              )}
+              <div style={{gridColumn:"1/-1",display:"flex",gap:10}}>
                 <button className="btn-p" style={S.btn} onClick={guardar}>✓ {editId?"Actualizar":"Guardar"}</button>
-                <button className="btn-g" style={S.btn} onClick={()=>{setShowForm(false);setEditId(null);setForm(emptyForm);}}>Cancelar</button>
+                <button className="btn-g" style={S.btn} onClick={()=>{setShowForm(false);setEditId(null);setForm(emptyForm);setAlertaDuplicado(null);}}>Cancelar</button>
               </div>
             </div>
           )}
