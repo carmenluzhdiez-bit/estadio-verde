@@ -5137,14 +5137,15 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     const w = window.open("","_blank"); w.document.write(html); w.document.close();
   };
 
-  // ── Resumen por cuenta ────────────────────────────────────────────────────
+  // ── Cálculos fondo ────────────────────────────────────────────────────────
+  // Fondo fijo = $3.000.000 siempre (no se suma el saldo anterior)
+  // Saldo anterior = referencia informativa del período previo pendiente de reembolso
   const totalGeneral = compras.reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
   const totalReembolsado  = rendiciones.reduce((a,r)=>a+(r.reembolso?Number(r.montoReembolso||0):0),0);
   const gastadoPendiente  = compras.filter(c=>["pendiente","pagada","pagada_efectivo","pagada_debito","en_rendicion"].includes(c.estado)).reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
-  const fondoReal         = fondo + Number(saldoAnterior||0) + totalReembolsado;
-  const saldoDisponible   = fondoReal - gastadoPendiente;
-  const pctUsado          = fondoReal?Math.round((gastadoPendiente/fondoReal)*100):0;
-  const colorSaldo        = saldoDisponible>fondoReal*0.4?"#22c55e":saldoDisponible>fondoReal*0.15?"#f59e0b":"#ef4444";
+  const saldoDisponible   = fondo - gastadoPendiente;
+  const pctUsado          = fondo?Math.round((gastadoPendiente/fondo)*100):0;
+  const colorSaldo        = saldoDisponible>fondo*0.4?"#22c55e":saldoDisponible>fondo*0.15?"#f59e0b":"#ef4444";
 
   const porCuenta = TODAS_CUENTAS.map(cu=>{
     const items=compras.filter(c=>c.cuenta===cu);
