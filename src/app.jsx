@@ -5226,7 +5226,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                     method:"POST",
                     headers:{"Content-Type":"application/json","x-api-key":"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","anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
                     body: JSON.stringify({
-                      model:"claude-sonnet-4-20250514",
+                      model:"claude-sonnet-4-6",
                       max_tokens:1000,
                       messages:[{role:"user",content:[
                         contentBlock,
@@ -5266,6 +5266,7 @@ Si un campo no está visible o no aplica, usa cadena vacía "" o 0 para números
                   setFotoBase64(isPdf ? null : `data:${mediaType};base64,${b64}`);
                   setShowForm(true);
                 } catch(err) {
+                  console.error("Error lectura documento:", err);
                   setFotoError("No se pudo leer el documento. Verifica que sea una imagen clara o un PDF legible.");
                 } finally {
                   setFotoAnalizando(false);
