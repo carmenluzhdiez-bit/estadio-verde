@@ -5199,16 +5199,16 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
             <div style={{fontSize:11,color:"#6aaa7a",letterSpacing:"0.6px",marginBottom:4,textTransform:"uppercase"}}>💼 Fondo disponible</div>
             <div style={{fontFamily:"'Playfair Display',serif",fontSize:32,fontWeight:900,color:colorSaldo}}>${saldoDisponible.toLocaleString("es-CL")}</div>
             <div style={{fontSize:12,color:"#5a8a6a",marginTop:2}}>
-              de ${fondoActual.toLocaleString("es-CL")} {hayRendicionPendiente&&Number(saldoAnterior)>0?"(saldo período anterior)":"(fondo base)"}
+              {"de $"+fondoActual.toLocaleString("es-CL")+" "+(hayRendicionPendiente&&Number(saldoAnterior)>0?"(saldo período anterior)":"(fondo base)")}
             </div>
             {hayRendicionPendiente&&Number(saldoAnterior)>0&&(
               <div style={{fontSize:11,color:"#f59e0b",marginTop:6,background:"rgba(245,158,11,0.08)",borderRadius:6,padding:"5px 8px"}}>
-                ⏳ Reembolso pendiente{periodoAnterior?` de ${periodoAnterior}`:""}: ${(fondo-Number(saldoAnterior)).toLocaleString("es-CL")} — cuando llegue, el fondo vuelve a ${fondo.toLocaleString("es-CL")}
+                {"⏳ Reembolso pendiente"+(periodoAnterior?" de "+periodoAnterior:"")+": $"+(fondo-Number(saldoAnterior)).toLocaleString("es-CL")+" — cuando llegue, el fondo vuelve a $"+fondo.toLocaleString("es-CL")}
               </div>
             )}
             {!hayRendicionPendiente&&Number(saldoAnterior)>0&&(
               <div style={{fontSize:11,color:"#22c55e",marginTop:6,background:"rgba(34,197,94,0.08)",borderRadius:6,padding:"5px 8px"}}>
-                ✅ Reembolso recibido — fondo en ${fondo.toLocaleString("es-CL")}
+                {"✅ Reembolso recibido — fondo en $"+fondo.toLocaleString("es-CL")}
               </div>
             )}
           </div>
