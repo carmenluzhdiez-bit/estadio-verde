@@ -1,5 +1,53 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import * as React from "react";
+
+// ─── FIREBASE ────────────────────────────────────────────────────────────────
+import { initializeApp } from "firebase/app";
+import { getDatabase, ref, onValue, set as fbSet } from "firebase/database";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBgxVOk_OAh2XTouD9gLw5rycaNF-OWlnU",
+  authDomain: "riego-estadio-espanol.firebaseapp.com",
+  databaseURL: "https://riego-estadio-espanol-default-rtdb.firebaseio.com",
+  projectId: "riego-estadio-espanol",
+  storageBucket: "riego-estadio-espanol.firebasestorage.app",
+  messagingSenderId: "972722300084",
+  appId: "1:972722300084:web:0da9c37b416a050c3b63e1",
+};
+
+const fbApp = initializeApp(firebaseConfig, "estadio-verde");
+const db    = getDatabase(fbApp);
+const ROOT  = "estadio-verde-data";
+
+// Hook genérico Firebase ↔ React state
+// Sincroniza un nodo de Firebase con un estado local.
+// defaultValue se usa solo si Firebase devuelve null.
+function useFirebaseState(path, defaultValue) {
+  const fullPath = `${ROOT}/${path}`;
+  const [value, setValueLocal] = useState(defaultValue);
+  const [ready,  setReady]     = useState(false);
+  const skipRef = useRef(false);
+
+  useEffect(() => {
+    const r = ref(db, fullPath);
+    const unsub = onValue(r, (snap) => {
+      if (skipRef.current) { skipRef.current = false; return; }
+      const v = snap.val();
+      setValueLocal(v !== null && v !== undefined ? v : defaultValue);
+      setReady(true);
+    });
+    return () => unsub();
+  }, [fullPath]);
+
+  const setValue = (newVal) => {
+    const resolved = typeof newVal === "function" ? newVal(value) : newVal;
+    skipRef.current = true;
+    setValueLocal(resolved);
+    fbSet(ref(db, fullPath), resolved).catch(() => { skipRef.current = false; });
+  };
+
+  return [value, setValue, ready];
+}
 
 // ─── CATEGORÍAS DE ELEMENTOS ────────────────────────────────────────────────
 const CATEGORIAS_ELEM = {
@@ -652,11 +700,7 @@ const TAREAS_PRESET = [
 ];
 
 const initData = () => {
-  try {
-    const saved = localStorage.getItem("ev2-data");
-    if (saved) return JSON.parse(saved);
-  } catch {}
-  // Build default: one record per zona with elements
+  // Build default data structure (usado solo si Firebase devuelve null)
   const d = {};
   MACROZONAS_BASE.forEach(z => {
     const elementos = {};
@@ -5180,7 +5224,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                     : {type:"image",source:{type:"base64",media_type:mediaType,data:b64}};
                   const resp = await fetch("https://api.anthropic.com/v1/messages",{
                     method:"POST",
-                    headers:{"Content-Type":"application/json"},
+                    headers:{"Content-Type":"application/json","x-api-key":"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","anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
                     body: JSON.stringify({
                       model:"claude-sonnet-4-20250514",
                       max_tokens:1000,
@@ -5585,13 +5629,19 @@ export default function App() {
     d.setDate(d.getDate()+diff); return d.toISOString().slice(0,10);
   });
 
-  const initPersonal = () => { try { const s=localStorage.getItem("ev2-personal"); if(s){ const p=JSON.parse(s); if(p.length>0) return p; } } catch {} return PERSONAL_INICIAL; };
-  const [personal, setPersonal] = useState(initPersonal);
+  // ─── ESTADO SINCRONIZADO CON FIREBASE ────────────────────────────────────────
+  const [data,           setData,           dataReady]     = useFirebaseState("data",           initData());
+  const [personal,       setPersonal,       personalReady] = useFirebaseState("personal",       PERSONAL_INICIAL);
+  const [tareasProg,     setTareasProg,     progReady]     = useFirebaseState("prog",           {});
+  const [aplicaciones,   setAplicaciones,   aplReady]      = useFirebaseState("fungicidas",     []);
+  const [incidenciasFito,setIncidenciasFito,incidReady]    = useFirebaseState("fung-incid",     []);
+  const [comprasData,    setComprasData,    comprasReady]  = useFirebaseState("compras",        {compras:[],cuentas:CUENTAS_DEFAULT});
 
-  const initTareasProg = () => { try { const s=localStorage.getItem("ev2-prog"); return s?JSON.parse(s):{}; } catch { return {}; } };
-  const [tareasProg, setTareasProg] = useState(initTareasProg);
-  useEffect(() => { try { localStorage.setItem("ev2-prog", JSON.stringify(tareasProg)); } catch {} }, [tareasProg]);
+  const appReady = dataReady && personalReady && progReady;
 
+  // PINes siguen en localStorage (son locales por dispositivo)
+  const getPines    = () => { try { return JSON.parse(localStorage.getItem("ev2-pines")||"{}"); } catch { return {}; } };
+  const setPinRol   = (rol, pin) => { const p=getPines(); p[rol]=pin; localStorage.setItem("ev2-pines", JSON.stringify(p)); };
   const [personalVista, setPersonalVista] = useState("lista");
   const [personalId, setPersonalId] = useState(null);
   const [personalTab, setPersonalTab] = useState("ficha");
@@ -5606,25 +5656,10 @@ export default function App() {
   const [rolLogueado, setRolLogueado] = useState(null);
 
   // ─── FUNGICIDAS ──────────────────────────────────────────────────────────────
-  const initFungicidas = () => { try { const s=localStorage.getItem("ev2-fungicidas"); return s?JSON.parse(s):[]; } catch { return []; } };
-  const [aplicaciones, setAplicaciones] = useState(initFungicidas);
-  useEffect(() => { try { localStorage.setItem("ev2-fungicidas", JSON.stringify(aplicaciones)); } catch {} }, [aplicaciones]);
-
-  const initIncidenciasFito = () => { try { const s=localStorage.getItem("ev2-fung-incid"); return s?JSON.parse(s):[]; } catch { return []; } };
-  const [incidenciasFito, setIncidenciasFito] = useState(initIncidenciasFito);
-  useEffect(() => { try { localStorage.setItem("ev2-fung-incid", JSON.stringify(incidenciasFito)); } catch {} }, [incidenciasFito]);
-
-  // ─── COMPRAS ─────────────────────────────────────────────────────────────────
   const CUENTAS_DEFAULT = ["Rama Golf","Mantenimiento Jardines","Obras","Insumos Generales","Maquinaria y Equipos","Fitosanitarios","Semillas y Plantas","Uniformes y EPP"];
-  const initCompras = () => { try { const s=localStorage.getItem("ev2-compras"); return s?JSON.parse(s):{compras:[],cuentas:CUENTAS_DEFAULT}; } catch { return {compras:[],cuentas:CUENTAS_DEFAULT}; } };
-  const [comprasData, setComprasData] = useState(initCompras);
-  useEffect(() => { try { localStorage.setItem("ev2-compras", JSON.stringify(comprasData)); } catch {} }, [comprasData]);
-  const getPines = () => { try { return JSON.parse(localStorage.getItem("ev2-pines")||"{}"); } catch { return {}; } };
-  const setPinRol = (rol, pin) => { const p=getPines(); p[rol]=pin; localStorage.setItem("ev2-pines", JSON.stringify(p)); };
   const checkPin = (rol, pin) => { const p=getPines(); return p[rol] && String(p[rol])===String(pin); };
 
-  useEffect(() => { try { localStorage.setItem("ev2-data", JSON.stringify(data)); } catch {} }, [data]);
-  useEffect(() => { try { localStorage.setItem("ev2-personal", JSON.stringify(personal)); } catch {} }, [personal]);
+  // updateZona — actualiza una zona en el estado data
 
   const updateZona = (id, patch) => setData(p => ({ ...p, [id]: { ...p[id], ...patch } }));
   const addHistorial = (id, txt) => setData(p => ({
@@ -5725,7 +5760,7 @@ export default function App() {
     const elems=getAllElems(zona.id).map(e=>`${e.nombre} (${ESTADOS_ELEM[e.edData.estado]?.label||"Bueno"})`).join(", ");
     const prompt=`Eres experto en mantenimiento de parques y jardines de un club español en Chile. Analiza la macrozona "${zona.nombre}" con estos elementos: ${elems}. Estado general: ${ESTADOS_ZONA[zd?.estadoGeneral]?.label}. Notas: ${zd?.notas||"Ninguna"}. Da recomendaciones específicas de mantenimiento para cada elemento en estado regular o crítico, y un plan de acción priorizado. Responde en español con viñetas y secciones claras.`;
     try {
-      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:prompt}]})});
+      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":"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","anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:prompt}]})});
       const json=await res.json();
       setAiText(json.content?.[0]?.text||"Sin respuesta.");
     } catch { setAiText("Error al conectar con el asistente IA."); }
@@ -5826,6 +5861,17 @@ export default function App() {
       </div>
     );
   };
+
+  // ── Pantalla de carga Firebase ────────────────────────────────────────────
+  if (!appReady) return (
+    <div style={{minHeight:"100vh",background:"#0d1f13",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
+      <div style={{fontSize:48}}>🌿</div>
+      <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,color:"#a0d8b0",fontWeight:700}}>Estadio Español</div>
+      <div style={{fontSize:13,color:"#4a8a5a",marginBottom:8}}>Conectando con Firebase...</div>
+      <div style={{width:40,height:40,border:"3px solid #1a3a22",borderTop:"3px solid #4a9a64",borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  );
 
   return (
     <div style={S.app}>
