@@ -5138,14 +5138,23 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   };
 
   // ── Cálculos fondo ────────────────────────────────────────────────────────
-  // Fondo fijo = $3.000.000 siempre (no se suma el saldo anterior)
-  // Saldo anterior = referencia informativa del período previo pendiente de reembolso
+  // Fondo disponible real = saldo anterior (si no hay reembolso pendiente → fondo base)
+  // Si hay rendición pendiente de reembolso → el fondo real es el saldo anterior
+  // Cuando llega el reembolso → el fondo vuelve a $3.000.000
   const totalGeneral = compras.reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
-  const totalReembolsado  = rendiciones.reduce((a,r)=>a+(r.reembolso?Number(r.montoReembolso||0):0),0);
-  const gastadoPendiente  = compras.filter(c=>["pendiente","pagada","pagada_efectivo","pagada_debito","en_rendicion"].includes(c.estado)).reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
-  const saldoDisponible   = fondo - gastadoPendiente;
-  const pctUsado          = fondo?Math.round((gastadoPendiente/fondo)*100):0;
-  const colorSaldo        = saldoDisponible>fondo*0.4?"#22c55e":saldoDisponible>fondo*0.15?"#f59e0b":"#ef4444";
+  const totalReembolsado = rendiciones.reduce((a,r)=>a+(r.reembolso?Number(r.montoReembolso||0):0),0);
+  const hayRendicionPendiente = rendiciones.some(r=>!r.reembolso);
+  // Si hay rendición pendiente de reembolso, el fondo actual es el saldo anterior
+  // Si no hay rendición pendiente (ya fue reembolsada), el fondo es el base ($3M)
+  const fondoActual = hayRendicionPendiente && Number(saldoAnterior)>0
+    ? Number(saldoAnterior)
+    : fondo;
+  const gastadoPendiente = compras
+    .filter(c=>["pendiente","pagada","pagada_efectivo","pagada_debito","en_rendicion"].includes(c.estado))
+    .reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
+  const saldoDisponible = fondoActual - gastadoPendiente;
+  const pctUsado        = fondoActual?Math.round((gastadoPendiente/fondoActual)*100):0;
+  const colorSaldo      = saldoDisponible>fondoActual*0.4?"#22c55e":saldoDisponible>fondoActual*0.15?"#f59e0b":"#ef4444";
 
   const porCuenta = TODAS_CUENTAS.map(cu=>{
     const items=compras.filter(c=>c.cuenta===cu);
@@ -5190,9 +5199,18 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
             <div style={{fontSize:11,color:"#6aaa7a",letterSpacing:"0.6px",marginBottom:4,textTransform:"uppercase"}}>💼 Fondo disponible</div>
             <div style={{fontFamily:"'Playfair Display',serif",fontSize:32,fontWeight:900,color:colorSaldo}}>${saldoDisponible.toLocaleString("es-CL")}</div>
             <div style={{fontSize:12,color:"#5a8a6a",marginTop:2}}>
-              de ${fondoReal.toLocaleString("es-CL")} total
-              {Number(saldoAnterior)>0&&<span style={{color:"#f59e0b"}}> · incluye ${Number(saldoAnterior).toLocaleString("es-CL")} remanente{periodoAnterior?` de ${periodoAnterior}`:""}</span>}
+              de ${fondoActual.toLocaleString("es-CL")} {hayRendicionPendiente&&Number(saldoAnterior)>0?"(saldo período anterior)":"(fondo base)"}
             </div>
+            {hayRendicionPendiente&&Number(saldoAnterior)>0&&(
+              <div style={{fontSize:11,color:"#f59e0b",marginTop:6,background:"rgba(245,158,11,0.08)",borderRadius:6,padding:"5px 8px"}}>
+                ⏳ Reembolso pendiente{periodoAnterior?` de ${periodoAnterior}`:""}: ${(fondo-Number(saldoAnterior)).toLocaleString("es-CL")} — cuando llegue, el fondo vuelve a ${fondo.toLocaleString("es-CL")}
+              </div>
+            )}
+            {!hayRendicionPendiente&&Number(saldoAnterior)>0&&(
+              <div style={{fontSize:11,color:"#22c55e",marginTop:6,background:"rgba(34,197,94,0.08)",borderRadius:6,padding:"5px 8px"}}>
+                ✅ Reembolso recibido — fondo en ${fondo.toLocaleString("es-CL")}
+              </div>
+            )}
           </div>
           <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
             <div style={{textAlign:"center",background:"rgba(255,255,255,0.04)",borderRadius:10,padding:"10px 16px"}}>
