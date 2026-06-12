@@ -5244,19 +5244,35 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
       {/* Formulario saldo anterior */}
       {showSaldoAnt&&(
         <div style={{...S.card,padding:16,marginBottom:16,background:"rgba(245,158,11,0.07)",borderColor:"rgba(245,158,11,0.3)"}}>
-          <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#fcd34d",marginBottom:12}}>💰 Saldo remanente del período anterior</div>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#fcd34d",marginBottom:6}}>💰 Inicializar saldo del fondo</div>
+          <div style={{fontSize:12,color:"#a08050",marginBottom:12}}>
+            Ingresa el saldo real disponible a la fecha de corte. Este es el punto de partida — la diferencia con ${fondo.toLocaleString("es-CL")} quedará registrada como rendición pendiente de reembolso.
+          </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
             <div>
-              <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>Monto ($)</label>
-              <input type="number" min={0} style={S.input} placeholder="ej: 200000" value={saldoForm.monto} onChange={e=>setSaldoForm(p=>({...p,monto:e.target.value}))}/>
+              <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>Saldo disponible ($)</label>
+              <input type="number" min={0} style={S.input} placeholder={"ej: 193793"} value={saldoForm.monto} onChange={e=>setSaldoForm(p=>({...p,monto:e.target.value}))}/>
             </div>
             <div>
-              <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>Período (ej: Mayo 2026)</label>
-              <input style={S.input} placeholder="ej: Mayo 2026" value={saldoForm.periodo} onChange={e=>setSaldoForm(p=>({...p,periodo:e.target.value}))}/>
+              <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>Fecha de corte</label>
+              <input type="date" style={S.input} value={saldoForm.periodo} onChange={e=>setSaldoForm(p=>({...p,periodo:e.target.value}))}/>
             </div>
           </div>
+          {saldoForm.monto&&saldoForm.periodo&&(
+            <div style={{fontSize:12,color:"#f59e0b",background:"rgba(245,158,11,0.06)",borderRadius:8,padding:"8px 12px",marginBottom:12}}>
+              <div>Saldo disponible actual: <strong>${Number(saldoForm.monto).toLocaleString("es-CL")}</strong></div>
+              <div>Pendiente de reembolso: <strong>${(fondo-Number(saldoForm.monto)).toLocaleString("es-CL")}</strong></div>
+              <div style={{fontSize:11,color:"#8a7050",marginTop:2}}>Cuando el Estadio reembolse, el fondo volverá a ${fondo.toLocaleString("es-CL")}</div>
+            </div>
+          )}
           <div style={{display:"flex",gap:8}}>
-            <button className="btn-p" style={S.btn} onClick={()=>{set({saldoAnterior:Number(saldoForm.monto)||0,periodoAnterior:saldoForm.periodo});setShowSaldoAnt(false);}}>✓ Guardar</button>
+            <button className="btn-p" style={S.btn} onClick={()=>{
+              const fechaFormateada = saldoForm.periodo
+                ? new Date(saldoForm.periodo+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"})
+                : "";
+              set({saldoAnterior:Number(saldoForm.monto)||0, periodoAnterior:fechaFormateada});
+              setShowSaldoAnt(false);
+            }}>✓ Guardar</button>
             <button className="btn-g" style={S.btn} onClick={()=>setShowSaldoAnt(false)}>Cancelar</button>
           </div>
         </div>
