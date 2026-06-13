@@ -55,8 +55,8 @@ function useFirebaseState(path, defaultValue) {
 
   const setValue = (newVal) => {
     const resolved = typeof newVal === "function" ? newVal(value) : newVal;
+    setValueLocal(resolved); // actualiza local inmediatamente
     skipRef.current = true;
-    setValueLocal(resolved);
     fbSet(ref(db, fullPath), resolved).catch(() => { skipRef.current = false; });
   };
 
@@ -5144,11 +5144,9 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   const totalGeneral = compras.reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
   const totalReembolsado = rendiciones.reduce((a,r)=>a+(r.reembolso?Number(r.montoReembolso||0):0),0);
   const hayRendicionPendiente = rendiciones.some(r=>!r.reembolso);
-  // Si hay rendición pendiente de reembolso, el fondo actual es el saldo anterior
-  // Si no hay rendición pendiente (ya fue reembolsada), el fondo es el base ($3M)
-  const fondoActual = hayRendicionPendiente && Number(saldoAnterior)>0
-    ? Number(saldoAnterior)
-    : fondo;
+  // Si hay saldo anterior ingresado → ese es el fondo actual (reembolso pendiente)
+  // Si no hay saldo anterior → fondo base ($3M)
+  const fondoActual = Number(saldoAnterior)>0 ? Number(saldoAnterior) : fondo;
   const gastadoPendiente = compras
     .filter(c=>["pendiente","pagada","pagada_efectivo","pagada_debito","en_rendicion"].includes(c.estado))
     .reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
@@ -5255,7 +5253,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
             </div>
             <div>
               <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>Fecha de corte</label>
-              <input type="date" style={S.input} value={saldoForm.periodo} onChange={e=>setSaldoForm(p=>({...p,periodo:e.target.value}))}/>
+              <input type="text" style={S.input} placeholder="ej: 03/06/2026" value={saldoForm.periodo} onChange={e=>setSaldoForm(p=>({...p,periodo:e.target.value}))}/>
             </div>
           </div>
           {saldoForm.monto&&saldoForm.periodo&&(
@@ -5267,10 +5265,11 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
           )}
           <div style={{display:"flex",gap:8}}>
             <button className="btn-p" style={S.btn} onClick={()=>{
-              const fechaFormateada = saldoForm.periodo
-                ? new Date(saldoForm.periodo+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"})
-                : "";
-              set({saldoAnterior:Number(saldoForm.monto)||0, periodoAnterior:fechaFormateada});
+              const montoNum = Number(saldoForm.monto)||0;
+              const fechaTexto = saldoForm.periodo||"";
+              if(montoNum>0) {
+                set({saldoAnterior:montoNum, periodoAnterior:fechaTexto});
+              }
               setShowSaldoAnt(false);
             }}>✓ Guardar</button>
             <button className="btn-g" style={S.btn} onClick={()=>setShowSaldoAnt(false)}>Cancelar</button>
