@@ -5031,8 +5031,14 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
       }
     }
     const doc = {...form, id:editId||Date.now()};
-    if(editId) { set({compras:compras.map(c=>c.id===editId?doc:c)}); setEditId(null); }
-    else        { set({compras:[doc,...compras]}); }
+    // Marcar notas de pedido vinculadas como "facturada"
+    const notasVinculadas = form.notasVinculadas||[];
+    if(editId) {
+      set({compras:compras.map(c=>c.id===editId?doc:c)});
+      setEditId(null);
+    } else {
+      set({compras:[doc,...compras.map(c=>notasVinculadas.includes(c.id)?{...c,estado:"facturada",facturaId:doc.id}:c)]});
+    }
     setForm(emptyForm); setShowForm(false); setAlertaDuplicado(null);
   };
 
@@ -5088,56 +5094,99 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   const imprimirRendicion = (r) => {
     const itemsRend = compras.filter(c=>r.items?.includes(c.id));
     const fechaRend = new Date(r.fecha+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"});
-    const rows = itemsRend.map(c=>{
-      const items = c.items||[{descripcion:c.descripcion,cantidad:c.cantidad,precioUnitario:c.precioUnitario,totalNeto:c.totalNeto,iva:c.iva,totalBruto:c.totalBruto}];
-      return items.map((it,i)=>`
-        <tr>
-          ${i===0?`<td rowspan="${items.length}" style="vertical-align:top;padding:6px 10px;border:1px solid #ddd;font-size:12px">${c.fecha}<br><small>${c.tipoDoc} ${c.nDocumento||""}</small><br><small>${c.proveedor||""}</small></td>`:""}
-          <td style="padding:6px 10px;border:1px solid #ddd;font-size:12px">${it.descripcion||""}</td>
-          <td style="padding:6px 10px;border:1px solid #ddd;font-size:12px;text-align:center">${it.cantidad||1} ${it.unidad||""}</td>
-          <td style="padding:6px 10px;border:1px solid #ddd;font-size:12px;text-align:right">$${Number(it.precioUnitario||0).toLocaleString("es-CL")}</td>
-          <td style="padding:6px 10px;border:1px solid #ddd;font-size:12px;text-align:right">$${Number(it.totalNeto||0).toLocaleString("es-CL")}</td>
-          <td style="padding:6px 10px;border:1px solid #ddd;font-size:12px;text-align:right">$${Number(it.iva||0).toLocaleString("es-CL")}</td>
-          <td style="padding:6px 10px;border:1px solid #ddd;font-size:12px;text-align:right;font-weight:bold">$${Number(it.totalBruto||0).toLocaleString("es-CL")}</td>
-          ${i===0?`<td rowspan="${items.length}" style="vertical-align:top;padding:6px 10px;border:1px solid #ddd;font-size:12px">${c.cuenta||""}</td>`:""}
-        </tr>`).join("");
+    const fechaHoy  = new Date().toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"});
+    const porCuentaRend = {};
+    itemsRend.forEach(c=>{
+      if(!porCuentaRend[c.cuenta]) porCuentaRend[c.cuenta]={total:0,n:0};
+      porCuentaRend[c.cuenta].total += Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
+      porCuentaRend[c.cuenta].n++;
+    });
+    const filas = itemsRend.map(c=>{
+      const items = c.items||[{descripcion:c.descripcion,cantidad:c.cantidad||1,unidad:c.unidad||"unidad",totalNeto:c.totalNeto||0,iva:c.iva||0,totalBruto:c.totalBruto||0}];
+      const totalDoc = Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
+      const notasVinc = compras.filter(np=>np.facturaId===c.id);
+      const notasHtml = notasVinc.length>0?`<tr><td colspan="8" style="padding:3px 8px 3px 24px;font-size:10px;color:#777;background:#fffde7;border:1px solid #e0e0e0"><em>NP vinculadas: ${notasVinc.map(np=>"NP "+np.nDocumento+" ("+np.fecha+")").join(", ")}</em></td></tr>`:"";
+      return `<tr>
+        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.fecha}</td>
+        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.tipoDoc} N°${c.nDocumento||"—"}</td>
+        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.proveedor||"—"}</td>
+        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${items.map(it=>it.descripcion+(it.categoria?" ("+it.categoria+")":"")).join("<br>")}</td>
+        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right">$${items.reduce((a,it)=>a+Number(it.totalNeto||0),0).toLocaleString("es-CL")}</td>
+        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right">$${items.reduce((a,it)=>a+Number(it.iva||0),0).toLocaleString("es-CL")}</td>
+        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right;font-weight:bold">$${totalDoc.toLocaleString("es-CL")}</td>
+        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.cuenta||"—"}</td>
+      </tr>${notasHtml}`;
     }).join("");
-    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-    <title>Rendición ${r.id} — ${fechaRend}</title>
-    <style>body{font-family:Arial,sans-serif;margin:30px;color:#1a1a1a}h1{font-size:20px;color:#1a5c2a}h2{font-size:14px;color:#333}table{width:100%;border-collapse:collapse;margin-bottom:20px}th{background:#1a5c2a;color:#fff;padding:8px 10px;font-size:12px;text-align:left}tr:nth-child(even){background:#f5f5f5}.total-row{background:#e8f5e9;font-weight:bold}.firma{margin-top:60px;display:flex;justify-content:space-between}.firma-bloque{text-align:center;width:45%}.firma-linea{border-top:1px solid #333;margin-bottom:8px;padding-top:8px}.footer{margin-top:30px;border-top:1px solid #ccc;padding-top:10px;font-size:10px;color:#666;text-align:center}@media print{button{display:none}}</style>
-    </head><body>
-    <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:20px">
-      <div><h1>Informe de Rendición de Gastos</h1><h2>Departamento de Áreas Verdes · Estadio Español de Las Condes</h2></div>
-      <div style="text-align:right;font-size:12px;color:#555"><strong>Fecha rendición:</strong> ${fechaRend}<br><strong>N° Rendición:</strong> ${r.id}<br><strong>Total:</strong> <span style="font-size:16px;color:#1a5c2a;font-weight:bold">$${r.total.toLocaleString("es-CL")}</span></div>
+    const subtotales = Object.entries(porCuentaRend).map(([cu,d])=>`<tr style="background:#f5f5f5"><td colspan="6" style="padding:4px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right">Subtotal ${cu}:</td><td style="padding:4px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right;font-weight:600">$${d.total.toLocaleString("es-CL")}</td><td style="padding:4px 8px;border:1px solid #e0e0e0;font-size:10px;color:#888">${d.n} doc.</td></tr>`).join("");
+    const totalNeto  = itemsRend.reduce((a,c)=>a+Number((c.items||[]).reduce((b,it)=>b+Number(it.totalNeto||0),0)||c.totalNeto||0),0);
+    const totalIva   = itemsRend.reduce((a,c)=>a+Number((c.items||[]).reduce((b,it)=>b+Number(it.iva||0),0)||c.iva||0),0);
+    const totalBruto = r.total;
+    const pendienteReembolso = fondo - Number(saldoAnterior||0);
+    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Rendicion Gastos Dpto Areas Verdes</title>
+    <style>body{font-family:Arial,sans-serif;margin:25px;color:#1a1a1a;font-size:12px}
+    h1{font-size:17px;color:#1a5c2a;margin:0 0 3px}h2{font-size:12px;color:#333;margin:0}
+    .hdr{display:flex;justify-content:space-between;border-bottom:2px solid #1a5c2a;padding-bottom:10px;margin-bottom:14px}
+    .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px}
+    .box{background:#f8f9fa;border:1px solid #ddd;border-radius:5px;padding:8px 10px}
+    .lbl{font-size:9px;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px}
+    .val{font-size:13px;font-weight:700;color:#1a5c2a}
+    table{width:100%;border-collapse:collapse;margin-bottom:14px}
+    th{background:#1a5c2a;color:#fff;padding:6px 8px;font-size:10px;text-align:left}
+    tr:nth-child(even){background:#fafafa}
+    .tot{background:#e8f5e9!important;font-weight:bold}
+    .sec{font-size:11px;font-weight:700;color:#1a5c2a;margin:12px 0 5px;border-left:3px solid #1a5c2a;padding-left:7px;text-transform:uppercase}
+    .firmas{display:flex;justify-content:space-between;margin-top:50px}
+    .firma{text-align:center;width:30%}
+    .flinea{border-top:1px solid #333;padding-top:6px;margin-top:40px;font-size:10px}
+    .footer{margin-top:18px;padding-top:8px;border-top:1px solid #ccc;font-size:9px;color:#888;text-align:center}
+    @media print{.noprint{display:none}}</style></head><body>
+    <div class="hdr">
+      <div><h1>Informe de Rendicion de Gastos</h1><h2>Departamento de Areas Verdes - Estadio Espanol de Las Condes</h2>
+      <div style="font-size:10px;color:#666;margin-top:3px">Dirigido a: Gerencia General y Administracion</div></div>
+      <div style="text-align:right">
+        <div style="font-size:10px;color:#666">Fecha rendicion: <strong>${fechaRend}</strong></div>
+        <div style="font-size:10px;color:#666">Emision: <strong>${fechaHoy}</strong></div>
+        <div style="font-size:18px;font-weight:900;color:#c62828">$${totalBruto.toLocaleString("es-CL")}</div>
+        <div style="font-size:10px;color:#888">Total a reembolsar</div>
+        ${r.obs?"<div style='font-size:10px;color:#555;margin-top:3px'><em>"+r.obs+"</em></div>":""}
+      </div>
     </div>
-    ${r.obs?`<p style="font-size:13px;color:#444;margin-bottom:16px"><strong>Observación:</strong> ${r.obs}</p>`:""}
-    <table>
-      <thead><tr><th>Fecha / Documento</th><th>Descripción</th><th>Cantidad</th><th>P. Unitario</th><th>Neto</th><th>IVA</th><th>Total</th><th>Cuenta</th></tr></thead>
-      <tbody>${rows}</tbody>
-      <tfoot>
-        <tr class="total-row"><td colspan="4" style="padding:8px 10px;border:1px solid #ddd;text-align:right">TOTALES</td>
-          <td style="padding:8px 10px;border:1px solid #ddd;text-align:right">$${itemsRend.reduce((a,c)=>a+Number(c.totalNetoDoc||c.totalNeto||0),0).toLocaleString("es-CL")}</td>
-          <td style="padding:8px 10px;border:1px solid #ddd;text-align:right">$${itemsRend.reduce((a,c)=>a+Number(c.ivaDoc||c.iva||0),0).toLocaleString("es-CL")}</td>
-          <td style="padding:8px 10px;border:1px solid #ddd;text-align:right">$${r.total.toLocaleString("es-CL")}</td>
-          <td style="padding:8px 10px;border:1px solid #ddd"></td>
-        </tr>
-      </tfoot>
-    </table>
-    ${r.reembolso?`<p style="font-size:13px"><strong>Reembolsado por Estadio Español:</strong> $${Number(r.montoReembolso).toLocaleString("es-CL")} — ${r.fechaReembolso} ${r.bancoReembolso?`· ${r.bancoReembolso}`:""} ${r.nTransReembolso?`· Trans: ${r.nTransReembolso}`:""}</p>`:""}
-    <div class="firma">
-      <div class="firma-bloque"><div class="firma-linea"></div><div style="font-size:12px">Firma Jefa Departamento</div></div>
-      <div class="firma-bloque"><div class="firma-linea"></div><div style="font-size:12px">Firma Gerencia / VB°</div></div>
+    <div class="grid3">
+      <div class="box"><div class="lbl">Fondo base</div><div class="val">$${fondo.toLocaleString("es-CL")}</div></div>
+      ${Number(saldoAnterior)>0?"<div class='box' style='border-color:#ffc107'><div class='lbl'>Saldo periodo anterior"+(periodoAnterior?" ("+periodoAnterior+")":"")+"</div><div class='val' style='color:#e65100'>$"+Number(saldoAnterior).toLocaleString("es-CL")+"</div></div>":"<div></div>"}
+      <div class="box" style="border-color:#c62828"><div class="lbl">Esta rendicion</div><div class="val" style="color:#c62828">$${totalBruto.toLocaleString("es-CL")}</div></div>
     </div>
-    <div class="footer">
-      Estadio Español de Las Condes · Departamento de Áreas Verdes<br>
-      ${PIE_PAGINA} · Documento generado el ${new Date().toLocaleDateString("es-CL")}
+    ${Number(saldoAnterior)>0&&pendienteReembolso>0?"<div style='background:#fff8e1;border:1px solid #ffc107;border-radius:5px;padding:8px 12px;margin-bottom:12px;font-size:11px'>Reembolso pendiente periodo anterior"+(periodoAnterior?" ("+periodoAnterior+")":"")+": <strong>$"+pendienteReembolso.toLocaleString("es-CL")+"</strong> - se solicita regularizacion junto a esta rendicion.</div>":""}
+    <div class="sec">Detalle de Documentos</div>
+    <table><thead><tr><th>Fecha</th><th>Documento</th><th>Proveedor</th><th>Descripcion</th><th style="text-align:right">Neto</th><th style="text-align:right">IVA</th><th style="text-align:right">Total</th><th>Cuenta</th></tr></thead>
+    <tbody>${filas}</tbody>${subtotales}
+    <tfoot><tr class="tot"><td colspan="4" style="padding:6px 8px;border:1px solid #e0e0e0;text-align:right">TOTALES</td>
+    <td style="padding:6px 8px;border:1px solid #e0e0e0;text-align:right">$${totalNeto.toLocaleString("es-CL")}</td>
+    <td style="padding:6px 8px;border:1px solid #e0e0e0;text-align:right">$${totalIva.toLocaleString("es-CL")}</td>
+    <td style="padding:6px 8px;border:1px solid #e0e0e0;text-align:right">$${totalBruto.toLocaleString("es-CL")}</td>
+    <td style="padding:6px 8px;border:1px solid #e0e0e0"></td></tr></tfoot></table>
+    <div class="sec">Resumen por Cuenta</div>
+    <table style="width:65%"><thead><tr><th>Cuenta</th><th>Tipo</th><th style="text-align:right">Total</th><th style="text-align:right">%</th></tr></thead><tbody>
+    ${Object.entries(porCuentaRend).map(([cu,d])=>{
+      const pct = totalBruto?Math.round((d.total/totalBruto)*100):0;
+      const barW = pct;
+      return "<tr><td style='padding:5px 8px;border:1px solid #e0e0e0'>"+cu+"</td><td style='padding:5px 8px;border:1px solid #e0e0e0;font-size:10px;color:#888'>"+(CUENTAS_INTERNAS.includes(cu)?"Interna":"Externa")+"</td><td style='padding:5px 8px;border:1px solid #e0e0e0;text-align:right;font-weight:600'>$"+d.total.toLocaleString("es-CL")+"</td><td style='padding:5px 8px;border:1px solid #e0e0e0;text-align:right'><div style='display:flex;align-items:center;justify-content:flex-end;gap:6px'><div style='width:60px;height:7px;background:#e0e0e0;border-radius:3px;overflow:hidden'><div style='width:"+barW+"%;height:100%;background:#1a5c2a;border-radius:3px'></div></div><span style='font-size:11px;font-weight:600;color:#1a5c2a'>"+pct+"%</span></div></td></tr>";
+    }).join("")}
+    <tr class="tot"><td colspan="2" style="padding:5px 8px;border:1px solid #e0e0e0;text-align:right">TOTAL A REEMBOLSAR</td><td style="padding:5px 8px;border:1px solid #e0e0e0;text-align:right;color:#c62828;font-size:14px">$${totalBruto.toLocaleString("es-CL")}</td><td style="padding:5px 8px;border:1px solid #e0e0e0;text-align:right;font-weight:700;color:#1a5c2a">100%</td></tr>
+    </tbody></table>
+    ${r.reembolso?"<div style='background:#e8f5e9;border:1px solid #4caf50;border-radius:5px;padding:7px 12px;margin-bottom:12px;font-size:11px'>Reembolso recibido: <strong>$"+Number(r.montoReembolso).toLocaleString("es-CL")+"</strong> - "+r.fechaReembolso+(r.bancoReembolso?" - "+r.bancoReembolso:"")+(r.nTransReembolso?" - Trans: "+r.nTransReembolso:"")+"</div>":""}
+    <div class="firmas">
+      <div class="firma"><div class="flinea"><strong>Carmen Luz Hermosilla Diez</strong><br>Jefe Depto. de Areas Verdes</div></div>
+      <div class="firma"><div class="flinea">Gerencia General<br>Estadio Espanol de Las Condes</div></div>
+      <div class="firma"><div class="flinea">Administracion / Finanzas<br>Estadio Espanol de Las Condes</div></div>
     </div>
-    <div style="text-align:center;margin-top:20px"><button onclick="window.print()" style="background:#1a5c2a;color:#fff;border:none;padding:10px 30px;border-radius:8px;font-size:14px;cursor:pointer">🖨️ Imprimir</button></div>
-    </body></html>`;
-    const w = window.open("","_blank"); w.document.write(html); w.document.close();
+    <div class="footer">Estadio Espanol de Las Condes - Departamento de Areas Verdes<br>
+    Jefe de Departamento de Areas Verdes - Carmen Luz Hermosilla Diez - Documento generado el ${fechaHoy}</div>
+    <div class="noprint" style="text-align:center;margin-top:18px">
+      <button onclick="window.print()" style="background:#1a5c2a;color:#fff;border:none;padding:10px 28px;border-radius:7px;font-size:13px;cursor:pointer">Imprimir / Guardar PDF</button>
+    </div></body></html>`;
+    const w=window.open("","_blank"); w.document.write(html); w.document.close();
   };
-
-  // ── Cálculos fondo ────────────────────────────────────────────────────────
   // Fondo disponible real = saldo anterior (si no hay reembolso pendiente → fondo base)
   // Si hay rendición pendiente de reembolso → el fondo real es el saldo anterior
   // Cuando llega el reembolso → el fondo vuelve a $3.000.000
@@ -5172,6 +5221,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     pagada:         {color:"#3b82f6",bg:"rgba(59,130,246,0.1)",   label:"💳 Pagada (transferencia)"},
     pagada_efectivo:{color:"#8b5cf6",bg:"rgba(139,92,246,0.1)",   label:"💵 Pagada (efectivo/débito)"},
     nota_credito:   {color:"#f97316",bg:"rgba(249,115,22,0.1)",   label:"📝 Nota de crédito"},
+    facturada:      {color:"#06b6d4",bg:"rgba(6,182,212,0.1)",    label:"🔗 Facturada"},
     en_rendicion:   {color:"#a78bfa",bg:"rgba(167,139,250,0.1)",  label:"📤 En rendición"},
     rendida:        {color:"#22c55e",bg:"rgba(34,197,94,0.1)",    label:"✅ Rendida"},
     rechazada:      {color:"#ef4444",bg:"rgba(239,68,68,0.1)",    label:"❌ Rechazada"},
@@ -5295,6 +5345,118 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
             </div>
           ):(
             <>
+              {/* Botón imprimir resumen */}
+              <div style={{display:"flex",justifyContent:"flex-end",marginBottom:14}}>
+                <button style={{...S.btn,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)",fontSize:12}}
+                  onClick={()=>{
+                    const fechaHoy = new Date().toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"});
+                    const mesActual = new Date().toLocaleDateString("es-CL",{month:"long",year:"numeric"});
+                    // Por cuenta con %
+                    const filasCuenta = porCuenta.map(c=>{
+                      const pct = totalGeneral?Math.round((c.total/totalGeneral)*100):0;
+                      return `<tr>
+                        <td style="padding:6px 10px;border:1px solid #e0e0e0">${c.cuenta}</td>
+                        <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:10px;color:#888">${CUENTAS_INTERNAS.includes(c.cuenta)?"Interna":"Externa"}</td>
+                        <td style="padding:6px 10px;border:1px solid #e0e0e0;text-align:center">${c.n}</td>
+                        <td style="padding:6px 10px;border:1px solid #e0e0e0;text-align:right;font-weight:600">$${c.total.toLocaleString("es-CL")}</td>
+                        <td style="padding:6px 10px;border:1px solid #e0e0e0;text-align:right">
+                          <div style="display:flex;align-items:center;justify-content:flex-end;gap:6px">
+                            <div style="width:80px;height:8px;background:#e0e0e0;border-radius:4px;overflow:hidden">
+                              <div style="width:${pct}%;height:100%;background:#1a5c2a;border-radius:4px"></div>
+                            </div>
+                            <strong style="color:#1a5c2a">${pct}%</strong>
+                          </div>
+                        </td>
+                      </tr>`;
+                    }).join("");
+                    // Pendientes de pago
+                    const pendientes = compras.filter(c=>c.estado==="pendiente");
+                    const filasPend = pendientes.length===0
+                      ? "<tr><td colspan='5' style='text-align:center;color:#888;padding:10px'>Sin compras pendientes</td></tr>"
+                      : pendientes.map(c=>`<tr>
+                          <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.fecha}</td>
+                          <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.tipoDoc} N°${c.nDocumento||"—"}</td>
+                          <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.proveedor||"—"}</td>
+                          <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.cuenta||"—"}</td>
+                          <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right;font-weight:600">$${Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0).toLocaleString("es-CL")}</td>
+                        </tr>`).join("");
+                    // Rendiciones pendientes
+                    const rendPend = rendiciones.filter(r=>!r.reembolso);
+                    const filasRend = rendPend.length===0
+                      ? "<tr><td colspan='3' style='text-align:center;color:#888;padding:10px'>Sin rendiciones pendientes</td></tr>"
+                      : rendPend.map(r=>`<tr>
+                          <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${new Date(r.fecha+"T12:00:00").toLocaleDateString("es-CL")}</td>
+                          <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${r.obs||"—"}</td>
+                          <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right;font-weight:600;color:#c62828">$${r.total.toLocaleString("es-CL")}</td>
+                        </tr>`).join("");
+                    // Gráfico barras por mes (texto)
+                    const filasGraf = porMes.filter(m=>m.total>0).map(m=>{
+                      const pct = maxMes?Math.round((m.total/maxMes)*100):0;
+                      return `<tr>
+                        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;width:100px">${m.label}</td>
+                        <td style="padding:5px 8px;border:1px solid #e0e0e0">
+                          <div style="display:flex;align-items:center;gap:8px">
+                            <div style="width:${Math.round(pct*2)}px;height:14px;background:#1a5c2a;border-radius:3px;min-width:4px"></div>
+                            <span style="font-size:11px;font-weight:600">$${Math.round(m.total/1000)}k</span>
+                          </div>
+                        </td>
+                        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right">$${m.total.toLocaleString("es-CL")}</td>
+                      </tr>`;
+                    }).join("");
+                    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Resumen Compras Dpto Areas Verdes</title>
+                    <style>body{font-family:Arial,sans-serif;margin:25px;color:#1a1a1a;font-size:12px}
+                    h1{font-size:17px;color:#1a5c2a;margin:0 0 3px}h2{font-size:12px;color:#333;margin:0}
+                    .hdr{display:flex;justify-content:space-between;border-bottom:2px solid #1a5c2a;padding-bottom:10px;margin-bottom:16px}
+                    .grid4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:16px}
+                    .box{background:#f8f9fa;border:1px solid #ddd;border-radius:5px;padding:8px 10px}
+                    .lbl{font-size:9px;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px}
+                    .val{font-size:14px;font-weight:700;color:#1a5c2a}
+                    table{width:100%;border-collapse:collapse;margin-bottom:16px}
+                    th{background:#1a5c2a;color:#fff;padding:6px 10px;font-size:10px;text-align:left}
+                    tr:nth-child(even){background:#fafafa}
+                    .tot{background:#e8f5e9!important;font-weight:bold}
+                    .sec{font-size:11px;font-weight:700;color:#1a5c2a;margin:14px 0 6px;border-left:3px solid #1a5c2a;padding-left:7px;text-transform:uppercase}
+                    .footer{margin-top:20px;padding-top:8px;border-top:1px solid #ccc;font-size:9px;color:#888;text-align:center}
+                    @media print{.noprint{display:none}}</style></head><body>
+                    <div class="hdr">
+                      <div><h1>Resumen de Compras y Rendicion</h1><h2>Departamento de Areas Verdes · Estadio Espanol de Las Condes</h2></div>
+                      <div style="text-align:right;font-size:10px;color:#666">Emitido: <strong>${fechaHoy}</strong><br>Periodo: <strong>${mesActual}</strong></div>
+                    </div>
+                    <!-- KPIs -->
+                    <div class="grid4">
+                      <div class="box"><div class="lbl">Fondo base</div><div class="val">$${fondo.toLocaleString("es-CL")}</div></div>
+                      <div class="box" style="border-color:${colorSaldo}"><div class="lbl">Disponible actual</div><div class="val" style="color:${saldoDisponible>=0?"#1a5c2a":"#c62828"}">$${saldoDisponible.toLocaleString("es-CL")}</div></div>
+                      <div class="box" style="border-color:#e65100"><div class="lbl">Comprometido</div><div class="val" style="color:#e65100">$${gastadoPendiente.toLocaleString("es-CL")}</div></div>
+                      <div class="box" style="border-color:#1565c0"><div class="lbl">Total reembolsado</div><div class="val" style="color:#1565c0">$${totalReembolsado.toLocaleString("es-CL")}</div></div>
+                    </div>
+                    ${Number(saldoAnterior)>0?"<div style='background:#fff8e1;border:1px solid #ffc107;border-radius:5px;padding:7px 12px;margin-bottom:14px;font-size:11px'>Saldo periodo anterior"+(periodoAnterior?" ("+periodoAnterior+")":"")+": <strong>$"+Number(saldoAnterior).toLocaleString("es-CL")+"</strong> — pendiente de reembolso.</div>":""}
+                    <!-- Por cuenta -->
+                    <div class="sec">Gasto por Cuenta</div>
+                    <table><thead><tr><th>Cuenta</th><th>Tipo</th><th style="text-align:center">N° Doc.</th><th style="text-align:right">Total</th><th style="text-align:right">% del total</th></tr></thead>
+                    <tbody>${filasCuenta}</tbody>
+                    <tfoot><tr class="tot"><td colspan="3" style="padding:6px 10px;border:1px solid #e0e0e0;text-align:right">TOTAL GENERAL</td><td style="padding:6px 10px;border:1px solid #e0e0e0;text-align:right">$${totalGeneral.toLocaleString("es-CL")}</td><td style="padding:6px 10px;border:1px solid #e0e0e0;text-align:right;color:#1a5c2a;font-weight:700">100%</td></tr></tfoot></table>
+                    <!-- Por mes -->
+                    <div class="sec">Gasto Mensual (ultimos 6 meses)</div>
+                    <table style="width:60%"><thead><tr><th>Mes</th><th>Barras</th><th style="text-align:right">Total</th></tr></thead>
+                    <tbody>${filasGraf||"<tr><td colspan='3' style='text-align:center;color:#888;padding:10px'>Sin movimientos</td></tr>"}</tbody></table>
+                    <!-- Pendientes -->
+                    <div class="sec">Compras Pendientes de Pago</div>
+                    <table><thead><tr><th>Fecha</th><th>Documento</th><th>Proveedor</th><th>Cuenta</th><th style="text-align:right">Total</th></tr></thead>
+                    <tbody>${filasPend}</tbody></table>
+                    <!-- Rendiciones pendientes -->
+                    <div class="sec">Rendiciones Pendientes de Reembolso</div>
+                    <table style="width:60%"><thead><tr><th>Fecha</th><th>Descripcion</th><th style="text-align:right">Total</th></tr></thead>
+                    <tbody>${filasRend}</tbody></table>
+                    <div class="footer">Estadio Espanol de Las Condes · Departamento de Areas Verdes<br>
+                    Jefe de Departamento de Areas Verdes · Carmen Luz Hermosilla Diez · ${fechaHoy}</div>
+                    <div class="noprint" style="text-align:center;margin-top:18px">
+                      <button onclick="window.print()" style="background:#1a5c2a;color:#fff;border:none;padding:10px 28px;border-radius:7px;font-size:13px;cursor:pointer">Imprimir / Guardar PDF</button>
+                    </div></body></html>`;
+                    const w=window.open("","_blank"); w.document.write(html); w.document.close();
+                  }}>
+                  🖨️ Imprimir resumen
+                </button>
+              </div>
               <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,marginBottom:10}}>💰 Gasto por cuenta</div>
               {[{grupo:"Internas (Beneficio general socios)",cuentas:CUENTAS_INTERNAS},{grupo:"Externas (Beneficio área específica)",cuentas:CUENTAS_EXTERNAS}].map(g=>{
                 const itemsG = porCuenta.filter(c=>g.cuentas.includes(c.cuenta));
@@ -5409,6 +5571,42 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                     <optgroup label="── Externas (beneficio área específica) ──">{CUENTAS_EXTERNAS.map(c=><option key={c}>{c}</option>)}</optgroup>
                   </select>
                 </div>
+
+                {/* Vinculación con notas de pedido (solo para Facturas) */}
+                {form.tipoDoc==="Factura"&&(()=>{
+                  const notasPendientes = compras.filter(c=>
+                    c.tipoDoc==="Nota de Pedido" &&
+                    !["facturada","cancelada"].includes(c.estado) &&
+                    c.proveedor?.trim().toLowerCase()===form.proveedor?.trim().toLowerCase() &&
+                    c.id!==editId
+                  );
+                  if(!notasPendientes.length) return null;
+                  return (
+                    <div style={{gridColumn:"1/-1",background:"rgba(251,191,36,0.06)",border:"1px solid rgba(251,191,36,0.2)",borderRadius:10,padding:"12px 14px"}}>
+                      <div style={{fontSize:11,color:"#fcd34d",letterSpacing:"0.6px",marginBottom:8,textTransform:"uppercase"}}>📋 Notas de Pedido del mismo proveedor — vincular a esta factura</div>
+                      <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                        {notasPendientes.map(np=>{
+                          const vinculada=(form.notasVinculadas||[]).includes(np.id);
+                          return (
+                            <div key={np.id} style={{display:"flex",alignItems:"center",gap:10,padding:"6px 10px",borderRadius:7,background:vinculada?"rgba(251,191,36,0.08)":"rgba(255,255,255,0.03)",border:`1px solid ${vinculada?"rgba(251,191,36,0.3)":"rgba(255,255,255,0.07)"}`,cursor:"pointer"}}
+                              onClick={()=>setForm(p=>({...p,notasVinculadas:vinculada?(p.notasVinculadas||[]).filter(x=>x!==np.id):[...(p.notasVinculadas||[]),np.id]}))}>
+                              <div style={{width:16,height:16,borderRadius:4,border:`2px solid ${vinculada?"#fcd34d":"rgba(255,255,255,0.2)"}`,background:vinculada?"#fcd34d":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                                {vinculada&&<span style={{color:"#000",fontSize:10,fontWeight:700}}>✓</span>}
+                              </div>
+                              <div style={{flex:1,minWidth:0}}>
+                                <div style={{fontSize:12,fontWeight:600}}>NP {np.nDocumento} — {np.fecha}</div>
+                                <div style={{fontSize:11,color:"#a08050"}}>{(np.items||[{descripcion:np.descripcion}]).map(i=>i.descripcion).join(", ")} · ${Number(np.totalBrutoDoc||np.totalBruto||np.totalNeto||0).toLocaleString("es-CL")}</div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {(form.notasVinculadas||[]).length>0&&(
+                        <div style={{fontSize:11,color:"#fcd34d",marginTop:8}}>✓ {(form.notasVinculadas||[]).length} nota{(form.notasVinculadas||[]).length!==1?"s":""} vinculada{(form.notasVinculadas||[]).length!==1?"s":""} — cambiarán a estado "Facturada" al guardar</div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* ── ÍTEMS DE LA FACTURA ── */}
