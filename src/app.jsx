@@ -4927,9 +4927,80 @@ function ActividadDelDia({ zonas, MACROZONAS_BASE, S, EC, tareasDelDia }) {
 // ─── PANEL DE COMPRAS Y RENDICIÓN ────────────────────────────────────────────
 const MESES_COMPRAS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 
-function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={}, updateZona=()=>{}, MACROZONAS_BASE=[] }) {
+// ─── DEFINICIÓN DE BODEGAS ───────────────────────────────────────────────────
+const BODEGAS_DEF = [
+  { id:"b01", nombre:"Vivero", icono:"🌱", color:"#4ade80",
+    descripcion:"Plantas, semillas, contenedores, sustratos",
+    categorias:["Planta","Semilla","Contenedor/Macetero","Sustrato","Herramienta vivero","Otro"],
+    tareasTipo:["Riego","Poda","Fertilización","Control plagas","Inventario","Orden y limpieza","Trasplante","Embalaje"],
+  },
+  { id:"b02", nombre:"Materiales de Riego", icono:"💧", color:"#60a5fa",
+    descripcion:"Tuberías, aspersores, goteros, accesorios riego",
+    categorias:["Tubería","Aspersor/Gotero","Válvula","Accesorio","Controlador","Cable/Sensor","Otro"],
+    tareasTipo:["Inventario","Orden y limpieza","Revisión stock","Recepción material"],
+  },
+  { id:"b03", nombre:"Materiales y Herramientas", icono:"🔧", color:"#f59e0b",
+    descripcion:"Herramientas manuales, materiales generales, fertilizantes",
+    categorias:["Herramienta manual","Herramienta eléctrica","Fertilizante","Maicillo","Arena","Compost","Malla","Geotextil","Material construcción","EPP","Otro"],
+    tareasTipo:["Inventario","Orden y limpieza","Mantenimiento herramientas","Recepción material","Baja de material"],
+  },
+  { id:"b04", nombre:"Maquinaria", icono:"🚜", color:"#f97316",
+    descripcion:"Tractores, cortadoras, equipos motorizados",
+    categorias:["Tractor","Cortadora césped","Motosierra","Bordeadora","Hidrolavadora","Compresor","Bomba","Otro equipo"],
+    tareasTipo:["Revisión nivel aceite","Revisión combustible","Registro horas uso","Mantención preventiva","Mantención externa","Reparación interna","Limpieza","Traslado"],
+  },
+  { id:"b05", nombre:"Pesticidas", icono:"🧪", color:"#a78bfa",
+    descripcion:"Fungicidas, herbicidas, insecticidas, reguladores",
+    categorias:["Fungicida","Herbicida","Insecticida","Acaricida","Regulador crecimiento","Adherente","Otro"],
+    tareasTipo:["Inventario","Orden y limpieza","Revisión vencimientos","Recepción","Baja/Destrucción"],
+  },
+  { id:"b06", nombre:"Golf", icono:"⛳", color:"#34d399",
+    descripcion:"Maquinaria, herramientas, materiales y fertilizantes específicos de Golf",
+    categorias:["Maquinaria golf","Herramienta golf","Fertilizante golf","Arena golf","Semilla golf","Material cancha","Accesorio golf","Otro"],
+    tareasTipo:["Inventario","Orden y limpieza","Revisión maquinaria","Mantención","Recepción","Registro uso combustible"],
+  },
+];
+const ESTADOS_MOV = {
+  entrada:   {color:"#22c55e", label:"📥 Entrada"},
+  salida:    {color:"#ef4444", label:"📤 Salida"},
+  traslado:  {color:"#f59e0b", label:"🔄 Traslado"},
+  baja:      {color:"#6b7280", label:"🗑️ Baja"},
+  ajuste:    {color:"#a78bfa", label:"⚙️ Ajuste inventario"},
+};
+
+function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={}, updateZona=()=>{}, MACROZONAS_BASE=[], bodegasData={}, setBodegasData=()=>{} }) {
   const { compras, rendiciones=[], fondo=3000000, saldoAnterior=0, periodoAnterior="" } = comprasData;
   const set = (patch) => setComprasData(p=>({...p,...patch}));
+
+  // ── Ingreso automático a bodega ───────────────────────────────────────────
+  const ingresarItemsABodega = (docFecha, docRef, items) => {
+    const porBodega = {};
+    items.forEach(it=>{
+      if(!it.bodegaDestino||!it.descripcion?.trim()) return;
+      if(!porBodega[it.bodegaDestino]) porBodega[it.bodegaDestino]=[];
+      porBodega[it.bodegaDestino].push(it);
+    });
+    if(!Object.keys(porBodega).length) return;
+    const nuevoBodegasData = {...bodegasData};
+    Object.entries(porBodega).forEach(([bodId, its])=>{
+      const bd = nuevoBodegasData[bodId]||{items:[],movimientos:[],tareas:[],traslados:[]};
+      const nuevosItems = [...(bd.items||[])];
+      const nuevosMovs  = [...(bd.movimientos||[])];
+      its.forEach(it=>{
+        const cant = Number(it.cantidad)||1;
+        // Buscar si ya existe el ítem por nombre
+        const idx = nuevosItems.findIndex(i=>i.nombre.trim().toLowerCase()===it.descripcion.trim().toLowerCase());
+        if(idx>=0) {
+          nuevosItems[idx] = {...nuevosItems[idx], stockActual:(Number(nuevosItems[idx].stockActual)||0)+cant};
+        } else {
+          nuevosItems.push({id:Date.now()+Math.random(), nombre:it.descripcion, categoria:it.categoria||"", unidad:it.unidad||"unidad", stockActual:cant, stockMinimo:0, ubicacion:"", obs:`Ingresado desde compra ${docRef}`});
+        }
+        nuevosMovs.unshift({id:Date.now()+Math.random(), fecha:docFecha, tipo:"entrada", cantidad:cant, unidad:it.unidad||"unidad", motivo:`Compra — ${docRef}`, responsable:"", itemId:String(idx>=0?nuevosItems[idx].id:nuevosItems[nuevosItems.length-1].id)});
+      });
+      nuevoBodegasData[bodId] = {...bd, items:nuevosItems, movimientos:nuevosMovs.slice(0,200)};
+    });
+    setBodegasData(nuevoBodegasData);
+  };
 
   // ── Categorías predefinidas ───────────────────────────────────────────────
   const CATEGORIAS = ["Caja chica","Combustible","Decoración Interior","Difusión/Educación","EPP / Uniforme","Fertilizante","Fletes","Herramienta","Maceteros","Maicillo","Maquinaria/Equipos","Material de construcción","Material de riego","Materiales/Herramientas","Mulch","Plaguicida","Planta","Repuesto maquinaria","Semilla","Servicio externo","Sustratos/Enmiendas","Otro"];
@@ -4959,7 +5030,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   const labelSt = {fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
 
   // ── Formulario cabecera + ítems ───────────────────────────────────────────
-  const emptyItem = {id:Date.now(), descripcion:"", categoria:"", cantidad:1, unidad:"unidad", precioUnitario:"", totalNeto:"", iva:"", totalBruto:""};
+  const emptyItem = {id:Date.now(), descripcion:"", categoria:"", cantidad:1, unidad:"unidad", precioUnitario:"", totalNeto:"", iva:"", totalBruto:"", bodegaDestino:""};
   const emptyForm = {
     fecha:hoy.toISOString().slice(0,10),
     proveedor:"", rut:"", nDocumento:"", tipoDoc:"Factura",
@@ -5032,6 +5103,8 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
       setEditId(null);
     } else {
       set({compras:[doc,...compras.map(c=>notasVinculadas.includes(c.id)?{...c,estado:"facturada",facturaId:docId}:c)]});
+      // Ingresar ítems a bodegas
+      ingresarItemsABodega(doc.fecha, `${doc.tipoDoc} ${doc.nDocumento||""} ${doc.proveedor||""}`, doc.items||[]);
     }
     setForm(emptyForm); setShowForm(false); setAlertaDuplicado(null);
   };
@@ -5668,6 +5741,13 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                       <div><label style={labelSt}>P. unitario neto</label><input type="number" min={0} style={S.input} value={item.precioUnitario} onChange={e=>updateItem(idx,{precioUnitario:e.target.value})}/></div>
                       <div><label style={labelSt}>Total bruto</label><input type="number" style={{...S.input,background:"rgba(59,130,246,0.08)",fontWeight:600}} value={item.totalBruto} readOnly/></div>
                     </div>
+                    <div style={{marginTop:8}}>
+                      <label style={labelSt}>📦 Ingresar a bodega</label>
+                      <select style={{...S.input,fontSize:12}} value={item.bodegaDestino||""} onChange={e=>updateItem(idx,{bodegaDestino:e.target.value})}>
+                        <option value="">— No ingresar a stock —</option>
+                        {BODEGAS_DEF.map(b=><option key={b.id} value={b.id}>{b.icono} {b.nombre}</option>)}
+                      </select>
+                    </div>
                   </div>
                 ))}
                 {/* Totales documento */}
@@ -5876,48 +5956,6 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     </div>
   );
 }
-// ─── DEFINICIÓN DE BODEGAS ───────────────────────────────────────────────────
-const BODEGAS_DEF = [
-  { id:"b01", nombre:"Vivero", icono:"🌱", color:"#4ade80",
-    descripcion:"Plantas, semillas, contenedores, sustratos",
-    categorias:["Planta","Semilla","Contenedor/Macetero","Sustrato","Herramienta vivero","Otro"],
-    tareasTipo:["Riego","Poda","Fertilización","Control plagas","Inventario","Orden y limpieza","Trasplante","Embalaje"],
-  },
-  { id:"b02", nombre:"Materiales de Riego", icono:"💧", color:"#60a5fa",
-    descripcion:"Tuberías, aspersores, goteros, accesorios riego",
-    categorias:["Tubería","Aspersor/Gotero","Válvula","Accesorio","Controlador","Cable/Sensor","Otro"],
-    tareasTipo:["Inventario","Orden y limpieza","Revisión stock","Recepción material"],
-  },
-  { id:"b03", nombre:"Materiales y Herramientas", icono:"🔧", color:"#f59e0b",
-    descripcion:"Herramientas manuales, materiales generales, fertilizantes",
-    categorias:["Herramienta manual","Herramienta eléctrica","Fertilizante","Maicillo","Arena","Compost","Malla","Geotextil","Material construcción","EPP","Otro"],
-    tareasTipo:["Inventario","Orden y limpieza","Mantenimiento herramientas","Recepción material","Baja de material"],
-  },
-  { id:"b04", nombre:"Maquinaria", icono:"🚜", color:"#f97316",
-    descripcion:"Tractores, cortadoras, equipos motorizados",
-    categorias:["Tractor","Cortadora césped","Motosierra","Bordeadora","Hidrolavadora","Compresor","Bomba","Otro equipo"],
-    tareasTipo:["Revisión nivel aceite","Revisión combustible","Registro horas uso","Mantención preventiva","Mantención externa","Reparación interna","Limpieza","Traslado"],
-  },
-  { id:"b05", nombre:"Pesticidas", icono:"🧪", color:"#a78bfa",
-    descripcion:"Fungicidas, herbicidas, insecticidas, reguladores",
-    categorias:["Fungicida","Herbicida","Insecticida","Acaricida","Regulador crecimiento","Adherente","Otro"],
-    tareasTipo:["Inventario","Orden y limpieza","Revisión vencimientos","Recepción","Baja/Destrucción"],
-  },
-  { id:"b06", nombre:"Golf", icono:"⛳", color:"#34d399",
-    descripcion:"Maquinaria, herramientas, materiales y fertilizantes específicos de Golf",
-    categorias:["Maquinaria golf","Herramienta golf","Fertilizante golf","Arena golf","Semilla golf","Material cancha","Accesorio golf","Otro"],
-    tareasTipo:["Inventario","Orden y limpieza","Revisión maquinaria","Mantención","Recepción","Registro uso combustible"],
-  },
-];
-
-const ESTADOS_MOV = {
-  entrada:   {color:"#22c55e", label:"📥 Entrada"},
-  salida:    {color:"#ef4444", label:"📤 Salida"},
-  traslado:  {color:"#f59e0b", label:"🔄 Traslado"},
-  baja:      {color:"#6b7280", label:"🗑️ Baja"},
-  ajuste:    {color:"#a78bfa", label:"⚙️ Ajuste inventario"},
-};
-
 function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareasProg, setTareasProg, compras=[] }) {
   const hoy = new Date().toISOString().slice(0,10);
   const [bodegaActiva, setBodegaActiva] = React.useState("b01");
@@ -5926,6 +5964,9 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
   const [showMovForm, setShowMovForm] = React.useState(false);
   const [showTareaForm, setShowTareaForm] = React.useState(false);
   const [showTraslForm, setShowTraslForm] = React.useState(false);
+  const [showInventForm, setShowInventForm] = React.useState(false);
+  const [inventFecha, setInventFecha] = React.useState(hoy);
+  const [inventItems, setInventItems] = React.useState([{id:1,nombre:"",categoria:"",unidad:"unidad",stockActual:0,stockMinimo:0,ubicacion:"",obs:""}]);
   const [editItemId, setEditItemId] = React.useState(null);
   const [expandMov, setExpandMov] = React.useState(null);
 
@@ -5954,7 +5995,24 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
   const [maqForm, setMaqForm] = React.useState(emptyMaq);
 
   // ── CRUD Items ────────────────────────────────────────────────────────────
-  const guardarItem = () => {
+  const guardarInventario = () => {
+    const validos = inventItems.filter(i=>i.nombre.trim());
+    if(!validos.length) return;
+    const nuevosItems = validos.map(i=>({...i,id:Date.now()+Math.random()}));
+    const movimientos = nuevosItems.map(i=>({
+      id:Date.now()+Math.random(), fecha:inventFecha, tipo:"entrada",
+      cantidad:Number(i.stockActual)||0, unidad:i.unidad,
+      motivo:`Inventario inicial — ${inventFecha}`,
+      responsable:"Carmen Luz Hermosilla Diez", obs:"Carga inicial de stock",
+      itemId:String(i.id),
+    }));
+    setbd({
+      items:[...(bd.items||[]),...nuevosItems],
+      movimientos:[...movimientos,...(bd.movimientos||[])].slice(0,200),
+    });
+    setInventItems([{id:1,nombre:"",categoria:"",unidad:"unidad",stockActual:0,stockMinimo:0,ubicacion:"",obs:""}]);
+    setShowInventForm(false);
+  };
     if(!itemForm.nombre.trim()) return;
     const items = editItemId
       ? (bd.items||[]).map(i=>i.id===editItemId?{...itemForm,id:editItemId}:i)
@@ -6074,12 +6132,73 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
       {subTab==="stock"&&(
         <div className="ein">
           <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
-            {esJefa&&<button className="btn-p" style={S.btn} onClick={()=>{setItemForm(emptyItem);setMaqForm(emptyMaq);setEditItemId(null);setShowItemForm(true);}}>
+            {esJefa&&<button className="btn-p" style={S.btn} onClick={()=>{setItemForm(emptyItem);setMaqForm(emptyMaq);setEditItemId(null);setShowItemForm(true);setShowInventForm(false);}}>
               ➕ {bodegaActiva==="b04"?"Nueva máquina":"Nuevo ítem"}
             </button>}
-            {esJefa&&<button style={{...S.btn,background:"rgba(34,197,94,0.12)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)"}} onClick={()=>setShowMovForm(true)}>📥 Registrar movimiento</button>}
-            {esJefa&&<button style={{...S.btn,background:"rgba(245,158,11,0.12)",color:"#fcd34d",border:"1px solid rgba(245,158,11,0.25)"}} onClick={()=>setShowTraslForm(true)}>🚛 Traslado</button>}
+            {esJefa&&<button style={{...S.btn,background:"rgba(167,139,250,0.15)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.3)"}} onClick={()=>{setShowInventForm(p=>!p);setShowItemForm(false);setShowMovForm(false);}}>
+              📋 Inventario inicial
+            </button>}
+            {esJefa&&<button style={{...S.btn,background:"rgba(34,197,94,0.12)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)"}} onClick={()=>{setShowMovForm(true);setShowInventForm(false);}}>📥 Movimiento</button>}
+            {esJefa&&<button style={{...S.btn,background:"rgba(245,158,11,0.12)",color:"#fcd34d",border:"1px solid rgba(245,158,11,0.25)"}} onClick={()=>{setShowTraslForm(true);setShowInventForm(false);}}>🚛 Traslado</button>}
           </div>
+
+          {/* Formulario inventario inicial */}
+          {showInventForm&&(
+            <div style={{...S.card,padding:20,marginBottom:14,background:"rgba(167,139,250,0.05)",borderColor:"rgba(167,139,250,0.25)"}} className="ein">
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#c4b5fd",marginBottom:6}}>📋 Inventario Inicial — {bodega.nombre}</div>
+              <div style={{fontSize:12,color:"#7a6a9a",marginBottom:14}}>Carga el stock real actual. Queda registrado como entrada con la fecha que indiques.</div>
+              <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:14}}>
+                <div><label style={labelSt}>Fecha de inventario</label><input type="date" style={{...S.input,width:160}} value={inventFecha} onChange={e=>setInventFecha(e.target.value)}/></div>
+                <button style={{...S.btn,marginTop:16,background:"rgba(167,139,250,0.15)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.3)",fontSize:12}}
+                  onClick={()=>setInventItems(p=>[...p,{id:Date.now(),nombre:"",categoria:"",unidad:"unidad",stockActual:0,stockMinimo:0,ubicacion:"",obs:""}])}>
+                  + Agregar fila
+                </button>
+              </div>
+              <div style={{overflowX:"auto"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                  <thead>
+                    <tr style={{background:"rgba(167,139,250,0.1)"}}>
+                      <th style={{padding:"6px 8px",textAlign:"left",color:"#c4b5fd",fontWeight:600,fontSize:10,letterSpacing:"0.5px"}}>NOMBRE</th>
+                      <th style={{padding:"6px 8px",textAlign:"left",color:"#c4b5fd",fontWeight:600,fontSize:10,letterSpacing:"0.5px"}}>CATEGORÍA</th>
+                      <th style={{padding:"6px 8px",textAlign:"left",color:"#c4b5fd",fontWeight:600,fontSize:10,letterSpacing:"0.5px"}}>UNIDAD</th>
+                      <th style={{padding:"6px 8px",textAlign:"center",color:"#c4b5fd",fontWeight:600,fontSize:10,letterSpacing:"0.5px"}}>STOCK ACTUAL</th>
+                      <th style={{padding:"6px 8px",textAlign:"center",color:"#c4b5fd",fontWeight:600,fontSize:10,letterSpacing:"0.5px"}}>STOCK MÍN.</th>
+                      <th style={{padding:"6px 8px",textAlign:"left",color:"#c4b5fd",fontWeight:600,fontSize:10,letterSpacing:"0.5px"}}>UBICACIÓN</th>
+                      <th style={{padding:"6px 8px",width:30}}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {inventItems.map((item,idx)=>(
+                      <tr key={item.id} style={{borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                        <td style={{padding:"4px 6px"}}><input style={{...S.input,fontSize:12,padding:"5px 8px"}} placeholder="Nombre del ítem" value={item.nombre} onChange={e=>setInventItems(p=>p.map((x,i)=>i===idx?{...x,nombre:e.target.value}:x))}/></td>
+                        <td style={{padding:"4px 6px"}}>
+                          <select style={{...S.input,fontSize:12,padding:"5px 8px"}} value={item.categoria} onChange={e=>setInventItems(p=>p.map((x,i)=>i===idx?{...x,categoria:e.target.value}:x))}>
+                            <option value="">—</option>
+                            {bodega.categorias.map(c=><option key={c}>{c}</option>)}
+                          </select>
+                        </td>
+                        <td style={{padding:"4px 6px"}}>
+                          <select style={{...S.input,fontSize:12,padding:"5px 8px"}} value={item.unidad} onChange={e=>setInventItems(p=>p.map((x,i)=>i===idx?{...x,unidad:e.target.value}:x))}>
+                            {["unidad","kg","L","m","m²","saco","caja","bolsa","par","set"].map(u=><option key={u}>{u}</option>)}
+                          </select>
+                        </td>
+                        <td style={{padding:"4px 6px"}}><input type="number" min={0} style={{...S.input,fontSize:12,padding:"5px 8px",textAlign:"center"}} value={item.stockActual} onChange={e=>setInventItems(p=>p.map((x,i)=>i===idx?{...x,stockActual:Number(e.target.value)}:x))}/></td>
+                        <td style={{padding:"4px 6px"}}><input type="number" min={0} style={{...S.input,fontSize:12,padding:"5px 8px",textAlign:"center"}} value={item.stockMinimo} onChange={e=>setInventItems(p=>p.map((x,i)=>i===idx?{...x,stockMinimo:Number(e.target.value)}:x))}/></td>
+                        <td style={{padding:"4px 6px"}}><input style={{...S.input,fontSize:12,padding:"5px 8px"}} placeholder="ej: Estante A" value={item.ubicacion} onChange={e=>setInventItems(p=>p.map((x,i)=>i===idx?{...x,ubicacion:e.target.value}:x))}/></td>
+                        <td style={{padding:"4px 6px"}}>
+                          {inventItems.length>1&&<button className="btn-d" style={{...S.btn,fontSize:10,padding:"3px 6px"}} onClick={()=>setInventItems(p=>p.filter((_,i)=>i!==idx))}>✕</button>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{display:"flex",gap:8,marginTop:14}}>
+                <button className="btn-p" style={S.btn} onClick={guardarInventario}>✓ Guardar inventario ({inventItems.filter(i=>i.nombre.trim()).length} ítems)</button>
+                <button className="btn-g" style={S.btn} onClick={()=>setShowInventForm(false)}>Cancelar</button>
+              </div>
+            </div>
+          )}
 
           {/* Formulario nuevo ítem */}
           {showItemForm&&(
@@ -7497,7 +7616,7 @@ export default function App() {
 
         {/* COMPRAS */}
         {vista==="compras"&&(
-          <PanelCompras S={S} comprasData={comprasData} setComprasData={setComprasData} personal={personal} esJefa={rolLogueado==="jefa"||rolLogueado==="supervisor"} data={data} updateZona={updateZona} MACROZONAS_BASE={MACROZONAS_BASE} />
+          <PanelCompras S={S} comprasData={comprasData} setComprasData={setComprasData} personal={personal} esJefa={rolLogueado==="jefa"||rolLogueado==="supervisor"} data={data} updateZona={updateZona} MACROZONAS_BASE={MACROZONAS_BASE} bodegasData={bodegasData} setBodegasData={setBodegasData} />
         )}
 
         {/* BODEGAS */}
