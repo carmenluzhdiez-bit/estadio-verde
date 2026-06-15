@@ -5012,6 +5012,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     if(!editId && form.nDocumento.trim()) {
       const duplicado = compras.find(c=>
         c.nDocumento?.trim()===form.nDocumento.trim() &&
+        c.tipoDoc===form.tipoDoc &&
         c.rut?.trim()===form.rut?.trim() &&
         c.rut?.trim()!==""
       );
