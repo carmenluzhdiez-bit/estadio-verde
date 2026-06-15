@@ -5218,10 +5218,12 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     rechazada:      {color:"#ef4444",bg:"rgba(239,68,68,0.1)",    label:"❌ Rechazada"},
   };
 
+  const [mostrarFacturadas, setMostrarFacturadas] = React.useState(false);
   const comprasFilt = compras.filter(c=>{
     const mc=filtroCuenta==="todas"||c.cuenta===filtroCuenta;
     const mm=filtroMes==="todos"||(c.fecha||"").slice(0,7)===filtroMes;
-    return mc&&mm;
+    const mf=mostrarFacturadas||c.estado!=="facturada";
+    return mc&&mm&&mf;
   });
 
   return (
@@ -5505,6 +5507,9 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
           <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
             <button className="btn-p" style={S.btn} onClick={()=>{setForm(emptyForm);setEditId(null);setShowForm(true);}}>➕ Nueva compra</button>
             {seleccionadas.length>0&&<button style={{...S.btn,background:"rgba(167,139,250,0.2)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.35)",fontSize:12}} onClick={()=>setShowRendForm(true)}>📤 Rendir ({seleccionadas.length})</button>}
+            <button style={{...S.btn,fontSize:11,background:mostrarFacturadas?"rgba(6,182,212,0.15)":"rgba(255,255,255,0.05)",color:mostrarFacturadas?"#22d3ee":"#5a8a6a",border:`1px solid ${mostrarFacturadas?"rgba(6,182,212,0.3)":"rgba(255,255,255,0.1)"}`}} onClick={()=>setMostrarFacturadas(p=>!p)}>
+              {mostrarFacturadas?"Ocultar NP facturadas":"Mostrar NP facturadas"}
+            </button>
             <select style={{...S.input,flex:1,minWidth:120,fontSize:12}} value={filtroCuenta} onChange={e=>setFiltroCuenta(e.target.value)}>
               <option value="todas">Todas las cuentas</option>
               <optgroup label="── Internas ──">{CUENTAS_INTERNAS.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>
