@@ -5635,6 +5635,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                   </select>
                 </div>
 
+              </div>{/* fin grid campos */}
 
               {/* ── ÍTEMS DE LA FACTURA ── */}
               <div style={{background:"rgba(61,122,82,0.06)",border:"1px solid rgba(61,122,82,0.2)",borderRadius:10,padding:"14px",marginBottom:12}}>
