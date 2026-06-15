@@ -5545,6 +5545,70 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
           {showForm&&(
             <div style={{...S.card,padding:20,marginBottom:16}} className="ein">
               <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:16,color:"#a0d8b0"}}>{editId?"✏️ Editar":"➕ Nueva"} compra</div>
+
+              {/* Panel notas de pedido AL INICIO — seleccionar primero si es Factura */}
+              {form.tipoDoc==="Factura"&&!editId&&(()=>{
+                const notasDisp = compras.filter(c=>
+                  c.tipoDoc==="Nota de Pedido" &&
+                  !["facturada","cancelada"].includes(c.estado)
+                );
+                if(!notasDisp.length) return null;
+                return (
+                  <div style={{background:"rgba(251,191,36,0.06)",border:"1px solid rgba(251,191,36,0.25)",borderRadius:10,padding:"12px 14px",marginBottom:16}}>
+                    <div style={{fontSize:11,color:"#fcd34d",letterSpacing:"0.6px",marginBottom:8,textTransform:"uppercase"}}>
+                      📋 ¿Esta factura corresponde a Notas de Pedido? — Selecciona las que incluye
+                    </div>
+                    <div style={{fontSize:11,color:"#a08050",marginBottom:10}}>Al seleccionar, se copian automáticamente proveedor, RUT e ítems</div>
+                    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                      {notasDisp.map(np=>{
+                        const vinculada=(form.notasVinculadas||[]).includes(np.id);
+                        return (
+                          <div key={np.id} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 10px",borderRadius:7,background:vinculada?"rgba(251,191,36,0.1)":"rgba(255,255,255,0.03)",border:`1px solid ${vinculada?"rgba(251,191,36,0.35)":"rgba(255,255,255,0.07)"}`,cursor:"pointer"}}
+                            onClick={()=>{
+                              const nuevasVinc = vinculada
+                                ? (form.notasVinculadas||[]).filter(x=>x!==np.id)
+                                : [...(form.notasVinculadas||[]),np.id];
+                              const notasSel = compras.filter(c=>nuevasVinc.includes(c.id));
+                              const primeraNote = notasSel[0];
+                              const itemsHeredados = notasSel.flatMap(n=>
+                                (n.items||[{descripcion:n.descripcion||"",categoria:"",cantidad:n.cantidad||1,unidad:n.unidad||"unidad",precioUnitario:n.precioUnitario||"",totalNeto:n.totalNeto||"",iva:n.iva||"",totalBruto:n.totalBruto||""}])
+                                .map(it=>({...it,id:Date.now()+Math.random()}))
+                              );
+                              const totalNeto  = itemsHeredados.reduce((a,it)=>a+Number(it.totalNeto||0),0);
+                              const ivaTotal   = itemsHeredados.reduce((a,it)=>a+Number(it.iva||0),0);
+                              const totalBruto = itemsHeredados.reduce((a,it)=>a+Number(it.totalBruto||0),0);
+                              setForm(p=>({...p,
+                                notasVinculadas:nuevasVinc,
+                                items: itemsHeredados.length>0?itemsHeredados:[{...emptyItem,id:1}],
+                                totalNetoDoc:totalNeto||"",ivaDoc:ivaTotal||"",totalBrutoDoc:totalBruto||"",
+                                ...(primeraNote&&nuevasVinc.length>0?{
+                                  proveedor: primeraNote.proveedor||"",
+                                  rut:       primeraNote.rut||"",
+                                  cuenta:    primeraNote.cuenta||"",
+                                  responsable: primeraNote.responsable||"",
+                                }:{}),
+                              }));
+                            }}>
+                            <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${vinculada?"#fcd34d":"rgba(255,255,255,0.2)"}`,background:vinculada?"#fcd34d":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                              {vinculada&&<span style={{color:"#000",fontSize:11,fontWeight:700}}>✓</span>}
+                            </div>
+                            <div style={{flex:1,minWidth:0}}>
+                              <div style={{fontSize:12,fontWeight:600}}>NP {np.nDocumento} — {np.proveedor} <span style={{fontSize:10,color:"#8a7050"}}>RUT {np.rut}</span></div>
+                              <div style={{fontSize:11,color:"#a08050"}}>{np.fecha} · {(np.items||[{descripcion:np.descripcion}]).map(i=>i.descripcion).filter(Boolean).join(", ")} · <strong>${Number(np.totalBrutoDoc||np.totalBruto||np.totalNeto||0).toLocaleString("es-CL")}</strong></div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {(form.notasVinculadas||[]).length>0&&(
+                      <div style={{fontSize:11,color:"#fcd34d",marginTop:8,background:"rgba(251,191,36,0.06)",borderRadius:6,padding:"5px 10px"}}>
+                        ✓ {(form.notasVinculadas||[]).length} nota{(form.notasVinculadas||[]).length!==1?"s":""} vinculada{(form.notasVinculadas||[]).length!==1?"s":""} — proveedor, RUT e ítems copiados automáticamente
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}}>
                 <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={form.fecha} onChange={e=>setForm(p=>({...p,fecha:e.target.value}))}/></div>
                 <div><label style={labelSt}>Tipo documento</label>
@@ -5571,43 +5635,6 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                   </select>
                 </div>
 
-                {/* Vinculación con notas de pedido (solo para Facturas) */}
-                {form.tipoDoc==="Factura"&&(()=>{
-                  const notasPendientes = compras.filter(c=>
-                    c.tipoDoc==="Nota de Pedido" &&
-                    !["facturada","cancelada"].includes(c.estado) &&
-                    c.rut?.trim()===form.rut?.trim() &&
-                    c.rut?.trim()!=="" &&
-                    c.id!==editId
-                  );
-                  if(!notasPendientes.length) return null;
-                  return (
-                    <div style={{gridColumn:"1/-1",background:"rgba(251,191,36,0.06)",border:"1px solid rgba(251,191,36,0.2)",borderRadius:10,padding:"12px 14px"}}>
-                      <div style={{fontSize:11,color:"#fcd34d",letterSpacing:"0.6px",marginBottom:8,textTransform:"uppercase"}}>📋 Notas de Pedido del mismo proveedor — vincular a esta factura</div>
-                      <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                        {notasPendientes.map(np=>{
-                          const vinculada=(form.notasVinculadas||[]).includes(np.id);
-                          return (
-                            <div key={np.id} style={{display:"flex",alignItems:"center",gap:10,padding:"6px 10px",borderRadius:7,background:vinculada?"rgba(251,191,36,0.08)":"rgba(255,255,255,0.03)",border:`1px solid ${vinculada?"rgba(251,191,36,0.3)":"rgba(255,255,255,0.07)"}`,cursor:"pointer"}}
-                              onClick={()=>setForm(p=>({...p,notasVinculadas:vinculada?(p.notasVinculadas||[]).filter(x=>x!==np.id):[...(p.notasVinculadas||[]),np.id]}))}>
-                              <div style={{width:16,height:16,borderRadius:4,border:`2px solid ${vinculada?"#fcd34d":"rgba(255,255,255,0.2)"}`,background:vinculada?"#fcd34d":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                                {vinculada&&<span style={{color:"#000",fontSize:10,fontWeight:700}}>✓</span>}
-                              </div>
-                              <div style={{flex:1,minWidth:0}}>
-                                <div style={{fontSize:12,fontWeight:600}}>NP {np.nDocumento} — {np.fecha}</div>
-                                <div style={{fontSize:11,color:"#a08050"}}>{(np.items||[{descripcion:np.descripcion}]).map(i=>i.descripcion).join(", ")} · ${Number(np.totalBrutoDoc||np.totalBruto||np.totalNeto||0).toLocaleString("es-CL")}</div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      {(form.notasVinculadas||[]).length>0&&(
-                        <div style={{fontSize:11,color:"#fcd34d",marginTop:8}}>✓ {(form.notasVinculadas||[]).length} nota{(form.notasVinculadas||[]).length!==1?"s":""} vinculada{(form.notasVinculadas||[]).length!==1?"s":""} — cambiarán a estado "Facturada" al guardar</div>
-                      )}
-                    </div>
-                  );
-                })()}
-              </div>
 
               {/* ── ÍTEMS DE LA FACTURA ── */}
               <div style={{background:"rgba(61,122,82,0.06)",border:"1px solid rgba(61,122,82,0.2)",borderRadius:10,padding:"14px",marginBottom:12}}>
