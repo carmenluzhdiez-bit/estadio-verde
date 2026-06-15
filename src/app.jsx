@@ -685,17 +685,6 @@ const MACROZONAS_BASE = [
       { id: "e9", nombre: "Bancas jugadores", tipo: "mobiliario" },
     ]
   },
-  {
-    id: 39, nombre: "Bodega", categoria: "Bodegas", icono: "🏚️",
-    elementos: [
-      { id: "e1", nombre: "Bodega de materiales y herramientas", tipo: "bodegas" },
-      { id: "e2", nombre: "Bodega de riego", tipo: "bodegas" },
-      { id: "e3", nombre: "Bodega de maquinaria", tipo: "bodegas" },
-      { id: "e4", nombre: "Guardería de plantas", tipo: "bodegas" },
-      { id: "e5", nombre: "Bodega de sustratos y fertilizantes", tipo: "bodegas" },
-      { id: "e6", nombre: "Bodega de pesticidas", tipo: "bodegas" },
-    ]
-  },
 ];
 
 const CATEGORIAS_ZONA = [...new Set(MACROZONAS_BASE.map(z => z.categoria))];
@@ -5023,21 +5012,23 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     if(!editId && form.nDocumento.trim()) {
       const duplicado = compras.find(c=>
         c.nDocumento?.trim()===form.nDocumento.trim() &&
-        c.proveedor?.trim().toLowerCase()===form.proveedor.trim().toLowerCase()
+        c.rut?.trim()===form.rut?.trim() &&
+        c.rut?.trim()!==""
       );
       if(duplicado) {
         setAlertaDuplicado(`⚠️ Ya existe una ${duplicado.tipoDoc} N° ${duplicado.nDocumento} de ${duplicado.proveedor} ingresada el ${duplicado.fecha}. ¿Deseas guardar igual?`);
         return;
       }
     }
-    const doc = {...form, id:editId||Date.now()};
+    const docId = editId || Date.now();
+    const doc = {...form, id:docId};
     // Marcar notas de pedido vinculadas como "facturada"
     const notasVinculadas = form.notasVinculadas||[];
     if(editId) {
       set({compras:compras.map(c=>c.id===editId?doc:c)});
       setEditId(null);
     } else {
-      set({compras:[doc,...compras.map(c=>notasVinculadas.includes(c.id)?{...c,estado:"facturada",facturaId:doc.id}:c)]});
+      set({compras:[doc,...compras.map(c=>notasVinculadas.includes(c.id)?{...c,estado:"facturada",facturaId:docId}:c)]});
     }
     setForm(emptyForm); setShowForm(false); setAlertaDuplicado(null);
   };
@@ -5577,7 +5568,8 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                   const notasPendientes = compras.filter(c=>
                     c.tipoDoc==="Nota de Pedido" &&
                     !["facturada","cancelada"].includes(c.estado) &&
-                    c.proveedor?.trim().toLowerCase()===form.proveedor?.trim().toLowerCase() &&
+                    c.rut?.trim()===form.rut?.trim() &&
+                    c.rut?.trim()!=="" &&
                     c.id!==editId
                   );
                   if(!notasPendientes.length) return null;
@@ -5848,6 +5840,602 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     </div>
   );
 }
+// ─── DEFINICIÓN DE BODEGAS ───────────────────────────────────────────────────
+const BODEGAS_DEF = [
+  { id:"b01", nombre:"Vivero", icono:"🌱", color:"#4ade80",
+    descripcion:"Plantas, semillas, contenedores, sustratos",
+    categorias:["Planta","Semilla","Contenedor/Macetero","Sustrato","Herramienta vivero","Otro"],
+    tareasTipo:["Riego","Poda","Fertilización","Control plagas","Inventario","Orden y limpieza","Trasplante","Embalaje"],
+  },
+  { id:"b02", nombre:"Materiales de Riego", icono:"💧", color:"#60a5fa",
+    descripcion:"Tuberías, aspersores, goteros, accesorios riego",
+    categorias:["Tubería","Aspersor/Gotero","Válvula","Accesorio","Controlador","Cable/Sensor","Otro"],
+    tareasTipo:["Inventario","Orden y limpieza","Revisión stock","Recepción material"],
+  },
+  { id:"b03", nombre:"Materiales y Herramientas", icono:"🔧", color:"#f59e0b",
+    descripcion:"Herramientas manuales, materiales generales, fertilizantes",
+    categorias:["Herramienta manual","Herramienta eléctrica","Fertilizante","Maicillo","Arena","Compost","Malla","Geotextil","Material construcción","EPP","Otro"],
+    tareasTipo:["Inventario","Orden y limpieza","Mantenimiento herramientas","Recepción material","Baja de material"],
+  },
+  { id:"b04", nombre:"Maquinaria", icono:"🚜", color:"#f97316",
+    descripcion:"Tractores, cortadoras, equipos motorizados",
+    categorias:["Tractor","Cortadora césped","Motosierra","Bordeadora","Hidrolavadora","Compresor","Bomba","Otro equipo"],
+    tareasTipo:["Revisión nivel aceite","Revisión combustible","Registro horas uso","Mantención preventiva","Mantención externa","Reparación interna","Limpieza","Traslado"],
+  },
+  { id:"b05", nombre:"Pesticidas", icono:"🧪", color:"#a78bfa",
+    descripcion:"Fungicidas, herbicidas, insecticidas, reguladores",
+    categorias:["Fungicida","Herbicida","Insecticida","Acaricida","Regulador crecimiento","Adherente","Otro"],
+    tareasTipo:["Inventario","Orden y limpieza","Revisión vencimientos","Recepción","Baja/Destrucción"],
+  },
+  { id:"b06", nombre:"Golf", icono:"⛳", color:"#34d399",
+    descripcion:"Maquinaria, herramientas, materiales y fertilizantes específicos de Golf",
+    categorias:["Maquinaria golf","Herramienta golf","Fertilizante golf","Arena golf","Semilla golf","Material cancha","Accesorio golf","Otro"],
+    tareasTipo:["Inventario","Orden y limpieza","Revisión maquinaria","Mantención","Recepción","Registro uso combustible"],
+  },
+];
+
+const ESTADOS_MOV = {
+  entrada:   {color:"#22c55e", label:"📥 Entrada"},
+  salida:    {color:"#ef4444", label:"📤 Salida"},
+  traslado:  {color:"#f59e0b", label:"🔄 Traslado"},
+  baja:      {color:"#6b7280", label:"🗑️ Baja"},
+  ajuste:    {color:"#a78bfa", label:"⚙️ Ajuste inventario"},
+};
+
+function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareasProg, setTareasProg, compras=[] }) {
+  const hoy = new Date().toISOString().slice(0,10);
+  const [bodegaActiva, setBodegaActiva] = React.useState("b01");
+  const [subTab, setSubTab] = React.useState("stock");
+  const [showItemForm, setShowItemForm] = React.useState(false);
+  const [showMovForm, setShowMovForm] = React.useState(false);
+  const [showTareaForm, setShowTareaForm] = React.useState(false);
+  const [showTraslForm, setShowTraslForm] = React.useState(false);
+  const [editItemId, setEditItemId] = React.useState(null);
+  const [expandMov, setExpandMov] = React.useState(null);
+
+  const bodega = BODEGAS_DEF.find(b=>b.id===bodegaActiva);
+  const bd = bodegasData[bodegaActiva] || {items:[], movimientos:[], tareas:[], traslados:[]};
+  const setbd = (patch) => setBodegasData(p=>({...p,[bodegaActiva]:{...bd,...patch}}));
+
+  const labelSt = {fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
+  const listaPersonal = [...personal].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+
+  // ── Formularios ───────────────────────────────────────────────────────────
+  const emptyItem = {nombre:"",categoria:"",descripcion:"",unidad:"unidad",stockActual:0,stockMinimo:0,ubicacion:"",obs:""};
+  const [itemForm, setItemForm] = React.useState(emptyItem);
+
+  const emptyMov = {fecha:hoy,tipo:"entrada",cantidad:1,unidad:"unidad",motivo:"",responsable:"",proveedor:"",nDoc:"",obs:"",itemId:""};
+  const [movForm, setMovForm] = React.useState(emptyMov);
+
+  const emptyTarea = {fecha:hoy,tipo:"",descripcion:"",responsable:"",estado:"pendiente",obs:""};
+  const [tareaForm, setTareaForm] = React.useState(emptyTarea);
+
+  const emptyTrasl = {fecha:hoy,itemId:"",cantidad:1,destino:"",motivo:"",conRegreso:true,fechaRegreso:"",responsable:"",obs:"",estado:"en_camino"};
+  const [traslForm, setTraslForm] = React.useState(emptyTrasl);
+
+  // ── Campos especiales Maquinaria ──────────────────────────────────────────
+  const emptyMaq = {nombre:"",marca:"",modelo:"",patente:"",horasUso:0,nivelAceite:"OK",nivelCombustible:"OK",kmMantención:"",proxMantención:"",obs:""};
+  const [maqForm, setMaqForm] = React.useState(emptyMaq);
+
+  // ── CRUD Items ────────────────────────────────────────────────────────────
+  const guardarItem = () => {
+    if(!itemForm.nombre.trim()) return;
+    const items = editItemId
+      ? (bd.items||[]).map(i=>i.id===editItemId?{...itemForm,id:editItemId}:i)
+      : [{...itemForm,id:Date.now(),...(bodegaActiva==="b04"?{...maqForm}:{})}, ...(bd.items||[])];
+    setbd({items});
+    setItemForm(emptyItem); setMaqForm(emptyMaq); setShowItemForm(false); setEditItemId(null);
+  };
+
+  const eliminarItem = (id) => setbd({items:(bd.items||[]).filter(i=>i.id!==id)});
+
+  // ── Movimientos ───────────────────────────────────────────────────────────
+  const guardarMov = () => {
+    if(!movForm.itemId||!movForm.cantidad) return;
+    const cant = Number(movForm.cantidad);
+    const mov = {...movForm, id:Date.now(), cantidad:cant};
+    // Actualizar stock del ítem
+    const items = (bd.items||[]).map(i=>{
+      if(i.id!==movForm.itemId) return i;
+      const delta = movForm.tipo==="entrada"||movForm.tipo==="ajuste"?cant:movForm.tipo==="traslado"?-cant:-cant;
+      return {...i, stockActual:Math.max(0,(Number(i.stockActual)||0)+delta)};
+    });
+    setbd({items, movimientos:[mov,...(bd.movimientos||[])].slice(0,200)});
+    setMovForm(emptyMov); setShowMovForm(false);
+  };
+
+  // ── Tareas ────────────────────────────────────────────────────────────────
+  const guardarTarea = () => {
+    if(!tareaForm.tipo) return;
+    const tarea = {...tareaForm, id:Date.now()};
+    setbd({tareas:[tarea,...(bd.tareas||[])].slice(0,100)});
+    // Enviar a programa del día
+    if(tareaForm.responsable&&tareaForm.fecha) {
+      setTareasProg(p=>({...p,[tareaForm.fecha]:[...(p[tareaForm.fecha]||[]),{
+        id:Date.now()+1, fecha:tareaForm.fecha,
+        zona:bodega.nombre, elemento:"",
+        tarea:`${bodega.icono} ${tareaForm.tipo}: ${tareaForm.descripcion||bodega.nombre}`,
+        responsable:tareaForm.responsable, estado:"por_designar",
+        notas:tareaForm.obs||"", auto:false,
+      }]}));
+    }
+    setTareaForm(emptyTarea); setShowTareaForm(false);
+  };
+
+  // ── Traslados ─────────────────────────────────────────────────────────────
+  const guardarTrasl = () => {
+    if(!traslForm.itemId||!traslForm.destino) return;
+    const cant = Number(traslForm.cantidad);
+    const trasl = {...traslForm, id:Date.now(), cantidad:cant, bodegaOrigen:bodegaActiva};
+    const items = (bd.items||[]).map(i=>i.id===traslForm.itemId?{...i,stockActual:Math.max(0,(Number(i.stockActual)||0)-cant)}:i);
+    setbd({items, traslados:[trasl,...(bd.traslados||[])].slice(0,100)});
+    setTraslForm(emptyTrasl); setShowTraslForm(false);
+  };
+
+  const marcarRegreso = (id) => setbd({traslados:(bd.traslados||[]).map(t=>{
+    if(t.id!==id) return t;
+    const items=(bd.items||[]).map(i=>i.id===t.itemId?{...i,stockActual:(Number(i.stockActual)||0)+Number(t.cantidad)}:i);
+    setbd({items});
+    return {...t,estado:"regresó",fechaRegresoReal:hoy};
+  })});
+
+  const itemsStockBajo = (bd.items||[]).filter(i=>Number(i.stockActual||0)<=Number(i.stockMinimo||0)&&Number(i.stockMinimo||0)>0);
+  const traslPendientes = (bd.traslados||[]).filter(t=>t.conRegreso&&t.estado==="en_camino");
+
+  return (
+    <div className="ein">
+      <div style={{marginBottom:16}}>
+        <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:24,fontWeight:900,marginBottom:4}}>🏪 Bodegas</h1>
+        <p style={{color:"#6aaa7a",fontSize:14}}>Gestión de inventario · Estadio Español</p>
+      </div>
+
+      {/* Selector de bodega */}
+      <div style={{display:"flex",gap:8,marginBottom:18,flexWrap:"wrap"}}>
+        {BODEGAS_DEF.map(b=>{
+          const bd2 = bodegasData[b.id]||{};
+          const bajo = (bd2.items||[]).some(i=>Number(i.stockActual||0)<=Number(i.stockMinimo||0)&&Number(i.stockMinimo||0)>0);
+          const traslP = (bd2.traslados||[]).some(t=>t.conRegreso&&t.estado==="en_camino");
+          return (
+            <button key={b.id} onClick={()=>{setBodegaActiva(b.id);setSubTab("stock");}} style={{position:"relative",background:bodegaActiva===b.id?`rgba(${b.color==="#4ade80"?"74,222,128":b.color==="#60a5fa"?"96,165,250":b.color==="#f59e0b"?"245,158,11":b.color==="#f97316"?"249,115,22":b.color==="#a78bfa"?"167,139,250":"52,211,153"},0.15)`:"rgba(255,255,255,0.05)",border:`1px solid ${bodegaActiva===b.id?b.color+"60":"rgba(255,255,255,0.1)"}`,borderRadius:10,padding:"8px 14px",color:bodegaActiva===b.id?b.color:"#7aaa80",fontFamily:"'Georgia',serif",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
+              <span style={{fontSize:16}}>{b.icono}</span>
+              <span>{b.nombre}</span>
+              {(bajo||traslP)&&<span style={{width:7,height:7,borderRadius:"50%",background:"#ef4444",flexShrink:0}}/>}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Info bodega activa */}
+      <div style={{...S.card,padding:"12px 16px",marginBottom:16,borderLeft:`3px solid ${bodega.color}`,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+        <div>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700}}>{bodega.icono} {bodega.nombre}</div>
+          <div style={{fontSize:12,color:"#6aaa7a",marginTop:2}}>{bodega.descripcion}</div>
+        </div>
+        <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+          <div style={{textAlign:"center",background:"rgba(255,255,255,0.04)",borderRadius:8,padding:"6px 12px"}}>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color:bodega.color}}>{(bd.items||[]).length}</div>
+            <div style={{fontSize:10,color:"#5a8a6a"}}>ítems</div>
+          </div>
+          {itemsStockBajo.length>0&&<div style={{textAlign:"center",background:"rgba(239,68,68,0.1)",borderRadius:8,padding:"6px 12px",border:"1px solid rgba(239,68,68,0.25)"}}>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color:"#ef4444"}}>{itemsStockBajo.length}</div>
+            <div style={{fontSize:10,color:"#ef4444"}}>stock bajo</div>
+          </div>}
+          {traslPendientes.length>0&&<div style={{textAlign:"center",background:"rgba(245,158,11,0.1)",borderRadius:8,padding:"6px 12px",border:"1px solid rgba(245,158,11,0.25)"}}>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color:"#f59e0b"}}>{traslPendientes.length}</div>
+            <div style={{fontSize:10,color:"#f59e0b"}}>en traslado</div>
+          </div>}
+        </div>
+      </div>
+
+      {/* Sub-tabs */}
+      <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
+        {[["stock","📦 Stock"],["movimientos","🔄 Movimientos"],["traslados","🚛 Traslados"],["tareas","✅ Tareas"],["historial","📜 Historial"]].map(([t,l])=>(
+          <button key={t} className={`tab${subTab===t?" on":""}`} onClick={()=>setSubTab(t)}>{l}</button>
+        ))}
+      </div>
+
+      {/* ── STOCK ── */}
+      {subTab==="stock"&&(
+        <div className="ein">
+          <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+            {esJefa&&<button className="btn-p" style={S.btn} onClick={()=>{setItemForm(emptyItem);setMaqForm(emptyMaq);setEditItemId(null);setShowItemForm(true);}}>
+              ➕ {bodegaActiva==="b04"?"Nueva máquina":"Nuevo ítem"}
+            </button>}
+            {esJefa&&<button style={{...S.btn,background:"rgba(34,197,94,0.12)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)"}} onClick={()=>setShowMovForm(true)}>📥 Registrar movimiento</button>}
+            {esJefa&&<button style={{...S.btn,background:"rgba(245,158,11,0.12)",color:"#fcd34d",border:"1px solid rgba(245,158,11,0.25)"}} onClick={()=>setShowTraslForm(true)}>🚛 Traslado</button>}
+          </div>
+
+          {/* Formulario nuevo ítem */}
+          {showItemForm&&(
+            <div style={{...S.card,padding:20,marginBottom:14}} className="ein">
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:14,color:bodega.color}}>{editItemId?"✏️ Editar":"➕ Nuevo"} {bodegaActiva==="b04"?"equipo/máquina":"ítem"}</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Nombre</label><input style={S.input} value={itemForm.nombre} onChange={e=>setItemForm(p=>({...p,nombre:e.target.value}))} placeholder="Nombre del ítem"/></div>
+                <div><label style={labelSt}>Categoría</label>
+                  <select style={S.input} value={itemForm.categoria} onChange={e=>setItemForm(p=>({...p,categoria:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    {bodega.categorias.map(c=><option key={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div><label style={labelSt}>Unidad</label>
+                  <select style={S.input} value={itemForm.unidad} onChange={e=>setItemForm(p=>({...p,unidad:e.target.value}))}>
+                    {["unidad","kg","L","m","m²","saco","caja","bolsa","par","set"].map(u=><option key={u}>{u}</option>)}
+                  </select>
+                </div>
+                <div><label style={labelSt}>Stock actual</label><input type="number" min={0} style={S.input} value={itemForm.stockActual} onChange={e=>setItemForm(p=>({...p,stockActual:Number(e.target.value)}))}/></div>
+                <div><label style={labelSt}>Stock mínimo (alerta)</label><input type="number" min={0} style={S.input} value={itemForm.stockMinimo} onChange={e=>setItemForm(p=>({...p,stockMinimo:Number(e.target.value)}))}/></div>
+                <div><label style={labelSt}>Ubicación en bodega</label><input style={S.input} value={itemForm.ubicacion} onChange={e=>setItemForm(p=>({...p,ubicacion:e.target.value}))} placeholder="ej: Estante A, Sector 2"/></div>
+                <div><label style={labelSt}>Observaciones</label><input style={S.input} value={itemForm.obs} onChange={e=>setItemForm(p=>({...p,obs:e.target.value}))}/></div>
+
+                {/* Campos extra Maquinaria */}
+                {bodegaActiva==="b04"&&(<>
+                  <div style={{gridColumn:"1/-1",background:"rgba(249,115,22,0.06)",border:"1px solid rgba(249,115,22,0.2)",borderRadius:8,padding:"12px 14px"}}>
+                    <div style={{fontSize:11,color:"#fb923c",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.5px"}}>🚜 Datos del equipo</div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                      <div><label style={labelSt}>Marca</label><input style={S.input} value={maqForm.marca} onChange={e=>setMaqForm(p=>({...p,marca:e.target.value}))}/></div>
+                      <div><label style={labelSt}>Modelo</label><input style={S.input} value={maqForm.modelo} onChange={e=>setMaqForm(p=>({...p,modelo:e.target.value}))}/></div>
+                      <div><label style={labelSt}>Patente / N° Serie</label><input style={S.input} value={maqForm.patente} onChange={e=>setMaqForm(p=>({...p,patente:e.target.value}))}/></div>
+                      <div><label style={labelSt}>Horas de uso actuales</label><input type="number" min={0} style={S.input} value={maqForm.horasUso} onChange={e=>setMaqForm(p=>({...p,horasUso:Number(e.target.value)}))}/></div>
+                      <div><label style={labelSt}>Nivel aceite</label>
+                        <select style={S.input} value={maqForm.nivelAceite} onChange={e=>setMaqForm(p=>({...p,nivelAceite:e.target.value}))}>
+                          {["OK","Bajo","Crítico","Recién cambiado"].map(v=><option key={v}>{v}</option>)}
+                        </select>
+                      </div>
+                      <div><label style={labelSt}>Nivel combustible</label>
+                        <select style={S.input} value={maqForm.nivelCombustible} onChange={e=>setMaqForm(p=>({...p,nivelCombustible:e.target.value}))}>
+                          {["Lleno","3/4","1/2","1/4","Vacío"].map(v=><option key={v}>{v}</option>)}
+                        </select>
+                      </div>
+                      <div><label style={labelSt}>Próxima mantención (horas)</label><input type="number" min={0} style={S.input} value={maqForm.proxMantención} onChange={e=>setMaqForm(p=>({...p,proxMantención:e.target.value}))}/></div>
+                    </div>
+                  </div>
+                </>)}
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button className="btn-p" style={S.btn} onClick={guardarItem}>✓ Guardar</button>
+                <button className="btn-g" style={S.btn} onClick={()=>{setShowItemForm(false);setEditItemId(null);}}>Cancelar</button>
+              </div>
+            </div>
+          )}
+
+          {/* Formulario movimiento */}
+          {showMovForm&&(
+            <div style={{...S.card,padding:16,marginBottom:14,background:"rgba(34,197,94,0.05)",borderColor:"rgba(34,197,94,0.2)"}} className="ein">
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#86efac",marginBottom:12}}>📥 Registrar movimiento de stock</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={movForm.fecha} onChange={e=>setMovForm(p=>({...p,fecha:e.target.value}))}/></div>
+                <div><label style={labelSt}>Tipo</label>
+                  <select style={S.input} value={movForm.tipo} onChange={e=>setMovForm(p=>({...p,tipo:e.target.value}))}>
+                    {Object.entries(ESTADOS_MOV).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
+                  </select>
+                </div>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Ítem</label>
+                  <select style={S.input} value={movForm.itemId} onChange={e=>{const it=(bd.items||[]).find(i=>String(i.id)===e.target.value);setMovForm(p=>({...p,itemId:e.target.value,unidad:it?.unidad||"unidad"}));}}>
+                    <option value="">Seleccionar ítem...</option>
+                    {(bd.items||[]).map(i=><option key={i.id} value={i.id}>{i.nombre} (stock: {i.stockActual} {i.unidad})</option>)}
+                  </select>
+                </div>
+                <div><label style={labelSt}>Cantidad</label><input type="number" min={0.01} step={0.01} style={S.input} value={movForm.cantidad} onChange={e=>setMovForm(p=>({...p,cantidad:e.target.value}))}/></div>
+                <div><label style={labelSt}>Responsable</label>
+                  <select style={S.input} value={movForm.responsable} onChange={e=>setMovForm(p=>({...p,responsable:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                  </select>
+                </div>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Motivo</label><input style={S.input} value={movForm.motivo} onChange={e=>setMovForm(p=>({...p,motivo:e.target.value}))} placeholder="ej: Compra factura 7609, Uso mantenimiento Cancha 1..."/></div>
+                {["entrada"].includes(movForm.tipo)&&<>
+                  <div><label style={labelSt}>Proveedor</label><input style={S.input} value={movForm.proveedor} onChange={e=>setMovForm(p=>({...p,proveedor:e.target.value}))}/></div>
+                  <div><label style={labelSt}>N° Documento</label><input style={S.input} value={movForm.nDoc} onChange={e=>setMovForm(p=>({...p,nDoc:e.target.value}))}/></div>
+                </>}
+                {/* Campo especial maquinaria */}
+                {bodegaActiva==="b04"&&movForm.tipo==="salida"&&(
+                  <div style={{gridColumn:"1/-1",background:"rgba(249,115,22,0.06)",borderRadius:8,padding:"10px 12px",border:"1px solid rgba(249,115,22,0.2)"}}>
+                    <div style={{fontSize:11,color:"#fb923c",marginBottom:6}}>⛽ Registro consumo combustible</div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                      <div><label style={labelSt}>Litros cargados</label><input type="number" min={0} style={S.input} value={movForm.litros||""} onChange={e=>setMovForm(p=>({...p,litros:e.target.value}))}/></div>
+                      <div><label style={labelSt}>Horas actuales</label><input type="number" min={0} style={S.input} value={movForm.horasActuales||""} onChange={e=>setMovForm(p=>({...p,horasActuales:e.target.value}))}/></div>
+                    </div>
+                  </div>
+                )}
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observaciones</label><input style={S.input} value={movForm.obs} onChange={e=>setMovForm(p=>({...p,obs:e.target.value}))}/></div>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button className="btn-p" style={S.btn} onClick={guardarMov}>✓ Registrar</button>
+                <button className="btn-g" style={S.btn} onClick={()=>setShowMovForm(false)}>Cancelar</button>
+              </div>
+            </div>
+          )}
+
+          {/* Formulario traslado */}
+          {showTraslForm&&(
+            <div style={{...S.card,padding:16,marginBottom:14,background:"rgba(245,158,11,0.05)",borderColor:"rgba(245,158,11,0.2)"}} className="ein">
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#fcd34d",marginBottom:12}}>🚛 Traslado de ítem</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={traslForm.fecha} onChange={e=>setTraslForm(p=>({...p,fecha:e.target.value}))}/></div>
+                <div><label style={labelSt}>Responsable</label>
+                  <select style={S.input} value={traslForm.responsable} onChange={e=>setTraslForm(p=>({...p,responsable:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                  </select>
+                </div>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Ítem a trasladar</label>
+                  <select style={S.input} value={traslForm.itemId} onChange={e=>setTraslForm(p=>({...p,itemId:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    {(bd.items||[]).map(i=><option key={i.id} value={i.id}>{i.nombre} (disponible: {i.stockActual} {i.unidad})</option>)}
+                  </select>
+                </div>
+                <div><label style={labelSt}>Cantidad</label><input type="number" min={1} style={S.input} value={traslForm.cantidad} onChange={e=>setTraslForm(p=>({...p,cantidad:e.target.value}))}/></div>
+                <div><label style={labelSt}>Destino</label><input style={S.input} value={traslForm.destino} onChange={e=>setTraslForm(p=>({...p,destino:e.target.value}))} placeholder="ej: Cancha Golf Hoyo 3, Taller externo..."/></div>
+                <div><label style={labelSt}>Motivo</label><input style={S.input} value={traslForm.motivo} onChange={e=>setTraslForm(p=>({...p,motivo:e.target.value}))}/></div>
+                <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",cursor:"pointer"}} onClick={()=>setTraslForm(p=>({...p,conRegreso:!p.conRegreso}))}>
+                  <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${traslForm.conRegreso?"#3d7a52":"rgba(255,255,255,0.2)"}`,background:traslForm.conRegreso?"#3d7a52":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    {traslForm.conRegreso&&<span style={{color:"#fff",fontSize:11}}>✓</span>}
+                  </div>
+                  <span style={{fontSize:13,color:"#a0d8b0"}}>¿Regresa a bodega?</span>
+                </div>
+                {traslForm.conRegreso&&<div><label style={labelSt}>Fecha estimada regreso</label><input type="date" style={S.input} value={traslForm.fechaRegreso} onChange={e=>setTraslForm(p=>({...p,fechaRegreso:e.target.value}))}/></div>}
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observaciones</label><input style={S.input} value={traslForm.obs} onChange={e=>setTraslForm(p=>({...p,obs:e.target.value}))}/></div>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button className="btn-p" style={S.btn} onClick={guardarTrasl}>✓ Registrar traslado</button>
+                <button className="btn-g" style={S.btn} onClick={()=>setShowTraslForm(false)}>Cancelar</button>
+              </div>
+            </div>
+          )}
+
+          {/* Lista de ítems */}
+          {(bd.items||[]).length===0&&!showItemForm&&!showMovForm&&!showTraslForm?(
+            <div style={{...S.card,padding:36,textAlign:"center",color:"#4a8a5a"}}>
+              <div style={{fontSize:36,marginBottom:8}}>{bodega.icono}</div>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15}}>Sin ítems registrados en {bodega.nombre}</div>
+              <div style={{fontSize:12,marginTop:4}}>Agrega ítems para comenzar el inventario</div>
+            </div>
+          ):(
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {(bd.items||[]).map(item=>{
+                const bajo = Number(item.stockActual||0)<=Number(item.stockMinimo||0)&&Number(item.stockMinimo||0)>0;
+                const agotado = Number(item.stockActual||0)===0;
+                const color = agotado?"#ef4444":bajo?"#f59e0b":"#22c55e";
+                return (
+                  <div key={item.id} style={{...S.card,padding:14,borderLeft:`3px solid ${color}`}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:8}}>
+                      <div style={{flex:1}}>
+                        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:4}}>
+                          <span style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700}}>{item.nombre}</span>
+                          {item.categoria&&<span style={{...S.chip,fontSize:10,background:"rgba(255,255,255,0.06)",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)"}}>{item.categoria}</span>}
+                          <span style={{...S.chip,background:agotado?"rgba(239,68,68,0.12)":bajo?"rgba(245,158,11,0.12)":"rgba(34,197,94,0.08)",color,border:`1px solid ${color}40`,fontSize:10}}>
+                            {agotado?"⛔ Sin stock":bajo?"⚠️ Stock bajo":"✅ OK"}
+                          </span>
+                        </div>
+                        <div style={{display:"flex",gap:14,flexWrap:"wrap",fontSize:12,color:"#7aaa80",marginBottom:bodegaActiva==="b04"?6:0}}>
+                          {item.ubicacion&&<span>📍 {item.ubicacion}</span>}
+                          <span style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color}}>
+                            {item.stockActual} <span style={{fontSize:12,fontWeight:400}}>{item.unidad}</span>
+                          </span>
+                          {Number(item.stockMinimo)>0&&<span style={{fontSize:11,color:"#5a8a6a"}}>mín: {item.stockMinimo} {item.unidad}</span>}
+                        </div>
+                        {/* Datos maquinaria */}
+                        {bodegaActiva==="b04"&&(item.marca||item.horasUso)&&(
+                          <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:11,color:"#7aaa80",marginTop:4}}>
+                            {item.marca&&<span>🏷️ {item.marca} {item.modelo}</span>}
+                            {item.patente&&<span>🔢 {item.patente}</span>}
+                            {item.horasUso&&<span>⏱️ {item.horasUso}h uso</span>}
+                            {item.nivelAceite&&<span style={{color:item.nivelAceite==="OK"||item.nivelAceite==="Recién cambiado"?"#22c55e":"#ef4444"}}>🛢️ Aceite: {item.nivelAceite}</span>}
+                            {item.nivelCombustible&&<span style={{color:item.nivelCombustible==="Lleno"||item.nivelCombustible==="3/4"?"#22c55e":item.nivelCombustible==="1/2"?"#f59e0b":"#ef4444"}}>⛽ Comb: {item.nivelCombustible}</span>}
+                            {item.proxMantención&&<span style={{color:"#f59e0b"}}>🔧 Próx. mant: {item.proxMantención}h</span>}
+                          </div>
+                        )}
+                        {item.obs&&<div style={{fontSize:11,color:"#5a8a6a",fontStyle:"italic",marginTop:3}}>{item.obs}</div>}
+                      </div>
+                      {esJefa&&(
+                        <div style={{display:"flex",gap:6,flexShrink:0}}>
+                          <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(34,197,94,0.12)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)"}}
+                            onClick={()=>setMovForm({...emptyMov,itemId:String(item.id),unidad:item.unidad||"unidad"})&&setShowMovForm(true)||setShowMovForm(true)&&setMovForm(p=>({...p,itemId:String(item.id),unidad:item.unidad||"unidad"}))}>
+                            ± Mov.
+                          </button>
+                          <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>{setItemForm({...item});setMaqForm({marca:item.marca||"",modelo:item.modelo||"",patente:item.patente||"",horasUso:item.horasUso||0,nivelAceite:item.nivelAceite||"OK",nivelCombustible:item.nivelCombustible||"OK",proxMantención:item.proxMantención||""});setEditItemId(item.id);setShowItemForm(true);}}>✏️</button>
+                          <button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>eliminarItem(item.id)}>🗑</button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── MOVIMIENTOS ── */}
+      {subTab==="movimientos"&&(
+        <div className="ein">
+          {esJefa&&<button style={{...S.btn,background:"rgba(34,197,94,0.12)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)",marginBottom:14}} onClick={()=>setShowMovForm(true)}>📥 Registrar movimiento</button>}
+          {(bd.movimientos||[]).length===0?(
+            <div style={{...S.card,padding:36,textAlign:"center",color:"#4a8a5a"}}>
+              <div style={{fontSize:32,marginBottom:8}}>🔄</div>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15}}>Sin movimientos registrados</div>
+            </div>
+          ):(
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {(bd.movimientos||[]).map(mov=>{
+                const est = ESTADOS_MOV[mov.tipo]||ESTADOS_MOV.entrada;
+                const item = (bd.items||[]).find(i=>String(i.id)===String(mov.itemId));
+                return (
+                  <div key={mov.id} style={{...S.card,padding:"12px 14px",borderLeft:`3px solid ${est.color}40`}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:6}}>
+                      <div style={{flex:1}}>
+                        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:3}}>
+                          <span style={{fontSize:13,fontWeight:600,color:est.color}}>{est.label}</span>
+                          <span style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700}}>{item?.nombre||"Ítem eliminado"}</span>
+                        </div>
+                        <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:11,color:"#7aaa80"}}>
+                          <span>📅 {mov.fecha}</span>
+                          <span style={{fontWeight:600,color:est.color}}>{mov.tipo==="entrada"?"+":" -"}{mov.cantidad} {mov.unidad}</span>
+                          {mov.responsable&&<span>👤 {mov.responsable}</span>}
+                          {mov.motivo&&<span>{mov.motivo}</span>}
+                          {mov.proveedor&&<span>🏪 {mov.proveedor}{mov.nDoc&&` N°${mov.nDoc}`}</span>}
+                          {mov.litros&&<span>⛽ {mov.litros}L</span>}
+                          {mov.horasActuales&&<span>⏱️ {mov.horasActuales}h</span>}
+                        </div>
+                        {mov.obs&&<div style={{fontSize:11,color:"#5a8a6a",fontStyle:"italic",marginTop:2}}>{mov.obs}</div>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── TRASLADOS ── */}
+      {subTab==="traslados"&&(
+        <div className="ein">
+          {esJefa&&<button style={{...S.btn,background:"rgba(245,158,11,0.12)",color:"#fcd34d",border:"1px solid rgba(245,158,11,0.25)",marginBottom:14}} onClick={()=>setShowTraslForm(true)}>🚛 Nuevo traslado</button>}
+          {(bd.traslados||[]).length===0?(
+            <div style={{...S.card,padding:36,textAlign:"center",color:"#4a8a5a"}}>
+              <div style={{fontSize:32,marginBottom:8}}>🚛</div>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15}}>Sin traslados registrados</div>
+            </div>
+          ):(
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {(bd.traslados||[]).map(t=>{
+                const item=(bd.items||[]).find(i=>String(i.id)===String(t.itemId));
+                const enCamino=t.conRegreso&&t.estado==="en_camino";
+                return (
+                  <div key={t.id} style={{...S.card,padding:14,borderLeft:`3px solid ${enCamino?"#f59e0b":t.estado==="regresó"?"#22c55e":"#6b7280"}`}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:8}}>
+                      <div style={{flex:1}}>
+                        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:4}}>
+                          <span style={{fontSize:14,fontWeight:700}}>{item?.nombre||"Ítem"}</span>
+                          <span style={{...S.chip,background:enCamino?"rgba(245,158,11,0.12)":t.estado==="regresó"?"rgba(34,197,94,0.12)":"rgba(107,114,128,0.12)",color:enCamino?"#fcd34d":t.estado==="regresó"?"#86efac":"#9ca3af",fontSize:10}}>
+                            {enCamino?"🚛 En camino":t.estado==="regresó"?"✅ Regresó":"📤 Sin regreso"}
+                          </span>
+                        </div>
+                        <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:11,color:"#7aaa80"}}>
+                          <span>📅 {t.fecha}</span>
+                          <span>📦 {t.cantidad} {item?.unidad||""}</span>
+                          <span>📍 {t.destino}</span>
+                          {t.responsable&&<span>👤 {t.responsable}</span>}
+                          {t.fechaRegreso&&<span style={{color:enCamino?"#fcd34d":"#5a8a6a"}}>🔄 Regreso est: {t.fechaRegreso}</span>}
+                          {t.fechaRegresoReal&&<span style={{color:"#86efac"}}>✅ Regresó: {t.fechaRegresoReal}</span>}
+                        </div>
+                        {t.motivo&&<div style={{fontSize:11,color:"#5a8a6a",marginTop:2}}>{t.motivo}</div>}
+                        {t.obs&&<div style={{fontSize:11,color:"#5a8a6a",fontStyle:"italic",marginTop:2}}>{t.obs}</div>}
+                      </div>
+                      {enCamino&&esJefa&&(
+                        <button style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(34,197,94,0.12)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)"}} onClick={()=>marcarRegreso(t.id)}>
+                          ✅ Marcó regreso
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── TAREAS ── */}
+      {subTab==="tareas"&&(
+        <div className="ein">
+          <div style={{display:"flex",gap:8,marginBottom:14}}>
+            {esJefa&&<button className="btn-p" style={S.btn} onClick={()=>setShowTareaForm(true)}>➕ Nueva tarea</button>}
+          </div>
+          {showTareaForm&&(
+            <div style={{...S.card,padding:16,marginBottom:14}} className="ein">
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#a0d8b0",marginBottom:12}}>➕ Nueva tarea para {bodega.nombre}</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={tareaForm.fecha} onChange={e=>setTareaForm(p=>({...p,fecha:e.target.value}))}/></div>
+                <div><label style={labelSt}>Tipo de tarea</label>
+                  <select style={S.input} value={tareaForm.tipo} onChange={e=>setTareaForm(p=>({...p,tipo:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    {bodega.tareasTipo.map(t=><option key={t}>{t}</option>)}
+                    <option value="Otro">Otro</option>
+                  </select>
+                </div>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Descripción</label><input style={S.input} value={tareaForm.descripcion} onChange={e=>setTareaForm(p=>({...p,descripcion:e.target.value}))} placeholder="Detalle de la tarea..."/></div>
+                <div><label style={labelSt}>Responsable</label>
+                  <select style={S.input} value={tareaForm.responsable} onChange={e=>setTareaForm(p=>({...p,responsable:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                  </select>
+                </div>
+                <div><label style={labelSt}>Observaciones</label><input style={S.input} value={tareaForm.obs} onChange={e=>setTareaForm(p=>({...p,obs:e.target.value}))}/></div>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button className="btn-p" style={S.btn} onClick={guardarTarea}>✓ Guardar y enviar al programa</button>
+                <button className="btn-g" style={S.btn} onClick={()=>setShowTareaForm(false)}>Cancelar</button>
+              </div>
+            </div>
+          )}
+          {(bd.tareas||[]).length===0&&!showTareaForm?(
+            <div style={{...S.card,padding:36,textAlign:"center",color:"#4a8a5a"}}>
+              <div style={{fontSize:32,marginBottom:8}}>✅</div>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15}}>Sin tareas registradas</div>
+            </div>
+          ):(
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {(bd.tareas||[]).map(t=>(
+                <div key={t.id} style={{...S.card,padding:"12px 14px",borderLeft:`3px solid ${t.estado==="completada"?"#22c55e":"rgba(255,255,255,0.1)"}`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:6}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,fontWeight:600,marginBottom:3}}>{t.tipo}{t.descripcion&&` — ${t.descripcion}`}</div>
+                      <div style={{display:"flex",gap:10,fontSize:11,color:"#7aaa80",flexWrap:"wrap"}}>
+                        <span>📅 {t.fecha}</span>
+                        {t.responsable&&<span>👤 {t.responsable}</span>}
+                        <span style={{color:t.estado==="completada"?"#22c55e":"#f59e0b"}}>{t.estado==="completada"?"✅ Completada":"⏳ Pendiente"}</span>
+                      </div>
+                      {t.obs&&<div style={{fontSize:11,color:"#5a8a6a",fontStyle:"italic",marginTop:2}}>{t.obs}</div>}
+                    </div>
+                    <div style={{display:"flex",gap:6}}>
+                      {t.estado!=="completada"&&<button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(34,197,94,0.12)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)"}}
+                        onClick={()=>setbd({tareas:(bd.tareas||[]).map(x=>x.id===t.id?{...x,estado:"completada"}:x)})}>✅</button>}
+                      {esJefa&&<button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}}
+                        onClick={()=>setbd({tareas:(bd.tareas||[]).filter(x=>x.id!==t.id)})}>🗑</button>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── HISTORIAL ── */}
+      {subTab==="historial"&&(
+        <div className="ein">
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,marginBottom:12}}>📜 Historial completo — {bodega.nombre}</div>
+          {[...(bd.movimientos||[]),...(bd.traslados||[]),...(bd.tareas||[])].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")).slice(0,50).map((evt,i)=>{
+            const esMov = evt.tipo&&Object.keys(ESTADOS_MOV).includes(evt.tipo);
+            const esTrasl = evt.destino!==undefined;
+            const esTarea = !esMov&&!esTrasl;
+            return (
+              <div key={i} style={{...S.card,padding:"10px 14px",marginBottom:6,borderLeft:`2px solid ${esMov?ESTADOS_MOV[evt.tipo]?.color||"#7aaa80":esTrasl?"#f59e0b":"#a0d8b0"}`}}>
+                <div style={{display:"flex",gap:8,alignItems:"center",fontSize:12,flexWrap:"wrap"}}>
+                  <span style={{color:"#5a8a6a"}}>{evt.fecha}</span>
+                  <span style={{fontWeight:600}}>{esMov?ESTADOS_MOV[evt.tipo]?.label:esTrasl?"🚛 Traslado":"✅ "+evt.tipo}</span>
+                  {esMov&&<span>{(bd.items||[]).find(i=>String(i.id)===String(evt.itemId))?.nombre||""} · {evt.tipo==="entrada"?"+":"-"}{evt.cantidad} {evt.unidad}</span>}
+                  {esTrasl&&<span>{(bd.items||[]).find(i=>String(i.id)===String(evt.itemId))?.nombre||""} → {evt.destino}</span>}
+                  {esTarea&&<span>{evt.descripcion||""}</span>}
+                  {evt.responsable&&<span style={{color:"#5a8a6a"}}>· 👤 {evt.responsable}</span>}
+                </div>
+              </div>
+            );
+          })}
+          {[...(bd.movimientos||[]),...(bd.traslados||[]),...(bd.tareas||[])].length===0&&(
+            <div style={{...S.card,padding:36,textAlign:"center",color:"#4a8a5a"}}>
+              <div style={{fontSize:32,marginBottom:8}}>📜</div>
+              <div>Sin actividad registrada</div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [zonas, setZonas] = useState(MACROZONAS_BASE);
   const [vista, setVista] = useState("dashboard");
@@ -5904,7 +6492,8 @@ export default function App() {
   const [tareasProg,     setTareasProg,     progReady]     = useFirebaseState("prog",           {});
   const [aplicaciones,   setAplicaciones,   aplReady]      = useFirebaseState("fungicidas",     []);
   const [incidenciasFito,setIncidenciasFito,incidReady]    = useFirebaseState("fung-incid",     []);
-  const [comprasData,    setComprasData,    comprasReady]  = useFirebaseState("compras",        {compras:[],cuentas:CUENTAS_DEFAULT});
+  const [comprasData,    setComprasData,    comprasReady]  = useFirebaseState("compras",  {compras:[],cuentas:CUENTAS_DEFAULT});
+  const [bodegasData,    setBodegasData,    bodegasReady]  = useFirebaseState("bodegas",  {});
 
   const appReady = dataReady && personalReady && progReady;
 
@@ -6232,9 +6821,9 @@ export default function App() {
         </div>
         <div style={S.headerNav} className="headerNav">
           {(fbRol==="jefa"
-            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["fungicidas","🧪","Fungicidas"],["compras","🛒","Compras"],["personal","👷","Personal"]]
+            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["fungicidas","🧪","Fungicidas"],["compras","🛒","Compras"],["bodegas","🏪","Bodegas"],["personal","👷","Personal"]]
             : fbRol==="supervisor"
-            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["fungicidas","🧪","Fungicidas"],["miturno","🌿","Mi Turno"]]
+            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["fungicidas","🧪","Fungicidas"],["bodegas","🏪","Bodegas"],["miturno","🌿","Mi Turno"]]
             : [["miturno","🌿","Mi Turno"]]
           ).map(([v,ico,lbl])=>(
             <button key={v} onClick={()=>{setVista(v);setZonaId(null);setAiText("");}} style={{cursor:"pointer",border:"none",background:"transparent",color:vista===v?"#fff":"#7aaa80",fontFamily:"'Georgia',serif",fontSize:12,padding:"10px 14px",borderBottom:vista===v?"2px solid #4a9a64":"2px solid transparent",transition:"all .15s",whiteSpace:"nowrap",display:"flex",flexDirection:"column",alignItems:"center",gap:2,flexShrink:0}}>
@@ -6873,6 +7462,11 @@ export default function App() {
         {/* COMPRAS */}
         {vista==="compras"&&(
           <PanelCompras S={S} comprasData={comprasData} setComprasData={setComprasData} personal={personal} esJefa={rolLogueado==="jefa"||rolLogueado==="supervisor"} data={data} updateZona={updateZona} MACROZONAS_BASE={MACROZONAS_BASE} />
+        )}
+
+        {/* BODEGAS */}
+        {vista==="bodegas"&&(
+          <PanelBodegas S={S} bodegasData={bodegasData} setBodegasData={setBodegasData} personal={personal} esJefa={rolLogueado==="jefa"||rolLogueado==="supervisor"} tareasProg={tareasProg} setTareasProg={setTareasProg} compras={comprasData?.compras||[]} />
         )}
 
         {/* PERSONAL */}
