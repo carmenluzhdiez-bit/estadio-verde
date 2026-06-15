@@ -5295,6 +5295,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   };
 
   const [mostrarFacturadas, setMostrarFacturadas] = React.useState(false);
+  const [selectBodegaId, setSelectBodegaId] = React.useState(null);
   const comprasFilt = compras.filter(c=>{
     const mc=filtroCuenta==="todas"||c.cuenta===filtroCuenta;
     const mm=filtroMes==="todos"||(c.fecha||"").slice(0,7)===filtroMes;
@@ -5856,11 +5857,32 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                             <button style={{...S.btn,fontSize:10,padding:"3px 8px",background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}} onClick={()=>marcarPagada(c.id,"transferencia")}>💳 Trans.</button>
                             <button style={{...S.btn,fontSize:10,padding:"3px 8px",background:"rgba(139,92,246,0.15)",color:"#c4b5fd",border:"1px solid rgba(139,92,246,0.3)"}} onClick={()=>marcarPagada(c.id,"efectivo")}>💵 Efect.</button>
                           </>}
+                          {esJefa&&<button style={{...S.btn,fontSize:10,padding:"3px 8px",background:"rgba(61,122,82,0.15)",color:"#86efac",border:"1px solid rgba(61,122,82,0.3)"}}
+                            onClick={()=>setSelectBodegaId(selectBodegaId===c.id?null:c.id)}>📦 Bodega</button>}
                           {esJefa&&<button className="btn-g" style={{...S.btn,fontSize:10,padding:"3px 8px"}} onClick={()=>editar(c)}>✏️</button>}
                           {esJefa&&<button className="btn-d" style={{...S.btn,fontSize:10,padding:"3px 8px"}} onClick={()=>eliminar(c.id)}>🗑</button>}
                         </div>
                       </div>
                     </div>
+                  {/* Selector bodega inline */}
+                  {selectBodegaId===c.id&&(
+                    <div style={{marginTop:8,background:"rgba(61,122,82,0.08)",borderRadius:8,padding:"10px 12px",border:"1px solid rgba(61,122,82,0.2)"}}>
+                      <div style={{fontSize:11,color:"#86efac",marginBottom:8}}>📦 ¿A qué bodega van los ítems de esta compra?</div>
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                        {BODEGAS_DEF.map(b=>(
+                          <button key={b.id} style={{...S.btn,fontSize:11,padding:"5px 10px",background:`rgba(${b.color==="#4ade80"?"74,222,128":b.color==="#60a5fa"?"96,165,250":b.color==="#f59e0b"?"245,158,11":b.color==="#f97316"?"249,115,22":b.color==="#a78bfa"?"167,139,250":"52,211,153"},0.12)`,color:b.color,border:`1px solid ${b.color}40`}}
+                            onClick={()=>{
+                              const items = c.items||[{descripcion:c.descripcion||"",categoria:"",cantidad:c.cantidad||1,unidad:c.unidad||"unidad"}];
+                              ingresarItemsABodega(c.fecha,`${c.tipoDoc} ${c.nDocumento||""} ${c.proveedor||""}`,items.map(it=>({...it,bodegaDestino:b.id})));
+                              setSelectBodegaId(null);
+                            }}>
+                            {b.icono} {b.nombre}
+                          </button>
+                        ))}
+                        <button className="btn-g" style={{...S.btn,fontSize:11,padding:"5px 10px"}} onClick={()=>setSelectBodegaId(null)}>Cancelar</button>
+                      </div>
+                    </div>
+                  )}
                   </div>
                 );
               })}
