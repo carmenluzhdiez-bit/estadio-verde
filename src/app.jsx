@@ -5007,14 +5007,16 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   const [alertaDuplicado, setAlertaDuplicado] = React.useState(null);
 
   const guardar = () => {
-    if(!form.proveedor.trim()||!form.cuenta||!form.items[0].descripcion.trim()) return;
-    // Verificar factura duplicada (mismo proveedor + mismo N° documento)
-    if(!editId && form.nDocumento.trim()) {
+    if(!form.proveedor.trim()||!form.cuenta||!form.items[0].descripcion.trim()) {
+      console.log("GUARDAR BLOQUEADO: falta proveedor, cuenta o descripción", {proveedor:form.proveedor, cuenta:form.cuenta, desc:form.items[0]?.descripcion});
+      return;
+    }
+    // Verificar duplicado — solo mismo tipoDoc + mismo N° + mismo RUT
+    if(!editId && form.nDocumento.trim() && form.rut.trim()) {
       const duplicado = compras.find(c=>
         c.nDocumento?.trim()===form.nDocumento.trim() &&
         c.tipoDoc===form.tipoDoc &&
-        c.rut?.trim()===form.rut?.trim() &&
-        c.rut?.trim()!==""
+        c.rut?.trim()===form.rut.trim()
       );
       if(duplicado) {
         setAlertaDuplicado(`⚠️ Ya existe una ${duplicado.tipoDoc} N° ${duplicado.nDocumento} de ${duplicado.proveedor} ingresada el ${duplicado.fecha}. ¿Deseas guardar igual?`);
@@ -5023,8 +5025,8 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     }
     const docId = editId || Date.now();
     const doc = {...form, id:docId};
-    // Marcar notas de pedido vinculadas como "facturada"
     const notasVinculadas = form.notasVinculadas||[];
+    console.log("GUARDANDO:", doc.tipoDoc, doc.nDocumento, "notas vinculadas:", notasVinculadas.length);
     if(editId) {
       set({compras:compras.map(c=>c.id===editId?doc:c)});
       setEditId(null);
