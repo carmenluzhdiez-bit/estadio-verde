@@ -3180,10 +3180,59 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
 }
 
 // ─── FICHA TRABAJADOR ────────────────────────────────────────────────────────
+// ─── SELECTOR TIPO EVENTO ─────────────────────────────────────────────────────
+function TipoEventoSelector({ value, onChange, S, TIPO_EVENTO }) {
+  const [open, setOpen] = React.useState(false);
+  const grupos = [
+    {label:"📋 Asistencia", color:"#60a5fa", keys:["permiso","vacaciones","licencia"]},
+    {label:"⏰ Horas", color:"#4ade80", keys:["horaExtra"]},
+    {label:"📚 Formación y otros", color:"#fbbf24", keys:["capacitacion","amonestacion","otro"]},
+  ];
+  const tp = TIPO_EVENTO[value];
+  return (
+    <div style={{position:"relative"}}>
+      <button style={{...S.input,width:"100%",textAlign:"left",cursor:"pointer",fontSize:13,display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px"}}
+        onClick={()=>setOpen(p=>!p)}>
+        <span>{tp?`${tp.icon} ${tp.label}`:"Seleccionar tipo..."}</span>
+        <span style={{fontSize:10,color:"#5a8a6a"}}>{open?"▲":"▼"}</span>
+      </button>
+      {open&&(
+        <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:100,background:"#0f2517",border:"1px solid rgba(255,255,255,0.15)",borderRadius:10,overflow:"hidden",boxShadow:"0 8px 24px rgba(0,0,0,0.5)",marginTop:4}}>
+          <div style={{maxHeight:260,overflowY:"auto"}}>
+            {grupos.map(g=>(
+              <div key={g.label}>
+                <div style={{padding:"8px 14px 4px",fontSize:11,color:g.color,fontWeight:700,letterSpacing:"0.8px",textTransform:"uppercase",background:"rgba(255,255,255,0.03)",borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+                  {g.label}
+                </div>
+                {g.keys.map(k=>{
+                  const t=TIPO_EVENTO[k];
+                  if(!t) return null;
+                  return (
+                    <div key={k} style={{padding:"9px 14px 9px 22px",cursor:"pointer",fontSize:13,color:value===k?t.color:"#ede9e0",background:value===k?`${t.color}18`:"transparent",borderLeft:value===k?`2px solid ${t.color}`:"2px solid transparent",display:"flex",alignItems:"center",gap:8}}
+                      onClick={()=>{onChange(k);setOpen(false);}}>
+                      <span style={{fontSize:16}}>{t.icon}</span>
+                      <span>{t.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDeleteEvento, onUpdateEvento }) {
   const [tab, setTab] = React.useState("ficha");
   const [showNuevoEvento, setShowNuevoEvento] = React.useState(false);
   const [nuevoEvento, setNuevoEvento] = React.useState({ tipo:"permiso", fecha:"", fechaFin:"", horas:"", descripcion:"", estado:"pendiente" });
+  const [editEventoId, setEditEventoId] = React.useState(null);
+  const [editEventoForm, setEditEventoForm] = React.useState({});
+
+  const abrirEditEvento = (ev) => { setEditEventoId(ev.id); setEditEventoForm({...ev}); setShowNuevoEvento(false); };
+  const guardarEditEvento = () => { onUpdateEvento(editEventoId, editEventoForm); setEditEventoId(null); };
 
   const TIPO_EVENTO = {
     permiso:          { label:"Permiso",               color:"#f59e0b", icon:"📋" },
@@ -3383,17 +3432,7 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
                   <div>
                     <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>TIPO</label>
-                    <select style={S.input} value={nuevoEvento.tipo} onChange={e=>setNuevoEvento(p=>({...p,tipo:e.target.value}))}>
-                      <optgroup label="── Asistencia ──">
-                        {["permiso","vacaciones","licencia"].map(k=><option key={k} value={k}>{TIPO_EVENTO[k].icon} {TIPO_EVENTO[k].label}</option>)}
-                      </optgroup>
-                      <optgroup label="── Horas ──">
-                        <option value="horaExtra">{TIPO_EVENTO.horaExtra.icon} {TIPO_EVENTO.horaExtra.label}</option>
-                      </optgroup>
-                      <optgroup label="── Otros ──">
-                        {["capacitacion","amonestacion","otro"].map(k=><option key={k} value={k}>{TIPO_EVENTO[k].icon} {TIPO_EVENTO[k].label}</option>)}
-                      </optgroup>
-                    </select>
+                    <TipoEventoSelector value={nuevoEvento.tipo} onChange={v=>setNuevoEvento(p=>({...p,tipo:v}))} S={S} TIPO_EVENTO={TIPO_EVENTO}/>
                   </div>
                   <div>
                     <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>ESTADO</label>
@@ -3456,12 +3495,48 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
                     </div>
                   </div>
                   <div style={{display:"flex",gap:6,flexShrink:0}}>
+                    <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 8px"}} onClick={()=>abrirEditEvento(ev)}>✏️</button>
                     <select value={ev.estado} style={{...S.input,width:"auto",fontSize:12,padding:"4px 8px"}} onChange={e=>onUpdateEvento(ev.id,{estado:e.target.value})}>
                       {Object.entries(ESTADO_EVENTO).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
                     </select>
                     <button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 8px"}} onClick={()=>onDeleteEvento(ev.id)}>🗑</button>
                   </div>
                 </div>
+                {/* Formulario edición inline */}
+                {editEventoId===ev.id&&(
+                  <div style={{marginTop:8,background:"rgba(255,255,255,0.04)",borderRadius:8,padding:"12px 14px",border:"1px solid rgba(255,255,255,0.1)"}}>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+                      <div><label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3}}>TIPO</label>
+                        <TipoEventoSelector value={editEventoForm.tipo||"permiso"} onChange={v=>setEditEventoForm(p=>({...p,tipo:v}))} S={S} TIPO_EVENTO={TIPO_EVENTO}/>
+                      </div>
+                      <div><label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3}}>ESTADO</label>
+                        <select style={S.input} value={editEventoForm.estado||"pendiente"} onChange={e=>setEditEventoForm(p=>({...p,estado:e.target.value}))}>
+                          {Object.entries(ESTADO_EVENTO).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
+                        </select>
+                      </div>
+                      <div><label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3}}>FECHA</label>
+                        <input type="date" style={S.input} value={editEventoForm.fecha||""} onChange={e=>setEditEventoForm(p=>({...p,fecha:e.target.value}))}/>
+                      </div>
+                      <div><label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3}}>FECHA FIN</label>
+                        <input type="date" style={S.input} value={editEventoForm.fechaFin||""} onChange={e=>setEditEventoForm(p=>({...p,fechaFin:e.target.value}))}/>
+                      </div>
+                      <div><label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3}}>HORAS</label>
+                        <input type="number" min={0} style={S.input} value={editEventoForm.horas||""} onChange={e=>setEditEventoForm(p=>({...p,horas:e.target.value}))}/>
+                      </div>
+                      <div><label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3}}>VALOR ($)</label>
+                        <input type="number" min={0} style={S.input} value={editEventoForm.valor||""} onChange={e=>setEditEventoForm(p=>({...p,valor:e.target.value}))}/>
+                      </div>
+                      <div style={{gridColumn:"1/-1"}}><label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3}}>DESCRIPCIÓN</label>
+                        <input style={S.input} value={editEventoForm.descripcion||""} onChange={e=>setEditEventoForm(p=>({...p,descripcion:e.target.value}))}/>
+                      </div>
+                    </div>
+                    <div style={{display:"flex",gap:6}}>
+                      <button className="btn-p" style={S.btn} onClick={guardarEditEvento}>✓ Guardar</button>
+                      <button className="btn-g" style={S.btn} onClick={()=>setEditEventoId(null)}>Cancelar</button>
+                    </div>
+                  </div>
+                )}
+              </div>
               );
             })}
           </div>
@@ -3558,12 +3633,41 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
                     </div>
                   </div>
                   <div style={{display:"flex",gap:6,flexShrink:0}}>
+                    <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 8px"}} onClick={()=>abrirEditEvento(ev)}>✏️</button>
                     <select value={ev.estado} style={{...S.input,width:"auto",fontSize:12,padding:"4px 8px"}} onChange={e=>onUpdateEvento(ev.id,{estado:e.target.value})}>
                       {Object.entries(ESTADO_EVENTO).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
                     </select>
                     <button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 8px"}} onClick={()=>onDeleteEvento(ev.id)}>🗑</button>
                   </div>
                 </div>
+                {editEventoId===ev.id&&(
+                  <div style={{marginTop:8,background:"rgba(255,255,255,0.04)",borderRadius:8,padding:"12px 14px",border:"1px solid rgba(255,255,255,0.1)"}}>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+                      <div><label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3}}>FECHA</label>
+                        <input type="date" style={S.input} value={editEventoForm.fecha||""} onChange={e=>setEditEventoForm(p=>({...p,fecha:e.target.value}))}/>
+                      </div>
+                      <div><label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3}}>ESTADO</label>
+                        <select style={S.input} value={editEventoForm.estado||"pendiente"} onChange={e=>setEditEventoForm(p=>({...p,estado:e.target.value}))}>
+                          {Object.entries(ESTADO_EVENTO).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
+                        </select>
+                      </div>
+                      <div><label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3}}>VALOR ($)</label>
+                        <input type="number" min={0} style={S.input} value={editEventoForm.valor||""} onChange={e=>setEditEventoForm(p=>({...p,valor:e.target.value}))}/>
+                      </div>
+                      <div><label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3}}>HORAS</label>
+                        <input type="number" min={0} style={S.input} value={editEventoForm.horas||""} onChange={e=>setEditEventoForm(p=>({...p,horas:e.target.value}))}/>
+                      </div>
+                      <div style={{gridColumn:"1/-1"}}><label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3}}>DESCRIPCIÓN</label>
+                        <input style={S.input} value={editEventoForm.descripcion||""} onChange={e=>setEditEventoForm(p=>({...p,descripcion:e.target.value}))}/>
+                      </div>
+                    </div>
+                    <div style={{display:"flex",gap:6}}>
+                      <button className="btn-p" style={S.btn} onClick={guardarEditEvento}>✓ Guardar</button>
+                      <button className="btn-g" style={S.btn} onClick={()=>setEditEventoId(null)}>Cancelar</button>
+                    </div>
+                  </div>
+                )}
+              </div>
               );
             })}
             {/* Total bonos aprobados */}
@@ -6862,6 +6966,177 @@ function TareaPlantacion({ modo, zona, zonaId, bodegasData, setBodegasData, tare
   );
 }
 
+// ─── INFORME MENSUAL RRHH ─────────────────────────────────────────────────────
+function InformeRRHH({ S, personal, bonosMasivos, onVolver }) {
+  const hoy = new Date();
+  const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,"0")}`;
+  const [mesSel, setMesSel] = React.useState(mesActual);
+  const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
+
+  const mesesDisp = [];
+  for(let i=5;i>=0;i--){
+    const d=new Date(hoy.getFullYear(),hoy.getMonth()-i,1);
+    mesesDisp.push({key:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`,label:d.toLocaleDateString("es-CL",{month:"long",year:"numeric"})});
+  }
+
+  const generarInforme = () => {
+    const fechaHoy = hoy.toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"});
+    const mesLabel = mesesDisp.find(m=>m.key===mesSel)?.label||mesSel;
+
+    const paginas = personalArr.map(t=>{
+      const eventosMes = (t.eventos||[]).filter(e=>(e.fecha||"").startsWith(mesSel));
+      const bonos = eventosMes.filter(e=>["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo));
+      const horasExtras = eventosMes.filter(e=>e.tipo==="horaExtra");
+      const permisos = eventosMes.filter(e=>["permiso","vacaciones","licencia"].includes(e.tipo));
+      // También bonos masivos del mes donde participa
+      const bonosMes = (Array.isArray(bonosMasivos)?bonosMasivos:Object.values(bonosMasivos||{}))
+        .filter(b=>(b.fecha||"").startsWith(mesSel)&&(b.participantes||[]).some(p=>String(p.trabajadorId)===String(t.id)));
+
+      const totalBonos = bonos.reduce((a,e)=>a+Number(e.valor||0),0) +
+        bonosMes.reduce((a,b)=>{const p=b.participantes?.find(p=>String(p.trabajadorId)===String(t.id));return a+Number(p?.monto||0);},0);
+      const totalHE = horasExtras.filter(e=>e.estado==="aprobado").reduce((a,e)=>a+Number(e.horas||0),0);
+
+      const filaBonos = [...bonos.map(e=>`
+        <tr><td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${e.fecha}</td>
+        <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${e.descripcion||"Bono"}</td>
+        <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px;text-align:center"><span style="background:#f3e5ff;color:#7b1fa2;padding:2px 8px;border-radius:10px;font-size:11px">${e.estado}</span></td>
+        <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px;text-align:right;font-weight:700">${e.valor?`$${Number(e.valor).toLocaleString("es-CL")}`:"—"}</td></tr>`),
+        ...bonosMes.map(b=>{const p=b.participantes?.find(p=>String(p.trabajadorId)===String(t.id));return `
+        <tr style="background:#f9f0ff"><td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${b.fecha}</td>
+        <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${p?.rol||""} — ${b.descripcion}</td>
+        <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px;text-align:center"><span style="background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:10px;font-size:11px">generado</span></td>
+        <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px;text-align:right;font-weight:700">$${Number(p?.monto||0).toLocaleString("es-CL")}</td></tr>`;})
+      ].join("");
+
+      const filaHE = horasExtras.map(e=>`
+        <tr><td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${e.fecha}</td>
+        <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${e.descripcion||"Hora extra"}</td>
+        <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px;text-align:center"><span style="background:#e3f2fd;color:#1565c0;padding:2px 8px;border-radius:10px;font-size:11px">${e.estado}</span></td>
+        <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px;text-align:right;font-weight:700">${e.horas||0} hrs</td></tr>`).join("");
+
+      const filaPermisos = permisos.map(e=>`
+        <tr><td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${e.fecha}${e.fechaFin?` al ${e.fechaFin}`:""}</td>
+        <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${e.tipo==="permiso"?"Permiso":e.tipo==="vacaciones"?"Vacaciones":"Licencia"}${e.descripcion?` — ${e.descripcion}`:""}</td>
+        <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px;text-align:center"><span style="background:#fff8e1;color:#f57f17;padding:2px 8px;border-radius:10px;font-size:11px">${e.estado}</span></td>
+        <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px;text-align:center">—</td></tr>`).join("");
+
+      if(!bonos.length&&!bonosMes.length&&!horasExtras.length&&!permisos.length) return "";
+
+      return `
+        <div class="pagina">
+          <div class="hdr">
+            <div>
+              <h1>Informe Mensual de Personal — ${mesLabel}</h1>
+              <h2>Departamento de Áreas Verdes · Estadio Español de Las Condes</h2>
+              <h2>Para: Recursos Humanos / Remuneraciones</h2>
+            </div>
+            <div style="text-align:right;font-size:12px;color:#555">Emisión: <strong>${fechaHoy}</strong></div>
+          </div>
+          <div style="background:#f0f7f0;border:1px solid #a5d6a7;border-radius:8px;padding:14px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div style="font-size:18px;font-weight:900;color:#1a1a1a">${t.nombre}</div>
+              <div style="font-size:13px;color:#555">${t.cargo||"—"} · ${t.contrato||"—"}</div>
+            </div>
+            <div style="text-align:right">
+              ${totalBonos>0?`<div style="font-size:11px;color:#888">Total bonos</div><div style="font-size:20px;font-weight:700;color:#7b1fa2">$${totalBonos.toLocaleString("es-CL")}</div>`:""}
+              ${totalHE>0?`<div style="font-size:11px;color:#888;margin-top:4px">Horas extras aprobadas</div><div style="font-size:16px;font-weight:700;color:#1565c0">${totalHE} hrs</div>`:""}
+            </div>
+          </div>
+
+          ${filaBonos?`
+          <div class="sec">💰 Bonos</div>
+          <table><thead><tr><th>Fecha</th><th>Descripción</th><th style="text-align:center">Estado</th><th style="text-align:right">Monto</th></tr></thead>
+          <tbody>${filaBonos}</tbody>
+          <tfoot><tr style="background:#f3e5ff;font-weight:bold"><td colspan="3" style="padding:6px 10px;border:1px solid #e0e0e0;text-align:right">TOTAL BONOS</td>
+          <td style="padding:6px 10px;border:1px solid #e0e0e0;text-align:right;color:#7b1fa2">$${totalBonos.toLocaleString("es-CL")}</td></tr></tfoot></table>`:""}
+
+          ${filaHE?`
+          <div class="sec">⏰ Horas Extras</div>
+          <table><thead><tr><th>Fecha</th><th>Descripción</th><th style="text-align:center">Estado</th><th style="text-align:right">Horas</th></tr></thead>
+          <tbody>${filaHE}</tbody>
+          <tfoot><tr style="background:#e3f2fd;font-weight:bold"><td colspan="3" style="padding:6px 10px;border:1px solid #e0e0e0;text-align:right">TOTAL HORAS EXTRAS</td>
+          <td style="padding:6px 10px;border:1px solid #e0e0e0;text-align:right;color:#1565c0">${totalHE} hrs</td></tr></tfoot></table>`:""}
+
+          ${filaPermisos?`
+          <div class="sec">📋 Permisos y Ausentismo</div>
+          <table><thead><tr><th>Período</th><th>Tipo</th><th style="text-align:center">Estado</th><th style="text-align:right">Obs.</th></tr></thead>
+          <tbody>${filaPermisos}</tbody></table>`:""}
+
+          <div class="firmas">
+            <div class="firma"><div class="flinea"><strong>${t.nombre}</strong><br>Firma trabajador</div></div>
+            <div class="firma"><div class="flinea"><strong>Carmen Luz Hermosilla Diez</strong><br>Jefe Dpto. Áreas Verdes</div></div>
+            <div class="firma"><div class="flinea">RRHH / Remuneraciones<br>Estadio Español</div></div>
+          </div>
+          <div class="footer">Estadio Español de Las Condes · Departamento de Áreas Verdes · Jefe de Departamento de Áreas Verdes · Carmen Luz Hermosilla Diez · ${fechaHoy}</div>
+        </div>`;
+    }).filter(Boolean).join("<div class='salto'></div>");
+
+    if(!paginas) { alert("No hay eventos registrados para el mes seleccionado."); return; }
+
+    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+    <title>Informe RRHH ${mesLabel}</title>
+    <style>
+      body{font-family:Arial,sans-serif;margin:0;color:#1a1a1a;font-size:13px}
+      .pagina{padding:28px;max-width:720px;margin:0 auto}
+      h1{font-size:17px;color:#1a5c2a;margin:0 0 3px}h2{font-size:12px;color:#444;margin:0;font-weight:normal}
+      .hdr{display:flex;justify-content:space-between;border-bottom:2px solid #1a5c2a;padding-bottom:10px;margin-bottom:16px}
+      .sec{font-size:11px;font-weight:700;color:#1a5c2a;margin:14px 0 6px;border-left:3px solid #1a5c2a;padding-left:7px;text-transform:uppercase}
+      table{width:100%;border-collapse:collapse;margin-bottom:14px}
+      th{background:#1a5c2a;color:#fff;padding:7px 10px;font-size:11px;text-align:left}
+      tr:nth-child(even){background:#fafafa}
+      .firmas{display:flex;justify-content:space-between;margin-top:40px}
+      .firma{text-align:center;width:30%}
+      .flinea{border-top:1px solid #333;padding-top:6px;margin-top:36px;font-size:11px}
+      .footer{margin-top:16px;padding-top:8px;border-top:1px solid #ccc;font-size:10px;color:#888;text-align:center}
+      .salto{page-break-after:always}
+      @media print{.noprint{display:none}.salto{border:none}}
+    </style></head><body>
+    ${paginas}
+    <div class="noprint" style="text-align:center;padding:20px;background:#f5f5f5">
+      <button onclick="window.print()" style="background:#1a5c2a;color:#fff;border:none;padding:10px 28px;border-radius:7px;font-size:13px;cursor:pointer">🖨️ Imprimir / Guardar PDF</button>
+    </div></body></html>`;
+    const w=window.open("","_blank"); w.document.write(html); w.document.close();
+  };
+
+  const trabajadoresConEventos = personalArr.filter(t=>{
+    const ev = (t.eventos||[]).filter(e=>(e.fecha||"").startsWith(mesSel));
+    const bm = (Array.isArray(bonosMasivos)?bonosMasivos:Object.values(bonosMasivos||{}))
+      .filter(b=>(b.fecha||"").startsWith(mesSel)&&(b.participantes||[]).some(p=>String(p.trabajadorId)===String(t.id)));
+    return ev.length>0||bm.length>0;
+  });
+
+  return (
+    <div className="ein">
+      <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:20,flexWrap:"wrap"}}>
+        <button className="btn-g" style={S.btn} onClick={onVolver}>← Volver</button>
+        <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:900,flex:1}}>📄 Informe Mensual RRHH</h1>
+      </div>
+      <div style={{...S.card,padding:20,marginBottom:16}}>
+        <div style={{display:"flex",gap:12,alignItems:"flex-end",flexWrap:"wrap"}}>
+          <div style={{flex:1,minWidth:160}}>
+            <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:4,textTransform:"uppercase"}}>Período</label>
+            <select style={S.input} value={mesSel} onChange={e=>setMesSel(e.target.value)}>
+              {mesesDisp.map(m=><option key={m.key} value={m.key}>{m.label}</option>)}
+            </select>
+          </div>
+          <button className="btn-p" style={{...S.btn,padding:"10px 20px"}} onClick={generarInforme}>
+            🖨️ Generar informe
+          </button>
+        </div>
+        {trabajadoresConEventos.length>0&&(
+          <div style={{fontSize:12,color:"#6aaa7a",marginTop:10}}>
+            {trabajadoresConEventos.length} trabajador{trabajadoresConEventos.length!==1?"es":""} con eventos en {mesesDisp.find(m=>m.key===mesSel)?.label||mesSel}:
+            {" "}{trabajadoresConEventos.map(t=>t.nombre).join(", ")}
+          </div>
+        )}
+        {trabajadoresConEventos.length===0&&(
+          <div style={{fontSize:12,color:"#4a6a54",marginTop:10}}>Sin eventos registrados para este período.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── BONO POR TAREA ──────────────────────────────────────────────────────────
 function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, setBonosMasivos, setPersonal, onVolver, esJefa }) {
   const hoy = new Date().toISOString().slice(0,10);
@@ -6874,12 +7149,16 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
 
   const [showConfig, setShowConfig] = React.useState(false);
   const [showForm,   setShowForm]   = React.useState(false);
+  const [editBonoId, setEditBonoId] = React.useState(null);
+  const [editBonoForm, setEditBonoForm] = React.useState(null);
   const [form, setForm] = React.useState({
     fecha: hoy, descripcion:"", valorMercado:"",
     ejecutor:"", ayudante:"", apoyos:[], obs:""
   });
 
-  const listaPersonal = [...personal].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+  const personalArr = Array.isArray(personal) ? personal : Object.values(personal||{});
+  const listaPersonal = [...personalArr].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+  const getNombre = (id) => personalArr.find(p=>String(p.id)===String(id))?.nombre||"—";
 
   const fondoTotal  = Math.round(Number(form.valorMercado||0) * pctFondo / 100);
   const montoEjec   = Math.round(fondoTotal * pctEjecutor / 100);
@@ -6891,79 +7170,69 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
   const imprimirBono = (bono) => {
     const fechaHoy = new Date().toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"});
     const fechaBono = bono.fecha ? new Date(bono.fecha+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"}) : bono.fecha;
-    const filas = (bono.participantes||[]).map(p=>`
-      <tr>
-        <td style="padding:8px 12px;border:1px solid #e0e0e0">${p.nombre}</td>
-        <td style="padding:8px 12px;border:1px solid #e0e0e0;text-align:center">
-          <span style="background:${p.rol==="Ejecutor"?"#e8f5e9":p.rol==="Ayudante"?"#e3f2fd":"#fff8e1"};padding:3px 10px;border-radius:10px;font-size:12px;color:${p.rol==="Ejecutor"?"#2e7d32":p.rol==="Ayudante"?"#1565c0":"#f57f17"}">${p.rol}</span>
-        </td>
-        <td style="padding:8px 12px;border:1px solid #e0e0e0;text-align:right">${p.pct}%</td>
-        <td style="padding:8px 12px;border:1px solid #e0e0e0;text-align:right;font-weight:700;font-size:15px">$${Number(p.monto).toLocaleString("es-CL")}</td>
-        <td style="padding:8px 12px;border:1px solid #e0e0e0;text-align:center">____________</td>
-      </tr>`).join("");
+    // Generar una página por trabajador
+    const paginas = (bono.participantes||[]).map(p=>`
+      <div class="pagina">
+        <div class="hdr">
+          <div>
+            <h1>Comprobante de Bono por Tarea Especial</h1>
+            <h2>Departamento de Áreas Verdes · Estadio Español de Las Condes</h2>
+            <h2>Para: Recursos Humanos / Remuneraciones</h2>
+          </div>
+          <div style="text-align:right;font-size:12px;color:#555">
+            <div>Fecha tarea: <strong>${fechaBono}</strong></div>
+            <div>Emisión: <strong>${fechaHoy}</strong></div>
+          </div>
+        </div>
+        <div style="background:#f8f9fa;border:1px solid #ddd;border-radius:8px;padding:16px;margin-bottom:18px">
+          <div style="font-size:16px;font-weight:700;color:#1a5c2a;margin-bottom:8px">📋 ${bono.descripcion}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+            <div><div style="font-size:10px;color:#888;text-transform:uppercase">Valor mercado</div><div style="font-size:14px;font-weight:700">$${Number(bono.valorMercado).toLocaleString("es-CL")}</div></div>
+            <div><div style="font-size:10px;color:#888;text-transform:uppercase">Fondo distribuido (${pctFondo}%)</div><div style="font-size:14px;font-weight:700;color:#c62828">$${Number(bono.fondoTotal).toLocaleString("es-CL")}</div></div>
+            <div><div style="font-size:10px;color:#888;text-transform:uppercase">N° participantes</div><div style="font-size:14px;font-weight:700">${(bono.participantes||[]).length} personas</div></div>
+          </div>
+        </div>
+        <div style="background:${p.rol==="Ejecutor"?"#e8f5e9":p.rol==="Ayudante"?"#e3f2fd":"#fff8e1"};border:2px solid ${p.rol==="Ejecutor"?"#2e7d32":p.rol==="Ayudante"?"#1565c0":"#f57f17"};border-radius:10px;padding:20px;margin-bottom:18px;text-align:center">
+          <div style="font-size:13px;color:#666;margin-bottom:4px">TRABAJADOR</div>
+          <div style="font-size:22px;font-weight:900;color:#1a1a1a;margin-bottom:8px">${p.nombre||"—"}</div>
+          <div style="display:inline-block;background:${p.rol==="Ejecutor"?"#2e7d32":p.rol==="Ayudante"?"#1565c0":"#f57f17"};color:#fff;padding:4px 16px;border-radius:20px;font-size:13px;font-weight:700;margin-bottom:12px">${p.rol}</div>
+          <div style="font-size:13px;color:#666">Porcentaje asignado: <strong>${p.pct}% del fondo</strong></div>
+          <div style="font-size:36px;font-weight:900;color:${p.rol==="Ejecutor"?"#2e7d32":p.rol==="Ayudante"?"#1565c0":"#e65100"};margin-top:8px">$${Number(p.monto).toLocaleString("es-CL")}</div>
+          <div style="font-size:12px;color:#888;margin-top:4px">MONTO BONO A PAGAR</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:50px">
+          <div style="text-align:center">
+            <div style="border-top:1px solid #333;padding-top:8px;margin-top:40px;font-size:12px">
+              <strong>${p.nombre||"—"}</strong><br>RUT: ___________________<br>Firma y fecha recepción
+            </div>
+          </div>
+          <div style="text-align:center">
+            <div style="border-top:1px solid #333;padding-top:8px;margin-top:40px;font-size:12px">
+              <strong>Carmen Luz Hermosilla Diez</strong><br>Jefe Dpto. de Áreas Verdes
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:20px;padding-top:8px;border-top:1px solid #ccc;font-size:10px;color:#888;text-align:center">
+          Estadio Español de Las Condes · Departamento de Áreas Verdes<br>
+          Jefe de Departamento de Áreas Verdes · Carmen Luz Hermosilla Diez · ${fechaHoy}
+        </div>
+      </div>`).join("<div class='salto'></div>");
 
     const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-    <title>Bono Tarea — ${bono.descripcion}</title>
+    <title>Bonos — ${bono.descripcion}</title>
     <style>
-      body{font-family:Arial,sans-serif;margin:30px;color:#1a1a1a;font-size:13px}
-      h1{font-size:18px;color:#1a5c2a;margin:0 0 4px}
-      h2{font-size:13px;color:#444;margin:0 0 2px;font-weight:normal}
-      .hdr{display:flex;justify-content:space-between;border-bottom:2px solid #1a5c2a;padding-bottom:12px;margin-bottom:18px}
-      .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:18px}
-      .box{background:#f8f9fa;border:1px solid #ddd;border-radius:5px;padding:10px 12px}
-      .lbl{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
-      .val{font-size:15px;font-weight:700;color:#1a5c2a}
-      table{width:100%;border-collapse:collapse;margin-bottom:20px}
-      th{background:#1a5c2a;color:#fff;padding:8px 12px;font-size:12px;text-align:left}
-      tr:nth-child(even){background:#fafafa}
-      .firmas{display:flex;justify-content:space-between;margin-top:50px}
-      .firma{text-align:center;width:30%}
-      .flinea{border-top:1px solid #333;padding-top:6px;margin-top:40px;font-size:11px}
-      .footer{margin-top:20px;padding-top:8px;border-top:1px solid #ccc;font-size:10px;color:#888;text-align:center}
-      @media print{.noprint{display:none}}
+      body{font-family:Arial,sans-serif;margin:0;color:#1a1a1a;font-size:13px}
+      .pagina{padding:30px;max-width:700px;margin:0 auto}
+      h1{font-size:17px;color:#1a5c2a;margin:0 0 3px}
+      h2{font-size:12px;color:#444;margin:0;font-weight:normal}
+      .hdr{display:flex;justify-content:space-between;border-bottom:2px solid #1a5c2a;padding-bottom:10px;margin-bottom:16px}
+      .salto{page-break-after:always;border-top:2px dashed #ccc;margin:20px 0}
+      @media print{.noprint{display:none}.salto{border:none}}
     </style></head><body>
-    <div class="hdr">
-      <div>
-        <h1>Informe de Bono por Tarea Especial</h1>
-        <h2>Departamento de Áreas Verdes · Estadio Español de Las Condes</h2>
-        <h2>Dirigido a: Recursos Humanos / Remuneraciones</h2>
-      </div>
-      <div style="text-align:right;font-size:12px;color:#555">
-        <div>Fecha tarea: <strong>${fechaBono}</strong></div>
-        <div>Emisión: <strong>${fechaHoy}</strong></div>
-      </div>
-    </div>
-    <div style="margin-bottom:16px">
-      <div style="font-size:16px;font-weight:700;color:#1a5c2a;margin-bottom:4px">📋 ${bono.descripcion}</div>
-      ${bono.obs?`<div style="font-size:12px;color:#666;font-style:italic">${bono.obs}</div>`:""}
-    </div>
-    <div class="grid">
-      <div class="box"><div class="lbl">Valor mercado tarea</div><div class="val">$${Number(bono.valorMercado).toLocaleString("es-CL")}</div></div>
-      <div class="box"><div class="lbl">Fondo a distribuir (${pctFondo}%)</div><div class="val" style="color:#c62828">$${Number(bono.fondoTotal).toLocaleString("es-CL")}</div></div>
-      <div class="box"><div class="lbl">N° participantes</div><div class="val">${(bono.participantes||[]).length} personas</div></div>
-    </div>
-    <table>
-      <thead><tr><th>Trabajador</th><th style="text-align:center">Rol</th><th style="text-align:right">% asignado</th><th style="text-align:right">Monto bono</th><th style="text-align:center">Firma recepción</th></tr></thead>
-      <tbody>${filas}</tbody>
-      <tfoot>
-        <tr style="background:#e8f5e9;font-weight:bold">
-          <td colspan="3" style="padding:8px 12px;border:1px solid #e0e0e0;text-align:right">TOTAL A PAGAR</td>
-          <td style="padding:8px 12px;border:1px solid #e0e0e0;text-align:right;font-size:16px;color:#c62828">$${(bono.participantes||[]).reduce((a,p)=>a+Number(p.monto),0).toLocaleString("es-CL")}</td>
-          <td style="padding:8px 12px;border:1px solid #e0e0e0"></td>
-        </tr>
-      </tfoot>
-    </table>
-    <div class="firmas">
-      <div class="firma"><div class="flinea"><strong>Carmen Luz Hermosilla Diez</strong><br>Jefe Dpto. de Áreas Verdes</div></div>
-      <div class="firma"><div class="flinea">Recursos Humanos / Remuneraciones<br>Estadio Español de Las Condes</div></div>
-      <div class="firma"><div class="flinea">VB° Gerencia General<br>Estadio Español de Las Condes</div></div>
-    </div>
-    <div class="footer">
-      Estadio Español de Las Condes · Departamento de Áreas Verdes<br>
-      Jefe de Departamento de Áreas Verdes · Carmen Luz Hermosilla Diez · ${fechaHoy}
-    </div>
-    <div class="noprint" style="text-align:center;margin-top:20px">
+    ${paginas}
+    <div class="noprint" style="text-align:center;padding:20px;background:#f5f5f5">
       <button onclick="window.print()" style="background:#1a5c2a;color:#fff;border:none;padding:10px 28px;border-radius:7px;font-size:13px;cursor:pointer">🖨️ Imprimir / Guardar PDF</button>
+      <p style="font-size:12px;color:#666;margin-top:8px">Se imprimirá un comprobante por página para cada trabajador</p>
     </div>
     </body></html>`;
     const w=window.open("","_blank"); w.document.write(html); w.document.close();
@@ -6973,18 +7242,18 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
     if(!form.descripcion.trim()||!form.valorMercado||!form.ejecutor) return;
     const apoyosValidos = form.apoyos.filter(a=>a);
     const participantes = [
-      {trabajadorId:String(form.ejecutor), nombre:personal.find(p=>String(p.id)===String(form.ejecutor))?.nombre||"", rol:"Ejecutor", pct:pctEjecutor, monto:montoEjec},
-      ...(form.ayudante?[{trabajadorId:String(form.ayudante), nombre:personal.find(p=>String(p.id)===String(form.ayudante))?.nombre||"", rol:"Ayudante", pct:pctAyudante, monto:montoAyud}]:[]),
-      ...apoyosValidos.map(id=>({trabajadorId:String(id), nombre:personal.find(p=>String(p.id)===String(id))?.nombre||"", rol:"Apoyo", pct:pctApoyo, monto:montoApoyo})),
+      {trabajadorId:String(form.ejecutor), nombre:getNombre(form.ejecutor), rol:"Ejecutor", pct:pctEjecutor, monto:montoEjec},
+      ...(form.ayudante?[{trabajadorId:String(form.ayudante), nombre:getNombre(form.ayudante), rol:"Ayudante", pct:pctAyudante, monto:montoAyud}]:[]),
+      ...apoyosValidos.map(id=>({trabajadorId:String(id), nombre:getNombre(id), rol:"Apoyo", pct:pctApoyo, monto:montoApoyo})),
     ];
     const nuevoBono = {
       id:Date.now(), fecha:form.fecha, descripcion:form.descripcion,
       valorMercado:Number(form.valorMercado), fondoTotal, obs:form.obs,
       estado:"generado", participantes,
     };
-    setBonosMasivos(p=>[nuevoBono,...(Array.isArray(p)?p:[])]);
+    setBonosMasivos(p=>[nuevoBono,...(Array.isArray(p)?p:Object.values(p||{}))]);
     // Agregar bono en ficha de cada trabajador
-    setPersonal(p=>(Array.isArray(p)?p:[]).map(t=>{
+    setPersonal(p=>{const arr=Array.isArray(p)?p:Object.values(p||{});return arr.map(t=>{
       const partic = participantes.find(x=>String(x.trabajadorId)===String(t.id));
       if(!partic) return t;
       const nuevaEntrada = {
@@ -7151,6 +7420,7 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
                     <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700}}>${Number(bono.valorMercado).toLocaleString("es-CL")}</div>
                     <div style={{fontSize:11,color:"#c4b5fd"}}>Fondo: ${Number(bono.fondoTotal).toLocaleString("es-CL")}</div>
                   </div>
+                  <button style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(255,255,255,0.06)",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)"}} onClick={()=>{setEditBonoId(bono.id);setEditBonoForm({...bono});}}>✏️ Editar</button>
                   <button style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}} onClick={()=>imprimirBono(bono)}>🖨️ Informe RRHH</button>
                 </div>
               </div>
@@ -7166,6 +7436,53 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
                 ))}
               </div>
               {bono.obs&&<div style={{fontSize:11,color:"#5a8a6a",marginTop:8,fontStyle:"italic"}}>{bono.obs}</div>}
+
+              {/* Formulario edición inline */}
+              {editBonoId===bono.id&&editBonoForm&&(
+                <div style={{marginTop:12,background:"rgba(255,255,255,0.04)",borderRadius:8,padding:"14px 16px",border:"1px solid rgba(255,255,255,0.1)"}}>
+                  <div style={{fontSize:12,color:"#c4b5fd",fontWeight:600,marginBottom:10}}>✏️ Editar bono</div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
+                    <div><label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3}}>FECHA</label>
+                      <input type="date" style={S.input} value={editBonoForm.fecha||""} onChange={e=>setEditBonoForm(p=>({...p,fecha:e.target.value}))}/>
+                    </div>
+                    <div><label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3}}>VALOR MERCADO ($)</label>
+                      <input type="number" min={0} style={S.input} value={editBonoForm.valorMercado||""} onChange={e=>{
+                        const vm=Number(e.target.value);
+                        const ft=Math.round(vm*pctFondo/100);
+                        const partic=(editBonoForm.participantes||[]).map(p=>({...p,
+                          monto:p.rol==="Ejecutor"?Math.round(ft*pctEjecutor/100):
+                                p.rol==="Ayudante"?Math.round(ft*pctAyudante/100):
+                                Math.round((ft*pctApoyo/100)/Math.max(1,(editBonoForm.participantes||[]).filter(x=>x.rol==="Apoyo").length))
+                        }));
+                        setEditBonoForm(p=>({...p,valorMercado:vm,fondoTotal:ft,participantes:partic}));
+                      }}/>
+                    </div>
+                    <div style={{gridColumn:"1/-1"}}><label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3}}>DESCRIPCIÓN</label>
+                      <input style={S.input} value={editBonoForm.descripcion||""} onChange={e=>setEditBonoForm(p=>({...p,descripcion:e.target.value}))}/>
+                    </div>
+                    <div style={{gridColumn:"1/-1"}}><label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3}}>OBSERVACIONES</label>
+                      <input style={S.input} value={editBonoForm.obs||""} onChange={e=>setEditBonoForm(p=>({...p,obs:e.target.value}))}/>
+                    </div>
+                  </div>
+                  {/* Editar montos individuales */}
+                  <div style={{fontSize:11,color:"#6aaa7a",marginBottom:6}}>Montos por participante (recalculados automáticamente al cambiar valor mercado):</div>
+                  {(editBonoForm.participantes||[]).map((p,i)=>(
+                    <div key={i} style={{display:"flex",gap:8,alignItems:"center",marginBottom:5,flexWrap:"wrap"}}>
+                      <span style={{fontSize:12,width:120,flexShrink:0,color:p.rol==="Ejecutor"?"#4ade80":p.rol==="Ayudante"?"#60a5fa":"#fbbf24"}}>{p.rol}: {p.nombre}</span>
+                      <input type="number" min={0} style={{...S.input,width:110,fontSize:12,padding:"4px 8px"}} value={p.monto||0}
+                        onChange={e=>setEditBonoForm(prev=>({...prev,participantes:prev.participantes.map((x,j)=>j===i?{...x,monto:Number(e.target.value)}:x)}))}/>
+                      <span style={{fontSize:11,color:"#5a8a6a"}}>${Number(p.monto||0).toLocaleString("es-CL")}</span>
+                    </div>
+                  ))}
+                  <div style={{display:"flex",gap:8,marginTop:10}}>
+                    <button className="btn-p" style={S.btn} onClick={()=>{
+                      setBonosMasivos(p=>(Array.isArray(p)?p:Object.values(p||{})).map(b=>b.id===editBonoId?editBonoForm:b));
+                      setEditBonoId(null);setEditBonoForm(null);
+                    }}>✓ Guardar</button>
+                    <button className="btn-g" style={S.btn} onClick={()=>{setEditBonoId(null);setEditBonoForm(null);}}>Cancelar</button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -8284,6 +8601,7 @@ export default function App() {
                 <p style={{color:"#6aaa7a",fontSize:14}}>{personal.length} trabajador{personal.length!==1?"es":""} registrado{personal.length!==1?"s":""}</p>
               </div>
               <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                <button style={{...S.btn,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}} onClick={()=>setPersonalVista("informe-rrhh")}>📄 Informe RRHH</button>
                 <button style={{...S.btn,background:"rgba(196,181,253,0.15)",color:"#c4b5fd",border:"1px solid rgba(196,181,253,0.3)"}} onClick={()=>setPersonalVista("bono-masivo")}>💰 Bono por Tarea</button>
                 <button className="btn-p" style={S.btn} onClick={()=>setPersonalVista("nuevo")}>➕ Nuevo Trabajador</button>
               </div>
@@ -8320,6 +8638,10 @@ export default function App() {
               })}
             </div>
           </div>
+        )}
+
+        {vista==="personal"&&personalVista==="informe-rrhh"&&(
+          <InformeRRHH S={S} personal={personal} bonosMasivos={bonosMasivos} onVolver={()=>setPersonalVista("lista")}/>
         )}
 
         {vista==="personal"&&personalVista==="bono-masivo"&&(
