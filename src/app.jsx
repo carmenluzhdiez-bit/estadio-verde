@@ -6881,7 +6881,6 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
 
   const listaPersonal = [...personal].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
 
-  // Cálculo en tiempo real
   const fondoTotal  = Math.round(Number(form.valorMercado||0) * pctFondo / 100);
   const montoEjec   = Math.round(fondoTotal * pctEjecutor / 100);
   const montoAyud   = Math.round(fondoTotal * pctAyudante / 100);
@@ -6889,32 +6888,112 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
   const montoApoyo  = nApoyos>0 ? Math.round((fondoTotal * pctApoyo / 100) / nApoyos) : 0;
   const totalDistr  = montoEjec + montoAyud + (montoApoyo * nApoyos);
 
+  const imprimirBono = (bono) => {
+    const fechaHoy = new Date().toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"});
+    const fechaBono = bono.fecha ? new Date(bono.fecha+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"}) : bono.fecha;
+    const filas = (bono.participantes||[]).map(p=>`
+      <tr>
+        <td style="padding:8px 12px;border:1px solid #e0e0e0">${p.nombre}</td>
+        <td style="padding:8px 12px;border:1px solid #e0e0e0;text-align:center">
+          <span style="background:${p.rol==="Ejecutor"?"#e8f5e9":p.rol==="Ayudante"?"#e3f2fd":"#fff8e1"};padding:3px 10px;border-radius:10px;font-size:12px;color:${p.rol==="Ejecutor"?"#2e7d32":p.rol==="Ayudante"?"#1565c0":"#f57f17"}">${p.rol}</span>
+        </td>
+        <td style="padding:8px 12px;border:1px solid #e0e0e0;text-align:right">${p.pct}%</td>
+        <td style="padding:8px 12px;border:1px solid #e0e0e0;text-align:right;font-weight:700;font-size:15px">$${Number(p.monto).toLocaleString("es-CL")}</td>
+        <td style="padding:8px 12px;border:1px solid #e0e0e0;text-align:center">____________</td>
+      </tr>`).join("");
+
+    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+    <title>Bono Tarea — ${bono.descripcion}</title>
+    <style>
+      body{font-family:Arial,sans-serif;margin:30px;color:#1a1a1a;font-size:13px}
+      h1{font-size:18px;color:#1a5c2a;margin:0 0 4px}
+      h2{font-size:13px;color:#444;margin:0 0 2px;font-weight:normal}
+      .hdr{display:flex;justify-content:space-between;border-bottom:2px solid #1a5c2a;padding-bottom:12px;margin-bottom:18px}
+      .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:18px}
+      .box{background:#f8f9fa;border:1px solid #ddd;border-radius:5px;padding:10px 12px}
+      .lbl{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+      .val{font-size:15px;font-weight:700;color:#1a5c2a}
+      table{width:100%;border-collapse:collapse;margin-bottom:20px}
+      th{background:#1a5c2a;color:#fff;padding:8px 12px;font-size:12px;text-align:left}
+      tr:nth-child(even){background:#fafafa}
+      .firmas{display:flex;justify-content:space-between;margin-top:50px}
+      .firma{text-align:center;width:30%}
+      .flinea{border-top:1px solid #333;padding-top:6px;margin-top:40px;font-size:11px}
+      .footer{margin-top:20px;padding-top:8px;border-top:1px solid #ccc;font-size:10px;color:#888;text-align:center}
+      @media print{.noprint{display:none}}
+    </style></head><body>
+    <div class="hdr">
+      <div>
+        <h1>Informe de Bono por Tarea Especial</h1>
+        <h2>Departamento de Áreas Verdes · Estadio Español de Las Condes</h2>
+        <h2>Dirigido a: Recursos Humanos / Remuneraciones</h2>
+      </div>
+      <div style="text-align:right;font-size:12px;color:#555">
+        <div>Fecha tarea: <strong>${fechaBono}</strong></div>
+        <div>Emisión: <strong>${fechaHoy}</strong></div>
+      </div>
+    </div>
+    <div style="margin-bottom:16px">
+      <div style="font-size:16px;font-weight:700;color:#1a5c2a;margin-bottom:4px">📋 ${bono.descripcion}</div>
+      ${bono.obs?`<div style="font-size:12px;color:#666;font-style:italic">${bono.obs}</div>`:""}
+    </div>
+    <div class="grid">
+      <div class="box"><div class="lbl">Valor mercado tarea</div><div class="val">$${Number(bono.valorMercado).toLocaleString("es-CL")}</div></div>
+      <div class="box"><div class="lbl">Fondo a distribuir (${pctFondo}%)</div><div class="val" style="color:#c62828">$${Number(bono.fondoTotal).toLocaleString("es-CL")}</div></div>
+      <div class="box"><div class="lbl">N° participantes</div><div class="val">${(bono.participantes||[]).length} personas</div></div>
+    </div>
+    <table>
+      <thead><tr><th>Trabajador</th><th style="text-align:center">Rol</th><th style="text-align:right">% asignado</th><th style="text-align:right">Monto bono</th><th style="text-align:center">Firma recepción</th></tr></thead>
+      <tbody>${filas}</tbody>
+      <tfoot>
+        <tr style="background:#e8f5e9;font-weight:bold">
+          <td colspan="3" style="padding:8px 12px;border:1px solid #e0e0e0;text-align:right">TOTAL A PAGAR</td>
+          <td style="padding:8px 12px;border:1px solid #e0e0e0;text-align:right;font-size:16px;color:#c62828">$${(bono.participantes||[]).reduce((a,p)=>a+Number(p.monto),0).toLocaleString("es-CL")}</td>
+          <td style="padding:8px 12px;border:1px solid #e0e0e0"></td>
+        </tr>
+      </tfoot>
+    </table>
+    <div class="firmas">
+      <div class="firma"><div class="flinea"><strong>Carmen Luz Hermosilla Diez</strong><br>Jefe Dpto. de Áreas Verdes</div></div>
+      <div class="firma"><div class="flinea">Recursos Humanos / Remuneraciones<br>Estadio Español de Las Condes</div></div>
+      <div class="firma"><div class="flinea">VB° Gerencia General<br>Estadio Español de Las Condes</div></div>
+    </div>
+    <div class="footer">
+      Estadio Español de Las Condes · Departamento de Áreas Verdes<br>
+      Jefe de Departamento de Áreas Verdes · Carmen Luz Hermosilla Diez · ${fechaHoy}
+    </div>
+    <div class="noprint" style="text-align:center;margin-top:20px">
+      <button onclick="window.print()" style="background:#1a5c2a;color:#fff;border:none;padding:10px 28px;border-radius:7px;font-size:13px;cursor:pointer">🖨️ Imprimir / Guardar PDF</button>
+    </div>
+    </body></html>`;
+    const w=window.open("","_blank"); w.document.write(html); w.document.close();
+  };
+
   const guardar = () => {
     if(!form.descripcion.trim()||!form.valorMercado||!form.ejecutor) return;
     const apoyosValidos = form.apoyos.filter(a=>a);
+    const participantes = [
+      {trabajadorId:String(form.ejecutor), nombre:personal.find(p=>String(p.id)===String(form.ejecutor))?.nombre||"", rol:"Ejecutor", pct:pctEjecutor, monto:montoEjec},
+      ...(form.ayudante?[{trabajadorId:String(form.ayudante), nombre:personal.find(p=>String(p.id)===String(form.ayudante))?.nombre||"", rol:"Ayudante", pct:pctAyudante, monto:montoAyud}]:[]),
+      ...apoyosValidos.map(id=>({trabajadorId:String(id), nombre:personal.find(p=>String(p.id)===String(id))?.nombre||"", rol:"Apoyo", pct:pctApoyo, monto:montoApoyo})),
+    ];
     const nuevoBono = {
-      id: Date.now(), fecha:form.fecha, descripcion:form.descripcion,
+      id:Date.now(), fecha:form.fecha, descripcion:form.descripcion,
       valorMercado:Number(form.valorMercado), fondoTotal, obs:form.obs,
-      estado:"generado",
-      participantes:[
-        {trabajadorId:form.ejecutor, nombre:personal.find(p=>p.id===form.ejecutor)?.nombre||"", rol:"Ejecutor", pct:pctEjecutor, monto:montoEjec},
-        ...(form.ayudante?[{trabajadorId:form.ayudante, nombre:personal.find(p=>p.id===form.ayudante)?.nombre||"", rol:"Ayudante", pct:pctAyudante, monto:montoAyud}]:[]),
-        ...apoyosValidos.map(id=>({trabajadorId:id, nombre:personal.find(p=>p.id===id)?.nombre||"", rol:"Apoyo", pct:pctApoyo, monto:montoApoyo})),
-      ]
+      estado:"generado", participantes,
     };
-    // Registrar bono masivo
-    setBonosMasivos(p=>[nuevoBono,...(p||[])]);
-    // Agregar bono individual a cada trabajador
-    const ahora = new Date().toISOString().slice(0,10);
-    setPersonal(p=>p.map(t=>{
-      const partic = nuevoBono.participantes.find(x=>x.trabajadorId===t.id);
+    setBonosMasivos(p=>[nuevoBono,...(Array.isArray(p)?p:[])]);
+    // Agregar bono en ficha de cada trabajador
+    setPersonal(p=>(Array.isArray(p)?p:[]).map(t=>{
+      const partic = participantes.find(x=>String(x.trabajadorId)===String(t.id));
       if(!partic) return t;
-      return {...t, eventos:[...(t.eventos||[]),{
+      const nuevaEntrada = {
         id:Date.now()+Math.random(), tipo:"bonoConstruccion",
         fecha:form.fecha, estado:"pendiente",
         descripcion:`${partic.rol} — ${form.descripcion}`,
         valor:String(partic.monto), horas:"",
-      }]};
+      };
+      return {...t, eventos:[...(t.eventos||[]),nuevaEntrada]};
     }));
     setForm({fecha:hoy,descripcion:"",valorMercado:"",ejecutor:"",ayudante:"",apoyos:[],obs:""});
     setShowForm(false);
@@ -7066,10 +7145,13 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
                   <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,marginBottom:3}}>{bono.descripcion}</div>
                   <div style={{fontSize:12,color:"#6aaa7a"}}>📅 {bono.fecha}</div>
                 </div>
-                <div style={{textAlign:"right"}}>
-                  <div style={{fontSize:11,color:"#7a6a9a"}}>Valor mercado</div>
-                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700}}>${Number(bono.valorMercado).toLocaleString("es-CL")}</div>
-                  <div style={{fontSize:11,color:"#c4b5fd"}}>Fondo: ${Number(bono.fondoTotal).toLocaleString("es-CL")}</div>
+                <div style={{display:"flex",gap:8,alignItems:"start",flexWrap:"wrap"}}>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:11,color:"#7a6a9a"}}>Valor mercado</div>
+                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700}}>${Number(bono.valorMercado).toLocaleString("es-CL")}</div>
+                    <div style={{fontSize:11,color:"#c4b5fd"}}>Fondo: ${Number(bono.fondoTotal).toLocaleString("es-CL")}</div>
+                  </div>
+                  <button style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}} onClick={()=>imprimirBono(bono)}>🖨️ Informe RRHH</button>
                 </div>
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:5}}>
