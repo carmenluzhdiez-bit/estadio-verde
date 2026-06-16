@@ -7000,84 +7000,82 @@ function TareaPlantacion({ modo, zona, zonaId, bodegasData, setBodegasData, tare
 
 // ─── INFORME MENSUAL RRHH ─────────────────────────────────────────────────────
 // ─── INFORME MENSUAL RRHH ────────────────────────────────────────────────────
-function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, onVolver }) {
+// ─── INFORME MENSUAL RRHH ────────────────────────────────────────────────────
+function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, rendicionesRRHH, setRendicionesRRHH, onVolver }) {
   const hoy = new Date();
   const fechaHoyStr = hoy.toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"});
   const mesRendicion = hoy.toLocaleDateString("es-CL",{month:"long",year:"numeric"});
   const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
   const bonosArr = Array.isArray(bonosMasivos)?bonosMasivos:Object.values(bonosMasivos||{});
+  const rendArr = Array.isArray(rendicionesRRHH)?rendicionesRRHH:Object.values(rendicionesRRHH||{});
 
-  // Bonos masivos pendientes de rendición
-  const bonosPendientes = bonosArr.filter(b=>b.estado!=="rendido");
-
-  // Selección de bonos a incluir en este informe
+  const [vista, setVista] = React.useState("nueva"); // "nueva" | "historial"
   const [selBonos, setSelBonos] = React.useState({});
-  // Eventos individuales pendientes por trabajador (horas extra, permisos)
   const [selEventos, setSelEventos] = React.useState({});
+  const [confirmado, setConfirmado] = React.useState(false);
 
-  // Al montar, pre-seleccionar todos los bonos pendientes
-  React.useEffect(()=>{
-    const ini = {};
-    bonosPendientes.forEach(b=>{ ini[b.id]=true; });
-    setSelBonos(ini);
-  },[bonosMasivos]);
-
-  // Construir vista previa por trabajador
+  const bonosPendientes = bonosArr.filter(b=>b.estado!=="rendido");
   const trabajadoresCon = personalArr.map(t=>{
-    const bonosT = bonosPendientes.filter(b=>(b.participantes||[]).some(p=>String(p.trabajadorId)===String(t.id)));
     const eventosT = (t.eventos||[]).filter(e=>
       ["bonoConstruccion","bonoPesado","bonoEspecializado","horaExtra","permiso","vacaciones","licencia"].includes(e.tipo) &&
       e.estado!=="rendido"
     );
-    if(!bonosT.length&&!eventosT.length) return null;
-    return {t, bonosT, eventosT};
+    if(!bonosPendientes.some(b=>(b.participantes||[]).some(p=>String(p.trabajadorId)===String(t.id)))&&!eventosT.length) return null;
+    return {t, eventosT};
   }).filter(Boolean);
 
-  const generarInforme = () => {
-    const bonosSeleccionados = bonosPendientes.filter(b=>selBonos[b.id]);
-    const eventosSeleccionados = selEventos; // {trabajadorId_eventoId: true}
+  React.useEffect(()=>{
+    const ini={};
+    bonosPendientes.forEach(b=>{ini[b.id]=true;});
+    setSelBonos(ini);
+  },[bonosMasivos]);
 
-    const paginas = trabajadoresCon.map(({t, bonosT, eventosT})=>{
-      const bonosTSel = bonosT.filter(b=>selBonos[b.id]);
-      const eventosTSel = eventosT.filter(e=>selEventos[`${t.id}_${e.id}`]);
-      if(!bonosTSel.length&&!eventosTSel.length) return "";
+  // Construir HTML del informe
+  const construirHTML = (titulo) => {
+    const bonosSel = bonosPendientes.filter(b=>selBonos[b.id]);
+    const fechaHoy2 = new Date().toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"});
 
-      const totalBonos = bonosTSel.reduce((a,b)=>{
+    const paginas = personalArr.map(t=>{
+      const bonosT = bonosSel.filter(b=>(b.participantes||[]).some(p=>String(p.trabajadorId)===String(t.id)));
+      const eventosT = (t.eventos||[]).filter(e=>selEventos[`${t.id}_${e.id}`]);
+      if(!bonosT.length&&!eventosT.length) return "";
+
+      const totalBonos = bonosT.reduce((a,b)=>{
         const p=b.participantes?.find(p=>String(p.trabajadorId)===String(t.id));
         return a+Number(p?.monto||0);
-      },0) + eventosTSel.filter(e=>["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)).reduce((a,e)=>a+Number(e.valor||0),0);
+      },0) + eventosT.filter(e=>["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)).reduce((a,e)=>a+Number(e.valor||0),0);
+      const totalHE = eventosT.filter(e=>e.tipo==="horaExtra"&&e.estado==="aprobado").reduce((a,e)=>a+Number(e.horas||0),0);
 
-      const totalHE = eventosTSel.filter(e=>e.tipo==="horaExtra"&&e.estado==="aprobado").reduce((a,e)=>a+Number(e.horas||0),0);
-
-      const filasBonosMasivos = bonosTSel.map(b=>{
+      const filasBonosMasivos = bonosT.map(b=>{
         const p=b.participantes?.find(p=>String(p.trabajadorId)===String(t.id));
+        const nombre = p?.nombre&&p.nombre!=="—"?p.nombre:personalArr.find(x=>String(x.id)===String(p?.trabajadorId))?.nombre||p?.nombre||"—";
         return `<tr style="background:#f9f0ff">
           <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${b.fecha}</td>
           <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${p?.rol||""} — ${b.descripcion}</td>
           <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px;text-align:right;font-weight:700;color:#7b1fa2">$${Number(p?.monto||0).toLocaleString("es-CL")}</td>
         </tr>`;}).join("");
 
-      const filasBonosInd = eventosTSel.filter(e=>["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)).map(e=>`
+      const filasBonosInd = eventosT.filter(e=>["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)).map(e=>`
         <tr><td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${e.fecha}</td>
         <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${e.descripcion||"Bono"}</td>
         <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px;text-align:right;font-weight:700;color:#7b1fa2">${e.valor?`$${Number(e.valor).toLocaleString("es-CL")}`:"—"}</td></tr>`).join("");
 
-      const filasHE = eventosTSel.filter(e=>e.tipo==="horaExtra").map(e=>`
+      const filasHE = eventosT.filter(e=>e.tipo==="horaExtra").map(e=>`
         <tr><td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${e.fecha}</td>
         <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${e.descripcion||"Hora extra"}</td>
         <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px;text-align:right;font-weight:700">${e.horas||0} hrs</td></tr>`).join("");
 
-      const filasPermisos = eventosTSel.filter(e=>["permiso","vacaciones","licencia"].includes(e.tipo)).map(e=>`
+      const filasPermisos = eventosT.filter(e=>["permiso","vacaciones","licencia"].includes(e.tipo)).map(e=>`
         <tr><td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${e.fecha}${e.fechaFin?` al ${e.fechaFin}`:""}</td>
         <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${e.tipo==="permiso"?"Permiso":e.tipo==="vacaciones"?"Vacaciones":"Licencia"}${e.descripcion?` — ${e.descripcion}`:""}</td>
         <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px;text-align:center">—</td></tr>`).join("");
 
       return `<div class="pagina">
         <div class="hdr">
-          <div><h1>Informe de Personal — Rendición ${mesRendicion}</h1>
+          <div><h1>${titulo||"Informe de Personal"} — ${mesRendicion}</h1>
           <h2>Departamento de Áreas Verdes · Estadio Español de Las Condes</h2>
           <h2>Para: Recursos Humanos / Remuneraciones</h2></div>
-          <div style="text-align:right;font-size:12px;color:#555">Emisión: <strong>${fechaHoyStr}</strong></div>
+          <div style="text-align:right;font-size:12px;color:#555">Emisión: <strong>${fechaHoy2}</strong></div>
         </div>
         <div style="background:#f0f7f0;border:1px solid #a5d6a7;border-radius:8px;padding:14px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
           <div><div style="font-size:18px;font-weight:900">${t.nombre}</div>
@@ -7087,8 +7085,7 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
             ${totalHE>0?`<div style="font-size:11px;color:#888;margin-top:4px">Horas extras</div><div style="font-size:16px;font-weight:700;color:#1565c0">${totalHE} hrs</div>`:""}
           </div>
         </div>
-        ${(filasBonosMasivos||filasBonosInd)?`
-        <div class="sec">💰 Bonos por Tarea</div>
+        ${(filasBonosMasivos||filasBonosInd)?`<div class="sec">💰 Bonos por Tarea</div>
         <table><thead><tr><th>Fecha tarea</th><th>Descripción</th><th style="text-align:right">Monto</th></tr></thead>
         <tbody>${filasBonosMasivos}${filasBonosInd}</tbody>
         <tfoot><tr style="background:#f3e5ff;font-weight:bold"><td colspan="2" style="padding:6px 10px;border:1px solid #e0e0e0;text-align:right">TOTAL BONOS</td>
@@ -7104,23 +7101,18 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
         <div class="firmas">
           <div class="firma"><div class="flinea"><strong>${t.nombre}</strong><br>Firma trabajador</div></div>
           <div class="firma"><div class="flinea"><strong>Carmen Luz Hermosilla Diez</strong><br>Jefe Dpto. Áreas Verdes</div></div>
-          <div class="firma"><div class="flinea">RRHH / Remuneraciones<br>Estadio Español</div></div>
+          <div class="firma"><div class="flinea">VB° Gerencia General<br>Estadio Español</div></div>
         </div>
-        <div class="footer">Estadio Español de Las Condes · Departamento de Áreas Verdes · Jefe de Departamento de Áreas Verdes · Carmen Luz Hermosilla Diez · ${fechaHoyStr}</div>
+        <div class="footer">Estadio Español de Las Condes · Departamento de Áreas Verdes · Jefe de Departamento de Áreas Verdes · Carmen Luz Hermosilla Diez · ${fechaHoy2}</div>
       </div>`;
-    }).filter(Boolean).join("<div class='salto'></div>");
+    }).filter(Boolean);
+    return paginas;
+  };
 
-    if(!paginas) { alert("No hay items seleccionados para incluir en el informe."); return; }
-
-    // Marcar bonos seleccionados como "rendido"
-    setBonosMasivos(prev=>(Array.isArray(prev)?prev:Object.values(prev||{})).map(b=>selBonos[b.id]?{...b,estado:"rendido",fechaRendicion:fechaHoyStr}:b));
-    // Marcar eventos individuales seleccionados como "rendido"
-    setPersonal(prev=>(Array.isArray(prev)?prev:Object.values(prev||{})).map(t=>({
-      ...t, eventos:(t.eventos||[]).map(e=>selEventos[`${t.id}_${e.id}`]?{...e,estado:"rendido"}:e)
-    })));
-
+  const abrirInforme = (paginas, esBorrador) => {
+    if(!paginas.length) { alert("No hay ítems seleccionados."); return; }
     const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-    <title>Informe RRHH ${mesRendicion}</title>
+    <title>${esBorrador?"BORRADOR —":""} Informe RRHH ${mesRendicion}</title>
     <style>body{font-family:Arial,sans-serif;margin:0;color:#1a1a1a;font-size:13px}
     .pagina{padding:28px;max-width:720px;margin:0 auto}
     h1{font-size:17px;color:#1a5c2a;margin:0 0 3px}h2{font-size:12px;color:#444;margin:0;font-weight:normal}
@@ -7133,81 +7125,178 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
     .firma{text-align:center;width:30%}
     .flinea{border-top:1px solid #333;padding-top:6px;margin-top:36px;font-size:11px}
     .footer{margin-top:14px;padding-top:8px;border-top:1px solid #ccc;font-size:10px;color:#888;text-align:center}
+    .borrador{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-size:80px;color:rgba(200,0,0,0.08);font-weight:900;pointer-events:none;z-index:999;white-space:nowrap}
     .salto{page-break-after:always}
     @media print{.noprint{display:none}.salto{border:none}}</style></head><body>
-    ${paginas}
+    ${esBorrador?'<div class="borrador">BORRADOR</div>':""}
+    ${paginas.join("<div class='salto'></div>")}
     <div class="noprint" style="text-align:center;padding:20px;background:#f5f5f5">
       <button onclick="window.print()" style="background:#1a5c2a;color:#fff;border:none;padding:10px 28px;border-radius:7px;font-size:13px;cursor:pointer">🖨️ Imprimir / Guardar PDF</button>
     </div></body></html>`;
     const w=window.open("","_blank"); w.document.write(html); w.document.close();
   };
 
+  const confirmarRendicion = () => {
+    const paginas = construirHTML("Informe Definitivo de Personal");
+    if(!paginas.length) { alert("No hay ítems seleccionados."); return; }
+    const bonosSel = bonosPendientes.filter(b=>selBonos[b.id]);
+    // Guardar rendición en historial
+    const nuevaRendicion = {
+      id: Date.now(),
+      fecha: fechaHoyStr,
+      mes: mesRendicion,
+      bonos: bonosSel.map(b=>({...b})),
+      eventosSeleccionados: {...selEventos},
+      paginas: paginas,
+      totalBonos: bonosSel.reduce((a,b)=>(b.participantes||[]).reduce((c,p)=>c+Number(p.monto||0),a),0),
+    };
+    setRendicionesRRHH(p=>[nuevaRendicion,...(Array.isArray(p)?p:Object.values(p||{}))]);
+    // Marcar bonos como rendidos
+    setBonosMasivos(p=>(Array.isArray(p)?p:Object.values(p||{})).map(b=>selBonos[b.id]?{...b,estado:"rendido",fechaRendicion:fechaHoyStr}:b));
+    // Marcar eventos individuales como rendidos
+    setPersonal(p=>(Array.isArray(p)?p:Object.values(p||{})).map(t=>({
+      ...t, eventos:(t.eventos||[]).map(e=>selEventos[`${t.id}_${e.id}`]?{...e,estado:"rendido"}:e)
+    })));
+    // Abrir informe definitivo
+    abrirInforme(paginas, false);
+    setConfirmado(true);
+  };
+
+  // Vista historial de rendiciones anteriores
+  if(vista==="historial") return (
+    <div className="ein">
+      <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:20,flexWrap:"wrap"}}>
+        <button className="btn-g" style={S.btn} onClick={()=>setVista("nueva")}>← Nueva rendición</button>
+        <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:900,flex:1}}>📚 Historial de Rendiciones RRHH</h1>
+      </div>
+      {rendArr.length===0?(
+        <div style={{...S.card,padding:40,textAlign:"center",color:"#4a8a5a"}}>
+          <div style={{fontSize:36,marginBottom:8}}>📄</div>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:16}}>Sin rendiciones anteriores</div>
+        </div>
+      ):(
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {rendArr.map(r=>(
+            <div key={r.id} style={{...S.card,padding:16}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:8}}>
+                <div>
+                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700}}>{r.mes}</div>
+                  <div style={{fontSize:12,color:"#6aaa7a"}}>📅 Generada: {r.fecha}</div>
+                  <div style={{fontSize:12,color:"#7a6a9a",marginTop:3}}>{(r.bonos||[]).length} bono{(r.bonos||[]).length!==1?"s":""} incluido{(r.bonos||[]).length!==1?"s":""}</div>
+                </div>
+                <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:11,color:"#7a6a9a"}}>Total bonos</div>
+                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#c4b5fd"}}>${Number(r.totalBonos||0).toLocaleString("es-CL")}</div>
+                  </div>
+                  <button style={{...S.btn,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)",fontSize:12}}
+                    onClick={()=>abrirInforme(r.paginas||[], false)}>
+                    🖨️ Reimprimir
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  // Vista nueva rendición
   return (
     <div className="ein">
       <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:20,flexWrap:"wrap"}}>
         <button className="btn-g" style={S.btn} onClick={onVolver}>← Volver</button>
-        <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:900,flex:1}}>📄 Informe RRHH — {mesRendicion}</h1>
-        <button className="btn-p" style={{...S.btn,padding:"10px 20px"}} onClick={generarInforme}>🖨️ Generar e imprimir</button>
+        <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:900,flex:1}}>📄 Informe RRHH — {mesRendicion}</h1>
+        <button style={{...S.btn,fontSize:12,background:"rgba(255,255,255,0.06)",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)"}} onClick={()=>setVista("historial")}>📚 Ver historial</button>
       </div>
 
-      <div style={{...S.card,padding:14,marginBottom:14,background:"rgba(196,181,253,0.06)",borderColor:"rgba(196,181,253,0.2)"}}>
-        <div style={{fontSize:12,color:"#c4b5fd",marginBottom:4,fontWeight:600}}>💡 Selecciona qué incluir en este informe</div>
-        <div style={{fontSize:11,color:"#7a6a9a"}}>Los ítems seleccionados quedarán como "Rendido" y no aparecerán en la próxima rendición. Los no seleccionados siguen pendientes.</div>
-      </div>
-
-      {/* Bonos masivos pendientes */}
-      {bonosPendientes.length>0&&(
-        <div style={{marginBottom:16}}>
-          <div style={{fontSize:13,fontWeight:700,color:"#c4b5fd",marginBottom:8}}>💰 Bonos por Tarea pendientes</div>
-          <div style={{display:"flex",flexDirection:"column",gap:6}}>
-            {bonosPendientes.map(b=>(
-              <div key={b.id} style={{...S.card,padding:"10px 14px",display:"flex",alignItems:"center",gap:10,cursor:"pointer",borderColor:selBonos[b.id]?"rgba(196,181,253,0.4)":"rgba(255,255,255,0.08)"}}
-                onClick={()=>setSelBonos(p=>({...p,[b.id]:!p[b.id]}))}>
-                <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${selBonos[b.id]?"#c4b5fd":"rgba(255,255,255,0.2)"}`,background:selBonos[b.id]?"#c4b5fd":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                  {selBonos[b.id]&&<span style={{color:"#1a1a1a",fontSize:11,fontWeight:700}}>✓</span>}
-                </div>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:13,fontWeight:600}}>{b.descripcion}</div>
-                  <div style={{fontSize:11,color:"#7a6a9a"}}>📅 Fecha tarea: {b.fecha} · {(b.participantes||[]).length} participantes · Fondo: ${Number(b.fondoTotal||0).toLocaleString("es-CL")}</div>
-                </div>
-                <div style={{fontSize:12,color:"#c4b5fd",fontWeight:700}}>${(b.participantes||[]).reduce((a,p)=>a+Number(p.monto||0),0).toLocaleString("es-CL")}</div>
-              </div>
-            ))}
+      {confirmado?(
+        <div style={{...S.card,padding:40,textAlign:"center",background:"rgba(34,197,94,0.06)",borderColor:"rgba(34,197,94,0.2)"}}>
+          <div style={{fontSize:48,marginBottom:12}}>✅</div>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,color:"#86efac",marginBottom:8}}>Rendición confirmada</div>
+          <div style={{fontSize:13,color:"#6aaa7a",marginBottom:20}}>Los ítems fueron marcados como "Rendido" y guardados en el historial.</div>
+          <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
+            <button className="btn-p" style={S.btn} onClick={()=>{setConfirmado(false);setSelBonos({});setSelEventos({});}}>➕ Nueva rendición</button>
+            <button style={{...S.btn,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}} onClick={()=>setVista("historial")}>📚 Ver historial</button>
           </div>
         </div>
-      )}
-
-      {/* Eventos por trabajador */}
-      {trabajadoresCon.map(({t, eventosT})=>{
-        const evSel = eventosT.filter(e=>selEventos[`${t.id}_${e.id}`]);
-        return (
-          <div key={t.id} style={{...S.card,padding:14,marginBottom:10}}>
-            <div style={{fontWeight:700,fontSize:14,marginBottom:8}}>{t.nombre} <span style={{fontSize:11,color:"#6aaa7a",fontWeight:400}}>{t.cargo}</span></div>
-            {eventosT.map(e=>(
-              <div key={e.id} style={{display:"flex",alignItems:"center",gap:10,padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,0.05)",cursor:"pointer"}}
-                onClick={()=>setSelEventos(p=>({...p,[`${t.id}_${e.id}`]:!p[`${t.id}_${e.id}`]}))}>
-                <div style={{width:16,height:16,borderRadius:3,border:`2px solid ${selEventos[`${t.id}_${e.id}`]?"#86efac":"rgba(255,255,255,0.2)"}`,background:selEventos[`${t.id}_${e.id}`]?"#86efac":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                  {selEventos[`${t.id}_${e.id}`]&&<span style={{color:"#000",fontSize:10,fontWeight:700}}>✓</span>}
-                </div>
-                <div style={{flex:1,fontSize:12}}>
-                  <span style={{color:"#a0d8b0"}}>{e.tipo==="horaExtra"?"⏰":e.tipo==="permiso"?"📋":e.tipo==="vacaciones"?"🏖️":e.tipo==="licencia"?"🏥":"💰"}</span>
-                  {" "}{e.descripcion||e.tipo} · {e.fecha}{e.fechaFin?` → ${e.fechaFin}`:""}
-                </div>
-                <div style={{fontSize:12,color:"#7aaa80",flexShrink:0}}>
-                  {e.valor?`$${Number(e.valor).toLocaleString("es-CL")}`:e.horas?`${e.horas}h`:""}
-                </div>
-              </div>
-            ))}
-            {eventosT.length===0&&<div style={{fontSize:12,color:"#4a6a54"}}>Sin eventos pendientes</div>}
+      ):(
+        <>
+          <div style={{...S.card,padding:14,marginBottom:14,background:"rgba(196,181,253,0.06)",borderColor:"rgba(196,181,253,0.2)"}}>
+            <div style={{fontSize:12,color:"#c4b5fd",marginBottom:4,fontWeight:600}}>📋 Flujo de rendición</div>
+            <div style={{fontSize:11,color:"#7a6a9a",lineHeight:1.6}}>
+              1. Selecciona los ítems a incluir → <strong style={{color:"#fbbf24"}}>🖨️ Imprimir borrador</strong> (no marca nada)<br/>
+              2. GG revisa y aprueba el borrador impreso<br/>
+              3. Vuelves aquí → <strong style={{color:"#86efac"}}>✓ Confirmar rendición</strong> → marca como rendido y guarda en historial
+            </div>
           </div>
-        );
-      })}
 
-      {bonosPendientes.length===0&&trabajadoresCon.length===0&&(
-        <div style={{...S.card,padding:40,textAlign:"center",color:"#4a8a5a"}}>
-          <div style={{fontSize:36,marginBottom:8}}>✅</div>
-          <div style={{fontFamily:"'Playfair Display',serif",fontSize:16}}>Todo al día — sin ítems pendientes de rendición</div>
-        </div>
+          {/* Bonos masivos pendientes */}
+          {bonosPendientes.length>0&&(
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#c4b5fd",marginBottom:8}}>💰 Bonos por Tarea pendientes</div>
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                {bonosPendientes.map(b=>(
+                  <div key={b.id} style={{...S.card,padding:"10px 14px",display:"flex",alignItems:"center",gap:10,cursor:"pointer",borderColor:selBonos[b.id]?"rgba(196,181,253,0.4)":"rgba(255,255,255,0.08)"}}
+                    onClick={()=>setSelBonos(p=>({...p,[b.id]:!p[b.id]}))}>
+                    <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${selBonos[b.id]?"#c4b5fd":"rgba(255,255,255,0.2)"}`,background:selBonos[b.id]?"#c4b5fd":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                      {selBonos[b.id]&&<span style={{color:"#1a1a1a",fontSize:11,fontWeight:700}}>✓</span>}
+                    </div>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,fontWeight:600}}>{b.descripcion}</div>
+                      <div style={{fontSize:11,color:"#7a6a9a"}}>📅 {b.fecha} · {(b.participantes||[]).length} participantes · Fondo: ${Number(b.fondoTotal||0).toLocaleString("es-CL")}</div>
+                    </div>
+                    <div style={{fontSize:13,color:"#c4b5fd",fontWeight:700,flexShrink:0}}>${(b.participantes||[]).reduce((a,p)=>a+Number(p.monto||0),0).toLocaleString("es-CL")}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Eventos por trabajador */}
+          {trabajadoresCon.map(({t,eventosT})=>(
+            <div key={t.id} style={{...S.card,padding:14,marginBottom:10}}>
+              <div style={{fontWeight:700,fontSize:14,marginBottom:8}}>{t.nombre} <span style={{fontSize:11,color:"#6aaa7a",fontWeight:400}}>{t.cargo}</span></div>
+              {eventosT.length===0&&<div style={{fontSize:12,color:"#4a6a54"}}>Sin eventos pendientes</div>}
+              {eventosT.map(e=>(
+                <div key={e.id} style={{display:"flex",alignItems:"center",gap:10,padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,0.05)",cursor:"pointer"}}
+                  onClick={()=>setSelEventos(p=>({...p,[`${t.id}_${e.id}`]:!p[`${t.id}_${e.id}`]}))}>
+                  <div style={{width:16,height:16,borderRadius:3,border:`2px solid ${selEventos[`${t.id}_${e.id}`]?"#86efac":"rgba(255,255,255,0.2)"}`,background:selEventos[`${t.id}_${e.id}`]?"#86efac":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    {selEventos[`${t.id}_${e.id}`]&&<span style={{color:"#000",fontSize:10,fontWeight:700}}>✓</span>}
+                  </div>
+                  <div style={{flex:1,fontSize:12}}>
+                    <span>{e.tipo==="horaExtra"?"⏰":e.tipo==="permiso"?"📋":e.tipo==="vacaciones"?"🏖️":e.tipo==="licencia"?"🏥":"💰"}</span>
+                    {" "}{e.descripcion||e.tipo} · {e.fecha}{e.fechaFin?` → ${e.fechaFin}`:""}
+                  </div>
+                  <div style={{fontSize:12,color:"#7aaa80",flexShrink:0}}>
+                    {e.valor?`$${Number(e.valor).toLocaleString("es-CL")}`:e.horas?`${e.horas}h`:""}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+
+          {bonosPendientes.length===0&&trabajadoresCon.length===0&&(
+            <div style={{...S.card,padding:40,textAlign:"center",color:"#4a8a5a"}}>
+              <div style={{fontSize:36,marginBottom:8}}>✅</div>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:16}}>Todo al día — sin ítems pendientes</div>
+            </div>
+          )}
+
+          {/* Botones acción */}
+          {(bonosPendientes.length>0||trabajadoresCon.length>0)&&(
+            <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:16,padding:"16px",background:"rgba(255,255,255,0.03)",borderRadius:10,border:"1px solid rgba(255,255,255,0.08)"}}>
+              <button style={{...S.btn,background:"rgba(251,191,36,0.15)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.3)"}}
+                onClick={()=>abrirInforme(construirHTML("BORRADOR — Informe de Personal"), true)}>
+                🖨️ Imprimir borrador
+              </button>
+              <button className="btn-p" style={{...S.btn,padding:"10px 20px"}} onClick={confirmarRendicion}>
+                ✓ Confirmar rendición y generar informe definitivo
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -7687,6 +7776,7 @@ export default function App() {
     pctFondo:50, pctEjecutor:50, pctAyudante:30, pctApoyo:20, año:new Date().getFullYear()
   });
   const [bonosMasivos,   setBonosMasivos,   bonosMasReady] = useFirebaseState("bonos-masivos", []);
+  const [rendicionesRRHH, setRendicionesRRHH] = useFirebaseState("rendiciones-rrhh", []);
 
   const appReady = dataReady && personalReady && progReady;
 
@@ -8762,7 +8852,7 @@ export default function App() {
         )}
 
         {vista==="personal"&&personalVista==="informe-rrhh"&&(
-          <InformeRRHH S={S} personal={personal} bonosMasivos={bonosMasivos} setBonosMasivos={setBonosMasivos} setPersonal={setPersonal} onVolver={()=>setPersonalVista("lista")}/>
+          <InformeRRHH S={S} personal={personal} bonosMasivos={bonosMasivos} setBonosMasivos={setBonosMasivos} setPersonal={setPersonal} rendicionesRRHH={rendicionesRRHH} setRendicionesRRHH={setRendicionesRRHH} onVolver={()=>setPersonalVista("lista")}/>
         )}
 
         {vista==="personal"&&personalVista==="bono-masivo"&&(
