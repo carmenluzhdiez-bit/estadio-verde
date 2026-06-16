@@ -7229,7 +7229,7 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
   const [editBonoForm, setEditBonoForm] = React.useState(null);
   const [form, setForm] = React.useState({
     fecha: hoy, descripcion:"", valorMercado:"",
-    ejecutor:"", ayudante:"", apoyos:[], obs:""
+    ejecutor:"", ejecutorNombre:"", ayudante:"", ayudanteNombre:"", apoyos:[], obs:""
   });
 
   const personalArr = Array.isArray(personal) ? personal : Object.values(personal||{});
@@ -7318,9 +7318,9 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
     if(!form.descripcion.trim()||!form.valorMercado||!form.ejecutor) return;
     const apoyosValidos = form.apoyos.filter(a=>a);
     const participantes = [
-      {trabajadorId:String(form.ejecutor), nombre:getNombre(form.ejecutor), rol:"Ejecutor", pct:pctEjecutor, monto:montoEjec},
-      ...(form.ayudante?[{trabajadorId:String(form.ayudante), nombre:getNombre(form.ayudante), rol:"Ayudante", pct:pctAyudante, monto:montoAyud}]:[]),
-      ...apoyosValidos.map(id=>({trabajadorId:String(id), nombre:getNombre(id), rol:"Apoyo", pct:pctApoyo, monto:montoApoyo})),
+      {trabajadorId:String(form.ejecutor), nombre:form.ejecutorNombre||getNombre(form.ejecutor), rol:"Ejecutor", pct:pctEjecutor, monto:montoEjec},
+      ...(form.ayudante?[{trabajadorId:String(form.ayudante), nombre:form.ayudanteNombre||getNombre(form.ayudante), rol:"Ayudante", pct:pctAyudante, monto:montoAyud}]:[]),
+      ...apoyosValidos.map(id=>({trabajadorId:String(id), nombre:listaPersonal.find(p=>String(p.id)===String(id))?.nombre||getNombre(id), rol:"Apoyo", pct:pctApoyo, monto:montoApoyo})),
     ];
     const nuevoBono = {
       id:Date.now(), fecha:form.fecha, descripcion:form.descripcion,
@@ -7342,7 +7342,7 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
         return {...t, eventos:[...(t.eventos||[]),nuevaEntrada]};
       });
     });
-    setForm({fecha:hoy,descripcion:"",valorMercado:"",ejecutor:"",ayudante:"",apoyos:[],obs:""});
+    setForm({fecha:hoy,descripcion:"",valorMercado:"",ejecutor:"",ejecutorNombre:"",ayudante:"",ayudanteNombre:"",apoyos:[],obs:""});
     setShowForm(false);
   };
 
@@ -7436,18 +7436,26 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
           {/* Asignación de roles */}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
             <div><label style={labelSt}>Ejecutor</label>
-              <select style={S.input} value={form.ejecutor} onChange={e=>setForm(p=>({...p,ejecutor:String(e.target.value)}))}>
+              <select style={S.input} value={form.ejecutor} onChange={e=>{
+                const id=String(e.target.value);
+                const nombre=listaPersonal.find(p=>String(p.id)===id)?.nombre||"—";
+                setForm(p=>({...p,ejecutor:id,ejecutorNombre:nombre}));
+              }}>
                 <option value="">Seleccionar...</option>
                 {listaPersonal.map(p=><option key={p.id} value={String(p.id)}>{p.nombre}</option>)}
               </select>
-              {form.ejecutor&&<div style={{fontSize:11,color:"#4ade80",marginTop:3}}>✓ {getNombre(form.ejecutor)}</div>}
+              {form.ejecutorNombre&&<div style={{fontSize:11,color:"#4ade80",marginTop:3}}>✓ {form.ejecutorNombre}</div>}
             </div>
             <div><label style={labelSt}>Ayudante</label>
-              <select style={S.input} value={form.ayudante} onChange={e=>setForm(p=>({...p,ayudante:String(e.target.value)}))}>
+              <select style={S.input} value={form.ayudante} onChange={e=>{
+                const id=String(e.target.value);
+                const nombre=listaPersonal.find(p=>String(p.id)===id)?.nombre||"";
+                setForm(p=>({...p,ayudante:id,ayudanteNombre:nombre}));
+              }}>
                 <option value="">Sin ayudante</option>
                 {listaPersonal.filter(p=>String(p.id)!==form.ejecutor).map(p=><option key={p.id} value={String(p.id)}>{p.nombre}</option>)}
               </select>
-              {form.ayudante&&<div style={{fontSize:11,color:"#60a5fa",marginTop:3}}>✓ {getNombre(form.ayudante)}</div>}
+              {form.ayudanteNombre&&<div style={{fontSize:11,color:"#60a5fa",marginTop:3}}>✓ {form.ayudanteNombre}</div>}
             </div>
             <div style={{gridColumn:"1/-1"}}>
               <label style={labelSt}>Apoyos</label>
