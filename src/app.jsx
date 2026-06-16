@@ -5013,6 +5013,7 @@ function BodegaSelector({ items, compra, onConfirm, onCancel, S }) {
   const [asignaciones, setAsignaciones] = React.useState(
     items.map(it=>it.bodegaDestino||"")
   );
+  return (
     <div style={{marginTop:8,background:"rgba(61,122,82,0.08)",borderRadius:10,padding:"12px 14px",border:"1px solid rgba(61,122,82,0.25)"}}>
       <div style={{fontSize:12,color:"#86efac",fontWeight:600,marginBottom:10}}>
         📦 Asignar ítems a bodega — {compra.proveedor}
