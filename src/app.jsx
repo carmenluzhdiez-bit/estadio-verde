@@ -3539,6 +3539,10 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
                 )}
               </div>
               );
+            })}
+          </div>
+        </div>
+      )}
 
       {tab==="bonos"&&(
         <div className="ein">
