@@ -7524,15 +7524,21 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
                 </div>
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:5}}>
-                {(bono.participantes||[]).map((p,i)=>(
+                {(bono.participantes||[]).map((p,i)=>{
+                  // Resolver nombre: primero p.nombre, luego buscar por trabajadorId en personalArr
+                  const nombreMostrar = p.nombre && p.nombre!=="—"
+                    ? p.nombre
+                    : personalArr.find(t=>String(t.id)===String(p.trabajadorId))?.nombre || "";
+                  return (
                   <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 10px",background:"rgba(255,255,255,0.03)",borderRadius:7,border:"1px solid rgba(255,255,255,0.06)"}}>
                     <div style={{display:"flex",gap:8,alignItems:"center"}}>
                       <span style={{fontSize:10,padding:"2px 8px",borderRadius:10,background:p.rol==="Ejecutor"?"rgba(74,222,128,0.12)":p.rol==="Ayudante"?"rgba(96,165,250,0.12)":"rgba(251,191,36,0.12)",color:p.rol==="Ejecutor"?"#4ade80":p.rol==="Ayudante"?"#60a5fa":"#fbbf24",fontWeight:600}}>{p.rol}</span>
-                      <span style={{fontSize:13}}>{p.nombre}</span>
+                      <span style={{fontSize:13,color:nombreMostrar?"#ede9e0":"#ef4444"}}>{nombreMostrar||"⚠️ Sin nombre — usa Editar"}</span>
                     </div>
                     <span style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:p.rol==="Ejecutor"?"#4ade80":p.rol==="Ayudante"?"#60a5fa":"#fbbf24"}}>${Number(p.monto).toLocaleString("es-CL")}</span>
                   </div>
-                ))}
+                  );
+                })}
               </div>
               {bono.obs&&<div style={{fontSize:11,color:"#5a8a6a",marginTop:8,fontStyle:"italic"}}>{bono.obs}</div>}
 
