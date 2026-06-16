@@ -4968,6 +4968,39 @@ const ESTADOS_MOV = {
   ajuste:    {color:"#a78bfa", label:"⚙️ Ajuste inventario"},
 };
 
+// ─── SELECTOR DE BODEGA POR ÍTEM ─────────────────────────────────────────────
+function BodegaSelector({ items, compra, onConfirm, onCancel, S }) {
+  const [asignaciones, setAsignaciones] = React.useState(
+    items.map(it=>it.bodegaDestino||"")
+  );
+  return (
+    <div style={{marginTop:8,background:"rgba(61,122,82,0.08)",borderRadius:10,padding:"12px 14px",border:"1px solid rgba(61,122,82,0.25)"}}>
+      <div style={{fontSize:12,color:"#86efac",fontWeight:600,marginBottom:10}}>
+        📦 Asignar ítems a bodega — {compra.proveedor}
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
+        {items.map((it,i)=>(
+          <div key={it.id||i} style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",background:"rgba(255,255,255,0.03)",borderRadius:7,padding:"7px 10px"}}>
+            <div style={{flex:1,minWidth:120}}>
+              <div style={{fontSize:12,fontWeight:600}}>{it.descripcion||"Sin descripción"}</div>
+              <div style={{fontSize:11,color:"#6aaa7a"}}>{it.cantidad} {it.unidad}</div>
+            </div>
+            <select style={{...S.input,fontSize:11,padding:"5px 8px",minWidth:160,flex:1}}
+              value={asignaciones[i]} onChange={e=>setAsignaciones(p=>{const n=[...p];n[i]=e.target.value;return n;})}>
+              <option value="">🚫 No ingresar (servicio/mano de obra)</option>
+              {BODEGAS_DEF.map(b=><option key={b.id} value={b.id}>{b.icono} {b.nombre}</option>)}
+            </select>
+          </div>
+        ))}
+      </div>
+      <div style={{display:"flex",gap:8}}>
+        <button className="btn-p" style={S.btn} onClick={()=>onConfirm(asignaciones)}>✓ Confirmar</button>
+        <button className="btn-g" style={S.btn} onClick={onCancel}>Cancelar</button>
+      </div>
+    </div>
+  );
+}
+
 function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={}, updateZona=()=>{}, MACROZONAS_BASE=[], bodegasData={}, setBodegasData=()=>{} }) {
   const { compras, rendiciones=[], fondo=3000000, saldoAnterior=0, periodoAnterior="" } = comprasData;
   const set = (patch) => setComprasData(p=>({...p,...patch}));
@@ -5561,15 +5594,21 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
               </div>
               <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,marginBottom:10}}>📅 Gasto mensual</div>
               <div style={{...S.card,padding:18,marginBottom:20}}>
-                <div style={{display:"flex",alignItems:"flex-end",gap:6,height:100,justifyContent:"space-around"}}>
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
                   {porMes.map(m=>{
-                    const h=Math.round((m.total/maxMes)*100);
+                    const pct=Math.round((m.total/maxMes)*100);
                     const esActual=m.key===`${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,"0")}`;
-                    return <div key={m.key} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,flex:1}}>
-                      {m.total>0&&<div style={{fontSize:9,color:"#93c5fd",textAlign:"center"}}>${Math.round(m.total/1000)}k</div>}
-                      <div style={{width:"100%",background:esActual?"rgba(59,130,246,0.4)":"rgba(59,130,246,0.15)",borderRadius:"3px 3px 0 0",height:`${Math.max(h,m.total>0?4:0)}%`,border:esActual?"1px solid rgba(59,130,246,0.5)":"none"}}/>
-                      <div style={{fontSize:9,color:esActual?"#93c5fd":"#5a8a6a",fontWeight:esActual?700:400,textAlign:"center"}}>{m.label.split(" ")[0]}</div>
-                    </div>;
+                    return (
+                      <div key={m.key} style={{display:"flex",alignItems:"center",gap:10}}>
+                        <div style={{fontSize:12,color:esActual?"#93c5fd":"#6aaa7a",fontWeight:esActual?700:400,width:60,flexShrink:0,textAlign:"right"}}>{m.label}</div>
+                        <div style={{flex:1,background:"rgba(255,255,255,0.06)",borderRadius:4,height:22,overflow:"hidden",position:"relative"}}>
+                          <div style={{width:`${Math.max(pct,m.total>0?2:0)}%`,height:"100%",background:esActual?"rgba(59,130,246,0.6)":"rgba(59,130,246,0.25)",borderRadius:4,transition:"width 0.3s"}}/>
+                        </div>
+                        <div style={{fontSize:12,fontWeight:600,color:esActual?"#93c5fd":"#7aaa80",width:90,flexShrink:0,textAlign:"right"}}>
+                          {m.total>0?"$"+m.total.toLocaleString("es-CL"):"—"}
+                        </div>
+                      </div>
+                    );
                   })}
                 </div>
               </div>
@@ -5865,24 +5904,22 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                       </div>
                     </div>
                   {/* Selector bodega inline */}
-                  {selectBodegaId===c.id&&(
-                    <div style={{marginTop:8,background:"rgba(61,122,82,0.08)",borderRadius:8,padding:"10px 12px",border:"1px solid rgba(61,122,82,0.2)"}}>
-                      <div style={{fontSize:11,color:"#86efac",marginBottom:8}}>📦 ¿A qué bodega van los ítems de esta compra?</div>
-                      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                        {BODEGAS_DEF.map(b=>(
-                          <button key={b.id} style={{...S.btn,fontSize:11,padding:"5px 10px",background:`rgba(${b.color==="#4ade80"?"74,222,128":b.color==="#60a5fa"?"96,165,250":b.color==="#f59e0b"?"245,158,11":b.color==="#f97316"?"249,115,22":b.color==="#a78bfa"?"167,139,250":"52,211,153"},0.12)`,color:b.color,border:`1px solid ${b.color}40`}}
-                            onClick={()=>{
-                              const items = c.items||[{descripcion:c.descripcion||"",categoria:"",cantidad:c.cantidad||1,unidad:c.unidad||"unidad"}];
-                              ingresarItemsABodega(c.fecha,`${c.tipoDoc} ${c.nDocumento||""} ${c.proveedor||""}`,items.map(it=>({...it,bodegaDestino:b.id})));
-                              setSelectBodegaId(null);
-                            }}>
-                            {b.icono} {b.nombre}
-                          </button>
-                        ))}
-                        <button className="btn-g" style={{...S.btn,fontSize:11,padding:"5px 10px"}} onClick={()=>setSelectBodegaId(null)}>Cancelar</button>
-                      </div>
-                    </div>
-                  )}
+                  {selectBodegaId===c.id&&(()=>{
+                    const items = c.items||[{id:"i0",descripcion:c.descripcion||"",categoria:"",cantidad:c.cantidad||1,unidad:c.unidad||"unidad"}];
+                    const [bodSel, setBodSel] = [c._bodSel||{}, (v)=>{}]; // placeholder — usamos estado local
+                    return (
+                      <BodegaSelector
+                        key={c.id} items={items} compra={c}
+                        onConfirm={(asignaciones)=>{
+                          const itemsConBodega = items.map((it,i)=>({...it,bodegaDestino:asignaciones[i]||""}));
+                          ingresarItemsABodega(c.fecha,`${c.tipoDoc} ${c.nDocumento||""} ${c.proveedor||""}`,itemsConBodega);
+                          setSelectBodegaId(null);
+                        }}
+                        onCancel={()=>setSelectBodegaId(null)}
+                        S={S}
+                      />
+                    );
+                  })()}
                   </div>
                 );
               })}
