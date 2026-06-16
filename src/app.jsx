@@ -7234,7 +7234,17 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
 
   const personalArr = Array.isArray(personal) ? personal : Object.values(personal||{});
   const listaPersonal = [...personalArr].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
-  const getNombre = (id) => personalArr.find(p=>String(p.id)===String(id))?.nombre||"—";
+  const getNombre = (id) => {
+    if(!id) return "—";
+    return personalArr.find(p=>String(p.id)===String(id))?.nombre || "—";
+  };
+
+  // Para el select de edición: encontrar el ID por nombre si el ID no existe
+  const getIdPorNombre = (nombre) => {
+    if(!nombre) return "";
+    const found = personalArr.find(p=>p.nombre===nombre);
+    return found ? String(found.id) : "";
+  };
 
   const fondoTotal  = Math.round(Number(form.valorMercado||0) * pctFondo / 100);
   const montoEjec   = Math.round(fondoTotal * pctEjecutor / 100);
@@ -7555,23 +7565,30 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
                   </div>
                   {/* Editar participantes y montos */}
                   <div style={{fontSize:11,color:"#6aaa7a",marginBottom:6,fontWeight:600}}>Participantes (puedes cambiar nombre y monto):</div>
-                  {(editBonoForm.participantes||[]).map((p,i)=>(
-                    <div key={i} style={{display:"flex",gap:8,alignItems:"center",marginBottom:6,flexWrap:"wrap",background:"rgba(255,255,255,0.03)",borderRadius:6,padding:"6px 10px"}}>
-                      <span style={{fontSize:11,padding:"2px 8px",borderRadius:10,background:p.rol==="Ejecutor"?"rgba(74,222,128,0.12)":p.rol==="Ayudante"?"rgba(96,165,250,0.12)":"rgba(251,191,36,0.12)",color:p.rol==="Ejecutor"?"#4ade80":p.rol==="Ayudante"?"#60a5fa":"#fbbf24",fontWeight:600,flexShrink:0}}>{p.rol}</span>
-                      <select style={{...S.input,flex:2,fontSize:12,padding:"4px 8px"}} value={p.trabajadorId||""}
+                  {(editBonoForm.participantes||[]).map((p,i)=>{
+                    // Resolver el ID del trabajador — puede venir como trabajadorId o encontrarse por nombre
+                    const tid = p.trabajadorId || getIdPorNombre(p.nombre) || "";
+                    const colorRol = p.rol==="Ejecutor"?"#4ade80":p.rol==="Ayudante"?"#60a5fa":"#fbbf24";
+                    const bgRol = p.rol==="Ejecutor"?"rgba(74,222,128,0.12)":p.rol==="Ayudante"?"rgba(96,165,250,0.12)":"rgba(251,191,36,0.12)";
+                    return (
+                    <div key={i} style={{display:"flex",gap:8,alignItems:"center",marginBottom:6,flexWrap:"wrap",background:"rgba(255,255,255,0.03)",borderRadius:6,padding:"8px 10px"}}>
+                      <span style={{fontSize:11,padding:"2px 8px",borderRadius:10,background:bgRol,color:colorRol,fontWeight:600,flexShrink:0,minWidth:60,textAlign:"center"}}>{p.rol}</span>
+                      <select style={{...S.input,flex:2,fontSize:12,padding:"4px 8px"}} value={tid}
                         onChange={e=>{
                           const nuevoId = String(e.target.value);
-                          const nuevoNombre = getNombre(nuevoId);
+                          const nuevoNombre = personalArr.find(lp=>String(lp.id)===nuevoId)?.nombre||"—";
                           setEditBonoForm(prev=>({...prev,participantes:prev.participantes.map((x,j)=>j===i?{...x,trabajadorId:nuevoId,nombre:nuevoNombre}:x)}));
                         }}>
-                        <option value="">Seleccionar...</option>
+                        <option value="">— Seleccionar trabajador —</option>
                         {listaPersonal.map(lp=><option key={lp.id} value={String(lp.id)}>{lp.nombre}</option>)}
                       </select>
-                      <input type="number" min={0} style={{...S.input,width:100,fontSize:12,padding:"4px 8px"}} value={p.monto||0}
+                      <div style={{fontSize:11,color:colorRol,flexShrink:0,fontWeight:600}}>{p.nombre||"Sin nombre"}</div>
+                      <input type="number" min={0} style={{...S.input,width:90,fontSize:12,padding:"4px 8px"}} value={p.monto||0}
                         onChange={e=>setEditBonoForm(prev=>({...prev,participantes:prev.participantes.map((x,j)=>j===i?{...x,monto:Number(e.target.value)}:x)}))}/>
                       <span style={{fontSize:11,color:"#5a8a6a",flexShrink:0}}>${Number(p.monto||0).toLocaleString("es-CL")}</span>
                     </div>
-                  ))}
+                    );
+                  })}
                   <div style={{display:"flex",gap:8,marginTop:10}}>
                     <button className="btn-p" style={S.btn} onClick={()=>{
                       setBonosMasivos(p=>(Array.isArray(p)?p:Object.values(p||{})).map(b=>b.id===editBonoId?editBonoForm:b));
