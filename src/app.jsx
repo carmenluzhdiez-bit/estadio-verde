@@ -5979,6 +5979,590 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   );
 }
 
+// ─── PANEL BODEGAS ───────────────────────────────────────────────────────────
+function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareasProg, setTareasProg, compras=[] }) {
+  const hoy = new Date().toISOString().slice(0,10);
+  const [bodegaActiva, setBodegaActiva] = React.useState("b01");
+  const [subTab, setSubTab] = React.useState("stock");
+  const [showItemForm, setShowItemForm] = React.useState(false);
+  const [showMovForm, setShowMovForm] = React.useState(false);
+  const [showTareaForm, setShowTareaForm] = React.useState(false);
+  const [showTraslForm, setShowTraslForm] = React.useState(false);
+  const [showInventForm, setShowInventForm] = React.useState(false);
+  const [editItemId, setEditItemId] = React.useState(null);
+  const [inventFecha, setInventFecha] = React.useState(hoy);
+  const [inventItems, setInventItems] = React.useState([{id:1,nombre:"",categoria:"",unidad:"unidad",stockActual:0,stockMinimo:0,ubicacion:""}]);
+
+  const bodega = BODEGAS_DEF.find(b=>b.id===bodegaActiva);
+  const bd = bodegasData[bodegaActiva]||{items:[],movimientos:[],tareas:[],traslados:[]};
+  const setbd = (patch) => setBodegasData(p=>({...p,[bodegaActiva]:{...bd,...patch}}));
+
+  const labelSt = {fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
+  const listaPersonal = [...personal].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+
+  const emptyItem = {nombre:"",categoria:"",descripcion:"",unidad:"unidad",stockActual:0,stockMinimo:0,ubicacion:"",obs:""};
+  const [itemForm, setItemForm] = React.useState(emptyItem);
+  const emptyMov = {fecha:hoy,tipo:"entrada",cantidad:1,unidad:"unidad",motivo:"",responsable:"",proveedor:"",nDoc:"",obs:"",itemId:"",litros:"",horasActuales:""};
+  const [movForm, setMovForm] = React.useState(emptyMov);
+  const emptyTarea = {fecha:hoy,tipo:"",descripcion:"",responsable:"",estado:"pendiente",obs:""};
+  const [tareaForm, setTareaForm] = React.useState(emptyTarea);
+  const emptyTrasl = {fecha:hoy,itemId:"",cantidad:1,destino:"",motivo:"",conRegreso:true,fechaRegreso:"",responsable:"",obs:"",estado:"en_camino"};
+  const [traslForm, setTraslForm] = React.useState(emptyTrasl);
+  const emptyMaq = {marca:"",modelo:"",patente:"",horasUso:0,nivelAceite:"OK",nivelCombustible:"OK",proxMantención:""};
+  const [maqForm, setMaqForm] = React.useState(emptyMaq);
+
+  const guardarInventario = () => {
+    const validos = inventItems.filter(i=>i.nombre.trim());
+    if(!validos.length) return;
+    const nuevosItems = validos.map(i=>({...i,id:Date.now()+Math.random()}));
+    const movimientos = nuevosItems.map(i=>({id:Date.now()+Math.random(),fecha:inventFecha,tipo:"entrada",cantidad:Number(i.stockActual)||0,unidad:i.unidad,motivo:`Inventario inicial — ${inventFecha}`,responsable:"",itemId:String(i.id)}));
+    setbd({items:[...(bd.items||[]),...nuevosItems],movimientos:[...movimientos,...(bd.movimientos||[])].slice(0,200)});
+    setInventItems([{id:1,nombre:"",categoria:"",unidad:"unidad",stockActual:0,stockMinimo:0,ubicacion:""}]);
+    setShowInventForm(false);
+  };
+
+  const guardarItem = () => {
+    if(!itemForm.nombre.trim()) return;
+    const items = editItemId
+      ? (bd.items||[]).map(i=>i.id===editItemId?{...itemForm,id:editItemId,...(bodegaActiva==="b04"?maqForm:{})}:i)
+      : [{...itemForm,id:Date.now(),...(bodegaActiva==="b04"?maqForm:{})}, ...(bd.items||[])];
+    setbd({items});
+    setItemForm(emptyItem); setMaqForm(emptyMaq); setShowItemForm(false); setEditItemId(null);
+  };
+
+  const eliminarItem = (id) => setbd({items:(bd.items||[]).filter(i=>i.id!==id)});
+
+  const guardarMov = () => {
+    if(!movForm.itemId||!movForm.cantidad) return;
+    const cant = Number(movForm.cantidad);
+    const mov = {...movForm,id:Date.now(),cantidad:cant};
+    const items = (bd.items||[]).map(i=>{
+      if(i.id!==movForm.itemId&&String(i.id)!==String(movForm.itemId)) return i;
+      const delta = movForm.tipo==="entrada"||movForm.tipo==="ajuste"?cant:-cant;
+      return {...i,stockActual:Math.max(0,(Number(i.stockActual)||0)+delta)};
+    });
+    setbd({items,movimientos:[mov,...(bd.movimientos||[])].slice(0,200)});
+    setMovForm(emptyMov); setShowMovForm(false);
+  };
+
+  const guardarTarea = () => {
+    if(!tareaForm.tipo) return;
+    const tarea = {...tareaForm,id:Date.now()};
+    setbd({tareas:[tarea,...(bd.tareas||[])].slice(0,100)});
+    if(tareaForm.responsable&&tareaForm.fecha) {
+      setTareasProg(p=>({...p,[tareaForm.fecha]:[...(p[tareaForm.fecha]||[]),{id:Date.now()+1,fecha:tareaForm.fecha,zona:bodega.nombre,elemento:"",tarea:`${bodega.icono} ${tareaForm.tipo}: ${tareaForm.descripcion||bodega.nombre}`,responsable:tareaForm.responsable,estado:"por_designar",notas:tareaForm.obs||"",auto:false}]}));
+    }
+    setTareaForm(emptyTarea); setShowTareaForm(false);
+  };
+
+  const guardarTrasl = () => {
+    if(!traslForm.itemId||!traslForm.destino) return;
+    const cant = Number(traslForm.cantidad);
+    const trasl = {...traslForm,id:Date.now(),cantidad:cant,bodegaOrigen:bodegaActiva};
+    const items = (bd.items||[]).map(i=>String(i.id)===String(traslForm.itemId)?{...i,stockActual:Math.max(0,(Number(i.stockActual)||0)-cant)}:i);
+    setbd({items,traslados:[trasl,...(bd.traslados||[])].slice(0,100)});
+    setTraslForm(emptyTrasl); setShowTraslForm(false);
+  };
+
+  const marcarRegreso = (id) => {
+    const t = (bd.traslados||[]).find(x=>x.id===id);
+    if(!t) return;
+    const items = (bd.items||[]).map(i=>String(i.id)===String(t.itemId)?{...i,stockActual:(Number(i.stockActual)||0)+Number(t.cantidad)}:i);
+    setbd({items,traslados:(bd.traslados||[]).map(x=>x.id===id?{...x,estado:"regresó",fechaRegresoReal:hoy}:x)});
+  };
+
+  const itemsStockBajo = (bd.items||[]).filter(i=>Number(i.stockActual||0)<=Number(i.stockMinimo||0)&&Number(i.stockMinimo||0)>0);
+  const traslPendientes = (bd.traslados||[]).filter(t=>t.conRegreso&&t.estado==="en_camino");
+
+  return (
+    <div className="ein">
+      <div style={{marginBottom:16}}>
+        <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:24,fontWeight:900,marginBottom:4}}>🏪 Bodegas</h1>
+        <p style={{color:"#6aaa7a",fontSize:14}}>Gestión de inventario · Estadio Español</p>
+      </div>
+
+      {/* Selector bodega */}
+      <div style={{display:"flex",gap:8,marginBottom:18,flexWrap:"wrap"}}>
+        {BODEGAS_DEF.map(b=>{
+          const bd2=bodegasData[b.id]||{};
+          const bajo=(bd2.items||[]).some(i=>Number(i.stockActual||0)<=Number(i.stockMinimo||0)&&Number(i.stockMinimo||0)>0);
+          const traslP=(bd2.traslados||[]).some(t=>t.conRegreso&&t.estado==="en_camino");
+          return (
+            <button key={b.id} onClick={()=>{setBodegaActiva(b.id);setSubTab("stock");}}
+              style={{position:"relative",background:bodegaActiva===b.id?`${b.color}22`:"rgba(255,255,255,0.05)",border:`1px solid ${bodegaActiva===b.id?b.color+"60":"rgba(255,255,255,0.1)"}`,borderRadius:10,padding:"8px 14px",color:bodegaActiva===b.id?b.color:"#7aaa80",fontFamily:"'Georgia',serif",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
+              <span style={{fontSize:16}}>{b.icono}</span><span>{b.nombre}</span>
+              {(bajo||traslP)&&<span style={{width:7,height:7,borderRadius:"50%",background:"#ef4444",flexShrink:0}}/>}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Info bodega */}
+      <div style={{...S.card,padding:"12px 16px",marginBottom:16,borderLeft:`3px solid ${bodega.color}`,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+        <div>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700}}>{bodega.icono} {bodega.nombre}</div>
+          <div style={{fontSize:12,color:"#6aaa7a",marginTop:2}}>{bodega.descripcion}</div>
+        </div>
+        <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+          <div style={{textAlign:"center",background:"rgba(255,255,255,0.04)",borderRadius:8,padding:"6px 12px"}}>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color:bodega.color}}>{(bd.items||[]).length}</div>
+            <div style={{fontSize:10,color:"#5a8a6a"}}>ítems</div>
+          </div>
+          {itemsStockBajo.length>0&&<div style={{textAlign:"center",background:"rgba(239,68,68,0.1)",borderRadius:8,padding:"6px 12px",border:"1px solid rgba(239,68,68,0.25)"}}>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color:"#ef4444"}}>{itemsStockBajo.length}</div>
+            <div style={{fontSize:10,color:"#ef4444"}}>stock bajo</div>
+          </div>}
+          {traslPendientes.length>0&&<div style={{textAlign:"center",background:"rgba(245,158,11,0.1)",borderRadius:8,padding:"6px 12px",border:"1px solid rgba(245,158,11,0.25)"}}>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color:"#f59e0b"}}>{traslPendientes.length}</div>
+            <div style={{fontSize:10,color:"#f59e0b"}}>en traslado</div>
+          </div>}
+        </div>
+      </div>
+
+      {/* Sub-tabs */}
+      <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
+        {[["stock","📦 Stock"],["movimientos","🔄 Movimientos"],["traslados","🚛 Traslados"],["tareas","✅ Tareas"],["historial","📜 Historial"]].map(([t,l])=>(
+          <button key={t} className={`tab${subTab===t?" on":""}`} onClick={()=>setSubTab(t)}>{l}</button>
+        ))}
+      </div>
+
+      {/* ── STOCK ── */}
+      {subTab==="stock"&&(
+        <div className="ein">
+          <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+            {esJefa&&<button className="btn-p" style={S.btn} onClick={()=>{setItemForm(emptyItem);setMaqForm(emptyMaq);setEditItemId(null);setShowItemForm(true);setShowInventForm(false);}}>
+              ➕ {bodegaActiva==="b04"?"Nueva máquina":"Nuevo ítem"}
+            </button>}
+            {esJefa&&<button style={{...S.btn,background:"rgba(167,139,250,0.15)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.3)"}} onClick={()=>{setShowInventForm(p=>!p);setShowItemForm(false);setShowMovForm(false);}}>📋 Inventario inicial</button>}
+            {esJefa&&<button style={{...S.btn,background:"rgba(34,197,94,0.12)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)"}} onClick={()=>{setShowMovForm(true);setShowInventForm(false);}}>📥 Movimiento</button>}
+            {esJefa&&<button style={{...S.btn,background:"rgba(245,158,11,0.12)",color:"#fcd34d",border:"1px solid rgba(245,158,11,0.25)"}} onClick={()=>{setShowTraslForm(true);setShowInventForm(false);}}>🚛 Traslado</button>}
+          </div>
+
+          {/* Inventario inicial */}
+          {showInventForm&&(
+            <div style={{...S.card,padding:20,marginBottom:14,background:"rgba(167,139,250,0.05)",borderColor:"rgba(167,139,250,0.25)"}} className="ein">
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#c4b5fd",marginBottom:6}}>📋 Inventario Inicial — {bodega.nombre}</div>
+              <div style={{fontSize:12,color:"#7a6a9a",marginBottom:14}}>Carga el stock real actual con la fecha del inventario.</div>
+              <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:14}}>
+                <div><label style={labelSt}>Fecha inventario</label><input type="date" style={{...S.input,width:160}} value={inventFecha} onChange={e=>setInventFecha(e.target.value)}/></div>
+                <button style={{...S.btn,marginTop:16,background:"rgba(167,139,250,0.15)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.3)",fontSize:12}}
+                  onClick={()=>setInventItems(p=>[...p,{id:Date.now(),nombre:"",categoria:"",unidad:"unidad",stockActual:0,stockMinimo:0,ubicacion:""}])}>+ Agregar fila</button>
+              </div>
+              <div style={{overflowX:"auto"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                  <thead><tr style={{background:"rgba(167,139,250,0.1)"}}>
+                    <th style={{padding:"6px 8px",textAlign:"left",color:"#c4b5fd",fontSize:10}}>NOMBRE</th>
+                    <th style={{padding:"6px 8px",textAlign:"left",color:"#c4b5fd",fontSize:10}}>CATEGORÍA</th>
+                    <th style={{padding:"6px 8px",textAlign:"left",color:"#c4b5fd",fontSize:10}}>UNIDAD</th>
+                    <th style={{padding:"6px 8px",textAlign:"center",color:"#c4b5fd",fontSize:10}}>STOCK</th>
+                    <th style={{padding:"6px 8px",textAlign:"center",color:"#c4b5fd",fontSize:10}}>MÍN.</th>
+                    <th style={{padding:"6px 8px",textAlign:"left",color:"#c4b5fd",fontSize:10}}>UBICACIÓN</th>
+                    <th style={{width:30}}></th>
+                  </tr></thead>
+                  <tbody>
+                    {inventItems.map((item,idx)=>(
+                      <tr key={item.id} style={{borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                        <td style={{padding:"4px 6px"}}><input style={{...S.input,fontSize:12,padding:"5px 8px"}} placeholder="Nombre" value={item.nombre} onChange={e=>setInventItems(p=>p.map((x,i)=>i===idx?{...x,nombre:e.target.value}:x))}/></td>
+                        <td style={{padding:"4px 6px"}}><select style={{...S.input,fontSize:12,padding:"5px 8px"}} value={item.categoria} onChange={e=>setInventItems(p=>p.map((x,i)=>i===idx?{...x,categoria:e.target.value}:x))}>
+                          <option value="">—</option>{bodega.categorias.map(c=><option key={c}>{c}</option>)}</select></td>
+                        <td style={{padding:"4px 6px"}}><select style={{...S.input,fontSize:12,padding:"5px 8px"}} value={item.unidad} onChange={e=>setInventItems(p=>p.map((x,i)=>i===idx?{...x,unidad:e.target.value}:x))}>
+                          {["unidad","kg","L","m","m²","saco","caja","bolsa","par","set"].map(u=><option key={u}>{u}</option>)}</select></td>
+                        <td style={{padding:"4px 6px"}}><input type="number" min={0} style={{...S.input,fontSize:12,padding:"5px 8px",textAlign:"center"}} value={item.stockActual} onChange={e=>setInventItems(p=>p.map((x,i)=>i===idx?{...x,stockActual:Number(e.target.value)}:x))}/></td>
+                        <td style={{padding:"4px 6px"}}><input type="number" min={0} style={{...S.input,fontSize:12,padding:"5px 8px",textAlign:"center"}} value={item.stockMinimo} onChange={e=>setInventItems(p=>p.map((x,i)=>i===idx?{...x,stockMinimo:Number(e.target.value)}:x))}/></td>
+                        <td style={{padding:"4px 6px"}}><input style={{...S.input,fontSize:12,padding:"5px 8px"}} placeholder="ej: Estante A" value={item.ubicacion} onChange={e=>setInventItems(p=>p.map((x,i)=>i===idx?{...x,ubicacion:e.target.value}:x))}/></td>
+                        <td style={{padding:"4px 6px"}}>{inventItems.length>1&&<button className="btn-d" style={{...S.btn,fontSize:10,padding:"3px 6px"}} onClick={()=>setInventItems(p=>p.filter((_,i)=>i!==idx))}>✕</button>}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{display:"flex",gap:8,marginTop:14}}>
+                <button className="btn-p" style={S.btn} onClick={guardarInventario}>✓ Guardar inventario ({inventItems.filter(i=>i.nombre.trim()).length} ítems)</button>
+                <button className="btn-g" style={S.btn} onClick={()=>setShowInventForm(false)}>Cancelar</button>
+              </div>
+            </div>
+          )}
+
+          {/* Nuevo ítem */}
+          {showItemForm&&(
+            <div style={{...S.card,padding:20,marginBottom:14}} className="ein">
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:14,color:bodega.color}}>{editItemId?"✏️ Editar":"➕ Nuevo"} {bodegaActiva==="b04"?"equipo":"ítem"}</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Nombre</label><input style={S.input} value={itemForm.nombre} onChange={e=>setItemForm(p=>({...p,nombre:e.target.value}))} placeholder="Nombre del ítem"/></div>
+                <div><label style={labelSt}>Categoría</label>
+                  <select style={S.input} value={itemForm.categoria} onChange={e=>setItemForm(p=>({...p,categoria:e.target.value}))}>
+                    <option value="">Seleccionar...</option>{bodega.categorias.map(c=><option key={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div><label style={labelSt}>Unidad</label>
+                  <select style={S.input} value={itemForm.unidad} onChange={e=>setItemForm(p=>({...p,unidad:e.target.value}))}>
+                    {["unidad","kg","L","m","m²","saco","caja","bolsa","par","set"].map(u=><option key={u}>{u}</option>)}
+                  </select>
+                </div>
+                <div><label style={labelSt}>Stock actual</label><input type="number" min={0} style={S.input} value={itemForm.stockActual} onChange={e=>setItemForm(p=>({...p,stockActual:Number(e.target.value)}))}/></div>
+                <div><label style={labelSt}>Stock mínimo</label><input type="number" min={0} style={S.input} value={itemForm.stockMinimo} onChange={e=>setItemForm(p=>({...p,stockMinimo:Number(e.target.value)}))}/></div>
+                <div><label style={labelSt}>Ubicación</label><input style={S.input} value={itemForm.ubicacion} onChange={e=>setItemForm(p=>({...p,ubicacion:e.target.value}))} placeholder="ej: Estante A"/></div>
+                <div><label style={labelSt}>Observaciones</label><input style={S.input} value={itemForm.obs} onChange={e=>setItemForm(p=>({...p,obs:e.target.value}))}/></div>
+                {bodegaActiva==="b04"&&(
+                  <div style={{gridColumn:"1/-1",background:"rgba(249,115,22,0.06)",border:"1px solid rgba(249,115,22,0.2)",borderRadius:8,padding:"12px 14px"}}>
+                    <div style={{fontSize:11,color:"#fb923c",marginBottom:8,textTransform:"uppercase"}}>🚜 Datos del equipo</div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                      <div><label style={labelSt}>Marca</label><input style={S.input} value={maqForm.marca} onChange={e=>setMaqForm(p=>({...p,marca:e.target.value}))}/></div>
+                      <div><label style={labelSt}>Modelo</label><input style={S.input} value={maqForm.modelo} onChange={e=>setMaqForm(p=>({...p,modelo:e.target.value}))}/></div>
+                      <div><label style={labelSt}>Patente / N° Serie</label><input style={S.input} value={maqForm.patente} onChange={e=>setMaqForm(p=>({...p,patente:e.target.value}))}/></div>
+                      <div><label style={labelSt}>Horas de uso</label><input type="number" min={0} style={S.input} value={maqForm.horasUso} onChange={e=>setMaqForm(p=>({...p,horasUso:Number(e.target.value)}))}/></div>
+                      <div><label style={labelSt}>Nivel aceite</label>
+                        <select style={S.input} value={maqForm.nivelAceite} onChange={e=>setMaqForm(p=>({...p,nivelAceite:e.target.value}))}>
+                          {["OK","Bajo","Crítico","Recién cambiado"].map(v=><option key={v}>{v}</option>)}
+                        </select>
+                      </div>
+                      <div><label style={labelSt}>Nivel combustible</label>
+                        <select style={S.input} value={maqForm.nivelCombustible} onChange={e=>setMaqForm(p=>({...p,nivelCombustible:e.target.value}))}>
+                          {["Lleno","3/4","1/2","1/4","Vacío"].map(v=><option key={v}>{v}</option>)}
+                        </select>
+                      </div>
+                      <div><label style={labelSt}>Próx. mantención (horas)</label><input type="number" min={0} style={S.input} value={maqForm.proxMantención} onChange={e=>setMaqForm(p=>({...p,proxMantención:e.target.value}))}/></div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button className="btn-p" style={S.btn} onClick={guardarItem}>✓ Guardar</button>
+                <button className="btn-g" style={S.btn} onClick={()=>{setShowItemForm(false);setEditItemId(null);}}>Cancelar</button>
+              </div>
+            </div>
+          )}
+
+          {/* Movimiento */}
+          {showMovForm&&(
+            <div style={{...S.card,padding:16,marginBottom:14,background:"rgba(34,197,94,0.05)",borderColor:"rgba(34,197,94,0.2)"}} className="ein">
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#86efac",marginBottom:12}}>📥 Registrar movimiento</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={movForm.fecha} onChange={e=>setMovForm(p=>({...p,fecha:e.target.value}))}/></div>
+                <div><label style={labelSt}>Tipo</label>
+                  <select style={S.input} value={movForm.tipo} onChange={e=>setMovForm(p=>({...p,tipo:e.target.value}))}>
+                    {Object.entries(ESTADOS_MOV).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
+                  </select>
+                </div>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Ítem</label>
+                  <select style={S.input} value={movForm.itemId} onChange={e=>{const it=(bd.items||[]).find(i=>String(i.id)===e.target.value);setMovForm(p=>({...p,itemId:e.target.value,unidad:it?.unidad||"unidad"}));}}>
+                    <option value="">Seleccionar ítem...</option>
+                    {(bd.items||[]).map(i=><option key={i.id} value={i.id}>{i.nombre} (stock: {i.stockActual} {i.unidad})</option>)}
+                  </select>
+                </div>
+                <div><label style={labelSt}>Cantidad</label><input type="number" min={0.01} step={0.01} style={S.input} value={movForm.cantidad} onChange={e=>setMovForm(p=>({...p,cantidad:e.target.value}))}/></div>
+                <div><label style={labelSt}>Responsable</label>
+                  <select style={S.input} value={movForm.responsable} onChange={e=>setMovForm(p=>({...p,responsable:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                  </select>
+                </div>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Motivo</label><input style={S.input} value={movForm.motivo} onChange={e=>setMovForm(p=>({...p,motivo:e.target.value}))} placeholder="ej: Uso mantenimiento, Compra factura..."/></div>
+                {movForm.tipo==="entrada"&&<>
+                  <div><label style={labelSt}>Proveedor</label><input style={S.input} value={movForm.proveedor} onChange={e=>setMovForm(p=>({...p,proveedor:e.target.value}))}/></div>
+                  <div><label style={labelSt}>N° Documento</label><input style={S.input} value={movForm.nDoc} onChange={e=>setMovForm(p=>({...p,nDoc:e.target.value}))}/></div>
+                </>}
+                {bodegaActiva==="b04"&&movForm.tipo==="salida"&&(
+                  <div style={{gridColumn:"1/-1",background:"rgba(249,115,22,0.06)",borderRadius:8,padding:"10px 12px",border:"1px solid rgba(249,115,22,0.2)"}}>
+                    <div style={{fontSize:11,color:"#fb923c",marginBottom:6}}>⛽ Registro combustible</div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                      <div><label style={labelSt}>Litros cargados</label><input type="number" min={0} style={S.input} value={movForm.litros} onChange={e=>setMovForm(p=>({...p,litros:e.target.value}))}/></div>
+                      <div><label style={labelSt}>Horas actuales</label><input type="number" min={0} style={S.input} value={movForm.horasActuales} onChange={e=>setMovForm(p=>({...p,horasActuales:e.target.value}))}/></div>
+                    </div>
+                  </div>
+                )}
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observaciones</label><input style={S.input} value={movForm.obs} onChange={e=>setMovForm(p=>({...p,obs:e.target.value}))}/></div>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button className="btn-p" style={S.btn} onClick={guardarMov}>✓ Registrar</button>
+                <button className="btn-g" style={S.btn} onClick={()=>setShowMovForm(false)}>Cancelar</button>
+              </div>
+            </div>
+          )}
+
+          {/* Traslado */}
+          {showTraslForm&&(
+            <div style={{...S.card,padding:16,marginBottom:14,background:"rgba(245,158,11,0.05)",borderColor:"rgba(245,158,11,0.2)"}} className="ein">
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#fcd34d",marginBottom:12}}>🚛 Traslado</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={traslForm.fecha} onChange={e=>setTraslForm(p=>({...p,fecha:e.target.value}))}/></div>
+                <div><label style={labelSt}>Responsable</label>
+                  <select style={S.input} value={traslForm.responsable} onChange={e=>setTraslForm(p=>({...p,responsable:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                  </select>
+                </div>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Ítem</label>
+                  <select style={S.input} value={traslForm.itemId} onChange={e=>setTraslForm(p=>({...p,itemId:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    {(bd.items||[]).map(i=><option key={i.id} value={i.id}>{i.nombre} (disponible: {i.stockActual} {i.unidad})</option>)}
+                  </select>
+                </div>
+                <div><label style={labelSt}>Cantidad</label><input type="number" min={1} style={S.input} value={traslForm.cantidad} onChange={e=>setTraslForm(p=>({...p,cantidad:e.target.value}))}/></div>
+                <div><label style={labelSt}>Destino</label><input style={S.input} value={traslForm.destino} onChange={e=>setTraslForm(p=>({...p,destino:e.target.value}))} placeholder="ej: Cancha Golf, Taller externo..."/></div>
+                <div><label style={labelSt}>Motivo</label><input style={S.input} value={traslForm.motivo} onChange={e=>setTraslForm(p=>({...p,motivo:e.target.value}))}/></div>
+                <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",cursor:"pointer"}} onClick={()=>setTraslForm(p=>({...p,conRegreso:!p.conRegreso}))}>
+                  <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${traslForm.conRegreso?"#3d7a52":"rgba(255,255,255,0.2)"}`,background:traslForm.conRegreso?"#3d7a52":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    {traslForm.conRegreso&&<span style={{color:"#fff",fontSize:11}}>✓</span>}
+                  </div>
+                  <span style={{fontSize:13}}>¿Regresa a bodega?</span>
+                </div>
+                {traslForm.conRegreso&&<div><label style={labelSt}>Fecha estimada regreso</label><input type="date" style={S.input} value={traslForm.fechaRegreso} onChange={e=>setTraslForm(p=>({...p,fechaRegreso:e.target.value}))}/></div>}
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observaciones</label><input style={S.input} value={traslForm.obs} onChange={e=>setTraslForm(p=>({...p,obs:e.target.value}))}/></div>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button className="btn-p" style={S.btn} onClick={guardarTrasl}>✓ Registrar</button>
+                <button className="btn-g" style={S.btn} onClick={()=>setShowTraslForm(false)}>Cancelar</button>
+              </div>
+            </div>
+          )}
+
+          {/* Lista ítems */}
+          {(bd.items||[]).length===0&&!showItemForm&&!showMovForm&&!showTraslForm&&!showInventForm?(
+            <div style={{...S.card,padding:36,textAlign:"center",color:"#4a8a5a"}}>
+              <div style={{fontSize:36,marginBottom:8}}>{bodega.icono}</div>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15}}>Sin ítems en {bodega.nombre}</div>
+              <div style={{fontSize:12,marginTop:4}}>Usa "Inventario inicial" para cargar el stock actual</div>
+            </div>
+          ):(
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {(bd.items||[]).map(item=>{
+                const bajo=Number(item.stockActual||0)<=Number(item.stockMinimo||0)&&Number(item.stockMinimo||0)>0;
+                const agotado=Number(item.stockActual||0)===0;
+                const color=agotado?"#ef4444":bajo?"#f59e0b":"#22c55e";
+                return (
+                  <div key={item.id} style={{...S.card,padding:14,borderLeft:`3px solid ${color}`}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:8}}>
+                      <div style={{flex:1}}>
+                        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:4}}>
+                          <span style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700}}>{item.nombre}</span>
+                          {item.categoria&&<span style={{...S.chip,fontSize:10,background:"rgba(255,255,255,0.06)",color:"#7aaa80"}}>{item.categoria}</span>}
+                          <span style={{...S.chip,background:agotado?"rgba(239,68,68,0.12)":bajo?"rgba(245,158,11,0.12)":"rgba(34,197,94,0.08)",color,fontSize:10}}>
+                            {agotado?"⛔ Sin stock":bajo?"⚠️ Bajo":"✅ OK"}
+                          </span>
+                        </div>
+                        <div style={{display:"flex",gap:14,flexWrap:"wrap",fontSize:12,color:"#7aaa80"}}>
+                          {item.ubicacion&&<span>📍 {item.ubicacion}</span>}
+                          <span style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color}}>{item.stockActual} <span style={{fontSize:12,fontWeight:400}}>{item.unidad}</span></span>
+                          {Number(item.stockMinimo)>0&&<span style={{fontSize:11,color:"#5a8a6a"}}>mín: {item.stockMinimo}</span>}
+                        </div>
+                        {bodegaActiva==="b04"&&(item.marca||item.horasUso)&&(
+                          <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:11,color:"#7aaa80",marginTop:4}}>
+                            {item.marca&&<span>🏷️ {item.marca} {item.modelo}</span>}
+                            {item.patente&&<span>🔢 {item.patente}</span>}
+                            {item.horasUso&&<span>⏱️ {item.horasUso}h</span>}
+                            {item.nivelAceite&&<span style={{color:item.nivelAceite==="OK"||item.nivelAceite==="Recién cambiado"?"#22c55e":"#ef4444"}}>🛢️ {item.nivelAceite}</span>}
+                            {item.nivelCombustible&&<span style={{color:["Lleno","3/4"].includes(item.nivelCombustible)?"#22c55e":item.nivelCombustible==="1/2"?"#f59e0b":"#ef4444"}}>⛽ {item.nivelCombustible}</span>}
+                            {item.proxMantención&&<span style={{color:"#f59e0b"}}>🔧 Próx: {item.proxMantención}h</span>}
+                          </div>
+                        )}
+                        {item.obs&&<div style={{fontSize:11,color:"#5a8a6a",fontStyle:"italic",marginTop:3}}>{item.obs}</div>}
+                      </div>
+                      {esJefa&&(
+                        <div style={{display:"flex",gap:6,flexShrink:0}}>
+                          <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(34,197,94,0.12)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)"}}
+                            onClick={()=>{setMovForm({...emptyMov,itemId:String(item.id),unidad:item.unidad||"unidad"});setShowMovForm(true);}}>± Mov.</button>
+                          <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}}
+                            onClick={()=>{setItemForm({nombre:item.nombre,categoria:item.categoria||"",descripcion:item.descripcion||"",unidad:item.unidad||"unidad",stockActual:item.stockActual||0,stockMinimo:item.stockMinimo||0,ubicacion:item.ubicacion||"",obs:item.obs||""});setMaqForm({marca:item.marca||"",modelo:item.modelo||"",patente:item.patente||"",horasUso:item.horasUso||0,nivelAceite:item.nivelAceite||"OK",nivelCombustible:item.nivelCombustible||"OK",proxMantención:item.proxMantención||""});setEditItemId(item.id);setShowItemForm(true);}}>✏️</button>
+                          <button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>eliminarItem(item.id)}>🗑</button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── MOVIMIENTOS ── */}
+      {subTab==="movimientos"&&(
+        <div className="ein">
+          {esJefa&&<button style={{...S.btn,background:"rgba(34,197,94,0.12)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)",marginBottom:14}} onClick={()=>setShowMovForm(true)}>📥 Registrar movimiento</button>}
+          {showMovForm&&(
+            <div style={{...S.card,padding:16,marginBottom:14,background:"rgba(34,197,94,0.05)",borderColor:"rgba(34,197,94,0.2)"}} className="ein">
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#86efac",marginBottom:12}}>📥 Registrar movimiento</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={movForm.fecha} onChange={e=>setMovForm(p=>({...p,fecha:e.target.value}))}/></div>
+                <div><label style={labelSt}>Tipo</label>
+                  <select style={S.input} value={movForm.tipo} onChange={e=>setMovForm(p=>({...p,tipo:e.target.value}))}>
+                    {Object.entries(ESTADOS_MOV).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
+                  </select>
+                </div>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Ítem</label>
+                  <select style={S.input} value={movForm.itemId} onChange={e=>{const it=(bd.items||[]).find(i=>String(i.id)===e.target.value);setMovForm(p=>({...p,itemId:e.target.value,unidad:it?.unidad||"unidad"}));}}>
+                    <option value="">Seleccionar ítem...</option>
+                    {(bd.items||[]).map(i=><option key={i.id} value={i.id}>{i.nombre} (stock: {i.stockActual} {i.unidad})</option>)}
+                  </select>
+                </div>
+                <div><label style={labelSt}>Cantidad</label><input type="number" min={0.01} step={0.01} style={S.input} value={movForm.cantidad} onChange={e=>setMovForm(p=>({...p,cantidad:e.target.value}))}/></div>
+                <div><label style={labelSt}>Responsable</label>
+                  <select style={S.input} value={movForm.responsable} onChange={e=>setMovForm(p=>({...p,responsable:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                  </select>
+                </div>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Motivo</label><input style={S.input} value={movForm.motivo} onChange={e=>setMovForm(p=>({...p,motivo:e.target.value}))}/></div>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observaciones</label><input style={S.input} value={movForm.obs} onChange={e=>setMovForm(p=>({...p,obs:e.target.value}))}/></div>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button className="btn-p" style={S.btn} onClick={guardarMov}>✓ Registrar</button>
+                <button className="btn-g" style={S.btn} onClick={()=>setShowMovForm(false)}>Cancelar</button>
+              </div>
+            </div>
+          )}
+          {(bd.movimientos||[]).length===0&&!showMovForm?(
+            <div style={{...S.card,padding:36,textAlign:"center",color:"#4a8a5a"}}><div style={{fontSize:32,marginBottom:8}}>🔄</div><div>Sin movimientos</div></div>
+          ):(
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {(bd.movimientos||[]).map(mov=>{
+                const est=ESTADOS_MOV[mov.tipo]||ESTADOS_MOV.entrada;
+                const item=(bd.items||[]).find(i=>String(i.id)===String(mov.itemId));
+                return (
+                  <div key={mov.id} style={{...S.card,padding:"12px 14px",borderLeft:`3px solid ${est.color}40`}}>
+                    <div style={{display:"flex",gap:8,alignItems:"center",fontSize:12,flexWrap:"wrap"}}>
+                      <span style={{color:"#5a8a6a"}}>{mov.fecha}</span>
+                      <span style={{fontWeight:600,color:est.color}}>{est.label}</span>
+                      <span style={{fontWeight:600}}>{item?.nombre||"Ítem"}</span>
+                      <span style={{color:est.color}}>{mov.tipo==="entrada"?"+":"-"}{mov.cantidad} {mov.unidad}</span>
+                      {mov.responsable&&<span style={{color:"#5a8a6a"}}>· 👤 {mov.responsable}</span>}
+                      {mov.motivo&&<span style={{color:"#5a8a6a"}}>· {mov.motivo}</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── TRASLADOS ── */}
+      {subTab==="traslados"&&(
+        <div className="ein">
+          {esJefa&&<button style={{...S.btn,background:"rgba(245,158,11,0.12)",color:"#fcd34d",border:"1px solid rgba(245,158,11,0.25)",marginBottom:14}} onClick={()=>setShowTraslForm(true)}>🚛 Nuevo traslado</button>}
+          {(bd.traslados||[]).length===0?(
+            <div style={{...S.card,padding:36,textAlign:"center",color:"#4a8a5a"}}><div style={{fontSize:32,marginBottom:8}}>🚛</div><div>Sin traslados</div></div>
+          ):(
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {(bd.traslados||[]).map(t=>{
+                const item=(bd.items||[]).find(i=>String(i.id)===String(t.itemId));
+                const enCamino=t.conRegreso&&t.estado==="en_camino";
+                return (
+                  <div key={t.id} style={{...S.card,padding:14,borderLeft:`3px solid ${enCamino?"#f59e0b":t.estado==="regresó"?"#22c55e":"#6b7280"}`}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:8}}>
+                      <div style={{flex:1}}>
+                        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:4}}>
+                          <span style={{fontSize:14,fontWeight:700}}>{item?.nombre||"Ítem"}</span>
+                          <span style={{...S.chip,fontSize:10,color:enCamino?"#fcd34d":t.estado==="regresó"?"#86efac":"#9ca3af"}}>
+                            {enCamino?"🚛 En camino":t.estado==="regresó"?"✅ Regresó":"📤 Sin regreso"}
+                          </span>
+                        </div>
+                        <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:11,color:"#7aaa80"}}>
+                          <span>📅 {t.fecha}</span><span>📦 {t.cantidad}</span><span>📍 {t.destino}</span>
+                          {t.fechaRegreso&&<span>🔄 Est: {t.fechaRegreso}</span>}
+                          {t.responsable&&<span>👤 {t.responsable}</span>}
+                        </div>
+                        {t.motivo&&<div style={{fontSize:11,color:"#5a8a6a",marginTop:2}}>{t.motivo}</div>}
+                      </div>
+                      {enCamino&&esJefa&&<button style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(34,197,94,0.12)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)"}} onClick={()=>marcarRegreso(t.id)}>✅ Regresó</button>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── TAREAS ── */}
+      {subTab==="tareas"&&(
+        <div className="ein">
+          {esJefa&&<button className="btn-p" style={{...S.btn,marginBottom:14}} onClick={()=>setShowTareaForm(true)}>➕ Nueva tarea</button>}
+          {showTareaForm&&(
+            <div style={{...S.card,padding:16,marginBottom:14}} className="ein">
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#a0d8b0",marginBottom:12}}>➕ Nueva tarea — {bodega.nombre}</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={tareaForm.fecha} onChange={e=>setTareaForm(p=>({...p,fecha:e.target.value}))}/></div>
+                <div><label style={labelSt}>Tipo</label>
+                  <select style={S.input} value={tareaForm.tipo} onChange={e=>setTareaForm(p=>({...p,tipo:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    {bodega.tareasTipo.map(t=><option key={t}>{t}</option>)}
+                    <option value="Otro">Otro</option>
+                  </select>
+                </div>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Descripción</label><input style={S.input} value={tareaForm.descripcion} onChange={e=>setTareaForm(p=>({...p,descripcion:e.target.value}))}/></div>
+                <div><label style={labelSt}>Responsable</label>
+                  <select style={S.input} value={tareaForm.responsable} onChange={e=>setTareaForm(p=>({...p,responsable:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                  </select>
+                </div>
+                <div><label style={labelSt}>Observaciones</label><input style={S.input} value={tareaForm.obs} onChange={e=>setTareaForm(p=>({...p,obs:e.target.value}))}/></div>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button className="btn-p" style={S.btn} onClick={guardarTarea}>✓ Guardar y enviar al programa</button>
+                <button className="btn-g" style={S.btn} onClick={()=>setShowTareaForm(false)}>Cancelar</button>
+              </div>
+            </div>
+          )}
+          {(bd.tareas||[]).length===0&&!showTareaForm?(
+            <div style={{...S.card,padding:36,textAlign:"center",color:"#4a8a5a"}}><div style={{fontSize:32,marginBottom:8}}>✅</div><div>Sin tareas</div></div>
+          ):(
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {(bd.tareas||[]).map(t=>(
+                <div key={t.id} style={{...S.card,padding:"12px 14px",borderLeft:`3px solid ${t.estado==="completada"?"#22c55e":"rgba(255,255,255,0.1)"}`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:6}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,fontWeight:600,marginBottom:3}}>{t.tipo}{t.descripcion&&` — ${t.descripcion}`}</div>
+                      <div style={{display:"flex",gap:10,fontSize:11,color:"#7aaa80",flexWrap:"wrap"}}>
+                        <span>📅 {t.fecha}</span>
+                        {t.responsable&&<span>👤 {t.responsable}</span>}
+                        <span style={{color:t.estado==="completada"?"#22c55e":"#f59e0b"}}>{t.estado==="completada"?"✅ Completada":"⏳ Pendiente"}</span>
+                      </div>
+                      {t.obs&&<div style={{fontSize:11,color:"#5a8a6a",fontStyle:"italic",marginTop:2}}>{t.obs}</div>}
+                    </div>
+                    <div style={{display:"flex",gap:6}}>
+                      {t.estado!=="completada"&&<button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(34,197,94,0.12)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)"}} onClick={()=>setbd({tareas:(bd.tareas||[]).map(x=>x.id===t.id?{...x,estado:"completada"}:x)})}>✅</button>}
+                      {esJefa&&<button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>setbd({tareas:(bd.tareas||[]).filter(x=>x.id!==t.id)})}>🗑</button>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── HISTORIAL ── */}
+      {subTab==="historial"&&(
+        <div className="ein">
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,marginBottom:12}}>📜 Historial — {bodega.nombre}</div>
+          {[...(bd.movimientos||[]),...(bd.traslados||[]),...(bd.tareas||[])].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")).slice(0,50).map((evt,i)=>{
+            const esMov=evt.tipo&&Object.keys(ESTADOS_MOV).includes(evt.tipo);
+            const esTrasl=evt.destino!==undefined;
+            return (
+              <div key={i} style={{...S.card,padding:"10px 14px",marginBottom:6,borderLeft:`2px solid ${esMov?ESTADOS_MOV[evt.tipo]?.color||"#7aaa80":esTrasl?"#f59e0b":"#a0d8b0"}`}}>
+                <div style={{display:"flex",gap:8,alignItems:"center",fontSize:12,flexWrap:"wrap"}}>
+                  <span style={{color:"#5a8a6a"}}>{evt.fecha}</span>
+                  <span style={{fontWeight:600}}>{esMov?ESTADOS_MOV[evt.tipo]?.label:esTrasl?"🚛 Traslado":"✅ "+evt.tipo}</span>
+                  {esMov&&<span>{(bd.items||[]).find(i=>String(i.id)===String(evt.itemId))?.nombre||""} · {evt.tipo==="entrada"?"+":"-"}{evt.cantidad} {evt.unidad}</span>}
+                  {esTrasl&&<span>{(bd.items||[]).find(i=>String(i.id)===String(evt.itemId))?.nombre||""} → {evt.destino}</span>}
+                  {!esMov&&!esTrasl&&<span>{evt.descripcion||""}</span>}
+                  {evt.responsable&&<span style={{color:"#5a8a6a"}}>· 👤 {evt.responsable}</span>}
+                </div>
+              </div>
+            );
+          })}
+          {[...(bd.movimientos||[]),...(bd.traslados||[]),...(bd.tareas||[])].length===0&&(
+            <div style={{...S.card,padding:36,textAlign:"center",color:"#4a8a5a"}}><div style={{fontSize:32,marginBottom:8}}>📜</div><div>Sin actividad</div></div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [zonas, setZonas] = useState(MACROZONAS_BASE);
   const [vista, setVista] = useState("dashboard");
