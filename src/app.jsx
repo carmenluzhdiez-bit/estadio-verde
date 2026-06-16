@@ -3284,7 +3284,7 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
           <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
             <span style={chip("rgba(59,130,246,0.12)","#93c5fd","1px solid rgba(59,130,246,0.25)")}>🏖️ {vacAprobadas}d vac.</span>
             <span style={chip("rgba(34,197,94,0.12)","#86efac","1px solid rgba(34,197,94,0.25)")}>⏰ {heTotal}h ext.</span>
-            {bonosTotal>0&&<span style={chip("rgba(124,58,237,0.12)","#c4b5fd","1px solid rgba(124,58,237,0.25)")}>💰 {bonosTotal}h bon.</span>}
+            {bonosMonto>0&&<span style={chip("rgba(124,58,237,0.12)","#c4b5fd","1px solid rgba(124,58,237,0.25)")}>💰 ${bonosMonto.toLocaleString("es-CL")}</span>}
             {pendientes>0&&<span style={chip("rgba(245,158,11,0.12)","#fcd34d","1px solid rgba(245,158,11,0.25)")}>⏳ {pendientes} pend.</span>}
             <button className="btn-d" style={{...S.btn,fontSize:12,padding:"5px 12px"}} onClick={()=>{if(window.confirm("¿Eliminar trabajador?")) onDelete();}}>🗑 Eliminar</button>
           </div>
@@ -7332,7 +7332,6 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
     setPersonal(p=>{
       const arr=Array.isArray(p)?p:Object.values(p||{});
       return arr.map(t=>{
-        const partic = participantes.find(x=>String(x.trabajadorId)===String(t.id));
         if(!partic) return t;
         const nuevaEntrada = {
           id:Date.now()+Math.random(), tipo:"bonoConstruccion",
@@ -8814,7 +8813,7 @@ export default function App() {
             onUpdate={(patch)=>updateTrabajador(personalId,patch)}
             onAddEvento={(ev)=>addEvento(personalId,ev)}
             onDeleteEvento={(eid)=>deleteEvento(personalId,eid)}
-            onUpdateEvento={(eid,patch)=>setPersonal(p=>p.map(t=>t.id===personalId?{...t,eventos:(t.eventos||[]).map(e=>e.id===eid?{...e,...patch}:e)}:t))}
+            onUpdateEvento={(eid,patch)=>setPersonal(p=>(Array.isArray(p)?p:Object.values(p||{})).map(t=>t.id===personalId?{...t,eventos:(t.eventos||[]).map(e=>e.id===eid?{...e,...patch}:e)}:t))}
           />
         )}
       </div>
