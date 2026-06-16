@@ -7647,16 +7647,7 @@ export default function App() {
   const handleLogout = () => signOut(auth);
   const CUENTAS_DEFAULT = ["Rama Golf","Mantenimiento Jardines","Obras","Insumos Generales","Maquinaria y Equipos","Fitosanitarios","Semillas y Plantas","Uniformes y EPP"];
   const [data,           setData,           dataReady]     = useFirebaseState("data",           initData());
-  const [personal,       setPersonalRaw,    personalReady] = useFirebaseState("personal",       PERSONAL_INICIAL);
-  const personalArr2 = Array.isArray(personal)?personal:Object.values(personal||{});
-  const setPersonal = (fn) => {
-    if(typeof fn==="function") {
-      const arr = Array.isArray(personal)?personal:Object.values(personal||{});
-      setPersonalRaw(fn(arr));
-    } else {
-      setPersonalRaw(fn);
-    }
-  };
+  const [personal, setPersonal, personalReady] = useFirebaseState("personal", PERSONAL_INICIAL);
   const [tareasProg,     setTareasProg,     progReady]     = useFirebaseState("prog",           {});
   const [aplicaciones,   setAplicaciones,   aplReady]      = useFirebaseState("fungicidas",     []);
   const [incidenciasFito,setIncidenciasFito,incidReady]    = useFirebaseState("fung-incid",     []);
@@ -7779,11 +7770,11 @@ export default function App() {
   const removeCustomElem = (zid,eid) => { const arr=(data[zid]?.elementosCustom||[]).filter(e=>e.id!==eid); updateZona(zid,{elementosCustom:arr}); };
   const removeBaseElem = (zid,eid) => { setZonas(prev=>prev.map(z=>z.id===zid?{...z,elementos:z.elementos.filter(e=>e.id!==eid)}:z)); const elems={...data[zid]?.elementos}; delete elems[eid]; updateZona(zid,{elementos:elems}); addHistorial(zid,`Elemento eliminado`); };
 
-  const addTrabajador = (t) => { const id=Date.now(); setPersonal(p=>[...p,{...t,id,eventos:[]}]); };
-  const updateTrabajador = (id,patch) => setPersonal(p=>p.map(t=>t.id===id?{...t,...patch}:t));
-  const deleteTrabajador = (id) => setPersonal(p=>p.filter(t=>t.id!==id));
-  const addEvento = (tid,ev) => setPersonal(p=>p.map(t=>t.id===tid?{...t,eventos:[...(t.eventos||[]),{...ev,id:Date.now()}]}:t));
-  const deleteEvento = (tid,eid) => setPersonal(p=>p.map(t=>t.id===tid?{...t,eventos:(t.eventos||[]).filter(e=>e.id!==eid)}:t));
+  const addTrabajador = (t) => { const id=Date.now(); setPersonal(p=>[...(Array.isArray(p)?p:Object.values(p||{})),{...t,id,eventos:[]}]); };
+  const updateTrabajador = (id,patch) => setPersonal(p=>(Array.isArray(p)?p:Object.values(p||{})).map(t=>t.id===id?{...t,...patch}:t));
+  const deleteTrabajador = (id) => setPersonal(p=>(Array.isArray(p)?p:Object.values(p||{})).filter(t=>t.id!==id));
+  const addEvento = (tid,ev) => setPersonal(p=>(Array.isArray(p)?p:Object.values(p||{})).map(t=>t.id===tid?{...t,eventos:[...(t.eventos||[]),{...ev,id:Date.now()}]}:t));
+  const deleteEvento = (tid,eid) => setPersonal(p=>(Array.isArray(p)?p:Object.values(p||{})).map(t=>t.id===tid?{...t,eventos:(t.eventos||[]).filter(e=>e.id!==eid)}:t));
   const getTrabajador = (id) => personal.find(t=>t.id===id);
 
   const getSugerenciaAI = async () => {
