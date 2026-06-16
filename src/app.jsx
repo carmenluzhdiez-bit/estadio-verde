@@ -7014,7 +7014,9 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
   const [selEventos, setSelEventos] = React.useState({});
   const [confirmado, setConfirmado] = React.useState(false);
 
+  const [mostrarRendidos, setMostrarRendidos] = React.useState(false);
   const bonosPendientes = bonosArr.filter(b=>b.estado!=="rendido");
+  const bonosRendidos   = bonosArr.filter(b=>b.estado==="rendido");
   const trabajadoresCon = personalArr.map(t=>{
     const eventosT = (t.eventos||[]).filter(e=>
       ["bonoConstruccion","bonoPesado","bonoEspecializado","horaExtra","permiso","vacaciones","licencia"].includes(e.tipo) &&
@@ -7251,6 +7253,33 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Bonos ya rendidos — recuperables */}
+          {bonosRendidos.length>0&&(
+            <div style={{marginBottom:16}}>
+              <button style={{...S.btn,fontSize:12,background:"rgba(255,255,255,0.05)",color:"#5a8a6a",border:"1px solid rgba(255,255,255,0.1)",marginBottom:8}}
+                onClick={()=>setMostrarRendidos(p=>!p)}>
+                {mostrarRendidos?"▲ Ocultar":"▼ Mostrar"} bonos ya rendidos ({bonosRendidos.length})
+              </button>
+              {mostrarRendidos&&(
+                <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                  {bonosRendidos.map(b=>(
+                    <div key={b.id} style={{...S.card,padding:"10px 14px",display:"flex",alignItems:"center",gap:10,opacity:0.7,borderColor:"rgba(255,255,255,0.05)"}}>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:13,fontWeight:600}}>{b.descripcion}</div>
+                        <div style={{fontSize:11,color:"#5a8a6a"}}>📅 {b.fecha} · Rendido: {b.fechaRendicion||"—"}</div>
+                        <div style={{fontSize:11,color:"#c4b5fd"}}>${(b.participantes||[]).reduce((a,p)=>a+Number(p.monto||0),0).toLocaleString("es-CL")}</div>
+                      </div>
+                      <button style={{...S.btn,fontSize:11,padding:"4px 12px",background:"rgba(245,158,11,0.15)",color:"#fbbf24",border:"1px solid rgba(245,158,11,0.3)",flexShrink:0}}
+                        onClick={()=>setBonosMasivos(p=>(Array.isArray(p)?p:Object.values(p||{})).map(x=>x.id===b.id?{...x,estado:"generado",fechaRendicion:null}:x))}>
+                        🔄 Recuperar
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
