@@ -3262,7 +3262,9 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
   },0);
   const heTotal = eventos.filter(e=>e.tipo==="horaExtra"&&e.estado==="aprobado").reduce((a,e)=>a+Number(e.horas||0),0);
   const pendientes = eventos.filter(e=>e.estado==="pendiente").length;
-  const bonosTotal = eventos.filter(e=>["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)&&e.estado==="aprobado").reduce((a,e)=>a+Number(e.horas||0),0);
+  const bonosRegistros = eventos.filter(e=>["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo));
+  const bonosAprobados = bonosRegistros.filter(e=>e.estado==="aprobado");
+  const bonosMonto = bonosAprobados.reduce((a,e)=>a+Number(e.valor||0),0);
 
   const chip = (bg,color,border,children) => ({display:"inline-flex",alignItems:"center",gap:4,padding:"3px 10px",borderRadius:20,fontSize:12,background:bg,color,border});
 
@@ -3693,12 +3695,11 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12,marginBottom:20}}>
             {[
               {label:"Días vacaciones",val:vacAprobadas,color:"#3b82f6",icon:"🏖️"},
-              {label:"Horas extra",val:heTotal,color:"#22c55e",icon:"⏰"},
+              {label:"Horas extra",val:`${heTotal}h`,color:"#22c55e",icon:"⏰"},
               {label:"Permisos",val:eventos.filter(e=>e.tipo==="permiso").length,color:"#f59e0b",icon:"📋"},
               {label:"Licencias",val:eventos.filter(e=>e.tipo==="licencia").length,color:"#a78bfa",icon:"🏥"},
               {label:"Capacitaciones",val:eventos.filter(e=>e.tipo==="capacitacion").length,color:"#2dd4bf",icon:"📚"},
               {label:"Amonestaciones",val:eventos.filter(e=>e.tipo==="amonestacion").length,color:"#ef4444",icon:"⚠️"},
-              {label:"Bonos aprobados",val:eventos.filter(e=>["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)&&e.estado==="aprobado").length,color:"#7c3aed",icon:"💰"},
             ].map(s=>(
               <div key={s.label} style={{...S.card,padding:"14px 10px",textAlign:"center"}}>
                 <div style={{fontSize:22,marginBottom:4}}>{s.icon}</div>
@@ -3706,6 +3707,35 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
                 <div style={{fontSize:11,color:"#6aaa7a"}}>{s.label}</div>
               </div>
             ))}
+          </div>
+          {/* Resumen bonos por tipo */}
+          <div style={{...S.card,padding:16,marginBottom:14}}>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,marginBottom:10}}>💰 Bonos por tarea</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:bonosRegistros.length>0?10:0}}>
+              {[
+                {tipo:"bonoConstruccion",label:"Bono Construcción",color:"#f97316",icon:"🏗️"},
+                {tipo:"bonoPesado",label:"Bono Trabajo Pesado",color:"#dc2626",icon:"💪"},
+                {tipo:"bonoEspecializado",label:"Bono Especializado",color:"#7c3aed",icon:"⭐"},
+              ].map(b=>{
+                const regs = bonosRegistros.filter(e=>e.tipo===b.tipo);
+                const aprov = regs.filter(e=>e.estado==="aprobado");
+                const monto = aprov.reduce((a,e)=>a+Number(e.valor||0),0);
+                return (
+                  <div key={b.tipo} style={{background:`${b.color}10`,borderRadius:8,padding:"10px 12px",border:`1px solid ${b.color}30`}}>
+                    <div style={{fontSize:16,marginBottom:4}}>{b.icon}</div>
+                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:700,color:b.color}}>{regs.length}</div>
+                    <div style={{fontSize:10,color:"#6aaa7a",marginBottom:4}}>registro{regs.length!==1?"s":""} · {aprov.length} aprobado{aprov.length!==1?"s":""}</div>
+                    {monto>0&&<div style={{fontSize:12,fontWeight:700,color:b.color}}>${monto.toLocaleString("es-CL")}</div>}
+                    <div style={{fontSize:10,color:"#5a8a6a"}}>{b.label}</div>
+                  </div>
+                );
+              })}
+            </div>
+            {bonosMonto>0&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 10px",background:"rgba(196,181,253,0.08)",borderRadius:7,border:"1px solid rgba(196,181,253,0.2)"}}>
+              <span style={{fontSize:12,color:"#c4b5fd"}}>Total bonos aprobados</span>
+              <span style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#c4b5fd"}}>${bonosMonto.toLocaleString("es-CL")}</span>
+            </div>}
+            {bonosRegistros.length===0&&<div style={{fontSize:12,color:"#4a6a54",textAlign:"center",padding:8}}>Sin bonos por tarea registrados</div>}
           </div>
           <div style={{...S.card,padding:18}}>
             <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:14}}>Últimos eventos</div>
@@ -7407,26 +7437,29 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
           {/* Asignación de roles */}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
             <div><label style={labelSt}>Ejecutor</label>
-              <select style={S.input} value={form.ejecutor} onChange={e=>setForm(p=>({...p,ejecutor:e.target.value}))}>
+              <select style={S.input} value={form.ejecutor} onChange={e=>setForm(p=>({...p,ejecutor:String(e.target.value)}))}>
                 <option value="">Seleccionar...</option>
-                {listaPersonal.map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}
+                {listaPersonal.map(p=><option key={p.id} value={String(p.id)}>{p.nombre}</option>)}
               </select>
+              {form.ejecutor&&<div style={{fontSize:11,color:"#4ade80",marginTop:3}}>✓ {getNombre(form.ejecutor)}</div>}
             </div>
             <div><label style={labelSt}>Ayudante</label>
-              <select style={S.input} value={form.ayudante} onChange={e=>setForm(p=>({...p,ayudante:e.target.value}))}>
+              <select style={S.input} value={form.ayudante} onChange={e=>setForm(p=>({...p,ayudante:String(e.target.value)}))}>
                 <option value="">Sin ayudante</option>
-                {listaPersonal.filter(p=>p.id!==form.ejecutor).map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}
+                {listaPersonal.filter(p=>String(p.id)!==form.ejecutor).map(p=><option key={p.id} value={String(p.id)}>{p.nombre}</option>)}
               </select>
+              {form.ayudante&&<div style={{fontSize:11,color:"#60a5fa",marginTop:3}}>✓ {getNombre(form.ayudante)}</div>}
             </div>
             <div style={{gridColumn:"1/-1"}}>
               <label style={labelSt}>Apoyos</label>
               <div style={{display:"flex",flexDirection:"column",gap:6}}>
                 {form.apoyos.map((ap,idx)=>(
-                  <div key={idx} style={{display:"flex",gap:6}}>
-                    <select style={{...S.input,flex:1}} value={ap} onChange={e=>setForm(p=>({...p,apoyos:p.apoyos.map((a,i)=>i===idx?e.target.value:a)}))}>
+                  <div key={idx} style={{display:"flex",gap:6,alignItems:"center"}}>
+                    <select style={{...S.input,flex:1}} value={ap} onChange={e=>setForm(p=>({...p,apoyos:p.apoyos.map((a,i)=>i===idx?String(e.target.value):a)}))}>
                       <option value="">Seleccionar...</option>
-                      {listaPersonal.filter(p=>p.id!==form.ejecutor&&p.id!==form.ayudante&&!form.apoyos.filter((_,i)=>i!==idx).includes(p.id)).map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}
+                      {listaPersonal.filter(p=>String(p.id)!==form.ejecutor&&String(p.id)!==form.ayudante&&!form.apoyos.filter((_,i)=>i!==idx).includes(String(p.id))).map(p=><option key={p.id} value={String(p.id)}>{p.nombre}</option>)}
                     </select>
+                    {ap&&<span style={{fontSize:11,color:"#fbbf24",flexShrink:0}}>✓ {getNombre(ap)}</span>}
                     <button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 8px"}} onClick={()=>setForm(p=>({...p,apoyos:p.apoyos.filter((_,i)=>i!==idx)}))}>✕</button>
                   </div>
                 ))}
@@ -7513,14 +7546,23 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
                       <input style={S.input} value={editBonoForm.obs||""} onChange={e=>setEditBonoForm(p=>({...p,obs:e.target.value}))}/>
                     </div>
                   </div>
-                  {/* Editar montos individuales */}
-                  <div style={{fontSize:11,color:"#6aaa7a",marginBottom:6}}>Montos por participante (recalculados automáticamente al cambiar valor mercado):</div>
+                  {/* Editar participantes y montos */}
+                  <div style={{fontSize:11,color:"#6aaa7a",marginBottom:6,fontWeight:600}}>Participantes (puedes cambiar nombre y monto):</div>
                   {(editBonoForm.participantes||[]).map((p,i)=>(
-                    <div key={i} style={{display:"flex",gap:8,alignItems:"center",marginBottom:5,flexWrap:"wrap"}}>
-                      <span style={{fontSize:12,width:120,flexShrink:0,color:p.rol==="Ejecutor"?"#4ade80":p.rol==="Ayudante"?"#60a5fa":"#fbbf24"}}>{p.rol}: {p.nombre}</span>
-                      <input type="number" min={0} style={{...S.input,width:110,fontSize:12,padding:"4px 8px"}} value={p.monto||0}
+                    <div key={i} style={{display:"flex",gap:8,alignItems:"center",marginBottom:6,flexWrap:"wrap",background:"rgba(255,255,255,0.03)",borderRadius:6,padding:"6px 10px"}}>
+                      <span style={{fontSize:11,padding:"2px 8px",borderRadius:10,background:p.rol==="Ejecutor"?"rgba(74,222,128,0.12)":p.rol==="Ayudante"?"rgba(96,165,250,0.12)":"rgba(251,191,36,0.12)",color:p.rol==="Ejecutor"?"#4ade80":p.rol==="Ayudante"?"#60a5fa":"#fbbf24",fontWeight:600,flexShrink:0}}>{p.rol}</span>
+                      <select style={{...S.input,flex:2,fontSize:12,padding:"4px 8px"}} value={p.trabajadorId||""}
+                        onChange={e=>{
+                          const nuevoId = String(e.target.value);
+                          const nuevoNombre = getNombre(nuevoId);
+                          setEditBonoForm(prev=>({...prev,participantes:prev.participantes.map((x,j)=>j===i?{...x,trabajadorId:nuevoId,nombre:nuevoNombre}:x)}));
+                        }}>
+                        <option value="">Seleccionar...</option>
+                        {listaPersonal.map(lp=><option key={lp.id} value={String(lp.id)}>{lp.nombre}</option>)}
+                      </select>
+                      <input type="number" min={0} style={{...S.input,width:100,fontSize:12,padding:"4px 8px"}} value={p.monto||0}
                         onChange={e=>setEditBonoForm(prev=>({...prev,participantes:prev.participantes.map((x,j)=>j===i?{...x,monto:Number(e.target.value)}:x)}))}/>
-                      <span style={{fontSize:11,color:"#5a8a6a"}}>${Number(p.monto||0).toLocaleString("es-CL")}</span>
+                      <span style={{fontSize:11,color:"#5a8a6a",flexShrink:0}}>${Number(p.monto||0).toLocaleString("es-CL")}</span>
                     </div>
                   ))}
                   <div style={{display:"flex",gap:8,marginTop:10}}>
@@ -7605,7 +7647,16 @@ export default function App() {
   const handleLogout = () => signOut(auth);
   const CUENTAS_DEFAULT = ["Rama Golf","Mantenimiento Jardines","Obras","Insumos Generales","Maquinaria y Equipos","Fitosanitarios","Semillas y Plantas","Uniformes y EPP"];
   const [data,           setData,           dataReady]     = useFirebaseState("data",           initData());
-  const [personal,       setPersonal,       personalReady] = useFirebaseState("personal",       PERSONAL_INICIAL);
+  const [personal,       setPersonalRaw,    personalReady] = useFirebaseState("personal",       PERSONAL_INICIAL);
+  const personalArr2 = Array.isArray(personal)?personal:Object.values(personal||{});
+  const setPersonal = (fn) => {
+    if(typeof fn==="function") {
+      const arr = Array.isArray(personal)?personal:Object.values(personal||{});
+      setPersonalRaw(fn(arr));
+    } else {
+      setPersonalRaw(fn);
+    }
+  };
   const [tareasProg,     setTareasProg,     progReady]     = useFirebaseState("prog",           {});
   const [aplicaciones,   setAplicaciones,   aplReady]      = useFirebaseState("fungicidas",     []);
   const [incidenciasFito,setIncidenciasFito,incidReady]    = useFirebaseState("fung-incid",     []);
