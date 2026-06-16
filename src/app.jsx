@@ -3480,7 +3480,8 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
               const est=ESTADO_EVENTO[ev.estado]||ESTADO_EVENTO.pendiente;
               const dias=ev.fechaFin&&ev.fecha?Math.round((new Date(ev.fechaFin)-new Date(ev.fecha))/(1000*60*60*24))+1:null;
               return (
-                <div key={ev.id} style={{...S.card,padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"start",gap:12}}>
+              <div key={ev.id}>
+                <div style={{...S.card,padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"start",gap:12}}>
                   <div style={{display:"flex",gap:10,alignItems:"start",flex:1}}>
                     <span style={{fontSize:20,flexShrink:0}}>{tp.icon}</span>
                     <div>
@@ -3504,7 +3505,7 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
                 </div>
                 {/* Formulario edición inline */}
                 {editEventoId===ev.id&&(
-                  <div style={{marginTop:8,background:"rgba(255,255,255,0.04)",borderRadius:8,padding:"12px 14px",border:"1px solid rgba(255,255,255,0.1)"}}>
+                  <div style={{marginTop:4,background:"rgba(255,255,255,0.04)",borderRadius:8,padding:"12px 14px",border:"1px solid rgba(255,255,255,0.1)"}}>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
                       <div><label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3}}>TIPO</label>
                         <TipoEventoSelector value={editEventoForm.tipo||"permiso"} onChange={v=>setEditEventoForm(p=>({...p,tipo:v}))} S={S} TIPO_EVENTO={TIPO_EVENTO}/>
@@ -3538,10 +3539,6 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
                 )}
               </div>
               );
-            })}
-          </div>
-        </div>
-      )}
 
       {tab==="bonos"&&(
         <div className="ein">
@@ -3618,7 +3615,8 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
               const tp=TIPO_EVENTO[ev.tipo];
               const est=ESTADO_EVENTO[ev.estado]||ESTADO_EVENTO.pendiente;
               return (
-                <div key={ev.id} style={{...S.card,padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"start",gap:12}}>
+              <div key={ev.id}>
+                <div style={{...S.card,padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"start",gap:12}}>
                   <div style={{display:"flex",gap:10,alignItems:"start",flex:1}}>
                     <span style={{fontSize:20,flexShrink:0}}>{tp.icon}</span>
                     <div>
@@ -3641,7 +3639,7 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
                   </div>
                 </div>
                 {editEventoId===ev.id&&(
-                  <div style={{marginTop:8,background:"rgba(255,255,255,0.04)",borderRadius:8,padding:"12px 14px",border:"1px solid rgba(255,255,255,0.1)"}}>
+                  <div style={{marginTop:4,background:"rgba(255,255,255,0.04)",borderRadius:8,padding:"12px 14px",border:"1px solid rgba(255,255,255,0.1)"}}>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
                       <div><label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3}}>FECHA</label>
                         <input type="date" style={S.input} value={editEventoForm.fecha||""} onChange={e=>setEditEventoForm(p=>({...p,fecha:e.target.value}))}/>
