@@ -4968,12 +4968,51 @@ const ESTADOS_MOV = {
   ajuste:    {color:"#a78bfa", label:"⚙️ Ajuste inventario"},
 };
 
+// ─── SELECTOR DE CUENTA ──────────────────────────────────────────────────────
+function CuentaSelector({ value, onChange, S, CUENTAS_INTERNAS, CUENTAS_EXTERNAS }) {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <div style={{position:"relative"}}>
+      <button style={{...S.input,width:"100%",textAlign:"left",cursor:"pointer",fontSize:13,display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 12px"}}
+        onClick={()=>setOpen(p=>!p)}>
+        <span style={{color:value?"#ede9e0":"#4a6a54"}}>{value||"Seleccionar cuenta..."}</span>
+        <span style={{fontSize:10,color:"#5a8a6a"}}>{open?"▲":"▼"}</span>
+      </button>
+      {open&&(
+        <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:100,background:"#0f2517",border:"1px solid rgba(255,255,255,0.15)",borderRadius:10,overflow:"hidden",boxShadow:"0 10px 30px rgba(0,0,0,0.5)",marginTop:4}}>
+          <div style={{padding:"4px 0",maxHeight:280,overflowY:"auto"}}>
+            {/* Internas */}
+            <div style={{padding:"8px 14px 4px",fontSize:10,color:"#4ade80",fontWeight:700,letterSpacing:"1px",textTransform:"uppercase",background:"rgba(74,222,128,0.05)"}}>
+              🏛️ Internas — Beneficio general socios
+            </div>
+            {CUENTAS_INTERNAS.map(c=>(
+              <div key={c} style={{padding:"9px 14px 9px 22px",cursor:"pointer",fontSize:13,color:value===c?"#86efac":"#ede9e0",background:value===c?"rgba(34,197,94,0.1)":"transparent",borderLeft:value===c?"2px solid #86efac":"2px solid transparent"}}
+                onClick={()=>{onChange(c);setOpen(false);}}>
+                {c}
+              </div>
+            ))}
+            {/* Externas */}
+            <div style={{padding:"8px 14px 4px",fontSize:10,color:"#60a5fa",fontWeight:700,letterSpacing:"1px",textTransform:"uppercase",background:"rgba(96,165,250,0.05)",borderTop:"1px solid rgba(255,255,255,0.06)",marginTop:4}}>
+              🏢 Externas — Beneficio área específica
+            </div>
+            {CUENTAS_EXTERNAS.map(c=>(
+              <div key={c} style={{padding:"9px 14px 9px 22px",cursor:"pointer",fontSize:13,color:value===c?"#93c5fd":"#ede9e0",background:value===c?"rgba(59,130,246,0.1)":"transparent",borderLeft:value===c?"2px solid #93c5fd":"2px solid transparent"}}
+                onClick={()=>{onChange(c);setOpen(false);}}>
+                {c}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── SELECTOR DE BODEGA POR ÍTEM ─────────────────────────────────────────────
 function BodegaSelector({ items, compra, onConfirm, onCancel, S }) {
   const [asignaciones, setAsignaciones] = React.useState(
     items.map(it=>it.bodegaDestino||"")
   );
-  return (
     <div style={{marginTop:8,background:"rgba(61,122,82,0.08)",borderRadius:10,padding:"12px 14px",border:"1px solid rgba(61,122,82,0.25)"}}>
       <div style={{fontSize:12,color:"#86efac",fontWeight:600,marginBottom:10}}>
         📦 Asignar ítems a bodega — {compra.proveedor}
@@ -5006,14 +5045,18 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   const set = (patch) => setComprasData(p=>({...p,...patch}));
 
   // ── Ingreso automático a bodega ───────────────────────────────────────────
-  const ingresarItemsABodega = (docFecha, docRef, items) => {
+  const ingresarItemsABodega = (docFecha, docRef, items, compraId) => {
     const porBodega = {};
     items.forEach(it=>{
       if(!it.bodegaDestino||!it.descripcion?.trim()) return;
       if(!porBodega[it.bodegaDestino]) porBodega[it.bodegaDestino]=[];
       porBodega[it.bodegaDestino].push(it);
     });
-    if(!Object.keys(porBodega).length) return;
+    if(!Object.keys(porBodega).length) {
+      // Igual guardar asignación aunque no haya bodegas (todo es servicio)
+      if(compraId) set({compras:compras.map(c=>c.id===compraId?{...c,items:(c.items||[]).map((it,i)=>({...it,bodegaDestino:items[i]?.bodegaDestino||""}))}:c)});
+      return;
+    }
     const nuevoBodegasData = {...bodegasData};
     Object.entries(porBodega).forEach(([bodId, its])=>{
       const bd = nuevoBodegasData[bodId]||{items:[],movimientos:[],tareas:[],traslados:[]};
@@ -5021,18 +5064,23 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
       const nuevosMovs  = [...(bd.movimientos||[])];
       its.forEach(it=>{
         const cant = Number(it.cantidad)||1;
-        // Buscar si ya existe el ítem por nombre
+        // Evitar duplicados: verificar si ya existe movimiento de esta compra+ítem
+        const yaIngresado = nuevosMovs.some(m=>m.docRef===docRef&&m.itemNombre?.toLowerCase()===it.descripcion.trim().toLowerCase());
+        if(yaIngresado) return;
         const idx = nuevosItems.findIndex(i=>i.nombre.trim().toLowerCase()===it.descripcion.trim().toLowerCase());
         if(idx>=0) {
           nuevosItems[idx] = {...nuevosItems[idx], stockActual:(Number(nuevosItems[idx].stockActual)||0)+cant};
         } else {
-          nuevosItems.push({id:Date.now()+Math.random(), nombre:it.descripcion, categoria:it.categoria||"", unidad:it.unidad||"unidad", stockActual:cant, stockMinimo:0, ubicacion:"", obs:`Ingresado desde compra ${docRef}`});
+          nuevosItems.push({id:Date.now()+Math.random(), nombre:it.descripcion, categoria:it.categoria||"", unidad:it.unidad||"unidad", stockActual:cant, stockMinimo:0, ubicacion:"", obs:`Ingresado desde ${docRef}`});
         }
-        nuevosMovs.unshift({id:Date.now()+Math.random(), fecha:docFecha, tipo:"entrada", cantidad:cant, unidad:it.unidad||"unidad", motivo:`Compra — ${docRef}`, responsable:"", itemId:String(idx>=0?nuevosItems[idx].id:nuevosItems[nuevosItems.length-1].id)});
+        const itemId = idx>=0?nuevosItems[idx].id:nuevosItems[nuevosItems.length-1].id;
+        nuevosMovs.unshift({id:Date.now()+Math.random(), fecha:docFecha, tipo:"entrada", cantidad:cant, unidad:it.unidad||"unidad", motivo:`Compra — ${docRef}`, responsable:"", itemId:String(itemId), docRef, itemNombre:it.descripcion.trim()});
       });
       nuevoBodegasData[bodId] = {...bd, items:nuevosItems, movimientos:nuevosMovs.slice(0,200)};
     });
     setBodegasData(nuevoBodegasData);
+    // Guardar asignación en la compra para que persista al volver
+    if(compraId) set({compras:compras.map(c=>c.id===compraId?{...c,items:(c.items||[]).map((it,i)=>({...it,bodegaDestino:items[i]?.bodegaDestino||it.bodegaDestino||""}))}:c)});
   };
 
   // ── Categorías predefinidas ───────────────────────────────────────────────
@@ -5329,6 +5377,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
 
   const [mostrarFacturadas, setMostrarFacturadas] = React.useState(false);
   const [selectBodegaId, setSelectBodegaId] = React.useState(null);
+  const [showCuentaMenu, setShowCuentaMenu] = React.useState(false);
   const comprasFilt = compras.filter(c=>{
     const mc=filtroCuenta==="todas"||c.cuenta===filtroCuenta;
     const mm=filtroMes==="todos"||(c.fecha||"").slice(0,7)===filtroMes;
@@ -5626,11 +5675,42 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
             <button style={{...S.btn,fontSize:11,background:mostrarFacturadas?"rgba(6,182,212,0.15)":"rgba(255,255,255,0.05)",color:mostrarFacturadas?"#22d3ee":"#5a8a6a",border:`1px solid ${mostrarFacturadas?"rgba(6,182,212,0.3)":"rgba(255,255,255,0.1)"}`}} onClick={()=>setMostrarFacturadas(p=>!p)}>
               {mostrarFacturadas?"Ocultar NP facturadas":"Mostrar NP facturadas"}
             </button>
-            <select style={{...S.input,flex:1,minWidth:120,fontSize:12}} value={filtroCuenta} onChange={e=>setFiltroCuenta(e.target.value)}>
-              <option value="todas">Todas las cuentas</option>
-              <optgroup label="── Internas ──">{CUENTAS_INTERNAS.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>
-              <optgroup label="── Externas ──">{CUENTAS_EXTERNAS.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>
-            </select>
+            {/* Selector cuentas personalizado */}
+            <div style={{position:"relative",flex:1,minWidth:160}}>
+              <button style={{...S.input,width:"100%",textAlign:"left",cursor:"pointer",fontSize:12,display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px"}}
+                onClick={()=>setShowCuentaMenu(p=>!p)}>
+                <span style={{color:filtroCuenta==="todas"?"#5a8a6a":"#ede9e0"}}>{filtroCuenta==="todas"?"Todas las cuentas":filtroCuenta}</span>
+                <span style={{fontSize:10,color:"#5a8a6a"}}>{showCuentaMenu?"▲":"▼"}</span>
+              </button>
+              {showCuentaMenu&&(
+                <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:50,background:"#0f2517",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,overflow:"hidden",boxShadow:"0 8px 24px rgba(0,0,0,0.4)",marginTop:4}}>
+                  <div style={{padding:"4px 0"}}>
+                    <div style={{padding:"7px 14px",cursor:"pointer",fontSize:12,color:filtroCuenta==="todas"?"#86efac":"#ede9e0",background:filtroCuenta==="todas"?"rgba(34,197,94,0.08)":"transparent"}}
+                      onClick={()=>{setFiltroCuenta("todas");setShowCuentaMenu(false);}}>
+                      Todas las cuentas
+                    </div>
+                    <div style={{padding:"5px 14px 3px",fontSize:10,color:"#3d7a52",fontWeight:700,letterSpacing:"0.8px",textTransform:"uppercase",borderTop:"1px solid rgba(255,255,255,0.06)",marginTop:2}}>
+                      Internas — beneficio general socios
+                    </div>
+                    {CUENTAS_INTERNAS.map(c=>(
+                      <div key={c} style={{padding:"7px 14px 7px 20px",cursor:"pointer",fontSize:12,color:filtroCuenta===c?"#86efac":"#ede9e0",background:filtroCuenta===c?"rgba(34,197,94,0.08)":"transparent"}}
+                        onClick={()=>{setFiltroCuenta(c);setShowCuentaMenu(false);}}>
+                        {c}
+                      </div>
+                    ))}
+                    <div style={{padding:"5px 14px 3px",fontSize:10,color:"#3d6a7a",fontWeight:700,letterSpacing:"0.8px",textTransform:"uppercase",borderTop:"1px solid rgba(255,255,255,0.06)",marginTop:2}}>
+                      Externas — beneficio área específica
+                    </div>
+                    {CUENTAS_EXTERNAS.map(c=>(
+                      <div key={c} style={{padding:"7px 14px 7px 20px",cursor:"pointer",fontSize:12,color:filtroCuenta===c?"#93c5fd":"#ede9e0",background:filtroCuenta===c?"rgba(59,130,246,0.08)":"transparent"}}
+                        onClick={()=>{setFiltroCuenta(c);setShowCuentaMenu(false);}}>
+                        {c}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
             <select style={{...S.input,flex:1,minWidth:100,fontSize:12}} value={filtroMes} onChange={e=>setFiltroMes(e.target.value)}>
               <option value="todos">Todos los meses</option>
               {mesesUnicos.map(m=><option key={m} value={m}>{m}</option>)}
@@ -5741,11 +5821,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                 </div>
                 <div style={{gridColumn:"1/-1"}}>
                   <label style={labelSt}>Cuenta a imputar</label>
-                  <select style={S.input} value={form.cuenta} onChange={e=>setForm(p=>({...p,cuenta:e.target.value}))}>
-                    <option value="">Seleccionar cuenta...</option>
-                    <optgroup label="── Internas (beneficio general socios) ──">{CUENTAS_INTERNAS.map(c=><option key={c}>{c}</option>)}</optgroup>
-                    <optgroup label="── Externas (beneficio área específica) ──">{CUENTAS_EXTERNAS.map(c=><option key={c}>{c}</option>)}</optgroup>
-                  </select>
+                  <CuentaSelector value={form.cuenta} onChange={v=>setForm(p=>({...p,cuenta:v}))} S={S} CUENTAS_INTERNAS={CUENTAS_INTERNAS} CUENTAS_EXTERNAS={CUENTAS_EXTERNAS}/>
                 </div>
 
               </div>{/* fin grid campos */}
@@ -5912,7 +5988,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                         key={c.id} items={items} compra={c}
                         onConfirm={(asignaciones)=>{
                           const itemsConBodega = items.map((it,i)=>({...it,bodegaDestino:asignaciones[i]||""}));
-                          ingresarItemsABodega(c.fecha,`${c.tipoDoc} ${c.nDocumento||""} ${c.proveedor||""}`,itemsConBodega);
+                          ingresarItemsABodega(c.fecha,`${c.tipoDoc} ${c.nDocumento||""} ${c.proveedor||""}`,itemsConBodega,c.id);
                           setSelectBodegaId(null);
                         }}
                         onCancel={()=>setSelectBodegaId(null)}
