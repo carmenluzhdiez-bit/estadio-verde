@@ -3517,6 +3517,10 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
                     <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>HORAS</label>
                     <input type="number" min="0" style={S.input} value={nuevoEvento.horas} placeholder="0" onChange={e=>setNuevoEvento(p=>({...p,horas:e.target.value}))}/>
                   </div>
+                  <div>
+                    <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>VALOR ($)</label>
+                    <input type="number" min="0" style={S.input} value={nuevoEvento.valor||""} placeholder="ej: 25000" onChange={e=>setNuevoEvento(p=>({...p,valor:e.target.value}))}/>
+                  </div>
                   <div style={{gridColumn:"1/-1"}}>
                     <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>DESCRIPCIÓN</label>
                     <textarea rows={2} style={{...S.input,resize:"vertical"}} value={nuevoEvento.descripcion} onChange={e=>setNuevoEvento(p=>({...p,descripcion:e.target.value}))}/>
@@ -3547,6 +3551,7 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
                         <span style={{fontSize:14,fontWeight:600,color:tp.color}}>{tp.label}</span>
                         <span style={{display:"inline-flex",padding:"2px 8px",borderRadius:20,fontSize:11,background:`${est.color}18`,color:est.color,border:`1px solid ${est.color}35`}}>{est.label}</span>
                         {ev.horas&&<span style={{fontSize:12,color:"#6aaa7a"}}>⏰ {ev.horas}h</span>}
+                        {ev.valor&&<span style={{fontSize:13,fontWeight:700,color:"#c4b5fd",fontFamily:"'Playfair Display',serif"}}>💵 ${Number(ev.valor).toLocaleString("es-CL")}</span>}
                       </div>
                       <div style={{fontSize:12,color:"#5a8a6a"}}>{ev.fecha}</div>
                       {ev.descripcion&&<div style={{fontSize:12,color:"#7aaa80",marginTop:3,fontStyle:"italic"}}>{ev.descripcion}</div>}
@@ -3561,6 +3566,15 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
                 </div>
               );
             })}
+            {/* Total bonos aprobados */}
+            {eventos.filter(e=>["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)&&e.estado==="aprobado"&&e.valor).length>0&&(
+              <div style={{...S.card,padding:"10px 16px",background:"rgba(196,181,253,0.08)",borderColor:"rgba(196,181,253,0.2)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span style={{fontSize:12,color:"#c4b5fd"}}>💰 Total bonos aprobados</span>
+                <span style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#c4b5fd"}}>
+                  ${eventos.filter(e=>["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)&&e.estado==="aprobado"&&e.valor).reduce((a,e)=>a+Number(e.valor||0),0).toLocaleString("es-CL")}
+                </span>
+              </div>
+            )}
             {eventos.filter(e=>["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)).length===0&&(
               <div style={{textAlign:"center",color:"#4a8a5a",padding:32,fontSize:14}}>Sin bonos registrados.</div>
             )}
@@ -6677,6 +6691,407 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
   );
 }
 
+// ─── TAREA PLANTACIÓN / TRASPLANTE ───────────────────────────────────────────
+function TareaPlantacion({ modo, zona, zonaId, bodegasData, setBodegasData, tareasProg, setTareasProg, personal, S, addTareaZona, addHistorial, onClose }) {
+  const hoy = new Date().toISOString().slice(0,10);
+  const labelSt = {fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
+  const listaPersonal = [...personal].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+
+  // Stock vivero
+  const vivero = bodegasData["b01"]||{items:[]};
+  const b03    = bodegasData["b03"]||{items:[]};
+  const plantasDisp = (vivero.items||[]).filter(i=>Number(i.stockActual||0)>0);
+  const insumosDisp = [
+    ...(vivero.items||[]).filter(i=>Number(i.stockActual||0)>0&&["Contenedor/Macetero","Sustrato"].some(cat=>i.categoria?.includes(cat))),
+    ...(b03.items||[]).filter(i=>Number(i.stockActual||0)>0&&["Fertilizante","Maicillo","Arena","Compost","Malla","Material construcción"].some(cat=>i.categoria?.includes(cat)||i.nombre?.toLowerCase().includes(cat.toLowerCase()))),
+  ];
+
+  const [fecha,    setFecha]    = React.useState(hoy);
+  const [planta,   setPlanta]   = React.useState("");
+  const [cantidad, setCantidad] = React.useState(1);
+  const [responsable, setResponsable] = React.useState("");
+  const [obs,      setObs]      = React.useState("");
+  const [insumos,  setInsumos]  = React.useState([]);
+  const [showInsumos, setShowInsumos] = React.useState(false);
+
+  const plantaSel = plantasDisp.find(i=>String(i.id)===planta);
+
+  const addInsumo = () => setInsumos(p=>[...p,{id:Date.now(),itemId:"",bodegaId:"b01",nombre:"",cantidad:1,unidad:"unidad"}]);
+  const updInsumo = (idx,patch) => setInsumos(p=>p.map((x,i)=>i===idx?{...x,...patch}:x));
+  const delInsumo = (idx) => setInsumos(p=>p.filter((_,i)=>i!==idx));
+
+  const guardar = () => {
+    if(modo==="plantar"&&!planta) return;
+    if(modo==="trasplantar"&&!obs.trim()) return;
+
+    const esPlantacion = modo==="plantar";
+    const textoTarea = esPlantacion
+      ? `🌱 Plantación: ${plantaSel?.nombre||"planta"} (${cantidad} ${plantaSel?.unidad||"unidad"}) en ${zona?.nombre||"zona"}`
+      : `🔄 Trasplante a Vivero desde ${zona?.nombre||"zona"}: ${obs}`;
+
+    // Descuentos de stock a ejecutar al completar
+    const descuentoStock = [];
+    if(esPlantacion && plantaSel) {
+      descuentoStock.push({bodegaId:"b01", itemId:String(plantaSel.id), cantidad:Number(cantidad), nombre:plantaSel.nombre, unidad:plantaSel.unidad||"unidad", fecha});
+    }
+    insumos.forEach(ins=>{
+      if(ins.itemId&&ins.cantidad) {
+        descuentoStock.push({bodegaId:ins.bodegaId, itemId:String(ins.itemId), cantidad:Number(ins.cantidad), nombre:ins.nombre, unidad:ins.unidad, fecha});
+      }
+    });
+
+    // Agregar tarea a la macrozona con descuentos pendientes
+    const nuevaTarea = {
+      id:Date.now(), texto:textoTarea, fecha,
+      completada:false, enviadaProg:!!responsable,
+      descuentoStock: descuentoStock.length>0?descuentoStock:null,
+      insumos: insumos.filter(i=>i.nombre).map(i=>({nombre:i.nombre,cantidad:i.cantidad,unidad:i.unidad})),
+    };
+
+    addTareaZona(zonaId, textoTarea, nuevaTarea);
+    addHistorial(zonaId, textoTarea);
+
+    // Enviar al programa si hay responsable
+    if(responsable&&fecha) {
+      setTareasProg(p=>({...p,[fecha]:[...(p[fecha]||[]),{
+        id:Date.now()+1, fecha, zona:zona?.nombre||"", elemento:"",
+        tarea:textoTarea, responsable, estado:"por_designar", notas:obs||"", auto:false,
+      }]}));
+    }
+
+    // Si es trasplante → ingresa planta al vivero inmediatamente
+    if(modo==="trasplantar"&&obs.trim()) {
+      const nuevoBodegasData = {...bodegasData};
+      const bdVivero = nuevoBodegasData["b01"]||{items:[],movimientos:[]};
+      const items = [...(bdVivero.items||[])];
+      const idx = items.findIndex(i=>i.nombre.trim().toLowerCase()===obs.trim().toLowerCase());
+      if(idx>=0) {
+        items[idx]={...items[idx],stockActual:(Number(items[idx].stockActual)||0)+Number(cantidad)};
+      } else {
+        items.push({id:Date.now()+2,nombre:obs.trim(),categoria:"Planta",unidad:"unidad",stockActual:Number(cantidad),stockMinimo:0,ubicacion:"",obs:`Trasplantada desde ${zona?.nombre} el ${fecha}`});
+      }
+      const movimientos=[{id:Date.now()+3,fecha,tipo:"entrada",cantidad:Number(cantidad),unidad:"unidad",motivo:`Trasplante desde ${zona?.nombre}`,itemId:String(idx>=0?items[idx].id:items[items.length-1].id)},...(bdVivero.movimientos||[])].slice(0,200);
+      nuevoBodegasData["b01"]={...bdVivero,items,movimientos};
+      setBodegasData(nuevoBodegasData);
+    }
+
+    onClose();
+  };
+
+  return (
+    <div style={{...S.card,padding:20,marginBottom:14,background:modo==="plantar"?"rgba(74,222,128,0.05)":"rgba(251,191,36,0.05)",borderColor:modo==="plantar"?"rgba(74,222,128,0.25)":"rgba(251,191,36,0.25)"}} className="ein">
+      <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:modo==="plantar"?"#4ade80":"#fbbf24",marginBottom:14}}>
+        {modo==="plantar"?"🌱 Plantar desde Vivero":"🔄 Trasplantar a Vivero"} — {zona?.nombre}
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+        <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={fecha} onChange={e=>setFecha(e.target.value)}/></div>
+        <div><label style={labelSt}>Responsable</label>
+          <select style={S.input} value={responsable} onChange={e=>setResponsable(e.target.value)}>
+            <option value="">Seleccionar...</option>
+            {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+          </select>
+        </div>
+
+        {modo==="plantar"?(
+          <>
+            <div style={{gridColumn:"1/-1"}}>
+              <label style={labelSt}>Planta del Vivero</label>
+              {plantasDisp.length===0?(
+                <div style={{...S.input,color:"#ef4444",fontSize:12}}>⚠️ Sin stock en Vivero</div>
+              ):(
+                <select style={S.input} value={planta} onChange={e=>setPlanta(e.target.value)}>
+                  <option value="">Seleccionar planta...</option>
+                  {plantasDisp.map(i=><option key={i.id} value={i.id}>{i.nombre} — stock: {i.stockActual} {i.unidad}</option>)}
+                </select>
+              )}
+            </div>
+            <div><label style={labelSt}>Cantidad</label>
+              <input type="number" min={1} max={plantaSel?.stockActual||999} style={S.input} value={cantidad} onChange={e=>setCantidad(e.target.value)}/>
+              {plantaSel&&Number(cantidad)>Number(plantaSel.stockActual)&&<div style={{fontSize:11,color:"#ef4444",marginTop:3}}>⚠️ Supera el stock disponible ({plantaSel.stockActual})</div>}
+            </div>
+            <div><label style={labelSt}>Observaciones</label><input style={S.input} value={obs} onChange={e=>setObs(e.target.value)} placeholder="Sector de plantación, condiciones..."/></div>
+          </>
+        ):(
+          <>
+            <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Nombre de la planta a trasplantar</label><input style={S.input} value={obs} onChange={e=>setObs(e.target.value)} placeholder="ej: Lavanda, Rosa..."/></div>
+            <div><label style={labelSt}>Cantidad</label><input type="number" min={1} style={S.input} value={cantidad} onChange={e=>setCantidad(e.target.value)}/></div>
+          </>
+        )}
+      </div>
+
+      {/* Insumos */}
+      <div style={{background:"rgba(255,255,255,0.03)",borderRadius:8,padding:"10px 12px",marginBottom:12,border:"1px solid rgba(255,255,255,0.07)"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:insumos.length>0||showInsumos?8:0}}>
+          <div style={{fontSize:12,color:"#7aaa80",fontWeight:600}}>📦 Insumos asociados (macetas, arena, compost...)</div>
+          <button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(255,255,255,0.06)",color:"#7aaa80"}}
+            onClick={()=>{setShowInsumos(true);addInsumo();}}>+ Agregar</button>
+        </div>
+        {(showInsumos||insumos.length>0)&&(
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            {insumos.map((ins,idx)=>(
+              <div key={ins.id} style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                <select style={{...S.input,flex:2,fontSize:12,padding:"5px 8px"}}
+                  value={ins.itemId}
+                  onChange={e=>{
+                    const allItems=[...(vivero.items||[]).map(i=>({...i,_bod:"b01"})),...(b03.items||[]).map(i=>({...i,_bod:"b03"}))];
+                    const sel=allItems.find(i=>String(i.id)===e.target.value);
+                    updInsumo(idx,{itemId:e.target.value,bodegaId:sel?._bod||"b03",nombre:sel?.nombre||"",unidad:sel?.unidad||"unidad"});
+                  }}>
+                  <option value="">Seleccionar insumo...</option>
+                  <optgroup label="🌱 Vivero">{(vivero.items||[]).filter(i=>Number(i.stockActual||0)>0).map(i=><option key={i.id} value={i.id}>{i.nombre} (stock:{i.stockActual})</option>)}</optgroup>
+                  <optgroup label="🔧 Materiales y Herramientas">{(b03.items||[]).filter(i=>Number(i.stockActual||0)>0).map(i=><option key={i.id} value={i.id}>{i.nombre} (stock:{i.stockActual})</option>)}</optgroup>
+                </select>
+                <input type="number" min={1} style={{...S.input,width:70,fontSize:12,padding:"5px 8px"}} value={ins.cantidad} onChange={e=>updInsumo(idx,{cantidad:e.target.value})} placeholder="Cant."/>
+                <button className="btn-d" style={{...S.btn,fontSize:11,padding:"3px 8px"}} onClick={()=>delInsumo(idx)}>✕</button>
+              </div>
+            ))}
+            <div style={{fontSize:11,color:"#f59e0b",marginTop:4}}>⚠️ Los insumos se descontarán del stock al marcar la tarea como completada</div>
+          </div>
+        )}
+      </div>
+
+      <div style={{display:"flex",gap:8}}>
+        <button className="btn-p" style={S.btn} onClick={guardar}
+          disabled={modo==="plantar"&&!planta}>
+          ✓ Crear tarea y enviar a programa
+        </button>
+        <button className="btn-g" style={S.btn} onClick={onClose}>Cancelar</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── BONO POR TAREA ──────────────────────────────────────────────────────────
+function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, setBonosMasivos, setPersonal, onVolver, esJefa }) {
+  const hoy = new Date().toISOString().slice(0,10);
+  const labelSt = {fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
+
+  const pctFondo    = Number(bonosConfig.pctFondo||50);
+  const pctEjecutor = Number(bonosConfig.pctEjecutor||50);
+  const pctAyudante = Number(bonosConfig.pctAyudante||30);
+  const pctApoyo    = Number(bonosConfig.pctApoyo||20);
+
+  const [showConfig, setShowConfig] = React.useState(false);
+  const [showForm,   setShowForm]   = React.useState(false);
+  const [form, setForm] = React.useState({
+    fecha: hoy, descripcion:"", valorMercado:"",
+    ejecutor:"", ayudante:"", apoyos:[], obs:""
+  });
+
+  const listaPersonal = [...personal].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+
+  // Cálculo en tiempo real
+  const fondoTotal  = Math.round(Number(form.valorMercado||0) * pctFondo / 100);
+  const montoEjec   = Math.round(fondoTotal * pctEjecutor / 100);
+  const montoAyud   = Math.round(fondoTotal * pctAyudante / 100);
+  const nApoyos     = form.apoyos.filter(a=>a).length;
+  const montoApoyo  = nApoyos>0 ? Math.round((fondoTotal * pctApoyo / 100) / nApoyos) : 0;
+  const totalDistr  = montoEjec + montoAyud + (montoApoyo * nApoyos);
+
+  const guardar = () => {
+    if(!form.descripcion.trim()||!form.valorMercado||!form.ejecutor) return;
+    const apoyosValidos = form.apoyos.filter(a=>a);
+    const nuevoBono = {
+      id: Date.now(), fecha:form.fecha, descripcion:form.descripcion,
+      valorMercado:Number(form.valorMercado), fondoTotal, obs:form.obs,
+      estado:"generado",
+      participantes:[
+        {trabajadorId:form.ejecutor, nombre:personal.find(p=>p.id===form.ejecutor)?.nombre||"", rol:"Ejecutor", pct:pctEjecutor, monto:montoEjec},
+        ...(form.ayudante?[{trabajadorId:form.ayudante, nombre:personal.find(p=>p.id===form.ayudante)?.nombre||"", rol:"Ayudante", pct:pctAyudante, monto:montoAyud}]:[]),
+        ...apoyosValidos.map(id=>({trabajadorId:id, nombre:personal.find(p=>p.id===id)?.nombre||"", rol:"Apoyo", pct:pctApoyo, monto:montoApoyo})),
+      ]
+    };
+    // Registrar bono masivo
+    setBonosMasivos(p=>[nuevoBono,...(p||[])]);
+    // Agregar bono individual a cada trabajador
+    const ahora = new Date().toISOString().slice(0,10);
+    setPersonal(p=>p.map(t=>{
+      const partic = nuevoBono.participantes.find(x=>x.trabajadorId===t.id);
+      if(!partic) return t;
+      return {...t, eventos:[...(t.eventos||[]),{
+        id:Date.now()+Math.random(), tipo:"bonoConstruccion",
+        fecha:form.fecha, estado:"pendiente",
+        descripcion:`${partic.rol} — ${form.descripcion}`,
+        valor:String(partic.monto), horas:"",
+      }]};
+    }));
+    setForm({fecha:hoy,descripcion:"",valorMercado:"",ejecutor:"",ayudante:"",apoyos:[],obs:""});
+    setShowForm(false);
+  };
+
+  return (
+    <div className="ein">
+      <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:20,flexWrap:"wrap"}}>
+        <button className="btn-g" style={S.btn} onClick={onVolver}>← Volver</button>
+        <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:900,flex:1}}>💰 Bono por Tarea</h1>
+        {esJefa&&<button style={{...S.btn,fontSize:12,background:"rgba(255,255,255,0.06)",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)"}} onClick={()=>setShowConfig(p=>!p)}>⚙️ Configurar %</button>}
+        <button className="btn-p" style={S.btn} onClick={()=>setShowForm(p=>!p)}>➕ Nueva tarea con bono</button>
+      </div>
+
+      {/* Configuración % */}
+      {showConfig&&esJefa&&(
+        <div style={{...S.card,padding:18,marginBottom:16,background:"rgba(255,255,255,0.03)"}}>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#c4b5fd",marginBottom:12}}>⚙️ Configuración de porcentajes — {bonosConfig.año||new Date().getFullYear()}</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+            <div><label style={labelSt}>% Fondo sobre valor mercado</label>
+              <input type="number" min={1} max={100} style={S.input} value={bonosConfig.pctFondo||50}
+                onChange={e=>setBonosConfig(p=>({...p,pctFondo:Number(e.target.value)}))}/>
+              <div style={{fontSize:10,color:"#5a8a6a",marginTop:3}}>Ejemplo: 50% de $200.000 = $100.000 a distribuir</div>
+            </div>
+            <div><label style={labelSt}>Año de vigencia</label>
+              <input type="number" style={S.input} value={bonosConfig.año||new Date().getFullYear()}
+                onChange={e=>setBonosConfig(p=>({...p,año:Number(e.target.value)}))}/>
+            </div>
+            <div><label style={labelSt}>% Ejecutor (del fondo)</label>
+              <input type="number" min={1} max={100} style={S.input} value={bonosConfig.pctEjecutor||50}
+                onChange={e=>setBonosConfig(p=>({...p,pctEjecutor:Number(e.target.value)}))}/>
+            </div>
+            <div><label style={labelSt}>% Ayudante (del fondo)</label>
+              <input type="number" min={1} max={100} style={S.input} value={bonosConfig.pctAyudante||30}
+                onChange={e=>setBonosConfig(p=>({...p,pctAyudante:Number(e.target.value)}))}/>
+            </div>
+            <div><label style={labelSt}>% Apoyo total (del fondo, se divide entre N)</label>
+              <input type="number" min={1} max={100} style={S.input} value={bonosConfig.pctApoyo||20}
+                onChange={e=>setBonosConfig(p=>({...p,pctApoyo:Number(e.target.value)}))}/>
+              <div style={{fontSize:10,color:"#5a8a6a",marginTop:3}}>Si hay 2 apoyos cada uno recibe {Math.round((bonosConfig.pctApoyo||20)/2)}%</div>
+            </div>
+            <div style={{display:"flex",alignItems:"end",paddingBottom:4}}>
+              <div style={{fontSize:13,color:pctEjecutor+pctAyudante+pctApoyo===100?"#86efac":"#ef4444",fontWeight:600}}>
+                Total distribuido: {pctEjecutor+pctAyudante+pctApoyo}%
+                {pctEjecutor+pctAyudante+pctApoyo!==100&&<span style={{fontSize:11}}> ⚠️ debe sumar 100%</span>}
+              </div>
+            </div>
+          </div>
+          <button className="btn-g" style={S.btn} onClick={()=>setShowConfig(false)}>✓ Guardar configuración</button>
+        </div>
+      )}
+
+      {/* Formulario nueva tarea con bono */}
+      {showForm&&(
+        <div style={{...S.card,padding:20,marginBottom:16}} className="ein">
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#c4b5fd",marginBottom:14}}>➕ Nueva tarea con bono</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+            <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={form.fecha} onChange={e=>setForm(p=>({...p,fecha:e.target.value}))}/></div>
+            <div><label style={labelSt}>Valor mercado de la tarea ($)</label>
+              <input type="number" min={0} style={S.input} placeholder="ej: 200000" value={form.valorMercado} onChange={e=>setForm(p=>({...p,valorMercado:e.target.value}))}/>
+            </div>
+            <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Descripción de la tarea</label>
+              <input style={S.input} placeholder="ej: Tala palmera cancha golf hoyo 5" value={form.descripcion} onChange={e=>setForm(p=>({...p,descripcion:e.target.value}))}/>
+            </div>
+          </div>
+
+          {/* Vista previa del fondo */}
+          {Number(form.valorMercado)>0&&(
+            <div style={{background:"rgba(196,181,253,0.08)",border:"1px solid rgba(196,181,253,0.2)",borderRadius:10,padding:"12px 16px",marginBottom:14}}>
+              <div style={{fontSize:11,color:"#c4b5fd",marginBottom:8,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.5px"}}>💰 Distribución del bono</div>
+              <div style={{display:"flex",gap:16,flexWrap:"wrap",fontSize:13}}>
+                <div><span style={{color:"#7a6a9a"}}>Valor mercado:</span> <strong>${Number(form.valorMercado).toLocaleString("es-CL")}</strong></div>
+                <div><span style={{color:"#7a6a9a"}}>Fondo ({pctFondo}%):</span> <strong style={{color:"#c4b5fd"}}>${fondoTotal.toLocaleString("es-CL")}</strong></div>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginTop:10}}>
+                <div style={{background:"rgba(74,222,128,0.08)",borderRadius:7,padding:"8px 10px",border:"1px solid rgba(74,222,128,0.2)"}}>
+                  <div style={{fontSize:10,color:"#4ade80",marginBottom:2}}>EJECUTOR ({pctEjecutor}%)</div>
+                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#4ade80"}}>${montoEjec.toLocaleString("es-CL")}</div>
+                </div>
+                <div style={{background:"rgba(96,165,250,0.08)",borderRadius:7,padding:"8px 10px",border:"1px solid rgba(96,165,250,0.2)"}}>
+                  <div style={{fontSize:10,color:"#60a5fa",marginBottom:2}}>AYUDANTE ({pctAyudante}%)</div>
+                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#60a5fa"}}>${montoAyud.toLocaleString("es-CL")}</div>
+                </div>
+                <div style={{background:"rgba(251,191,36,0.08)",borderRadius:7,padding:"8px 10px",border:"1px solid rgba(251,191,36,0.2)"}}>
+                  <div style={{fontSize:10,color:"#fbbf24",marginBottom:2}}>APOYO c/u ({pctApoyo}%÷{Math.max(nApoyos,1)})</div>
+                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#fbbf24"}}>${montoApoyo.toLocaleString("es-CL")}</div>
+                </div>
+              </div>
+              {totalDistr!==fondoTotal&&<div style={{fontSize:11,color:"#f59e0b",marginTop:6}}>⚠️ Distribuido: ${totalDistr.toLocaleString("es-CL")} de ${fondoTotal.toLocaleString("es-CL")}</div>}
+            </div>
+          )}
+
+          {/* Asignación de roles */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+            <div><label style={labelSt}>Ejecutor</label>
+              <select style={S.input} value={form.ejecutor} onChange={e=>setForm(p=>({...p,ejecutor:e.target.value}))}>
+                <option value="">Seleccionar...</option>
+                {listaPersonal.map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}
+              </select>
+            </div>
+            <div><label style={labelSt}>Ayudante</label>
+              <select style={S.input} value={form.ayudante} onChange={e=>setForm(p=>({...p,ayudante:e.target.value}))}>
+                <option value="">Sin ayudante</option>
+                {listaPersonal.filter(p=>p.id!==form.ejecutor).map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}
+              </select>
+            </div>
+            <div style={{gridColumn:"1/-1"}}>
+              <label style={labelSt}>Apoyos</label>
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                {form.apoyos.map((ap,idx)=>(
+                  <div key={idx} style={{display:"flex",gap:6}}>
+                    <select style={{...S.input,flex:1}} value={ap} onChange={e=>setForm(p=>({...p,apoyos:p.apoyos.map((a,i)=>i===idx?e.target.value:a)}))}>
+                      <option value="">Seleccionar...</option>
+                      {listaPersonal.filter(p=>p.id!==form.ejecutor&&p.id!==form.ayudante&&!form.apoyos.filter((_,i)=>i!==idx).includes(p.id)).map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}
+                    </select>
+                    <button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 8px"}} onClick={()=>setForm(p=>({...p,apoyos:p.apoyos.filter((_,i)=>i!==idx)}))}>✕</button>
+                  </div>
+                ))}
+                <button style={{...S.btn,fontSize:12,background:"rgba(251,191,36,0.1)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.2)",alignSelf:"flex-start"}}
+                  onClick={()=>setForm(p=>({...p,apoyos:[...p.apoyos,""]}))}>+ Agregar apoyo</button>
+              </div>
+            </div>
+            <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observaciones</label>
+              <input style={S.input} value={form.obs} onChange={e=>setForm(p=>({...p,obs:e.target.value}))} placeholder="Condiciones especiales, notas..."/>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button className="btn-p" style={S.btn} onClick={guardar} disabled={!form.descripcion||!form.valorMercado||!form.ejecutor}>
+              ✓ Generar bonos
+            </button>
+            <button className="btn-g" style={S.btn} onClick={()=>setShowForm(false)}>Cancelar</button>
+          </div>
+        </div>
+      )}
+
+      {/* Historial bonos masivos */}
+      {(bonosMasivos||[]).length===0&&!showForm?(
+        <div style={{...S.card,padding:40,textAlign:"center",color:"#4a8a5a"}}>
+          <div style={{fontSize:36,marginBottom:8}}>💰</div>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:16}}>Sin bonos por tarea registrados</div>
+          <div style={{fontSize:13,marginTop:4}}>Crea una nueva tarea con bono para comenzar</div>
+        </div>
+      ):(
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          {(bonosMasivos||[]).map(bono=>(
+            <div key={bono.id} style={{...S.card,padding:16}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:8,marginBottom:10}}>
+                <div>
+                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,marginBottom:3}}>{bono.descripcion}</div>
+                  <div style={{fontSize:12,color:"#6aaa7a"}}>📅 {bono.fecha}</div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:11,color:"#7a6a9a"}}>Valor mercado</div>
+                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700}}>${Number(bono.valorMercado).toLocaleString("es-CL")}</div>
+                  <div style={{fontSize:11,color:"#c4b5fd"}}>Fondo: ${Number(bono.fondoTotal).toLocaleString("es-CL")}</div>
+                </div>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:5}}>
+                {(bono.participantes||[]).map((p,i)=>(
+                  <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 10px",background:"rgba(255,255,255,0.03)",borderRadius:7,border:"1px solid rgba(255,255,255,0.06)"}}>
+                    <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                      <span style={{fontSize:10,padding:"2px 8px",borderRadius:10,background:p.rol==="Ejecutor"?"rgba(74,222,128,0.12)":p.rol==="Ayudante"?"rgba(96,165,250,0.12)":"rgba(251,191,36,0.12)",color:p.rol==="Ejecutor"?"#4ade80":p.rol==="Ayudante"?"#60a5fa":"#fbbf24",fontWeight:600}}>{p.rol}</span>
+                      <span style={{fontSize:13}}>{p.nombre}</span>
+                    </div>
+                    <span style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:p.rol==="Ejecutor"?"#4ade80":p.rol==="Ayudante"?"#60a5fa":"#fbbf24"}}>${Number(p.monto).toLocaleString("es-CL")}</span>
+                  </div>
+                ))}
+              </div>
+              {bono.obs&&<div style={{fontSize:11,color:"#5a8a6a",marginTop:8,fontStyle:"italic"}}>{bono.obs}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [zonas, setZonas] = useState(MACROZONAS_BASE);
   const [vista, setVista] = useState("dashboard");
@@ -6691,6 +7106,19 @@ export default function App() {
   const [nuevaTarea, setNuevaTarea] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiText, setAiText] = useState("");
+  const [showPlantacionForm, setShowPlantacionForm] = useState(null);
+
+  const ejecutarDescuentoStock = (descuentos) => {
+    if(!descuentos||!descuentos.length) return;
+    const nuevoBodegasData = {...bodegasData};
+    descuentos.forEach(({bodegaId, itemId, cantidad, nombre, unidad, fecha})=>{
+      const bd = nuevoBodegasData[bodegaId]||{items:[],movimientos:[]};
+      const items = (bd.items||[]).map(i=>String(i.id)===String(itemId)?{...i,stockActual:Math.max(0,(Number(i.stockActual)||0)-Number(cantidad))}:i);
+      const movimientos = [{id:Date.now()+Math.random(),fecha:fecha||new Date().toISOString().slice(0,10),tipo:"salida",cantidad:Number(cantidad),unidad:unidad||"unidad",motivo:"Tarea completada — uso en macrozona",itemId:String(itemId),itemNombre:nombre},...(bd.movimientos||[])].slice(0,200);
+      nuevoBodegasData[bodegaId] = {...bd,items,movimientos};
+    });
+    setBodegasData(nuevoBodegasData);
+  };
   const [fechaReporte, setFechaReporte] = useState(new Date().toISOString().slice(0,10));
   const [tabReporte, setTabReporte] = useState("general");
   const [semanaBase, setSemanaBase] = useState(()=>{
@@ -6735,6 +7163,10 @@ export default function App() {
   const [incidenciasFito,setIncidenciasFito,incidReady]    = useFirebaseState("fung-incid",     []);
   const [comprasData,    setComprasData,    comprasReady]  = useFirebaseState("compras",  {compras:[],cuentas:CUENTAS_DEFAULT});
   const [bodegasData,    setBodegasData,    bodegasReady]  = useFirebaseState("bodegas",  {});
+  const [bonosConfig,    setBonosConfig,    bonosReady]    = useFirebaseState("bonos-config", {
+    pctFondo:50, pctEjecutor:50, pctAyudante:30, pctApoyo:20, año:new Date().getFullYear()
+  });
+  const [bonosMasivos,   setBonosMasivos,   bonosMasReady] = useFirebaseState("bonos-masivos", []);
 
   const appReady = dataReady && personalReady && progReady;
 
@@ -6807,10 +7239,10 @@ export default function App() {
   const totalElems = MACROZONAS_BASE.reduce((a,z)=>a+getAllElems(z.id).length,0);
   const elemsOk = MACROZONAS_BASE.reduce((a,z)=>a+getAllElems(z.id).filter(e=>e.edData.estado==="bueno").length,0);
 
-  const addTareaZona = (zid, texto) => {
+  const addTareaZona = (zid, texto, tareaObj) => {
     if(!texto.trim()) return;
-    // 1. Agregar al checklist de la zona
-    updateZona(zid, { tareas: [...(getZD(zid).tareas||[]), { id:Date.now(), texto, completada:false, fecha:new Date().toLocaleDateString("es-CL"), enviadaProg:true }] });
+    const nuevaTareaZona = tareaObj || { id:Date.now(), texto, completada:false, fecha:new Date().toLocaleDateString("es-CL"), enviadaProg:true };
+    updateZona(zid, { tareas: [...(getZD(zid).tareas||[]), nuevaTareaZona] });
     addHistorial(zid, `Tarea añadida: ${texto}`);
     // 2. Agregar a programación diaria como tarea pendiente (hoy)
     const hoy = new Date().toISOString().slice(0,10);
@@ -7316,19 +7748,70 @@ export default function App() {
             {tab==="tareas"&&(
               <div className="ein">
                 <div style={{...S.card,padding:16,marginBottom:14}}>
-                  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
                     <input placeholder="Escribir tarea..." value={nuevaTarea} onChange={e=>setNuevaTarea(e.target.value)} style={{...S.input,flex:"2 1 180px"}} onKeyDown={e=>{if(e.key==="Enter"){addTareaZona(zonaId,nuevaTarea);setNuevaTarea("");}}}/>
                     <button className="btn-p" style={S.btn} onClick={()=>{addTareaZona(zonaId,nuevaTarea);setNuevaTarea("");}}>➕ Agregar</button>
                   </div>
-                  <div style={{fontSize:11,color:"#5a8a6a",marginTop:6}}>💡 Las tareas aparecen en 📆 <b style={{color:"#c084fc"}}>Programación</b> como <b style={{color:"#94a3b8"}}>Por designar</b> — listas para asignar responsable y fecha.</div>
-                  <div style={{fontSize:11,color:"#5a8a6a",marginTop:6}}>💡 Las tareas agregadas aparecen automáticamente en 📆 Programación como <b style={{color:"#94a3b8"}}>Por designar</b> para asignar responsable y fecha.</div>
+                  {/* Botones especiales */}
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                    <button style={{...S.btn,background:"rgba(74,222,128,0.12)",color:"#4ade80",border:"1px solid rgba(74,222,128,0.3)",fontSize:12}}
+                      onClick={()=>setShowPlantacionForm(p=>p==="plantar"?null:"plantar")}>
+                      🌱 Plantar desde Vivero
+                    </button>
+                    <button style={{...S.btn,background:"rgba(251,191,36,0.12)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.3)",fontSize:12}}
+                      onClick={()=>setShowPlantacionForm(p=>p==="trasplantar"?null:"trasplantar")}>
+                      🔄 Trasplantar a Vivero
+                    </button>
+                  </div>
+                  <div style={{fontSize:11,color:"#5a8a6a",marginTop:8}}>💡 Las tareas aparecen en 📆 Programación como Por designar — listas para asignar responsable y fecha.</div>
                 </div>
+
+                {/* Formulario Plantación desde Vivero */}
+                {showPlantacionForm==="plantar"&&(
+                  <TareaPlantacion
+                    modo="plantar" zona={zona} zonaId={zonaId}
+                    bodegasData={bodegasData} setBodegasData={setBodegasData}
+                    tareasProg={tareasProg} setTareasProg={setTareasProg}
+                    personal={personal} S={S}
+                    addTareaZona={addTareaZona} addHistorial={addHistorial}
+                    onClose={()=>setShowPlantacionForm(null)}
+                  />
+                )}
+
+                {/* Formulario Trasplante a Vivero */}
+                {showPlantacionForm==="trasplantar"&&(
+                  <TareaPlantacion
+                    modo="trasplantar" zona={zona} zonaId={zonaId}
+                    bodegasData={bodegasData} setBodegasData={setBodegasData}
+                    tareasProg={tareasProg} setTareasProg={setTareasProg}
+                    personal={personal} S={S}
+                    addTareaZona={addTareaZona} addHistorial={addHistorial}
+                    onClose={()=>setShowPlantacionForm(null)}
+                  />
+                )}
+
                 <div style={{display:"flex",flexDirection:"column",gap:8}}>
                   {(zd.tareas||[]).length===0&&<div style={{textAlign:"center",color:"#4a8a5a",padding:32,fontSize:15}}>Sin tareas registradas.</div>}
                   {(zd.tareas||[]).map(t=>(
                     <div key={t.id} style={{...S.card,padding:"11px 16px",display:"flex",alignItems:"center",gap:12,opacity:t.completada?0.55:1}}>
-                      <input type="checkbox" checked={t.completada} onChange={()=>{toggleTareaZona(zonaId,t.id);addHistorial(zonaId,`Tarea ${t.completada?"reabierta":"completada"}: ${t.texto}`);}} style={{width:17,height:17,accentColor:"#3d7a52",cursor:"pointer",flexShrink:0}}/>
-                      <span style={{flex:1,fontSize:14,textDecoration:t.completada?"line-through":"none"}}>{t.texto}</span>
+                      <input type="checkbox" checked={t.completada} onChange={()=>{
+                        toggleTareaZona(zonaId,t.id);
+                        addHistorial(zonaId,`Tarea ${t.completada?"reabierta":"completada"}: ${t.texto}`);
+                        // Si la tarea tiene descuento de stock pendiente, ejecutarlo al completar
+                        if(!t.completada && t.descuentoStock) {
+                          ejecutarDescuentoStock(t.descuentoStock);
+                        }
+                      }} style={{width:17,height:17,accentColor:"#3d7a52",cursor:"pointer",flexShrink:0}}/>
+                      <div style={{flex:1}}>
+                        <span style={{fontSize:14,textDecoration:t.completada?"line-through":"none"}}>{t.texto}</span>
+                        {t.insumos&&t.insumos.length>0&&(
+                          <div style={{fontSize:11,color:"#6aaa7a",marginTop:3}}>
+                            📦 Insumos: {t.insumos.map(i=>`${i.nombre} (${i.cantidad} ${i.unidad})`).join(", ")}
+                            {!t.completada&&<span style={{color:"#fbbf24"}}> — se descontarán al confirmar</span>}
+                            {t.completada&&<span style={{color:"#4ade80"}}> ✅ descontados</span>}
+                          </div>
+                        )}
+                      </div>
                       <span style={{fontSize:11,color:"#4a8a5a"}}>{t.fecha}</span>
                       {t.enviadaProg&&<span style={{fontSize:10,color:"#c084fc",background:"rgba(192,132,252,0.1)",padding:"1px 6px",borderRadius:8,border:"1px solid rgba(192,132,252,0.2)",flexShrink:0}}>📆 En prog.</span>}
                     </div>
@@ -7718,7 +8201,10 @@ export default function App() {
                 <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:24,fontWeight:900,marginBottom:3}}>Personal</h1>
                 <p style={{color:"#6aaa7a",fontSize:14}}>{personal.length} trabajador{personal.length!==1?"es":""} registrado{personal.length!==1?"s":""}</p>
               </div>
-              <button className="btn-p" style={S.btn} onClick={()=>setPersonalVista("nuevo")}>➕ Nuevo Trabajador</button>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                <button style={{...S.btn,background:"rgba(196,181,253,0.15)",color:"#c4b5fd",border:"1px solid rgba(196,181,253,0.3)"}} onClick={()=>setPersonalVista("bono-masivo")}>💰 Bono por Tarea</button>
+                <button className="btn-p" style={S.btn} onClick={()=>setPersonalVista("nuevo")}>➕ Nuevo Trabajador</button>
+              </div>
             </div>
             {personal.length===0&&(
               <div style={{...S.card,padding:48,textAlign:"center",color:"#4a8a5a"}}>
@@ -7752,6 +8238,16 @@ export default function App() {
               })}
             </div>
           </div>
+        )}
+
+        {vista==="personal"&&personalVista==="bono-masivo"&&(
+          <BonoMasivo
+            S={S} personal={personal} bonosConfig={bonosConfig} setBonosConfig={setBonosConfig}
+            bonosMasivos={bonosMasivos} setBonosMasivos={setBonosMasivos}
+            setPersonal={setPersonal}
+            onVolver={()=>setPersonalVista("lista")}
+            esJefa={rolLogueado==="jefa"}
+          />
         )}
 
         {vista==="personal"&&personalVista==="nuevo"&&(
