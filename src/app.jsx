@@ -6296,7 +6296,40 @@ const GREENS_DEF = [
   {id:"g8", nombre:"Green 08", hoyos:"Hoyo 08 - 17"},
   {id:"g9", nombre:"Green 09", hoyos:"Hoyo 09 - 18"},
 ];
-const TEES_DEF   = Array.from({length:18},(_,i)=>({id:`t${i+1}`,nombre:`Tee ${String(i+1).padStart(2,"0")}`,hoyo:`Hoyo ${i+1}`}));
+const TEES_DEF = Array.from({length:18},(_,i)=>({id:`t${i+1}`,nombre:`Tee ${String(i+1).padStart(2,"0")}`,hoyo:`Hoyo ${i+1}`}));
+const BUNKERS_DEF = [
+  {id:"bk1", nombre:"Búnker Hoyo 01"},
+  {id:"bk2", nombre:"Búnker Hoyo 02"},
+  {id:"bk3", nombre:"Búnker Hoyo 06"},
+  {id:"bk4", nombre:"Búnker Hoyo 09 Oriente"},
+  {id:"bk5", nombre:"Búnker Hoyo 09 Poniente"},
+];
+const FAIRWAYS_DEF = Array.from({length:9},(_,i)=>({id:`fw${i+1}`,nombre:`Fairway ${String(i+1).padStart(2,"0")}`,hoyo:`Hoyo ${i+1}`}));
+const ZONAS_GOLF_EXTRA = [
+  {id:"antegreen", nombre:"Ante-greens", icono:"🌿", color:"#6ee7b7"},
+  {id:"lomas",     nombre:"Lomas",       icono:"⛰️",  color:"#a3e635"},
+  {id:"macizo_acceso",   nombre:"Macizo Acceso",   icono:"🌺", color:"#f9a8d4"},
+  {id:"macizo_interior", nombre:"Macizo Interior",  icono:"🌺", color:"#f9a8d4"},
+  {id:"macizo_exterior", nombre:"Macizo Exterior",  icono:"🌺", color:"#f9a8d4"},
+  {id:"isla_arena",      nombre:"Isla de Arena",    icono:"🏝️", color:"#fde68a"},
+  {id:"jaula",           nombre:"Jaula",            icono:"🕸️", color:"#d1d5db"},
+];
+const PLANTAS_GOLF = [
+  {id:"bignonia_poniente",  nombre:"Bignonia Poniente",        ubicacion:"Poniente"},
+  {id:"bignonia_bano",      nombre:"Bignonia Baño Hombres",    ubicacion:"Baño Hombres"},
+  {id:"lavanda",            nombre:"Lavanda",                  ubicacion:"Exterior"},
+  {id:"romero",             nombre:"Romero",                   ubicacion:"Exterior"},
+];
+const EDIFICIO_GOLF = [
+  {id:"edif_1p_macetas",   nombre:"Macetas 1er Piso",      piso:"1er piso"},
+  {id:"edif_2p_jardinera", nombre:"Jardinera 2do Piso",    piso:"2do piso"},
+  {id:"edif_2p_liquidambar",nombre:"Macetas Liquidámbar 2do Piso", piso:"2do piso"},
+];
+const TAREAS_BUNKERS    = ["Recortar bordes","Rastrillar y labrar arena","Rellenar con arena","Rastrillado superficial","Recoger piedras/escombros","Revisión estado"];
+const TAREAS_FAIRWAYS   = ["Corte","Riego","Fertilización","Control malezas","Aireación","Resiembra","Soplado"];
+const TAREAS_LOMAS      = ["Corte","Desbrozado","Riego","Control malezas"];
+const TAREAS_MACIZOS    = ["Poda","Riego","Fertilización","Control plagas","Limpieza","Reemplazo plantas","Mulching"];
+const TAREAS_EDIFICIO   = ["Riego","Fertilización","Cambio tierra","Poda/formación","Revisión estado","Limpieza macetas"];
 const TIPOS_ARBOL = ["Hoja caduca","Hoja persistente","Coníferas","Palmera","Arbusto"];
 const TAREAS_GREENS_DIARIAS = ["Limpieza general","Corte de greens","Rodado","Riego ligero (Syringing)","Cambio de bandera","Revisión hoyos","Soplado/Barrido","Reparación pitch marks"];
 const TAREAS_GREENS_PERIODICAS = ["Medición de altura","Fertilización","Aireación","Escarificado","Resiembra","Control de plagas","Riego automático revisión","Aplicación fungicida","Top dressing","Control malezas","Perforar nuevos hoyos","Corte ante-greens"];
@@ -6359,6 +6392,94 @@ const PLANTILLA_PRE_TORNEO = {
   ],
 };
 
+// ─── ZONA GOLF SIMPLE (Búnkers, Fairways) ────────────────────────────────────
+function ZonaGolfSimple({ S, labelSt, zonas, tareas, titulo, colorAcento, golfData, setG, listaPersonal, setTareasProg, sincronizarMacrozona }) {
+  const hoy = new Date().toISOString().slice(0,10);
+  const [selZona, setSelZona] = React.useState(zonas[0]?.id||"");
+  const [showForm, setShowForm] = React.useState(false);
+  const [form, setForm] = React.useState({fecha:hoy,tipo:"",responsable:"",descripcion:"",obs:""});
+  const clave = `registros_${selZona}`;
+  const registros = Array.isArray(golfData[clave])?golfData[clave]:Object.values(golfData[clave]||{});
+
+  const guardar = () => {
+    if(!form.tipo) return;
+    const reg = {...form,id:Date.now()};
+    setG({[clave]:[reg,...registros].slice(0,100)});
+    // Enviar al programa
+    if(form.responsable&&form.fecha) {
+      setTareasProg(p=>({...p,[form.fecha]:[...(p[form.fecha]||[]),{
+        id:Date.now()+1,fecha:form.fecha,zona:"Golf",
+        elemento:zonas.find(z=>z.id===selZona)?.nombre||selZona,
+        tarea:`⛳ ${form.tipo}${form.descripcion?" — "+form.descripcion:""} · ${zonas.find(z=>z.id===selZona)?.nombre||selZona}`,
+        responsable:form.responsable,estado:"pendiente",notas:form.obs||"",auto:false,
+      }]}));
+    }
+    sincronizarMacrozona(form.tipo, zonas.find(z=>z.id===selZona)?.nombre||selZona);
+    setForm({fecha:hoy,tipo:"",responsable:"",descripcion:"",obs:""});
+    setShowForm(false);
+  };
+
+  return (
+    <div className="ein">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:8}}>
+        <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:18,color:colorAcento,margin:0}}>{titulo}</h2>
+        <button className="btn-p" style={S.btn} onClick={()=>setShowForm(true)}>📋 Nueva tarea</button>
+      </div>
+      {/* Selector zona */}
+      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
+        {zonas.map(z=>(
+          <button key={z.id} onClick={()=>setSelZona(z.id)}
+            style={{background:selZona===z.id?`${colorAcento}20`:"rgba(255,255,255,0.04)",border:`1px solid ${selZona===z.id?colorAcento+"60":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"6px 12px",color:selZona===z.id?colorAcento:"#5a9a7a",fontSize:11,cursor:"pointer"}}>
+            {z.nombre}{z.hoyo&&<><br/><span style={{fontSize:9,color:"#5a9a7a"}}>{z.hoyo}</span></>}
+          </button>
+        ))}
+      </div>
+      {/* Formulario */}
+      {showForm&&(
+        <div style={{...S.card,padding:16,marginBottom:12,background:`${colorAcento}08`,borderColor:`${colorAcento}25`}} className="ein">
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:colorAcento,marginBottom:12}}>
+            📋 Nueva tarea — {zonas.find(z=>z.id===selZona)?.nombre}
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+            <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={form.fecha} onChange={e=>setForm(p=>({...p,fecha:e.target.value}))}/></div>
+            <div><label style={labelSt}>Responsable</label>
+              <select style={S.input} value={form.responsable} onChange={e=>setForm(p=>({...p,responsable:e.target.value}))}>
+                <option value="">Seleccionar...</option>
+                {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+              </select>
+            </div>
+            <div><label style={labelSt}>Tarea</label>
+              <select style={S.input} value={form.tipo} onChange={e=>setForm(p=>({...p,tipo:e.target.value}))}>
+                <option value="">Seleccionar...</option>
+                {tareas.map(t=><option key={t}>{t}</option>)}
+                <option value="Otra">Otra...</option>
+              </select>
+            </div>
+            <div><label style={labelSt}>Descripción</label><input style={S.input} value={form.descripcion} onChange={e=>setForm(p=>({...p,descripcion:e.target.value}))} placeholder="Detalles..."/></div>
+            <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observaciones</label><input style={S.input} value={form.obs} onChange={e=>setForm(p=>({...p,obs:e.target.value}))}/></div>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button className="btn-p" style={S.btn} onClick={guardar}>✓ Guardar y enviar al programa</button>
+            <button className="btn-g" style={S.btn} onClick={()=>setShowForm(false)}>Cancelar</button>
+          </div>
+        </div>
+      )}
+      {/* Historial */}
+      <div style={{fontFamily:"'Playfair Display',serif",fontSize:13,fontWeight:700,marginBottom:8,color:colorAcento}}>📜 Últimos registros — {zonas.find(z=>z.id===selZona)?.nombre}</div>
+      {registros.length===0&&!showForm&&(
+        <div style={{...S.card,padding:32,textAlign:"center",color:"#3a7a5a"}}>Sin registros</div>
+      )}
+      {[...registros].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")).slice(0,15).map(r=>(
+        <div key={r.id} style={{...S.card,padding:"10px 14px",marginBottom:6,borderLeft:`2px solid ${colorAcento}40`}}>
+          <div style={{fontSize:12,fontWeight:600}}>📅 {r.fecha} · 👤 {r.responsable||"Sin asignar"}</div>
+          <div style={{fontSize:12,color:colorAcento,marginTop:2}}>{r.tipo}{r.descripcion&&` — ${r.descripcion}`}</div>
+          {r.obs&&<div style={{fontSize:11,color:"#5a9a7a",fontStyle:"italic"}}>{r.obs}</div>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial }) {
   const GOLF_ZONA_ID = 31; // ID macrozona Golf
   const sincronizarMacrozona = (tipo, detalle) => {
@@ -6374,7 +6495,9 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
   const listaPersonal = [...personalArr].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
 
-  const [subTab, setSubTab] = React.useState("panel");
+  const [subTabZona, setSubTabZona] = React.useState(null);
+
+
   const setG = (patch) => setGolfData(p=>({...p,...patch}));
 
   const greens    = golfData.greens    || {};
@@ -6596,7 +6719,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
 
       {/* Sub-tabs */}
       <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
-        {[["panel","📊 Panel"],["greens","⛳ Greens"],["tees","🎯 Tees"],["arboles","🌳 Árboles"],["mediciones","📏 Mediciones"],["eventos","🏆 Eventos"]].map(([t,l])=>(
+        {[["panel","📊 Panel"],["greens","⛳ Greens"],["tees","🎯 Tees"],["bunkers","🏖️ Búnkers"],["fairways","🌾 Fairways"],["zonas","🌿 Zonas"],["arboles","🌳 Árboles"],["mediciones","📏 Mediciones"],["eventos","🏆 Eventos"]].map(([t,l])=>(
           <button key={t} className={`tab${subTab===t?" on":""}`} onClick={()=>setSubTab(t)} style={{fontFamily:"'Georgia',serif"}}>{l}</button>
         ))}
       </div>
@@ -7055,6 +7178,119 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               </div>
             );
           })()}
+        </div>
+      )}
+
+      {/* ── BÚNKERS ── */}
+      {subTab==="bunkers"&&(
+        <ZonaGolfSimple S={S} labelSt={labelSt} zonas={BUNKERS_DEF} tareas={TAREAS_BUNKERS}
+          titulo="🏖️ Búnkers" colorAcento="#fde68a"
+          golfData={golfData} setG={setG} listaPersonal={listaPersonal}
+          setTareasProg={setTareasProg} sincronizarMacrozona={sincronizarMacrozona}/>
+      )}
+
+      {/* ── FAIRWAYS ── */}
+      {subTab==="fairways"&&(
+        <ZonaGolfSimple S={S} labelSt={labelSt} zonas={FAIRWAYS_DEF} tareas={TAREAS_FAIRWAYS}
+          titulo="🌾 Fairways" colorAcento="#a3e635"
+          golfData={golfData} setG={setG} listaPersonal={listaPersonal}
+          setTareasProg={setTareasProg} sincronizarMacrozona={sincronizarMacrozona}/>
+      )}
+
+      {/* ── ZONAS ESPECIALES ── */}
+      {subTab==="zonas"&&(
+        <div className="ein">
+          <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:18,marginBottom:16,color:"#34d399"}}>🌿 Zonas Especiales Golf</h2>
+
+          {/* Ante-greens, Lomas, Macizos, Isla, Jaula */}
+          {ZONAS_GOLF_EXTRA.map(zona=>{
+            const tareasZona = zona.id==="lomas"?TAREAS_LOMAS:TAREAS_MACIZOS;
+            const registros = (golfData[`zona_${zona.id}`]||[]);
+            const [showForm, setShowForm] = [false,()=>{}]; // placeholder — uso estado global
+            return (
+              <div key={zona.id} style={{...S.card,padding:14,marginBottom:10,borderLeft:`3px solid ${zona.color}50`}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:zona.color}}>{zona.icono} {zona.nombre}</div>
+                  <button style={{...S.btn,fontSize:11,padding:"4px 12px",background:`${zona.color}15`,color:zona.color,border:`1px solid ${zona.color}40`}}
+                    onClick={()=>setSubTabZona(zona.id)}>
+                    Ver / Tareas
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Plantas ornamentales */}
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:"#f9a8d4",margin:"16px 0 8px"}}>🌸 Plantas Ornamentales</div>
+          {PLANTAS_GOLF.map(p=>(
+            <div key={p.id} style={{...S.card,padding:"10px 14px",marginBottom:6,borderLeft:"3px solid rgba(249,168,212,0.4)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+                <div>
+                  <div style={{fontSize:13,fontWeight:600}}>{p.nombre}</div>
+                  <div style={{fontSize:11,color:"#5a9a7a"}}>📍 {p.ubicacion}</div>
+                </div>
+                <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(249,168,212,0.12)",color:"#f9a8d4",border:"1px solid rgba(249,168,212,0.3)"}}
+                  onClick={()=>{setTareaForm({...emptyTarea,descripcion:p.nombre,target:"zona",targetId:p.id});setShowTareaForm("zona");}}>
+                  📋 Tarea
+                </button>
+              </div>
+            </div>
+          ))}
+
+          {/* Edificio Golf */}
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:"#c4b5fd",margin:"16px 0 8px"}}>🏢 Edificio Golf</div>
+          {EDIFICIO_GOLF.map(e=>(
+            <div key={e.id} style={{...S.card,padding:"10px 14px",marginBottom:6,borderLeft:"3px solid rgba(196,181,253,0.4)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+                <div>
+                  <div style={{fontSize:13,fontWeight:600}}>{e.nombre}</div>
+                  <div style={{fontSize:11,color:"#5a9a7a"}}>📍 {e.piso}</div>
+                </div>
+                <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(196,181,253,0.12)",color:"#c4b5fd",border:"1px solid rgba(196,181,253,0.3)"}}
+                  onClick={()=>{setTareaForm({...emptyTarea,descripcion:e.nombre,target:"zona",targetId:e.id});setShowTareaForm("zona");}}>
+                  📋 Tarea
+                </button>
+              </div>
+            </div>
+          ))}
+
+          {/* Formulario tarea zona */}
+          {showTareaForm==="zona"&&(
+            <div style={{...S.card,padding:16,marginBottom:12}} className="ein">
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#34d399",marginBottom:12}}>📋 Nueva tarea — {tareaForm.descripcion}</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={tareaForm.fecha} onChange={e=>setTareaForm(p=>({...p,fecha:e.target.value}))}/></div>
+                <div><label style={labelSt}>Responsable</label>
+                  <select style={S.input} value={tareaForm.responsable} onChange={e=>setTareaForm(p=>({...p,responsable:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                  </select>
+                </div>
+                <div><label style={labelSt}>Tarea</label>
+                  <select style={S.input} value={tareaForm.tipo} onChange={e=>setTareaForm(p=>({...p,tipo:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    {TAREAS_MACIZOS.concat(TAREAS_EDIFICIO).filter((v,i,a)=>a.indexOf(v)===i).map(t=><option key={t}>{t}</option>)}
+                    <option value="Otra">Otra...</option>
+                  </select>
+                </div>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Descripción</label><input style={S.input} value={tareaForm.obs} onChange={e=>setTareaForm(p=>({...p,obs:e.target.value}))}/></div>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button className="btn-p" style={S.btn} onClick={()=>{
+                  if(!tareaForm.tipo) return;
+                  setTareasProg(p=>({...p,[tareaForm.fecha]:[...(p[tareaForm.fecha]||[]),{
+                    id:Date.now(),fecha:tareaForm.fecha,zona:"Golf",elemento:tareaForm.descripcion,
+                    tarea:`⛳ ${tareaForm.tipo} — ${tareaForm.descripcion}`,
+                    responsable:tareaForm.responsable,
+                    estado:tareaForm.responsable?"pendiente":"por_designar",
+                    notas:tareaForm.obs||"",auto:false,
+                  }]}));
+                  setShowTareaForm(null);setTareaForm(emptyTarea);
+                }}>✓ Enviar al programa</button>
+                <button className="btn-g" style={S.btn} onClick={()=>setShowTareaForm(null)}>Cancelar</button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
