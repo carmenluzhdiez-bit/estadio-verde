@@ -7301,6 +7301,9 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                     </div>
                   </div>
                 )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
