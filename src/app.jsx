@@ -6298,10 +6298,66 @@ const GREENS_DEF = [
 ];
 const TEES_DEF   = Array.from({length:18},(_,i)=>({id:`t${i+1}`,nombre:`Tee ${String(i+1).padStart(2,"0")}`,hoyo:`Hoyo ${i+1}`}));
 const TIPOS_ARBOL = ["Hoja caduca","Hoja persistente","Coníferas","Palmera","Arbusto"];
-const TAREAS_GREENS_DIARIAS = ["Limpieza general","Corte de greens","Riego manual","Cambio de bandera","Revisión hoyos","Soplado"];
-const TAREAS_GREENS_PERIODICAS = ["Medición de altura","Fertilización","Aireación","Escarificado","Resiembra","Control de plagas","Riego automático revisión","Aplicación fungicida","Top dressing","Control malezas"];
-const TAREAS_TEES = ["Limpieza","Corte","Riego","Reparación divots","Cambio de marcas"];
+const TAREAS_GREENS_DIARIAS = ["Limpieza general","Corte de greens","Rodado","Riego ligero (Syringing)","Cambio de bandera","Revisión hoyos","Soplado/Barrido","Reparación pitch marks"];
+const TAREAS_GREENS_PERIODICAS = ["Medición de altura","Fertilización","Aireación","Escarificado","Resiembra","Control de plagas","Riego automático revisión","Aplicación fungicida","Top dressing","Control malezas","Perforar nuevos hoyos","Corte ante-greens"];
+const TAREAS_TEES = ["Limpieza","Corte y orillado","Riego","Reparación divots","Cambio de marcas","Posicionar tee markers","Corte rough","Corte calles","Corte lomas"];
+const TAREAS_BUNKERS = ["Recortar bordes","Rastrillar y labrar arena","Rellenar con arena","Rastrillado superficial","Recoger piedras/escombros"];
 const TAREAS_ARBOLES_GENERALES = ["Poda formación","Poda sanitaria","Fertilización","Riego","Control plagas","Aplicación fungicida","Revisión estado"];
+const TAREAS_HOJA_CADUCA = ["Poda de invierno","Raleo","Recolección hojas","Poda post floración"];
+const TAREAS_HOJA_PERSISTENTE = ["Poda de mantenimiento","Lavado follaje"];
+
+// Plantilla pre-torneo por día
+const PLANTILLA_PRE_TORNEO = {
+  "Día -6 (Lunes)": [
+    {cat:"Árboles",tarea:"Despeje de troncos en línea de tiro — verificar y despejar árboles que interfieren con el juego"},
+  ],
+  "Día -3 (Miércoles)": [
+    {cat:"Greens",tarea:"Limpieza y afilado de cuchillas cortadora de greens"},
+    {cat:"Greens",tarea:"Riego profundo greens"},
+    {cat:"Bunkers",tarea:"Recortar bordes del césped alrededor de bunkers"},
+    {cat:"Tees y Calles",tarea:"Cortar rough a altura de torneo"},
+    {cat:"Administración",tarea:"Revisar pronóstico del tiempo y ajustar planes"},
+  ],
+  "Día -2 (Jueves)": [
+    {cat:"Greens",tarea:"Corte inicial greens (HOC 4.7mm)"},
+    {cat:"Greens",tarea:"Rodado inicial de greens"},
+    {cat:"Bunkers",tarea:"Rastrillar y labrar arena (profundidad uniforme)"},
+    {cat:"Bunkers",tarea:"Rellenar con arena si es necesario"},
+    {cat:"Tees y Calles",tarea:"Cortar tees y calles a altura final de torneo"},
+    {cat:"Tees y Calles",tarea:"Cortar lomas de cancha"},
+    {cat:"Tees y Calles",tarea:"Riego profundo tees y calles"},
+    {cat:"Administración",tarea:"Revisar pronóstico del tiempo"},
+  ],
+  "Día -1 (Viernes)": [
+    {cat:"Greens",tarea:"Corte final greens (HOC 4.5mm)"},
+    {cat:"Greens",tarea:"Doble rodado greens"},
+    {cat:"Greens",tarea:"Perforar nuevos hoyos"},
+    {cat:"Greens",tarea:"Riego ligero (Syringing) tarde"},
+    {cat:"Greens",tarea:"Corte ante-greens"},
+    {cat:"Bunkers",tarea:"Rastrillado superficial bunkers"},
+    {cat:"Bunkers",tarea:"Recoger piedras/escombros"},
+    {cat:"Tees y Calles",tarea:"Riego profundo"},
+    {cat:"Estética",tarea:"Soplar/barrer recortes de todas las superficies"},
+    {cat:"Estética",tarea:"Limpiar basureros y retirar basura"},
+    {cat:"Maquinaria",tarea:"Revisión final de maquinaria lista para la mañana"},
+    {cat:"Administración",tarea:"Revisar pronóstico del tiempo"},
+  ],
+  "Día Torneo (Sábado)": [
+    {cat:"Greens",tarea:"Corte final greens (HOC 4.5mm)"},
+    {cat:"Greens",tarea:"Doble rodado greens"},
+    {cat:"Bunkers",tarea:"Rastrillado superficial bunkers"},
+    {cat:"Bunkers",tarea:"Recoger piedras/escombros"},
+    {cat:"Estética",tarea:"Soplar/barrer recortes de todas las superficies"},
+    {cat:"Administración",tarea:"Revisar pronóstico del tiempo"},
+  ],
+  "Día Torneo (Domingo)": [
+    {cat:"Greens",tarea:"Doble corte (opcional, máxima velocidad)"},
+    {cat:"Bunkers",tarea:"Rastrillado superficial bunkers"},
+    {cat:"Bunkers",tarea:"Recoger piedras/escombros"},
+    {cat:"Estética",tarea:"Soplar/barrer recortes de todas las superficies"},
+    {cat:"Administración",tarea:"Revisar pronóstico del tiempo"},
+  ],
+};
 const TAREAS_HOJA_CADUCA = ["Poda de invierno","Raleo","Recolección hojas","Poda post floración"];
 const TAREAS_HOJA_PERSISTENTE = ["Poda de mantenimiento","Lavado follaje"];
 
@@ -6375,11 +6431,60 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   };
 
   // ── Guardar evento ───────────────────────────────────────────────────────
+  const [editEventoId, setEditEventoId] = React.useState(null);
+  const [showPreTorneo, setShowPreTorneo] = React.useState(null); // id del torneo
+
+  const abrirEditEvento = (ev) => {
+    setEventoForm({...ev});
+    setEditEventoId(ev.id);
+    setShowEventoForm(true);
+  };
+
   const guardarEvento = () => {
     if(!eventoForm.nombre||!eventoForm.fecha) return;
-    setG({eventos:[{...eventoForm,id:Date.now()},...eventos]});
+    if(editEventoId) {
+      setG({eventos:eventos.map(e=>e.id===editEventoId?{...eventoForm,id:editEventoId}:e)});
+      setEditEventoId(null);
+    } else {
+      setG({eventos:[{...eventoForm,id:Date.now()},...eventos]});
+    }
     sincronizarMacrozona("Evento registrado", `${eventoForm.nombre} (${eventoForm.fecha})`);
     setEventoForm(emptyEvento); setShowEventoForm(false);
+  };
+
+  const generarTareasPreTorneo = (evento) => {
+    // Calcular fechas desde el torneo
+    const fechaTorneo = new Date(evento.fecha+"T12:00:00");
+    const nuevasTareas = [];
+    Object.entries(PLANTILLA_PRE_TORNEO).forEach(([dia, tareas])=>{
+      const offset = dia.includes("-6")?-6:dia.includes("-3")?-3:dia.includes("-2")?-2:dia.includes("-1")?-1:dia.includes("Sábado")?0:1;
+      const fechaDia = new Date(fechaTorneo);
+      fechaDia.setDate(fechaDia.getDate()+offset);
+      const fechaStr = fechaDia.toISOString().slice(0,10);
+      tareas.forEach(t=>{
+        nuevasTareas.push({
+          id:Date.now()+Math.random(),
+          fecha:fechaStr,
+          zona:"Golf",
+          elemento:t.cat,
+          tarea:`⛳ Pre-torneo ${evento.nombre} — ${t.tarea}`,
+          responsable:"",
+          estado:"por_designar",
+          notas:`Preparación torneo: ${dia}`,
+          auto:true,
+        });
+      });
+    });
+    setTareasProg(p=>{
+      const nuevo={...p};
+      nuevasTareas.forEach(t=>{
+        if(!nuevo[t.fecha]) nuevo[t.fecha]=[];
+        nuevo[t.fecha]=[...nuevo[t.fecha],t];
+      });
+      return nuevo;
+    });
+    setShowPreTorneo(null);
+    alert(`✅ ${nuevasTareas.length} tareas de preparación enviadas al Programa del Día`);
   };
 
   // ── Guardar árbol ────────────────────────────────────────────────────────
@@ -6515,7 +6620,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             <button style={{...S.btn,background:"rgba(59,130,246,0.12)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.25)"}} onClick={()=>{setSubTab("mediciones");setShowMedForm(true);}}>📏 Medición alturas</button>
           </div>
 
-          {/* Selector green */}
+          {/* Selector green + vivero */}
           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
             {GREENS_DEF.map(g=>{
               const alt=ultimaMed?.alturas?.[g.id];
@@ -6527,10 +6632,87 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                 </button>
               );
             })}
+            {/* Vivero */}
+            <button onClick={()=>setSelectedGreen("vivero")}
+              style={{background:selectedGreen==="vivero"?"rgba(74,222,128,0.2)":"rgba(255,255,255,0.04)",border:`1px solid ${selectedGreen==="vivero"?"rgba(74,222,128,0.5)":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"6px 12px",color:selectedGreen==="vivero"?"#4ade80":"#5a9a7a",fontSize:11,cursor:"pointer",fontFamily:"'Georgia',serif"}}>
+              🌱 Vivero<br/><span style={{fontSize:9,color:"#5a9a7a"}}>Césped parche</span>
+            </button>
           </div>
 
-          {/* Detalle green seleccionado */}
-          {(()=>{
+          {/* Detalle green o vivero seleccionado */}
+          {selectedGreen==="vivero"?(()=>{
+            const altViv = ultimaMed?.alturas?.vivero;
+            const humViv = ultimaMed?.humedades?.vivero;
+            return (
+              <div>
+                <div style={{...S.card,padding:16,marginBottom:12,borderLeft:"3px solid #4ade80"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:8}}>
+                    <div>
+                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#4ade80"}}>🌱 Vivero Golf</div>
+                      <div style={{fontSize:12,color:"#5a9a7a"}}>Césped de parche y reemplazo en greens</div>
+                      <div style={{fontSize:11,color:"#5a9a7a",marginTop:4}}>⚠️ Altura variable según siembras y resiembras activas</div>
+                    </div>
+                    <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+                      {altViv&&<div style={{textAlign:"center",background:"rgba(74,222,128,0.1)",borderRadius:8,padding:"8px 14px",border:"1px solid rgba(74,222,128,0.25)"}}>
+                        <div style={{fontSize:10,color:"#5a9a7a",marginBottom:2}}>ALTURA</div>
+                        <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:700,color:"#4ade80"}}>{altViv}mm</div>
+                      </div>}
+                      {humViv&&<div style={{textAlign:"center",background:"rgba(96,165,250,0.1)",borderRadius:8,padding:"8px 14px",border:"1px solid rgba(96,165,250,0.2)"}}>
+                        <div style={{fontSize:10,color:"#5a9a7a",marginBottom:2}}>HUMEDAD</div>
+                        <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:700,color:"#60a5fa"}}>{humViv}/8</div>
+                      </div>}
+                    </div>
+                  </div>
+                </div>
+                {/* Registro diario para vivero */}
+                {showDiariaForm&&(
+                  <div style={{...S.card,padding:16,marginBottom:12,background:"rgba(74,222,128,0.04)",borderColor:"rgba(74,222,128,0.2)"}} className="ein">
+                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#4ade80",marginBottom:12}}>✅ Registro diario — Vivero</div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                      <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={diariaForm.fecha} onChange={e=>setDiariaForm(p=>({...p,fecha:e.target.value}))}/></div>
+                      <div><label style={labelSt}>Responsable</label>
+                        <select style={S.input} value={diariaForm.responsable} onChange={e=>setDiariaForm(p=>({...p,responsable:e.target.value}))}>
+                          <option value="">Seleccionar...</option>
+                          {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <div style={{fontSize:11,color:"#5a9a7a",marginBottom:8}}>Tareas realizadas en el vivero hoy:</div>
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
+                      {[...TAREAS_GREENS_DIARIAS,"Siembra","Resiembra","Preparación parches","Control malezas"].map(t=>(
+                        <div key={t} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 10px",borderRadius:8,background:diariaForm.tareas[t]?"rgba(74,222,128,0.12)":"rgba(255,255,255,0.04)",border:`1px solid ${diariaForm.tareas[t]?"rgba(74,222,128,0.35)":"rgba(255,255,255,0.08)"}`,cursor:"pointer",fontSize:12}}
+                          onClick={()=>setDiariaForm(p=>({...p,tareas:{...p.tareas,[t]:!p.tareas[t]}}))}>
+                          <div style={{width:14,height:14,borderRadius:3,border:`2px solid ${diariaForm.tareas[t]?"#4ade80":"rgba(255,255,255,0.2)"}`,background:diariaForm.tareas[t]?"#4ade80":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                            {diariaForm.tareas[t]&&<span style={{color:"#000",fontSize:9,fontWeight:700}}>✓</span>}
+                          </div>
+                          {t}
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{marginBottom:8}}>
+                      <label style={labelSt}>Altura actual vivero (mm) — si se midió hoy</label>
+                      <input type="number" step="0.1" min="0" max="50" style={{...S.input,width:100}} value={diariaForm.alturaVivero||""} onChange={e=>setDiariaForm(p=>({...p,alturaVivero:e.target.value}))} placeholder="mm"/>
+                    </div>
+                    <div><label style={labelSt}>Observaciones (siembras activas, estado parches...)</label><input style={S.input} value={diariaForm.obs} onChange={e=>setDiariaForm(p=>({...p,obs:e.target.value}))}/></div>
+                    <div style={{display:"flex",gap:8,marginTop:10}}>
+                      <button className="btn-p" style={S.btn} onClick={guardarDiaria}>✓ Guardar</button>
+                      <button className="btn-g" style={S.btn} onClick={()=>setShowDiariaForm(false)}>Cancelar</button>
+                    </div>
+                  </div>
+                )}
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:13,fontWeight:700,marginBottom:8,color:"#4ade80"}}>📜 Últimos registros vivero</div>
+                {(golfData.registrosDiarios||[]).filter(r=>r.esVivero).slice(0,8).map(r=>(
+                  <div key={r.id} style={{...S.card,padding:"10px 14px",marginBottom:6,borderLeft:"2px solid rgba(74,222,128,0.3)"}}>
+                    <div style={{fontSize:12,fontWeight:600}}>📅 {r.fecha} · 👤 {r.responsable}</div>
+                    <div style={{fontSize:11,color:"#5a9a7a",marginTop:2}}>{Object.entries(r.tareas||{}).filter(([,v])=>v).map(([k])=>k).join(" · ")||"Sin tareas"}</div>
+                    {r.alturaVivero&&<div style={{fontSize:11,color:"#4ade80"}}>📏 Altura: {r.alturaVivero}mm</div>}
+                    {r.obs&&<div style={{fontSize:11,color:"#5a9a7a",fontStyle:"italic"}}>{r.obs}</div>}
+                  </div>
+                ))}
+                {!(golfData.registrosDiarios||[]).some(r=>r.esVivero)&&<div style={{...S.card,padding:24,textAlign:"center",color:"#3a7a5a"}}>Sin registros de vivero aún</div>}
+              </div>
+            );
+          })():(()=>{
             const g = GREENS_DEF.find(x=>x.id===selectedGreen);
             const alt = ultimaMed?.alturas?.[selectedGreen];
             const hum = ultimaMed?.humedades?.[selectedGreen];
@@ -6646,6 +6828,9 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                   </div>
                 ))}
                 {!(golfData.registrosDiarios||[]).length&&<div style={{...S.card,padding:24,textAlign:"center",color:"#3a7a5a"}}>Sin registros aún</div>}
+              </div>
+            );
+          })()}
               </div>
             );
           })()}
@@ -7004,19 +7189,38 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             <button className="btn-p" style={{...S.btn,marginBottom:14}} onClick={()=>setShowEventoForm(true)}>🏆 Cargar evento / torneo</button>
           )}
 
-          {showEventoForm&&rolLogueado==="jefa"&&(
+            {showEventoForm&&rolLogueado==="jefa"&&(
             <div style={{...S.card,padding:20,marginBottom:14,background:"rgba(251,191,36,0.04)",borderColor:"rgba(251,191,36,0.25)"}} className="ein">
-              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#fbbf24",marginBottom:14}}>🏆 Nuevo evento / torneo</div>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#fbbf24",marginBottom:14}}>
+                {editEventoId?"✏️ Editar":"🏆 Nuevo"} evento / torneo
+              </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Nombre del evento</label><input style={S.input} value={eventoForm.nombre} onChange={e=>setEventoForm(p=>({...p,nombre:e.target.value}))} placeholder="ej: Torneo Primavera 2026"/></div>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Nombre del evento</label>
+                  <input style={S.input} value={eventoForm.nombre} onChange={e=>setEventoForm(p=>({...p,nombre:e.target.value}))} placeholder="ej: Torneo Primavera 2026"/>
+                </div>
                 <div><label style={labelSt}>Fecha inicio</label><input type="date" style={S.input} value={eventoForm.fecha} onChange={e=>setEventoForm(p=>({...p,fecha:e.target.value}))}/></div>
                 <div><label style={labelSt}>Fecha término</label><input type="date" style={S.input} value={eventoForm.fechaFin} onChange={e=>setEventoForm(p=>({...p,fechaFin:e.target.value}))}/></div>
-                <div><label style={labelSt}>Tipo</label>
+                <div><label style={labelSt}>Tipo de evento</label>
                   <select style={S.input} value={eventoForm.tipo} onChange={e=>setEventoForm(p=>({...p,tipo:e.target.value}))}>
                     {["torneo","competencia","evento social","mantenimiento programado","cierre cancha","otro"].map(t=><option key={t}>{t}</option>)}
                   </select>
                 </div>
-                <div><label style={labelSt}>Responsable</label>
+                <div><label style={labelSt}>Participación</label>
+                  <select style={S.input} value={eventoForm.participacion||"interno"} onChange={e=>setEventoForm(p=>({...p,participacion:e.target.value}))}>
+                    <option value="interno">🏠 Interno (solo socios)</option>
+                    <option value="externo">🌐 Externo (con invitados)</option>
+                    <option value="mixto">👥 Mixto</option>
+                  </select>
+                </div>
+                {(eventoForm.participacion==="externo"||eventoForm.participacion==="mixto")&&(
+                  <div style={{gridColumn:"1/-1",background:"rgba(251,191,36,0.08)",borderRadius:8,padding:"10px 12px",border:"1px solid rgba(251,191,36,0.2)"}}>
+                    <div style={{fontSize:11,color:"#fbbf24",marginBottom:4}}>⚠️ Con invitados externos — práctica en cancha durante la semana previa interfiere con preparación</div>
+                    <div><label style={labelSt}>Días de práctica invitados</label>
+                      <input style={S.input} value={eventoForm.diasPractica||""} onChange={e=>setEventoForm(p=>({...p,diasPractica:e.target.value}))} placeholder="ej: Jueves y viernes desde 14:00hrs"/>
+                    </div>
+                  </div>
+                )}
+                <div><label style={labelSt}>Responsable coordinación</label>
                   <select style={S.input} value={eventoForm.responsable} onChange={e=>setEventoForm(p=>({...p,responsable:e.target.value}))}>
                     <option value="">Seleccionar...</option>
                     {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
@@ -7026,21 +7230,23 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                   <label style={labelSt}>Tareas restringidas durante el evento</label>
                   <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:4}}>
                     {["Aireación","Escarificado","Fertilización","Top dressing","Resiembra","Aplicación fungicida","Corte greens","Poda árboles"].map(t=>(
-                      <div key={t} style={{display:"flex",alignItems:"center",gap:5,padding:"4px 10px",borderRadius:7,background:eventoForm.restricciones.includes(t)?"rgba(251,191,36,0.12)":"rgba(255,255,255,0.04)",border:`1px solid ${eventoForm.restricciones.includes(t)?"rgba(251,191,36,0.35)":"rgba(255,255,255,0.08)"}`,cursor:"pointer",fontSize:12}}
-                        onClick={()=>setEventoForm(p=>({...p,restricciones:p.restricciones.includes(t)?p.restricciones.filter(x=>x!==t):[...p.restricciones,t]}))}>
-                        <div style={{width:13,height:13,borderRadius:3,border:`2px solid ${eventoForm.restricciones.includes(t)?"#fbbf24":"rgba(255,255,255,0.2)"}`,background:eventoForm.restricciones.includes(t)?"#fbbf24":"transparent",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                          {eventoForm.restricciones.includes(t)&&<span style={{color:"#000",fontSize:8,fontWeight:700}}>✓</span>}
+                      <div key={t} style={{display:"flex",alignItems:"center",gap:5,padding:"4px 10px",borderRadius:7,background:(eventoForm.restricciones||[]).includes(t)?"rgba(251,191,36,0.12)":"rgba(255,255,255,0.04)",border:`1px solid ${(eventoForm.restricciones||[]).includes(t)?"rgba(251,191,36,0.35)":"rgba(255,255,255,0.08)"}`,cursor:"pointer",fontSize:12}}
+                        onClick={()=>setEventoForm(p=>({...p,restricciones:(p.restricciones||[]).includes(t)?(p.restricciones||[]).filter(x=>x!==t):[...(p.restricciones||[]),t]}))}>
+                        <div style={{width:13,height:13,borderRadius:3,border:`2px solid ${(eventoForm.restricciones||[]).includes(t)?"#fbbf24":"rgba(255,255,255,0.2)"}`,background:(eventoForm.restricciones||[]).includes(t)?"#fbbf24":"transparent",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                          {(eventoForm.restricciones||[]).includes(t)&&<span style={{color:"#000",fontSize:8,fontWeight:700}}>✓</span>}
                         </div>
                         {t}
                       </div>
                     ))}
                   </div>
                 </div>
-                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observaciones</label><input style={S.input} value={eventoForm.obs} onChange={e=>setEventoForm(p=>({...p,obs:e.target.value}))} placeholder="Instrucciones especiales, horarios..."/></div>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observaciones / Instrucciones</label>
+                  <input style={S.input} value={eventoForm.obs} onChange={e=>setEventoForm(p=>({...p,obs:e.target.value}))} placeholder="Instrucciones especiales, horarios..."/>
+                </div>
               </div>
               <div style={{display:"flex",gap:8}}>
-                <button className="btn-p" style={S.btn} onClick={guardarEvento}>✓ Guardar evento</button>
-                <button className="btn-g" style={S.btn} onClick={()=>setShowEventoForm(false)}>Cancelar</button>
+                <button className="btn-p" style={S.btn} onClick={guardarEvento}>✓ {editEventoId?"Actualizar":"Guardar"} evento</button>
+                <button className="btn-g" style={S.btn} onClick={()=>{setShowEventoForm(false);setEditEventoId(null);setEventoForm(emptyEvento);}}>Cancelar</button>
               </div>
             </div>
           )}
@@ -7059,16 +7265,47 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                     <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:4}}>
                       <span style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700}}>{ev.nombre}</span>
                       <span style={{fontSize:10,padding:"2px 8px",borderRadius:10,background:activo?"rgba(251,191,36,0.15)":pasado?"rgba(107,114,128,0.12)":"rgba(52,211,153,0.12)",color:activo?"#fbbf24":pasado?"#6b7280":"#34d399",fontWeight:600}}>{activo?"🟡 ACTIVO":pasado?"Finalizado":"Próximo"}</span>
+                      {ev.participacion&&<span style={{fontSize:10,padding:"2px 8px",borderRadius:10,background:ev.participacion==="externo"?"rgba(239,68,68,0.1)":"rgba(96,165,250,0.1)",color:ev.participacion==="externo"?"#fca5a5":ev.participacion==="mixto"?"#fbbf24":"#93c5fd",fontWeight:600}}>
+                        {ev.participacion==="externo"?"🌐 Con invitados":ev.participacion==="mixto"?"👥 Mixto":"🏠 Interno"}
+                      </span>}
                     </div>
                     <div style={{fontSize:12,color:"#5a9a7a"}}>📅 {ev.fecha}{ev.fechaFin&&ev.fechaFin!==ev.fecha?` → ${ev.fechaFin}`:""} · {ev.tipo}</div>
-                    {ev.restricciones?.length>0&&<div style={{fontSize:11,color:"#f59e0b",marginTop:3}}>🚫 Restringido: {ev.restricciones.join(", ")}</div>}
+                    {ev.diasPractica&&<div style={{fontSize:11,color:"#f59e0b",marginTop:2}}>🏌️ Práctica invitados: {ev.diasPractica}</div>}
+                    {ev.restricciones?.length>0&&<div style={{fontSize:11,color:"#f59e0b",marginTop:2}}>🚫 Restringido: {ev.restricciones.join(", ")}</div>}
                     {ev.obs&&<div style={{fontSize:11,color:"#5a9a7a",fontStyle:"italic",marginTop:2}}>{ev.obs}</div>}
                   </div>
-                  {rolLogueado==="jefa"&&<button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 8px"}} onClick={()=>setG({eventos:eventos.filter(x=>x.id!==ev.id)})}>🗑</button>}
+                  {rolLogueado==="jefa"&&<div style={{display:"flex",gap:6,flexShrink:0,flexWrap:"wrap"}}>
+                    <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(52,211,153,0.12)",color:"#34d399",border:"1px solid rgba(52,211,153,0.25)"}}
+                      onClick={()=>setShowPreTorneo(showPreTorneo===ev.id?null:ev.id)}>
+                      📋 Pre-torneo
+                    </button>
+                    <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 8px"}} onClick={()=>abrirEditEvento(ev)}>✏️</button>
+                    <button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 8px"}} onClick={()=>setG({eventos:eventos.filter(x=>x.id!==ev.id)})}>🗑</button>
+                  </div>}
                 </div>
-              </div>
-            );
-          })}
+                {/* Panel pre-torneo */}
+                {showPreTorneo===ev.id&&(
+                  <div style={{marginTop:10,background:"rgba(52,211,153,0.05)",borderRadius:10,padding:"14px 16px",border:"1px solid rgba(52,211,153,0.2)"}}>
+                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#34d399",marginBottom:6}}>📋 Preparación — {ev.nombre}</div>
+                    <div style={{fontSize:11,color:"#5a9a7a",marginBottom:12}}>Se generarán {Object.values(PLANTILLA_PRE_TORNEO).flat().length} tareas distribuidas desde 3 días antes hasta el torneo ({ev.fecha}).{(ev.participacion==="externo"||ev.participacion==="mixto")?" ⚠️ Considera práctica de invitados al planificar horarios.":""}</div>
+                    {Object.entries(PLANTILLA_PRE_TORNEO).map(([dia,tareas])=>(
+                      <div key={dia} style={{marginBottom:8}}>
+                        <div style={{fontSize:11,fontWeight:700,color:"#fbbf24",marginBottom:3}}>{dia}</div>
+                        <div style={{display:"flex",flexDirection:"column",gap:2}}>
+                          {tareas.map((t,i)=>(
+                            <div key={i} style={{fontSize:11,color:"#6aaa7a",padding:"2px 8px",background:"rgba(255,255,255,0.03)",borderRadius:4}}>
+                              <span style={{color:"#34d399",fontWeight:600}}>[{t.cat}]</span> {t.tarea}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    <div style={{display:"flex",gap:8,marginTop:12}}>
+                      <button className="btn-p" style={S.btn} onClick={()=>generarTareasPreTorneo(ev)}>✓ Enviar al Programa del Día</button>
+                      <button className="btn-g" style={S.btn} onClick={()=>setShowPreTorneo(null)}>Cancelar</button>
+                    </div>
+                  </div>
+                )}
         </div>
       )}
     </div>
