@@ -4073,7 +4073,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
         id:Date.now()+Math.random(), fecha:fp,
         zona: sectLabel, elemento:"",
         tarea:`🧪 Fumigación: ${incidForm.productoAplicar} — ${incidForm.agenteCausal||incidForm.diagnostico}`,
-        responsable: incidForm.diagnosticadoPor||"", estado:"por_designar",
+        responsable: incidForm.diagnosticadoPor||"", estado:incidForm.diagnosticadoPor?"pendiente":"por_designar",
         notas:`Reingreso estimado: ${reap.label}. ${reap.nota}`, auto:false, origenFungicida:true,
       }]}));
     }
@@ -6383,6 +6383,49 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   const eventos   = Array.isArray(golfData.eventos)?golfData.eventos:Object.values(golfData.eventos||{});
   const mediciones= Array.isArray(golfData.mediciones)?golfData.mediciones:Object.values(golfData.mediciones||{});
 
+  // Nombre de Bhalú Armijo
+  const BHALÚ = personalArr.find(p=>p.nombre?.includes("Armijo")||p.nombre?.toLowerCase().includes("bhalu"))?.nombre || "Osmar Bhalú Armijo Zúñiga";
+
+  // ── Generación automática de tareas diarias ───────────────────────────────
+  React.useEffect(()=>{
+    if(!hoy||!setTareasProg) return;
+    const diaSemana = new Date(hoy+"T12:00:00").getDay(); // 0=domingo
+    const esDomingo = diaSemana===0;
+    const hayTorneo = eventos.some(e=>e.fecha<=hoy&&(e.fechaFin||e.fecha)>=hoy);
+    // Verificar si ya se generaron las tareas de hoy para Golf
+    const tareasHoy = tareasProg[hoy]||[];
+    const yaGeneradas = tareasHoy.some(t=>t.zona==="Golf"&&t.auto===true&&t.autoGolfFecha===hoy);
+    if(yaGeneradas) return;
+
+    const nuevas = [];
+    const mkTarea = (tarea,elemento,resp) => ({
+      id:Date.now()+Math.random(), fecha:hoy, zona:"Golf", elemento,
+      tarea:`⛳ ${tarea}`, responsable:resp||BHALÚ,
+      estado:resp||BHALÚ?"pendiente":"por_designar",
+      notas:"Tarea recurrente automática", auto:true, autoGolfFecha:hoy,
+    });
+
+    // 1. Medición Green 03, 07 y Vivero — Lunes a Sábado (nunca domingo)
+    if(!esDomingo) {
+      nuevas.push(mkTarea("Medición de altura — Green 03","Green 03 (Hoyo 03-12)"));
+      nuevas.push(mkTarea("Medición de altura — Green 07","Green 07 (Hoyo 07-16)"));
+      nuevas.push(mkTarea("Medición de altura — Vivero","Vivero"));
+    }
+
+    // 2. Limpieza todos los greens + Vivero — Lunes a Sábado siempre + Domingo si hay torneo
+    if(!esDomingo || hayTorneo) {
+      GREENS_DEF.forEach(g=>{
+        nuevas.push(mkTarea(`Limpieza — ${g.nombre}`,`${g.nombre} (${g.hoyos})`));
+      });
+      nuevas.push(mkTarea("Limpieza — Vivero","Vivero"));
+    }
+
+    if(nuevas.length>0) {
+      setTareasProg(p=>({...p,[hoy]:[...(p[hoy]||[]),...nuevas]}));
+    }
+  },[hoy, eventos.length]);
+
+
   // ── Formularios ──────────────────────────────────────────────────────────
   const [showMedForm,    setShowMedForm]    = React.useState(false);
   const [showEventoForm, setShowEventoForm] = React.useState(false);
@@ -6507,7 +6550,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
     if(tareaForm.responsable&&tareaForm.fecha) {
       setTareasProg(p=>({...p,[tareaForm.fecha]:[...(p[tareaForm.fecha]||[]),{
         id:Date.now(),fecha:tareaForm.fecha,zona:"Golf",elemento:target||"",
-        tarea:textoTarea,responsable:tareaForm.responsable,estado:"por_designar",notas:tareaForm.obs||"",auto:false,
+        tarea:textoTarea,responsable:tareaForm.responsable,estado:tareaForm.responsable?"pendiente":"por_designar",notas:tareaForm.obs||"",auto:false,
       }]}));
     }
     sincronizarMacrozona("Tarea programada", `${tareaForm.tipo} — ${tareaForm.responsable||"Sin asignar"}`);
@@ -6765,6 +6808,21 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                         </div>
                       ))}
                     </div>
+                    {/* Pediluvios */}
+                    <div style={{background:"rgba(96,165,250,0.06)",borderRadius:8,padding:"10px 12px",marginBottom:10,border:"1px solid rgba(96,165,250,0.2)"}}>
+                      <div style={{fontSize:11,color:"#93c5fd",fontWeight:600,marginBottom:7}}>💧 Pediluvios de acceso</div>
+                      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                        {["Pediluvio al entrar — llenado","Pediluvio al salir — llenado"].map(t=>(
+                          <div key={t} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 12px",borderRadius:8,background:diariaForm.tareas[t]?"rgba(96,165,250,0.15)":"rgba(255,255,255,0.04)",border:`1px solid ${diariaForm.tareas[t]?"rgba(96,165,250,0.4)":"rgba(255,255,255,0.08)"}`,cursor:"pointer",fontSize:12}}
+                            onClick={()=>setDiariaForm(p=>({...p,tareas:{...p.tareas,[t]:!p.tareas[t]}}))}>
+                            <div style={{width:14,height:14,borderRadius:3,border:`2px solid ${diariaForm.tareas[t]?"#93c5fd":"rgba(255,255,255,0.2)"}`,background:diariaForm.tareas[t]?"#93c5fd":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                              {diariaForm.tareas[t]&&<span style={{color:"#000",fontSize:9,fontWeight:700}}>✓</span>}
+                            </div>
+                            {t}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                     <div><label style={labelSt}>Observaciones</label><input style={S.input} value={diariaForm.obs} onChange={e=>setDiariaForm(p=>({...p,obs:e.target.value}))} placeholder="Novedades, condiciones especiales..."/></div>
                     <div style={{display:"flex",gap:8,marginTop:10}}>
                       <button className="btn-p" style={S.btn} onClick={guardarDiaria}>✓ Guardar</button>
@@ -6894,7 +6952,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                             elemento:nombreZona+(hoyosZona?` (${hoyosZona})`:""),
                             tarea:`⛳ ${tareaForm.tipo}${tareaForm.descripcion?" — "+tareaForm.descripcion:""} · ${nombreZona}`,
                             responsable:tareaForm.responsable,
-                            estado:"por_designar",
+                            estado:tareaForm.responsable?"pendiente":"por_designar",
                             notas:tareaForm.obs||"",
                             auto:false,
                           };
@@ -7487,7 +7545,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
     const tarea = {...tareaForm,id:Date.now()};
     setbd({tareas:[tarea,...(bd.tareas||[])].slice(0,100)});
     if(tareaForm.responsable&&tareaForm.fecha) {
-      setTareasProg(p=>({...p,[tareaForm.fecha]:[...(p[tareaForm.fecha]||[]),{id:Date.now()+1,fecha:tareaForm.fecha,zona:bodega.nombre,elemento:"",tarea:`${bodega.icono} ${tareaForm.tipo}: ${tareaForm.descripcion||bodega.nombre}`,responsable:tareaForm.responsable,estado:"por_designar",notas:tareaForm.obs||"",auto:false}]}));
+      setTareasProg(p=>({...p,[tareaForm.fecha]:[...(p[tareaForm.fecha]||[]),{id:Date.now()+1,fecha:tareaForm.fecha,zona:bodega.nombre,elemento:"",tarea:`${bodega.icono} ${tareaForm.tipo}: ${tareaForm.descripcion||bodega.nombre}`,responsable:tareaForm.responsable,estado:tareaForm.responsable?"pendiente":"por_designar",notas:tareaForm.obs||"",auto:false}]}));
     }
     setTareaForm(emptyTarea); setShowTareaForm(false);
   };
@@ -8064,7 +8122,7 @@ function TareaPlantacion({ modo, zona, zonaId, bodegasData, setBodegasData, tare
     if(responsable&&fecha) {
       setTareasProg(p=>({...p,[fecha]:[...(p[fecha]||[]),{
         id:Date.now()+1, fecha, zona:zona?.nombre||"", elemento:"",
-        tarea:textoTarea, responsable, estado:"por_designar", notas:obs||"", auto:false,
+        tarea:textoTarea, responsable, estado:responsable?"pendiente":"por_designar", notas:obs||"", auto:false,
       }]}));
     }
 
