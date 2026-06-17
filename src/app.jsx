@@ -7206,9 +7206,19 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
                         if(!window.confirm(`¿Anular la rendición de ${r.mes}?\n\nLos bonos volverán a estado "pendiente" para generar una nueva rendición.\nEsta versión quedará en el historial marcada como ERRÓNEA.`)) return;
                         // Marcar rendición como anulada (no se elimina)
                         setRendicionesRRHH(p=>(Array.isArray(p)?p:Object.values(p||{})).map(x=>x.id===r.id?{...x,anulada:true,fechaAnulacion:new Date().toLocaleDateString("es-CL")}:x));
-                        // Recuperar bonos a pendiente
+                        // Recuperar bonos masivos a pendiente
                         const idsBonosRend = (r.bonos||[]).map(b=>b.id);
                         setBonosMasivos(p=>(Array.isArray(p)?p:Object.values(p||{})).map(b=>idsBonosRend.includes(b.id)?{...b,estado:"generado",fechaRendicion:null}:b));
+                        // Recuperar eventos individuales (horas extras, permisos, etc.)
+                        const evSel = r.eventosSeleccionados||{};
+                        if(Object.keys(evSel).length>0) {
+                          setPersonal(p=>(Array.isArray(p)?p:Object.values(p||{})).map(t=>({
+                            ...t, eventos:(t.eventos||[]).map(e=>{
+                              const key = `${t.id}_${e.id}`;
+                              return evSel[key]&&e.estado==="rendido"?{...e,estado:"pendiente"}:e;
+                            })
+                          })));
+                        }
                       }}>
                       ⚠️ Anular
                     </button>
