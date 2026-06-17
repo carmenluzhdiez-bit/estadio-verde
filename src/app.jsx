@@ -6285,7 +6285,17 @@ const getMesEstacion = () => {
   if(m>=6&&m<=8)  return "invierno";
   return "primavera";
 };
-const GREENS_DEF = Array.from({length:9},(_,i)=>({id:`g${i+1}`,nombre:`Green ${String(i+1).padStart(2,"0")}`,hoyos:`Hoyo ${i*2+1}-${i*2+2}`}));
+const GREENS_DEF = [
+  {id:"g1", nombre:"Green 01", hoyos:"Hoyo 01 - 10"},
+  {id:"g2", nombre:"Green 02", hoyos:"Hoyo 02 - 11"},
+  {id:"g3", nombre:"Green 03", hoyos:"Hoyo 03 - 12"},
+  {id:"g4", nombre:"Green 04", hoyos:"Hoyo 04 - 13"},
+  {id:"g5", nombre:"Green 05", hoyos:"Hoyo 05 - 14"},
+  {id:"g6", nombre:"Green 06", hoyos:"Hoyo 06 - 15"},
+  {id:"g7", nombre:"Green 07", hoyos:"Hoyo 07 - 16"},
+  {id:"g8", nombre:"Green 08", hoyos:"Hoyo 08 - 17"},
+  {id:"g9", nombre:"Green 09", hoyos:"Hoyo 09 - 18"},
+];
 const TEES_DEF   = Array.from({length:18},(_,i)=>({id:`t${i+1}`,nombre:`Tee ${String(i+1).padStart(2,"0")}`,hoyo:`Hoyo ${i+1}`}));
 const TIPOS_ARBOL = ["Hoja caduca","Hoja persistente","Coníferas","Palmera","Arbusto"];
 const TAREAS_GREENS_DIARIAS = ["Limpieza general","Corte de greens","Riego manual","Cambio de bandera","Revisión hoyos","Soplado"];
@@ -6487,7 +6497,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                     <div style={{fontSize:11,fontWeight:600,color:"#34d399"}}>{g.nombre}</div>
                     <div style={{fontSize:10,color:"#5a9a7a",marginBottom:4}}>{g.hoyos}</div>
                     <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color}}>{alt?`${alt}mm`:"—"}</div>
-                    {hum&&<div style={{fontSize:10,color:"#60a5fa"}}>💧{hum}%</div>}
+                    {hum&&<div style={{fontSize:10,color:Number(hum)<=2?"#ef4444":Number(hum)<=3?"#f59e0b":Number(hum)<=6?"#22c55e":"#3b82f6"}}>💧{hum}/8</div>}
                   </div>
                 );
               })}
@@ -6859,32 +6869,59 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                   </select>
                 </div>
               </div>
-              <div style={{fontSize:11,color:"#34d399",marginBottom:10,fontWeight:600}}>Greens — Rango {rango.label}: {rango.min}–{rango.max}mm</div>
+              <div style={{fontSize:11,color:"#34d399",marginBottom:10,fontWeight:600}}>Greens — Rango {rango.label}: {rango.min}–{rango.max}mm · Humedad: 1=seco / 8=saturado / óptimo 4-6</div>
               <div style={{overflowX:"auto",marginBottom:12}}>
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
                   <thead><tr style={{background:"rgba(52,211,153,0.1)"}}>
                     <th style={{padding:"6px 10px",textAlign:"left",color:"#34d399",fontSize:10}}>GREEN</th>
                     <th style={{padding:"6px 10px",textAlign:"center",color:"#34d399",fontSize:10}}>ALTURA (mm)</th>
-                    <th style={{padding:"6px 10px",textAlign:"center",color:"#34d399",fontSize:10}}>HUMEDAD (%)</th>
+                    <th style={{padding:"6px 10px",textAlign:"center",color:"#fbbf24",fontSize:10}}>PROYECCIÓN</th>
+                    <th style={{padding:"6px 10px",textAlign:"center",color:"#60a5fa",fontSize:10}}>HUMEDAD (1-8)</th>
                     <th style={{padding:"6px 10px",textAlign:"left",color:"#34d399",fontSize:10}}>OBS</th>
                   </tr></thead>
                   <tbody>
                     {GREENS_DEF.map(g=>{
                       const alt=medForm.alturas?.[g.id]||"";
                       const hum=medForm.humedades?.[g.id]||"";
+                      const diasCrecimiento=medForm.diasDesdeCorte?.[g.id]||"";
                       const color=colorAltura(alt);
+                      // Proyección: si hay altura y días, calcular tasa y cuándo llegará al límite
+                      let proyeccion = null;
+                      if(alt && diasCrecimiento && Number(diasCrecimiento)>0) {
+                        const tasaDiaria = (Number(alt)-rango.min) / Number(diasCrecimiento);
+                        if(tasaDiaria>0) {
+                          const diasHastaLimite = Math.round((rango.max - Number(alt)) / tasaDiaria);
+                          proyeccion = diasHastaLimite<=0 ? "⚠️ Cortar ya" :
+                                       diasHastaLimite<=2 ? `⏰ ${diasHastaLimite}d` :
+                                       `${diasHastaLimite}d`;
+                        }
+                      }
+                      const colorHum = !hum?"#5a9a7a":Number(hum)<=2?"#ef4444":Number(hum)<=3?"#f59e0b":Number(hum)<=6?"#22c55e":"#3b82f6";
                       return (
                         <tr key={g.id} style={{borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
-                          <td style={{padding:"5px 10px"}}><div style={{fontWeight:600,color:"#34d399"}}>{g.nombre}</div><div style={{fontSize:10,color:"#5a9a7a"}}>{g.hoyos}</div></td>
-                          <td style={{padding:"5px 6px",textAlign:"center"}}>
-                            <input type="number" step="0.1" min="0" max="20" style={{...S.input,width:70,fontSize:13,padding:"4px 6px",textAlign:"center",borderColor:alt&&color!=="#22c55e"?color:"",fontWeight:600,color:alt?color:"inherit"}} value={alt}
-                              onChange={e=>setMedForm(p=>({...p,alturas:{...p.alturas,[g.id]:e.target.value}}))}
-                              placeholder="mm"/>
+                          <td style={{padding:"5px 10px"}}>
+                            <div style={{fontWeight:600,color:"#34d399"}}>{g.nombre}</div>
+                            <div style={{fontSize:10,color:"#5a9a7a"}}>{g.hoyos}</div>
+                          </td>
+                          <td style={{padding:"5px 6px"}}>
+                            <div style={{display:"flex",gap:4,alignItems:"center",justifyContent:"center"}}>
+                              <input type="number" step="0.1" min="0" max="20" style={{...S.input,width:65,fontSize:13,padding:"4px 6px",textAlign:"center",borderColor:alt&&color!=="#22c55e"?color:"",fontWeight:600,color:alt?color:"inherit"}} value={alt}
+                                onChange={e=>setMedForm(p=>({...p,alturas:{...p.alturas,[g.id]:e.target.value}}))} placeholder="mm"/>
+                              <div style={{width:4,height:4,borderRadius:"50%",background:color,flexShrink:0}}/>
+                            </div>
                           </td>
                           <td style={{padding:"5px 6px",textAlign:"center"}}>
-                            <input type="number" step="1" min="0" max="100" style={{...S.input,width:65,fontSize:12,padding:"4px 6px",textAlign:"center"}} value={hum}
-                              onChange={e=>setMedForm(p=>({...p,humedades:{...p.humedades,[g.id]:e.target.value}}))}
-                              placeholder="%"/>
+                            <div style={{display:"flex",gap:4,alignItems:"center",justifyContent:"center"}}>
+                              <input type="number" min="0" max="30" style={{...S.input,width:45,fontSize:11,padding:"3px 5px",textAlign:"center"}} value={diasCrecimiento}
+                                onChange={e=>setMedForm(p=>({...p,diasDesdeCorte:{...p.diasDesdeCorte,[g.id]:e.target.value}}))} placeholder="días"/>
+                              {proyeccion&&<span style={{fontSize:10,fontWeight:700,color:proyeccion.includes("ya")?"#ef4444":proyeccion.includes("⏰")?"#f59e0b":"#22c55e",whiteSpace:"nowrap"}}>{proyeccion}</span>}
+                            </div>
+                            <div style={{fontSize:9,color:"#5a9a7a"}}>días desde corte</div>
+                          </td>
+                          <td style={{padding:"5px 6px",textAlign:"center"}}>
+                            <input type="number" step="1" min="1" max="8" style={{...S.input,width:55,fontSize:13,padding:"4px 6px",textAlign:"center",borderColor:hum?colorHum:"",color:hum?colorHum:"inherit",fontWeight:600}} value={hum}
+                              onChange={e=>setMedForm(p=>({...p,humedades:{...p.humedades,[g.id]:e.target.value}}))} placeholder="1-8"/>
+                            {hum&&<div style={{fontSize:9,color:colorHum}}>{Number(hum)<=2?"Seco":Number(hum)<=3?"Muy bajo":Number(hum)<=4?"Bajo":Number(hum)<=6?"Óptimo":Number(hum)<=7?"Alto":"Saturado"}</div>}
                           </td>
                           <td style={{padding:"5px 6px"}}>
                             <input style={{...S.input,fontSize:11,padding:"4px 6px"}} value={medForm.obsGreen?.[g.id]||""} placeholder="obs..."
@@ -6895,14 +6932,22 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                     })}
                     {/* Vivero */}
                     <tr style={{background:"rgba(74,222,128,0.04)",borderTop:"2px solid rgba(74,222,128,0.2)"}}>
-                      <td style={{padding:"5px 10px"}}><div style={{fontWeight:600,color:"#4ade80"}}>🌱 Vivero</div><div style={{fontSize:10,color:"#5a9a7a"}}>Altura variable</div></td>
+                      <td style={{padding:"5px 10px"}}>
+                        <div style={{fontWeight:600,color:"#4ade80"}}>🌱 Vivero</div>
+                        <div style={{fontSize:10,color:"#5a9a7a"}}>Altura variable</div>
+                      </td>
                       <td style={{padding:"5px 6px",textAlign:"center"}}>
-                        <input type="number" step="0.1" min="0" max="30" style={{...S.input,width:70,fontSize:13,padding:"4px 6px",textAlign:"center"}} value={medForm.alturas?.vivero||""}
+                        <input type="number" step="0.1" min="0" max="30" style={{...S.input,width:65,fontSize:13,padding:"4px 6px",textAlign:"center"}} value={medForm.alturas?.vivero||""}
                           onChange={e=>setMedForm(p=>({...p,alturas:{...p.alturas,vivero:e.target.value}}))} placeholder="mm"/>
                       </td>
                       <td style={{padding:"5px 6px",textAlign:"center"}}>
-                        <input type="number" step="1" min="0" max="100" style={{...S.input,width:65,fontSize:12,padding:"4px 6px",textAlign:"center"}} value={medForm.humedades?.vivero||""}
-                          onChange={e=>setMedForm(p=>({...p,humedades:{...p.humedades,vivero:e.target.value}}))} placeholder="%"/>
+                        <input type="number" min="0" max="30" style={{...S.input,width:45,fontSize:11,padding:"3px 5px",textAlign:"center"}} value={medForm.diasDesdeCorte?.vivero||""}
+                          onChange={e=>setMedForm(p=>({...p,diasDesdeCorte:{...p.diasDesdeCorte,vivero:e.target.value}}))} placeholder="días"/>
+                        <div style={{fontSize:9,color:"#5a9a7a"}}>días desde corte</div>
+                      </td>
+                      <td style={{padding:"5px 6px",textAlign:"center"}}>
+                        <input type="number" step="1" min="1" max="8" style={{...S.input,width:55,fontSize:12,padding:"4px 6px",textAlign:"center"}} value={medForm.humedades?.vivero||""}
+                          onChange={e=>setMedForm(p=>({...p,humedades:{...p.humedades,vivero:e.target.value}}))} placeholder="1-8"/>
                       </td>
                       <td style={{padding:"5px 6px"}}>
                         <input style={{...S.input,fontSize:11,padding:"4px 6px"}} value={medForm.obsGreen?.vivero||""} placeholder="siembra, resiembra..."
