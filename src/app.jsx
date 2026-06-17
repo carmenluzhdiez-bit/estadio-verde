@@ -7179,22 +7179,45 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
       ):(
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           {rendArr.map(r=>(
-            <div key={r.id} style={{...S.card,padding:16}}>
+            <div key={r.id} style={{...S.card,padding:16,opacity:r.anulada?0.7:1,borderColor:r.anulada?"rgba(239,68,68,0.3)":undefined}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:8}}>
                 <div>
-                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700}}>{r.mes}</div>
+                  <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:3}}>
+                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700}}>{r.mes}</div>
+                    {r.anulada&&<span style={{fontSize:10,background:"rgba(239,68,68,0.12)",color:"#fca5a5",padding:"2px 8px",borderRadius:10,border:"1px solid rgba(239,68,68,0.25)",fontWeight:700}}>⚠️ VERSIÓN ERRÓNEA</span>}
+                  </div>
                   <div style={{fontSize:12,color:"#6aaa7a"}}>📅 Generada: {r.fecha}</div>
-                  <div style={{fontSize:12,color:"#7a6a9a",marginTop:3}}>{(r.bonos||[]).length} bono{(r.bonos||[]).length!==1?"s":""} incluido{(r.bonos||[]).length!==1?"s":""}</div>
+                  <div style={{fontSize:12,color:"#7a6a9a",marginTop:2}}>{(r.bonos||[]).length} bono{(r.bonos||[]).length!==1?"s":""} incluido{(r.bonos||[]).length!==1?"s":""}</div>
+                  {r.anulada&&<div style={{fontSize:11,color:"#ef4444",marginTop:2}}>Anulada el {r.fechaAnulacion} — bonos recuperados para nueva rendición</div>}
                 </div>
                 <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
                   <div style={{textAlign:"right"}}>
                     <div style={{fontSize:11,color:"#7a6a9a"}}>Total bonos</div>
-                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#c4b5fd"}}>${Number(r.totalBonos||0).toLocaleString("es-CL")}</div>
+                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:r.anulada?"#ef4444":"#c4b5fd"}}>${Number(r.totalBonos||0).toLocaleString("es-CL")}</div>
+                    {r.anulada&&<div style={{fontSize:10,color:"#ef4444",fontWeight:600}}>⚠️ ANULADA</div>}
                   </div>
                   <button style={{...S.btn,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)",fontSize:12}}
                     onClick={()=>abrirInforme(r.paginas||[], false)}>
                     🖨️ Reimprimir
                   </button>
+                  {!r.anulada&&(
+                    <button style={{...S.btn,background:"rgba(239,68,68,0.12)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.25)",fontSize:12}}
+                      onClick={()=>{
+                        if(!window.confirm(`¿Anular la rendición de ${r.mes}?\n\nLos bonos volverán a estado "pendiente" para generar una nueva rendición.\nEsta versión quedará en el historial marcada como ERRÓNEA.`)) return;
+                        // Marcar rendición como anulada (no se elimina)
+                        setRendicionesRRHH(p=>(Array.isArray(p)?p:Object.values(p||{})).map(x=>x.id===r.id?{...x,anulada:true,fechaAnulacion:new Date().toLocaleDateString("es-CL")}:x));
+                        // Recuperar bonos a pendiente
+                        const idsBonosRend = (r.bonos||[]).map(b=>b.id);
+                        setBonosMasivos(p=>(Array.isArray(p)?p:Object.values(p||{})).map(b=>idsBonosRend.includes(b.id)?{...b,estado:"generado",fechaRendicion:null}:b));
+                      }}>
+                      ⚠️ Anular
+                    </button>
+                  )}
+                  {r.anulada&&(
+                    <span style={{fontSize:11,color:"#ef4444",padding:"4px 10px",background:"rgba(239,68,68,0.08)",borderRadius:6,border:"1px solid rgba(239,68,68,0.2)"}}>
+                      Anulada: {r.fechaAnulacion}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
