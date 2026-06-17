@@ -6776,7 +6776,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                 {/* Formulario nueva tarea green */}
                 {showTareaForm==="green"&&(
                   <div style={{...S.card,padding:16,marginBottom:12}} className="ein">
-                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#34d399",marginBottom:12}}>📋 Nueva tarea — {g.nombre}</div>
+                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#34d399",marginBottom:12}}>📋 Nueva tarea — Greens</div>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
                       <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={tareaForm.fecha} onChange={e=>setTareaForm(p=>({...p,fecha:e.target.value}))}/></div>
                       <div><label style={labelSt}>Responsable</label>
@@ -6794,17 +6794,123 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                         </select>
                       </div>
                       <div><label style={labelSt}>Aplicar a</label>
-                        <select style={S.input} value={tareaForm.target} onChange={e=>setTareaForm(p=>({...p,target:e.target.value,targetId:e.target.value==="green"?selectedGreen:""}))}>
-                          <option value="todos">Todos los greens</option>
+                        <select style={S.input} value={tareaForm.target} onChange={e=>setTareaForm(p=>({...p,target:e.target.value,greensSeleccionados:e.target.value==="todos"?GREENS_DEF.map(g=>g.id):e.target.value==="green"?[selectedGreen]:e.target.value==="vivero"?["vivero"]:e.target.value==="todos_vivero"?[...GREENS_DEF.map(g=>g.id),"vivero"]:[selectedGreen]}))}>
                           <option value="green">Este green ({g.nombre})</option>
-                          <option value="vivero">Vivero</option>
+                          <option value="seleccion">Greens seleccionados...</option>
+                          <option value="todos">Todos los greens (9)</option>
+                          <option value="todos_vivero">Todos los greens + Vivero</option>
+                          <option value="vivero">Solo Vivero</option>
                         </select>
                       </div>
-                      <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Descripción adicional</label><input style={S.input} value={tareaForm.descripcion} onChange={e=>setTareaForm(p=>({...p,descripcion:e.target.value}))} placeholder="Detalles, condiciones..."/></div>
+                    </div>
+
+                    {/* Selector de greens individuales */}
+                    {tareaForm.target==="seleccion"&&(
+                      <div style={{marginBottom:10}}>
+                        <label style={labelSt}>Selecciona los greens</label>
+                        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:4}}>
+                          {GREENS_DEF.map(gr=>{
+                            const sel=(tareaForm.greensSeleccionados||[]).includes(gr.id);
+                            return (
+                              <div key={gr.id} style={{display:"flex",alignItems:"center",gap:5,padding:"5px 10px",borderRadius:8,background:sel?"rgba(52,211,153,0.15)":"rgba(255,255,255,0.04)",border:`1px solid ${sel?"rgba(52,211,153,0.4)":"rgba(255,255,255,0.1)"}`,cursor:"pointer",fontSize:12}}
+                                onClick={()=>setTareaForm(p=>({...p,greensSeleccionados:sel?(p.greensSeleccionados||[]).filter(x=>x!==gr.id):[...(p.greensSeleccionados||[]),gr.id]}))}>
+                                <div style={{width:14,height:14,borderRadius:3,border:`2px solid ${sel?"#34d399":"rgba(255,255,255,0.2)"}`,background:sel?"#34d399":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                                  {sel&&<span style={{color:"#000",fontSize:9,fontWeight:700}}>✓</span>}
+                                </div>
+                                <span style={{color:sel?"#34d399":"#7aaa80"}}>{gr.nombre}</span>
+                                <span style={{fontSize:9,color:"#5a9a7a"}}>{gr.hoyos}</span>
+                              </div>
+                            );
+                          })}
+                          {/* Vivero como opción extra */}
+                          {(()=>{
+                            const sel=(tareaForm.greensSeleccionados||[]).includes("vivero");
+                            return (
+                              <div style={{display:"flex",alignItems:"center",gap:5,padding:"5px 10px",borderRadius:8,background:sel?"rgba(74,222,128,0.15)":"rgba(255,255,255,0.04)",border:`1px solid ${sel?"rgba(74,222,128,0.4)":"rgba(255,255,255,0.1)"}`,cursor:"pointer",fontSize:12}}
+                                onClick={()=>setTareaForm(p=>({...p,greensSeleccionados:sel?(p.greensSeleccionados||[]).filter(x=>x!=="vivero"):[...(p.greensSeleccionados||[]),"vivero"]}))}>
+                                <div style={{width:14,height:14,borderRadius:3,border:`2px solid ${sel?"#4ade80":"rgba(255,255,255,0.2)"}`,background:sel?"#4ade80":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                                  {sel&&<span style={{color:"#000",fontSize:9,fontWeight:700}}>✓</span>}
+                                </div>
+                                <span style={{color:sel?"#4ade80":"#7aaa80"}}>🌱 Vivero</span>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                        {(tareaForm.greensSeleccionados||[]).length>0&&(
+                          <div style={{fontSize:11,color:"#34d399",marginTop:6}}>✓ {(tareaForm.greensSeleccionados||[]).length} zona{(tareaForm.greensSeleccionados||[]).length!==1?"s":""} seleccionada{(tareaForm.greensSeleccionados||[]).length!==1?"s":""}</div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Vista previa de zonas a aplicar */}
+                    {tareaForm.tipo&&tareaForm.target&&(()=>{
+                      const zonas = tareaForm.target==="seleccion"
+                        ? (tareaForm.greensSeleccionados||[])
+                        : tareaForm.target==="todos"
+                        ? GREENS_DEF.map(g=>g.id)
+                        : tareaForm.target==="todos_vivero"
+                        ? [...GREENS_DEF.map(g=>g.id),"vivero"]
+                        : tareaForm.target==="vivero"
+                        ? ["vivero"]
+                        : [selectedGreen];
+                      if(!zonas.length) return null;
+                      return (
+                        <div style={{background:"rgba(52,211,153,0.06)",borderRadius:8,padding:"8px 12px",marginBottom:10,border:"1px solid rgba(52,211,153,0.15)"}}>
+                          <div style={{fontSize:11,color:"#34d399",fontWeight:600,marginBottom:4}}>
+                            📋 Se generarán {zonas.length} tarea{zonas.length!==1?"s":""}: <strong>{tareaForm.tipo}</strong>
+                          </div>
+                          <div style={{fontSize:11,color:"#5a9a7a"}}>
+                            {zonas.map(id=>id==="vivero"?"🌱 Vivero":GREENS_DEF.find(g=>g.id===id)?.nombre||id).join(" · ")}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                      <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Descripción adicional</label><input style={S.input} value={tareaForm.descripcion} onChange={e=>setTareaForm(p=>({...p,descripcion:e.target.value}))} placeholder="Detalles, altura de corte, condiciones..."/></div>
                       <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observaciones</label><input style={S.input} value={tareaForm.obs} onChange={e=>setTareaForm(p=>({...p,obs:e.target.value}))}/></div>
                     </div>
                     <div style={{display:"flex",gap:8}}>
-                      <button className="btn-p" style={S.btn} onClick={()=>{setTareaForm(p=>({...p,targetId:selectedGreen,target:"green"}));guardarTareaGolf();}}>✓ Guardar y enviar al programa</button>
+                      <button className="btn-p" style={S.btn} onClick={()=>{
+                        // Determinar zonas a aplicar
+                        const zonas = tareaForm.target==="seleccion"
+                          ? (tareaForm.greensSeleccionados||[])
+                          : tareaForm.target==="todos"
+                          ? GREENS_DEF.map(g=>g.id)
+                          : tareaForm.target==="todos_vivero"
+                          ? [...GREENS_DEF.map(g=>g.id),"vivero"]
+                          : tareaForm.target==="vivero"
+                          ? ["vivero"]
+                          : [selectedGreen];
+                        if(!zonas.length||!tareaForm.tipo) return;
+                        // Generar una tarea por cada zona
+                        const nuevasTareas = zonas.map(id=>{
+                          const nombreZona = id==="vivero"?"Vivero":GREENS_DEF.find(g=>g.id===id)?.nombre||id;
+                          const hoyosZona = id==="vivero"?"":GREENS_DEF.find(g=>g.id===id)?.hoyos||"";
+                          return {
+                            id:Date.now()+Math.random(),
+                            fecha:tareaForm.fecha,
+                            zona:"Golf",
+                            elemento:nombreZona+(hoyosZona?` (${hoyosZona})`:""),
+                            tarea:`⛳ ${tareaForm.tipo}${tareaForm.descripcion?" — "+tareaForm.descripcion:""} · ${nombreZona}`,
+                            responsable:tareaForm.responsable,
+                            estado:"por_designar",
+                            notas:tareaForm.obs||"",
+                            auto:false,
+                          };
+                        });
+                        setTareasProg(p=>{
+                          const nuevo={...p};
+                          nuevasTareas.forEach(t=>{
+                            if(!nuevo[t.fecha]) nuevo[t.fecha]=[];
+                            nuevo[t.fecha]=[...nuevo[t.fecha],t];
+                          });
+                          return nuevo;
+                        });
+                        sincronizarMacrozona("Tarea programada", `${tareaForm.tipo} — ${zonas.length} zonas`);
+                        setTareaForm(emptyTarea);
+                        setShowTareaForm(null);
+                      }}>✓ Guardar {(()=>{const n=tareaForm.target==="todos"?9:tareaForm.target==="todos_vivero"?10:tareaForm.target==="vivero"?1:tareaForm.target==="seleccion"?(tareaForm.greensSeleccionados||[]).length:1;return n>1?`(${n} tareas)`:"";})()} y enviar al programa</button>
                       <button className="btn-g" style={S.btn} onClick={()=>setShowTareaForm(null)}>Cancelar</button>
                     </div>
                   </div>
