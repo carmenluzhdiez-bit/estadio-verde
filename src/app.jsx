@@ -3497,11 +3497,25 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
                       {ev.descripcion&&<div style={{fontSize:12,color:"#7aaa80",marginTop:3,fontStyle:"italic"}}>{ev.descripcion}</div>}
                     </div>
                   </div>
-                  <div style={{display:"flex",gap:6,flexShrink:0}}>
+                  <div style={{display:"flex",gap:6,flexShrink:0,flexWrap:"wrap",justifyContent:"flex-end"}}>
+                    {ev.estado==="pendiente"&&<>
+                      <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(34,197,94,0.15)",color:"#86efac",border:"1px solid rgba(34,197,94,0.35)",fontWeight:600}}
+                        onClick={()=>onUpdateEvento(ev.id,{estado:"aprobado"})}>✓ Aprobar</button>
+                      <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(239,68,68,0.12)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.25)"}}
+                        onClick={()=>onUpdateEvento(ev.id,{estado:"rechazado"})}>✕ Rechazar</button>
+                    </>}
+                    {ev.estado==="aprobado"&&<>
+                      <span style={{fontSize:11,color:"#86efac",padding:"4px 10px",background:"rgba(34,197,94,0.1)",borderRadius:6,border:"1px solid rgba(34,197,94,0.25)",fontWeight:600}}>✓ Aprobado</span>
+                      <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(245,158,11,0.12)",color:"#fcd34d",border:"1px solid rgba(245,158,11,0.25)"}}
+                        onClick={()=>onUpdateEvento(ev.id,{estado:"pendiente"})}>↩ Revertir</button>
+                    </>}
+                    {ev.estado==="rechazado"&&<>
+                      <span style={{fontSize:11,color:"#fca5a5",padding:"4px 10px",background:"rgba(239,68,68,0.1)",borderRadius:6,border:"1px solid rgba(239,68,68,0.25)"}}>✕ Rechazado</span>
+                      <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(245,158,11,0.12)",color:"#fcd34d",border:"1px solid rgba(245,158,11,0.25)"}}
+                        onClick={()=>onUpdateEvento(ev.id,{estado:"pendiente"})}>↩ Revertir</button>
+                    </>}
+                    {ev.estado==="rendido"&&<span style={{fontSize:11,color:"#5a8a6a",padding:"4px 10px",background:"rgba(255,255,255,0.04)",borderRadius:6}}>📤 Rendido</span>}
                     <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 8px"}} onClick={()=>abrirEditEvento(ev)}>✏️</button>
-                    <select value={ev.estado} style={{...S.input,width:"auto",fontSize:12,padding:"4px 8px"}} onChange={e=>onUpdateEvento(ev.id,{estado:e.target.value})}>
-                      {Object.entries(ESTADO_EVENTO).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
-                    </select>
                     <button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 8px"}} onClick={()=>onDeleteEvento(ev.id)}>🗑</button>
                   </div>
                 </div>
@@ -3636,11 +3650,25 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
                       {ev.descripcion&&<div style={{fontSize:12,color:"#7aaa80",marginTop:3,fontStyle:"italic"}}>{ev.descripcion}</div>}
                     </div>
                   </div>
-                  <div style={{display:"flex",gap:6,flexShrink:0}}>
+                  <div style={{display:"flex",gap:6,flexShrink:0,flexWrap:"wrap",justifyContent:"flex-end"}}>
+                    {ev.estado==="pendiente"&&<>
+                      <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(34,197,94,0.15)",color:"#86efac",border:"1px solid rgba(34,197,94,0.35)",fontWeight:600}}
+                        onClick={()=>onUpdateEvento(ev.id,{estado:"aprobado"})}>✓ Aprobar</button>
+                      <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(239,68,68,0.12)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.25)"}}
+                        onClick={()=>onUpdateEvento(ev.id,{estado:"rechazado"})}>✕ Rechazar</button>
+                    </>}
+                    {ev.estado==="aprobado"&&<>
+                      <span style={{fontSize:11,color:"#86efac",padding:"4px 10px",background:"rgba(34,197,94,0.1)",borderRadius:6,border:"1px solid rgba(34,197,94,0.25)",fontWeight:600}}>✓ Aprobado</span>
+                      <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(245,158,11,0.12)",color:"#fcd34d",border:"1px solid rgba(245,158,11,0.25)"}}
+                        onClick={()=>onUpdateEvento(ev.id,{estado:"pendiente"})}>↩ Revertir</button>
+                    </>}
+                    {ev.estado==="rechazado"&&<>
+                      <span style={{fontSize:11,color:"#fca5a5",padding:"4px 10px",background:"rgba(239,68,68,0.1)",borderRadius:6,border:"1px solid rgba(239,68,68,0.25)"}}>✕ Rechazado</span>
+                      <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(245,158,11,0.12)",color:"#fcd34d",border:"1px solid rgba(245,158,11,0.25)"}}
+                        onClick={()=>onUpdateEvento(ev.id,{estado:"pendiente"})}>↩ Revertir</button>
+                    </>}
+                    {ev.estado==="rendido"&&<span style={{fontSize:11,color:"#5a8a6a",padding:"4px 10px",background:"rgba(255,255,255,0.04)",borderRadius:6}}>📤 Rendido</span>}
                     <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 8px"}} onClick={()=>abrirEditEvento(ev)}>✏️</button>
-                    <select value={ev.estado} style={{...S.input,width:"auto",fontSize:12,padding:"4px 8px"}} onChange={e=>onUpdateEvento(ev.id,{estado:e.target.value})}>
-                      {Object.entries(ESTADO_EVENTO).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
-                    </select>
                     <button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 8px"}} onClick={()=>onDeleteEvento(ev.id)}>🗑</button>
                   </div>
                 </div>
@@ -7047,6 +7075,7 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
         return a+Number(p?.monto||0);
       },0) + eventosT.filter(e=>["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)).reduce((a,e)=>a+Number(e.valor||0),0);
       const totalHE = eventosT.filter(e=>e.tipo==="horaExtra"&&e.estado==="aprobado").reduce((a,e)=>a+Number(e.horas||0),0);
+      const hePendientes = eventosT.filter(e=>e.tipo==="horaExtra"&&e.estado!=="aprobado");
 
       const filasBonosMasivos = bonosT.map(b=>{
         const p=b.participantes?.find(p=>String(p.trabajadorId)===String(t.id));
@@ -7095,8 +7124,16 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
         ${filasHE?`<div class="sec">⏰ Horas Extras</div>
         <table><thead><tr><th>Fecha</th><th>Descripción</th><th style="text-align:right">Horas</th></tr></thead>
         <tbody>${filasHE}</tbody>
-        <tfoot><tr style="background:#e3f2fd;font-weight:bold"><td colspan="2" style="padding:6px 10px;border:1px solid #e0e0e0;text-align:right">TOTAL</td>
-        <td style="padding:6px 10px;border:1px solid #e0e0e0;text-align:right;color:#1565c0">${totalHE} hrs</td></tr></tfoot></table>`:""}
+        <tfoot><tr style="background:#e3f2fd;font-weight:bold"><td colspan="2" style="padding:6px 10px;border:1px solid #e0e0e0;text-align:right">TOTAL APROBADAS</td>
+        <td style="padding:6px 10px;border:1px solid #e0e0e0;text-align:right;color:#1565c0">${totalHE} hrs</td></tr></tfoot></table>
+        ${hePendientes.length>0?`<div style="background:#fff8e1;border:1px solid #ffc107;border-radius:6px;padding:8px 12px;font-size:11px;margin-bottom:8px">
+          ⚠️ <strong>${hePendientes.length} hora${hePendientes.length!==1?"s extras":""} extra${hePendientes.length!==1?"s":""} pendiente${hePendientes.length!==1?"s":""} de aprobación</strong> (${hePendientes.reduce((a,e)=>a+Number(e.horas||0),0)} hrs total) — no incluida${hePendientes.length!==1?"s":""} en esta rendición.
+        </div>`:""}
+        `:""}
+        ${hePendientes&&hePendientes.length>0&&!filasHE?`
+        <div style="background:#fff8e1;border:1px solid #ffc107;border-radius:6px;padding:8px 12px;font-size:11px;margin-bottom:8px">
+          ⚠️ <strong>${hePendientes.length} hora${hePendientes.length!==1?"s extras":""} extra${hePendientes.length!==1?"s":""} pendiente${hePendientes.length!==1?"s":""} de aprobación</strong> (${hePendientes.reduce((a,e)=>a+Number(e.horas||0),0)} hrs) — aprobar antes de rendir.
+        </div>`:""}
         ${filasPermisos?`<div class="sec">📋 Permisos y Ausentismo</div>
         <table><thead><tr><th>Período</th><th>Tipo</th><th>—</th></tr></thead>
         <tbody>${filasPermisos}</tbody></table>`:""}
@@ -7330,6 +7367,7 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
                   <div style={{flex:1,fontSize:12}}>
                     <span>{e.tipo==="horaExtra"?"⏰":e.tipo==="permiso"?"📋":e.tipo==="vacaciones"?"🏖️":e.tipo==="licencia"?"🏥":"💰"}</span>
                     {" "}{e.descripcion||e.tipo} · {e.fecha}{e.fechaFin?` → ${e.fechaFin}`:""}
+                    {e.tipo==="horaExtra"&&e.estado!=="aprobado"&&<span style={{fontSize:10,color:"#f59e0b",marginLeft:6,background:"rgba(245,158,11,0.1)",padding:"1px 6px",borderRadius:8,border:"1px solid rgba(245,158,11,0.2)"}}>⚠️ Pendiente aprobación — no se sumará</span>}
                   </div>
                   <div style={{fontSize:12,color:"#7aaa80",flexShrink:0}}>
                     {e.valor?`$${Number(e.valor).toLocaleString("es-CL")}`:e.horas?`${e.horas}h`:""}
