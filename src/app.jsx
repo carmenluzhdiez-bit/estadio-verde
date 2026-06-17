@@ -6358,8 +6358,6 @@ const PLANTILLA_PRE_TORNEO = {
     {cat:"Administración",tarea:"Revisar pronóstico del tiempo"},
   ],
 };
-const TAREAS_HOJA_CADUCA = ["Poda de invierno","Raleo","Recolección hojas","Poda post floración"];
-const TAREAS_HOJA_PERSISTENTE = ["Poda de mantenimiento","Lavado follaje"];
 
 function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial }) {
   const GOLF_ZONA_ID = 31; // ID macrozona Golf
@@ -6828,9 +6826,6 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                   </div>
                 ))}
                 {!(golfData.registrosDiarios||[]).length&&<div style={{...S.card,padding:24,textAlign:"center",color:"#3a7a5a"}}>Sin registros aún</div>}
-              </div>
-            );
-          })()}
               </div>
             );
           })()}
