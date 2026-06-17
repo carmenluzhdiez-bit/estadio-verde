@@ -6271,6 +6271,765 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   );
 }
 
+// ─── RANGOS ALTURA GOLF ──────────────────────────────────────────────────────
+const RANGOS_ALTURA = {
+  verano:    {min:4.7, max:5.0, label:"Verano (Dic-Feb)"},
+  otono:     {min:4.5, max:4.8, label:"Otoño (Mar-May)"},
+  invierno:  {min:4.8, max:4.9, label:"Invierno (Jun-Ago)"},
+  primavera: {min:4.5, max:4.8, label:"Primavera (Sep-Nov)"},
+};
+const getMesEstacion = () => {
+  const m = new Date().getMonth()+1;
+  if(m>=12||m<=2) return "verano";
+  if(m>=3&&m<=5)  return "otono";
+  if(m>=6&&m<=8)  return "invierno";
+  return "primavera";
+};
+const GREENS_DEF = Array.from({length:9},(_,i)=>({id:`g${i+1}`,nombre:`Green ${String(i+1).padStart(2,"0")}`,hoyos:`Hoyo ${i*2+1}-${i*2+2}`}));
+const TEES_DEF   = Array.from({length:18},(_,i)=>({id:`t${i+1}`,nombre:`Tee ${String(i+1).padStart(2,"0")}`,hoyo:`Hoyo ${i+1}`}));
+const TIPOS_ARBOL = ["Hoja caduca","Hoja persistente","Coníferas","Palmera","Arbusto"];
+const TAREAS_GREENS_DIARIAS = ["Limpieza general","Corte de greens","Riego manual","Cambio de bandera","Revisión hoyos","Soplado"];
+const TAREAS_GREENS_PERIODICAS = ["Medición de altura","Fertilización","Aireación","Escarificado","Resiembra","Control de plagas","Riego automático revisión","Aplicación fungicida","Top dressing","Control malezas"];
+const TAREAS_TEES = ["Limpieza","Corte","Riego","Reparación divots","Cambio de marcas"];
+const TAREAS_ARBOLES_GENERALES = ["Poda formación","Poda sanitaria","Fertilización","Riego","Control plagas","Aplicación fungicida","Revisión estado"];
+const TAREAS_HOJA_CADUCA = ["Poda de invierno","Raleo","Recolección hojas","Poda post floración"];
+const TAREAS_HOJA_PERSISTENTE = ["Poda de mantenimiento","Lavado follaje"];
+
+function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial }) {
+  const GOLF_ZONA_ID = 31; // ID macrozona Golf
+  const sincronizarMacrozona = (tipo, detalle) => {
+    if(!updateZona) return;
+    const hoyFmt = new Date().toLocaleDateString("es-CL");
+    updateZona(GOLF_ZONA_ID, {ultimoMant: new Date().toISOString().slice(0,10)});
+    if(addHistorial) addHistorial(GOLF_ZONA_ID, `⛳ ${tipo}: ${detalle} — ${hoyFmt}`);
+  };
+  const hoy = new Date().toISOString().slice(0,10);
+  const estacion = getMesEstacion();
+  const rango = RANGOS_ALTURA[estacion];
+  const labelSt = {fontSize:10,color:"#34d399",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
+  const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
+  const listaPersonal = [...personalArr].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+
+  const [subTab, setSubTab] = React.useState("panel");
+  const setG = (patch) => setGolfData(p=>({...p,...patch}));
+
+  const greens    = golfData.greens    || {};
+  const tees      = golfData.tees      || {};
+  const arboles   = Array.isArray(golfData.arboles)?golfData.arboles:Object.values(golfData.arboles||{});
+  const eventos   = Array.isArray(golfData.eventos)?golfData.eventos:Object.values(golfData.eventos||{});
+  const mediciones= Array.isArray(golfData.mediciones)?golfData.mediciones:Object.values(golfData.mediciones||{});
+
+  // ── Formularios ──────────────────────────────────────────────────────────
+  const [showMedForm,    setShowMedForm]    = React.useState(false);
+  const [showEventoForm, setShowEventoForm] = React.useState(false);
+  const [showArbolForm,  setShowArbolForm]  = React.useState(false);
+  const [showTareaForm,  setShowTareaForm]  = React.useState(null); // "green"|"tee"|"arbol"
+  const [showDiariaForm, setShowDiariaForm] = React.useState(false);
+  const [selectedGreen,  setSelectedGreen]  = React.useState("g1");
+  const [selectedTee,    setSelectedTee]    = React.useState("t1");
+
+  // Formulario medición semanal
+  const emptyMed = {fecha:hoy,responsable:"",tipo:"semanal",alturas:{},humedades:{},obs:""};
+  const [medForm, setMedForm] = React.useState(emptyMed);
+
+  // Formulario evento/torneo
+  const emptyEvento = {nombre:"",fecha:"",fechaFin:"",tipo:"torneo",restricciones:[],responsable:"",obs:""};
+  const [eventoForm, setEventoForm] = React.useState(emptyEvento);
+
+  // Formulario árbol
+  const emptyArbol = {nombre:"",especie:"",tipo:"Hoja caduca",ubicacion:"",cantidad:1,estado:"bueno",fechaIngreso:hoy,obs:""};
+  const [arbolForm, setArbolForm] = React.useState(emptyArbol);
+  const [editArbolId, setEditArbolId] = React.useState(null);
+
+  // Formulario tarea
+  const emptyTarea = {fecha:hoy,tipo:"",descripcion:"",responsable:"",target:"todos",targetId:"",obs:""};
+  const [tareaForm, setTareaForm] = React.useState(emptyTarea);
+
+  // Formulario tarea diaria
+  const emptyDiaria = {fecha:hoy,responsable:"",tareas:{},obs:""};
+  const [diariaForm, setDiariaForm] = React.useState(emptyDiaria);
+
+  // ── Evento activo hoy ────────────────────────────────────────────────────
+  const eventoHoy = eventos.find(e=>e.fecha<=hoy&&(e.fechaFin||e.fecha)>=hoy);
+
+  // ── Última medición ──────────────────────────────────────────────────────
+  const ultimaMed = [...mediciones].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""))[0];
+  const diasDesdeUltMed = ultimaMed ? Math.round((new Date(hoy)-new Date(ultimaMed.fecha))/(1000*60*60*24)) : null;
+
+  // ── Guardar medición ─────────────────────────────────────────────────────
+  const guardarMedicion = () => {
+    if(!medForm.responsable) return;
+    setG({mediciones:[{...medForm,id:Date.now()},...mediciones].slice(0,100)});
+    sincronizarMacrozona("Medición de alturas", `${medForm.tipo} — ${medForm.responsable}`);
+    setMedForm(emptyMed); setShowMedForm(false);
+  };
+
+  // ── Guardar evento ───────────────────────────────────────────────────────
+  const guardarEvento = () => {
+    if(!eventoForm.nombre||!eventoForm.fecha) return;
+    setG({eventos:[{...eventoForm,id:Date.now()},...eventos]});
+    sincronizarMacrozona("Evento registrado", `${eventoForm.nombre} (${eventoForm.fecha})`);
+    setEventoForm(emptyEvento); setShowEventoForm(false);
+  };
+
+  // ── Guardar árbol ────────────────────────────────────────────────────────
+  const guardarArbol = () => {
+    if(!arbolForm.nombre.trim()) return;
+    if(editArbolId) {
+      setG({arboles:arboles.map(a=>a.id===editArbolId?{...arbolForm,id:editArbolId}:a)});
+      setEditArbolId(null);
+    } else {
+      setG({arboles:[{...arbolForm,id:Date.now()},...arboles]});
+    }
+    setArbolForm(emptyArbol); setShowArbolForm(false);
+  };
+
+  // ── Guardar tarea Golf → Programa ────────────────────────────────────────
+  const guardarTareaGolf = () => {
+    if(!tareaForm.tipo||!tareaForm.fecha) return;
+    const target = tareaForm.target==="green" ? GREENS_DEF.find(g=>g.id===tareaForm.targetId)?.nombre :
+                   tareaForm.target==="tee"   ? TEES_DEF.find(t=>t.id===tareaForm.targetId)?.nombre :
+                   tareaForm.target==="arbol" ? (arboles.find(a=>String(a.id)===tareaForm.targetId)?.nombre||"Árbol") : "Todos";
+    const textoTarea = `⛳ Golf — ${tareaForm.tipo}${target&&target!=="Todos"?" ("+target+")":""}${tareaForm.descripcion?" — "+tareaForm.descripcion:""}`;
+    if(tareaForm.responsable&&tareaForm.fecha) {
+      setTareasProg(p=>({...p,[tareaForm.fecha]:[...(p[tareaForm.fecha]||[]),{
+        id:Date.now(),fecha:tareaForm.fecha,zona:"Golf",elemento:target||"",
+        tarea:textoTarea,responsable:tareaForm.responsable,estado:"por_designar",notas:tareaForm.obs||"",auto:false,
+      }]}));
+    }
+    sincronizarMacrozona("Tarea programada", `${tareaForm.tipo} — ${tareaForm.responsable||"Sin asignar"}`);
+    setTareaForm(emptyTarea); setShowTareaForm(null);
+  };
+
+  // ── Guardar registro diario ──────────────────────────────────────────────
+  const guardarDiaria = () => {
+    if(!diariaForm.responsable) return;
+    const reg = {...diariaForm, id:Date.now()};
+    const tareasRealizadas = Object.entries(diariaForm.tareas||{}).filter(([,v])=>v).map(([k])=>k);
+    setG({registrosDiarios:[reg,...(golfData.registrosDiarios||[])].slice(0,200)});
+    sincronizarMacrozona("Registro diario", `${tareasRealizadas.length} tareas — ${diariaForm.responsable}`);
+    setDiariaForm(emptyDiaria); setShowDiariaForm(false);
+  };
+
+  const colorAltura = (v) => {
+    if(!v) return "#5a8a6a";
+    const n=Number(v);
+    if(n<rango.min) return "#3b82f6";
+    if(n>rango.max) return "#ef4444";
+    return "#22c55e";
+  };
+
+  // ── RENDER ───────────────────────────────────────────────────────────────
+  return (
+    <div className="ein">
+      <div style={{marginBottom:14}}>
+        <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:24,fontWeight:900,marginBottom:2}}>🏌️ Golf</h1>
+        <p style={{color:"#34d399",fontSize:13}}>Gestión integral cancha · Estadio Español</p>
+      </div>
+
+      {/* Alerta evento activo */}
+      {eventoHoy&&(
+        <div style={{background:"rgba(251,191,36,0.1)",border:"1px solid rgba(251,191,36,0.3)",borderRadius:10,padding:"10px 16px",marginBottom:14,display:"flex",gap:10,alignItems:"center"}}>
+          <span style={{fontSize:20}}>🏆</span>
+          <div>
+            <div style={{fontSize:13,fontWeight:700,color:"#fbbf24"}}>{eventoHoy.nombre}</div>
+            <div style={{fontSize:11,color:"#a08050"}}>{eventoHoy.fecha}{eventoHoy.fechaFin&&eventoHoy.fechaFin!==eventoHoy.fecha?` → ${eventoHoy.fechaFin}`:""} · {eventoHoy.obs||"Evento activo"}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Sub-tabs */}
+      <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
+        {[["panel","📊 Panel"],["greens","⛳ Greens"],["tees","🎯 Tees"],["arboles","🌳 Árboles"],["mediciones","📏 Mediciones"],["eventos","🏆 Eventos"]].map(([t,l])=>(
+          <button key={t} className={`tab${subTab===t?" on":""}`} onClick={()=>setSubTab(t)} style={{fontFamily:"'Georgia',serif"}}>{l}</button>
+        ))}
+      </div>
+
+      {/* ── PANEL ── */}
+      {subTab==="panel"&&(
+        <div className="ein">
+          {/* KPIs */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:16}}>
+            {[
+              {label:"Estación actual",val:rango.label.split(" ")[0],color:"#34d399",icon:"🌿"},
+              {label:"Rango altura",val:`${rango.min}-${rango.max}mm`,color:"#34d399",icon:"📏"},
+              {label:"Última medición",val:ultimaMed?`Hace ${diasDesdeUltMed}d`:"Sin datos",color:diasDesdeUltMed>7?"#ef4444":diasDesdeUltMed>5?"#f59e0b":"#22c55e",icon:"📅"},
+              {label:"Árboles registrados",val:arboles.length,color:"#4ade80",icon:"🌳"},
+              {label:"Eventos próximos",val:eventos.filter(e=>e.fecha>=hoy).length,color:"#fbbf24",icon:"🏆"},
+            ].map(k=>(
+              <div key={k.label} style={{...S.card,padding:"12px 10px",textAlign:"center",borderColor:`${k.color}30`}}>
+                <div style={{fontSize:22,marginBottom:4}}>{k.icon}</div>
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color:k.color}}>{k.val}</div>
+                <div style={{fontSize:10,color:"#5a9a7a"}}>{k.label}</div>
+              </div>
+            ))}
+          </div>
+          {/* Accesos rápidos */}
+          <div style={{...S.card,padding:16,marginBottom:14}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#34d399",marginBottom:10}}>⚡ Acciones rápidas</div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              <button style={{...S.btn,background:"rgba(52,211,153,0.15)",color:"#34d399",border:"1px solid rgba(52,211,153,0.3)"}} onClick={()=>{setSubTab("mediciones");setShowMedForm(true);}}>📏 Nueva medición</button>
+              <button style={{...S.btn,background:"rgba(52,211,153,0.12)",color:"#6ee7b7",border:"1px solid rgba(52,211,153,0.2)"}} onClick={()=>{setSubTab("greens");setShowDiariaForm(true);}}>✅ Registro diario</button>
+              <button style={{...S.btn,background:"rgba(52,211,153,0.12)",color:"#6ee7b7",border:"1px solid rgba(52,211,153,0.2)"}} onClick={()=>{setSubTab("greens");setShowTareaForm("green");}}>📋 Nueva tarea greens</button>
+              {esJefa&&<button style={{...S.btn,background:"rgba(251,191,36,0.12)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.25)"}} onClick={()=>{setSubTab("eventos");setShowEventoForm(true);}}>🏆 Cargar evento</button>}
+            </div>
+          </div>
+          {/* Estado greens hoy */}
+          <div style={{...S.card,padding:16}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#34d399",marginBottom:10}}>⛳ Estado Greens — última medición{ultimaMed?` (${ultimaMed.fecha})`:""}</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(100px,1fr))",gap:8}}>
+              {GREENS_DEF.map(g=>{
+                const alt = ultimaMed?.alturas?.[g.id];
+                const hum = ultimaMed?.humedades?.[g.id];
+                const color = colorAltura(alt);
+                return (
+                  <div key={g.id} style={{background:`${color}10`,borderRadius:8,padding:"8px 10px",border:`1px solid ${color}30`,textAlign:"center",cursor:"pointer"}} onClick={()=>{setSubTab("greens");setSelectedGreen(g.id);}}>
+                    <div style={{fontSize:11,fontWeight:600,color:"#34d399"}}>{g.nombre}</div>
+                    <div style={{fontSize:10,color:"#5a9a7a",marginBottom:4}}>{g.hoyos}</div>
+                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color}}>{alt?`${alt}mm`:"—"}</div>
+                    {hum&&<div style={{fontSize:10,color:"#60a5fa"}}>💧{hum}%</div>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── GREENS ── */}
+      {subTab==="greens"&&(
+        <div className="ein">
+          <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+            {esJefa&&<button className="btn-p" style={S.btn} onClick={()=>setShowTareaForm("green")}>📋 Nueva tarea</button>}
+            <button style={{...S.btn,background:"rgba(52,211,153,0.12)",color:"#34d399",border:"1px solid rgba(52,211,153,0.25)"}} onClick={()=>setShowDiariaForm(true)}>✅ Registro diario</button>
+            <button style={{...S.btn,background:"rgba(59,130,246,0.12)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.25)"}} onClick={()=>{setSubTab("mediciones");setShowMedForm(true);}}>📏 Medición alturas</button>
+          </div>
+
+          {/* Selector green */}
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
+            {GREENS_DEF.map(g=>{
+              const alt=ultimaMed?.alturas?.[g.id];
+              const color=colorAltura(alt);
+              return (
+                <button key={g.id} onClick={()=>setSelectedGreen(g.id)}
+                  style={{background:selectedGreen===g.id?`${color}20`:"rgba(255,255,255,0.04)",border:`1px solid ${selectedGreen===g.id?color+"60":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"6px 12px",color:selectedGreen===g.id?color:"#5a9a7a",fontSize:11,cursor:"pointer",fontFamily:"'Georgia',serif"}}>
+                  {g.nombre}<br/><span style={{fontSize:9,color:"#5a9a7a"}}>{g.hoyos}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Detalle green seleccionado */}
+          {(()=>{
+            const g = GREENS_DEF.find(x=>x.id===selectedGreen);
+            const alt = ultimaMed?.alturas?.[selectedGreen];
+            const hum = ultimaMed?.humedades?.[selectedGreen];
+            const color = colorAltura(alt);
+            const tareasG = (golfData.tareasGreen||[]).filter(t=>t.greenId===selectedGreen);
+            return (
+              <div>
+                <div style={{...S.card,padding:16,marginBottom:12,borderLeft:`3px solid ${color}`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:8}}>
+                    <div>
+                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700}}>{g.nombre}</div>
+                      <div style={{fontSize:12,color:"#5a9a7a"}}>{g.hoyos}</div>
+                    </div>
+                    <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+                      <div style={{textAlign:"center",background:`${color}12`,borderRadius:8,padding:"8px 14px",border:`1px solid ${color}30`}}>
+                        <div style={{fontSize:10,color:"#5a9a7a",marginBottom:2}}>ALTURA</div>
+                        <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:700,color}}>{alt?`${alt}mm`:"—"}</div>
+                        <div style={{fontSize:9,color:"#5a9a7a"}}>rango {rango.min}-{rango.max}mm</div>
+                        {alt&&Number(alt)<rango.min&&<div style={{fontSize:10,color:"#3b82f6"}}>▼ Bajo rango</div>}
+                        {alt&&Number(alt)>rango.max&&<div style={{fontSize:10,color:"#ef4444"}}>▲ Sobre rango</div>}
+                      </div>
+                      {hum&&<div style={{textAlign:"center",background:"rgba(96,165,250,0.1)",borderRadius:8,padding:"8px 14px",border:"1px solid rgba(96,165,250,0.2)"}}>
+                        <div style={{fontSize:10,color:"#5a9a7a",marginBottom:2}}>HUMEDAD</div>
+                        <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:700,color:"#60a5fa"}}>{hum}%</div>
+                      </div>}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Formulario registro diario */}
+                {showDiariaForm&&(
+                  <div style={{...S.card,padding:16,marginBottom:12,background:"rgba(52,211,153,0.04)",borderColor:"rgba(52,211,153,0.2)"}} className="ein">
+                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#34d399",marginBottom:12}}>✅ Registro diario Greens</div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                      <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={diariaForm.fecha} onChange={e=>setDiariaForm(p=>({...p,fecha:e.target.value}))}/></div>
+                      <div><label style={labelSt}>Responsable</label>
+                        <select style={S.input} value={diariaForm.responsable} onChange={e=>setDiariaForm(p=>({...p,responsable:e.target.value}))}>
+                          <option value="">Seleccionar...</option>
+                          {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <div style={{fontSize:11,color:"#5a9a7a",marginBottom:8}}>Selecciona las tareas realizadas hoy:</div>
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
+                      {TAREAS_GREENS_DIARIAS.map(t=>(
+                        <div key={t} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 10px",borderRadius:8,background:diariaForm.tareas[t]?"rgba(52,211,153,0.12)":"rgba(255,255,255,0.04)",border:`1px solid ${diariaForm.tareas[t]?"rgba(52,211,153,0.35)":"rgba(255,255,255,0.08)"}`,cursor:"pointer",fontSize:12}}
+                          onClick={()=>setDiariaForm(p=>({...p,tareas:{...p.tareas,[t]:!p.tareas[t]}}))}>
+                          <div style={{width:14,height:14,borderRadius:3,border:`2px solid ${diariaForm.tareas[t]?"#34d399":"rgba(255,255,255,0.2)"}`,background:diariaForm.tareas[t]?"#34d399":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                            {diariaForm.tareas[t]&&<span style={{color:"#000",fontSize:9,fontWeight:700}}>✓</span>}
+                          </div>
+                          {t}
+                        </div>
+                      ))}
+                    </div>
+                    <div><label style={labelSt}>Observaciones</label><input style={S.input} value={diariaForm.obs} onChange={e=>setDiariaForm(p=>({...p,obs:e.target.value}))} placeholder="Novedades, condiciones especiales..."/></div>
+                    <div style={{display:"flex",gap:8,marginTop:10}}>
+                      <button className="btn-p" style={S.btn} onClick={guardarDiaria}>✓ Guardar</button>
+                      <button className="btn-g" style={S.btn} onClick={()=>setShowDiariaForm(false)}>Cancelar</button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Formulario nueva tarea green */}
+                {showTareaForm==="green"&&(
+                  <div style={{...S.card,padding:16,marginBottom:12}} className="ein">
+                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#34d399",marginBottom:12}}>📋 Nueva tarea — {g.nombre}</div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                      <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={tareaForm.fecha} onChange={e=>setTareaForm(p=>({...p,fecha:e.target.value}))}/></div>
+                      <div><label style={labelSt}>Responsable</label>
+                        <select style={S.input} value={tareaForm.responsable} onChange={e=>setTareaForm(p=>({...p,responsable:e.target.value}))}>
+                          <option value="">Seleccionar...</option>
+                          {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                        </select>
+                      </div>
+                      <div><label style={labelSt}>Tarea</label>
+                        <select style={S.input} value={tareaForm.tipo} onChange={e=>setTareaForm(p=>({...p,tipo:e.target.value}))}>
+                          <option value="">Seleccionar...</option>
+                          <optgroup label="── Periódicas ──">{TAREAS_GREENS_PERIODICAS.map(t=><option key={t}>{t}</option>)}</optgroup>
+                          <optgroup label="── Diarias ──">{TAREAS_GREENS_DIARIAS.map(t=><option key={t}>{t}</option>)}</optgroup>
+                          <option value="Otra">Otra...</option>
+                        </select>
+                      </div>
+                      <div><label style={labelSt}>Aplicar a</label>
+                        <select style={S.input} value={tareaForm.target} onChange={e=>setTareaForm(p=>({...p,target:e.target.value,targetId:e.target.value==="green"?selectedGreen:""}))}>
+                          <option value="todos">Todos los greens</option>
+                          <option value="green">Este green ({g.nombre})</option>
+                          <option value="vivero">Vivero</option>
+                        </select>
+                      </div>
+                      <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Descripción adicional</label><input style={S.input} value={tareaForm.descripcion} onChange={e=>setTareaForm(p=>({...p,descripcion:e.target.value}))} placeholder="Detalles, condiciones..."/></div>
+                      <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observaciones</label><input style={S.input} value={tareaForm.obs} onChange={e=>setTareaForm(p=>({...p,obs:e.target.value}))}/></div>
+                    </div>
+                    <div style={{display:"flex",gap:8}}>
+                      <button className="btn-p" style={S.btn} onClick={()=>{setTareaForm(p=>({...p,targetId:selectedGreen,target:"green"}));guardarTareaGolf();}}>✓ Guardar y enviar al programa</button>
+                      <button className="btn-g" style={S.btn} onClick={()=>setShowTareaForm(null)}>Cancelar</button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Historial registros diarios */}
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:13,fontWeight:700,marginBottom:8,color:"#34d399"}}>📜 Últimos registros</div>
+                {(golfData.registrosDiarios||[]).filter(r=>!r.greenId||r.greenId===selectedGreen).slice(0,10).map(r=>(
+                  <div key={r.id} style={{...S.card,padding:"10px 14px",marginBottom:6,borderLeft:"2px solid rgba(52,211,153,0.3)"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:6}}>
+                      <div>
+                        <div style={{fontSize:12,fontWeight:600}}>📅 {r.fecha} · 👤 {r.responsable}</div>
+                        <div style={{fontSize:11,color:"#5a9a7a",marginTop:3}}>
+                          {Object.entries(r.tareas||{}).filter(([,v])=>v).map(([k])=>k).join(" · ")||"Sin tareas marcadas"}
+                        </div>
+                        {r.obs&&<div style={{fontSize:11,color:"#5a9a7a",fontStyle:"italic",marginTop:2}}>{r.obs}</div>}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {!(golfData.registrosDiarios||[]).length&&<div style={{...S.card,padding:24,textAlign:"center",color:"#3a7a5a"}}>Sin registros aún</div>}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* ── TEES ── */}
+      {subTab==="tees"&&(
+        <div className="ein">
+          <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+            {esJefa&&<button className="btn-p" style={S.btn} onClick={()=>setShowTareaForm("tee")}>📋 Nueva tarea tees</button>}
+          </div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
+            {TEES_DEF.map(t=>(
+              <button key={t.id} onClick={()=>setSelectedTee(t.id)}
+                style={{background:selectedTee===t.id?"rgba(52,211,153,0.15)":"rgba(255,255,255,0.04)",border:`1px solid ${selectedTee===t.id?"rgba(52,211,153,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"5px 10px",color:selectedTee===t.id?"#34d399":"#5a9a7a",fontSize:11,cursor:"pointer"}}>
+                {t.nombre}<br/><span style={{fontSize:9}}>{t.hoyo}</span>
+              </button>
+            ))}
+          </div>
+          {(()=>{
+            const tee=TEES_DEF.find(x=>x.id===selectedTee);
+            const tareasT=(golfData.tareasTee||[]).filter(t=>t.teeId===selectedTee);
+            return (
+              <div>
+                <div style={{...S.card,padding:14,marginBottom:12,borderLeft:"3px solid rgba(52,211,153,0.4)"}}>
+                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700}}>{tee.nombre}</div>
+                  <div style={{fontSize:12,color:"#5a9a7a"}}>{tee.hoyo}</div>
+                </div>
+                {showTareaForm==="tee"&&(
+                  <div style={{...S.card,padding:16,marginBottom:12}} className="ein">
+                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#34d399",marginBottom:12}}>📋 Nueva tarea — {tee.nombre}</div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                      <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={tareaForm.fecha} onChange={e=>setTareaForm(p=>({...p,fecha:e.target.value}))}/></div>
+                      <div><label style={labelSt}>Responsable</label>
+                        <select style={S.input} value={tareaForm.responsable} onChange={e=>setTareaForm(p=>({...p,responsable:e.target.value}))}>
+                          <option value="">Seleccionar...</option>
+                          {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                        </select>
+                      </div>
+                      <div><label style={labelSt}>Tarea</label>
+                        <select style={S.input} value={tareaForm.tipo} onChange={e=>setTareaForm(p=>({...p,tipo:e.target.value}))}>
+                          <option value="">Seleccionar...</option>
+                          {TAREAS_TEES.map(t=><option key={t}>{t}</option>)}
+                          <option value="Otra">Otra...</option>
+                        </select>
+                      </div>
+                      <div><label style={labelSt}>Aplicar a</label>
+                        <select style={S.input} value={tareaForm.target} onChange={e=>setTareaForm(p=>({...p,target:e.target.value}))}>
+                          <option value="todos">Todos los tees</option>
+                          <option value="tee">Este tee ({tee.nombre})</option>
+                        </select>
+                      </div>
+                      <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Descripción</label><input style={S.input} value={tareaForm.descripcion} onChange={e=>setTareaForm(p=>({...p,descripcion:e.target.value}))}/></div>
+                    </div>
+                    <div style={{display:"flex",gap:8}}>
+                      <button className="btn-p" style={S.btn} onClick={()=>{setTareaForm(p=>({...p,targetId:selectedTee,target:"tee"}));guardarTareaGolf();}}>✓ Guardar y enviar al programa</button>
+                      <button className="btn-g" style={S.btn} onClick={()=>setShowTareaForm(null)}>Cancelar</button>
+                    </div>
+                  </div>
+                )}
+                {tareasT.length===0&&!showTareaForm&&<div style={{...S.card,padding:24,textAlign:"center",color:"#3a7a5a"}}>Sin tareas registradas</div>}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* ── ÁRBOLES ── */}
+      {subTab==="arboles"&&(
+        <div className="ein">
+          <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+            {esJefa&&<button className="btn-p" style={S.btn} onClick={()=>{setArbolForm(emptyArbol);setEditArbolId(null);setShowArbolForm(true);}}>➕ Registrar árbol / grupo</button>}
+            {esJefa&&<button style={{...S.btn,background:"rgba(74,222,128,0.12)",color:"#4ade80",border:"1px solid rgba(74,222,128,0.25)"}} onClick={()=>setShowTareaForm("arbol")}>📋 Nueva tarea árboles</button>}
+          </div>
+
+          {/* Resumen por tipo */}
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
+            {TIPOS_ARBOL.map(tipo=>{
+              const n=arboles.filter(a=>a.tipo===tipo).length;
+              if(!n) return null;
+              return <div key={tipo} style={{...S.card,padding:"8px 14px",fontSize:12,color:"#4ade80"}}><strong>{n}</strong> {tipo}</div>;
+            })}
+            <div style={{...S.card,padding:"8px 14px",fontSize:12,color:"#34d399"}}><strong>{arboles.length}</strong> total individuos/grupos</div>
+          </div>
+
+          {/* Formulario árbol */}
+          {showArbolForm&&(
+            <div style={{...S.card,padding:16,marginBottom:14}} className="ein">
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#4ade80",marginBottom:12}}>{editArbolId?"✏️ Editar":"➕ Registrar"} árbol / grupo</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                <div><label style={labelSt}>Nombre / Especie</label><input style={S.input} value={arbolForm.nombre} onChange={e=>setArbolForm(p=>({...p,nombre:e.target.value}))} placeholder="ej: Olmo, Algarrobo..."/></div>
+                <div><label style={labelSt}>Tipo</label>
+                  <select style={S.input} value={arbolForm.tipo} onChange={e=>setArbolForm(p=>({...p,tipo:e.target.value}))}>
+                    {TIPOS_ARBOL.map(t=><option key={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div><label style={labelSt}>Cantidad individuos</label><input type="number" min={1} style={S.input} value={arbolForm.cantidad} onChange={e=>setArbolForm(p=>({...p,cantidad:Number(e.target.value)}))}/></div>
+                <div><label style={labelSt}>Estado</label>
+                  <select style={S.input} value={arbolForm.estado} onChange={e=>setArbolForm(p=>({...p,estado:e.target.value}))}>
+                    {["bueno","regular","malo","en tratamiento","retirado"].map(s=><option key={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Ubicación en cancha</label><input style={S.input} value={arbolForm.ubicacion} onChange={e=>setArbolForm(p=>({...p,ubicacion:e.target.value}))} placeholder="ej: Junto al hoyo 3, Lateral calle hoyo 7..."/></div>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observaciones</label><input style={S.input} value={arbolForm.obs} onChange={e=>setArbolForm(p=>({...p,obs:e.target.value}))}/></div>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button className="btn-p" style={S.btn} onClick={guardarArbol}>✓ Guardar</button>
+                <button className="btn-g" style={S.btn} onClick={()=>{setShowArbolForm(false);setEditArbolId(null);}}>Cancelar</button>
+              </div>
+            </div>
+          )}
+
+          {/* Formulario tarea árboles */}
+          {showTareaForm==="arbol"&&(
+            <div style={{...S.card,padding:16,marginBottom:14}} className="ein">
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#4ade80",marginBottom:12}}>📋 Nueva tarea — Árboles</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={tareaForm.fecha} onChange={e=>setTareaForm(p=>({...p,fecha:e.target.value}))}/></div>
+                <div><label style={labelSt}>Responsable</label>
+                  <select style={S.input} value={tareaForm.responsable} onChange={e=>setTareaForm(p=>({...p,responsable:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                  </select>
+                </div>
+                <div><label style={labelSt}>Aplicar a</label>
+                  <select style={S.input} value={tareaForm.target} onChange={e=>setTareaForm(p=>({...p,target:e.target.value,targetId:""}))}>
+                    <option value="todos">Todos los árboles</option>
+                    <option value="tipo_caduca">Hoja caduca</option>
+                    <option value="tipo_persistente">Hoja persistente</option>
+                    <option value="arbol">Especie específica</option>
+                  </select>
+                </div>
+                {tareaForm.target==="arbol"&&<div><label style={labelSt}>Especie</label>
+                  <select style={S.input} value={tareaForm.targetId} onChange={e=>setTareaForm(p=>({...p,targetId:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    {[...new Set(arboles.map(a=>a.nombre))].map(n=><option key={n}>{n}</option>)}
+                  </select>
+                </div>}
+                <div><label style={labelSt}>Tarea</label>
+                  <select style={S.input} value={tareaForm.tipo} onChange={e=>setTareaForm(p=>({...p,tipo:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    <optgroup label="── Generales ──">{TAREAS_ARBOLES_GENERALES.map(t=><option key={t}>{t}</option>)}</optgroup>
+                    <optgroup label="── Hoja caduca ──">{TAREAS_HOJA_CADUCA.map(t=><option key={t}>{t}</option>)}</optgroup>
+                    <optgroup label="── Hoja persistente ──">{TAREAS_HOJA_PERSISTENTE.map(t=><option key={t}>{t}</option>)}</optgroup>
+                    <option value="Otra">Otra...</option>
+                  </select>
+                </div>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Descripción</label><input style={S.input} value={tareaForm.descripcion} onChange={e=>setTareaForm(p=>({...p,descripcion:e.target.value}))}/></div>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button className="btn-p" style={S.btn} onClick={guardarTareaGolf}>✓ Enviar al programa</button>
+                <button className="btn-g" style={S.btn} onClick={()=>setShowTareaForm(null)}>Cancelar</button>
+              </div>
+            </div>
+          )}
+
+          {/* Lista árboles */}
+          {arboles.length===0&&!showArbolForm&&!showTareaForm&&(
+            <div style={{...S.card,padding:36,textAlign:"center",color:"#3a7a5a"}}>
+              <div style={{fontSize:36,marginBottom:8}}>🌳</div>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15}}>Sin árboles registrados</div>
+              <div style={{fontSize:12,marginTop:4}}>Registra los ~70 individuos de la cancha</div>
+            </div>
+          )}
+          {[...new Set(arboles.map(a=>a.tipo))].map(tipo=>(
+            <div key={tipo} style={{marginBottom:16}}>
+              <div style={{fontSize:12,fontWeight:700,color:"#4ade80",marginBottom:8,borderLeft:"3px solid #4ade80",paddingLeft:8,textTransform:"uppercase",letterSpacing:"0.5px"}}>{tipo} ({arboles.filter(a=>a.tipo===tipo).length})</div>
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                {arboles.filter(a=>a.tipo===tipo).map(a=>{
+                  const colorEst = a.estado==="bueno"?"#22c55e":a.estado==="regular"?"#f59e0b":a.estado==="malo"?"#ef4444":"#a78bfa";
+                  return (
+                    <div key={a.id} style={{...S.card,padding:"11px 14px",borderLeft:`3px solid ${colorEst}40`}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+                        <div style={{flex:1}}>
+                          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:3}}>
+                            <span style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700}}>{a.nombre}</span>
+                            <span style={{fontSize:11,fontWeight:600,color:colorEst,background:`${colorEst}12`,padding:"1px 8px",borderRadius:10,border:`1px solid ${colorEst}30`}}>{a.estado}</span>
+                            {a.cantidad>1&&<span style={{fontSize:11,color:"#5a9a7a"}}>{a.cantidad} ind.</span>}
+                          </div>
+                          {a.ubicacion&&<div style={{fontSize:11,color:"#5a9a7a"}}>📍 {a.ubicacion}</div>}
+                          {a.obs&&<div style={{fontSize:11,color:"#4a7a5a",fontStyle:"italic"}}>{a.obs}</div>}
+                        </div>
+                        {esJefa&&<div style={{display:"flex",gap:6}}>
+                          <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 8px"}} onClick={()=>{setArbolForm({...a});setEditArbolId(a.id);setShowArbolForm(true);}}>✏️</button>
+                          <button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 8px"}} onClick={()=>setG({arboles:arboles.filter(x=>x.id!==a.id)})}>🗑</button>
+                        </div>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── MEDICIONES ── */}
+      {subTab==="mediciones"&&(
+        <div className="ein">
+          <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+            <button className="btn-p" style={S.btn} onClick={()=>setShowMedForm(true)}>📏 Nueva medición</button>
+          </div>
+
+          {showMedForm&&(
+            <div style={{...S.card,padding:20,marginBottom:14,background:"rgba(52,211,153,0.04)",borderColor:"rgba(52,211,153,0.2)"}} className="ein">
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#34d399",marginBottom:14}}>📏 Medición de Alturas y Humedad</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+                <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={medForm.fecha} onChange={e=>setMedForm(p=>({...p,fecha:e.target.value}))}/></div>
+                <div><label style={labelSt}>Responsable</label>
+                  <select style={S.input} value={medForm.responsable} onChange={e=>setMedForm(p=>({...p,responsable:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                  </select>
+                </div>
+                <div><label style={labelSt}>Tipo</label>
+                  <select style={S.input} value={medForm.tipo} onChange={e=>setMedForm(p=>({...p,tipo:e.target.value}))}>
+                    <option value="semanal">Semanal (todos los greens)</option>
+                    <option value="puntual">Puntual (green específico)</option>
+                    <option value="siembra">Post siembra / resiembra</option>
+                  </select>
+                </div>
+              </div>
+              <div style={{fontSize:11,color:"#34d399",marginBottom:10,fontWeight:600}}>Greens — Rango {rango.label}: {rango.min}–{rango.max}mm</div>
+              <div style={{overflowX:"auto",marginBottom:12}}>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                  <thead><tr style={{background:"rgba(52,211,153,0.1)"}}>
+                    <th style={{padding:"6px 10px",textAlign:"left",color:"#34d399",fontSize:10}}>GREEN</th>
+                    <th style={{padding:"6px 10px",textAlign:"center",color:"#34d399",fontSize:10}}>ALTURA (mm)</th>
+                    <th style={{padding:"6px 10px",textAlign:"center",color:"#34d399",fontSize:10}}>HUMEDAD (%)</th>
+                    <th style={{padding:"6px 10px",textAlign:"left",color:"#34d399",fontSize:10}}>OBS</th>
+                  </tr></thead>
+                  <tbody>
+                    {GREENS_DEF.map(g=>{
+                      const alt=medForm.alturas?.[g.id]||"";
+                      const hum=medForm.humedades?.[g.id]||"";
+                      const color=colorAltura(alt);
+                      return (
+                        <tr key={g.id} style={{borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                          <td style={{padding:"5px 10px"}}><div style={{fontWeight:600,color:"#34d399"}}>{g.nombre}</div><div style={{fontSize:10,color:"#5a9a7a"}}>{g.hoyos}</div></td>
+                          <td style={{padding:"5px 6px",textAlign:"center"}}>
+                            <input type="number" step="0.1" min="0" max="20" style={{...S.input,width:70,fontSize:13,padding:"4px 6px",textAlign:"center",borderColor:alt&&color!=="#22c55e"?color:"",fontWeight:600,color:alt?color:"inherit"}} value={alt}
+                              onChange={e=>setMedForm(p=>({...p,alturas:{...p.alturas,[g.id]:e.target.value}}))}
+                              placeholder="mm"/>
+                          </td>
+                          <td style={{padding:"5px 6px",textAlign:"center"}}>
+                            <input type="number" step="1" min="0" max="100" style={{...S.input,width:65,fontSize:12,padding:"4px 6px",textAlign:"center"}} value={hum}
+                              onChange={e=>setMedForm(p=>({...p,humedades:{...p.humedades,[g.id]:e.target.value}}))}
+                              placeholder="%"/>
+                          </td>
+                          <td style={{padding:"5px 6px"}}>
+                            <input style={{...S.input,fontSize:11,padding:"4px 6px"}} value={medForm.obsGreen?.[g.id]||""} placeholder="obs..."
+                              onChange={e=>setMedForm(p=>({...p,obsGreen:{...p.obsGreen,[g.id]:e.target.value}}))}/>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {/* Vivero */}
+                    <tr style={{background:"rgba(74,222,128,0.04)",borderTop:"2px solid rgba(74,222,128,0.2)"}}>
+                      <td style={{padding:"5px 10px"}}><div style={{fontWeight:600,color:"#4ade80"}}>🌱 Vivero</div><div style={{fontSize:10,color:"#5a9a7a"}}>Altura variable</div></td>
+                      <td style={{padding:"5px 6px",textAlign:"center"}}>
+                        <input type="number" step="0.1" min="0" max="30" style={{...S.input,width:70,fontSize:13,padding:"4px 6px",textAlign:"center"}} value={medForm.alturas?.vivero||""}
+                          onChange={e=>setMedForm(p=>({...p,alturas:{...p.alturas,vivero:e.target.value}}))} placeholder="mm"/>
+                      </td>
+                      <td style={{padding:"5px 6px",textAlign:"center"}}>
+                        <input type="number" step="1" min="0" max="100" style={{...S.input,width:65,fontSize:12,padding:"4px 6px",textAlign:"center"}} value={medForm.humedades?.vivero||""}
+                          onChange={e=>setMedForm(p=>({...p,humedades:{...p.humedades,vivero:e.target.value}}))} placeholder="%"/>
+                      </td>
+                      <td style={{padding:"5px 6px"}}>
+                        <input style={{...S.input,fontSize:11,padding:"4px 6px"}} value={medForm.obsGreen?.vivero||""} placeholder="siembra, resiembra..."
+                          onChange={e=>setMedForm(p=>({...p,obsGreen:{...p.obsGreen,vivero:e.target.value}}))}/>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div><label style={labelSt}>Observaciones generales</label><input style={S.input} value={medForm.obs} onChange={e=>setMedForm(p=>({...p,obs:e.target.value}))} placeholder="Condiciones del día, novedades..."/></div>
+              <div style={{display:"flex",gap:8,marginTop:12}}>
+                <button className="btn-p" style={S.btn} onClick={guardarMedicion}>✓ Guardar medición</button>
+                <button className="btn-g" style={S.btn} onClick={()=>setShowMedForm(false)}>Cancelar</button>
+              </div>
+            </div>
+          )}
+
+          {/* Historial mediciones */}
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:10,color:"#34d399"}}>📜 Historial de mediciones</div>
+          {mediciones.length===0&&!showMedForm&&(
+            <div style={{...S.card,padding:36,textAlign:"center",color:"#3a7a5a"}}><div style={{fontSize:32,marginBottom:8}}>📏</div><div>Sin mediciones registradas</div></div>
+          )}
+          {[...mediciones].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")).slice(0,20).map(m=>(
+            <div key={m.id} style={{...S.card,padding:14,marginBottom:10}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:8,marginBottom:8}}>
+                <div>
+                  <div style={{fontSize:13,fontWeight:700}}>📅 {m.fecha} · 👤 {m.responsable}</div>
+                  <div style={{fontSize:11,color:"#5a9a7a"}}>{m.tipo==="semanal"?"Medición semanal":m.tipo==="siembra"?"Post siembra":"Medición puntual"}</div>
+                </div>
+              </div>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                {GREENS_DEF.map(g=>{
+                  const alt=m.alturas?.[g.id];
+                  if(!alt) return null;
+                  const color=colorAltura(alt);
+                  return <div key={g.id} style={{background:`${color}10`,border:`1px solid ${color}30`,borderRadius:6,padding:"3px 8px",fontSize:11}}>
+                    <span style={{color:"#5a9a7a"}}>{g.nombre}: </span><span style={{color,fontWeight:700}}>{alt}mm</span>
+                  </div>;
+                })}
+                {m.alturas?.vivero&&<div style={{background:"rgba(74,222,128,0.08)",border:"1px solid rgba(74,222,128,0.2)",borderRadius:6,padding:"3px 8px",fontSize:11}}>
+                  <span style={{color:"#5a9a7a"}}>Vivero: </span><span style={{color:"#4ade80",fontWeight:700}}>{m.alturas.vivero}mm</span>
+                </div>}
+              </div>
+              {m.obs&&<div style={{fontSize:11,color:"#4a7a5a",fontStyle:"italic",marginTop:6}}>{m.obs}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── EVENTOS / TORNEOS ── */}
+      {subTab==="eventos"&&(
+        <div className="ein">
+          {rolLogueado==="jefa"&&(
+            <button className="btn-p" style={{...S.btn,marginBottom:14}} onClick={()=>setShowEventoForm(true)}>🏆 Cargar evento / torneo</button>
+          )}
+
+          {showEventoForm&&rolLogueado==="jefa"&&(
+            <div style={{...S.card,padding:20,marginBottom:14,background:"rgba(251,191,36,0.04)",borderColor:"rgba(251,191,36,0.25)"}} className="ein">
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#fbbf24",marginBottom:14}}>🏆 Nuevo evento / torneo</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Nombre del evento</label><input style={S.input} value={eventoForm.nombre} onChange={e=>setEventoForm(p=>({...p,nombre:e.target.value}))} placeholder="ej: Torneo Primavera 2026"/></div>
+                <div><label style={labelSt}>Fecha inicio</label><input type="date" style={S.input} value={eventoForm.fecha} onChange={e=>setEventoForm(p=>({...p,fecha:e.target.value}))}/></div>
+                <div><label style={labelSt}>Fecha término</label><input type="date" style={S.input} value={eventoForm.fechaFin} onChange={e=>setEventoForm(p=>({...p,fechaFin:e.target.value}))}/></div>
+                <div><label style={labelSt}>Tipo</label>
+                  <select style={S.input} value={eventoForm.tipo} onChange={e=>setEventoForm(p=>({...p,tipo:e.target.value}))}>
+                    {["torneo","competencia","evento social","mantenimiento programado","cierre cancha","otro"].map(t=><option key={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div><label style={labelSt}>Responsable</label>
+                  <select style={S.input} value={eventoForm.responsable} onChange={e=>setEventoForm(p=>({...p,responsable:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                  </select>
+                </div>
+                <div style={{gridColumn:"1/-1"}}>
+                  <label style={labelSt}>Tareas restringidas durante el evento</label>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:4}}>
+                    {["Aireación","Escarificado","Fertilización","Top dressing","Resiembra","Aplicación fungicida","Corte greens","Poda árboles"].map(t=>(
+                      <div key={t} style={{display:"flex",alignItems:"center",gap:5,padding:"4px 10px",borderRadius:7,background:eventoForm.restricciones.includes(t)?"rgba(251,191,36,0.12)":"rgba(255,255,255,0.04)",border:`1px solid ${eventoForm.restricciones.includes(t)?"rgba(251,191,36,0.35)":"rgba(255,255,255,0.08)"}`,cursor:"pointer",fontSize:12}}
+                        onClick={()=>setEventoForm(p=>({...p,restricciones:p.restricciones.includes(t)?p.restricciones.filter(x=>x!==t):[...p.restricciones,t]}))}>
+                        <div style={{width:13,height:13,borderRadius:3,border:`2px solid ${eventoForm.restricciones.includes(t)?"#fbbf24":"rgba(255,255,255,0.2)"}`,background:eventoForm.restricciones.includes(t)?"#fbbf24":"transparent",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                          {eventoForm.restricciones.includes(t)&&<span style={{color:"#000",fontSize:8,fontWeight:700}}>✓</span>}
+                        </div>
+                        {t}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observaciones</label><input style={S.input} value={eventoForm.obs} onChange={e=>setEventoForm(p=>({...p,obs:e.target.value}))} placeholder="Instrucciones especiales, horarios..."/></div>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button className="btn-p" style={S.btn} onClick={guardarEvento}>✓ Guardar evento</button>
+                <button className="btn-g" style={S.btn} onClick={()=>setShowEventoForm(false)}>Cancelar</button>
+              </div>
+            </div>
+          )}
+
+          {/* Lista eventos */}
+          {eventos.length===0&&!showEventoForm&&(
+            <div style={{...S.card,padding:36,textAlign:"center",color:"#3a7a5a"}}><div style={{fontSize:32,marginBottom:8}}>🏆</div><div style={{fontFamily:"'Playfair Display',serif",fontSize:15}}>Sin eventos registrados</div></div>
+          )}
+          {[...eventos].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")).map(ev=>{
+            const activo=ev.fecha<=hoy&&(ev.fechaFin||ev.fecha)>=hoy;
+            const pasado=(ev.fechaFin||ev.fecha)<hoy;
+            return (
+              <div key={ev.id} style={{...S.card,padding:14,marginBottom:10,borderLeft:`3px solid ${activo?"#fbbf24":pasado?"rgba(255,255,255,0.1)":"rgba(52,211,153,0.4)"}`}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:8}}>
+                  <div style={{flex:1}}>
+                    <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:4}}>
+                      <span style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700}}>{ev.nombre}</span>
+                      <span style={{fontSize:10,padding:"2px 8px",borderRadius:10,background:activo?"rgba(251,191,36,0.15)":pasado?"rgba(107,114,128,0.12)":"rgba(52,211,153,0.12)",color:activo?"#fbbf24":pasado?"#6b7280":"#34d399",fontWeight:600}}>{activo?"🟡 ACTIVO":pasado?"Finalizado":"Próximo"}</span>
+                    </div>
+                    <div style={{fontSize:12,color:"#5a9a7a"}}>📅 {ev.fecha}{ev.fechaFin&&ev.fechaFin!==ev.fecha?` → ${ev.fechaFin}`:""} · {ev.tipo}</div>
+                    {ev.restricciones?.length>0&&<div style={{fontSize:11,color:"#f59e0b",marginTop:3}}>🚫 Restringido: {ev.restricciones.join(", ")}</div>}
+                    {ev.obs&&<div style={{fontSize:11,color:"#5a9a7a",fontStyle:"italic",marginTop:2}}>{ev.obs}</div>}
+                  </div>
+                  {rolLogueado==="jefa"&&<button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 8px"}} onClick={()=>setG({eventos:eventos.filter(x=>x.id!==ev.id)})}>🗑</button>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── PANEL BODEGAS ───────────────────────────────────────────────────────────
 function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareasProg, setTareasProg, compras=[] }) {
   const hoy = new Date().toISOString().slice(0,10);
@@ -7872,6 +8631,7 @@ export default function App() {
   const [incidenciasFito,setIncidenciasFito,incidReady]    = useFirebaseState("fung-incid",     []);
   const [comprasData,    setComprasData,    comprasReady]  = useFirebaseState("compras",  {compras:[],cuentas:CUENTAS_DEFAULT});
   const [bodegasData,    setBodegasData,    bodegasReady]  = useFirebaseState("bodegas",  {});
+  const [golfData,       setGolfData,       golfReady]     = useFirebaseState("golf", {greens:{},tees:{},arboles:[],eventos:[],mediciones:[]});
   const [bonosConfig,    setBonosConfig,    bonosReady]    = useFirebaseState("bonos-config", {
     pctFondo:50, pctEjecutor:50, pctAyudante:30, pctApoyo:20, año:new Date().getFullYear()
   });
@@ -8204,7 +8964,7 @@ export default function App() {
         </div>
         <div style={S.headerNav} className="headerNav">
           {(fbRol==="jefa"
-            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["fungicidas","🧪","Fungicidas"],["compras","🛒","Compras"],["bodegas","🏪","Bodegas"],["personal","👷","Personal"]]
+            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["fungicidas","🧪","Fungicidas"],["compras","🛒","Compras"],["bodegas","🏪","Bodegas"],["golf","🏌️","Golf"],["personal","👷","Personal"]]
             : fbRol==="supervisor"
             ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["fungicidas","🧪","Fungicidas"],["bodegas","🏪","Bodegas"],["miturno","🌿","Mi Turno"]]
             : [["miturno","🌿","Mi Turno"]]
@@ -8896,6 +9656,11 @@ export default function App() {
         {/* COMPRAS */}
         {vista==="compras"&&(
           <PanelCompras S={S} comprasData={comprasData} setComprasData={setComprasData} personal={personal} esJefa={rolLogueado==="jefa"||rolLogueado==="supervisor"} data={data} updateZona={updateZona} MACROZONAS_BASE={MACROZONAS_BASE} bodegasData={bodegasData} setBodegasData={setBodegasData} />
+        )}
+
+        {/* GOLF */}
+        {vista==="golf"&&(
+          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={rolLogueado==="jefa"||rolLogueado==="supervisor"} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial}/>
         )}
 
         {/* BODEGAS */}
