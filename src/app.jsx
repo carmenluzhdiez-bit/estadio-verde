@@ -7206,7 +7206,6 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           {ZONAS_GOLF_EXTRA.map(zona=>{
             const tareasZona = zona.id==="lomas"?TAREAS_LOMAS:TAREAS_MACIZOS;
             const registros = (golfData[`zona_${zona.id}`]||[]);
-            const [showForm, setShowForm] = [false,()=>{}]; // placeholder — uso estado global
             return (
               <div key={zona.id} style={{...S.card,padding:14,marginBottom:10,borderLeft:`3px solid ${zona.color}50`}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
@@ -7465,15 +7464,25 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                       const hum=medForm.humedades?.[g.id]||"";
                       const diasCrecimiento=medForm.diasDesdeCorte?.[g.id]||"";
                       const color=colorAltura(alt);
-                      // Proyección: si hay altura y días, calcular tasa y cuándo llegará al límite
+                      // Proyección: altura máxima = altura corte × 1.5 (regla del 1/3)
+                      // Si quiero cortar a 4.8mm → no cortar hasta 7.2mm (4.8 × 1.5)
                       let proyeccion = null;
-                      if(alt && diasCrecimiento && Number(diasCrecimiento)>0) {
-                        const tasaDiaria = (Number(alt)-rango.min) / Number(diasCrecimiento);
-                        if(tasaDiaria>0) {
-                          const diasHastaLimite = Math.round((rango.max - Number(alt)) / tasaDiaria);
-                          proyeccion = diasHastaLimite<=0 ? "⚠️ Cortar ya" :
-                                       diasHastaLimite<=2 ? `⏰ ${diasHastaLimite}d` :
-                                       `${diasHastaLimite}d`;
+                      let alturaMaxCorte = null;
+                      if(alt) {
+                        alturaMaxCorte = (rango.min * 1.5).toFixed(1); // altura donde hay que cortar
+                        if(Number(alt) >= Number(alturaMaxCorte)) {
+                          proyeccion = "⚠️ Cortar ya";
+                        } else if(diasCrecimiento && Number(diasCrecimiento)>0) {
+                          const alturaDesdeCorte = Number(alt) - rango.min;
+                          if(alturaDesdeCorte > 0) {
+                            const tasaDiaria = alturaDesdeCorte / Number(diasCrecimiento);
+                            if(tasaDiaria > 0) {
+                              const diasHastaCorte = Math.round((Number(alturaMaxCorte) - Number(alt)) / tasaDiaria);
+                              proyeccion = diasHastaCorte <= 0 ? "⚠️ Cortar ya" :
+                                           diasHastaCorte <= 2 ? `⏰ ${diasHastaCorte}d` :
+                                           `${diasHastaCorte}d`;
+                            }
+                          }
                         }
                       }
                       const colorHum = !hum?"#5a9a7a":Number(hum)<=2?"#ef4444":Number(hum)<=3?"#f59e0b":Number(hum)<=6?"#22c55e":"#3b82f6";
@@ -7496,6 +7505,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                                 onChange={e=>setMedForm(p=>({...p,diasDesdeCorte:{...p.diasDesdeCorte,[g.id]:e.target.value}}))} placeholder="días"/>
                               {proyeccion&&<span style={{fontSize:10,fontWeight:700,color:proyeccion.includes("ya")?"#ef4444":proyeccion.includes("⏰")?"#f59e0b":"#22c55e",whiteSpace:"nowrap"}}>{proyeccion}</span>}
                             </div>
+                            {alturaMaxCorte&&<div style={{fontSize:9,color:"#5a9a7a"}}>cortar en {alturaMaxCorte}mm</div>}
                             <div style={{fontSize:9,color:"#5a9a7a"}}>días desde corte</div>
                           </td>
                           <td style={{padding:"5px 6px",textAlign:"center"}}>
