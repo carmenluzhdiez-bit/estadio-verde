@@ -6330,14 +6330,13 @@ const TAREAS_FAIRWAYS   = ["Corte","Riego","Fertilización","Control malezas","A
 const TAREAS_LOMAS      = ["Corte","Desbrozado","Riego","Control malezas"];
 const TAREAS_MACIZOS    = ["Poda","Riego","Fertilización","Control plagas","Limpieza","Reemplazo plantas","Mulching"];
 const TAREAS_EDIFICIO   = ["Riego","Fertilización","Cambio tierra","Poda/formación","Revisión estado","Limpieza macetas"];
+const TAREAS_ARBOLES_GENERALES = ["Poda formación","Poda sanitaria","Fertilización","Riego","Control plagas","Aplicación fungicida","Revisión estado"];
+const TAREAS_HOJA_CADUCA = ["Poda de invierno","Raleo","Recolección hojas","Poda post floración"];
+const TAREAS_HOJA_PERSISTENTE = ["Poda de mantenimiento","Lavado follaje"];
 const TIPOS_ARBOL = ["Hoja caduca","Hoja persistente","Coníferas","Palmera","Arbusto"];
 const TAREAS_GREENS_DIARIAS = ["Limpieza general","Corte de greens","Rodado","Riego ligero (Syringing)","Cambio de bandera","Revisión hoyos","Soplado/Barrido","Reparación pitch marks"];
 const TAREAS_GREENS_PERIODICAS = ["Medición de altura","Fertilización","Aireación","Escarificado","Resiembra","Control de plagas","Riego automático revisión","Aplicación fungicida","Top dressing","Control malezas","Perforar nuevos hoyos","Corte ante-greens"];
 const TAREAS_TEES = ["Limpieza","Corte y orillado","Riego","Reparación divots","Cambio de marcas","Posicionar tee markers","Corte rough","Corte calles","Corte lomas"];
-const TAREAS_BUNKERS = ["Recortar bordes","Rastrillar y labrar arena","Rellenar con arena","Rastrillado superficial","Recoger piedras/escombros"];
-const TAREAS_ARBOLES_GENERALES = ["Poda formación","Poda sanitaria","Fertilización","Riego","Control plagas","Aplicación fungicida","Revisión estado"];
-const TAREAS_HOJA_CADUCA = ["Poda de invierno","Raleo","Recolección hojas","Poda post floración"];
-const TAREAS_HOJA_PERSISTENTE = ["Poda de mantenimiento","Lavado follaje"];
 
 // Plantilla pre-torneo por día
 const PLANTILLA_PRE_TORNEO = {
