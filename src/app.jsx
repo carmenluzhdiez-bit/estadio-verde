@@ -6495,9 +6495,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   const listaPersonal = [...personalArr].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
 
   const [subTabZona, setSubTabZona] = React.useState(null);
-
-
-  const setG = (patch) => setGolfData(p=>({...p,...patch}));
+  const [subTab, setSubTab] = React.useState("panel"); => setGolfData(p=>({...p,...patch}));
 
   const greens    = golfData.greens    || {};
   const tees      = golfData.tees      || {};
