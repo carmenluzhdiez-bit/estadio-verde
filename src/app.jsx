@@ -6391,6 +6391,321 @@ const PLANTILLA_PRE_TORNEO = {
   ],
 };
 
+// ─── ANÁLISIS MEDICIONES GOLF ────────────────────────────────────────────────
+function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJefa, onBorrar, onBorrarTodo }) {
+  const ZONAS = [...GREENS_DEF, {id:"vivero", nombre:"Vivero", hoyos:""}];
+  const COLORES_ZONA = {
+    g1:"#34d399",g2:"#60a5fa",g3:"#f59e0b",g4:"#a78bfa",g5:"#f472b6",
+    g6:"#22d3ee",g7:"#fb923c",g8:"#86efac",g9:"#fcd34d",vivero:"#4ade80",
+  };
+  const ESTACIONES = {
+    "12":"verano","01":"verano","02":"verano",
+    "03":"otoño","04":"otoño","05":"otoño",
+    "06":"invierno","07":"invierno","08":"invierno",
+    "09":"primavera","10":"primavera","11":"primavera",
+  };
+  const MESES_LABEL = ["","Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+
+  const [vistaGrafico, setVistaGrafico] = React.useState("individual");
+  const [zonaSelGrafico, setZonaSelGrafico] = React.useState("g1");
+  const [zonasComparativas, setZonasComparativas] = React.useState(["g1","g3","vivero"]);
+  const [confirmarBorrarTodo, setConfirmarBorrarTodo] = React.useState(false);
+
+  const medOrdenadas = [...mediciones].sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||""));
+
+  // ── Calcular tasa de crecimiento entre dos mediciones consecutivas ──────
+  const calcTasa = (zona) => {
+    const puntos = medOrdenadas
+      .filter(m=>m.alturas?.[zona])
+      .map(m=>({fecha:m.fecha, alt:Number(m.alturas[zona])}));
+    if(puntos.length<2) return null;
+    const tasas = [];
+    for(let i=1;i<puntos.length;i++) {
+      const dias = Math.round((new Date(puntos[i].fecha)-new Date(puntos[i-1].fecha))/(1000*60*60*24));
+      if(dias>0) {
+        const delta = puntos[i].alt - puntos[i-1].alt;
+        tasas.push({
+          fecha:puntos[i].fecha, dias, delta,
+          tasa: Math.round((delta/dias)*100)/100,
+          mes: puntos[i].fecha.slice(5,7),
+          estacion: ESTACIONES[puntos[i].fecha.slice(5,7)]||"—",
+        });
+      }
+    }
+    return tasas;
+  };
+
+  // ── Análisis por mes/estación/año ─────────────────────────────────────
+  const analisisTasas = (zona) => {
+    const tasas = calcTasa(zona);
+    if(!tasas||!tasas.length) return null;
+    const porMes = {}, porEstacion = {}, porAnio = {};
+    tasas.forEach(t=>{
+      const mes = t.mes, est = t.estacion, anio = t.fecha.slice(0,4);
+      if(!porMes[mes])       porMes[mes]      = [];
+      if(!porEstacion[est])  porEstacion[est] = [];
+      if(!porAnio[anio])     porAnio[anio]    = [];
+      porMes[mes].push(t.tasa);
+      porEstacion[est].push(t.tasa);
+      porAnio[anio].push(t.tasa);
+    });
+    const avg = arr => Math.round(arr.reduce((a,b)=>a+b,0)/arr.length*100)/100;
+    return {
+      porMes: Object.entries(porMes).sort((a,b)=>a[0].localeCompare(b[0])).map(([k,v])=>({mes:MESES_LABEL[Number(k)],tasa:avg(v)})),
+      porEstacion: Object.entries(porEstacion).map(([k,v])=>({est:k,tasa:avg(v)})),
+      porAnio: Object.entries(porAnio).sort().map(([k,v])=>({anio:k,tasa:avg(v)})),
+      tasaGlobal: avg(tasas.map(t=>t.tasa)),
+      categoria: avg(tasas.map(t=>t.tasa)) < 0.3 ? "🐢 Lento" : avg(tasas.map(t=>t.tasa)) < 0.6 ? "➡️ Medio" : "🚀 Rápido",
+    };
+  };
+
+  // ── SVG gráfico de línea ──────────────────────────────────────────────
+  const graficoLinea = (zonas) => {
+    const W=520, H=160, PAD={top:20,right:20,bottom:30,left:45};
+    const todasFechas = [...new Set(medOrdenadas.map(m=>m.fecha))];
+    if(todasFechas.length<2) return <div style={{fontSize:12,color:"#5a9a7a",padding:20,textAlign:"center"}}>Se necesitan al menos 2 mediciones para graficar</div>;
+    const puntosPorZona = zonas.map(z=>({
+      id:z, color:COLORES_ZONA[z]||"#34d399",
+      pts:todasFechas.map(f=>{const m=medOrdenadas.find(x=>x.fecha===f);return m?.alturas?.[z]?{f,v:Number(m.alturas[z])}:null;}).filter(Boolean)
+    })).filter(p=>p.pts.length>0);
+    if(!puntosPorZona.some(p=>p.pts.length>1)) return <div style={{fontSize:12,color:"#5a9a7a",padding:20,textAlign:"center"}}>Insuficientes datos para graficar</div>;
+    const allVals = puntosPorZona.flatMap(p=>p.pts.map(x=>x.v));
+    const minV = Math.min(...allVals, rango.min)-0.5;
+    const maxV = Math.max(...allVals, rango.max)+0.5;
+    const xScale = i=>(PAD.left+(i/(todasFechas.length-1))*(W-PAD.left-PAD.right));
+    const yScale = v=>(H-PAD.bottom-(v-minV)/(maxV-minV)*(H-PAD.top-PAD.bottom));
+    // Líneas de rango
+    const yMin = yScale(rango.min), yMax = yScale(rango.max);
+    return (
+      <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",height:"auto",borderRadius:8}}>
+        {/* Zona rango óptimo */}
+        <rect x={PAD.left} y={yMax} width={W-PAD.left-PAD.right} height={yMin-yMax} fill="rgba(52,211,153,0.08)" stroke="none"/>
+        <line x1={PAD.left} y1={yMin} x2={W-PAD.right} y2={yMin} stroke="#34d39960" strokeWidth="1" strokeDasharray="4,3"/>
+        <line x1={PAD.left} y1={yMax} x2={W-PAD.right} y2={yMax} stroke="#34d39960" strokeWidth="1" strokeDasharray="4,3"/>
+        <text x={PAD.left-3} y={yMin+3} textAnchor="end" fill="#34d399" fontSize="9">{rango.min}</text>
+        <text x={PAD.left-3} y={yMax+3} textAnchor="end" fill="#34d399" fontSize="9">{rango.max}</text>
+        {/* Eje Y labels */}
+        {[minV, (minV+maxV)/2, maxV].map((v,i)=>(
+          <text key={i} x={PAD.left-4} y={yScale(v)+3} textAnchor="end" fill="#5a9a7a" fontSize="8">{v.toFixed(1)}</text>
+        ))}
+        {/* Líneas por zona */}
+        {puntosPorZona.map(z=>{
+          if(z.pts.length<2) return null;
+          const idxOf = f=>todasFechas.indexOf(f);
+          const path = z.pts.map((p,i)=>`${i===0?"M":"L"}${xScale(idxOf(p.f))},${yScale(p.v)}`).join(" ");
+          return (
+            <g key={z.id}>
+              <path d={path} stroke={z.color} strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+              {z.pts.map((p,i)=>(
+                <circle key={i} cx={xScale(idxOf(p.f))} cy={yScale(p.v)} r="3" fill={z.color} stroke="#0f2517" strokeWidth="1"/>
+              ))}
+            </g>
+          );
+        })}
+        {/* Eje X fechas */}
+        {todasFechas.filter((_,i)=>i===0||i===todasFechas.length-1||todasFechas.length<=6||(i%Math.ceil(todasFechas.length/5)===0)).map((f,i)=>(
+          <text key={f} x={xScale(todasFechas.indexOf(f))} y={H-5} textAnchor="middle" fill="#5a9a7a" fontSize="8">{f.slice(5)}</text>
+        ))}
+      </svg>
+    );
+  };
+
+  const colorCategoria = (cat) => cat?.includes("Rápido")?"#ef4444":cat?.includes("Medio")?"#f59e0b":"#22c55e";
+
+  return (
+    <div className="ein">
+      {/* Encabezado historial */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
+        <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,color:"#34d399"}}>📊 Análisis de Crecimiento</div>
+        {esJefa&&mediciones.length>0&&(
+          <div style={{display:"flex",gap:6}}>
+            {confirmarBorrarTodo?(
+              <>
+                <span style={{fontSize:12,color:"#ef4444",alignSelf:"center"}}>¿Borrar todo?</span>
+                <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}} onClick={()=>{onBorrarTodo();setConfirmarBorrarTodo(false);}}>Sí, borrar</button>
+                <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>setConfirmarBorrarTodo(false)}>Cancelar</button>
+              </>
+            ):(
+              <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(239,68,68,0.1)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.2)"}} onClick={()=>setConfirmarBorrarTodo(true)}>🗑 Borrar historial</button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {mediciones.length===0&&(
+        <div style={{...S.card,padding:36,textAlign:"center",color:"#3a7a5a"}}><div style={{fontSize:32,marginBottom:8}}>📏</div><div>Sin mediciones registradas</div></div>
+      )}
+
+      {mediciones.length>=2&&(<>
+        {/* Selector modo gráfico */}
+        <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
+          {[["individual","📈 Individual"],["comparativo","📊 Comparativo"],["tasas","⚡ Tasas/día"]].map(([v,l])=>(
+            <button key={v} style={{...S.btn,fontSize:12,padding:"5px 12px",background:vistaGrafico===v?"rgba(52,211,153,0.2)":"rgba(255,255,255,0.05)",color:vistaGrafico===v?"#34d399":"#5a9a7a",border:`1px solid ${vistaGrafico===v?"rgba(52,211,153,0.4)":"rgba(255,255,255,0.1)"}`}}
+              onClick={()=>setVistaGrafico(v)}>{l}</button>
+          ))}
+        </div>
+
+        {/* Vista Individual */}
+        {vistaGrafico==="individual"&&(
+          <div style={{...S.card,padding:16,marginBottom:14}}>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
+              {ZONAS.map(z=>{
+                const a=analisisTasas(z.id);
+                return (
+                  <button key={z.id} onClick={()=>setZonaSelGrafico(z.id)}
+                    style={{fontSize:11,padding:"4px 10px",borderRadius:8,background:zonaSelGrafico===z.id?`${COLORES_ZONA[z.id]}25`:"rgba(255,255,255,0.04)",border:`1px solid ${zonaSelGrafico===z.id?COLORES_ZONA[z.id]+"60":"rgba(255,255,255,0.1)"}`,color:zonaSelGrafico===z.id?COLORES_ZONA[z.id]:"#5a9a7a",cursor:"pointer"}}>
+                    {z.nombre}
+                    {a&&<span style={{marginLeft:4,color:colorCategoria(a.categoria),fontSize:9}}>{a.categoria.split(" ")[0]}</span>}
+                  </button>
+                );
+              })}
+            </div>
+            {graficoLinea([zonaSelGrafico])}
+            {(()=>{
+              const a = analisisTasas(zonaSelGrafico);
+              const z = ZONAS.find(x=>x.id===zonaSelGrafico);
+              if(!a) return <div style={{fontSize:12,color:"#5a9a7a",marginTop:8}}>Insuficientes datos para calcular tasa</div>;
+              return (
+                <div style={{marginTop:12}}>
+                  <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:10}}>
+                    <div style={{background:"rgba(255,255,255,0.04)",borderRadius:8,padding:"8px 12px",textAlign:"center"}}>
+                      <div style={{fontSize:10,color:"#5a9a7a"}}>Tasa global</div>
+                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color:COLORES_ZONA[zonaSelGrafico]}}>{a.tasaGlobal>0?"+":""}{a.tasaGlobal} mm/día</div>
+                    </div>
+                    <div style={{background:`${colorCategoria(a.categoria)}15`,borderRadius:8,padding:"8px 12px",textAlign:"center",border:`1px solid ${colorCategoria(a.categoria)}30`}}>
+                      <div style={{fontSize:10,color:"#5a9a7a"}}>Categoría</div>
+                      <div style={{fontSize:16,fontWeight:700,color:colorCategoria(a.categoria)}}>{a.categoria}</div>
+                    </div>
+                  </div>
+                  {/* Por estación */}
+                  {a.porEstacion.length>0&&(
+                    <div style={{marginBottom:8}}>
+                      <div style={{fontSize:11,color:"#34d399",fontWeight:600,marginBottom:5}}>Por estación</div>
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                        {a.porEstacion.map(e=>(
+                          <div key={e.est} style={{background:"rgba(255,255,255,0.04)",borderRadius:7,padding:"5px 10px",fontSize:11}}>
+                            <span style={{color:"#5a9a7a",textTransform:"capitalize"}}>{e.est}: </span>
+                            <span style={{fontWeight:700,color:e.tasa>0.5?"#ef4444":e.tasa>0.3?"#f59e0b":"#22c55e"}}>{e.tasa>0?"+":""}{e.tasa} mm/d</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {/* Por mes */}
+                  {a.porMes.length>0&&(
+                    <div>
+                      <div style={{fontSize:11,color:"#34d399",fontWeight:600,marginBottom:5}}>Por mes</div>
+                      <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+                        {a.porMes.map(m=>(
+                          <div key={m.mes} style={{background:"rgba(255,255,255,0.04)",borderRadius:7,padding:"4px 8px",fontSize:11}}>
+                            <span style={{color:"#5a9a7a"}}>{m.mes}: </span>
+                            <span style={{fontWeight:700,color:m.tasa>0.5?"#ef4444":m.tasa>0.3?"#f59e0b":"#22c55e"}}>{m.tasa>0?"+":""}{m.tasa}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* Vista Comparativa */}
+        {vistaGrafico==="comparativo"&&(
+          <div style={{...S.card,padding:16,marginBottom:14}}>
+            <div style={{fontSize:11,color:"#5a9a7a",marginBottom:8}}>Selecciona zonas a comparar:</div>
+            <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:12}}>
+              {ZONAS.map(z=>{
+                const sel=zonasComparativas.includes(z.id);
+                return (
+                  <div key={z.id} style={{display:"flex",alignItems:"center",gap:4,padding:"4px 10px",borderRadius:7,background:sel?`${COLORES_ZONA[z.id]}20`:"rgba(255,255,255,0.04)",border:`1px solid ${sel?COLORES_ZONA[z.id]+"50":"rgba(255,255,255,0.1)"}`,cursor:"pointer",fontSize:11}}
+                    onClick={()=>setZonasComparativas(p=>sel?p.filter(x=>x!==z.id):[...p,z.id])}>
+                    <div style={{width:8,height:8,borderRadius:"50%",background:sel?COLORES_ZONA[z.id]:"rgba(255,255,255,0.2)",flexShrink:0}}/>
+                    <span style={{color:sel?COLORES_ZONA[z.id]:"#5a9a7a"}}>{z.nombre}</span>
+                  </div>
+                );
+              })}
+            </div>
+            {graficoLinea(zonasComparativas)}
+            {/* Leyenda */}
+            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>
+              {zonasComparativas.map(id=>{
+                const z=ZONAS.find(x=>x.id===id);
+                const a=analisisTasas(id);
+                return z?(
+                  <div key={id} style={{display:"flex",alignItems:"center",gap:5,fontSize:11}}>
+                    <div style={{width:12,height:3,background:COLORES_ZONA[id],borderRadius:2}}/>
+                    <span style={{color:"#7aaa80"}}>{z.nombre}</span>
+                    {a&&<span style={{color:colorCategoria(a.categoria),fontWeight:600}}>{a.tasaGlobal>0?"+":""}{a.tasaGlobal}mm/d {a.categoria.split(" ")[0]}</span>}
+                  </div>
+                ):null;
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Vista Tasas resumen */}
+        {vistaGrafico==="tasas"&&(
+          <div style={{...S.card,padding:16,marginBottom:14}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#34d399",marginBottom:10}}>⚡ Clasificación por tasa de crecimiento (mm/día)</div>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {ZONAS.map(z=>{
+                const a=analisisTasas(z.id);
+                if(!a) return null;
+                const w = Math.min(Math.abs(a.tasaGlobal)/1.5*100,100);
+                return (
+                  <div key={z.id} style={{display:"flex",alignItems:"center",gap:10}}>
+                    <div style={{width:100,fontSize:11,color:"#7aaa80",flexShrink:0,textAlign:"right"}}>{z.nombre}</div>
+                    <div style={{flex:1,background:"rgba(255,255,255,0.06)",borderRadius:4,height:20,overflow:"hidden",position:"relative"}}>
+                      <div style={{width:`${w}%`,height:"100%",background:colorCategoria(a.categoria),borderRadius:4,transition:"width 0.3s",opacity:0.8}}/>
+                    </div>
+                    <div style={{width:80,fontSize:11,fontWeight:700,color:colorCategoria(a.categoria),flexShrink:0}}>
+                      {a.tasaGlobal>0?"+":""}{a.tasaGlobal} mm/d
+                    </div>
+                    <div style={{fontSize:10,color:colorCategoria(a.categoria),flexShrink:0}}>{a.categoria}</div>
+                  </div>
+                );
+              }).filter(Boolean)}
+            </div>
+            <div style={{fontSize:10,color:"#5a9a7a",marginTop:10}}>
+              🟢 Lento: &lt;0.3mm/d · 🟡 Medio: 0.3-0.6mm/d · 🔴 Rápido: &gt;0.6mm/d
+            </div>
+          </div>
+        )}
+      </>)}
+
+      {/* Historial individual con borrar */}
+      <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:10,color:"#34d399",marginTop:14}}>📜 Registros individuales</div>
+      {[...mediciones].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")).map(m=>(
+        <div key={m.id} style={{...S.card,padding:14,marginBottom:8}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:8,marginBottom:6}}>
+            <div>
+              <div style={{fontSize:13,fontWeight:700}}>📅 {m.fecha} · 👤 {m.responsable}</div>
+              <div style={{fontSize:11,color:"#5a9a7a"}}>{m.tipo==="semanal"?"Medición semanal":m.tipo==="siembra"?"Post siembra":"Medición puntual"}</div>
+            </div>
+            {esJefa&&<button className="btn-d" style={{...S.btn,fontSize:11,padding:"3px 8px"}} onClick={()=>onBorrar(m.id)}>🗑</button>}
+          </div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+            {GREENS_DEF.map(g=>{
+              const alt=m.alturas?.[g.id];
+              if(!alt) return null;
+              const color=colorAltura(alt);
+              return <div key={g.id} style={{background:`${color}10`,border:`1px solid ${color}30`,borderRadius:6,padding:"3px 8px",fontSize:11}}>
+                <span style={{color:"#5a9a7a"}}>{g.nombre}: </span><span style={{color,fontWeight:700}}>{alt}mm</span>
+              </div>;
+            })}
+            {m.alturas?.vivero&&<div style={{background:"rgba(74,222,128,0.08)",border:"1px solid rgba(74,222,128,0.2)",borderRadius:6,padding:"3px 8px",fontSize:11}}>
+              <span style={{color:"#5a9a7a"}}>Vivero: </span><span style={{color:"#4ade80",fontWeight:700}}>{m.alturas.vivero}mm</span>
+            </div>}
+          </div>
+          {m.obs&&<div style={{fontSize:11,color:"#4a7a5a",fontStyle:"italic",marginTop:4}}>{m.obs}</div>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── ZONA GOLF SIMPLE (Búnkers, Fairways) ────────────────────────────────────
 function ZonaGolfSimple({ S, labelSt, zonas, tareas, titulo, colorAcento, golfData, setG, listaPersonal, setTareasProg, sincronizarMacrozona }) {
   const hoy = new Date().toISOString().slice(0,10);
@@ -7554,35 +7869,13 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             </div>
           )}
 
-          {/* Historial mediciones */}
-          <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:10,color:"#34d399"}}>📜 Historial de mediciones</div>
-          {mediciones.length===0&&!showMedForm&&(
-            <div style={{...S.card,padding:36,textAlign:"center",color:"#3a7a5a"}}><div style={{fontSize:32,marginBottom:8}}>📏</div><div>Sin mediciones registradas</div></div>
-          )}
-          {[...mediciones].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")).slice(0,20).map(m=>(
-            <div key={m.id} style={{...S.card,padding:14,marginBottom:10}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:8,marginBottom:8}}>
-                <div>
-                  <div style={{fontSize:13,fontWeight:700}}>📅 {m.fecha} · 👤 {m.responsable}</div>
-                  <div style={{fontSize:11,color:"#5a9a7a"}}>{m.tipo==="semanal"?"Medición semanal":m.tipo==="siembra"?"Post siembra":"Medición puntual"}</div>
-                </div>
-              </div>
-              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                {GREENS_DEF.map(g=>{
-                  const alt=m.alturas?.[g.id];
-                  if(!alt) return null;
-                  const color=colorAltura(alt);
-                  return <div key={g.id} style={{background:`${color}10`,border:`1px solid ${color}30`,borderRadius:6,padding:"3px 8px",fontSize:11}}>
-                    <span style={{color:"#5a9a7a"}}>{g.nombre}: </span><span style={{color,fontWeight:700}}>{alt}mm</span>
-                  </div>;
-                })}
-                {m.alturas?.vivero&&<div style={{background:"rgba(74,222,128,0.08)",border:"1px solid rgba(74,222,128,0.2)",borderRadius:6,padding:"3px 8px",fontSize:11}}>
-                  <span style={{color:"#5a9a7a"}}>Vivero: </span><span style={{color:"#4ade80",fontWeight:700}}>{m.alturas.vivero}mm</span>
-                </div>}
-              </div>
-              {m.obs&&<div style={{fontSize:11,color:"#4a7a5a",fontStyle:"italic",marginTop:6}}>{m.obs}</div>}
-            </div>
-          ))}
+          {/* Historial mediciones + Gráfico */}
+          <MedicionesAnalisis
+            mediciones={mediciones} GREENS_DEF={GREENS_DEF} rango={rango}
+            colorAltura={colorAltura} S={S} esJefa={esJefa}
+            onBorrar={(id)=>setG({mediciones:mediciones.filter(m=>m.id!==id)})}
+            onBorrarTodo={()=>setG({mediciones:[]})}
+          />
         </div>
       )}
 
