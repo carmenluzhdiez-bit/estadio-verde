@@ -7446,7 +7446,6 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                     <div style={{fontSize:11,fontWeight:600,color:"#34d399"}}>{g.nombre}</div>
                     <div style={{fontSize:10,color:"#5a9a7a",marginBottom:4}}>{g.hoyos}</div>
                     <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color}}>{alt?`${alt}mm`:"—"}</div>
-                    {hum&&<div style={{fontSize:10,color:Number(hum)<=2?"#ef4444":Number(hum)<=3?"#f59e0b":Number(hum)<=6?"#22c55e":"#3b82f6"}}>💧{hum}/8</div>}
                   </div>
                 );
               })}
@@ -7703,10 +7702,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                         {alt&&Number(alt)<rango.min&&<div style={{fontSize:10,color:"#3b82f6"}}>▼ Bajo rango</div>}
                         {alt&&Number(alt)>rango.max&&<div style={{fontSize:10,color:"#ef4444"}}>▲ Sobre rango</div>}
                       </div>
-                      {hum&&<div style={{textAlign:"center",background:"rgba(96,165,250,0.1)",borderRadius:8,padding:"8px 14px",border:"1px solid rgba(96,165,250,0.2)"}}>
-                        <div style={{fontSize:10,color:"#5a9a7a",marginBottom:2}}>HUMEDAD</div>
-                        <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:700,color:"#60a5fa"}}>{hum}%</div>
-                      </div>}
+
                     </div>
                   </div>
                 </div>
@@ -8361,7 +8357,6 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                           proyeccion=dias<=0?"⚠️ Cortar ya":dias<=2?`⏰ ${dias}d`:`${dias}d`;
                         }
                       }
-                      const colorHum = !hum?"#5a9a7a":Number(hum)<=2?"#ef4444":Number(hum)<=3?"#f59e0b":Number(hum)<=6?"#22c55e":"#3b82f6";
                       return (
                         <tr key={g.id} style={{borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
                           <td style={{padding:"5px 10px"}}>
