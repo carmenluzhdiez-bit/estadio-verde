@@ -6937,6 +6937,10 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   const [showArbolForm,  setShowArbolForm]  = React.useState(false);
   const [showTareaForm,  setShowTareaForm]  = React.useState(null); // "green"|"tee"|"arbol"
   const [showDiariaForm, setShowDiariaForm] = React.useState(false);
+  // ── Estado sección Humedad ──
+  const [showHumForm,    setShowHumForm]    = React.useState(false);
+  const emptyHumForm = {fecha:hoy,hora:new Date().toTimeString().slice(0,5),motivo:"rutina",responsable:"",valores:{},valorVivero:"",decision:"sin-cambio",obs:"",generarTarea:false};
+  const [humForm,        setHumForm]        = React.useState(emptyHumForm);
   const [selectedGreen,  setSelectedGreen]  = React.useState("g1");
   const [selectedTee,    setSelectedTee]    = React.useState("t1");
 
@@ -8226,9 +8230,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           {value:"abrir-cancha",    label:"✅ Abrir cancha"},
           {value:"monitorear",      label:"👁️ Monitorear"},
         ];
-        const [showHumForm,setShowHumForm]=React.useState(false);
         const emptyHumForm={fecha:hoy,hora:new Date().toTimeString().slice(0,5),motivo:"rutina",responsable:"",valores:{},valorVivero:"",decision:"sin-cambio",obs:"",generarTarea:false};
-        const [humForm,setHumForm]=React.useState(emptyHumForm);
         const ultimaHum=[...humedades].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""))[0];
         const calcDecision=(valores)=>{
           const vals=Object.values(valores).map(v=>Number(v.valor||0)).filter(v=>v>0);
