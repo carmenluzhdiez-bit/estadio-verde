@@ -7439,7 +7439,6 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(100px,1fr))",gap:8}}>
               {GREENS_DEF.map(g=>{
                 const alt = ultimaMed?.alturas?.[g.id];
-                const hum = ultimaMed?.humedades?.[g.id];
                 const color = colorAltura(alt);
                 return (
                   <div key={g.id} style={{background:`${color}10`,borderRadius:8,padding:"8px 10px",border:`1px solid ${color}30`,textAlign:"center",cursor:"pointer"}} onClick={()=>{setSubTab("greens");setSelectedGreen(g.id);}}>
@@ -7610,7 +7609,6 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           {/* Detalle green o vivero seleccionado */}
           {selectedGreen==="vivero"?(()=>{
             const altViv = ultimaMed?.alturas?.vivero;
-            const humViv = ultimaMed?.humedades?.vivero;
             return (
               <div>
                 <div style={{...S.card,padding:16,marginBottom:12,borderLeft:"3px solid #4ade80"}}>
@@ -7683,7 +7681,6 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           })():(()=>{
             const g = GREENS_DEF.find(x=>x.id===selectedGreen);
             const alt = ultimaMed?.alturas?.[selectedGreen];
-            const hum = ultimaMed?.humedades?.[selectedGreen];
             const color = colorAltura(alt);
             const tareasG = (golfData.tareasGreen||[]).filter(t=>t.greenId===selectedGreen);
             return (
