@@ -6383,25 +6383,31 @@ const TAREAS_GREENS_DIARIAS = [
   "Pediluvios — llenado y revisión",
 ];
 const TAREAS_GREENS_PERIODICAS = [
-  "Corte de greens (tasa lenta — cada 30+ días)",
-  "Corte de greens (tasa media — cada 14-21 días)",
-  "Corte de greens (tasa rápida — cada 7 días)",
+  // ── Corte ──
+  "Corte de greens",
   "Corte ante-greens",
   "Rodado de greens",
+  // ── Riego ──
   "Riego ligero (Syringing)",
   "Revisión riego automático",
+  // ── Medición y fitosanitario ──
   "Medición de altura",
   "Aplicación fungicida",
   "Control de plagas",
   "Control malezas",
+  // ── Mantenimiento mayor ──
   "Aireación",
   "Escarificado",
   "Top dressing",
   "Resiembra / Reparación parches",
   "Fertilización",
+  // ── Hoyos ──
+  "Cambio de hoyos (tasa lenta — cada 30+ días)",
+  "Cambio de hoyos (tasa media — cada 14-21 días)",
+  "Cambio de hoyos (tasa rápida — cada 7 días)",
+  // ── Torneo ──
   "Cambio de banderas (pre-torneo)",
   "Cambio de banderas (post-torneo)",
-  "Perforar nuevos hoyos",
   "Reparación pitch marks",
 ];
 const TAREAS_TEES = ["Limpieza","Corte y orillado","Riego","Reparación divots","Cambio de marcas","Posicionar tee markers","Corte rough","Corte calles","Corte lomas"];
@@ -7239,7 +7245,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   const [selectedTee,    setSelectedTee]    = React.useState("t1");
 
   // Formulario medición semanal
-  const emptyMed = {fecha:hoy,responsable:"",tipo:"semanal",alturas:{},humedades:{},obs:""};
+  const emptyMed = {fecha:hoy,responsable:"",tipo:"semanal",alturas:{},diasDesdeCorte:{},obsGreen:{},obs:""};
   const [medForm, setMedForm] = React.useState(emptyMed);
 
   // Formulario evento/torneo
@@ -7268,10 +7274,15 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
 
   // ── Guardar medición ─────────────────────────────────────────────────────
   const guardarMedicion = () => {
-    if(!medForm.responsable) return;
-    setG({mediciones:[{...medForm,id:Date.now()},...mediciones].slice(0,100)});
-    sincronizarMacrozona("Medición de alturas", `${medForm.tipo} — ${medForm.responsable}`);
-    setMedForm(emptyMed); setShowMedForm(false);
+    if(!medForm.fecha) return;
+    const hayAlturas = Object.values(medForm.alturas||{}).some(v=>v);
+    if(!hayAlturas && !medForm.alturas?.vivero) return;
+    const nueva = {...medForm, id:Date.now()};
+    const nuevasMed = [nueva, ...mediciones].slice(0,100);
+    setG({mediciones:nuevasMed});
+    sincronizarMacrozona("Medición de alturas", `${medForm.tipo} — ${medForm.responsable||"Sin responsable"}`);
+    setMedForm({...emptyMed, fecha:hoy});
+    setShowMedForm(false);
   };
 
   // ── Guardar evento ───────────────────────────────────────────────────────
@@ -8292,7 +8303,6 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                     <th style={{padding:"6px 10px",textAlign:"left",color:"#34d399",fontSize:10}}>GREEN</th>
                     <th style={{padding:"6px 10px",textAlign:"center",color:"#34d399",fontSize:10}}>ALTURA (mm)</th>
                     <th style={{padding:"6px 10px",textAlign:"center",color:"#fbbf24",fontSize:10}}>PROYECCIÓN</th>
-                    <th style={{padding:"6px 10px",textAlign:"center",color:"#60a5fa",fontSize:10}}>HUM. (ref.💧)</th>
                     <th style={{padding:"6px 10px",textAlign:"left",color:"#34d399",fontSize:10}}>OBS</th>
                   </tr></thead>
                   <tbody>
@@ -8396,24 +8406,6 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                                 placeholder="días"/>
                             )}
                           </td>
-                          <td style={{padding:"5px 6px",textAlign:"center"}}>
-                            {(()=>{
-                              const ESCALA_R={1:"#ef4444",2:"#ef4444",3:"#f97316",4:"#f59e0b",5:"#f59e0b",6:"#22c55e",7:"#22c55e",8:"#3b82f6"};
-                              const LABEL_R={1:"Seco",2:"Seco",3:"Bajo",4:"Medio",5:"Medio",6:"Óptimo",7:"Óptimo",8:"Saturado"};
-                              const ultH=[...(Array.isArray(golfData.humedades)?golfData.humedades:Object.values(golfData.humedades||{}))].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""))[0];
-                              const vR=ultH?.valores?.[g.id]?.valor;
-                              const cR=vR?ESCALA_R[Math.min(Math.max(Number(vR),1),8)]:"#3a6a5a";
-                              return vR?(
-                                <div>
-                                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:cR}}>{vR}</div>
-                                  <div style={{fontSize:9,color:cR}}>{LABEL_R[Math.min(Math.max(Number(vR),1),8)]}</div>
-                                  <div style={{fontSize:9,color:"#3a6a5a"}}>{ultH.fecha}</div>
-                                </div>
-                              ):(
-                                <div style={{fontSize:10,color:"#3a6a5a"}}>—<br/><span style={{fontSize:9}}>ver 💧</span></div>
-                              );
-                            })()}
-                          </td>
                           <td style={{padding:"5px 6px"}}>
                             <input style={{...S.input,fontSize:11,padding:"4px 6px"}} value={medForm.obsGreen?.[g.id]||""} placeholder="obs..."
                               onChange={e=>setMedForm(p=>({...p,obsGreen:{...p.obsGreen,[g.id]:e.target.value}}))}/>
@@ -8435,24 +8427,6 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                         <input type="number" min="0" max="30" style={{...S.input,width:45,fontSize:11,padding:"3px 5px",textAlign:"center"}} value={medForm.diasDesdeCorte?.vivero||""}
                           onChange={e=>setMedForm(p=>({...p,diasDesdeCorte:{...p.diasDesdeCorte,vivero:e.target.value}}))} placeholder="días"/>
                         <div style={{fontSize:9,color:"#5a9a7a"}}>días desde corte</div>
-                      </td>
-                      <td style={{padding:"5px 6px",textAlign:"center"}}>
-                        {(()=>{
-                          const ESCALA_R={1:"#ef4444",2:"#ef4444",3:"#f97316",4:"#f59e0b",5:"#f59e0b",6:"#22c55e",7:"#22c55e",8:"#3b82f6"};
-                          const LABEL_R={1:"Seco",2:"Seco",3:"Bajo",4:"Medio",5:"Medio",6:"Óptimo",7:"Óptimo",8:"Saturado"};
-                          const ultH=[...(Array.isArray(golfData.humedades)?golfData.humedades:Object.values(golfData.humedades||{}))].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""))[0];
-                          const vR=ultH?.valorVivero;
-                          const cR=vR?ESCALA_R[Math.min(Math.max(Number(vR),1),8)]:"#3a6a5a";
-                          return vR?(
-                            <div>
-                              <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:cR}}>{vR}</div>
-                              <div style={{fontSize:9,color:cR}}>{LABEL_R[Math.min(Math.max(Number(vR),1),8)]}</div>
-                              <div style={{fontSize:9,color:"#3a6a5a"}}>{ultH.fecha}</div>
-                            </div>
-                          ):(
-                            <div style={{fontSize:10,color:"#3a6a5a"}}>—<br/><span style={{fontSize:9}}>ver 💧</span></div>
-                          );
-                        })()}
                       </td>
                       <td style={{padding:"5px 6px"}}>
                         <input style={{...S.input,fontSize:11,padding:"4px 6px"}} value={medForm.obsGreen?.vivero||""} placeholder="siembra, resiembra..."
