@@ -1,4 +1,3 @@
-Código recibido: 753807 caracteres
 import { useState, useEffect, useRef } from "react";
 import * as React from "react";
 
