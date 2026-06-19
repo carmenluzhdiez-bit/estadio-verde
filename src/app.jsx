@@ -1,3 +1,4 @@
+Código recibido: 753807 caracteres
 import { useState, useEffect, useRef } from "react";
 import * as React from "react";
 
@@ -1867,7 +1868,13 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
             }}
             style={{...S.input,width:"auto",fontSize:13}}/>
           <button onClick={proponerTareas} style={{...S.btn,background:"rgba(59,130,246,0.2)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)",fontSize:13}}>✨ Proponer del día</button>
-          <button onClick={()=>setShowAgregar(true)} style={{...S.btn,background:"rgba(61,122,82,0.25)",color:"#90d0a0",border:"1px solid rgba(61,122,82,0.35)",fontSize:13}}>➕ Agregar tarea</button>
+          <button onClick={()=>{
+            setNuevaTarea(p=>({...p,
+              zona:filtroZona!=="todas"&&filtroZona!=="Golf"?filtroZona:p.zona,
+              elemento:"",tarea:""
+            }));
+            setShowAgregar(true);
+          }} style={{...S.btn,background:"rgba(61,122,82,0.25)",color:"#90d0a0",border:"1px solid rgba(61,122,82,0.35)",fontSize:13}}>➕ Agregar tarea</button>
         </div>
       </div>
 
@@ -1931,7 +1938,8 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
               </select>
               <select value={filtroZona} onChange={e=>setFiltroZona(e.target.value)} style={{...S.input,flex:"1 1 160px",maxWidth:220,fontSize:13}}>
                 <option value="todas">Todas las zonas</option>
-                {zonasEnProg.map(z=><option key={z} value={z}>{z}</option>)}
+                {zonasEnProg.filter(z=>z!=="Golf").map(z=><option key={z} value={z}>{z}</option>)}
+                {zonasEnProg.includes("Golf")&&<option value="Golf" disabled>⛳ Golf → programar en sección Golf</option>}
               </select>
               {(filtroEstado!=="todos"||filtroZona!=="todas")&&(
                 <button onClick={()=>{setFiltroEstado("todos");setFiltroZona("todas");}} style={{...S.btn,background:"transparent",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)",fontSize:12}}>✕ Limpiar</button>
@@ -1942,23 +1950,55 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           {showAgregar && (
             <div style={{...S.card,padding:18,marginBottom:16}} className="ein">
               <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:14}}>Nueva Tarea — {fecha}</div>
+              {(()=>{
+                const zonasSinGolf=[...MACROZONAS_BASE].filter(z=>z.id!==31).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+                const zonaObj=zonasSinGolf.find(z=>z.nombre===nuevaTarea.zona);
+                const elemsZona=zonaObj?getAllElems(zonaObj.id):[];
+                const elemObj=elemsZona.find(e=>e.nombre===nuevaTarea.elemento);
+                const tareasDisp=elemObj
+                  ?[...new Set((TAREAS_DEFAULT[elemObj.tipo]||[]).map(t=>t.tarea))].sort()
+                  :elemsZona.length>0
+                    ?[...new Set(elemsZona.flatMap(e=>(TAREAS_DEFAULT[e.tipo]||[]).map(t=>t.tarea)))].sort()
+                    :TAREAS_PRESET;
+                return(<>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
                 <div>
                   <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>MACROZONA</label>
-                  <select style={{...S.input,fontSize:13}} value={nuevaTarea.zona} onChange={e=>setNuevaTarea(p=>({...p,zona:e.target.value,elemento:""}))}>
+                  <select style={{...S.input,fontSize:13}} value={nuevaTarea.zona}
+                    onChange={e=>setNuevaTarea(p=>({...p,zona:e.target.value,elemento:"",tarea:""}))}>
                     <option value="">Seleccionar zona...</option>
-                    {[...MACROZONAS_BASE].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(z=>(
+                    {zonasSinGolf.map(z=>(
                       <option key={z.id} value={z.nombre}>{z.icono} {z.nombre}</option>
                     ))}
                   </select>
+                  <div style={{fontSize:10,color:"#4a7a5a",marginTop:3}}>⛳ Golf se programa en la sección Golf</div>
                 </div>
                 <div>
                   <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>ELEMENTO</label>
-                  <input style={{...S.input,fontSize:13}} placeholder="Ej: Maceteros colgantes..." value={nuevaTarea.elemento} onChange={e=>setNuevaTarea(p=>({...p,elemento:e.target.value}))}/>
+                  {elemsZona.length>0?(
+                    <select style={{...S.input,fontSize:13}} value={nuevaTarea.elemento}
+                      onChange={e=>setNuevaTarea(p=>({...p,elemento:e.target.value,tarea:""}))}>
+                      <option value="">General / Todos</option>
+                      {elemsZona.map(e=><option key={e.id} value={e.nombre}>{e.nombre}</option>)}
+                    </select>
+                  ):(
+                    <input style={{...S.input,fontSize:13}} placeholder="Elemento..."
+                      value={nuevaTarea.elemento} onChange={e=>setNuevaTarea(p=>({...p,elemento:e.target.value}))}/>
+                  )}
                 </div>
                 <div style={{gridColumn:"1/-1"}}>
                   <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>TAREA</label>
-                  <input style={{...S.input,fontSize:13}} placeholder="Ej: Riego, Poda de limpieza..." value={nuevaTarea.tarea} onChange={e=>setNuevaTarea(p=>({...p,tarea:e.target.value}))}/>
+                  <select style={{...S.input,fontSize:13}} value={nuevaTarea.tarea}
+                    onChange={e=>setNuevaTarea(p=>({...p,tarea:e.target.value==="__otro__"?"":e.target.value}))}>
+                    <option value="">Seleccionar tarea...</option>
+                    {tareasDisp.map(t=><option key={t} value={t}>{t}</option>)}
+                    <option value="__otro__">✏️ Escribir otra...</option>
+                  </select>
+                  {nuevaTarea.tarea===""&&(
+                    <input style={{...S.input,fontSize:13,marginTop:6}} autoFocus
+                      placeholder="Describir tarea..."
+                      onChange={e=>setNuevaTarea(p=>({...p,tarea:e.target.value}))}/>
+                  )}
                 </div>
                 <div>
                   <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>RESPONSABLE</label>
@@ -1981,6 +2021,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                   <textarea rows={2} style={{...S.input,resize:"vertical",fontSize:13}} value={nuevaTarea.notas} onChange={e=>setNuevaTarea(p=>({...p,notas:e.target.value}))}/>
                 </div>
               </div>
+              </>);})()}
               <div style={{display:"flex",gap:8}}>
                 <button className="btn-p" style={S.btn} onClick={()=>{
                   if(!nuevaTarea.zona||!nuevaTarea.tarea) return;
@@ -6334,8 +6375,36 @@ const TAREAS_ARBOLES_GENERALES = ["Poda formación","Poda sanitaria","Fertilizac
 const TAREAS_HOJA_CADUCA = ["Poda de invierno","Raleo","Recolección hojas","Poda post floración"];
 const TAREAS_HOJA_PERSISTENTE = ["Poda de mantenimiento","Lavado follaje"];
 const TIPOS_ARBOL = ["Hoja caduca","Hoja persistente","Coníferas","Palmera","Arbusto"];
-const TAREAS_GREENS_DIARIAS = ["Limpieza general","Corte de greens","Rodado","Riego ligero (Syringing)","Cambio de bandera","Revisión hoyos","Soplado/Barrido","Reparación pitch marks"];
-const TAREAS_GREENS_PERIODICAS = ["Medición de altura","Fertilización","Aireación","Escarificado","Resiembra","Control de plagas","Riego automático revisión","Aplicación fungicida","Top dressing","Control malezas","Perforar nuevos hoyos","Corte ante-greens"];
+const TAREAS_GREENS_DIARIAS = [
+  "Limpieza Tee 01",
+  "Revisión estado general greens (visual)",
+  "Revisión humedad greens",
+  "Revisión estado fitosanitario",
+  "Soplado/Barrido",
+  "Pediluvios — llenado y revisión",
+];
+const TAREAS_GREENS_PERIODICAS = [
+  "Corte de greens (tasa lenta — cada 30+ días)",
+  "Corte de greens (tasa media — cada 14-21 días)",
+  "Corte de greens (tasa rápida — cada 7 días)",
+  "Corte ante-greens",
+  "Rodado de greens",
+  "Riego ligero (Syringing)",
+  "Revisión riego automático",
+  "Medición de altura",
+  "Aplicación fungicida",
+  "Control de plagas",
+  "Control malezas",
+  "Aireación",
+  "Escarificado",
+  "Top dressing",
+  "Resiembra / Reparación parches",
+  "Fertilización",
+  "Cambio de banderas (pre-torneo)",
+  "Cambio de banderas (post-torneo)",
+  "Perforar nuevos hoyos",
+  "Reparación pitch marks",
+];
 const TAREAS_TEES = ["Limpieza","Corte y orillado","Riego","Reparación divots","Cambio de marcas","Posicionar tee markers","Corte rough","Corte calles","Corte lomas"];
 
 // Plantilla pre-torneo por día
@@ -7033,7 +7102,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
 
       {/* Sub-tabs */}
       <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
-        {[["panel","📊 Panel"],["greens","⛳ Greens"],["tees","🎯 Tees"],["bunkers","🏖️ Búnkers"],["fairways","🌾 Fairways"],["zonas","🌿 Zonas"],["arboles","🌳 Árboles"],["mediciones","📏 Mediciones"],["eventos","🏆 Eventos"]].map(([t,l])=>(
+        {[["panel","📊 Panel"],["greens","⛳ Greens"],["tees","🎯 Tees"],["bunkers","🏖️ Búnkers"],["fairways","🌾 Fairways"],["zonas","🌿 Zonas"],["arboles","🌳 Árboles"],["mediciones","📏 Alturas"],["humedad","💧 Humedad"],["eventos","🏆 Eventos"]].map(([t,l])=>(
           <button key={t} className={`tab${subTab===t?" on":""}`} onClick={()=>setSubTab(t)} style={{fontFamily:"'Georgia',serif"}}>{l}</button>
         ))}
       </div>
@@ -7086,6 +7155,131 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               })}
             </div>
           </div>
+
+          {/* ── RESUMEN URGENCIA DE CORTE ── */}
+          {(()=>{
+            const ESCALA_URG={1:"#ef4444",2:"#ef4444",3:"#f97316",4:"#f59e0b",5:"#f59e0b",6:"#22c55e",7:"#22c55e",8:"#3b82f6"};
+            const colorUrg={cortar:"#ef4444",urgente:"#f97316",pronto:"#f59e0b",normal:"#22c55e",ok:"#4ade80","sin-tasa":"#5a9a7a","sin-datos":"#3a6a5a"};
+            const labelUrg={cortar:"✂️ Cortar ya",urgente:"⏰ Urgente",pronto:"📅 Pronto",normal:"✅ Normal",ok:"✅ OK","sin-tasa":"📏 Sin tasa","sin-datos":"— Sin datos"};
+            const urgencias=GREENS_DEF.map(g=>{
+              const alt=ultimaMed?.alturas?.[g.id];
+              if(!alt) return {g,diasRestantes:null,urgencia:"sin-datos",alt:null,tasa:null,altObjetivo:null,infoCorte:null};
+              const cortesG=Object.values(tareasProg).flat()
+                .filter(t=>t.zona==="Golf"&&t.alturaCorte&&
+                  (t.elemento?.includes(g.nombre)||t.tarea?.includes(g.nombre)||t.elemento?.toLowerCase().includes("todos")))
+                .sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
+              const infoCorte=cortesG[0]||null;
+              const altObjetivo=infoCorte?.alturaObjetivo?Number(infoCorte.alturaObjetivo):(rango.min*1.5);
+              const histG=[...mediciones].filter(m=>m.alturas?.[g.id]&&m.fecha).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+              const histPost=infoCorte?.fecha?histG.filter(m=>m.fecha>=infoCorte.fecha):histG;
+              let tasa=null;
+              if(histPost.length>=2){
+                const a1=Number(histPost[0].alturas[g.id]),a2=Number(histPost[1].alturas[g.id]);
+                const d=Math.round((new Date(histPost[0].fecha+"T12:00:00")-new Date(histPost[1].fecha+"T12:00:00"))/(1000*60*60*24));
+                if(d>0&&a1>a2) tasa=(a1-a2)/d;
+              }
+              if(!tasa&&infoCorte?.alturaCorte&&infoCorte?.fecha){
+                const d=Math.round((new Date((ultimaMed.fecha||hoy)+"T12:00:00")-new Date(infoCorte.fecha+"T12:00:00"))/(1000*60*60*24));
+                const delta=Number(alt)-Number(infoCorte.alturaCorte);
+                if(d>0&&delta>0) tasa=delta/d;
+              }
+              const altN=Number(alt);
+              if(altN>=altObjetivo) return {g,diasRestantes:0,urgencia:"cortar",alt:altN,tasa,altObjetivo,infoCorte};
+              if(!tasa||tasa<=0) return {g,diasRestantes:null,urgencia:"sin-tasa",alt:altN,tasa:null,altObjetivo,infoCorte};
+              const dias=Math.round((altObjetivo-altN)/tasa);
+              const urgencia=dias<=0?"cortar":dias<=2?"urgente":dias<=5?"pronto":dias<=10?"normal":"ok";
+              return {g,diasRestantes:dias,urgencia,alt:altN,tasa,altObjetivo,infoCorte};
+            }).sort((a,b)=>{
+              const ord={cortar:0,urgente:1,pronto:2,normal:3,ok:4,"sin-tasa":5,"sin-datos":6};
+              return (ord[a.urgencia]??9)-(ord[b.urgencia]??9);
+            });
+            const hayDatos=urgencias.some(u=>u.urgencia!=="sin-datos");
+            return (
+              <div style={{...S.card,padding:16}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
+                  <div style={{fontSize:13,fontWeight:700,color:"#34d399"}}>✂️ Urgencia de Corte</div>
+                  <div style={{display:"flex",gap:10,fontSize:10,color:"#5a9a7a",flexWrap:"wrap"}}>
+                    {[{k:"cortar",c:"#ef4444"},{k:"urgente",c:"#f97316"},{k:"pronto",c:"#f59e0b"},{k:"normal",c:"#22c55e"},{k:"ok",c:"#4ade80"}].map(({k,c})=>(
+                      <span key={k} style={{display:"flex",alignItems:"center",gap:3}}>
+                        <span style={{width:7,height:7,borderRadius:"50%",background:c,display:"inline-block"}}/>
+                        {labelUrg[k]}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                {!hayDatos?(
+                  <div style={{textAlign:"center",color:"#3a6a5a",padding:"20px 0",fontSize:13}}>
+                    Sin mediciones. Ve a 📏 Alturas para ingresar datos.
+                  </div>
+                ):(
+                  <>
+                    <div style={{overflowX:"auto"}}>
+                      <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                        <thead>
+                          <tr style={{background:"rgba(52,211,153,0.1)"}}>
+                            {["Green","Alt. actual","Objetivo","Tasa","Proyección","Estado"].map(h=>(
+                              <th key={h} style={{padding:"6px 10px",textAlign:"left",color:"#34d399",fontSize:10,letterSpacing:"0.5px",fontWeight:600,whiteSpace:"nowrap"}}>{h.toUpperCase()}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {urgencias.map((u,i)=>{
+                            const c=colorUrg[u.urgencia]||"#5a9a7a";
+                            return (
+                              <tr key={u.g.id} style={{borderBottom:"1px solid rgba(255,255,255,0.05)",background:i%2===0?"transparent":"rgba(255,255,255,0.018)",cursor:"pointer"}}
+                                onClick={()=>{setSubTab("greens");setSelectedGreen(u.g.id);}}>
+                                <td style={{padding:"7px 10px",fontWeight:600,color:"#34d399"}}>
+                                  {u.g.nombre}
+                                  <div style={{fontSize:9,color:"#4a7a5a",fontWeight:400}}>{u.g.hoyos}</div>
+                                </td>
+                                <td style={{padding:"7px 10px",fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:colorAltura(u.alt)}}>
+                                  {u.alt?`${u.alt}mm`:"—"}
+                                </td>
+                                <td style={{padding:"7px 10px",color:"#fbbf24",fontSize:12}}>
+                                  {u.altObjetivo?`${Number(u.altObjetivo).toFixed(1)}mm`:"—"}
+                                  <div style={{fontSize:9,color:u.infoCorte?.alturaObjetivo?"#5a9a7a":"#4a7a5a"}}>{u.infoCorte?.alturaObjetivo?"definido":"regla 1/3"}</div>
+                                </td>
+                                <td style={{padding:"7px 10px",color:"#5a9a7a",fontSize:11}}>
+                                  {u.tasa?`${u.tasa.toFixed(2)}mm/d`:"—"}
+                                </td>
+                                <td style={{padding:"7px 10px"}}>
+                                  {u.urgencia==="sin-datos"||u.urgencia==="sin-tasa"?(
+                                    <span style={{fontSize:11,color:"#3a6a5a"}}>—</span>
+                                  ):u.diasRestantes===0?(
+                                    <span style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,color:"#ef4444"}}>✂️ HOY</span>
+                                  ):(
+                                    <span style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,color:c}}>{u.diasRestantes}d</span>
+                                  )}
+                                  {u.infoCorte&&<div style={{fontSize:9,color:"#4a7a5a"}}>✂️ {u.infoCorte.fecha}{u.infoCorte.alturaCorte&&` @ ${u.infoCorte.alturaCorte}mm`}</div>}
+                                </td>
+                                <td style={{padding:"7px 10px"}}>
+                                  <span style={{fontSize:11,fontWeight:600,color:c,background:`${c}15`,padding:"2px 8px",borderRadius:20,border:`1px solid ${c}35`,whiteSpace:"nowrap"}}>
+                                    {labelUrg[u.urgencia]}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    {urgencias.some(u=>u.urgencia==="cortar"||u.urgencia==="urgente")&&(
+                      <div style={{marginTop:12,background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:8,padding:"10px 14px"}}>
+                        <div style={{fontSize:12,fontWeight:600,color:"#fca5a5",marginBottom:6}}>⚠️ Acción requerida</div>
+                        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                          {urgencias.filter(u=>u.urgencia==="cortar"||u.urgencia==="urgente").map(u=>(
+                            <span key={u.g.id} style={{fontSize:11,background:`${colorUrg[u.urgencia]}15`,color:colorUrg[u.urgencia],border:`1px solid ${colorUrg[u.urgencia]}35`,padding:"3px 10px",borderRadius:20}}>
+                              {u.g.nombre} {u.urgencia==="cortar"?"— Cortar ya":`— ${u.diasRestantes}d`}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -7245,20 +7439,13 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                         </div>
                       ))}
                     </div>
-                    {/* Pediluvios */}
-                    <div style={{background:"rgba(96,165,250,0.06)",borderRadius:8,padding:"10px 12px",marginBottom:10,border:"1px solid rgba(96,165,250,0.2)"}}>
-                      <div style={{fontSize:11,color:"#93c5fd",fontWeight:600,marginBottom:7}}>💧 Pediluvios de acceso</div>
-                      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                        {["Pediluvio al entrar — llenado","Pediluvio al salir — llenado"].map(t=>(
-                          <div key={t} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 12px",borderRadius:8,background:diariaForm.tareas[t]?"rgba(96,165,250,0.15)":"rgba(255,255,255,0.04)",border:`1px solid ${diariaForm.tareas[t]?"rgba(96,165,250,0.4)":"rgba(255,255,255,0.08)"}`,cursor:"pointer",fontSize:12}}
-                            onClick={()=>setDiariaForm(p=>({...p,tareas:{...p.tareas,[t]:!p.tareas[t]}}))}>
-                            <div style={{width:14,height:14,borderRadius:3,border:`2px solid ${diariaForm.tareas[t]?"#93c5fd":"rgba(255,255,255,0.2)"}`,background:diariaForm.tareas[t]?"#93c5fd":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                              {diariaForm.tareas[t]&&<span style={{color:"#000",fontSize:9,fontWeight:700}}>✓</span>}
-                            </div>
-                            {t}
-                          </div>
-                        ))}
-                      </div>
+                    {/* Observación fitosanitaria */}
+                    <div style={{background:"rgba(167,139,250,0.06)",borderRadius:8,padding:"10px 12px",marginBottom:10,border:"1px solid rgba(167,139,250,0.2)"}}>
+                      <div style={{fontSize:11,color:"#c4b5fd",fontWeight:600,marginBottom:6}}>🔬 Observación fitosanitaria</div>
+                      <input style={{...S.input,fontSize:12}} placeholder="ej: Sin novedades · Mancha sospechosa Green 03 borde norte · Presencia de trips..."
+                        value={diariaForm.obsFito||""}
+                        onChange={e=>setDiariaForm(p=>({...p,obsFito:e.target.value}))}/>
+                      <div style={{fontSize:10,color:"#5a7a9a",marginTop:4}}>Si hay novedad relevante → registrar en 🧪 Fungicidas → Incidencias</div>
                     </div>
                     <div><label style={labelSt}>Observaciones</label><input style={S.input} value={diariaForm.obs} onChange={e=>setDiariaForm(p=>({...p,obs:e.target.value}))} placeholder="Novedades, condiciones especiales..."/></div>
                     <div style={{display:"flex",gap:8,marginTop:10}}>
@@ -7362,7 +7549,46 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                     })()}
 
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-                      <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Descripción adicional</label><input style={S.input} value={tareaForm.descripcion} onChange={e=>setTareaForm(p=>({...p,descripcion:e.target.value}))} placeholder="Detalles, altura de corte, condiciones..."/></div>
+                      {(tareaForm.tipo?.toLowerCase().includes("corte"))&&(
+                        <div style={{gridColumn:"1/-1",background:"rgba(52,211,153,0.06)",border:"1px solid rgba(52,211,153,0.2)",borderRadius:10,padding:"12px 14px"}}>
+                          <div style={{fontSize:11,color:"#34d399",fontWeight:600,marginBottom:10,textTransform:"uppercase",letterSpacing:"0.5px"}}>✂️ Parámetros de corte</div>
+                          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                            <div>
+                              <label style={labelSt}>Altura de corte HOY (mm)</label>
+                              <input type="number" step="0.1" min="2" max="15"
+                                style={{...S.input,fontSize:14,fontWeight:700,color:"#34d399",borderColor:"rgba(52,211,153,0.3)"}}
+                                value={tareaForm.alturaCorte||""}
+                                onChange={e=>setTareaForm(p=>({...p,alturaCorte:e.target.value}))}
+                                placeholder="ej: 4.5"/>
+                              <div style={{fontSize:10,color:"#5a9a7a",marginTop:3}}>Altura a la que se cortará</div>
+                            </div>
+                            <div>
+                              <label style={labelSt}>Próxima altura objetivo (mm)</label>
+                              <input type="number" step="0.1" min="2" max="15"
+                                style={{...S.input,fontSize:14,fontWeight:700,color:"#fbbf24",borderColor:"rgba(251,191,36,0.3)"}}
+                                value={tareaForm.alturaObjetivo||""}
+                                onChange={e=>setTareaForm(p=>({...p,alturaObjetivo:e.target.value}))}
+                                placeholder="ej: 7.2"/>
+                              <div style={{fontSize:10,color:"#5a9a7a",marginTop:3}}>Cuándo volver a cortar</div>
+                            </div>
+                          </div>
+                          {tareaForm.alturaCorte&&!tareaForm.alturaObjetivo&&(
+                            <div style={{marginTop:8,fontSize:11,color:"#f59e0b",display:"flex",alignItems:"center",gap:8}}>
+                              💡 Sugerencia: {(Number(tareaForm.alturaCorte)*1.5).toFixed(1)}mm (regla del tercio)
+                              <button style={{...S.btn,fontSize:10,padding:"2px 8px",background:"rgba(251,191,36,0.15)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.3)"}}
+                                onClick={()=>setTareaForm(p=>({...p,alturaObjetivo:String((Number(p.alturaCorte)*1.5).toFixed(1))}))}>
+                                Usar
+                              </button>
+                            </div>
+                          )}
+                          {tareaForm.alturaCorte&&tareaForm.alturaObjetivo&&(
+                            <div style={{marginTop:8,fontSize:11,color:"#34d399"}}>
+                              📐 Crecimiento permitido: {(Number(tareaForm.alturaObjetivo)-Number(tareaForm.alturaCorte)).toFixed(1)}mm
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Descripción adicional</label><input style={S.input} value={tareaForm.descripcion} onChange={e=>setTareaForm(p=>({...p,descripcion:e.target.value}))} placeholder="Condiciones del día, motivo del ajuste de altura..."/></div>
                       <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observaciones</label><input style={S.input} value={tareaForm.obs} onChange={e=>setTareaForm(p=>({...p,obs:e.target.value}))}/></div>
                     </div>
                     <div style={{display:"flex",gap:8}}>
@@ -7387,10 +7613,12 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                             fecha:tareaForm.fecha,
                             zona:"Golf",
                             elemento:nombreZona+(hoyosZona?` (${hoyosZona})`:""),
-                            tarea:`⛳ ${tareaForm.tipo}${tareaForm.descripcion?" — "+tareaForm.descripcion:""} · ${nombreZona}`,
+                            tarea:`⛳ ${tareaForm.tipo}${tareaForm.alturaCorte?" HOC "+tareaForm.alturaCorte+"mm":""}${tareaForm.descripcion?" — "+tareaForm.descripcion:""} · ${nombreZona}`,
                             responsable:tareaForm.responsable,
                             estado:tareaForm.responsable?"pendiente":"por_designar",
                             notas:tareaForm.obs||"",
+                            alturaCorte:tareaForm.alturaCorte||null,
+                            alturaObjetivo:tareaForm.alturaObjetivo||null,
                             auto:false,
                           };
                         });
@@ -7421,6 +7649,11 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                         <div style={{fontSize:11,color:"#5a9a7a",marginTop:3}}>
                           {Object.entries(r.tareas||{}).filter(([,v])=>v).map(([k])=>k).join(" · ")||"Sin tareas marcadas"}
                         </div>
+                        {r.obsFito&&(
+                          <div style={{fontSize:11,color:"#c4b5fd",marginTop:3,fontStyle:"italic",padding:"3px 8px",background:"rgba(167,139,250,0.06)",borderRadius:6,border:"1px solid rgba(167,139,250,0.15)"}}>
+                            🔬 {r.obsFito}
+                          </div>
+                        )}
                         {r.obs&&<div style={{fontSize:11,color:"#5a9a7a",fontStyle:"italic",marginTop:2}}>{r.obs}</div>}
                       </div>
                     </div>
@@ -7769,7 +8002,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                     <th style={{padding:"6px 10px",textAlign:"left",color:"#34d399",fontSize:10}}>GREEN</th>
                     <th style={{padding:"6px 10px",textAlign:"center",color:"#34d399",fontSize:10}}>ALTURA (mm)</th>
                     <th style={{padding:"6px 10px",textAlign:"center",color:"#fbbf24",fontSize:10}}>PROYECCIÓN</th>
-                    <th style={{padding:"6px 10px",textAlign:"center",color:"#60a5fa",fontSize:10}}>HUMEDAD (1-8)</th>
+                    <th style={{padding:"6px 10px",textAlign:"center",color:"#60a5fa",fontSize:10}}>HUM. (ref.💧)</th>
                     <th style={{padding:"6px 10px",textAlign:"left",color:"#34d399",fontSize:10}}>OBS</th>
                   </tr></thead>
                   <tbody>
@@ -7778,25 +8011,58 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                       const hum=medForm.humedades?.[g.id]||"";
                       const diasCrecimiento=medForm.diasDesdeCorte?.[g.id]||"";
                       const color=colorAltura(alt);
-                      // Proyección: altura máxima = altura corte × 1.5 (regla del 1/3)
-                      // Si quiero cortar a 4.8mm → no cortar hasta 7.2mm (4.8 × 1.5)
-                      let proyeccion = null;
-                      let alturaMaxCorte = null;
-                      if(alt) {
-                        alturaMaxCorte = (rango.min * 1.5).toFixed(1); // altura donde hay que cortar
-                        if(Number(alt) >= Number(alturaMaxCorte)) {
-                          proyeccion = "⚠️ Cortar ya";
-                        } else if(diasCrecimiento && Number(diasCrecimiento)>0) {
-                          const alturaDesdeCorte = Number(alt) - rango.min;
-                          if(alturaDesdeCorte > 0) {
-                            const tasaDiaria = alturaDesdeCorte / Number(diasCrecimiento);
-                            if(tasaDiaria > 0) {
-                              const diasHastaCorte = Math.round((Number(alturaMaxCorte) - Number(alt)) / tasaDiaria);
-                              proyeccion = diasHastaCorte <= 0 ? "⚠️ Cortar ya" :
-                                           diasHastaCorte <= 2 ? `⏰ ${diasHastaCorte}d` :
-                                           `${diasHastaCorte}d`;
-                            }
+                      // ── Cálculo automático tasa y proyección ──
+                      let proyeccion=null,alturaMaxCorte=null,tasaCalculada=null,tasaFuente=null,infoCorte=null;
+                      if(alt){
+                        // 1. Último corte registrado para este green
+                        const cortesG=Object.values(tareasProg).flat()
+                          .filter(t=>t.zona==="Golf"&&t.alturaCorte&&
+                            (t.elemento?.includes(g.nombre)||t.tarea?.includes(g.nombre)||
+                             t.elemento?.toLowerCase().includes("todos")))
+                          .sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
+                        if(cortesG.length>0) infoCorte=cortesG[0];
+                        // 2. Altura objetivo
+                        alturaMaxCorte=infoCorte?.alturaObjetivo
+                          ?Number(infoCorte.alturaObjetivo)
+                          :(rango.min*1.5);
+                        alturaMaxCorte=Number(alturaMaxCorte).toFixed(1);
+                        // 3. Tasa desde mediciones
+                        const histG=[...mediciones]
+                          .filter(m=>m.alturas?.[g.id]&&m.fecha&&m.fecha!==medForm.fecha)
+                          .sort((a,b)=>b.fecha.localeCompare(a.fecha));
+                        const histPost=infoCorte?.fecha?histG.filter(m=>m.fecha>=infoCorte.fecha):histG;
+                        if(histPost.length>=1){
+                          const prev=histPost[0];
+                          const altPrev=Number(prev.alturas[g.id]);
+                          const altCurr=Number(alt);
+                          const d=Math.round((new Date(medForm.fecha+"T12:00:00")-new Date(prev.fecha+"T12:00:00"))/(1000*60*60*24));
+                          if(d>0&&altCurr>altPrev){tasaCalculada=(altCurr-altPrev)/d;tasaFuente="auto";}
+                        }
+                        // 4. Fallback: desde corte registrado
+                        if(!tasaCalculada&&infoCorte?.alturaCorte&&infoCorte?.fecha){
+                          const d=Math.round((new Date(medForm.fecha+"T12:00:00")-new Date(infoCorte.fecha+"T12:00:00"))/(1000*60*60*24));
+                          const delta=Number(alt)-Number(infoCorte.alturaCorte);
+                          if(d>0&&delta>0){tasaCalculada=delta/d;tasaFuente="corte";}
+                        }
+                        // 5. Fallback manual
+                        if(!tasaCalculada&&diasCrecimiento&&Number(diasCrecimiento)>0){
+                          const altDesde=infoCorte?.alturaCorte?Number(alt)-Number(infoCorte.alturaCorte):Number(alt)-rango.min;
+                          if(altDesde>0){tasaCalculada=altDesde/Number(diasCrecimiento);tasaFuente="manual";}
+                        }
+                        // 6. Fallback histórico
+                        if(!tasaCalculada){
+                          const histG2=[...mediciones].filter(m=>m.alturas?.[g.id]&&m.fecha).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+                          if(histG2.length>=2){
+                            const a1=Number(histG2[0].alturas[g.id]),a2=Number(histG2[1].alturas[g.id]);
+                            const d=Math.round((new Date(histG2[0].fecha+"T12:00:00")-new Date(histG2[1].fecha+"T12:00:00"))/(1000*60*60*24));
+                            if(d>0&&a1>a2){tasaCalculada=(a1-a2)/d;tasaFuente="histórico";}
                           }
+                        }
+                        // 7. Proyección final
+                        if(Number(alt)>=Number(alturaMaxCorte)){proyeccion="⚠️ Cortar ya";}
+                        else if(tasaCalculada&&tasaCalculada>0){
+                          const dias=Math.round((Number(alturaMaxCorte)-Number(alt))/tasaCalculada);
+                          proyeccion=dias<=0?"⚠️ Cortar ya":dias<=2?`⏰ ${dias}d`:`${dias}d`;
                         }
                       }
                       const colorHum = !hum?"#5a9a7a":Number(hum)<=2?"#ef4444":Number(hum)<=3?"#f59e0b":Number(hum)<=6?"#22c55e":"#3b82f6";
@@ -7814,18 +8080,51 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                             </div>
                           </td>
                           <td style={{padding:"5px 6px",textAlign:"center"}}>
-                            <div style={{display:"flex",gap:4,alignItems:"center",justifyContent:"center"}}>
-                              <input type="number" min="0" max="30" style={{...S.input,width:45,fontSize:11,padding:"3px 5px",textAlign:"center"}} value={diasCrecimiento}
-                                onChange={e=>setMedForm(p=>({...p,diasDesdeCorte:{...p.diasDesdeCorte,[g.id]:e.target.value}}))} placeholder="días"/>
-                              {proyeccion&&<span style={{fontSize:10,fontWeight:700,color:proyeccion.includes("ya")?"#ef4444":proyeccion.includes("⏰")?"#f59e0b":"#22c55e",whiteSpace:"nowrap"}}>{proyeccion}</span>}
-                            </div>
-                            {alturaMaxCorte&&<div style={{fontSize:9,color:"#5a9a7a"}}>cortar en {alturaMaxCorte}mm</div>}
-                            <div style={{fontSize:9,color:"#5a9a7a"}}>días desde corte</div>
+                            {proyeccion?(
+                              <div style={{fontWeight:700,fontSize:12,color:proyeccion.includes("ya")?"#ef4444":proyeccion.includes("⏰")?"#f59e0b":"#22c55e",whiteSpace:"nowrap"}}>{proyeccion}</div>
+                            ):(
+                              <div style={{fontSize:10,color:"#3a6a5a"}}>—</div>
+                            )}
+                            {alturaMaxCorte&&(
+                              <div style={{fontSize:9,color:infoCorte?.alturaObjetivo?"#fbbf24":"#5a9a7a"}}>
+                                {infoCorte?.alturaObjetivo?"✂️":"→"} cortar en {alturaMaxCorte}mm
+                              </div>
+                            )}
+                            {tasaCalculada&&(
+                              <div style={{fontSize:9,color:tasaFuente==="auto"?"#4ade80":tasaFuente==="corte"?"#34d399":tasaFuente==="histórico"?"#f59e0b":"#5a9a7a"}}>
+                                {tasaCalculada.toFixed(2)}mm/d {tasaFuente==="auto"?"●":tasaFuente==="corte"?"◆":tasaFuente==="histórico"?"○":"*"}
+                              </div>
+                            )}
+                            {infoCorte&&(
+                              <div style={{fontSize:9,color:"#4a7a5a"}}>
+                                ✂️ {infoCorte.fecha}{infoCorte.alturaCorte&&` @ ${infoCorte.alturaCorte}mm`}
+                              </div>
+                            )}
+                            {!tasaCalculada&&(
+                              <input type="number" min="0" max="30"
+                                style={{...S.input,width:45,fontSize:10,padding:"2px 4px",textAlign:"center",marginTop:3}}
+                                value={diasCrecimiento}
+                                onChange={e=>setMedForm(p=>({...p,diasDesdeCorte:{...p.diasDesdeCorte,[g.id]:e.target.value}}))}
+                                placeholder="días"/>
+                            )}
                           </td>
                           <td style={{padding:"5px 6px",textAlign:"center"}}>
-                            <input type="number" step="1" min="1" max="8" style={{...S.input,width:55,fontSize:13,padding:"4px 6px",textAlign:"center",borderColor:hum?colorHum:"",color:hum?colorHum:"inherit",fontWeight:600}} value={hum}
-                              onChange={e=>setMedForm(p=>({...p,humedades:{...p.humedades,[g.id]:e.target.value}}))} placeholder="1-8"/>
-                            {hum&&<div style={{fontSize:9,color:colorHum}}>{Number(hum)<=2?"Seco":Number(hum)<=3?"Muy bajo":Number(hum)<=4?"Bajo":Number(hum)<=6?"Óptimo":Number(hum)<=7?"Alto":"Saturado"}</div>}
+                            {(()=>{
+                              const ESCALA_R={1:"#ef4444",2:"#ef4444",3:"#f97316",4:"#f59e0b",5:"#f59e0b",6:"#22c55e",7:"#22c55e",8:"#3b82f6"};
+                              const LABEL_R={1:"Seco",2:"Seco",3:"Bajo",4:"Medio",5:"Medio",6:"Óptimo",7:"Óptimo",8:"Saturado"};
+                              const ultH=[...(Array.isArray(golfData.humedades)?golfData.humedades:Object.values(golfData.humedades||{}))].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""))[0];
+                              const vR=ultH?.valores?.[g.id]?.valor;
+                              const cR=vR?ESCALA_R[Math.min(Math.max(Number(vR),1),8)]:"#3a6a5a";
+                              return vR?(
+                                <div>
+                                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:cR}}>{vR}</div>
+                                  <div style={{fontSize:9,color:cR}}>{LABEL_R[Math.min(Math.max(Number(vR),1),8)]}</div>
+                                  <div style={{fontSize:9,color:"#3a6a5a"}}>{ultH.fecha}</div>
+                                </div>
+                              ):(
+                                <div style={{fontSize:10,color:"#3a6a5a"}}>—<br/><span style={{fontSize:9}}>ver 💧</span></div>
+                              );
+                            })()}
                           </td>
                           <td style={{padding:"5px 6px"}}>
                             <input style={{...S.input,fontSize:11,padding:"4px 6px"}} value={medForm.obsGreen?.[g.id]||""} placeholder="obs..."
@@ -7850,8 +8149,22 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                         <div style={{fontSize:9,color:"#5a9a7a"}}>días desde corte</div>
                       </td>
                       <td style={{padding:"5px 6px",textAlign:"center"}}>
-                        <input type="number" step="1" min="1" max="8" style={{...S.input,width:55,fontSize:12,padding:"4px 6px",textAlign:"center"}} value={medForm.humedades?.vivero||""}
-                          onChange={e=>setMedForm(p=>({...p,humedades:{...p.humedades,vivero:e.target.value}}))} placeholder="1-8"/>
+                        {(()=>{
+                          const ESCALA_R={1:"#ef4444",2:"#ef4444",3:"#f97316",4:"#f59e0b",5:"#f59e0b",6:"#22c55e",7:"#22c55e",8:"#3b82f6"};
+                          const LABEL_R={1:"Seco",2:"Seco",3:"Bajo",4:"Medio",5:"Medio",6:"Óptimo",7:"Óptimo",8:"Saturado"};
+                          const ultH=[...(Array.isArray(golfData.humedades)?golfData.humedades:Object.values(golfData.humedades||{}))].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""))[0];
+                          const vR=ultH?.valorVivero;
+                          const cR=vR?ESCALA_R[Math.min(Math.max(Number(vR),1),8)]:"#3a6a5a";
+                          return vR?(
+                            <div>
+                              <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:cR}}>{vR}</div>
+                              <div style={{fontSize:9,color:cR}}>{LABEL_R[Math.min(Math.max(Number(vR),1),8)]}</div>
+                              <div style={{fontSize:9,color:"#3a6a5a"}}>{ultH.fecha}</div>
+                            </div>
+                          ):(
+                            <div style={{fontSize:10,color:"#3a6a5a"}}>—<br/><span style={{fontSize:9}}>ver 💧</span></div>
+                          );
+                        })()}
                       </td>
                       <td style={{padding:"5px 6px"}}>
                         <input style={{...S.input,fontSize:11,padding:"4px 6px"}} value={medForm.obsGreen?.vivero||""} placeholder="siembra, resiembra..."
@@ -7878,6 +8191,287 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           />
         </div>
       )}
+
+      {/* ── HUMEDAD ── */}
+      {subTab==="humedad"&&(()=>{
+        const humedades=Array.isArray(golfData.humedades)?golfData.humedades:Object.values(golfData.humedades||{});
+        const setHumedades=(arr)=>setG({humedades:arr});
+        const estacionActual=getMesEstacion();
+        const esSecaEstacion=estacionActual==="verano"||estacionActual==="primavera";
+        const sectorLabel=esSecaEstacion?"más seco":"más húmedo";
+        const sectorColor=esSecaEstacion?"#f59e0b":"#60a5fa";
+        const ESCALA_HUM={
+          1:{label:"Seco",      color:"#ef4444",bg:"rgba(239,68,68,0.12)",   accion:"💧 Riego urgente"},
+          2:{label:"Seco",      color:"#ef4444",bg:"rgba(239,68,68,0.12)",   accion:"💧 Riego urgente"},
+          3:{label:"Bajo",      color:"#f97316",bg:"rgba(249,115,22,0.12)",  accion:"📅 Ajustar programa"},
+          4:{label:"Medio",     color:"#f59e0b",bg:"rgba(245,158,11,0.12)",  accion:"📅 Ajustar programa"},
+          5:{label:"Medio",     color:"#f59e0b",bg:"rgba(245,158,11,0.12)",  accion:"📅 Ajustar programa"},
+          6:{label:"Óptimo",    color:"#22c55e",bg:"rgba(34,197,94,0.12)",   accion:"✅ Sin cambio"},
+          7:{label:"Óptimo",    color:"#22c55e",bg:"rgba(34,197,94,0.12)",   accion:"✅ Sin cambio"},
+          8:{label:"Saturado",  color:"#3b82f6",bg:"rgba(59,130,246,0.12)",  accion:"🚫 Cerrar / suspender riego"},
+        };
+        const MOTIVOS=[
+          {value:"post-lluvia",       label:"🌧️ Post lluvia"},
+          {value:"pre-riego",         label:"💦 Pre-riego automático"},
+          {value:"rutina",            label:"📋 Rutina semanal"},
+          {value:"cierre-cancha",     label:"🚫 Evaluación cierre cancha"},
+          {value:"apertura-cancha",   label:"✅ Evaluación apertura cancha"},
+          {value:"otro",              label:"📌 Otro"},
+        ];
+        const DECISIONES=[
+          {value:"sin-cambio",      label:"✅ Sin cambio"},
+          {value:"ajustar-riego",   label:"💦 Ajustar programa de riego"},
+          {value:"riego-urgente",   label:"💧 Riego urgente"},
+          {value:"suspender-riego", label:"🛑 Suspender riego"},
+          {value:"cerrar-cancha",   label:"🚫 Cerrar cancha"},
+          {value:"abrir-cancha",    label:"✅ Abrir cancha"},
+          {value:"monitorear",      label:"👁️ Monitorear"},
+        ];
+        const [showHumForm,setShowHumForm]=React.useState(false);
+        const emptyHumForm={fecha:hoy,hora:new Date().toTimeString().slice(0,5),motivo:"rutina",responsable:"",valores:{},valorVivero:"",decision:"sin-cambio",obs:"",generarTarea:false};
+        const [humForm,setHumForm]=React.useState(emptyHumForm);
+        const ultimaHum=[...humedades].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""))[0];
+        const calcDecision=(valores)=>{
+          const vals=Object.values(valores).map(v=>Number(v.valor||0)).filter(v=>v>0);
+          if(!vals.length) return null;
+          const extremo=esSecaEstacion?Math.min(...vals):Math.max(...vals);
+          if(extremo<=2) return "riego-urgente";
+          if(extremo<=5) return "ajustar-riego";
+          if(extremo===8) return esSecaEstacion?"monitorear":"cerrar-cancha";
+          return "sin-cambio";
+        };
+        const guardarHumedad=()=>{
+          if(!humForm.responsable) return;
+          const nueva={...humForm,id:Date.now()};
+          setHumedades([nueva,...humedades].slice(0,200));
+          if(humForm.generarTarea&&(humForm.decision==="cerrar-cancha"||humForm.decision==="abrir-cancha"||humForm.decision==="riego-urgente")){
+            const txt=humForm.decision==="cerrar-cancha"?"🚫 Cierre cancha golf — humedad"+(!esSecaEstacion?" excesiva":""):humForm.decision==="abrir-cancha"?"✅ Apertura cancha golf":"💧 Riego urgente golf";
+            setTareasProg(p=>({...p,[humForm.fecha]:[...(p[humForm.fecha]||[]),{id:Date.now()+1,fecha:humForm.fecha,zona:"Golf",elemento:"Cancha completa",tarea:txt,responsable:humForm.responsable,estado:"pendiente",notas:humForm.obs||"",auto:false,origenHumedad:true}]}));
+          }
+          setHumForm(emptyHumForm);
+          setShowHumForm(false);
+        };
+        return (
+          <div className="ein">
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",marginBottom:16,flexWrap:"wrap",gap:12}}>
+              <div>
+                <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:900,marginBottom:4}}>💧 Humedad de Greens</h2>
+                <div style={{fontSize:13,color:"#6aaa7a"}}>
+                  Estación: <strong style={{color:sectorColor}}>{ESTACIONES[estacionActual]?.icon} {ESTACIONES[estacionActual]?.label}</strong>
+                  {" · "}Medir sector <strong style={{color:sectorColor}}>{sectorLabel}</strong>
+                </div>
+              </div>
+              <button className="btn-p" style={S.btn} onClick={()=>setShowHumForm(true)}>💧 Nueva medición</button>
+            </div>
+            {/* Escala */}
+            <div style={{...S.card,padding:"10px 14px",marginBottom:14,display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+              <span style={{fontSize:11,color:"#5a9a7a",marginRight:4}}>Escala:</span>
+              {[{v:1,l:"1-2 Seco",c:"#ef4444"},{v:3,l:"3-5 Ajustar",c:"#f59e0b"},{v:6,l:"6-7 Óptimo",c:"#22c55e"},{v:8,l:"8 Saturado",c:"#3b82f6"}].map(({v,l,c})=>(
+                <span key={v} style={{fontSize:11,background:`${c}15`,color:c,border:`1px solid ${c}35`,padding:"2px 8px",borderRadius:20,fontWeight:600}}>{l}</span>
+              ))}
+              <span style={{fontSize:10,color:"#4a7a5a",marginLeft:4}}>· Sector: {sectorLabel}</span>
+            </div>
+            {/* Formulario */}
+            {showHumForm&&(
+              <div style={{...S.card,padding:20,marginBottom:16,background:"rgba(96,165,250,0.04)",borderColor:"rgba(96,165,250,0.2)"}} className="ein">
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#60a5fa",marginBottom:14}}>
+                  💧 Nueva medición — sector {sectorLabel}
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+                  <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={humForm.fecha} onChange={e=>setHumForm(p=>({...p,fecha:e.target.value}))}/></div>
+                  <div><label style={labelSt}>Hora</label><input type="time" style={S.input} value={humForm.hora} onChange={e=>setHumForm(p=>({...p,hora:e.target.value}))}/></div>
+                  <div><label style={labelSt}>Motivo</label>
+                    <select style={S.input} value={humForm.motivo} onChange={e=>setHumForm(p=>({...p,motivo:e.target.value}))}>
+                      {MOTIVOS.map(m=><option key={m.value} value={m.value}>{m.label}</option>)}
+                    </select>
+                  </div>
+                  <div><label style={labelSt}>Responsable</label>
+                    <select style={S.input} value={humForm.responsable} onChange={e=>setHumForm(p=>({...p,responsable:e.target.value}))}>
+                      <option value="">Seleccionar...</option>
+                      {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                    </select>
+                  </div>
+                </div>
+                {/* Tabla greens */}
+                <div style={{fontSize:11,color:"#60a5fa",fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.5px"}}>Valores — sector {sectorLabel}</div>
+                <div style={{overflowX:"auto",marginBottom:14}}>
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                    <thead>
+                      <tr style={{background:"rgba(96,165,250,0.1)"}}>
+                        {["Green","Humedad (1-8)","Interpretación","Obs"].map(h=>(
+                          <th key={h} style={{padding:"6px 10px",textAlign:"left",color:"#60a5fa",fontSize:10}}>{h.toUpperCase()}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...GREENS_DEF,{id:"vivero",nombre:"🌱 Vivero",hoyos:""}].map(g=>{
+                        const val=g.id==="vivero"?humForm.valorVivero:(humForm.valores[g.id]?.valor||"");
+                        const numV=Number(val);
+                        const info=val?ESCALA_HUM[Math.min(Math.max(numV,1),8)]:null;
+                        return (
+                          <tr key={g.id} style={{borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                            <td style={{padding:"6px 10px"}}>
+                              <div style={{fontWeight:600,color:"#34d399",fontSize:12}}>{g.nombre}</div>
+                              {g.hoyos&&<div style={{fontSize:9,color:"#4a7a5a"}}>{g.hoyos}</div>}
+                            </td>
+                            <td style={{padding:"6px 8px"}}>
+                              <input type="number" min="1" max="8" step="1"
+                                style={{...S.input,width:60,fontSize:15,fontWeight:700,textAlign:"center",
+                                  borderColor:info?info.color:"rgba(255,255,255,0.14)",
+                                  color:info?info.color:"#ede9e0",
+                                  background:info?info.bg:"rgba(255,255,255,0.07)"}}
+                                value={val}
+                                onChange={e=>{
+                                  if(g.id==="vivero") setHumForm(p=>({...p,valorVivero:e.target.value}));
+                                  else{
+                                    const nuevos={...humForm.valores,[g.id]:{...humForm.valores[g.id],valor:e.target.value}};
+                                    const dec=calcDecision(nuevos);
+                                    setHumForm(p=>({...p,valores:nuevos,decision:dec||p.decision}));
+                                  }
+                                }} placeholder="—"/>
+                            </td>
+                            <td style={{padding:"6px 8px"}}>
+                              {info?<span style={{fontSize:11,fontWeight:600,color:info.color}}>{info.label}<br/><span style={{fontSize:9,fontWeight:400}}>{info.accion}</span></span>:<span style={{fontSize:11,color:"#3a6a5a"}}>—</span>}
+                            </td>
+                            <td style={{padding:"6px 8px"}}>
+                              <input style={{...S.input,fontSize:11,padding:"4px 8px"}} placeholder="obs..."
+                                value={g.id==="vivero"?(humForm.obsVivero||""):(humForm.valores[g.id]?.obs||"")}
+                                onChange={e=>{
+                                  if(g.id==="vivero") setHumForm(p=>({...p,obsVivero:e.target.value}));
+                                  else setHumForm(p=>({...p,valores:{...p.valores,[g.id]:{...p.valores[g.id],obs:e.target.value}}}));
+                                }}/>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {/* Decisión */}
+                <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"12px 14px",marginBottom:14}}>
+                  <div style={{fontSize:11,color:"#6aaa7a",fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.5px"}}>📋 Decisión resultante</div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                    <div>
+                      <label style={labelSt}>Acción</label>
+                      <select style={S.input} value={humForm.decision} onChange={e=>setHumForm(p=>({...p,decision:e.target.value}))}>
+                        {DECISIONES.map(d=><option key={d.value} value={d.value}>{d.label}</option>)}
+                      </select>
+                      <div style={{fontSize:10,color:"#4a7a5a",marginTop:3}}>⚡ Calculado automáticamente — puedes ajustar</div>
+                    </div>
+                    <div>
+                      <label style={labelSt}>Observaciones generales</label>
+                      <input style={S.input} value={humForm.obs} onChange={e=>setHumForm(p=>({...p,obs:e.target.value}))} placeholder="Condiciones del día..."/>
+                    </div>
+                  </div>
+                  {(humForm.decision==="cerrar-cancha"||humForm.decision==="abrir-cancha"||humForm.decision==="riego-urgente")&&(
+                    <div style={{marginTop:10,display:"flex",alignItems:"center",gap:10,cursor:"pointer",padding:"8px 10px",background:"rgba(251,191,36,0.06)",borderRadius:8,border:"1px solid rgba(251,191,36,0.2)"}}
+                      onClick={()=>setHumForm(p=>({...p,generarTarea:!p.generarTarea}))}>
+                      <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${humForm.generarTarea?"#fbbf24":"rgba(255,255,255,0.2)"}`,background:humForm.generarTarea?"#fbbf24":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        {humForm.generarTarea&&<span style={{color:"#000",fontSize:11,fontWeight:700}}>✓</span>}
+                      </div>
+                      <span style={{fontSize:13,color:"#fbbf24"}}>
+                        Generar tarea en Programación ({humForm.decision==="cerrar-cancha"?"🚫 Cierre":humForm.decision==="abrir-cancha"?"✅ Apertura":"💧 Riego urgente"})
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <div style={{display:"flex",gap:8}}>
+                  <button className="btn-p" style={S.btn} onClick={guardarHumedad} disabled={!humForm.responsable}>✓ Guardar</button>
+                  <button className="btn-g" style={S.btn} onClick={()=>setShowHumForm(false)}>Cancelar</button>
+                </div>
+              </div>
+            )}
+            {/* Última medición */}
+            {ultimaHum&&(
+              <div style={{...S.card,padding:16,marginBottom:16,borderLeft:"3px solid #60a5fa"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
+                  <div>
+                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700}}>
+                      Última medición — {ultimaHum.fecha}{ultimaHum.hora&&` ${ultimaHum.hora}`}
+                    </div>
+                    <div style={{fontSize:12,color:"#6aaa7a"}}>
+                      {MOTIVOS.find(m=>m.value===ultimaHum.motivo)?.label||ultimaHum.motivo}
+                      {ultimaHum.responsable&&` · 👤 ${ultimaHum.responsable}`}
+                    </div>
+                  </div>
+                  {ultimaHum.decision&&(()=>{
+                    const dec=DECISIONES.find(d=>d.value===ultimaHum.decision);
+                    const c=ultimaHum.decision==="cerrar-cancha"?"#ef4444":ultimaHum.decision==="abrir-cancha"?"#22c55e":ultimaHum.decision==="riego-urgente"?"#ef4444":ultimaHum.decision==="ajustar-riego"?"#f59e0b":"#22c55e";
+                    return <span style={{fontSize:12,fontWeight:600,color:c,background:`${c}12`,padding:"4px 12px",borderRadius:20,border:"1px solid rgba(255,255,255,0.1)"}}>{dec?.label||ultimaHum.decision}</span>;
+                  })()}
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(88px,1fr))",gap:8}}>
+                  {GREENS_DEF.map(g=>{
+                    const v=ultimaHum.valores?.[g.id]?.valor;
+                    const info=v?ESCALA_HUM[Math.min(Math.max(Number(v),1),8)]:null;
+                    return (
+                      <div key={g.id} style={{background:info?info.bg:"rgba(255,255,255,0.03)",borderRadius:8,padding:"8px 10px",border:`1px solid ${info?info.color+"35":"rgba(255,255,255,0.06)"}`,textAlign:"center"}}>
+                        <div style={{fontSize:10,fontWeight:600,color:"#34d399",marginBottom:2}}>{g.nombre}</div>
+                        <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color:info?info.color:"#3a6a5a"}}>{v||"—"}</div>
+                        {info&&<div style={{fontSize:9,color:info.color}}>{info.label}</div>}
+                      </div>
+                    );
+                  })}
+                  {ultimaHum.valorVivero&&(()=>{
+                    const info=ESCALA_HUM[Math.min(Math.max(Number(ultimaHum.valorVivero),1),8)];
+                    return <div style={{background:info.bg,borderRadius:8,padding:"8px 10px",border:`1px solid ${info.color}35`,textAlign:"center"}}>
+                      <div style={{fontSize:10,fontWeight:600,color:"#4ade80",marginBottom:2}}>🌱 Vivero</div>
+                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color:info.color}}>{ultimaHum.valorVivero}</div>
+                      <div style={{fontSize:9,color:info.color}}>{info.label}</div>
+                    </div>;
+                  })()}
+                </div>
+                {ultimaHum.obs&&<div style={{fontSize:12,color:"#5a9a7a",marginTop:10,fontStyle:"italic",padding:"6px 10px",background:"rgba(255,255,255,0.03)",borderRadius:6}}>{ultimaHum.obs}</div>}
+              </div>
+            )}
+            {/* Historial */}
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:10,color:"#60a5fa"}}>📜 Historial</div>
+            {humedades.length===0&&!showHumForm&&(
+              <div style={{...S.card,padding:36,textAlign:"center",color:"#3a6a5a"}}>
+                <div style={{fontSize:36,marginBottom:8}}>💧</div>
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:15}}>Sin mediciones de humedad</div>
+              </div>
+            )}
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {[...humedades].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")).map(m=>{
+                const dec=DECISIONES.find(d=>d.value===m.decision);
+                const colDec=m.decision==="cerrar-cancha"?"#ef4444":m.decision==="abrir-cancha"?"#22c55e":m.decision==="riego-urgente"?"#ef4444":m.decision==="ajustar-riego"?"#f59e0b":"#22c55e";
+                const vals=Object.values(m.valores||{}).map(v=>Number(v.valor||0)).filter(v=>v>0);
+                const extremo=vals.length?(esSecaEstacion?Math.min(...vals):Math.max(...vals)):null;
+                const infoExtremo=extremo?ESCALA_HUM[Math.min(Math.max(extremo,1),8)]:null;
+                return (
+                  <div key={m.id} style={{...S.card,padding:"12px 16px",borderLeft:`3px solid ${colDec}40`}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:8}}>
+                      <div style={{flex:1}}>
+                        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:4}}>
+                          <span style={{fontSize:13,fontWeight:600}}>📅 {m.fecha}{m.hora&&` ${m.hora}`}</span>
+                          <span style={{fontSize:11,color:"#6aaa7a"}}>{MOTIVOS.find(x=>x.value===m.motivo)?.label||m.motivo}</span>
+                          {m.responsable&&<span style={{fontSize:11,color:"#5a9a7a"}}>👤 {m.responsable}</span>}
+                        </div>
+                        <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:4}}>
+                          {GREENS_DEF.map(g=>{
+                            const v=m.valores?.[g.id]?.valor;
+                            if(!v) return null;
+                            const info=ESCALA_HUM[Math.min(Math.max(Number(v),1),8)];
+                            return <span key={g.id} style={{fontSize:10,color:info.color,background:info.bg,padding:"1px 6px",borderRadius:8,border:`1px solid ${info.color}30`}}>{g.nombre.replace("Green ","")}:{v}</span>;
+                          })}
+                          {m.valorVivero&&(()=>{const info=ESCALA_HUM[Math.min(Math.max(Number(m.valorVivero),1),8)];return <span style={{fontSize:10,color:info.color,background:info.bg,padding:"1px 6px",borderRadius:8,border:`1px solid ${info.color}30`}}>🌱:{m.valorVivero}</span>;})()} 
+                        </div>
+                        {infoExtremo&&<div style={{fontSize:11,color:infoExtremo.color}}>{esSecaEstacion?"🏜️ Mínimo":"💦 Máximo"}: {extremo}/8 — {infoExtremo.accion}</div>}
+                        {m.obs&&<div style={{fontSize:11,color:"#5a9a7a",fontStyle:"italic",marginTop:3}}>{m.obs}</div>}
+                      </div>
+                      <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
+                        {dec&&<span style={{fontSize:11,fontWeight:600,color:colDec,background:`${colDec}15`,padding:"3px 10px",borderRadius:20,border:`1px solid ${colDec}35`,whiteSpace:"nowrap"}}>{dec.label}</span>}
+                        {esJefa&&<button className="btn-d" style={{...S.btn,fontSize:11,padding:"3px 8px"}} onClick={()=>setHumedades(humedades.filter(x=>x.id!==m.id))}>🗑</button>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── EVENTOS / TORNEOS ── */}
       {subTab==="eventos"&&(
@@ -10788,3 +11382,4 @@ export default function App() {
     </div>
   );
 }
+
