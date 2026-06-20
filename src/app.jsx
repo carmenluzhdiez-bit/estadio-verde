@@ -7741,14 +7741,15 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                             </button>
                           </div>
                           {tareasViv.map(t=>(
-                        <div key={t} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 10px",borderRadius:8,background:diariaForm.tareas[t]?"rgba(74,222,128,0.12)":"rgba(255,255,255,0.04)",border:`1px solid ${diariaForm.tareas[t]?"rgba(74,222,128,0.35)":"rgba(255,255,255,0.08)"}`,cursor:"pointer",fontSize:12}}
-                          onClick={()=>setDiariaForm(p=>({...p,tareas:{...p.tareas,[t]:!p.tareas[t]}}))}>
-                          <div style={{width:14,height:14,borderRadius:3,border:`2px solid ${diariaForm.tareas[t]?"#4ade80":"rgba(255,255,255,0.2)"}`,background:diariaForm.tareas[t]?"#4ade80":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                            {diariaForm.tareas[t]&&<span style={{color:"#000",fontSize:9,fontWeight:700}}>✓</span>}
-                          </div>
-                          {t}
-                        </div>
-                      ))}
+                            <div key={t} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 10px",borderRadius:8,background:diariaForm.tareas[t]?"rgba(74,222,128,0.12)":"rgba(255,255,255,0.04)",border:`1px solid ${diariaForm.tareas[t]?"rgba(74,222,128,0.35)":"rgba(255,255,255,0.08)"}`,cursor:"pointer",fontSize:12}}
+                              onClick={()=>setDiariaForm(p=>({...p,tareas:{...p.tareas,[t]:!p.tareas[t]}}))}>
+                              <div style={{width:14,height:14,borderRadius:3,border:`2px solid ${diariaForm.tareas[t]?"#4ade80":"rgba(255,255,255,0.2)"}`,background:diariaForm.tareas[t]?"#4ade80":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                                {diariaForm.tareas[t]&&<span style={{color:"#000",fontSize:9,fontWeight:700}}>✓</span>}
+                              </div>
+                              {t}
+                            </div>
+                          ))}
+                        </>);})()}
                     </div>
                     <div style={{marginBottom:8}}>
                       <label style={labelSt}>Altura actual vivero (mm) — si se midió hoy</label>
