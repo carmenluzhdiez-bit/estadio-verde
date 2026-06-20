@@ -10345,6 +10345,12 @@ export default function App() {
 
   // ─── AUTENTICACIÓN FIREBASE ──────────────────────────────────────────────────
   const [fbUser,    setFbUser]    = useState(null);
+  // Worker states — deben declararse antes de los useEffects que los usan
+  const [vistaWorker,    setVistaWorker]    = useState(false);
+  const [workerLogueado, setWorkerLogueado] = useState(null);
+  const [workerPinError, setWorkerPinError] = useState(false);
+  const [workerPinInput, setWorkerPinInput] = useState("");
+  const [rolSeleccionado, setRolSeleccionado] = useState("trabajador");
   const [fbRol,     setFbRol]     = useState(null);
   const [authReady, setAuthReady] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
@@ -10424,11 +10430,7 @@ export default function App() {
   const [showNuevoEvento, setShowNuevoEvento] = useState(false);
   const [nuevoEvento, setNuevoEvento] = useState({ tipo:"permiso", fecha:"", fechaFin:"", horas:"", descripcion:"", estado:"pendiente" });
   const [nuevoTrabajador, setNuevoTrabajador] = useState({ nombre:"", rut:"", cargo:"", zona:"", telefono:"", email:"", fechaIngreso:"", contrato:"indefinido", foto:"", pin:"" });
-  const [vistaWorker, setVistaWorker] = useState(false);
-  const [workerLogueado, setWorkerLogueado] = useState(null);
-  const [workerPinError, setWorkerPinError] = useState(false);
-  const [workerPinInput, setWorkerPinInput] = useState("");
-  const [rolSeleccionado, setRolSeleccionado] = useState("trabajador");
+  // [worker states moved up]
   const rolLogueado = fbRol;
   const esJefa = fbRol === "jefa";
   const esSupervisor = fbRol === "supervisor";
