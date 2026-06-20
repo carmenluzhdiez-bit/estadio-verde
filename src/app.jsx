@@ -7902,7 +7902,6 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                           {t}
                         </div>
                       ))}
-                        </> );})()} 
                     </div>
                     {/* Observación fitosanitaria */}
                     <div style={{background:"rgba(167,139,250,0.06)",borderRadius:8,padding:"10px 12px",marginBottom:10,border:"1px solid rgba(167,139,250,0.2)"}}>
