@@ -7470,9 +7470,12 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             const urgencias=GREENS_DEF.map(g=>{
               const alt=ultimaMed?.alturas?.[g.id];
               if(!alt) return {g,diasRestantes:null,urgencia:"sin-datos",alt:null,tasa:null,altObjetivo:null,infoCorte:null};
+              const esTareaCorteG = t => t.zona==="Golf" &&
+                (t.tarea?.toLowerCase().includes("corte")||t.tipo?.toLowerCase().includes("corte")) &&
+                (t.elemento?.includes(g.nombre)||t.tarea?.includes(g.nombre)||
+                 t.elemento?.toLowerCase().includes("todos")||t.tarea?.toLowerCase().includes("todos"));
               const cortesG=Object.values(tareasProg).flat()
-                .filter(t=>t.zona==="Golf"&&t.alturaCorte&&
-                  (t.elemento?.includes(g.nombre)||t.tarea?.includes(g.nombre)||t.elemento?.toLowerCase().includes("todos")))
+                .filter(esTareaCorteG)
                 .sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
               const infoCorte=cortesG[0]||null;
               const altObjetivo=infoCorte?.alturaObjetivo?Number(infoCorte.alturaObjetivo):(rango.min*1.5);
@@ -7714,6 +7717,65 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                     </div>
                   </div>
                 </div>
+
+                {/* ── Últimos cortes registrados para este green ── */}
+                {(()=>{
+                  const nombreG = g.nombre;
+                  const cortesEsteGreen = Object.entries(tareasProg)
+                    .flatMap(([fecha,tareas])=>tareas.map(t=>({...t,fecha})))
+                    .filter(t=>t.zona==="Golf"&&
+                      (t.tarea?.toLowerCase().includes("corte")||t.tipo?.toLowerCase().includes("corte"))&&
+                      (t.elemento?.includes(nombreG)||t.tarea?.includes(nombreG)||
+                       t.elemento?.toLowerCase().includes("todos")||t.tarea?.toLowerCase().includes("todos")))
+                    .sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""))
+                    .slice(0,5);
+                  if(!cortesEsteGreen.length) return null;
+                  return (
+                    <div style={{...S.card,padding:"12px 16px",marginBottom:12,borderLeft:"3px solid rgba(52,211,153,0.4)"}}>
+                      <div style={{fontSize:12,fontWeight:700,color:"#34d399",marginBottom:8}}>✂️ Últimos cortes — {nombreG}</div>
+                      <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                        {cortesEsteGreen.map(t=>(
+                          <div key={t.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:6,padding:"6px 8px",background:"rgba(255,255,255,0.03)",borderRadius:6}}>
+                            <div>
+                              <span style={{fontSize:12,fontWeight:600}}>📅 {t.fecha}</span>
+                              <span style={{fontSize:11,color:"#5a9a7a",marginLeft:8}}>{t.tarea?.replace(`· ${nombreG}`,"").replace("⛳ ","")}</span>
+                            </div>
+                            <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                              {t.alturaCorte?(
+                                <span style={{fontSize:12,fontWeight:700,color:"#34d399"}}>✂️ {t.alturaCorte}mm</span>
+                              ):(
+                                <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                                  <span style={{fontSize:10,color:"#f59e0b"}}>Sin altura</span>
+                                  <input type="number" step="0.1" min="2" max="15"
+                                    style={{...S.input,width:55,fontSize:11,padding:"2px 4px",textAlign:"center",borderColor:"rgba(245,158,11,0.4)"}}
+                                    placeholder="mm"
+                                    onBlur={e=>{
+                                      if(!e.target.value) return;
+                                      setTareasProg(p=>{
+                                        const nuevo={...p};
+                                        if(nuevo[t.fecha]){
+                                          nuevo[t.fecha]=nuevo[t.fecha].map(x=>x.id===t.id?{...x,alturaCorte:e.target.value}:x);
+                                        }
+                                        return nuevo;
+                                      });
+                                    }}/>
+                                </div>
+                              )}
+                              {t.alturaObjetivo&&(
+                                <span style={{fontSize:10,color:"#fbbf24"}}>→ {t.alturaObjetivo}mm</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      {cortesEsteGreen.some(t=>!t.alturaCorte)&&(
+                        <div style={{fontSize:10,color:"#f59e0b",marginTop:6}}>
+                          💡 Ingresa la altura de corte para activar la proyección automática
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Formulario registro diario */}
                 {showDiariaForm&&(
@@ -8314,10 +8376,14 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                       let proyeccion=null,alturaMaxCorte=null,tasaCalculada=null,tasaFuente=null,infoCorte=null;
                       if(alt){
                         // 1. Último corte registrado para este green
+                        // Buscar tareas de corte — con o sin alturaCorte
+                        const esTareaCorte = t => t.zona==="Golf" &&
+                          (t.tarea?.toLowerCase().includes("corte")||t.tipo?.toLowerCase().includes("corte")) &&
+                          (t.elemento?.includes(g.nombre)||t.tarea?.includes(g.nombre)||
+                           t.elemento?.toLowerCase().includes("todos")||t.elemento?.toLowerCase().includes("vivero")||
+                           t.tarea?.toLowerCase().includes("todos"));
                         const cortesG=Object.values(tareasProg).flat()
-                          .filter(t=>t.zona==="Golf"&&t.alturaCorte&&
-                            (t.elemento?.includes(g.nombre)||t.tarea?.includes(g.nombre)||
-                             t.elemento?.toLowerCase().includes("todos")))
+                          .filter(esTareaCorte)
                           .sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
                         if(cortesG.length>0) infoCorte=cortesG[0];
                         // 2. Altura objetivo
