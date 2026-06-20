@@ -1501,9 +1501,16 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   };
 
   const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
+  const ORDEN_ESTADO = {pendiente:0, haciendose:1, no_pudo:2, hecha:3, por_designar:4};
   const misTargets = (tareas[fechaVer]||[])
-    .filter(t => t.responsable && normalizar(t.responsable) === normalizar(trabajador.nombre))
-    .sort((a,b)=>(a.zona||"").localeCompare(b.zona||"","es",{sensitivity:"base"}));
+    .filter(t => t.responsable && normalizar(t.responsable) === normalizar(trabajador?.nombre||""))
+    .sort((a,b)=>{
+      // 1. Pendientes/haciéndose primero, hechas al final
+      const ea = ORDEN_ESTADO[a.estado]??0, eb = ORDEN_ESTADO[b.estado]??0;
+      if(ea!==eb) return ea-eb;
+      // 2. Dentro del mismo estado, ordenar por zona
+      return (a.zona||"").localeCompare(b.zona||"","es",{sensitivity:"base"});
+    });
 
   const stats = {
     total: misTargets.length,
@@ -1548,6 +1555,14 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
     }
     onUpdateTarea(fechaVer, t.id, { estado:"hecha", humedad:true, notaWorker:"Terreno húmedo — frecuencia ajustada +2 días" });
   };
+
+  if(!trabajador) return (
+    <div style={{minHeight:"100vh",background:"linear-gradient(150deg,#0a1f10 0%,#122d1a 100%)",color:"#ede9e0",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12}}>
+      <div style={{fontSize:36}}>🌿</div>
+      <div style={{fontFamily:"'Playfair Display',serif",fontSize:18}}>Cargando tu perfil...</div>
+      <div style={{fontSize:13,color:"#6aaa7a"}}>Verificando datos</div>
+    </div>
+  );
 
   return (
     <div style={{minHeight:"100vh",background:"linear-gradient(150deg,#0a1f10 0%,#122d1a 100%)",color:"#ede9e0",fontFamily:"'Georgia',serif",padding:"0 0 40px"}}>
@@ -10340,11 +10355,37 @@ export default function App() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       setFbUser(user);
-      setFbRol(user ? getRolByEmail(user.email) : null);
+      const rol = user ? getRolByEmail(user.email) : null;
+      setFbRol(rol);
       setAuthReady(true);
+      // Si es trabajador, auto-activar vistaWorker con su id de personal
+      if(user && rol==="trabajador") {
+        // Buscar en personalArr por email (se carga después, usar setTimeout)
+        setTimeout(()=>{
+          setVistaWorker(true);
+        }, 500);
+      } else {
+        setVistaWorker(false);
+        setWorkerLogueado(null);
+      }
     });
     return () => unsub();
   }, []);
+
+  // Cuando personal carga y el rol es trabajador, setear workerLogueado por email
+  useEffect(()=>{
+    if(fbRol==="trabajador" && fbUser) {
+      const arr = Array.isArray(personal)?personal:Object.values(personal||{});
+      if(arr.length>0){
+        const p = arr.find(x=>x.email?.toLowerCase()===fbUser.email?.toLowerCase());
+        if(p){
+          setWorkerLogueado(p.id);
+          setVistaWorker(true);
+          setVista("miturno");
+        }
+      }
+    }
+  }, [fbRol, fbUser, personal]);
 
   const handleLogin = async (e) => {
     e && e.preventDefault();
@@ -10392,6 +10433,11 @@ export default function App() {
   const esJefa = fbRol === "jefa";
   const esSupervisor = fbRol === "supervisor";
   const esTrabajador = fbRol === "trabajador";
+
+  // Trabajador siempre va a Mi Turno
+  useEffect(()=>{
+    if(esTrabajador && vista!=="miturno") setVista("miturno");
+  },[esTrabajador]);
 
   // ─── FUNGICIDAS ──────────────────────────────────────────────────────────────
   const checkPin = (rol, pin) => { const p=getPines(); return p[rol] && String(p[rol])===String(pin); };
@@ -11245,7 +11291,12 @@ export default function App() {
               <div>
                 <button className="btn-g" style={{...S.btn,marginBottom:16}} onClick={()=>{setVistaWorker(false);setWorkerPinInput("");setWorkerLogueado(null);setRolLogueado(null);}}>← Salir</button>
                 <VistaWorker
-                  trabajador={personal.find(x=>String(x.id)===String(workerLogueado))}
+                  trabajador={(()=>{
+                    const arr=Array.isArray(personal)?personal:Object.values(personal||{});
+                    return workerLogueado
+                      ? arr.find(x=>String(x.id)===String(workerLogueado))
+                      : fbUser ? arr.find(x=>x.email?.toLowerCase()===fbUser.email?.toLowerCase()) : null;
+                  })()}
                   fecha={new Date().toISOString().slice(0,10)}
                   tareas={tareasProg}
                   S={S}
