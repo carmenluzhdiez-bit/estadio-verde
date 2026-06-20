@@ -7262,7 +7262,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   const [tareaForm, setTareaForm] = React.useState(emptyTarea);
 
   // Formulario tarea diaria
-  const emptyDiaria = {fecha:hoy,responsable:"",tareas:{},obs:""};
+  const emptyDiaria = {fecha:hoy,responsable:BHALÚ,tareas:{},obs:""};
   const [diariaForm, setDiariaForm] = React.useState(emptyDiaria);
 
   // ── Evento activo hoy ────────────────────────────────────────────────────
@@ -7462,6 +7462,50 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             </div>
           </div>
 
+          {/* ── TAREAS GOLF HOY E HISTORIAL RECIENTE ── */}
+          {(()=>{
+            const tareasGolfHoy=(tareasProg[hoy]||[]).filter(t=>t.zona==="Golf");
+            const tareasGolfRecientes=Object.entries(tareasProg)
+              .filter(([f])=>f<=hoy)
+              .sort(([a],[b])=>b.localeCompare(a))
+              .slice(0,7)
+              .flatMap(([f,ts])=>ts.filter(t=>t.zona==="Golf").map(t=>({...t,fecha:f})));
+            if(!tareasGolfRecientes.length) return null;
+            const ESTADOS={pendiente:{c:"#f59e0b",l:"Pendiente"},realizada:{c:"#22c55e",l:"✓"},no_realizada:{c:"#ef4444",l:"✗"},por_designar:{c:"#5a9a7a",l:"Sin asignar"}};
+            return (
+              <div style={{...S.card,padding:16,marginBottom:14}}>
+                <div style={{fontSize:13,fontWeight:700,color:"#34d399",marginBottom:10}}>📋 Tareas Golf — Historial reciente</div>
+                {tareasGolfHoy.length>0&&(
+                  <div style={{marginBottom:10}}>
+                    <div style={{fontSize:11,color:"#fbbf24",fontWeight:600,marginBottom:6}}>HOY — {hoy}</div>
+                    {tareasGolfHoy.map(t=>(
+                      <div key={t.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 8px",background:"rgba(251,191,36,0.05)",borderRadius:6,marginBottom:4,flexWrap:"wrap",gap:4}}>
+                        <div>
+                          <span style={{fontSize:12}}>{t.tarea}</span>
+                          {t.alturaCorte&&<span style={{fontSize:11,color:"#34d399",marginLeft:6}}>✂️ {t.alturaCorte}mm</span>}
+                          {t.elemento&&<span style={{fontSize:10,color:"#5a9a7a",marginLeft:6}}>{t.elemento}</span>}
+                        </div>
+                        <span style={{fontSize:10,fontWeight:600,color:ESTADOS[t.estado]?.c||"#5a9a7a"}}>{ESTADOS[t.estado]?.l||t.estado}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                  {tareasGolfRecientes.filter(t=>t.fecha!==hoy).slice(0,15).map(t=>(
+                    <div key={t.id+t.fecha} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 8px",borderBottom:"1px solid rgba(255,255,255,0.04)",flexWrap:"wrap",gap:4}}>
+                      <div>
+                        <span style={{fontSize:11,color:"#5a9a7a",marginRight:6}}>{t.fecha}</span>
+                        <span style={{fontSize:12}}>{t.tarea?.replace("⛳ ","")}</span>
+                        {t.alturaCorte&&<span style={{fontSize:10,color:"#34d399",marginLeft:6}}>✂️ {t.alturaCorte}mm</span>}
+                      </div>
+                      <span style={{fontSize:10,color:ESTADOS[t.estado]?.c||"#5a9a7a"}}>{ESTADOS[t.estado]?.l||t.estado}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* ── RESUMEN URGENCIA DE CORTE ── */}
           {(()=>{
             const ESCALA_URG={1:"#ef4444",2:"#ef4444",3:"#f97316",4:"#f59e0b",5:"#f59e0b",6:"#22c55e",7:"#22c55e",8:"#3b82f6"};
@@ -7478,6 +7522,12 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                 .filter(esTareaCorteG)
                 .sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
               const infoCorte=cortesG[0]||null;
+              const extraerAlturaCorte = (t) => {
+                if(t?.alturaCorte) return Number(t.alturaCorte);
+                const m=(t?.tarea||t?.descripcion||"").match(/(?:HOC|a)\s*([0-9]+(?:\.[0-9]+))\s*mm/i);
+                return m?Number(m[1]):null;
+              };
+              const altCorteReal = extraerAlturaCorte(infoCorte);
               const altObjetivo=infoCorte?.alturaObjetivo?Number(infoCorte.alturaObjetivo):(rango.min*1.5);
               const histG=[...mediciones].filter(m=>m.alturas?.[g.id]&&m.fecha).sort((a,b)=>b.fecha.localeCompare(a.fecha));
               const histPost=infoCorte?.fecha?histG.filter(m=>m.fecha>=infoCorte.fecha):histG;
@@ -7487,9 +7537,12 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                 const d=Math.round((new Date(histPost[0].fecha+"T12:00:00")-new Date(histPost[1].fecha+"T12:00:00"))/(1000*60*60*24));
                 if(d>0&&a1>a2) tasa=(a1-a2)/d;
               }
-              if(!tasa&&infoCorte?.alturaCorte&&infoCorte?.fecha){
-                const d=Math.round((new Date((ultimaMed.fecha||hoy)+"T12:00:00")-new Date(infoCorte.fecha+"T12:00:00"))/(1000*60*60*24));
-                const delta=Number(alt)-Number(infoCorte.alturaCorte);
+              // Fallback: tasa desde altura de corte (campo o extraída del texto) hasta medición actual
+              if(!tasa&&altCorteReal&&infoCorte?.fecha){
+                const fechaRef = histG[0]?.fecha||hoy;
+                const altRef = histG.length>0?Number(histG[0].alturas[g.id]):Number(alt);
+                const d=Math.round((new Date(fechaRef+"T12:00:00")-new Date(infoCorte.fecha+"T12:00:00"))/(1000*60*60*24));
+                const delta=altRef-altCorteReal;
                 if(d>0&&delta>0) tasa=delta/d;
               }
               const altN=Number(alt);
@@ -7659,7 +7712,20 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                     </div>
                     <div style={{fontSize:11,color:"#5a9a7a",marginBottom:8}}>Tareas realizadas en el vivero hoy:</div>
                     <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
-                      {[...TAREAS_GREENS_DIARIAS,"Siembra","Resiembra","Preparación parches","Control malezas"].map(t=>(
+                      {(()=>{
+                        const tareasViv=[...TAREAS_GREENS_DIARIAS,"Siembra","Resiembra","Preparación parches","Control malezas"];
+                        const todasV=tareasViv.every(t=>diariaForm.tareas[t]);
+                        return (<>
+                          <div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}>
+                            <button style={{...S.btn,fontSize:11,padding:"3px 12px",
+                              background:todasV?"rgba(239,68,68,0.15)":"rgba(74,222,128,0.15)",
+                              color:todasV?"#f87171":"#4ade80",
+                              border:`1px solid ${todasV?"rgba(239,68,68,0.3)":"rgba(74,222,128,0.3)"}`}}
+                              onClick={()=>{const n={};tareasViv.forEach(t=>{n[t]=!todasV;});setDiariaForm(p=>({...p,tareas:{...p.tareas,...n}}));}}>
+                              {todasV?"✗ Desmarcar todas":"✓ Marcar todas"}
+                            </button>
+                          </div>
+                          {tareasViv.map(t=>(
                         <div key={t} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 10px",borderRadius:8,background:diariaForm.tareas[t]?"rgba(74,222,128,0.12)":"rgba(255,255,255,0.04)",border:`1px solid ${diariaForm.tareas[t]?"rgba(74,222,128,0.35)":"rgba(255,255,255,0.08)"}`,cursor:"pointer",fontSize:12}}
                           onClick={()=>setDiariaForm(p=>({...p,tareas:{...p.tareas,[t]:!p.tareas[t]}}))}>
                           <div style={{width:14,height:14,borderRadius:3,border:`2px solid ${diariaForm.tareas[t]?"#4ade80":"rgba(255,255,255,0.2)"}`,background:diariaForm.tareas[t]?"#4ade80":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
@@ -7790,7 +7856,26 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                         </select>
                       </div>
                     </div>
-                    <div style={{fontSize:11,color:"#5a9a7a",marginBottom:8}}>Selecciona las tareas realizadas hoy:</div>
+                    {(()=>{
+                      const todasMarcadas = TAREAS_GREENS_DIARIAS.every(t=>diariaForm.tareas[t]);
+                      const marcarTodas = () => {
+                        const nuevas = {};
+                        TAREAS_GREENS_DIARIAS.forEach(t=>{ nuevas[t]=!todasMarcadas; });
+                        setDiariaForm(p=>({...p,tareas:{...p.tareas,...nuevas}}));
+                      };
+                      return (
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,flexWrap:"wrap",gap:6}}>
+                          <div style={{fontSize:11,color:"#5a9a7a"}}>Selecciona las tareas realizadas hoy:</div>
+                          <button style={{...S.btn,fontSize:11,padding:"3px 12px",
+                            background:todasMarcadas?"rgba(239,68,68,0.15)":"rgba(52,211,153,0.15)",
+                            color:todasMarcadas?"#f87171":"#34d399",
+                            border:`1px solid ${todasMarcadas?"rgba(239,68,68,0.3)":"rgba(52,211,153,0.3)"}`}}
+                            onClick={marcarTodas}>
+                            {todasMarcadas?"✗ Desmarcar todas":"✓ Marcar todas"}
+                          </button>
+                        </div>
+                      );
+                    })()}
                     <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
                       {TAREAS_GREENS_DIARIAS.map(t=>(
                         <div key={t} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 10px",borderRadius:8,background:diariaForm.tareas[t]?"rgba(52,211,153,0.12)":"rgba(255,255,255,0.04)",border:`1px solid ${diariaForm.tareas[t]?"rgba(52,211,153,0.35)":"rgba(255,255,255,0.08)"}`,cursor:"pointer",fontSize:12}}
@@ -7801,6 +7886,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                           {t}
                         </div>
                       ))}
+                        </> );})()} 
                     </div>
                     {/* Observación fitosanitaria */}
                     <div style={{background:"rgba(167,139,250,0.06)",borderRadius:8,padding:"10px 12px",marginBottom:10,border:"1px solid rgba(167,139,250,0.2)"}}>
@@ -8403,11 +8489,17 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                           const d=Math.round((new Date(medForm.fecha+"T12:00:00")-new Date(prev.fecha+"T12:00:00"))/(1000*60*60*24));
                           if(d>0&&altCurr>altPrev){tasaCalculada=(altCurr-altPrev)/d;tasaFuente="auto";}
                         }
-                        // 4. Fallback: desde corte registrado
-                        if(!tasaCalculada&&infoCorte?.alturaCorte&&infoCorte?.fecha){
-                          const d=Math.round((new Date(medForm.fecha+"T12:00:00")-new Date(infoCorte.fecha+"T12:00:00"))/(1000*60*60*24));
-                          const delta=Number(alt)-Number(infoCorte.alturaCorte);
-                          if(d>0&&delta>0){tasaCalculada=delta/d;tasaFuente="corte";}
+                        // 4. Fallback: desde corte registrado (campo o extraído del texto)
+                        if(!tasaCalculada&&infoCorte?.fecha){
+                          const altC=infoCorte.alturaCorte?Number(infoCorte.alturaCorte):(()=>{
+                            const m=(infoCorte.tarea||infoCorte.descripcion||"").match(/(?:HOC|a)\s*([0-9]+(?:\.[0-9]+))\s*mm/i);
+                            return m?Number(m[1]):null;
+                          })();
+                          if(altC){
+                            const d=Math.round((new Date(medForm.fecha+"T12:00:00")-new Date(infoCorte.fecha+"T12:00:00"))/(1000*60*60*24));
+                            const delta=Number(alt)-altC;
+                            if(d>0&&delta>0){tasaCalculada=delta/d;tasaFuente="corte";}
+                          }
                         }
                         // 5. Fallback manual
                         if(!tasaCalculada&&diasCrecimiento&&Number(diasCrecimiento)>0){
