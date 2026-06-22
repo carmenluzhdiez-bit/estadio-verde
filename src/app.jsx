@@ -1482,7 +1482,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   const [showNuevaTareaEmerg, setShowNuevaTareaEmerg] = React.useState(false);
   const [nuevaTareaEmerg, setNuevaTareaEmerg] = React.useState({ zona:"", tarea:"", notas:"" });
   // Estado de grupos colapsables — objeto {key: bool}
-  const [gruposAbiertos, setGruposAbiertos] = React.useState({corte:true,medicion:true,riego:true,fitosan:true,limpieza:true,otros:true});
+  const [gruposAbiertos, setGruposAbiertos] = React.useState({diarias:true,corte:true,medicion:true,riego:true,fitosan:true,limpieza:true,otros:true});
   const toggleGrupo = (key) => setGruposAbiertos(p=>({...p,[key]:!p[key]}));
 
   const ESTADOS_TAREA = {
@@ -1722,42 +1722,59 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
         )}
 
         {/* ── TAREAS DIARIAS ── */}
-        {misTareasDiarias.length>0&&(
-          <div style={{marginBottom:20}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-              <div style={{fontSize:13,fontWeight:700,color:"#34d399",letterSpacing:"0.5px"}}>
-                📋 Tareas diarias
-              </div>
-              <div style={{fontSize:11,color:"#5a9a7a"}}>
-                {misTareasDiarias.filter(t=>t.estado==="hecha").length}/{misTareasDiarias.length} hechas
-              </div>
-            </div>
-            {misTareasDiarias.map(t=>{
-              const est = ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente;
-              return (
-                <div key={t.id} style={{background:est.bg,border:`1px solid ${est.color}35`,borderRadius:12,padding:"12px 14px",marginBottom:8}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",gap:8}}>
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:14,fontWeight:600,marginBottom:2}}>{t.tarea}</div>
-                      {t.zona&&<div style={{fontSize:11,color:"#6aaa7a"}}>{t.zona}{t.elemento&&` · ${t.elemento}`}</div>}
-                      {t.notas&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:3,fontStyle:"italic"}}>{t.notas}</div>}
-                    </div>
-                    <span style={{fontSize:11,fontWeight:600,color:est.color,whiteSpace:"nowrap"}}>{est.icon} {est.label}</span>
-                  </div>
-                  <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap"}}>
-                    {Object.entries(ESTADOS_TAREA).map(([k,v])=>(
-                      <button key={k} onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:k})}
-                        style={{cursor:"pointer",border:`1px solid ${t.estado===k?v.color:"rgba(255,255,255,0.15)"}`,borderRadius:20,padding:"3px 10px",background:t.estado===k?v.bg:"transparent",color:t.estado===k?v.color:"#6aaa7a",fontSize:11,fontFamily:"'Georgia',serif"}}>
-                        {v.icon} {v.label}
-                      </button>
-                    ))}
-                  </div>
-                  {t.notaWorker&&<div style={{fontSize:11,color:"#f59e0b",marginTop:6,fontStyle:"italic"}}>💬 {t.notaWorker}</div>}
+        {misTareasDiarias.length>0&&(()=>{
+          const hechasDiarias = misTareasDiarias.filter(t=>t.estado==="hecha").length;
+          const todasHechas = hechasDiarias===misTareasDiarias.length;
+          const openDiarias = gruposAbiertos["diarias"]!==false;
+          return (
+            <div style={{marginBottom:12}}>
+              {/* Cabecera colapsable */}
+              <div onClick={()=>toggleGrupo("diarias")}
+                style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                  padding:"10px 14px",borderRadius:openDiarias?"10px 10px 0 0":"10px",
+                  background:todasHechas?"rgba(34,197,94,0.08)":"rgba(52,211,153,0.06)",
+                  border:`1px solid ${todasHechas?"rgba(34,197,94,0.25)":"rgba(52,211,153,0.2)"}`,
+                  cursor:"pointer",userSelect:"none"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontSize:16}}>📋</span>
+                  <span style={{fontSize:13,fontWeight:700,color:todasHechas?"#22c55e":"#34d399"}}>Tareas diarias</span>
+                  <span style={{fontSize:11,color:"#5a9a7a",background:"rgba(255,255,255,0.06)",padding:"1px 8px",borderRadius:20}}>
+                    {hechasDiarias}/{misTareasDiarias.length}
+                  </span>
                 </div>
-              );
-            })}
-          </div>
-        )}
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  {todasHechas&&<span style={{fontSize:11,color:"#22c55e"}}>✓ Listo</span>}
+                  <span style={{fontSize:12,color:"#5a9a7a",transition:"transform .2s",display:"inline-block",transform:openDiarias?"rotate(90deg)":"rotate(0deg)"}}>▶</span>
+                </div>
+              </div>
+              {/* Lista colapsable */}
+              {openDiarias&&(
+                <div style={{border:"1px solid rgba(52,211,153,0.15)",borderTop:"none",borderRadius:"0 0 10px 10px",overflow:"hidden"}}>
+                  {misTareasDiarias.map((t,i)=>{
+                    const est = ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente;
+                    return (
+                      <div key={t.id} style={{padding:"10px 14px",background:i%2===0?"rgba(255,255,255,0.025)":"rgba(255,255,255,0.04)",borderBottom:i<misTareasDiarias.length-1?"1px solid rgba(255,255,255,0.06)":"none"}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,marginBottom:6}}>
+                          <span style={{fontSize:13,fontWeight:600}}>{t.tarea?.replace("⛳ ","")}</span>
+                          <span style={{fontSize:11,fontWeight:600,color:est.color,whiteSpace:"nowrap"}}>{est.icon} {est.label}</span>
+                        </div>
+                        <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+                          {Object.entries(ESTADOS_TAREA).map(([k,v])=>(
+                            <button key={k} onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:k})}
+                              style={{cursor:"pointer",border:`1px solid ${t.estado===k?v.color:"rgba(255,255,255,0.12)"}`,borderRadius:16,padding:"3px 10px",background:t.estado===k?v.bg:"transparent",color:t.estado===k?v.color:"#6aaa7a",fontSize:11,fontFamily:"'Georgia',serif"}}>
+                              {v.icon} {v.label}
+                            </button>
+                          ))}
+                        </div>
+                        {t.notaWorker&&<div style={{fontSize:11,color:"#f59e0b",marginTop:4,fontStyle:"italic"}}>💬 {t.notaWorker}</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* ── OTRAS TAREAS AGRUPADAS ── */}
         {misTareasOtras.length>0&&(()=>{
@@ -7290,7 +7307,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   const listaPersonal = [...personalArr].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
 
   const [subTabZona, setSubTabZona] = React.useState(null);
-  const [subTab, setSubTab] = React.useState("panel");
+  const [subTab, setSubTab] = React.useState(rolLogueado==="trabajador"?"greens":"panel");
   // Exponer para acceso rápido desde VistaWorker
   React.useEffect(()=>{ window.__golfSubTab = setSubTab; return ()=>{ window.__golfSubTab=null; }; },[]);
 
@@ -7532,13 +7549,19 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
 
       {/* Sub-tabs */}
       <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
-        {[["panel","📊 Panel"],["greens","⛳ Greens"],["tees","🎯 Tees"],["bunkers","🏖️ Búnkers"],["fairways","🌾 Fairways"],["zonas","🌿 Zonas"],["arboles","🌳 Árboles"],["mediciones","📏 Alturas"],["humedad","💧 Humedad"],["eventos","🏆 Eventos"]].map(([t,l])=>(
+        {(()=>{
+          // Tabs según rol: trabajador solo ve lo que le corresponde
+          const todosTabs = [["panel","📊 Panel"],["greens","⛳ Greens"],["tees","🎯 Tees"],["bunkers","🏖️ Búnkers"],["fairways","🌾 Fairways"],["zonas","🌿 Zonas"],["arboles","🌳 Árboles"],["mediciones","📏 Alturas"],["humedad","💧 Humedad"],["eventos","🏆 Eventos"]];
+          const tabsWorker = [["greens","⛳ Greens"],["mediciones","📏 Alturas"],["humedad","💧 Humedad"]];
+          const tabsVisibles = (rolLogueado==="trabajador") ? tabsWorker : todosTabs;
+          return tabsVisibles;
+        })().map(([t,l])=>(
           <button key={t} className={`tab${subTab===t?" on":""}`} onClick={()=>setSubTab(t)} style={{fontFamily:"'Georgia',serif"}}>{l}</button>
         ))}
       </div>
 
       {/* ── PANEL ── */}
-      {subTab==="panel"&&(
+      {subTab==="panel"&&rolLogueado!=="trabajador"&&(
         <div className="ein">
           {/* KPIs */}
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:16}}>
@@ -8235,7 +8258,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       )}
 
       {/* ── TEES ── */}
-      {subTab==="tees"&&(
+      {subTab==="tees"&&rolLogueado!=="trabajador"&&(
         <div className="ein">
           <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
             {esJefa&&<button className="btn-p" style={S.btn} onClick={()=>setShowTareaForm("tee")}>📋 Nueva tarea tees</button>}
@@ -8297,7 +8320,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       )}
 
       {/* ── BÚNKERS ── */}
-      {subTab==="bunkers"&&(
+      {subTab==="bunkers"&&rolLogueado!=="trabajador"&&(
         <ZonaGolfSimple S={S} labelSt={labelSt} zonas={BUNKERS_DEF} tareas={TAREAS_BUNKERS}
           titulo="🏖️ Búnkers" colorAcento="#fde68a"
           golfData={golfData} setG={setG} listaPersonal={listaPersonal}
@@ -8305,7 +8328,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       )}
 
       {/* ── FAIRWAYS ── */}
-      {subTab==="fairways"&&(
+      {subTab==="fairways"&&rolLogueado!=="trabajador"&&(
         <ZonaGolfSimple S={S} labelSt={labelSt} zonas={FAIRWAYS_DEF} tareas={TAREAS_FAIRWAYS}
           titulo="🌾 Fairways" colorAcento="#a3e635"
           golfData={golfData} setG={setG} listaPersonal={listaPersonal}
@@ -8313,7 +8336,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       )}
 
       {/* ── ZONAS ESPECIALES ── */}
-      {subTab==="zonas"&&(
+      {subTab==="zonas"&&rolLogueado!=="trabajador"&&(
         <div className="ein">
           <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:18,marginBottom:16,color:"#34d399"}}>🌿 Zonas Especiales Golf</h2>
 
@@ -8409,7 +8432,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       )}
 
       {/* ── ÁRBOLES ── */}
-      {subTab==="arboles"&&(
+      {subTab==="arboles"&&rolLogueado!=="trabajador"&&(
         <div className="ein">
           <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
             {esJefa&&<button className="btn-p" style={S.btn} onClick={()=>{setArbolForm(emptyArbol);setEditArbolId(null);setShowArbolForm(true);}}>➕ Registrar árbol / grupo</button>}
@@ -8751,7 +8774,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       )}
 
             {/* ── EVENTOS / TORNEOS ── */}
-      {subTab==="eventos"&&(
+      {subTab==="eventos"&&rolLogueado!=="trabajador"&&(
         <div className="ein">
           {rolLogueado==="jefa"&&(
             <button className="btn-p" style={{...S.btn,marginBottom:14}} onClick={()=>setShowEventoForm(true)}>🏆 Cargar evento / torneo</button>
