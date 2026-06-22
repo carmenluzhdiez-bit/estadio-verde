@@ -1786,13 +1786,27 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                         </div>
                         <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
                           {Object.entries(ESTADOS_TAREA).map(([k,v])=>(
-                            <button key={k} onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:k})}
+                            <button key={k} onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:k,notaWorker:k!=="no_pudo"?t.notaWorker:""})}
                               style={{cursor:"pointer",border:`1px solid ${t.estado===k?v.color:"rgba(255,255,255,0.12)"}`,borderRadius:16,padding:"3px 10px",background:t.estado===k?v.bg:"transparent",color:t.estado===k?v.color:"#6aaa7a",fontSize:11,fontFamily:"'Georgia',serif"}}>
                               {v.icon} {v.label}
                             </button>
                           ))}
                         </div>
-                        {t.notaWorker&&<div style={{fontSize:11,color:"#f59e0b",marginTop:4,fontStyle:"italic"}}>💬 {t.notaWorker}</div>}
+                        {t.estado==="no_pudo"&&(
+                          <div style={{marginTop:6}}>
+                            <textarea
+                              rows={2}
+                              placeholder="¿Por qué no se pudo? (obligatorio para guardar)"
+                              value={t.notaWorker||""}
+                              onChange={e=>onUpdateTarea(fechaVer,t.id,{notaWorker:e.target.value})}
+                              style={{width:"100%",background:"rgba(239,68,68,0.08)",border:`1px solid ${t.notaWorker?"rgba(239,68,68,0.4)":"rgba(239,68,68,0.6)"}`,borderRadius:8,color:"#fca5a5",padding:"7px 10px",fontFamily:"'Georgia',serif",fontSize:12,resize:"vertical",outline:"none",boxSizing:"border-box"}}
+                            />
+                            {!t.notaWorker&&(
+                              <div style={{fontSize:10,color:"#ef4444",marginTop:2}}>⚠️ Explica el motivo para registrar esta tarea</div>
+                            )}
+                          </div>
+                        )}
+                        {t.notaWorker&&t.estado!=="no_pudo"&&<div style={{fontSize:11,color:"#f59e0b",marginTop:4,fontStyle:"italic"}}>💬 {t.notaWorker}</div>}
                       </div>
                     );
                   })}
@@ -1886,7 +1900,19 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                                   💧 Terreno húmedo
                                 </button>
                               )}
-                              {t.notaWorker&&<div style={{fontSize:11,color:"#f59e0b",marginTop:4,fontStyle:"italic"}}>💬 {t.notaWorker}</div>}
+                              {t.estado==="no_pudo"&&(
+                                <div style={{marginTop:6}}>
+                                  <textarea
+                                    rows={2}
+                                    placeholder="¿Por qué no se pudo? (obligatorio)"
+                                    value={t.notaWorker||""}
+                                    onChange={e=>onUpdateTarea(fechaVer,t.id,{notaWorker:e.target.value})}
+                                    style={{width:"100%",background:"rgba(239,68,68,0.08)",border:`1px solid ${t.notaWorker?"rgba(239,68,68,0.4)":"rgba(239,68,68,0.6)"}`,borderRadius:8,color:"#fca5a5",padding:"7px 10px",fontFamily:"'Georgia',serif",fontSize:12,resize:"vertical",outline:"none",boxSizing:"border-box"}}
+                                  />
+                                  {!t.notaWorker&&<div style={{fontSize:10,color:"#ef4444",marginTop:2}}>⚠️ Explica el motivo para registrar esta tarea</div>}
+                                </div>
+                              )}
+                              {t.notaWorker&&t.estado!=="no_pudo"&&<div style={{fontSize:11,color:"#f59e0b",marginTop:4,fontStyle:"italic"}}>💬 {t.notaWorker}</div>}
                             </div>
                           );
                         })}
@@ -7410,16 +7436,10 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   const [selectedTee,    setSelectedTee]    = React.useState("t1");
 
   // Formulario medición semanal
-  // Pre-llenar responsable con el trabajador logueado
-  const miNombrePerfil = React.useMemo(()=>{
-    if(rolLogueado!=="trabajador") return "";
-    return listaPersonal.find(p=>p.email?.toLowerCase()===
-      (Array.isArray(personal)?personal:Object.values(personal||{}))
-      .find(x=>x.id===workerLogueado)?.email?.toLowerCase()
-    )?.nombre || BHALÚ;
-  },[rolLogueado, workerLogueado, listaPersonal]);
+  // Pre-llenar responsable: si es trabajador usar BHALÚ, si no dejar vacío
+  const miNombrePerfil = rolLogueado==="trabajador" ? BHALÚ : "";
 
-  const emptyMed = {fecha:hoy,responsable:miNombrePerfil||"",tipo:"semanal",alturas:{},diasDesdeCorte:{},obsGreen:{},obs:""};
+  const emptyMed = {fecha:hoy,responsable:miNombrePerfil,tipo:"semanal",alturas:{},diasDesdeCorte:{},obsGreen:{},obs:""};
   const [medForm, setMedForm] = React.useState(emptyMed);
 
   // Formulario evento/torneo
@@ -11504,6 +11524,7 @@ export default function App() {
                   S={S}
                   MACROZONAS_BASE={MACROZONAS_BASE}
                   onUpdateTarea={(fecha,tid,patch)=>{
+                    // Si marca no_pudo sin nota, solo actualizar estado pero no cerrar — textarea pedirá explicación
                     setTareasProg(prev=>{
                       const updated={...prev,[fecha]:(prev[fecha]||[]).map(t=>t.id===tid?{...t,...patch}:t)};
                       if(patch.estado==="no_pudo"||patch.estado==="hecha"||patch.estado==="haciendose"){
