@@ -1476,7 +1476,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false }) 
 
 // ─── PROGRAMACIÓN DIARIA ─────────────────────────────────────────────────────
 // ─── VISTA TRABAJADOR ────────────────────────────────────────────────────────
-function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE, onAccesoRapido }) {
+function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE, onAccesoRapido, onCambiarMetodo }) {
   const hoy = new Date().toISOString().slice(0,10);
   const [fechaVer, setFechaVer] = React.useState(fecha || hoy);
   const [showNuevaTareaEmerg, setShowNuevaTareaEmerg] = React.useState(false);
@@ -1510,7 +1510,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
     const nombre = (t.tarea||"").toLowerCase();
     // Tareas generadas por el registro diario de greens
     const keywordsDiarias = [
-      "limpieza tee","revisión estado general","revisión humedad greens",
+      "limpieza tee","limpieza —","revisión estado general","revisión humedad greens",
       "revisión estado fitosanitario","soplado","barrido","pediluvios",
       "limpieza general","riego manual","orden y limpieza","registro diario"
     ];
@@ -1755,7 +1755,33 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                     return (
                       <div key={t.id} style={{padding:"10px 14px",background:i%2===0?"rgba(255,255,255,0.025)":"rgba(255,255,255,0.04)",borderBottom:i<misTareasDiarias.length-1?"1px solid rgba(255,255,255,0.06)":"none"}}>
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,marginBottom:6}}>
-                          <span style={{fontSize:13,fontWeight:600}}>{t.tarea?.replace("⛳ ","")}</span>
+                          <div style={{flex:1}}>
+                            <span style={{fontSize:13,fontWeight:600}}>{t.tarea?.replace("⛳ ","")}</span>
+                            {/* Indicación de método — visible para todos, editable para jefa/supervisor */}
+                            {t.metodoLimpieza&&(
+                              <div style={{marginTop:3,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                                <span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.08)",padding:"1px 8px",borderRadius:10,border:"1px solid rgba(251,191,36,0.2)"}}>
+                                  {t.metodoLimpieza==="sopladora"?"🌬️ Sopladora":
+                                   t.metodoLimpieza==="barrido"?"🧹 Barrido con vara":
+                                   t.metodoLimpieza==="ambos"?"🌬️ Sopladora + 🧹 Barrido":
+                                   t.metodoLimpieza}
+                                </span>
+                                {onCambiarMetodo&&(
+                                  <select
+                                    value={t.metodoLimpieza}
+                                    onChange={e=>onCambiarMetodo(fechaVer,t.id,e.target.value)}
+                                    style={{fontSize:10,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:6,color:"#6aaa7a",padding:"1px 4px",cursor:"pointer"}}>
+                                    <option value="sopladora">🌬️ Sopladora</option>
+                                    <option value="barrido">🧹 Barrido con vara</option>
+                                    <option value="ambos">🌬️+🧹 Ambos</option>
+                                  </select>
+                                )}
+                              </div>
+                            )}
+                            {t.indicacion&&(
+                              <div style={{fontSize:11,color:"#f59e0b",marginTop:3,fontStyle:"italic"}}>📌 {t.indicacion}</div>
+                            )}
+                          </div>
                           <span style={{fontSize:11,fontWeight:600,color:est.color,whiteSpace:"nowrap"}}>{est.icon} {est.label}</span>
                         </div>
                         <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
@@ -7356,12 +7382,12 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       TAREAS_GREENS_DIARIAS.forEach(t => nuevas.push(mkDiaria(t)));
     }
 
-    // 3. Limpieza por green — solo si no existen aún
+    // 3. Limpieza por green — diaria, con método variable (sopladora/barrido)
     if(!yaGeneradasOtras && (!esDomingo || hayTorneo)) {
       GREENS_DEF.forEach(g=>{
-        nuevas.push(mkTarea(`Limpieza — ${g.nombre}`,`${g.nombre} (${g.hoyos})`));
+        nuevas.push({...mkDiaria(`Limpieza — ${g.nombre}`), elemento:`${g.nombre} (${g.hoyos})`, metodoLimpieza:"sopladora"});
       });
-      nuevas.push(mkTarea("Limpieza — Vivero","Vivero"));
+      nuevas.push({...mkDiaria("Limpieza — Vivero"), elemento:"Vivero", metodoLimpieza:"sopladora"});
     }
 
     if(nuevas.length>0) {
@@ -7622,7 +7648,22 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                 <div style={{fontSize:13,fontWeight:700,color:"#34d399",marginBottom:10}}>📋 Tareas Golf — Historial reciente</div>
                 {tareasGolfHoy.length>0&&(
                   <div style={{marginBottom:10}}>
-                    <div style={{fontSize:11,color:"#fbbf24",fontWeight:600,marginBottom:6}}>HOY — {hoy}</div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,flexWrap:"wrap",gap:6}}>
+                      <div style={{fontSize:11,color:"#fbbf24",fontWeight:600}}>HOY — {hoy}</div>
+                      {/* Cambio masivo de método de limpieza */}
+                      {esJefa&&tareasGolfHoy.some(t=>t.metodoLimpieza)&&(
+                        <div style={{display:"flex",alignItems:"center",gap:6}}>
+                          <span style={{fontSize:10,color:"#5a9a7a"}}>Método limpieza hoy:</span>
+                          {["sopladora","barrido","ambos"].map(m=>(
+                            <button key={m} onClick={()=>{
+                              setTareasProg(p=>({...p,[hoy]:(p[hoy]||[]).map(t=>t.metodoLimpieza?{...t,metodoLimpieza:m}:t)}));
+                            }} style={{cursor:"pointer",fontSize:10,padding:"2px 8px",borderRadius:10,border:"1px solid rgba(251,191,36,0.3)",background:"rgba(251,191,36,0.08)",color:"#fbbf24",fontFamily:"'Georgia',serif"}}>
+                              {m==="sopladora"?"🌬️":m==="barrido"?"🧹":"🌬️+🧹"}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     {tareasGolfHoy.map(t=>(
                       <div key={t.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 8px",background:"rgba(251,191,36,0.05)",borderRadius:6,marginBottom:4,flexWrap:"wrap",gap:4}}>
                         <div>
@@ -11464,6 +11505,11 @@ export default function App() {
                     const elem=zona.elementos.find(e=>e.nombre===nombreElem); if(!elem) return null;
                     const frecs=zdat.elementos?.[elem.id]?.frecuencias||(TAREAS_DEFAULT[elem.tipo]||[]).map(t=>({...t}));
                     return {frecs,eid:elem.id,isCustom:false};
+                  }}
+                  onCambiarMetodo={(fecha,tid,metodo)=>{
+                    setTareasProg(prev=>({...prev,
+                      [fecha]:(prev[fecha]||[]).map(t=>t.id===tid?{...t,metodoLimpieza:metodo}:t)
+                    }));
                   }}
                   onAccesoRapido={(tipo)=>{
                     setVista("golf");
