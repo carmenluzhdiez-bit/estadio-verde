@@ -7343,6 +7343,288 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
   );
 }
 
+
+// ══════════════════════════════════════════════════════════════════
+// PROGRAMACIÓN GOLF — módulo de tareas periódicas con frecuencia
+// ══════════════════════════════════════════════════════════════════
+function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, BHALÚ, esJefa }) {
+
+  // ── Definición de tareas periódicas con última fecha y frecuencia ──
+  // Frecuencias dinámicas: invierno (jun-ago) vs verano (dic-feb) vs transición
+  const mesHoy = new Date(hoy).getMonth() + 1; // 1-12
+  const esVerano  = [12,1,2].includes(mesHoy);
+  const esInvierno = [6,7,8].includes(mesHoy);
+
+  const TAREAS_PERIODICAS = [
+    // ── CORTES ──────────────────────────────────────────────────────
+    { id:"c_greens",   cat:"✂️ Cortes", nombre:"Corte de Greens + Vivero",
+      zona:"Golf/GREEN", subzona:"Todos los greens + Vivero",
+      frec: esVerano ? 1 : esInvierno ? 4 : 3,
+      frecLabel: esVerano ? "Diario (verano)" : esInvierno ? "Cada 4 días (invierno)" : "Cada 3 días",
+      ultima:"2026-06-17", resp:BHALÚ,
+      notas:"Cambiar dirección de corte. Registrar altura de corte.", linkedTareas:["Cambio de hoyos"] },
+    { id:"c_anteg",    cat:"✂️ Cortes", nombre:"Corte de Antegreens",
+      zona:"Golf/ANTEGREEN", subzona:"Todos los antegreens",
+      frec:16, frecLabel:"Cada 16 días",
+      ultima:"2026-06-12", resp:BHALÚ, notas:"a 1cm, usar helicoidal" },
+    { id:"c_fairways", cat:"✂️ Cortes", nombre:"Corte de Fairways",
+      zona:"Golf/FAIRWAYS", subzona:"Todos los fairways",
+      frec:10, frecLabel:"Cada 10 días",
+      ultima:"2026-06-12", resp:BHALÚ, notas:"1,75cm" },
+    { id:"c_lomas",    cat:"✂️ Cortes", nombre:"Corte de Lomas",
+      zona:"Golf/LOMAS", subzona:"Lomas",
+      frec:20, frecLabel:"Cada 20 días",
+      ultima:"2026-06-12", resp:BHALÚ, notas:"Con flotante, nivel más bajo" },
+    { id:"c_cancha",   cat:"✂️ Cortes", nombre:"Corte de Cancha (césped)",
+      zona:"Golf/CANCHA", subzona:"Cancha general",
+      frec:14, frecLabel:"Cada 14 días",
+      ultima:"2026-06-13", resp:BHALÚ, notas:"3" y 2,75"" },
+
+    // ── LABORES GREENS ───────────────────────────────────────────────
+    { id:"fertil",     cat:"🌱 Fertilización", nombre:"Fertilización Greens + Vivero",
+      zona:"Golf/GREEN", subzona:"Todos los greens + Vivero",
+      frec:14, frecLabel:"Cada 14 días",
+      ultima:"2026-06-17", resp:BHALÚ, notas:"Alternar Novatec Premium / Salitre K según etapa" },
+    { id:"fertil_fair",cat:"🌱 Fertilización", nombre:"Fertilización Fairways",
+      zona:"Golf/FAIRWAYS", subzona:"Todos los fairways",
+      frec:45, frecLabel:"Cada 45 días",
+      ultima:"2026-04-14", resp:BHALÚ, notas:"Salitre Potásico después del corte" },
+    { id:"aire_ch",    cat:"🌬️ Aireación", nombre:"Aireación púas chicas (otoño/primavera)",
+      zona:"Golf/GREEN", subzona:"Todos los greens + Vivero",
+      frec:null, frecLabel:"2 veces/año: marzo y ago-sep",
+      ultima:"2026-03-16", resp:BHALÚ,
+      notas:"C/púas chicas después del corte. Terminar con riego y fertilización. Próxima: agosto-septiembre 2026",
+      proxFija:"2026-09-01" },
+    { id:"aire_gr",    cat:"🌬️ Aireación", nombre:"Aireación sacabocados grandes (anual)",
+      zona:"Golf/GREEN", subzona:"Todos los greens",
+      frec:null, frecLabel:"1 vez/año: abril",
+      ultima:"2026-04-13", resp:BHALÚ,
+      notas:"C/púas grandes + fertilización + riego. Próxima: abril 2027",
+      proxFija:"2027-04-01" },
+    { id:"aire_fair",  cat:"🌬️ Aireación", nombre:"Aireación sacabocados grandes Fairways",
+      zona:"Golf/FAIRWAYS", subzona:"Todos los fairways",
+      frec:null, frecLabel:"2 veces/año: marzo y septiembre",
+      ultima:"2026-03-16", resp:BHALÚ,
+      notas:"C/sacabocados grandes. Terminar con riego.",
+      proxFija:"2026-09-10" },
+    { id:"vert",       cat:"🔧 Mantenimiento", nombre:"Verticorte / Groomer fuerte",
+      zona:"Golf/GREEN", subzona:"Todos los greens",
+      frec:25, frecLabel:"Cada 25 días",
+      ultima:"2026-05-28", resp:BHALÚ, notas:"Pasar groomer fuerte con corte" },
+    { id:"orilla_ag",  cat:"🔧 Mantenimiento", nombre:"Orillado Antegreens",
+      zona:"Golf/ANTEGREEN", subzona:"Todos los antegreens H01-H09",
+      frec:17, frecLabel:"Cada 17 días",
+      ultima:"2026-05-27", resp:BHALÚ, notas:"1,5-2,5cm con orilladora" },
+    { id:"orilla_can", cat:"🔧 Mantenimiento", nombre:"Orillado Cancha / perfilado macizos",
+      zona:"Golf/CANCHA", subzona:"Cancha",
+      frec:21, frecLabel:"Cada 21 días",
+      ultima:"2026-06-12", resp:BHALÚ, notas:"Proteger troncos y plantas. Solo antes 12:00hrs" },
+
+    // ── REVISIONES ───────────────────────────────────────────────────
+    { id:"rev_plagas", cat:"🔬 Revisiones", nombre:"Revisión Plagas y Enfermedades Greens",
+      zona:"Golf/GREEN", subzona:"Todos los greens",
+      frec:7, frecLabel:"Semanal",
+      ultima:"2026-06-19", resp:BHALÚ, notas:"Si se detecta: generar tarea de control inmediata" },
+    { id:"rev_hum",    cat:"🔬 Revisiones", nombre:"Revisión Humedad Greens",
+      zona:"Golf/GREEN", subzona:"Todos los greens",
+      frec:7, frecLabel:"Semanal",
+      ultima:"2026-06-10", resp:BHALÚ, notas:"Medir en lado más seco. Después del almuerzo" },
+    { id:"rev_riego_g",cat:"🔬 Revisiones", nombre:"Revisión Sistema Riego Greens",
+      zona:"Golf/GREEN", subzona:"Controlador C09",
+      frec:14, frecLabel:"Quincenal",
+      ultima:"2026-06-06", resp:"Carmen Luz", notas:"Verificar señal, programas, porcentajes" },
+    { id:"rev_riego_c",cat:"🔬 Revisiones", nombre:"Revisión Sistema Riego Cancha",
+      zona:"Golf/CANCHA", subzona:"Controlador C10",
+      frec:14, frecLabel:"Quincenal",
+      ultima:"2026-06-05", resp:"Carmen Luz", notas:"Verificar señal, alcances, boquillas" },
+    { id:"rev_plagas_f",cat:"🔬 Revisiones", nombre:"Revisión Plagas y Enfermedades Fairways",
+      zona:"Golf/FAIRWAYS", subzona:"Todos los fairways",
+      frec:14, frecLabel:"Quincenal",
+      ultima:"2026-06-10", resp:BHALÚ, notas:"Si se detecta: generar tarea de control inmediata" },
+
+    // ── DESMALEZADO ──────────────────────────────────────────────────
+    { id:"desmaz_g",   cat:"🌿 Desmalezado", nombre:"Desmalezado bordes Greens",
+      zona:"Golf/GREEN", subzona:"Todos los greens",
+      frec:7, frecLabel:"Semanal (rotación)",
+      ultima:"2026-06-19", resp:BHALÚ, notas:"Límites del borde con placa larga" },
+    { id:"desmaz_ag",  cat:"🌿 Desmalezado", nombre:"Desmalezado bordes Antegreens",
+      zona:"Golf/ANTEGREEN", subzona:"Todos los antegreens",
+      frec:21, frecLabel:"Cada 21 días",
+      ultima:"2026-05-28", resp:BHALÚ, notas:"Manualmente" },
+  ];
+
+  const [ultimasFechas, setUltimasFechas] = React.useState(() => {
+    const init = {};
+    TAREAS_PERIODICAS.forEach(t => { init[t.id] = t.ultima; });
+    return init;
+  });
+  const [editandoFecha, setEditandoFecha] = React.useState(null);
+  const [filtroUrgencia, setFiltroUrgencia] = React.useState("todas");
+
+  // ── Calcular próxima fecha y urgencia ──
+  const calcUrgencia = (tarea) => {
+    const ult = ultimasFechas[tarea.id] || tarea.ultima;
+    const ultDate = new Date(ult);
+    const hoyDate = new Date(hoy);
+    let proxDate;
+    if (tarea.proxFija) {
+      proxDate = new Date(tarea.proxFija);
+    } else if (tarea.frec) {
+      proxDate = new Date(ultDate.getTime() + tarea.frec * 86400000);
+    } else {
+      return { dias: 999, estado: "ok", proxStr: tarea.proxFija || "—" };
+    }
+    const dias = Math.round((proxDate - hoyDate) / 86400000);
+    const estado = dias < 0 ? "vencida" : dias === 0 ? "hoy" : dias <= 3 ? "pronto" : dias <= 7 ? "esta_semana" : "ok";
+    return {
+      dias,
+      estado,
+      proxStr: proxDate.toLocaleDateString("es-CL"),
+      ultStr: ultDate.toLocaleDateString("es-CL"),
+    };
+  };
+
+  const tareasConUrgencia = TAREAS_PERIODICAS.map(t => ({
+    ...t,
+    ...calcUrgencia(t),
+  })).sort((a,b) => a.dias - b.dias);
+
+  const tareasFiltered = filtroUrgencia === "todas" ? tareasConUrgencia :
+    filtroUrgencia === "urgentes" ? tareasConUrgencia.filter(t => t.estado !== "ok") :
+    tareasConUrgencia.filter(t => t.cat === filtroUrgencia);
+
+  // ── Agrupar por categoría ──
+  const categorias = [...new Set(tareasConUrgencia.map(t => t.cat))];
+
+  const colorEstado = { vencida:"#ef4444", hoy:"#f97316", pronto:"#f59e0b", esta_semana:"#eab308", ok:"#22c55e" };
+  const labelEstado = { vencida:"Vencida", hoy:"HOY", pronto:"En 1-3 días", esta_semana:"Esta semana", ok:"OK" };
+  const bgEstado = { vencida:"rgba(239,68,68,0.08)", hoy:"rgba(249,115,22,0.08)", pronto:"rgba(245,158,11,0.08)", esta_semana:"rgba(234,179,8,0.06)", ok:"rgba(34,197,94,0.04)" };
+
+  const programarTarea = (tarea) => {
+    const prox = tarea.proxFija ? new Date(tarea.proxFija) : new Date(new Date(ultimasFechas[tarea.id] || tarea.ultima).getTime() + (tarea.frec||0)*86400000);
+    const fechaStr = prox.toISOString().slice(0,10);
+    const nuevaTarea = {
+      id: Date.now() + Math.random(),
+      fecha: fechaStr,
+      zona: tarea.zona.includes("GREEN") ? "Golf" : tarea.zona.split("/")[0],
+      subZona: tarea.zona.split("/")[1] || "Golf",
+      elemento: tarea.subzona,
+      tarea: `⛳ ${tarea.nombre}`,
+      responsable: tarea.resp,
+      estado: "pendiente",
+      notas: tarea.notas || "",
+      auto: false,
+      origen: "programacion_golf",
+    };
+    setTareasProg(p => ({
+      ...p,
+      [fechaStr]: [...(p[fechaStr]||[]), nuevaTarea]
+    }));
+    alert(`✅ "${tarea.nombre}" programada para el ${prox.toLocaleDateString("es-CL")}`);
+  };
+
+  const [catAbierta, setCatAbierta] = React.useState({});
+
+  const resumen = {
+    vencidas: tareasConUrgencia.filter(t => t.estado==="vencida").length,
+    hoy: tareasConUrgencia.filter(t => t.estado==="hoy").length,
+    pronto: tareasConUrgencia.filter(t => t.estado==="pronto" || t.estado==="esta_semana").length,
+  };
+
+  return (
+    <div className="ein">
+      {/* Header resumen */}
+      <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,color:"#fbbf24",marginBottom:16}}>
+        📅 Programación Golf — Estado actual
+      </div>
+
+      {/* KPIs */}
+      <div style={{display:"flex",gap:10,marginBottom:18,flexWrap:"wrap"}}>
+        {[
+          {label:"Vencidas",val:resumen.vencidas,color:"#ef4444",bg:"rgba(239,68,68,0.1)"},
+          {label:"Esta semana",val:resumen.pronto,color:"#f59e0b",bg:"rgba(245,158,11,0.1)"},
+          {label:"OK",val:tareasConUrgencia.length-resumen.vencidas-resumen.pronto-resumen.hoy,color:"#22c55e",bg:"rgba(34,197,94,0.08)"},
+        ].map(k=>(
+          <div key={k.label} style={{flex:1,minWidth:90,background:k.bg,border:`1px solid ${k.color}30`,borderRadius:10,padding:"10px 12px",textAlign:"center"}}>
+            <div style={{fontSize:22,fontWeight:700,color:k.color}}>{k.val}</div>
+            <div style={{fontSize:11,color:"#6aaa7a"}}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filtros rápidos */}
+      <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>
+        {[["todas","Todas"],["urgentes","⚠️ Urgentes"],
+          ...categorias.map(c=>[c,c])
+        ].map(([v,l])=>(
+          <button key={v} onClick={()=>setFiltroUrgencia(v)}
+            style={{cursor:"pointer",border:`1px solid ${filtroUrgencia===v?"#fbbf24":"rgba(255,255,255,0.12)"}`,
+              borderRadius:16,padding:"4px 11px",fontSize:11,
+              background:filtroUrgencia===v?"rgba(251,191,36,0.12)":"transparent",
+              color:filtroUrgencia===v?"#fbbf24":"#6aaa7a",fontFamily:"'Georgia',serif"}}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {/* Lista de tareas */}
+      {tareasFiltered.map(t => {
+        const col = colorEstado[t.estado];
+        const bg = bgEstado[t.estado];
+        return (
+          <div key={t.id} style={{background:bg,border:`1px solid ${col}25`,borderRadius:12,padding:"12px 14px",marginBottom:8}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:6}}>
+              <div style={{flex:1}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                  <span style={{fontSize:13,fontWeight:700}}>{t.nombre}</span>
+                  <span style={{fontSize:10,background:`${col}20`,color:col,padding:"1px 8px",borderRadius:10,fontWeight:600,border:`1px solid ${col}40`}}>
+                    {t.dias < 0 ? `${Math.abs(t.dias)}d vencida` : t.dias === 0 ? "HOY" : `en ${t.dias}d`}
+                  </span>
+                </div>
+                <div style={{fontSize:11,color:"#5a9a7a",marginTop:3}}>
+                  {t.zona} · {t.frecLabel}
+                </div>
+              </div>
+              <div style={{textAlign:"right",minWidth:80}}>
+                <div style={{fontSize:11,color:col,fontWeight:600}}>{labelEstado[t.estado]}</div>
+                <div style={{fontSize:10,color:"#5a9a7a"}}>→ {t.proxStr}</div>
+              </div>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+              <span style={{fontSize:11,color:"#4a8a5a"}}>Última: {t.ultStr||"—"}</span>
+              {esJefa && editandoFecha===t.id ? (
+                <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                  <input type="date" defaultValue={ultimasFechas[t.id]||t.ultima}
+                    id={`fecha_${t.id}`}
+                    style={{...S.input,fontSize:11,padding:"2px 6px",width:130}}/>
+                  <button onClick={()=>{
+                    const v = document.getElementById(`fecha_${t.id}`)?.value;
+                    if(v) setUltimasFechas(p=>({...p,[t.id]:v}));
+                    setEditandoFecha(null);
+                  }} style={{cursor:"pointer",border:"none",borderRadius:6,padding:"2px 8px",background:"#3d7a52",color:"#fff",fontSize:11}}>✓</button>
+                  <button onClick={()=>setEditandoFecha(null)} style={{cursor:"pointer",border:"1px solid rgba(255,255,255,0.15)",borderRadius:6,padding:"2px 8px",background:"transparent",color:"#6aaa7a",fontSize:11}}>✗</button>
+                </div>
+              ) : (
+                esJefa && <button onClick={()=>setEditandoFecha(t.id)}
+                  style={{cursor:"pointer",border:"1px solid rgba(255,255,255,0.1)",borderRadius:6,padding:"2px 8px",background:"transparent",color:"#5a9a7a",fontSize:11}}>
+                  ✏️ corregir fecha
+                </button>
+              )}
+              {(t.estado!=="ok" || t.dias <= 5) && esJefa && (
+                <button onClick={()=>programarTarea(t)}
+                  style={{cursor:"pointer",border:`1px solid ${col}50`,borderRadius:8,padding:"3px 12px",background:`${col}15`,color:col,fontSize:11,fontFamily:"'Georgia',serif",marginLeft:"auto"}}>
+                  📆 Programar
+                </button>
+              )}
+            </div>
+            {t.notas && <div style={{fontSize:11,color:"#4a7a5a",marginTop:4,fontStyle:"italic"}}>💡 {t.notas}</div>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial }) {
   const GOLF_ZONA_ID = 31; // ID macrozona Golf
   const sincronizarMacrozona = (tipo, detalle) => {
@@ -7608,7 +7890,9 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           // Tabs según rol: trabajador solo ve lo que le corresponde
           const todosTabs = [["panel","📊 Panel"],["greens","⛳ Greens"],["tees","🎯 Tees"],["bunkers","🏖️ Búnkers"],["fairways","🌾 Fairways"],["zonas","🌿 Zonas"],["arboles","🌳 Árboles"],["mediciones","📏 Alturas"],["humedad","💧 Humedad"],["eventos","🏆 Eventos"]];
           const tabsWorker = [["greens","⛳ Greens"],["mediciones","📏 Alturas"],["humedad","💧 Humedad"]];
-          const tabsVisibles = (rolLogueado==="trabajador") ? tabsWorker : todosTabs;
+          // Agregar Programación solo para jefa/supervisor
+          const todosTabs2 = [...todosTabs, ["programacion_golf","📅 Programación"]];
+          const tabsVisibles = (rolLogueado==="trabajador") ? tabsWorker : todosTabs2;
           return tabsVisibles;
         })().map(([t,l])=>(
           <button key={t} className={`tab${subTab===t?" on":""}`} onClick={()=>setSubTab(t)} style={{fontFamily:"'Georgia',serif"}}>{l}</button>
@@ -8848,6 +9132,17 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       )}
 
             {/* ── EVENTOS / TORNEOS ── */}
+      {subTab==="programacion_golf"&&rolLogueado!=="trabajador"&&(
+        <ProgramacionGolf
+          S={S}
+          tareasProg={tareasProg}
+          setTareasProg={setTareasProg}
+          hoy={hoy}
+          BHALÚ={BHALÚ}
+          esJefa={esJefa}
+        />
+      )}
+
       {subTab==="eventos"&&rolLogueado!=="trabajador"&&(
         <div className="ein">
           {rolLogueado==="jefa"&&(
