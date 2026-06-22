@@ -1476,11 +1476,14 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false }) 
 
 // ─── PROGRAMACIÓN DIARIA ─────────────────────────────────────────────────────
 // ─── VISTA TRABAJADOR ────────────────────────────────────────────────────────
-function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE }) {
+function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE, onAccesoRapido }) {
   const hoy = new Date().toISOString().slice(0,10);
   const [fechaVer, setFechaVer] = React.useState(fecha || hoy);
   const [showNuevaTareaEmerg, setShowNuevaTareaEmerg] = React.useState(false);
   const [nuevaTareaEmerg, setNuevaTareaEmerg] = React.useState({ zona:"", tarea:"", notas:"" });
+  // Estado de grupos colapsables — objeto {key: bool}
+  const [gruposAbiertos, setGruposAbiertos] = React.useState({corte:true,medicion:true,riego:true,fitosan:true,limpieza:true,otros:true});
+  const toggleGrupo = (key) => setGruposAbiertos(p=>({...p,[key]:!p[key]}));
 
   const ESTADOS_TAREA = {
     pendiente:    { label:"Pendiente",      color:"#f59e0b", bg:"rgba(245,158,11,0.15)",  icon:"🟡" },
@@ -1616,6 +1619,24 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
               <span style={{color:"#22c55e"}}>✅ {stats.hechas} hechas</span>
               {stats.noPudo>0&&<span style={{color:"#ef4444"}}>❌ {stats.noPudo} no pudieron</span>}
             </div>
+          </div>
+        )}
+
+        {/* Accesos rápidos para Bhalú */}
+        {fechaVer===hoy&&(
+          <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
+            <button onClick={()=>onAccesoRapido?.("medicion")}
+              style={{flex:1,minWidth:120,cursor:"pointer",border:"1px solid rgba(52,211,153,0.3)",borderRadius:10,padding:"9px 8px",background:"rgba(52,211,153,0.08)",color:"#34d399",fontFamily:"'Georgia',serif",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+              📏 Registrar alturas
+            </button>
+            <button onClick={()=>onAccesoRapido?.("humedad")}
+              style={{flex:1,minWidth:120,cursor:"pointer",border:"1px solid rgba(96,165,250,0.3)",borderRadius:10,padding:"9px 8px",background:"rgba(96,165,250,0.08)",color:"#60a5fa",fontFamily:"'Georgia',serif",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+              💧 Registrar humedad
+            </button>
+            <button onClick={()=>onAccesoRapido?.("diario")}
+              style={{flex:1,minWidth:120,cursor:"pointer",border:"1px solid rgba(167,139,250,0.3)",borderRadius:10,padding:"9px 8px",background:"rgba(167,139,250,0.08)",color:"#c4b5fd",fontFamily:"'Georgia',serif",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+              📋 Registro diario
+            </button>
           </div>
         )}
 
@@ -1771,13 +1792,8 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                 const hechasGrupo = tareaGrupo.filter(t=>t.estado==="hecha").length;
                 const todasHechas = hechasGrupo===tareaGrupo.length;
                 // Usar un ID único para el estado de colapso — guardado en sessionStorage
-                const storageKey = `grupo_open_${grupo.key}`;
-                const [open, setOpen] = React.useState(()=>{
-                  try { return sessionStorage.getItem(storageKey)!=="0"; } catch { return true; }
-                });
-                const toggle = () => {
-                  setOpen(v=>{ try{sessionStorage.setItem(storageKey,v?"0":"1");}catch{} return !v; });
-                };
+                const open = gruposAbiertos[grupo.key]!==false;
+                const toggle = () => toggleGrupo(grupo.key);
                 return (
                   <div key={grupo.key} style={{marginBottom:8}}>
                     {/* Cabecera del grupo — siempre visible */}
@@ -7275,6 +7291,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
 
   const [subTabZona, setSubTabZona] = React.useState(null);
   const [subTab, setSubTab] = React.useState("panel");
+  // Exponer para acceso rápido desde VistaWorker
+  React.useEffect(()=>{ window.__golfSubTab = setSubTab; return ()=>{ window.__golfSubTab=null; }; },[]);
 
   const setG = (patch) => setGolfData(p=>({...p,...patch}));
 
@@ -7295,8 +7313,10 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
     const hayTorneo = eventos.some(e=>e.fecha<=hoy&&(e.fechaFin||e.fecha)>=hoy);
     // Verificar si ya se generaron las tareas de hoy para Golf
     const tareasHoy = tareasProg[hoy]||[];
-    const yaGeneradas = tareasHoy.some(t=>t.zona==="Golf"&&t.auto===true&&t.autoGolfFecha===hoy);
-    if(yaGeneradas) return;
+    // Verificar si las tareas DIARIAS ya están generadas (no solo cualquier tarea auto)
+    const yaGeneradasDiarias = tareasHoy.some(t=>t.zona==="Golf"&&t.diaria===true);
+    const yaGeneradasOtras = tareasHoy.some(t=>t.zona==="Golf"&&t.auto===true&&t.autoGolfFecha===hoy&&!t.diaria);
+    if(yaGeneradasDiarias && yaGeneradasOtras) return;
 
     const nuevas = [];
     const mkTarea = (tarea,elemento,resp) => ({
@@ -7305,20 +7325,22 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       estado:resp||BHALÚ?"pendiente":"por_designar",
       notas:"Tarea recurrente automática", auto:true, autoGolfFecha:hoy,
     });
+    const mkDiaria = (tarea) => ({...mkTarea(tarea,"Greens"),diaria:true});
 
-    // 1. Medición Green 03, 07 y Vivero — Lunes a Sábado (nunca domingo)
-    if(!esDomingo) {
+    // 1. Medición Green 03, 07 y Vivero — Lunes a Sábado
+    if(!esDomingo && !yaGeneradasOtras) {
       nuevas.push(mkTarea("Medición de altura — Green 03","Green 03 (Hoyo 03-12)"));
       nuevas.push(mkTarea("Medición de altura — Green 07","Green 07 (Hoyo 07-16)"));
       nuevas.push(mkTarea("Medición de altura — Vivero","Vivero"));
     }
 
-    // 2. Tareas diarias de greens — Lunes a Sábado + Domingo si hay torneo
-    if(!esDomingo || hayTorneo) {
-      // Tareas diarias individuales (marcadas con diaria:true para VistaWorker)
-      const mkDiaria = (tarea) => ({...mkTarea(tarea,"Greens"),diaria:true});
+    // 2. Tareas diarias — solo si no existen aún
+    if(!yaGeneradasDiarias && (!esDomingo || hayTorneo)) {
       TAREAS_GREENS_DIARIAS.forEach(t => nuevas.push(mkDiaria(t)));
-      // Limpieza por green (Otras tareas)
+    }
+
+    // 3. Limpieza por green — solo si no existen aún
+    if(!yaGeneradasOtras && (!esDomingo || hayTorneo)) {
       GREENS_DEF.forEach(g=>{
         nuevas.push(mkTarea(`Limpieza — ${g.nombre}`,`${g.nombre} (${g.hoyos})`));
       });
@@ -11419,6 +11441,14 @@ export default function App() {
                     const elem=zona.elementos.find(e=>e.nombre===nombreElem); if(!elem) return null;
                     const frecs=zdat.elementos?.[elem.id]?.frecuencias||(TAREAS_DEFAULT[elem.tipo]||[]).map(t=>({...t}));
                     return {frecs,eid:elem.id,isCustom:false};
+                  }}
+                  onAccesoRapido={(tipo)=>{
+                    setVista("golf");
+                    setTimeout(()=>{
+                      if(tipo==="medicion") window.__golfSubTab?.("mediciones");
+                      if(tipo==="humedad")  window.__golfSubTab?.("humedad");
+                      if(tipo==="diario")   window.__golfSubTab?.("greens");
+                    },300);
                   }}
                   onSetFrecs={setElemFrecs}
                   onAddTarea={(nuevaTarea)=>{
