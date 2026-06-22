@@ -7252,8 +7252,12 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       nuevas.push(mkTarea("Medición de altura — Vivero","Vivero"));
     }
 
-    // 2. Limpieza todos los greens + Vivero — Lunes a Sábado siempre + Domingo si hay torneo
+    // 2. Tareas diarias de greens — Lunes a Sábado + Domingo si hay torneo
     if(!esDomingo || hayTorneo) {
+      // Tareas diarias individuales (marcadas con diaria:true para VistaWorker)
+      const mkDiaria = (tarea) => ({...mkTarea(tarea,"Greens"),diaria:true});
+      TAREAS_GREENS_DIARIAS.forEach(t => nuevas.push(mkDiaria(t)));
+      // Limpieza por green (Otras tareas)
       GREENS_DEF.forEach(g=>{
         nuevas.push(mkTarea(`Limpieza — ${g.nombre}`,`${g.nombre} (${g.hoyos})`));
       });
