@@ -7410,7 +7410,16 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   const [selectedTee,    setSelectedTee]    = React.useState("t1");
 
   // Formulario medición semanal
-  const emptyMed = {fecha:hoy,responsable:"",tipo:"semanal",alturas:{},diasDesdeCorte:{},obsGreen:{},obs:""};
+  // Pre-llenar responsable con el trabajador logueado
+  const miNombrePerfil = React.useMemo(()=>{
+    if(rolLogueado!=="trabajador") return "";
+    return listaPersonal.find(p=>p.email?.toLowerCase()===
+      (Array.isArray(personal)?personal:Object.values(personal||{}))
+      .find(x=>x.id===workerLogueado)?.email?.toLowerCase()
+    )?.nombre || BHALÚ;
+  },[rolLogueado, workerLogueado, listaPersonal]);
+
+  const emptyMed = {fecha:hoy,responsable:miNombrePerfil||"",tipo:"semanal",alturas:{},diasDesdeCorte:{},obsGreen:{},obs:""};
   const [medForm, setMedForm] = React.useState(emptyMed);
 
   // Formulario evento/torneo
@@ -8605,20 +8614,24 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       {subTab==="mediciones"&&(
         <div className="ein">
           <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
-            <button className="btn-p" style={S.btn} onClick={()=>setShowMedForm(true)}>📏 Nueva medición</button>
+            <button className="btn-p" style={S.btn} onClick={()=>{
+            setShowMedForm(true);
+          }}>📏 Nueva medición</button>
           </div>
 
           {showMedForm&&(
             <div style={{...S.card,padding:20,marginBottom:14,background:"rgba(52,211,153,0.04)",borderColor:"rgba(52,211,153,0.2)"}} className="ein">
-              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#34d399",marginBottom:14}}>📏 Medición de Alturas y Humedad</div>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#34d399",marginBottom:14}}>📏 Medición de Alturas</div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
                 <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={medForm.fecha} onChange={e=>setMedForm(p=>({...p,fecha:e.target.value}))}/></div>
-                <div><label style={labelSt}>Responsable</label>
-                  <select style={S.input} value={medForm.responsable} onChange={e=>setMedForm(p=>({...p,responsable:e.target.value}))}>
-                    <option value="">Seleccionar...</option>
-                    {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
-                  </select>
-                </div>
+                {rolLogueado!=="trabajador"&&(
+                  <div><label style={labelSt}>Responsable</label>
+                    <select style={S.input} value={medForm.responsable} onChange={e=>setMedForm(p=>({...p,responsable:e.target.value}))}>
+                      <option value="">Seleccionar...</option>
+                      {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                    </select>
+                  </div>
+                )}
                 <div><label style={labelSt}>Tipo</label>
                   <select style={S.input} value={medForm.tipo} onChange={e=>setMedForm(p=>({...p,tipo:e.target.value}))}>
                     <option value="semanal">Semanal (todos los greens)</option>
