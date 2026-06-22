@@ -1502,16 +1502,16 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
 
   const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
   const ORDEN_ESTADO = {pendiente:0, haciendose:1, no_pudo:2, hecha:3, por_designar:4};
-  const TAREAS_DIARIAS_LABELS = [
-    "Limpieza Tee 01","Revisión estado general greens (visual)","Revisión humedad greens",
-    "Revisión estado fitosanitario","Soplado/Barrido","Pediluvios — llenado y revisión",
-    "Limpieza general","Riego","Riego manual","Barrido","Orden y limpieza",
-  ];
   const esDiaria = (t) => {
+    if(t.diaria === true) return true;
     const nombre = (t.tarea||"").toLowerCase();
-    return t.diaria === true ||
-      TAREAS_DIARIAS_LABELS.some(d => nombre.includes(d.toLowerCase())) ||
-      nombre.includes("diario") || nombre.includes("diaria");
+    // Tareas generadas por el registro diario de greens
+    const keywordsDiarias = [
+      "limpieza tee","revisión estado general","revisión humedad greens",
+      "revisión estado fitosanitario","soplado","barrido","pediluvios",
+      "limpieza general","riego manual","orden y limpieza","registro diario"
+    ];
+    return keywordsDiarias.some(k => nombre.includes(k));
   };
   const sortTareas = (arr) => arr.sort((a,b)=>{
     const ea = ORDEN_ESTADO[a.estado]??0, eb = ORDEN_ESTADO[b.estado]??0;
@@ -1803,80 +1803,6 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
           </div>
         )}
 
-        {/* Lista de tareas */}
-        <div style={{display:"flex",flexDirection:"column",gap:12}}>
-          {misTargets.map(t=>{
-            const est = ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente;
-            const esAgua = esRiegoOCorte(t.tarea);
-            return (
-              <div key={t.id} style={{background:"rgba(255,255,255,0.055)",border:`1px solid rgba(255,255,255,0.10)`,borderRadius:14,borderLeft:`4px solid ${est.color}`,padding:"16px 16px",opacity:t.estado==="hecha"||t.estado==="no_pudo"?0.75:1}}>
-                {/* Info tarea */}
-                <div style={{marginBottom:12}}>
-                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,marginBottom:4}}>{t.tarea}</div>
-                  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                    <span style={{fontSize:12,color:"#5a8a6a",background:"rgba(255,255,255,0.06)",padding:"2px 8px",borderRadius:10}}>{MACROZONAS_BASE.find(z=>z.nombre===t.zona)?.icono||"📍"} {t.zona}</span>
-                    {t.elemento&&<span style={{fontSize:12,color:"#4a7a6a",background:"rgba(255,255,255,0.04)",padding:"2px 8px",borderRadius:10}}>{t.elemento}</span>}
-                  </div>
-                  {t.notaWorker&&<div style={{fontSize:12,color:"#7aaa80",marginTop:6,fontStyle:"italic",padding:"6px 10px",background:"rgba(255,255,255,0.04)",borderRadius:8}}>{t.notaWorker}</div>}
-                </div>
-
-                {/* Botones de estado */}
-                {t.estado!=="hecha" && t.estado!=="no_pudo" && (
-                  <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom: esAgua?"10px":"0"}}>
-                    <button onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:"haciendose"})}
-                      style={{flex:1,minWidth:100,cursor:"pointer",border:"none",borderRadius:10,padding:"10px 8px",background:t.estado==="haciendose"?"rgba(59,130,246,0.3)":"rgba(255,255,255,0.07)",color:t.estado==="haciendose"?"#93c5fd":"#a0c8a0",fontFamily:"'Georgia',serif",fontSize:13,transition:"all .15s"}}>
-                      🔵 Haciéndose
-                    </button>
-                    <button onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:"hecha",notaWorker:""})}
-                      style={{flex:1,minWidth:100,cursor:"pointer",border:"none",borderRadius:10,padding:"10px 8px",background:"rgba(34,197,94,0.15)",color:"#86efac",fontFamily:"'Georgia',serif",fontSize:13,transition:"all .15s"}}>
-                      ✅ Hecha
-                    </button>
-                    <button onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:"no_pudo",notaWorker:""})}
-                      style={{flex:1,minWidth:100,cursor:"pointer",border:"none",borderRadius:10,padding:"10px 8px",background:"rgba(239,68,68,0.12)",color:"#fca5a5",fontFamily:"'Georgia',serif",fontSize:13,transition:"all .15s"}}>
-                      ❌ No se pudo
-                    </button>
-                  </div>
-                )}
-
-                {/* Húmedo — solo riego/corte */}
-                {esAgua && t.estado!=="hecha" && t.estado!=="no_pudo" && (
-                  <button onClick={()=>handleHumedad(t)}
-                    style={{width:"100%",cursor:"pointer",border:"1px solid rgba(96,165,250,0.3)",borderRadius:10,padding:"9px 8px",background:"rgba(96,165,250,0.08)",color:"#93c5fd",fontFamily:"'Georgia',serif",fontSize:13,marginBottom:0}}>
-                    💧 Terreno húmedo — omitir y postponer 2 días
-                  </button>
-                )}
-
-                {/* Razón si no se pudo */}
-                {t.estado==="no_pudo" && (
-                  <div style={{marginTop:8}}>
-                    <textarea
-                      rows={2}
-                      placeholder="¿Por qué no se pudo? (obligatorio)"
-                      value={t.notaWorker||""}
-                      onChange={e=>onUpdateTarea(fechaVer,t.id,{notaWorker:e.target.value})}
-                      style={{background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:8,color:"#fca5a5",padding:"8px 10px",fontFamily:"'Georgia',serif",fontSize:13,width:"100%",resize:"vertical",outline:"none"}}
-                    />
-                    <button onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:"pendiente"})}
-                      style={{marginTop:6,cursor:"pointer",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,padding:"5px 12px",background:"transparent",color:"#7aaa80",fontFamily:"'Georgia',serif",fontSize:12}}>
-                      ← Volver a pendiente
-                    </button>
-                  </div>
-                )}
-
-                {/* Reabrir si ya está hecha */}
-                {(t.estado==="hecha"||t.estado==="no_pudo") && (
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:6}}>
-                    <span style={{fontSize:12,color:est.color,fontWeight:600}}>{est.icon} {est.label}</span>
-                    <button onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:"pendiente",notaWorker:"",humedad:false})}
-                      style={{cursor:"pointer",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,padding:"4px 10px",background:"transparent",color:"#6aaa7a",fontFamily:"'Georgia',serif",fontSize:11}}>
-                      ↩ Reabrir
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
       </div>
     </div>
   );
