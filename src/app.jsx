@@ -1513,15 +1513,18 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
     ];
     return keywordsDiarias.some(k => nombre.includes(k));
   };
-  const sortTareas = (arr) => arr.sort((a,b)=>{
+  const sortTareas = (arr) => [...arr].sort((a,b)=>{
     const ea = ORDEN_ESTADO[a.estado]??0, eb = ORDEN_ESTADO[b.estado]??0;
     if(ea!==eb) return ea-eb;
     return (a.zona||"").localeCompare(b.zona||"","es",{sensitivity:"base"});
   });
-  const todasMisTareas = (tareas[fechaVer]||[])
-    .filter(t => t.responsable && normalizar(t.responsable) === normalizar(trabajador?.nombre||""));
-  const misTareasDiarias  = sortTareas(todasMisTareas.filter(t=>esDiaria(t)));
-  const misTareasOtras    = sortTareas(todasMisTareas.filter(t=>!esDiaria(t)));
+  // Leer siempre directamente del prop tareas para que React detecte cambios
+  const todasMisTareas = React.useMemo(()=>
+    (tareas[fechaVer]||[]).filter(t => t.responsable && normalizar(t.responsable) === normalizar(trabajador?.nombre||"")),
+    [tareas, fechaVer, trabajador]
+  );
+  const misTareasDiarias  = React.useMemo(()=>sortTareas(todasMisTareas.filter(t=>esDiaria(t))),[todasMisTareas]);
+  const misTareasOtras    = React.useMemo(()=>sortTareas(todasMisTareas.filter(t=>!esDiaria(t))),[todasMisTareas]);
   const misTargets = [...misTareasDiarias, ...misTareasOtras];
 
   const stats = {
@@ -1735,49 +1738,107 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
           </div>
         )}
 
-        {/* ── OTRAS TAREAS ── */}
-        {misTareasOtras.length>0&&(
-          <div style={{marginBottom:20}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-              <div style={{fontSize:13,fontWeight:700,color:"#fbbf24",letterSpacing:"0.5px"}}>
-                🌿 Otras tareas del día
-              </div>
-              <div style={{fontSize:11,color:"#5a9a7a"}}>
-                {misTareasOtras.filter(t=>t.estado==="hecha").length}/{misTareasOtras.length} hechas
-              </div>
-            </div>
-            {misTareasOtras.map(t=>{
-              const est = ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente;
-              return (
-                <div key={t.id} style={{background:est.bg,border:`1px solid ${est.color}35`,borderRadius:12,padding:"12px 14px",marginBottom:8}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",gap:8}}>
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:14,fontWeight:600,marginBottom:2}}>{t.tarea}</div>
-                      {t.zona&&<div style={{fontSize:11,color:"#6aaa7a"}}>{t.zona}{t.elemento&&` · ${t.elemento}`}</div>}
-                      {t.notas&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:3,fontStyle:"italic"}}>{t.notas}</div>}
-                    </div>
-                    <span style={{fontSize:11,fontWeight:600,color:est.color,whiteSpace:"nowrap"}}>{est.icon} {est.label}</span>
-                  </div>
-                  <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap"}}>
-                    {Object.entries(ESTADOS_TAREA).map(([k,v])=>(
-                      <button key={k} onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:k})}
-                        style={{cursor:"pointer",border:`1px solid ${t.estado===k?v.color:"rgba(255,255,255,0.15)"}`,borderRadius:20,padding:"3px 10px",background:t.estado===k?v.bg:"transparent",color:t.estado===k?v.color:"#6aaa7a",fontSize:11,fontFamily:"'Georgia',serif"}}>
-                        {v.icon} {v.label}
-                      </button>
-                    ))}
-                  </div>
-                  {esRiegoOCorte(t.tarea)&&t.estado!=="hecha"&&(
-                    <button onClick={()=>handleHumedad(t)}
-                      style={{marginTop:8,cursor:"pointer",border:"1px solid rgba(96,165,250,0.4)",borderRadius:8,padding:"4px 12px",background:"rgba(96,165,250,0.1)",color:"#93c5fd",fontSize:11,fontFamily:"'Georgia',serif",display:"flex",alignItems:"center",gap:6}}>
-                      💧 Terreno húmedo — ajustar frecuencia
-                    </button>
-                  )}
-                  {t.notaWorker&&<div style={{fontSize:11,color:"#f59e0b",marginTop:6,fontStyle:"italic"}}>💬 {t.notaWorker}</div>}
+        {/* ── OTRAS TAREAS AGRUPADAS ── */}
+        {misTareasOtras.length>0&&(()=>{
+          // Clasificar por tipo
+          const GRUPOS = [
+            {key:"corte",   icon:"✂️", label:"Cortes",      match: t=>(t.tarea||"").toLowerCase().includes("corte")},
+            {key:"medicion",icon:"📏", label:"Mediciones",  match: t=>(t.tarea||"").toLowerCase().includes("medición")||(t.tarea||"").toLowerCase().includes("medicion")},
+            {key:"riego",   icon:"💧", label:"Riego",       match: t=>(t.tarea||"").toLowerCase().includes("riego")||(t.tarea||"").toLowerCase().includes("syringing")},
+            {key:"fitosan", icon:"🔬", label:"Fitosanitario",match: t=>(t.tarea||"").toLowerCase().includes("fungicida")||(t.tarea||"").toLowerCase().includes("plagas")||(t.tarea||"").toLowerCase().includes("fitosan")},
+            {key:"limpieza",icon:"🧹", label:"Limpieza",    match: t=>(t.tarea||"").toLowerCase().includes("limpieza")},
+            {key:"otros",   icon:"🌿", label:"Otros",       match: ()=>true},
+          ];
+          // Asignar grupo a cada tarea (primera coincidencia)
+          const asignarGrupo = (t) => GRUPOS.find(g=>g.match(t))?.key||"otros";
+          const porGrupo = {};
+          misTareasOtras.forEach(t=>{
+            const g = asignarGrupo(t);
+            if(!porGrupo[g]) porGrupo[g]=[];
+            porGrupo[g].push(t);
+          });
+
+          return (
+            <div style={{marginBottom:20}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                <div style={{fontSize:13,fontWeight:700,color:"#fbbf24",letterSpacing:"0.5px"}}>🌿 Otras tareas del día</div>
+                <div style={{fontSize:11,color:"#5a9a7a"}}>
+                  {misTareasOtras.filter(t=>t.estado==="hecha").length}/{misTareasOtras.length} hechas
                 </div>
-              );
-            })}
-          </div>
-        )}
+              </div>
+              {GRUPOS.filter(g=>porGrupo[g.key]?.length>0).map(grupo=>{
+                const tareaGrupo = porGrupo[grupo.key];
+                const hechasGrupo = tareaGrupo.filter(t=>t.estado==="hecha").length;
+                const todasHechas = hechasGrupo===tareaGrupo.length;
+                // Usar un ID único para el estado de colapso — guardado en sessionStorage
+                const storageKey = `grupo_open_${grupo.key}`;
+                const [open, setOpen] = React.useState(()=>{
+                  try { return sessionStorage.getItem(storageKey)!=="0"; } catch { return true; }
+                });
+                const toggle = () => {
+                  setOpen(v=>{ try{sessionStorage.setItem(storageKey,v?"0":"1");}catch{} return !v; });
+                };
+                return (
+                  <div key={grupo.key} style={{marginBottom:8}}>
+                    {/* Cabecera del grupo — siempre visible */}
+                    <div onClick={toggle}
+                      style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                        padding:"10px 14px",borderRadius:open?`10px 10px 0 0`:"10px",
+                        background:todasHechas?"rgba(34,197,94,0.08)":"rgba(255,255,255,0.05)",
+                        border:`1px solid ${todasHechas?"rgba(34,197,94,0.2)":"rgba(255,255,255,0.1)"}`,
+                        cursor:"pointer",userSelect:"none"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <span style={{fontSize:16}}>{grupo.icon}</span>
+                        <span style={{fontSize:13,fontWeight:600,color:todasHechas?"#22c55e":"#ede9e0"}}>{grupo.label}</span>
+                        <span style={{fontSize:11,color:"#5a9a7a",background:"rgba(255,255,255,0.06)",padding:"1px 8px",borderRadius:20}}>
+                          {hechasGrupo}/{tareaGrupo.length}
+                        </span>
+                      </div>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        {todasHechas&&<span style={{fontSize:11,color:"#22c55e"}}>✓ Listo</span>}
+                        <span style={{fontSize:12,color:"#5a9a7a",transition:"transform .2s",display:"inline-block",transform:open?"rotate(90deg)":"rotate(0deg)"}}>▶</span>
+                      </div>
+                    </div>
+                    {/* Tareas del grupo — colapsables */}
+                    {open&&(
+                      <div style={{border:"1px solid rgba(255,255,255,0.08)",borderTop:"none",borderRadius:"0 0 10px 10px",overflow:"hidden"}}>
+                        {tareaGrupo.map((t,i)=>{
+                          const est = ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente;
+                          return (
+                            <div key={t.id} style={{padding:"10px 14px",background:i%2===0?"rgba(255,255,255,0.025)":"rgba(255,255,255,0.04)",borderBottom:i<tareaGrupo.length-1?"1px solid rgba(255,255,255,0.06)":"none"}}>
+                              <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",gap:8,marginBottom:8}}>
+                                <div style={{flex:1}}>
+                                  <div style={{fontSize:13,fontWeight:600}}>{t.tarea?.replace("⛳ ","")}</div>
+                                  {t.elemento&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:2}}>{t.elemento}</div>}
+                                </div>
+                                <span style={{fontSize:11,fontWeight:600,color:est.color,whiteSpace:"nowrap"}}>{est.icon} {est.label}</span>
+                              </div>
+                              <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+                                {Object.entries(ESTADOS_TAREA).map(([k,v])=>(
+                                  <button key={k} onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:k})}
+                                    style={{cursor:"pointer",border:`1px solid ${t.estado===k?v.color:"rgba(255,255,255,0.12)"}`,borderRadius:16,padding:"3px 10px",background:t.estado===k?v.bg:"transparent",color:t.estado===k?v.color:"#6aaa7a",fontSize:11,fontFamily:"'Georgia',serif"}}>
+                                    {v.icon} {v.label}
+                                  </button>
+                                ))}
+                              </div>
+                              {esRiegoOCorte(t.tarea)&&t.estado!=="hecha"&&(
+                                <button onClick={()=>handleHumedad(t)}
+                                  style={{marginTop:6,cursor:"pointer",border:"1px solid rgba(96,165,250,0.3)",borderRadius:8,padding:"3px 10px",background:"rgba(96,165,250,0.08)",color:"#93c5fd",fontSize:11,fontFamily:"'Georgia',serif"}}>
+                                  💧 Terreno húmedo
+                                </button>
+                              )}
+                              {t.notaWorker&&<div style={{fontSize:11,color:"#f59e0b",marginTop:4,fontStyle:"italic"}}>💬 {t.notaWorker}</div>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
 
         {/* Sin tareas */}
         {misTargets.length===0 && (
