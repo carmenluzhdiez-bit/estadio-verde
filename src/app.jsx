@@ -1502,15 +1502,27 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
 
   const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
   const ORDEN_ESTADO = {pendiente:0, haciendose:1, no_pudo:2, hecha:3, por_designar:4};
-  const misTargets = (tareas[fechaVer]||[])
-    .filter(t => t.responsable && normalizar(t.responsable) === normalizar(trabajador?.nombre||""))
-    .sort((a,b)=>{
-      // 1. Pendientes/haciéndose primero, hechas al final
-      const ea = ORDEN_ESTADO[a.estado]??0, eb = ORDEN_ESTADO[b.estado]??0;
-      if(ea!==eb) return ea-eb;
-      // 2. Dentro del mismo estado, ordenar por zona
-      return (a.zona||"").localeCompare(b.zona||"","es",{sensitivity:"base"});
-    });
+  const TAREAS_DIARIAS_LABELS = [
+    "Limpieza Tee 01","Revisión estado general greens (visual)","Revisión humedad greens",
+    "Revisión estado fitosanitario","Soplado/Barrido","Pediluvios — llenado y revisión",
+    "Limpieza general","Riego","Riego manual","Barrido","Orden y limpieza",
+  ];
+  const esDiaria = (t) => {
+    const nombre = (t.tarea||"").toLowerCase();
+    return t.diaria === true ||
+      TAREAS_DIARIAS_LABELS.some(d => nombre.includes(d.toLowerCase())) ||
+      nombre.includes("diario") || nombre.includes("diaria");
+  };
+  const sortTareas = (arr) => arr.sort((a,b)=>{
+    const ea = ORDEN_ESTADO[a.estado]??0, eb = ORDEN_ESTADO[b.estado]??0;
+    if(ea!==eb) return ea-eb;
+    return (a.zona||"").localeCompare(b.zona||"","es",{sensitivity:"base"});
+  });
+  const todasMisTareas = (tareas[fechaVer]||[])
+    .filter(t => t.responsable && normalizar(t.responsable) === normalizar(trabajador?.nombre||""));
+  const misTareasDiarias  = sortTareas(todasMisTareas.filter(t=>esDiaria(t)));
+  const misTareasOtras    = sortTareas(todasMisTareas.filter(t=>!esDiaria(t)));
+  const misTargets = [...misTareasDiarias, ...misTareasOtras];
 
   const stats = {
     total: misTargets.length,
@@ -1682,6 +1694,88 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── TAREAS DIARIAS ── */}
+        {misTareasDiarias.length>0&&(
+          <div style={{marginBottom:20}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#34d399",letterSpacing:"0.5px"}}>
+                📋 Tareas diarias
+              </div>
+              <div style={{fontSize:11,color:"#5a9a7a"}}>
+                {misTareasDiarias.filter(t=>t.estado==="hecha").length}/{misTareasDiarias.length} hechas
+              </div>
+            </div>
+            {misTareasDiarias.map(t=>{
+              const est = ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente;
+              return (
+                <div key={t.id} style={{background:est.bg,border:`1px solid ${est.color}35`,borderRadius:12,padding:"12px 14px",marginBottom:8}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",gap:8}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:14,fontWeight:600,marginBottom:2}}>{t.tarea}</div>
+                      {t.zona&&<div style={{fontSize:11,color:"#6aaa7a"}}>{t.zona}{t.elemento&&` · ${t.elemento}`}</div>}
+                      {t.notas&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:3,fontStyle:"italic"}}>{t.notas}</div>}
+                    </div>
+                    <span style={{fontSize:11,fontWeight:600,color:est.color,whiteSpace:"nowrap"}}>{est.icon} {est.label}</span>
+                  </div>
+                  <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap"}}>
+                    {Object.entries(ESTADOS_TAREA).map(([k,v])=>(
+                      <button key={k} onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:k})}
+                        style={{cursor:"pointer",border:`1px solid ${t.estado===k?v.color:"rgba(255,255,255,0.15)"}`,borderRadius:20,padding:"3px 10px",background:t.estado===k?v.bg:"transparent",color:t.estado===k?v.color:"#6aaa7a",fontSize:11,fontFamily:"'Georgia',serif"}}>
+                        {v.icon} {v.label}
+                      </button>
+                    ))}
+                  </div>
+                  {t.notaWorker&&<div style={{fontSize:11,color:"#f59e0b",marginTop:6,fontStyle:"italic"}}>💬 {t.notaWorker}</div>}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── OTRAS TAREAS ── */}
+        {misTareasOtras.length>0&&(
+          <div style={{marginBottom:20}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#fbbf24",letterSpacing:"0.5px"}}>
+                🌿 Otras tareas del día
+              </div>
+              <div style={{fontSize:11,color:"#5a9a7a"}}>
+                {misTareasOtras.filter(t=>t.estado==="hecha").length}/{misTareasOtras.length} hechas
+              </div>
+            </div>
+            {misTareasOtras.map(t=>{
+              const est = ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente;
+              return (
+                <div key={t.id} style={{background:est.bg,border:`1px solid ${est.color}35`,borderRadius:12,padding:"12px 14px",marginBottom:8}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",gap:8}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:14,fontWeight:600,marginBottom:2}}>{t.tarea}</div>
+                      {t.zona&&<div style={{fontSize:11,color:"#6aaa7a"}}>{t.zona}{t.elemento&&` · ${t.elemento}`}</div>}
+                      {t.notas&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:3,fontStyle:"italic"}}>{t.notas}</div>}
+                    </div>
+                    <span style={{fontSize:11,fontWeight:600,color:est.color,whiteSpace:"nowrap"}}>{est.icon} {est.label}</span>
+                  </div>
+                  <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap"}}>
+                    {Object.entries(ESTADOS_TAREA).map(([k,v])=>(
+                      <button key={k} onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:k})}
+                        style={{cursor:"pointer",border:`1px solid ${t.estado===k?v.color:"rgba(255,255,255,0.15)"}`,borderRadius:20,padding:"3px 10px",background:t.estado===k?v.bg:"transparent",color:t.estado===k?v.color:"#6aaa7a",fontSize:11,fontFamily:"'Georgia',serif"}}>
+                        {v.icon} {v.label}
+                      </button>
+                    ))}
+                  </div>
+                  {esRiegoOCorte(t.tarea)&&t.estado!=="hecha"&&(
+                    <button onClick={()=>handleHumedad(t)}
+                      style={{marginTop:8,cursor:"pointer",border:"1px solid rgba(96,165,250,0.4)",borderRadius:8,padding:"4px 12px",background:"rgba(96,165,250,0.1)",color:"#93c5fd",fontSize:11,fontFamily:"'Georgia',serif",display:"flex",alignItems:"center",gap:6}}>
+                      💧 Terreno húmedo — ajustar frecuencia
+                    </button>
+                  )}
+                  {t.notaWorker&&<div style={{fontSize:11,color:"#f59e0b",marginTop:6,fontStyle:"italic"}}>💬 {t.notaWorker}</div>}
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -7705,10 +7799,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                         <div style={{fontSize:10,color:"#5a9a7a",marginBottom:2}}>ALTURA</div>
                         <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:700,color:"#4ade80"}}>{altViv}mm</div>
                       </div>}
-                      {humViv&&<div style={{textAlign:"center",background:"rgba(96,165,250,0.1)",borderRadius:8,padding:"8px 14px",border:"1px solid rgba(96,165,250,0.2)"}}>
-                        <div style={{fontSize:10,color:"#5a9a7a",marginBottom:2}}>HUMEDAD</div>
-                        <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:700,color:"#60a5fa"}}>{humViv}/8</div>
-                      </div>}
+
                     </div>
                   </div>
                 </div>
@@ -10408,6 +10499,23 @@ export default function App() {
 
   const appReady = dataReady && personalReady && progReady;
 
+  // Migración: corregir tareas con responsable asignado pero estado "por_designar"
+  useEffect(()=>{
+    if(!progReady) return;
+    let hayCorreccion = false;
+    const nuevoProg = {};
+    Object.entries(tareasProg).forEach(([fecha, tareas])=>{
+      nuevoProg[fecha] = tareas.map(t=>{
+        if(t.estado==="por_designar" && t.responsable && t.responsable.trim()!=="") {
+          hayCorreccion = true;
+          return {...t, estado:"pendiente"};
+        }
+        return t;
+      });
+    });
+    if(hayCorreccion) setTareasProg(nuevoProg);
+  }, [progReady]);
+
   // Cuando personal carga y el rol es trabajador, setear workerLogueado por email
   useEffect(()=>{
     if(fbRol==="trabajador" && fbUser) {
@@ -10715,7 +10823,7 @@ export default function App() {
         .hov:hover{background:rgba(255,255,255,0.09)!important;border-color:rgba(150,210,140,0.3)!important;transform:translateY(-1px)}
         .btn-p{background:#3d7a52;color:#fff}.btn-p:hover{background:#4c9464}
         .btn-g{background:transparent;color:#a0c8a0;border:1px solid rgba(160,200,140,0.25)}.btn-g:hover{background:rgba(160,200,140,0.1)}
-        .btn-d{background:rgba(239,68,68,0.15);color:#fca5a5;border:1px solid rgba(239,68,68,0.25)}.btn-d:hover{background:rgba(239,68,68,0.25)}
+        .btn-d{background:rgba(239,68,68,0.22);color:#fca5a5;border:1px solid rgba(239,68,68,0.45);font-weight:600}.btn-d:hover{background:rgba(239,68,68,0.4);color:#fff;border-color:rgba(239,68,68,0.7)}
         .tab{cursor:pointer;padding:7px 16px;border-radius:8px;font-family:'Georgia',serif;font-size:14px;transition:all .15s}
         .tab.on{background:#3d7a52;color:#fff}.tab:not(.on){color:#7aaa80}.tab:not(.on):hover{background:rgba(61,122,82,0.2);color:#a0c8a0}
         input:focus,select:focus,textarea:focus{border-color:#3d7a52!important;background:rgba(255,255,255,0.12)!important}
@@ -11286,14 +11394,14 @@ export default function App() {
                 setTareasProg={setTareasProg}
                 personal={personal}
                 MACROZONAS_BASE={MACROZONAS_BASE}
-                onSalir={()=>{setRolLogueado(null);setWorkerPinInput("");setWorkerLogueado(null);}}
+                onSalir={()=>{setWorkerPinInput("");setWorkerLogueado(null);setVistaWorker(false);}}
               />
             )}
 
             {/* ── Logged in as worker ── */}
             {rolLogueado==="trabajador"&&vistaWorker&&(
               <div>
-                <button className="btn-g" style={{...S.btn,marginBottom:16}} onClick={()=>{setVistaWorker(false);setWorkerPinInput("");setWorkerLogueado(null);setRolLogueado(null);}}>← Salir</button>
+                <button className="btn-g" style={{...S.btn,marginBottom:16}} onClick={()=>{setVistaWorker(false);setWorkerPinInput("");setWorkerLogueado(null);}}>← Salir</button>
                 <VistaWorker
                   trabajador={(()=>{
                     const arr=Array.isArray(personal)?personal:Object.values(personal||{});
@@ -11379,10 +11487,10 @@ export default function App() {
                         if(e.key!=="Enter") return;
                         if(rolSeleccionado==="trabajador"){
                           const t=personal.find(x=>String(x.id)===String(workerLogueado));
-                          if(t&&String(t.pin)===String(workerPinInput)){setVistaWorker(true);setRolLogueado("trabajador");setWorkerPinError(false);}
+                          if(t&&String(t.pin)===String(workerPinInput)){setVistaWorker(true);setWorkerPinError(false);}
                           else setWorkerPinError(true);
                         } else {
-                          if(checkPin(rolSeleccionado,workerPinInput)){setRolLogueado(rolSeleccionado);setWorkerPinError(false);}
+                          if(checkPin(rolSeleccionado,workerPinInput)){setWorkerPinError(false);}
                           else setWorkerPinError(true);
                         }
                       }}
@@ -11400,10 +11508,10 @@ export default function App() {
                     onClick={()=>{
                       if(rolSeleccionado==="trabajador"){
                         const t=personal.find(x=>String(x.id)===String(workerLogueado));
-                        if(t&&String(t.pin)===String(workerPinInput)){setVistaWorker(true);setRolLogueado("trabajador");setWorkerPinError(false);}
+                        if(t&&String(t.pin)===String(workerPinInput)){setVistaWorker(true);setWorkerPinError(false);}
                         else setWorkerPinError(true);
                       } else {
-                        if(checkPin(rolSeleccionado,workerPinInput)){setRolLogueado(rolSeleccionado);setWorkerPinError(false);}
+                        if(checkPin(rolSeleccionado,workerPinInput)){setWorkerPinError(false);}
                         else setWorkerPinError(true);
                       }
                     }}>
@@ -11425,7 +11533,7 @@ export default function App() {
                 <p style={{color:"#6aaa7a",fontSize:14,marginBottom:24}}>Usa el menú de navegación para acceder a todas las secciones.</p>
                 <button onClick={()=>setVista("programacion")} style={{...S.btn,background:"#3d7a52",color:"#fff",fontSize:15,padding:"12px 28px"}}>📆 Ir a Programación →</button>
                 <div style={{marginTop:12}}>
-                  <button onClick={()=>{setRolLogueado(null);setWorkerPinInput("");}} style={{...S.btn,background:"transparent",color:"#6aaa7a",border:"1px solid rgba(255,255,255,0.1)",fontSize:13}}>← Cerrar sesión</button>
+                  <button onClick={()=>{setWorkerPinInput("");}} style={{...S.btn,background:"transparent",color:"#6aaa7a",border:"1px solid rgba(255,255,255,0.1)",fontSize:13}}>← Cerrar sesión</button>
 
                 <div style={{maxWidth:380,margin:"24px auto 0"}}>
                   <PinConfig getPines={getPines} setPinRol={setPinRol} S={S}/>
