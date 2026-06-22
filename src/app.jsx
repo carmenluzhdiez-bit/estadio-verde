@@ -10378,20 +10378,7 @@ export default function App() {
     return () => unsub();
   }, []);
 
-  // Cuando personal carga y el rol es trabajador, setear workerLogueado por email
-  useEffect(()=>{
-    if(fbRol==="trabajador" && fbUser) {
-      const arr = Array.isArray(personal)?personal:Object.values(personal||{});
-      if(arr.length>0){
-        const p = arr.find(x=>x.email?.toLowerCase()===fbUser.email?.toLowerCase());
-        if(p){
-          setWorkerLogueado(p.id);
-          setVistaWorker(true);
-          setVista("miturno");
-        }
-      }
-    }
-  }, [fbRol, fbUser, personal]);
+
 
   const handleLogin = async (e) => {
     e && e.preventDefault();
@@ -10420,6 +10407,21 @@ export default function App() {
   const [rendicionesRRHH, setRendicionesRRHH] = useFirebaseState("rendiciones-rrhh", []);
 
   const appReady = dataReady && personalReady && progReady;
+
+  // Cuando personal carga y el rol es trabajador, setear workerLogueado por email
+  useEffect(()=>{
+    if(fbRol==="trabajador" && fbUser) {
+      const arr = Array.isArray(personal)?personal:Object.values(personal||{});
+      if(arr.length>0){
+        const p = arr.find(x=>x.email?.toLowerCase()===fbUser.email?.toLowerCase());
+        if(p){
+          setWorkerLogueado(p.id);
+          setVistaWorker(true);
+          setVista("miturno");
+        }
+      }
+    }
+  }, [fbRol, fbUser, personal]);
 
   // PINes siguen en localStorage (son locales por dispositivo)
   const getPines    = () => { try { return JSON.parse(localStorage.getItem("ev2-pines")||"{}"); } catch { return {}; } };
