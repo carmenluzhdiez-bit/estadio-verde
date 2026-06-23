@@ -1278,9 +1278,11 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false }) 
   };
 
   // Opciones únicas para filtros
-  const allTareas   = Object.values(tareas).flat();
+  const allTareas   = Object.values(tareas).flat().filter(t => t.zona !== "Golf"); // Golf tiene módulo propio
   const todasTareas = [...new Set(allTareas.map(t=>t.tarea))].sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
-  const todasZonas  = [...new Set(allTareas.map(t=>t.zona).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
+  // Excluir tareas de Golf del programa general (Golf tiene su propio módulo)
+  const allTareasSinGolf = allTareas.filter(t => t.zona !== "Golf");
+  const todasZonas  = [...new Set(allTareasSinGolf.map(t=>t.zona).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
 
   const diasOrdenados = Object.keys(tareas)
     .filter(d => (tareas[d]||[]).length > 0)
@@ -1288,6 +1290,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false }) 
     .sort((a,b)=>b.localeCompare(a));
 
   const filtrarTareas = (td) => td.filter(t => {
+    if(t.zona==="Golf") return false; // Golf tiene módulo propio
     const mE = filtroEstado==="todos" || t.estado===filtroEstado;
     const mT = !filtroTarea || t.tarea===filtroTarea;
     const mZ = filtroZona==="todas" || t.zona===filtroZona;
@@ -7347,7 +7350,7 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
 // ══════════════════════════════════════════════════════════════════
 // PROGRAMACIÓN GOLF — módulo de tareas periódicas con frecuencia
 // ══════════════════════════════════════════════════════════════════
-function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, BHALÚ, esJefa }) {
+function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJefa }) {
 
   // ── Definición de tareas periódicas con última fecha y frecuencia ──
   // Frecuencias dinámicas: invierno (jun-ago) vs verano (dic-feb) vs transición
@@ -7361,74 +7364,74 @@ function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, BHALÚ, esJefa })
       zona:"Golf/GREEN", subzona:"Todos los greens + Vivero",
       frec: esVerano ? 1 : esInvierno ? 4 : 3,
       frecLabel: esVerano ? "Diario (verano)" : esInvierno ? "Cada 4 días (invierno)" : "Cada 3 días",
-      ultima:"2026-06-17", resp:BHALÚ,
+      ultima:"2026-06-17", resp:bhaluNombre,
       notas:"Cambiar dirección de corte. Registrar altura de corte.", linkedTareas:["Cambio de hoyos"] },
     { id:"c_anteg",    cat:"✂️ Cortes", nombre:"Corte de Antegreens",
       zona:"Golf/ANTEGREEN", subzona:"Todos los antegreens",
       frec:16, frecLabel:"Cada 16 días",
-      ultima:"2026-06-12", resp:BHALÚ, notas:"a 1cm, usar helicoidal" },
+      ultima:"2026-06-12", resp:bhaluNombre, notas:"a 1cm, usar helicoidal" },
     { id:"c_fairways", cat:"✂️ Cortes", nombre:"Corte de Fairways",
       zona:"Golf/FAIRWAYS", subzona:"Todos los fairways",
       frec:10, frecLabel:"Cada 10 días",
-      ultima:"2026-06-12", resp:BHALÚ, notas:"1,75cm" },
+      ultima:"2026-06-12", resp:bhaluNombre, notas:"1,75cm" },
     { id:"c_lomas",    cat:"✂️ Cortes", nombre:"Corte de Lomas",
       zona:"Golf/LOMAS", subzona:"Lomas",
       frec:20, frecLabel:"Cada 20 días",
-      ultima:"2026-06-12", resp:BHALÚ, notas:"Con flotante, nivel más bajo" },
+      ultima:"2026-06-12", resp:bhaluNombre, notas:"Con flotante, nivel más bajo" },
     { id:"c_cancha",   cat:"✂️ Cortes", nombre:"Corte de Cancha (césped)",
       zona:"Golf/CANCHA", subzona:"Cancha general",
       frec:14, frecLabel:"Cada 14 días",
-      ultima:"2026-06-13", resp:BHALÚ, notas:"3" y 2,75"" },
+      ultima:"2026-06-13", resp:bhaluNombre, notas:"3" y 2,75"" },
 
     // ── LABORES GREENS ───────────────────────────────────────────────
     { id:"fertil",     cat:"🌱 Fertilización", nombre:"Fertilización Greens + Vivero",
       zona:"Golf/GREEN", subzona:"Todos los greens + Vivero",
       frec:14, frecLabel:"Cada 14 días",
-      ultima:"2026-06-17", resp:BHALÚ, notas:"Alternar Novatec Premium / Salitre K según etapa" },
+      ultima:"2026-06-17", resp:bhaluNombre, notas:"Alternar Novatec Premium / Salitre K según etapa" },
     { id:"fertil_fair",cat:"🌱 Fertilización", nombre:"Fertilización Fairways",
       zona:"Golf/FAIRWAYS", subzona:"Todos los fairways",
       frec:45, frecLabel:"Cada 45 días",
-      ultima:"2026-04-14", resp:BHALÚ, notas:"Salitre Potásico después del corte" },
+      ultima:"2026-04-14", resp:bhaluNombre, notas:"Salitre Potásico después del corte" },
     { id:"aire_ch",    cat:"🌬️ Aireación", nombre:"Aireación púas chicas (otoño/primavera)",
       zona:"Golf/GREEN", subzona:"Todos los greens + Vivero",
       frec:null, frecLabel:"2 veces/año: marzo y ago-sep",
-      ultima:"2026-03-16", resp:BHALÚ,
+      ultima:"2026-03-16", resp:bhaluNombre,
       notas:"C/púas chicas después del corte. Terminar con riego y fertilización. Próxima: agosto-septiembre 2026",
       proxFija:"2026-09-01" },
     { id:"aire_gr",    cat:"🌬️ Aireación", nombre:"Aireación sacabocados grandes (anual)",
       zona:"Golf/GREEN", subzona:"Todos los greens",
       frec:null, frecLabel:"1 vez/año: abril",
-      ultima:"2026-04-13", resp:BHALÚ,
+      ultima:"2026-04-13", resp:bhaluNombre,
       notas:"C/púas grandes + fertilización + riego. Próxima: abril 2027",
       proxFija:"2027-04-01" },
     { id:"aire_fair",  cat:"🌬️ Aireación", nombre:"Aireación sacabocados grandes Fairways",
       zona:"Golf/FAIRWAYS", subzona:"Todos los fairways",
       frec:null, frecLabel:"2 veces/año: marzo y septiembre",
-      ultima:"2026-03-16", resp:BHALÚ,
+      ultima:"2026-03-16", resp:bhaluNombre,
       notas:"C/sacabocados grandes. Terminar con riego.",
       proxFija:"2026-09-10" },
     { id:"vert",       cat:"🔧 Mantenimiento", nombre:"Verticorte / Groomer fuerte",
       zona:"Golf/GREEN", subzona:"Todos los greens",
       frec:25, frecLabel:"Cada 25 días",
-      ultima:"2026-05-28", resp:BHALÚ, notas:"Pasar groomer fuerte con corte" },
+      ultima:"2026-05-28", resp:bhaluNombre, notas:"Pasar groomer fuerte con corte" },
     { id:"orilla_ag",  cat:"🔧 Mantenimiento", nombre:"Orillado Antegreens",
       zona:"Golf/ANTEGREEN", subzona:"Todos los antegreens H01-H09",
       frec:17, frecLabel:"Cada 17 días",
-      ultima:"2026-05-27", resp:BHALÚ, notas:"1,5-2,5cm con orilladora" },
+      ultima:"2026-05-27", resp:bhaluNombre, notas:"1,5-2,5cm con orilladora" },
     { id:"orilla_can", cat:"🔧 Mantenimiento", nombre:"Orillado Cancha / perfilado macizos",
       zona:"Golf/CANCHA", subzona:"Cancha",
       frec:21, frecLabel:"Cada 21 días",
-      ultima:"2026-06-12", resp:BHALÚ, notas:"Proteger troncos y plantas. Solo antes 12:00hrs" },
+      ultima:"2026-06-12", resp:bhaluNombre, notas:"Proteger troncos y plantas. Solo antes 12:00hrs" },
 
     // ── REVISIONES ───────────────────────────────────────────────────
     { id:"rev_plagas", cat:"🔬 Revisiones", nombre:"Revisión Plagas y Enfermedades Greens",
       zona:"Golf/GREEN", subzona:"Todos los greens",
       frec:7, frecLabel:"Semanal",
-      ultima:"2026-06-19", resp:BHALÚ, notas:"Si se detecta: generar tarea de control inmediata" },
+      ultima:"2026-06-19", resp:bhaluNombre, notas:"Si se detecta: generar tarea de control inmediata" },
     { id:"rev_hum",    cat:"🔬 Revisiones", nombre:"Revisión Humedad Greens",
       zona:"Golf/GREEN", subzona:"Todos los greens",
       frec:7, frecLabel:"Semanal",
-      ultima:"2026-06-10", resp:BHALÚ, notas:"Medir en lado más seco. Después del almuerzo" },
+      ultima:"2026-06-10", resp:bhaluNombre, notas:"Medir en lado más seco. Después del almuerzo" },
     { id:"rev_riego_g",cat:"🔬 Revisiones", nombre:"Revisión Sistema Riego Greens",
       zona:"Golf/GREEN", subzona:"Controlador C09",
       frec:14, frecLabel:"Quincenal",
@@ -7440,17 +7443,17 @@ function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, BHALÚ, esJefa })
     { id:"rev_plagas_f",cat:"🔬 Revisiones", nombre:"Revisión Plagas y Enfermedades Fairways",
       zona:"Golf/FAIRWAYS", subzona:"Todos los fairways",
       frec:14, frecLabel:"Quincenal",
-      ultima:"2026-06-10", resp:BHALÚ, notas:"Si se detecta: generar tarea de control inmediata" },
+      ultima:"2026-06-10", resp:bhaluNombre, notas:"Si se detecta: generar tarea de control inmediata" },
 
     // ── DESMALEZADO ──────────────────────────────────────────────────
     { id:"desmaz_g",   cat:"🌿 Desmalezado", nombre:"Desmalezado bordes Greens",
       zona:"Golf/GREEN", subzona:"Todos los greens",
       frec:7, frecLabel:"Semanal (rotación)",
-      ultima:"2026-06-19", resp:BHALÚ, notas:"Límites del borde con placa larga" },
+      ultima:"2026-06-19", resp:bhaluNombre, notas:"Límites del borde con placa larga" },
     { id:"desmaz_ag",  cat:"🌿 Desmalezado", nombre:"Desmalezado bordes Antegreens",
       zona:"Golf/ANTEGREEN", subzona:"Todos los antegreens",
       frec:21, frecLabel:"Cada 21 días",
-      ultima:"2026-05-28", resp:BHALÚ, notas:"Manualmente" },
+      ultima:"2026-05-28", resp:bhaluNombre, notas:"Manualmente" },
   ];
 
   const [ultimasFechas, setUltimasFechas] = React.useState(() => {
@@ -9138,7 +9141,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           tareasProg={tareasProg}
           setTareasProg={setTareasProg}
           hoy={hoy}
-          BHALÚ={BHALÚ}
+          bhaluNombre={BHALÚ}
           esJefa={esJefa}
         />
       )}
