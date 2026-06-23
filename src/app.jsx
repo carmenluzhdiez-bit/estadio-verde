@@ -7396,6 +7396,9 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
 // ══════════════════════════════════════════════════════════════════
 function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJefa }) {
 
+  // Guard: si hoy no está disponible aún, no renderizar
+  if (!hoy || typeof hoy !== "string") return null;
+
   // ── Definición de tareas periódicas con última fecha y frecuencia ──
   // Frecuencias dinámicas: invierno (jun-ago) vs verano (dic-feb) vs transición
   const mesHoy = new Date(hoy).getMonth() + 1; // 1-12
@@ -9246,7 +9249,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       )}
 
             {/* ── EVENTOS / TORNEOS ── */}
-      {subTab==="programacion_golf"&&rolLogueado!=="trabajador"&&(
+      {subTab==="programacion_golf"&&rolLogueado!=="trabajador"&&hoy&&(
         <ProgramacionGolf
           S={S}
           tareasProg={tareasProg}
@@ -11024,7 +11027,9 @@ export default function App() {
     let hayCorreccion = false;
     const nuevoProg = {};
     Object.entries(tareasProg).forEach(([fecha, tareas])=>{
+      if(!Array.isArray(tareas)) { nuevoProg[fecha] = tareas; return; }
       nuevoProg[fecha] = tareas.map(t=>{
+        if(!t || t.zona==="Golf") return t; // Golf no participa en migración
         if(t.estado==="por_designar" && t.responsable && t.responsable.trim()!=="") {
           hayCorreccion = true;
           return {...t, estado:"pendiente"};
@@ -11918,7 +11923,7 @@ export default function App() {
             )}
 
             {/* ── Logged in as worker ── */}
-            {rolLogueado==="trabajador"&&vistaWorker&&(
+            {rolLogueado==="trabajador"&&(vistaWorker||fbUser)&&(
               <div>
                 <button className="btn-g" style={{...S.btn,marginBottom:16}} onClick={()=>{setVistaWorker(false);setWorkerPinInput("");setWorkerLogueado(null);}}>← Salir</button>
                 <VistaWorker
