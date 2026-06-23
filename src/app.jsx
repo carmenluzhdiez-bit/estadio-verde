@@ -1659,7 +1659,8 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
               <div style={{fontSize:11,color:"#5a9a7a"}}>Marca lo que realizaste hoy:</div>
               <button onClick={()=>{
                 const todas = (()=>{
-                  const td = tareas.filter(t=>t.diaria).map(t=>{
+                  const tareasArr2 = Array.isArray(tareas) ? tareas : [];
+                  const td = tareasArr2.filter(t=>t.diaria).map(t=>{
                     const n=(t.tarea||"").replace("⛳ ","");
                     if(t.metodoLimpieza&&n.toLowerCase().includes("limpieza")){
                       const m=t.metodoLimpieza==="sopladora"?"🌬️ sopladora":t.metodoLimpieza==="barrido"?"🧹 barrido con vara":"🌬️+🧹 sopladora + barrido";
@@ -1674,13 +1675,14 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                 todas.forEach(t=>{ nuevo[t]=!todosMarcados; });
                 setRegistroDiarioForm(p=>({...p,tareas:nuevo}));
               }} style={{cursor:"pointer",border:"1px solid rgba(52,211,153,0.3)",borderRadius:8,padding:"3px 10px",background:"transparent",color:"#34d399",fontSize:11}}>
-                {Object.values(registroDiarioForm.tareas).every(Boolean)?"✗ Desmarcar":"✓ Marcar todas"}
+                {Object.keys(registroDiarioForm.tareas).length>0 && Object.values(registroDiarioForm.tareas).every(Boolean)?"✗ Desmarcar":"✓ Marcar todas"}
               </button>
             </div>
             <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
               {(()=>{
                 // Construir lista desde las tareas diarias del día + fijas
-                const tareasDelDia = tareas
+                const tareasArr = Array.isArray(tareas) ? tareas : [];
+                const tareasDelDia = tareasArr
                   .filter(t=>t.diaria)
                   .map(t=>{
                     const nombre = (t.tarea||"").replace("⛳ ","");
@@ -1750,8 +1752,9 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                 // Marcar tarea diaria de pediluvios/soplado como hecha si está entre las marcadas
                 const tareasRealizadasHoy = Object.entries(registroDiarioForm.tareas)
                   .filter(([,v])=>v).map(([k])=>k);
+                const tareasArrGuardar = Array.isArray(tareas) ? tareas : [];
                 tareasRealizadasHoy.forEach(nombreTarea => {
-                  const td = tareas.find(t=>(t.tarea||"").toLowerCase().includes(nombreTarea.toLowerCase().slice(0,10)));
+                  const td = tareasArrGuardar.find(t=>(t.tarea||"").toLowerCase().includes(nombreTarea.toLowerCase().slice(0,10)));
                   if(td && td.estado!=="hecha") onUpdateTarea(fechaVer, td.id, {estado:"hecha"});
                 });
 
@@ -7223,7 +7226,7 @@ function ZonaGolfSimple({ S, labelSt, zonas, tareas, titulo, colorAcento, golfDa
             <div><label style={labelSt}>Tarea</label>
               <select style={S.input} value={form.tipo} onChange={e=>setForm(p=>({...p,tipo:e.target.value}))}>
                 <option value="">Seleccionar...</option>
-                {tareas.map(t=><option key={t}>{t}</option>)}
+                {(Array.isArray(tareas)?tareas:[]).map(t=><option key={t}>{t}</option>)}
                 <option value="Otra">Otra...</option>
               </select>
             </div>
