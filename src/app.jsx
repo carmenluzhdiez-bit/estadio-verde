@@ -7381,7 +7381,7 @@ function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJe
     { id:"c_cancha",   cat:"✂️ Cortes", nombre:"Corte de Cancha (césped)",
       zona:"Golf/CANCHA", subzona:"Cancha general",
       frec:14, frecLabel:"Cada 14 días",
-      ultima:"2026-06-13", resp:bhaluNombre, notas:"3" y 2,75"" },
+      ultima:"2026-06-13", resp:bhaluNombre, notas:'3" y 2,75"' },
 
     // ── LABORES GREENS ───────────────────────────────────────────────
     { id:"fertil",     cat:"🌱 Fertilización", nombre:"Fertilización Greens + Vivero",
