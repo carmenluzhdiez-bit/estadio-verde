@@ -1487,6 +1487,8 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   // Estado de grupos colapsables — objeto {key: bool}
   const [gruposAbiertos, setGruposAbiertos] = React.useState({diarias:true,corte:true,medicion:true,riego:true,fitosan:true,limpieza:true,otros:true});
   const toggleGrupo = (key) => setGruposAbiertos(p=>({...p,[key]:!p[key]}));
+  const [showRegistroDiarioWorker, setShowRegistroDiarioWorker] = React.useState(false);
+  const [registroDiarioForm, setRegistroDiarioForm] = React.useState({tareas:{}, obsFito:"", obs:""});
 
   const ESTADOS_TAREA = {
     pendiente:    { label:"Pendiente",      color:"#f59e0b", bg:"rgba(245,158,11,0.15)",  icon:"🟡" },
@@ -1636,7 +1638,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
               style={{flex:1,minWidth:120,cursor:"pointer",border:"1px solid rgba(96,165,250,0.3)",borderRadius:10,padding:"9px 8px",background:"rgba(96,165,250,0.08)",color:"#60a5fa",fontFamily:"'Georgia',serif",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
               💧 Registrar humedad
             </button>
-            <button onClick={()=>onAccesoRapido?.("diario")}
+            <button onClick={()=>setShowRegistroDiarioWorker(true)}
               style={{flex:1,minWidth:120,cursor:"pointer",border:"1px solid rgba(167,139,250,0.3)",borderRadius:10,padding:"9px 8px",background:"rgba(167,139,250,0.08)",color:"#c4b5fd",fontFamily:"'Georgia',serif",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
               📋 Registro diario
             </button>
@@ -6671,26 +6673,91 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
 
   const medOrdenadas = [...mediciones].sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||""));
 
-  // ── Calcular tasa de crecimiento entre dos mediciones consecutivas ──────
+  // ── Calcular tasa de crecimiento real considerando cortes ───────────────
+  // Lógica: si la medición tiene diasDesdeCorte registrado → usar eso
+  // Si no: buscar si hubo un corte entre esta medición y la anterior en tareasProg
+  // Si hay corte: tasa = (altura_actual - alturaCorte) / diasDesdeCorte
+  // Si no hay corte: tasa = (altura_actual - altura_anterior) / días (solo si delta>0)
   const calcTasa = (zona) => {
+    const zonaKey = zona; // ej: "green01", "vivero"
     const puntos = medOrdenadas
       .filter(m=>m.alturas?.[zona])
-      .map(m=>({fecha:m.fecha, alt:Number(m.alturas[zona])}));
+      .map(m=>({
+        fecha:m.fecha,
+        alt:Number(m.alturas[zona]),
+        diasDesdeCorte: m.diasDesdeCorte?.[zona] ? Number(m.diasDesdeCorte[zona]) : null,
+      }));
     if(puntos.length<2) return null;
+
+    // Obtener cortes registrados en tareasProg para esta zona
+    const todosCortes = Object.entries(tareasProg||{}).flatMap(([fecha, ts])=>
+      (ts||[]).filter(t=>
+        t.estado==="hecha" &&
+        (t.tarea||"").toLowerCase().includes("corte") &&
+        (t.zona==="Golf" || (t.zona||"").includes("Golf")) &&
+        (t.elemento||"").toLowerCase().includes(zona.replace("green","green ").replace(/0/g,""))
+      ).map(t=>({fecha, alturaCorte:t.alturaCorte?Number(t.alturaCorte):null}))
+    ).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+
     const tasas = [];
     for(let i=1;i<puntos.length;i++) {
-      const dias = Math.round((new Date(puntos[i].fecha)-new Date(puntos[i-1].fecha))/(1000*60*60*24));
-      if(dias>0) {
-        const delta = puntos[i].alt - puntos[i-1].alt;
+      const p = puntos[i];
+      const pPrev = puntos[i-1];
+      const diasTotal = Math.round((new Date(p.fecha)-new Date(pPrev.fecha))/(1000*60*60*24));
+      if(diasTotal<=0) continue;
+
+      let delta, diasRef, metodo;
+
+      if(p.diasDesdeCorte && p.diasDesdeCorte > 0 && p.diasDesdeCorte <= diasTotal) {
+        // Bhalú registró días desde el último corte → usar ese dato
+        // Buscar altura del corte más reciente antes de esta medición
+        const corteReciente = [...todosCortes].reverse().find(c=>c.fecha<p.fecha);
+        const altBase = corteReciente?.alturaCorte || null;
+        if(altBase && p.alt > altBase) {
+          delta = p.alt - altBase;
+          diasRef = p.diasDesdeCorte;
+          metodo = "desde_corte";
+        } else {
+          // No tenemos alturaCorte registrada, usar días desde corte como referencia
+          delta = p.alt - pPrev.alt;
+          diasRef = p.diasDesdeCorte;
+          metodo = "dias_registrados";
+        }
+      } else {
+        // Sin días desde corte: buscar si hubo corte entre las dos mediciones
+        const corteEntremedias = todosCortes.find(c=>c.fecha>pPrev.fecha && c.fecha<=p.fecha);
+        if(corteEntremedias) {
+          // Hubo corte: calcular solo desde el corte hasta la medición actual
+          const diasDesdeCorte = Math.round((new Date(p.fecha)-new Date(corteEntremedias.fecha))/(1000*60*60*24));
+          const altBase = corteEntremedias.alturaCorte || null;
+          if(altBase && p.alt > altBase && diasDesdeCorte > 0) {
+            delta = p.alt - altBase;
+            diasRef = diasDesdeCorte;
+            metodo = "corte_detectado";
+          } else if(diasDesdeCorte > 0) {
+            // Corte sin altura registrada: omitir este intervalo (dato no confiable)
+            continue;
+          } else { continue; }
+        } else {
+          // Sin corte entre mediciones: delta directo, pero solo si positivo
+          delta = p.alt - pPrev.alt;
+          diasRef = diasTotal;
+          metodo = "directo";
+          if(delta <= 0) continue; // descarte: reducción = corte no registrado
+        }
+      }
+
+      if(diasRef > 0 && delta > 0) {
         tasas.push({
-          fecha:puntos[i].fecha, dias, delta,
-          tasa: Math.round((delta/dias)*100)/100,
-          mes: puntos[i].fecha.slice(5,7),
-          estacion: ESTACIONES[puntos[i].fecha.slice(5,7)]||"—",
+          fecha:p.fecha, dias:diasRef, delta,
+          tasa: Math.round((delta/diasRef)*100)/100,
+          mes: p.fecha.slice(5,7),
+          estacion: ESTACIONES[p.fecha.slice(5,7)]||"—",
+          metodo,
         });
       }
     }
-    return tasas;
+    return tasas.length ? tasas : null;
   };
 
   // ── Análisis por mes/estación/año ─────────────────────────────────────
@@ -7080,7 +7147,7 @@ const DECISIONES_HUM=[
   {value:"monitorear",      label:"👁️ Monitorear"},
 ];
 
-function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasProg, setTareasProg, showHumForm, setShowHumForm, humForm, setHumForm, emptyHumForm }) {
+function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasProg, setTareasProg, showHumForm, setShowHumForm, humForm, setHumForm, emptyHumForm , onRegistroGuardado }) {
   const humedades = Array.isArray(golfData.humedades)?golfData.humedades:Object.values(golfData.humedades||{});
   const setHumedades = (arr) => setG({humedades:arr});
   const labelSt = {fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
@@ -7115,6 +7182,7 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
     }
     setHumForm(emptyHumForm);
     setShowHumForm(false);
+    if(onRegistroGuardado) onRegistroGuardado("humedad");
   };
 
   return (
@@ -7396,9 +7464,6 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
 // ══════════════════════════════════════════════════════════════════
 function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJefa }) {
 
-  // Guard: si hoy no está disponible aún, no renderizar
-  if (!hoy || typeof hoy !== "string") return null;
-
   // ── Definición de tareas periódicas con última fecha y frecuencia ──
   // Frecuencias dinámicas: invierno (jun-ago) vs verano (dic-feb) vs transición
   const mesHoy = new Date(hoy).getMonth() + 1; // 1-12
@@ -7606,6 +7671,9 @@ function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJe
     pronto: tareasConUrgencia.filter(t => t.estado==="pronto" || t.estado==="esta_semana").length,
   };
 
+  // Guard DESPUÉS de hooks (regla de React)
+  if (!hoy || typeof hoy !== "string") return null;
+
   return (
     <div className="ein">
       {/* Header resumen */}
@@ -7742,7 +7810,7 @@ function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJe
   );
 }
 
-function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial }) {
+function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado }) {
   const GOLF_ZONA_ID = 31; // ID macrozona Golf
   const sincronizarMacrozona = (tipo, detalle) => {
     if(!updateZona) return;
@@ -7876,6 +7944,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
     sincronizarMacrozona("Medición de alturas", `${medForm.tipo} — ${medForm.responsable||"Sin responsable"}`);
     setMedForm({...emptyMed, fecha:hoy});
     setShowMedForm(false);
+    // Si vino desde Mi Turno (trabajador), volver automáticamente
+    if(onRegistroGuardado) onRegistroGuardado("medicion");
   };
 
   // ── Guardar evento ───────────────────────────────────────────────────────
@@ -9240,6 +9310,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           esJefa={esJefa}
           tareasProg={tareasProg}
           setTareasProg={setTareasProg}
+          onRegistroGuardado={onRegistroGuardado}
           showHumForm={showHumForm}
           setShowHumForm={setShowHumForm}
           humForm={humForm}
@@ -12095,7 +12166,14 @@ export default function App() {
 
         {/* GOLF */}
         {vista==="golf"&&(
-          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={rolLogueado==="jefa"||rolLogueado==="supervisor"} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial}/>
+          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={rolLogueado==="jefa"||rolLogueado==="supervisor"} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial}
+            onRegistroGuardado={(tipo)=>{
+              // Volver a Mi Turno después de registrar alturas o humedad
+              if(rolLogueado==="trabajador") {
+                setVista("miturno");
+              }
+            }}
+          />
         )}
 
         {/* BODEGAS */}
