@@ -7342,6 +7342,50 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
           );
         })}
       </div>
+
+      {/* ── Modal de confirmación de programación ── */}
+      {confirmando&&(
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.6)",zIndex:999,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+          <div style={{background:"#1a2e22",border:"1px solid rgba(61,122,82,0.5)",borderRadius:16,padding:24,maxWidth:400,width:"100%"}}>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,color:"#fbbf24",marginBottom:6}}>
+              📆 Programar tarea
+            </div>
+            <div style={{fontSize:14,fontWeight:600,color:"#ede9e0",marginBottom:4}}>
+              {confirmando.tarea.nombre}
+            </div>
+            <div style={{fontSize:12,color:"#5a9a7a",marginBottom:16}}>
+              {confirmando.tarea.zona} · Resp: {confirmando.tarea.resp}
+            </div>
+            <label style={{fontSize:12,color:"#6aaa7a",display:"block",marginBottom:6}}>
+              Fecha de programación:
+            </label>
+            <input type="date" value={fechaElegida}
+              onChange={e=>setFechaElegida(e.target.value)}
+              style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(61,122,82,0.4)",borderRadius:8,color:"#ede9e0",padding:"8px 12px",fontSize:13,marginBottom:6,boxSizing:"border-box"}}
+            />
+            {fechaElegida !== confirmando.fechaSugerida && (
+              <div style={{fontSize:11,color:"#f59e0b",marginBottom:10}}>
+                ⚠️ Fecha sugerida: {new Date(confirmando.fechaSugerida).toLocaleDateString("es-CL")}
+              </div>
+            )}
+            {confirmando.tarea.notas&&(
+              <div style={{fontSize:11,color:"#4a8a5a",marginBottom:14,fontStyle:"italic"}}>
+                💡 {confirmando.tarea.notas}
+              </div>
+            )}
+            <div style={{display:"flex",gap:10,marginTop:8}}>
+              <button onClick={confirmarProgramacion}
+                style={{flex:1,cursor:"pointer",border:"none",borderRadius:10,padding:"10px",background:"#3d7a52",color:"#fff",fontSize:13,fontFamily:"'Georgia',serif",fontWeight:600}}>
+                ✅ Confirmar
+              </button>
+              <button onClick={()=>setConfirmando(null)}
+                style={{flex:1,cursor:"pointer",border:"1px solid rgba(255,255,255,0.15)",borderRadius:10,padding:"10px",background:"transparent",color:"#6aaa7a",fontSize:13,fontFamily:"'Georgia',serif"}}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -7469,13 +7513,17 @@ function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJe
     const ult = ultimasFechas[tarea.id] || tarea.ultima;
     const ultDate = new Date(ult);
     const hoyDate = new Date(hoy);
+    // Usar frecuencia editada si existe
+    const frecOverride = frecuencias[tarea.id];
+    const frecEfectiva = frecOverride !== undefined ? frecOverride : tarea.frec;
+    const proxFijaEfectiva = frecOverride === null ? null : tarea.proxFija;
     let proxDate;
-    if (tarea.proxFija) {
-      proxDate = new Date(tarea.proxFija);
-    } else if (tarea.frec) {
-      proxDate = new Date(ultDate.getTime() + tarea.frec * 86400000);
+    if (proxFijaEfectiva && frecOverride === undefined) {
+      proxDate = new Date(proxFijaEfectiva);
+    } else if (frecEfectiva) {
+      proxDate = new Date(ultDate.getTime() + frecEfectiva * 86400000);
     } else {
-      return { dias: 999, estado: "ok", proxStr: tarea.proxFija || "—" };
+      return { dias: 999, estado: "ok", proxStr: tarea.proxFija || "—", frecEfectiva, frecLabelEfectiva: frecLabels[tarea.id] || tarea.frecLabel };
     }
     const dias = Math.round((proxDate - hoyDate) / 86400000);
     const estado = dias < 0 ? "vencida" : dias === 0 ? "hoy" : dias <= 3 ? "pronto" : dias <= 7 ? "esta_semana" : "ok";
@@ -7484,6 +7532,8 @@ function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJe
       estado,
       proxStr: proxDate.toLocaleDateString("es-CL"),
       ultStr: ultDate.toLocaleDateString("es-CL"),
+      frecEfectiva: frecEfectiva || tarea.frec,
+      frecLabelEfectiva: frecLabels[tarea.id] || tarea.frecLabel,
     };
   };
 
@@ -7505,12 +7555,20 @@ function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJe
 
   const programarTarea = (tarea) => {
     const prox = tarea.proxFija ? new Date(tarea.proxFija) : new Date(new Date(ultimasFechas[tarea.id] || tarea.ultima).getTime() + (tarea.frec||0)*86400000);
-    const fechaStr = prox.toISOString().slice(0,10);
+    const fechaSug = prox.toISOString().slice(0,10);
+    setFechaElegida(fechaSug);
+    setConfirmando({tarea, fechaSugerida:fechaSug});
+  };
+
+  const confirmarProgramacion = () => {
+    if(!confirmando) return;
+    const {tarea} = confirmando;
+    const fechaStr = fechaElegida;
     const nuevaTarea = {
       id: Date.now() + Math.random(),
       fecha: fechaStr,
-      zona: tarea.zona.includes("GREEN") ? "Golf" : tarea.zona.split("/")[0],
-      subZona: tarea.zona.split("/")[1] || "Golf",
+      zona: "Golf",
+      subZona: tarea.zona.replace("Golf/",""),
       elemento: tarea.subzona,
       tarea: `⛳ ${tarea.nombre}`,
       responsable: tarea.resp,
@@ -7523,10 +7581,18 @@ function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJe
       ...p,
       [fechaStr]: [...(p[fechaStr]||[]), nuevaTarea]
     }));
-    alert(`✅ "${tarea.nombre}" programada para el ${prox.toLocaleDateString("es-CL")}`);
+    // Actualizar la última fecha en el estado local
+    setUltimasFechas(p => ({...p, [tarea.id]: fechaStr}));
+    setConfirmando(null);
   };
 
   const [catAbierta, setCatAbierta] = React.useState({});
+  const [confirmando, setConfirmando] = React.useState(null); // {tarea, fechaSugerida}
+  const [fechaElegida, setFechaElegida] = React.useState("");
+  const [frecuencias, setFrecuencias] = React.useState({}); // override de frecuencias por id
+  const [frecLabels, setFrecLabels] = React.useState({});   // override de labels
+  const [editandoFrec, setEditandoFrec] = React.useState(null); // id de tarea en edición
+  const [frecForm, setFrecForm] = React.useState({tipo:"dias", dias:"", label:""});
 
   const resumen = {
     vencidas: tareasConUrgencia.filter(t => t.estado==="vencida").length,
@@ -7584,8 +7650,50 @@ function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJe
                     {t.dias < 0 ? `${Math.abs(t.dias)}d vencida` : t.dias === 0 ? "HOY" : `en ${t.dias}d`}
                   </span>
                 </div>
-                <div style={{fontSize:11,color:"#5a9a7a",marginTop:3}}>
-                  {t.zona} · {t.frecLabel}
+                <div style={{fontSize:11,color:"#5a9a7a",marginTop:3,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                  <span>{t.zona}</span>
+                  <span>·</span>
+                  {editandoFrec===t.id ? (
+                    <span style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                      <select value={frecForm.tipo} onChange={e=>setFrecForm(p=>({...p,tipo:e.target.value}))}
+                        style={{fontSize:11,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(61,122,82,0.4)",borderRadius:6,color:"#ede9e0",padding:"2px 6px"}}>
+                        <option value="dias">Cada N días</option>
+                        <option value="veces_año">Veces al año</option>
+                        <option value="manual">Texto libre</option>
+                      </select>
+                      {frecForm.tipo==="dias"&&(
+                        <input type="number" min="1" max="365" value={frecForm.dias}
+                          onChange={e=>setFrecForm(p=>({...p,dias:e.target.value}))}
+                          placeholder="días" style={{width:60,fontSize:11,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(61,122,82,0.4)",borderRadius:6,color:"#ede9e0",padding:"2px 6px"}}/>
+                      )}
+                      {frecForm.tipo==="veces_año"&&(
+                        <input type="number" min="1" max="12" value={frecForm.dias}
+                          onChange={e=>setFrecForm(p=>({...p,dias:e.target.value}))}
+                          placeholder="veces" style={{width:60,fontSize:11,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(61,122,82,0.4)",borderRadius:6,color:"#ede9e0",padding:"2px 6px"}}/>
+                      )}
+                      <input type="text" value={frecForm.label}
+                        onChange={e=>setFrecForm(p=>({...p,label:e.target.value}))}
+                        placeholder="descripción (ej: 2 veces/año)"
+                        style={{width:150,fontSize:11,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(61,122,82,0.4)",borderRadius:6,color:"#ede9e0",padding:"2px 6px"}}/>
+                      <button onClick={()=>{
+                        const dias = frecForm.tipo==="dias" ? parseInt(frecForm.dias) :
+                                     frecForm.tipo==="veces_año" ? Math.round(365/parseInt(frecForm.dias)) : null;
+                        setFrecuencias(p=>({...p,[t.id]:dias}));
+                        setFrecLabels(p=>({...p,[t.id]:frecForm.label||t.frecLabel}));
+                        setEditandoFrec(null);
+                      }} style={{cursor:"pointer",border:"none",borderRadius:6,padding:"2px 8px",background:"#3d7a52",color:"#fff",fontSize:11}}>✓</button>
+                      <button onClick={()=>setEditandoFrec(null)}
+                        style={{cursor:"pointer",border:"1px solid rgba(255,255,255,0.15)",borderRadius:6,padding:"2px 8px",background:"transparent",color:"#6aaa7a",fontSize:11}}>✗</button>
+                    </span>
+                  ) : (
+                    <span style={{display:"flex",alignItems:"center",gap:4}}>
+                      <span style={{color: frecuencias[t.id]!==undefined?"#fbbf24":"#5a9a7a"}}>{t.frecLabelEfectiva}</span>
+                      {esJefa&&<button onClick={()=>{
+                        setEditandoFrec(t.id);
+                        setFrecForm({tipo:"dias", dias: frecuencias[t.id]||t.frec||"", label: frecLabels[t.id]||t.frecLabel||""});
+                      }} style={{cursor:"pointer",border:"none",background:"transparent",color:"#3d6a52",fontSize:10,padding:"0 2px"}}>✏️</button>}
+                    </span>
+                  )}
                 </div>
               </div>
               <div style={{textAlign:"right",minWidth:80}}>
