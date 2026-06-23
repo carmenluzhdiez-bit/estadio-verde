@@ -1487,7 +1487,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   // Estado de grupos colapsables — objeto {key: bool}
   const [gruposAbiertos, setGruposAbiertos] = React.useState({diarias:true,corte:true,medicion:true,riego:true,fitosan:true,limpieza:true,otros:true});
   const toggleGrupo = (key) => setGruposAbiertos(p=>({...p,[key]:!p[key]}));
-  const [showRegistroDiarioWorker, setShowRegistroDiarioWorker] = React.useState(false);
+  const [showRegistroDiarioWorker, setShowRegistroDiarioWorker] = React.useState(true); // abierto por defecto
   const [registroDiarioForm, setRegistroDiarioForm] = React.useState({tareas:{}, obsFito:"", obs:""});
 
   const ESTADOS_TAREA = {
@@ -1638,10 +1638,143 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
               style={{flex:1,minWidth:120,cursor:"pointer",border:"1px solid rgba(96,165,250,0.3)",borderRadius:10,padding:"9px 8px",background:"rgba(96,165,250,0.08)",color:"#60a5fa",fontFamily:"'Georgia',serif",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
               💧 Registrar humedad
             </button>
-            <button onClick={()=>setShowRegistroDiarioWorker(true)}
-              style={{flex:1,minWidth:120,cursor:"pointer",border:"1px solid rgba(167,139,250,0.3)",borderRadius:10,padding:"9px 8px",background:"rgba(167,139,250,0.08)",color:"#c4b5fd",fontFamily:"'Georgia',serif",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-              📋 Registro diario
+            <button onClick={()=>setShowRegistroDiarioWorker(v=>!v)}
+              style={{flex:1,minWidth:120,cursor:"pointer",border:"1px solid rgba(167,139,250,0.3)",borderRadius:10,padding:"9px 8px",background:showRegistroDiarioWorker?"rgba(167,139,250,0.18)":"rgba(167,139,250,0.08)",color:"#c4b5fd",fontFamily:"'Georgia',serif",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+              📋 {showRegistroDiarioWorker?"Cerrar registro":"Registro diario"}
             </button>
+          </div>
+        )}
+
+        {/* ── Registro diario inline para trabajador ── */}
+        {showRegistroDiarioWorker&&(
+          <div style={{background:"rgba(52,211,153,0.05)",border:"1px solid rgba(52,211,153,0.25)",borderRadius:14,padding:16,marginBottom:14}} className="ein">
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#34d399"}}>✅ Registro diario — Greens</div>
+              <button onClick={()=>setShowRegistroDiarioWorker(false)}
+                style={{cursor:"pointer",border:"none",background:"transparent",color:"#5a9a7a",fontSize:18,lineHeight:1}}>✕</button>
+            </div>
+
+            {/* Tareas a marcar — dinámicas según lo programado hoy */}
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+              <div style={{fontSize:11,color:"#5a9a7a"}}>Marca lo que realizaste hoy:</div>
+              <button onClick={()=>{
+                const todas = (()=>{
+                  const td = tareas.filter(t=>t.diaria).map(t=>{
+                    const n=(t.tarea||"").replace("⛳ ","");
+                    if(t.metodoLimpieza&&n.toLowerCase().includes("limpieza")){
+                      const m=t.metodoLimpieza==="sopladora"?"🌬️ sopladora":t.metodoLimpieza==="barrido"?"🧹 barrido con vara":"🌬️+🧹 sopladora + barrido";
+                      return `${n} (${m})`;
+                    }
+                    return n;
+                  });
+                  return [...new Set([...td,"Medición de alturas","Revisión humedad greens","Revisión sistema de riego"])];
+                })();
+                const todosMarcados = todas.every(t=>registroDiarioForm.tareas[t]);
+                const nuevo = {};
+                todas.forEach(t=>{ nuevo[t]=!todosMarcados; });
+                setRegistroDiarioForm(p=>({...p,tareas:nuevo}));
+              }} style={{cursor:"pointer",border:"1px solid rgba(52,211,153,0.3)",borderRadius:8,padding:"3px 10px",background:"transparent",color:"#34d399",fontSize:11}}>
+                {Object.values(registroDiarioForm.tareas).every(Boolean)?"✗ Desmarcar":"✓ Marcar todas"}
+              </button>
+            </div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
+              {(()=>{
+                // Construir lista desde las tareas diarias del día + fijas
+                const tareasDelDia = tareas
+                  .filter(t=>t.diaria)
+                  .map(t=>{
+                    const nombre = (t.tarea||"").replace("⛳ ","");
+                    // Mostrar método de limpieza si aplica
+                    if(t.metodoLimpieza && nombre.toLowerCase().includes("limpieza")) {
+                      const met = t.metodoLimpieza==="sopladora"?"🌬️ sopladora":
+                                  t.metodoLimpieza==="barrido"?"🧹 barrido con vara":
+                                  "🌬️+🧹 sopladora + barrido";
+                      return `${nombre} (${met})`;
+                    }
+                    return nombre;
+                  });
+                // Añadir items fijos que no vienen de tareas programadas
+                const extras = ["Medición de alturas","Revisión humedad greens","Revisión sistema de riego"];
+                const listaCompleta = [...new Set([...tareasDelDia, ...extras])];
+                return listaCompleta;
+              })().map(t=>{
+                const marcada = registroDiarioForm.tareas[t];
+                return (
+                  <div key={t} onClick={()=>setRegistroDiarioForm(p=>({...p,tareas:{...p.tareas,[t]:!p.tareas[t]}}))}
+                    style={{display:"flex",alignItems:"center",gap:6,padding:"6px 10px",borderRadius:8,
+                      background:marcada?"rgba(52,211,153,0.12)":"rgba(255,255,255,0.04)",
+                      border:`1px solid ${marcada?"rgba(52,211,153,0.4)":"rgba(255,255,255,0.08)"}`,
+                      cursor:"pointer",fontSize:12,userSelect:"none"}}>
+                    <div style={{width:14,height:14,borderRadius:3,
+                      border:`2px solid ${marcada?"#34d399":"rgba(255,255,255,0.2)"}`,
+                      background:marcada?"#34d399":"transparent",
+                      display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                      {marcada&&<span style={{color:"#000",fontSize:9,fontWeight:700}}>✓</span>}
+                    </div>
+                    <span>{t}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Observación fitosanitaria */}
+            <div style={{background:"rgba(167,139,250,0.06)",borderRadius:8,padding:"10px 12px",marginBottom:10,border:"1px solid rgba(167,139,250,0.2)"}}>
+              <div style={{fontSize:11,color:"#c4b5fd",fontWeight:600,marginBottom:6}}>🔬 Observación fitosanitaria</div>
+              <input style={{...S.input,fontSize:12}}
+                placeholder="Sin novedades · Mancha sospechosa Green 03 · Presencia de trips..."
+                value={registroDiarioForm.obsFito||""}
+                onChange={e=>setRegistroDiarioForm(p=>({...p,obsFito:e.target.value}))}/>
+              <div style={{fontSize:10,color:"#5a7a9a",marginTop:4}}>
+                Si hay novedad relevante será registrada en Incidencias fitosanitarias
+              </div>
+            </div>
+
+            {/* Observaciones generales */}
+            <div style={{marginBottom:12}}>
+              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4}}>Observaciones generales</label>
+              <input style={{...S.input,fontSize:12}}
+                placeholder="Condiciones del día, novedades..."
+                value={registroDiarioForm.obs||""}
+                onChange={e=>setRegistroDiarioForm(p=>({...p,obs:e.target.value}))}/>
+            </div>
+
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>{
+                // Guardar registro vía onAddTarea como tarea especial de registro
+                const resumen = Object.entries(registroDiarioForm.tareas)
+                  .filter(([,v])=>v).map(([k])=>k).join(", ");
+                if(!resumen && !registroDiarioForm.obsFito && !registroDiarioForm.obs) {
+                  alert("Marca al menos una tarea o agrega una observación");
+                  return;
+                }
+                // Marcar tarea diaria de pediluvios/soplado como hecha si está entre las marcadas
+                const tareasRealizadasHoy = Object.entries(registroDiarioForm.tareas)
+                  .filter(([,v])=>v).map(([k])=>k);
+                tareasRealizadasHoy.forEach(nombreTarea => {
+                  const td = tareas.find(t=>(t.tarea||"").toLowerCase().includes(nombreTarea.toLowerCase().slice(0,10)));
+                  if(td && td.estado!=="hecha") onUpdateTarea(fechaVer, td.id, {estado:"hecha"});
+                });
+
+                onAddTarea({
+                  id:Date.now(),
+                  fecha:fechaVer,
+                  zona:"Golf",
+                  subZona:"GREEN",
+                  elemento:"Greens",
+                  tarea:"⛳ Registro diario — Greens",
+                  responsable:trabajador?.nombre||"Bhalú",
+                  estado:"hecha",
+                  notas:`Tareas: ${resumen||"—"} | Fito: ${registroDiarioForm.obsFito||"Sin novedades"} | ${registroDiarioForm.obs||""}`,
+                  esRegistroDiario:true,
+                  tareasRealizadas:registroDiarioForm.tareas,
+                  obsFito:registroDiarioForm.obsFito||"",
+                  obs:registroDiarioForm.obs||"",
+                });
+                setRegistroDiarioForm({tareas:{},obsFito:"",obs:""});
+                setShowRegistroDiarioWorker(false);
+              }} className="btn-p" style={S.btn}>✓ Guardar registro</button>
+              <button onClick={()=>setShowRegistroDiarioWorker(false)} className="btn-g" style={S.btn}>Cancelar</button>
+            </div>
           </div>
         )}
 
