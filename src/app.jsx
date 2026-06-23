@@ -1654,52 +1654,26 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                 style={{cursor:"pointer",border:"none",background:"transparent",color:"#5a9a7a",fontSize:18,lineHeight:1}}>✕</button>
             </div>
 
-            {/* Tareas a marcar — dinámicas según lo programado hoy */}
+            {/* Tareas a marcar */}
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
               <div style={{fontSize:11,color:"#5a9a7a"}}>Marca lo que realizaste hoy:</div>
               <button onClick={()=>{
-                const todas = (()=>{
-                  const tareasArr2 = Array.isArray(tareas) ? tareas : [];
-                  const td = tareasArr2.filter(t=>t.diaria).map(t=>{
-                    const n=(t.tarea||"").replace("⛳ ","");
-                    if(t.metodoLimpieza&&n.toLowerCase().includes("limpieza")){
-                      const m=t.metodoLimpieza==="sopladora"?"🌬️ sopladora":t.metodoLimpieza==="barrido"?"🧹 barrido con vara":"🌬️+🧹 sopladora + barrido";
-                      return `${n} (${m})`;
-                    }
-                    return n;
-                  });
-                  return [...new Set([...td,"Medición de alturas","Revisión humedad greens","Revisión sistema de riego"])];
-                })();
-                const todosMarcados = todas.every(t=>registroDiarioForm.tareas[t]);
+                const listaTareas = [...TAREAS_GREENS_DIARIAS,"Limpieza — Greens","Medición de alturas","Revisión humedad greens","Revisión sistema de riego"];
+                const todosMarcados = listaTareas.every(t=>registroDiarioForm.tareas[t]);
                 const nuevo = {};
-                todas.forEach(t=>{ nuevo[t]=!todosMarcados; });
+                listaTareas.forEach(t=>{ nuevo[t]=!todosMarcados; });
                 setRegistroDiarioForm(p=>({...p,tareas:nuevo}));
               }} style={{cursor:"pointer",border:"1px solid rgba(52,211,153,0.3)",borderRadius:8,padding:"3px 10px",background:"transparent",color:"#34d399",fontSize:11}}>
-                {Object.keys(registroDiarioForm.tareas).length>0 && Object.values(registroDiarioForm.tareas).every(Boolean)?"✗ Desmarcar":"✓ Marcar todas"}
+                {Object.values(registroDiarioForm.tareas).some(Boolean)?"✗ Desmarcar":"✓ Marcar todas"}
               </button>
             </div>
             <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
-              {(()=>{
-                // Construir lista desde las tareas diarias del día + fijas
-                const tareasArr = Array.isArray(tareas) ? tareas : [];
-                const tareasDelDia = tareasArr
-                  .filter(t=>t.diaria)
-                  .map(t=>{
-                    const nombre = (t.tarea||"").replace("⛳ ","");
-                    // Mostrar método de limpieza si aplica
-                    if(t.metodoLimpieza && nombre.toLowerCase().includes("limpieza")) {
-                      const met = t.metodoLimpieza==="sopladora"?"🌬️ sopladora":
-                                  t.metodoLimpieza==="barrido"?"🧹 barrido con vara":
-                                  "🌬️+🧹 sopladora + barrido";
-                      return `${nombre} (${met})`;
-                    }
-                    return nombre;
-                  });
-                // Añadir items fijos que no vienen de tareas programadas
-                const extras = ["Medición de alturas","Revisión humedad greens","Revisión sistema de riego"];
-                const listaCompleta = [...new Set([...tareasDelDia, ...extras])];
-                return listaCompleta;
-              })().map(t=>{
+              {[...TAREAS_GREENS_DIARIAS,
+                "Limpieza — Greens",
+                "Medición de alturas",
+                "Revisión humedad greens",
+                "Revisión sistema de riego"
+              ].map(t=>{
                 const marcada = registroDiarioForm.tareas[t];
                 return (
                   <div key={t} onClick={()=>setRegistroDiarioForm(p=>({...p,tareas:{...p.tareas,[t]:!p.tareas[t]}}))}
@@ -6788,7 +6762,7 @@ const PLANTILLA_PRE_TORNEO = {
 };
 
 // ─── ANÁLISIS MEDICIONES GOLF ────────────────────────────────────────────────
-function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJefa, onBorrar, onBorrarTodo }) {
+function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJefa, onBorrar, onBorrarTodo, tareasProg }) {
   const ZONAS = [...GREENS_DEF, {id:"vivero", nombre:"Vivero", hoyos:""}];
   const COLORES_ZONA = {
     g1:"#34d399",g2:"#60a5fa",g3:"#f59e0b",g4:"#a78bfa",g5:"#f472b6",
@@ -6809,8 +6783,8 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
 
   const medOrdenadas = [...mediciones].sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||""));
 
-  // ── Calcular tasa de crecimiento real considerando cortes ───────────────
-  // Lógica: si la medición tiene diasDesdeCorte registrado → usar eso
+  //  Calcular tasa de crecimiento real considerando cortes 
+  // Lógica: si la medición tiene diasDesdeCorte registrado -> usar eso
   // Si no: buscar si hubo un corte entre esta medición y la anterior en tareasProg
   // Si hay corte: tasa = (altura_actual - alturaCorte) / diasDesdeCorte
   // Si no hay corte: tasa = (altura_actual - altura_anterior) / días (solo si delta>0)
@@ -7547,49 +7521,6 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
         })}
       </div>
 
-      {/* ── Modal de confirmación de programación ── */}
-      {confirmando&&(
-        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.6)",zIndex:999,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
-          <div style={{background:"#1a2e22",border:"1px solid rgba(61,122,82,0.5)",borderRadius:16,padding:24,maxWidth:400,width:"100%"}}>
-            <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,color:"#fbbf24",marginBottom:6}}>
-              📆 Programar tarea
-            </div>
-            <div style={{fontSize:14,fontWeight:600,color:"#ede9e0",marginBottom:4}}>
-              {confirmando.tarea.nombre}
-            </div>
-            <div style={{fontSize:12,color:"#5a9a7a",marginBottom:16}}>
-              {confirmando.tarea.zona} · Resp: {confirmando.tarea.resp}
-            </div>
-            <label style={{fontSize:12,color:"#6aaa7a",display:"block",marginBottom:6}}>
-              Fecha de programación:
-            </label>
-            <input type="date" value={fechaElegida}
-              onChange={e=>setFechaElegida(e.target.value)}
-              style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(61,122,82,0.4)",borderRadius:8,color:"#ede9e0",padding:"8px 12px",fontSize:13,marginBottom:6,boxSizing:"border-box"}}
-            />
-            {fechaElegida !== confirmando.fechaSugerida && (
-              <div style={{fontSize:11,color:"#f59e0b",marginBottom:10}}>
-                ⚠️ Fecha sugerida: {new Date(confirmando.fechaSugerida).toLocaleDateString("es-CL")}
-              </div>
-            )}
-            {confirmando.tarea.notas&&(
-              <div style={{fontSize:11,color:"#4a8a5a",marginBottom:14,fontStyle:"italic"}}>
-                💡 {confirmando.tarea.notas}
-              </div>
-            )}
-            <div style={{display:"flex",gap:10,marginTop:8}}>
-              <button onClick={confirmarProgramacion}
-                style={{flex:1,cursor:"pointer",border:"none",borderRadius:10,padding:"10px",background:"#3d7a52",color:"#fff",fontSize:13,fontFamily:"'Georgia',serif",fontWeight:600}}>
-                ✅ Confirmar
-              </button>
-              <button onClick={()=>setConfirmando(null)}
-                style={{flex:1,cursor:"pointer",border:"1px solid rgba(255,255,255,0.15)",borderRadius:10,padding:"10px",background:"transparent",color:"#6aaa7a",fontSize:13,fontFamily:"'Georgia',serif"}}>
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -7942,6 +7873,49 @@ function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJe
           </div>
         );
       })}
+      {/* ── Modal de confirmación de programación ── */}
+      {confirmando&&(
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.6)",zIndex:999,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+          <div style={{background:"#1a2e22",border:"1px solid rgba(61,122,82,0.5)",borderRadius:16,padding:24,maxWidth:400,width:"100%"}}>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,color:"#fbbf24",marginBottom:6}}>
+              📆 Programar tarea
+            </div>
+            <div style={{fontSize:14,fontWeight:600,color:"#ede9e0",marginBottom:4}}>
+              {confirmando.tarea.nombre}
+            </div>
+            <div style={{fontSize:12,color:"#5a9a7a",marginBottom:16}}>
+              {confirmando.tarea.zona} · Resp: {confirmando.tarea.resp}
+            </div>
+            <label style={{fontSize:12,color:"#6aaa7a",display:"block",marginBottom:6}}>
+              Fecha de programación:
+            </label>
+            <input type="date" value={fechaElegida}
+              onChange={e=>setFechaElegida(e.target.value)}
+              style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(61,122,82,0.4)",borderRadius:8,color:"#ede9e0",padding:"8px 12px",fontSize:13,marginBottom:6,boxSizing:"border-box"}}
+            />
+            {fechaElegida !== confirmando.fechaSugerida && (
+              <div style={{fontSize:11,color:"#f59e0b",marginBottom:10}}>
+                ⚠️ Fecha sugerida: {new Date(confirmando.fechaSugerida).toLocaleDateString("es-CL")}
+              </div>
+            )}
+            {confirmando.tarea.notas&&(
+              <div style={{fontSize:11,color:"#4a8a5a",marginBottom:14,fontStyle:"italic"}}>
+                💡 {confirmando.tarea.notas}
+              </div>
+            )}
+            <div style={{display:"flex",gap:10,marginTop:8}}>
+              <button onClick={confirmarProgramacion}
+                style={{flex:1,cursor:"pointer",border:"none",borderRadius:10,padding:"10px",background:"#3d7a52",color:"#fff",fontSize:13,fontFamily:"'Georgia',serif",fontWeight:600}}>
+                ✅ Confirmar
+              </button>
+              <button onClick={()=>setConfirmando(null)}
+                style={{flex:1,cursor:"pointer",border:"1px solid rgba(255,255,255,0.15)",borderRadius:10,padding:"10px",background:"transparent",color:"#6aaa7a",fontSize:13,fontFamily:"'Georgia',serif"}}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -9429,6 +9403,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           <MedicionesAnalisis
             mediciones={mediciones} GREENS_DEF={GREENS_DEF} rango={rango}
             colorAltura={colorAltura} S={S} esJefa={esJefa}
+            tareasProg={tareasProg}
             onBorrar={(id)=>setG({mediciones:mediciones.filter(m=>m.id!==id)})}
             onBorrarTodo={()=>setG({mediciones:[]})}
           />
