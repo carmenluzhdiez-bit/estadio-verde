@@ -7509,21 +7509,27 @@ function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJe
   const [filtroUrgencia, setFiltroUrgencia] = React.useState("todas");
 
   // ── Calcular próxima fecha y urgencia ──
+  const [frecuencias, setFrecuencias] = React.useState({});
+  const [frecLabels, setFrecLabels] = React.useState({});
+  const [editandoFrec, setEditandoFrec] = React.useState(null);
+  const [frecForm, setFrecForm] = React.useState({tipo:"dias", dias:"", label:""});
+
   const calcUrgencia = (tarea) => {
     const ult = ultimasFechas[tarea.id] || tarea.ultima;
     const ultDate = new Date(ult);
     const hoyDate = new Date(hoy);
-    // Usar frecuencia editada si existe
-    const frecOverride = frecuencias[tarea.id];
+    const frecOverride = frecuencias[tarea.id]; // undefined = no editado
     const frecEfectiva = frecOverride !== undefined ? frecOverride : tarea.frec;
-    const proxFijaEfectiva = frecOverride === null ? null : tarea.proxFija;
+    const labelEfectiva = frecLabels[tarea.id] || tarea.frecLabel;
     let proxDate;
-    if (proxFijaEfectiva && frecOverride === undefined) {
-      proxDate = new Date(proxFijaEfectiva);
-    } else if (frecEfectiva) {
+    if (frecEfectiva) {
+      // Si hay frecuencia (original o editada) calcular desde última fecha
       proxDate = new Date(ultDate.getTime() + frecEfectiva * 86400000);
+    } else if (tarea.proxFija && frecOverride === undefined) {
+      // Sin frecuencia y sin override: usar fecha fija original
+      proxDate = new Date(tarea.proxFija);
     } else {
-      return { dias: 999, estado: "ok", proxStr: tarea.proxFija || "—", frecEfectiva, frecLabelEfectiva: frecLabels[tarea.id] || tarea.frecLabel };
+      return { dias:999, estado:"ok", proxStr:"-", ultStr:ultDate.toLocaleDateString("es-CL"), frecEfectiva:null, frecLabelEfectiva:labelEfectiva };
     }
     const dias = Math.round((proxDate - hoyDate) / 86400000);
     const estado = dias < 0 ? "vencida" : dias === 0 ? "hoy" : dias <= 3 ? "pronto" : dias <= 7 ? "esta_semana" : "ok";
@@ -7532,8 +7538,8 @@ function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJe
       estado,
       proxStr: proxDate.toLocaleDateString("es-CL"),
       ultStr: ultDate.toLocaleDateString("es-CL"),
-      frecEfectiva: frecEfectiva || tarea.frec,
-      frecLabelEfectiva: frecLabels[tarea.id] || tarea.frecLabel,
+      frecEfectiva,
+      frecLabelEfectiva: labelEfectiva,
     };
   };
 
@@ -7589,10 +7595,7 @@ function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJe
   const [catAbierta, setCatAbierta] = React.useState({});
   const [confirmando, setConfirmando] = React.useState(null); // {tarea, fechaSugerida}
   const [fechaElegida, setFechaElegida] = React.useState("");
-  const [frecuencias, setFrecuencias] = React.useState({}); // override de frecuencias por id
-  const [frecLabels, setFrecLabels] = React.useState({});   // override de labels
-  const [editandoFrec, setEditandoFrec] = React.useState(null); // id de tarea en edición
-  const [frecForm, setFrecForm] = React.useState({tipo:"dias", dias:"", label:""});
+
 
   const resumen = {
     vencidas: tareasConUrgencia.filter(t => t.estado==="vencida").length,
@@ -7702,7 +7705,7 @@ function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJe
               </div>
             </div>
             <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-              <span style={{fontSize:11,color:"#4a8a5a"}}>Última: {t.ultStr||"—"}</span>
+              <span style={{fontSize:11,color:"#4a8a5a"}}>Última: {t.ultStr||"-"}</span>
               {esJefa && editandoFecha===t.id ? (
                 <div style={{display:"flex",gap:6,alignItems:"center"}}>
                   <input type="date" defaultValue={ultimasFechas[t.id]||t.ultima}
