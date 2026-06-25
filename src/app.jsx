@@ -819,6 +819,11 @@ function ResponsableSelector({ value, personal, onChange, S, fontSize=14, inline
 // ─── REPORTE SEMANAL ─────────────────────────────────────────────────────────
 function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_BASE, personal, incidenciasFito=[] }) {
 
+  // Modo: semana | rango
+  const [modoReporte, setModoReporte] = React.useState("semana");
+  const [fechaDesde, setFechaDesde] = React.useState(semanaBase||"");
+  const [fechaHasta, setFechaHasta] = React.useState(semanaBase||"");
+
   // Calcular días lunes-domingo de la semana elegida
   const getDiasSemana = (lunesStr) => {
     const lunes = new Date(lunesStr + "T12:00:00");
@@ -826,6 +831,16 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
       const d = new Date(lunes); d.setDate(d.getDate()+i);
       return d.toISOString().slice(0,10);
     });
+  };
+
+  // Calcular todos los días entre dos fechas
+  const getDiasRango = (desde, hasta) => {
+    if(!desde||!hasta) return [];
+    const dias = [];
+    const d = new Date(desde+"T12:00:00");
+    const fin = new Date(hasta+"T12:00:00");
+    while(d<=fin) { dias.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1); }
+    return dias;
   };
 
   const semanaAnterior = () => {
@@ -841,11 +856,13 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
     d.setDate(d.getDate()+diff); setSemanaBase(d.toISOString().slice(0,10));
   };
 
-  const dias = getDiasSemana(semanaBase);
-  const domingo = dias[6];
+  const dias = modoReporte==="semana"
+    ? getDiasSemana(semanaBase)
+    : getDiasRango(fechaDesde, fechaHasta);
+  const domingo = modoReporte==="semana" ? dias[6] : fechaHasta;
   const DIAS_LABEL = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
 
-  // Todas las tareas de la semana
+  // Todas las tareas del período
   const tareasSemanales = dias.flatMap(d => (tareasProg[d]||[]).map(t=>({...t, fechaDia:d})));
 
   // Stats globales
@@ -1032,26 +1049,59 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
 
   return (
     <div className="ein">
-      {/* Navegación de semana */}
+      {/* Navegación — modo semana o rango libre */}
       <div style={{...S.card,padding:"14px 18px",marginBottom:20}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12}}>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <button onClick={semanaAnterior} style={{...S.btn,padding:"6px 14px",fontSize:16,background:"rgba(255,255,255,0.07)",color:"#a0c8a0",border:"1px solid rgba(255,255,255,0.12)"}}>‹</button>
-            <div style={{textAlign:"center"}}>
-              <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700}}>
-                {new Date(semanaBase+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"long"})} – {new Date(domingo+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"})}
-              </div>
-              <div style={{fontSize:12,color:"#6aaa7a",marginTop:2}}>Semana {Math.ceil(new Date(semanaBase+"T12:00:00").toLocaleDateString("es-CL").split("/")[0]/7)}</div>
-            </div>
-            <button onClick={semanaSiguiente} style={{...S.btn,padding:"6px 14px",fontSize:16,background:"rgba(255,255,255,0.07)",color:"#a0c8a0",border:"1px solid rgba(255,255,255,0.12)"}}>›</button>
-          </div>
-          <div style={{display:"flex",gap:8,alignItems:"center"}}>
-            <input type="date" value={semanaBase} onChange={e=>{const d=new Date(e.target.value+"T12:00:00");const day=d.getDay();const diff=(day===0?-6:1-day);d.setDate(d.getDate()+diff);setSemanaBase(d.toISOString().slice(0,10));}}
-              style={{...S.input,width:"auto",fontSize:13}}/>
-            <button onClick={semanaActual} style={{...S.btn,background:"transparent",color:"#6aaa7a",border:"1px solid rgba(255,255,255,0.1)",fontSize:12}}>Esta semana</button>
-            <button onClick={imprimir} style={{...S.btn,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)",fontSize:13}}>🖨️ Imprimir</button>
-          </div>
+        {/* Selector de modo */}
+        <div style={{display:"flex",gap:6,marginBottom:12}}>
+          {[["semana","📅 Por semana"],["rango","📆 Rango de fechas"]].map(([m,l])=>(
+            <button key={m} onClick={()=>setModoReporte(m)}
+              style={{cursor:"pointer",border:`1px solid ${modoReporte===m?"#34d399":"rgba(255,255,255,0.12)"}`,
+                borderRadius:8,padding:"4px 14px",fontSize:12,
+                background:modoReporte===m?"rgba(52,211,153,0.12)":"transparent",
+                color:modoReporte===m?"#34d399":"#6aaa7a"}}>
+              {l}
+            </button>
+          ))}
         </div>
+        {modoReporte==="semana" ? (
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <button onClick={semanaAnterior} style={{...S.btn,padding:"6px 14px",fontSize:16,background:"rgba(255,255,255,0.07)",color:"#a0c8a0",border:"1px solid rgba(255,255,255,0.12)"}}>‹</button>
+              <div style={{textAlign:"center"}}>
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700}}>
+                  {new Date(semanaBase+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"long"})} – {new Date(domingo+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"})}
+                </div>
+                <div style={{fontSize:12,color:"#6aaa7a",marginTop:2}}>{dias.length} días · {tareasSemanales.length} tareas</div>
+              </div>
+              <button onClick={semanaSiguiente} style={{...S.btn,padding:"6px 14px",fontSize:16,background:"rgba(255,255,255,0.07)",color:"#a0c8a0",border:"1px solid rgba(255,255,255,0.12)"}}>›</button>
+            </div>
+            <div style={{display:"flex",gap:8,alignItems:"center"}}>
+              <input type="date" value={semanaBase} onChange={e=>{const d=new Date(e.target.value+"T12:00:00");const day=d.getDay();const diff=(day===0?-6:1-day);d.setDate(d.getDate()+diff);setSemanaBase(d.toISOString().slice(0,10));}}
+                style={{...S.input,width:"auto",fontSize:13}}/>
+              <button onClick={semanaActual} style={{...S.btn,background:"transparent",color:"#6aaa7a",border:"1px solid rgba(255,255,255,0.1)",fontSize:12}}>Esta semana</button>
+              <button onClick={imprimir} style={{...S.btn,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)",fontSize:13}}>🖨️ Imprimir</button>
+            </div>
+          </div>
+        ) : (
+          <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <label style={{fontSize:12,color:"#6aaa7a"}}>Desde:</label>
+              <input type="date" value={fechaDesde} onChange={e=>setFechaDesde(e.target.value)}
+                style={{...S.input,width:"auto",fontSize:13}}/>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <label style={{fontSize:12,color:"#6aaa7a"}}>Hasta:</label>
+              <input type="date" value={fechaHasta} onChange={e=>setFechaHasta(e.target.value)}
+                style={{...S.input,width:"auto",fontSize:13}}/>
+            </div>
+            {fechaDesde&&fechaHasta&&fechaDesde<=fechaHasta&&(
+              <div style={{fontSize:12,color:"#5a9a7a"}}>
+                {dias.length} días · {tareasSemanales.length} tareas
+              </div>
+            )}
+            <button onClick={imprimir} style={{...S.btn,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)",fontSize:13,marginLeft:"auto"}}>🖨️ Imprimir</button>
+          </div>
+        )}
       </div>
 
       {/* KPIs */}
@@ -1259,7 +1309,7 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
 }
 
 // ─── HISTORIAL DE PROGRAMACIÓN ───────────────────────────────────────────────
-function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false }) {
+function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, puedeCrear=false }) {
   const [filtroDia,    setFiltroDia]    = React.useState("");
   const [filtroEstado, setFiltroEstado] = React.useState("todos");
   const [filtroTarea,  setFiltroTarea]  = React.useState("");
@@ -1431,7 +1481,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false }) 
                   style={{...S.btn,padding:"5px 12px",fontSize:12,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}}>
                   🖨️ Imprimir
                 </button>
-                {esJefa&&(
+                {(esJefa||puedeCrear)&&(
                   <button
                     onClick={()=>{if(window.confirm("¿Eliminar todas las tareas del día "+dia+"?"))setTareas(prev=>{const n={...prev};delete n[dia];return n;});}}
                     style={{cursor:"pointer",border:"1px solid rgba(239,68,68,0.3)",borderRadius:8,padding:"5px 12px",fontSize:12,background:"rgba(239,68,68,0.12)",color:"#fca5a5",fontFamily:"'Georgia',serif"}}>
@@ -2069,7 +2119,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   );
 }
 
-function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACROZONAS_BASE, tareas, setTareas, tareasZonaHoy=0, esJefa=false }) {
+function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACROZONAS_BASE, tareas, setTareas, tareasZonaHoy=0, esJefa=false, puedeCrear=false }) {
   const hoy = new Date().toISOString().slice(0,10);
   const [fecha, setFecha] = React.useState(hoy);
   const [tabProg, setTabProg] = React.useState("programa");
@@ -2182,7 +2232,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
 
       {/* ── HISTORIAL ── */}
       {tabProg==="historial" && (
-        <HistorialProg tareas={tareas} setTareas={setTareas} MACROZONAS_BASE={MACROZONAS_BASE} S={S} esJefa={esJefa}/>
+        <HistorialProg tareas={tareas} setTareas={setTareas} MACROZONAS_BASE={MACROZONAS_BASE} S={S} esJefa={esJefa} puedeCrear={puedeCrear}/>
       )}
 
       {/* ── PROGRAMAR ── */}
@@ -3765,7 +3815,9 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
                   </div>
                 </div>
                 <div style={{fontSize:11,color:"#5a8a6a",maxWidth:300}}>
-                  PIN para acceder a 🌿 Mi Turno. Solo visible para la jefa.
+                  {t.cargo?.toLowerCase().includes("jefa")||t.cargo?.toLowerCase().includes("supervisor")
+                    ? "Accede con email+clave Firebase. Rol: acceso completo al sistema (jefa) o gestión de tareas (supervisor)."
+                    : "Accede con email+clave Firebase → va directo a Mi Turno (solo sus tareas del día). PIN no requerido para jardineros."}
                 </div>
               </div>
               {t.email&&(
@@ -11760,7 +11812,7 @@ export default function App() {
           {(fbRol==="jefa"
             ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["fungicidas","🧪","Fungicidas"],["compras","🛒","Compras"],["bodegas","🏪","Bodegas"],["golf","🏌️","Golf"],["personal","👷","Personal"]]
             : fbRol==="supervisor"
-            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["fungicidas","🧪","Fungicidas"],["bodegas","🏪","Bodegas"],["miturno","🌿","Mi Turno"]]
+            ? [["dashboard","📊","Panel"],["programacion","📆","Programa"],["reporte","📋","Reporte"],["golf","🏌️","Golf"],["miturno","🌿","Mi Turno"]]
             : [["miturno","🌿","Mi Turno"]]
           ).map(([v,ico,lbl])=>(
             <button key={v} onClick={()=>{setVista(v);setZonaId(null);setAiText("");}} style={{cursor:"pointer",border:"none",background:"transparent",color:vista===v?"#fff":"#7aaa80",fontFamily:"'Georgia',serif",fontSize:12,padding:"10px 14px",borderBottom:vista===v?"2px solid #4a9a64":"2px solid transparent",transition:"all .15s",whiteSpace:"nowrap",display:"flex",flexDirection:"column",alignItems:"center",gap:2,flexShrink:0}}>
@@ -12282,6 +12334,7 @@ export default function App() {
           <ProgramacionDiaria key="prog" S={S} zonas={zonas} data={data} personal={personal} getZD={getZD} getAllElems={getAllElems} MACROZONAS_BASE={MACROZONAS_BASE} tareas={tareasProg} setTareas={setTareasProg}
             tareasZonaHoy={(tareasProg[new Date().toISOString().slice(0,10)]||[]).filter(t=>t.origenZona&&t.estado==="por_designar").length}
             esJefa={rolLogueado==="jefa"}
+            puedeCrear={rolLogueado==="jefa"||rolLogueado==="supervisor"}
           />
         )}
 
@@ -12463,17 +12516,17 @@ export default function App() {
 
         {/* FUNGICIDAS */}
         {vista==="fungicidas"&&(
-          <PanelFungicidas S={S} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} personal={personal} esJefa={rolLogueado==="jefa"||rolLogueado==="supervisor"} tareasProg={tareasProg} setTareasProg={setTareasProg} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} />
+          <PanelFungicidas S={S} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} />
         )}
 
         {/* COMPRAS */}
         {vista==="compras"&&(
-          <PanelCompras S={S} comprasData={comprasData} setComprasData={setComprasData} personal={personal} esJefa={rolLogueado==="jefa"||rolLogueado==="supervisor"} data={data} updateZona={updateZona} MACROZONAS_BASE={MACROZONAS_BASE} bodegasData={bodegasData} setBodegasData={setBodegasData} />
+          <PanelCompras S={S} comprasData={comprasData} setComprasData={setComprasData} personal={personal} esJefa={esJefa} data={data} updateZona={updateZona} MACROZONAS_BASE={MACROZONAS_BASE} bodegasData={bodegasData} setBodegasData={setBodegasData} />
         )}
 
         {/* GOLF */}
         {vista==="golf"&&(
-          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={rolLogueado==="jefa"||rolLogueado==="supervisor"} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial}
+          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial}
             onRegistroGuardado={(tipo)=>{
               // Volver a Mi Turno después de registrar alturas o humedad
               if(rolLogueado==="trabajador") {
@@ -12485,7 +12538,7 @@ export default function App() {
 
         {/* BODEGAS */}
         {vista==="bodegas"&&(
-          <PanelBodegas S={S} bodegasData={bodegasData} setBodegasData={setBodegasData} personal={personal} esJefa={rolLogueado==="jefa"||rolLogueado==="supervisor"} tareasProg={tareasProg} setTareasProg={setTareasProg} compras={comprasData?.compras||[]} />
+          <PanelBodegas S={S} bodegasData={bodegasData} setBodegasData={setBodegasData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} compras={comprasData?.compras||[]} />
         )}
 
         {/* PERSONAL */}
