@@ -3562,6 +3562,7 @@ function TipoEventoSelector({ value, onChange, S, TIPO_EVENTO }) {
 
 function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDeleteEvento, onUpdateEvento }) {
   const [tab, setTab] = React.useState("ficha");
+  const [verPin, setVerPin] = React.useState(false);
   const [showNuevoEvento, setShowNuevoEvento] = React.useState(false);
   const [nuevoEvento, setNuevoEvento] = React.useState({ tipo:"permiso", fecha:"", fechaFin:"", horas:"", descripcion:"", estado:"pendiente" });
   const [editEventoId, setEditEventoId] = React.useState(null);
@@ -3740,57 +3741,72 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
           {/* ── SECCIÓN 5: ACCESO ── */}
           <div style={{...S.card,padding:18,marginBottom:12}}>
             <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:12,color:"#a0d8b0",borderBottom:"1px solid rgba(255,255,255,0.08)",paddingBottom:8}}>🔐 Acceso al Sistema</div>
-            {(()=>{
-              const [verPin, setVerPin] = React.useState(false);
-              return (
-                <div style={{display:"flex",flexDirection:"column",gap:12}}>
-                  <div style={{display:"flex",alignItems:"flex-end",gap:10,flexWrap:"wrap"}}>
-                    <div>
-                      <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>PIN (4 DÍGITOS)</label>
-                      <div style={{display:"flex",alignItems:"center",gap:6}}>
-                        <input type={verPin?"text":"password"} maxLength={4} placeholder="••••"
-                          style={{...S.input,width:100,fontSize:20,letterSpacing:"0.5em",textAlign:"center"}}
-                          value={t.pin||""} onChange={e=>onUpdate({pin:e.target.value})}/>
-                        <button onClick={()=>setVerPin(v=>!v)}
-                          title={verPin?"Ocultar PIN":"Ver PIN"}
-                          style={{cursor:"pointer",border:"1px solid rgba(255,255,255,0.15)",borderRadius:8,
-                            padding:"6px 10px",background:"transparent",color:"#6aaa7a",fontSize:14}}>
-                          {verPin?"🙈":"👁️"}
-                        </button>
-                        {verPin&&t.pin&&(
-                          <span style={{fontSize:18,fontWeight:700,color:"#fbbf24",
-                            background:"rgba(251,191,36,0.1)",padding:"4px 12px",borderRadius:8,
-                            border:"1px solid rgba(251,191,36,0.3)",letterSpacing:"0.3em"}}>
-                            {t.pin}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div style={{fontSize:11,color:"#5a8a6a",maxWidth:300}}>
-                      PIN para acceder a 🌿 Mi Turno. Solo visible para la jefa.
-                    </div>
+            <div style={{display:"flex",flexDirection:"column",gap:12}}>
+              <div style={{display:"flex",alignItems:"flex-end",gap:10,flexWrap:"wrap"}}>
+                <div>
+                  <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>PIN (4 DÍGITOS)</label>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <input type={verPin?"text":"password"} maxLength={4} placeholder="••••"
+                      style={{...S.input,width:100,fontSize:20,letterSpacing:"0.5em",textAlign:"center"}}
+                      value={t.pin||""} onChange={e=>onUpdate({pin:e.target.value})}/>
+                    <button onClick={()=>setVerPin(v=>!v)}
+                      title={verPin?"Ocultar":"Ver PIN"}
+                      style={{cursor:"pointer",border:"1px solid rgba(255,255,255,0.15)",borderRadius:8,
+                        padding:"6px 10px",background:"transparent",color:"#6aaa7a",fontSize:14}}>
+                      {verPin?"🙈":"👁️"}
+                    </button>
+                    {verPin&&t.pin&&(
+                      <span style={{fontSize:18,fontWeight:700,color:"#fbbf24",
+                        background:"rgba(251,191,36,0.1)",padding:"4px 12px",borderRadius:8,
+                        border:"1px solid rgba(251,191,36,0.3)",letterSpacing:"0.3em"}}>
+                        {t.pin}
+                      </span>
+                    )}
                   </div>
-                  {t.email&&(
-                    <div>
-                      <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>EMAIL FIREBASE (ACCESO SISTEMA)</label>
-                      <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <span style={{fontSize:12,color:"#ede9e0",background:"rgba(255,255,255,0.05)",
-                          padding:"6px 12px",borderRadius:8,border:"1px solid rgba(255,255,255,0.1)",
-                          fontFamily:"monospace"}}>
-                          {t.email}
-                        </span>
-                        <button onClick={()=>navigator.clipboard?.writeText(t.email)}
-                          title="Copiar email"
-                          style={{cursor:"pointer",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,
-                            padding:"4px 8px",background:"transparent",color:"#5a9a7a",fontSize:12}}>
-                          📋
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
-              );
-            })()}
+                <div style={{fontSize:11,color:"#5a8a6a",maxWidth:300}}>
+                  PIN para acceder a 🌿 Mi Turno. Solo visible para la jefa.
+                </div>
+              </div>
+              {t.email&&(
+                <div>
+                  <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>EMAIL FIREBASE (ACCESO SISTEMA)</label>
+                  <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                    <span style={{fontSize:12,color:"#ede9e0",background:"rgba(255,255,255,0.05)",
+                      padding:"6px 12px",borderRadius:8,border:"1px solid rgba(255,255,255,0.1)",
+                      fontFamily:"monospace"}}>
+                      {t.email}
+                    </span>
+                    {t.claveFirebase&&(
+                      <div style={{display:"flex",alignItems:"center",gap:6}}>
+                        <label style={{fontSize:10,color:"#6aaa7a"}}>CLAVE:</label>
+                        <span style={{fontSize:13,fontWeight:700,color:"#fbbf24",
+                          background:"rgba(251,191,36,0.08)",padding:"4px 10px",borderRadius:8,
+                          border:"1px solid rgba(251,191,36,0.25)",letterSpacing:"0.1em",
+                          fontFamily:"monospace"}}>
+                          {verPin?t.claveFirebase:"••••••••"}
+                        </span>
+                        <input style={{...S.input,width:120,fontSize:12,fontFamily:"monospace"}}
+                          placeholder="clave Firebase..."
+                          value={t.claveFirebase||""}
+                          onChange={e=>onUpdate({claveFirebase:e.target.value})}/>
+                      </div>
+                    )}
+                    {!t.claveFirebase&&(
+                      <input style={{...S.input,width:140,fontSize:12,fontFamily:"monospace"}}
+                        placeholder="agregar clave Firebase..."
+                        onChange={e=>onUpdate({claveFirebase:e.target.value})}/>
+                    )}
+                    <button onClick={()=>navigator.clipboard?.writeText(t.email)}
+                      title="Copiar email"
+                      style={{cursor:"pointer",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,
+                        padding:"4px 8px",background:"transparent",color:"#5a9a7a",fontSize:12}}>
+                      📋
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* ── SECCIÓN 6: OBSERVACIONES ── */}
@@ -4174,7 +4190,8 @@ const PERSONAL_INICIAL = [
     cargo: "Jefa de Áreas Verdes",
     contrato: "indefinido",
     telefono: "",
-    email: "",
+    email: "carmenluzhdiez@gmail.com",
+    claveFirebase: "Jefe4971",
     fechaIngreso: "",
     zona: "",
     notas: "Jornada: Lun 08-18h · Mar-Jue 09-18h · Vie 08-18h · 42h/semana",
@@ -4184,7 +4201,7 @@ const PERSONAL_INICIAL = [
   {
     id: 1002, nombre:"Juber Leopoldo Juárez Burgos", rut:"22.052.327-6",
     cargo:"Supervisor de Áreas Verdes", contrato:"indefinido",
-    telefono:"+56 9 5959 9594", email:"juberjuarez1234@gmail.com",
+    telefono:"+56 9 5959 9594", email:"juberjuarez1234@gmail.com", claveFirebase:"Super01",
     fechaIngreso:"2016-11-10", fechaNacimiento:"1987-08-31",
     nacionalidad:"Peruano", direccion:"Pantaleón Vélez Silva 862, Independencia",
     tallaPolera:"M", tallaPoleron:"M", tallaPantalon:"44", tallaZapato:"39",
@@ -4199,7 +4216,7 @@ const PERSONAL_INICIAL = [
   {
     id: 1003, nombre:"Andrés Astorga Guzmán", rut:"17.879.479-5",
     cargo:"Jardinero", contrato:"indefinido",
-    telefono:"+56 9 7834 6909", email:"astorga.guzman@gmail.com",
+    telefono:"+56 9 7834 6909", email:"astorga.guzman@gmail.com", claveFirebase:"Jard01",
     fechaIngreso:"2023-09-25", fechaNacimiento:"1991-09-16",
     nacionalidad:"Chileno", direccion:"San Agustín 9122, Pudahuel",
     tallaPolera:"M", tallaPoleron:"M", tallaPantalon:"44", tallaZapato:"42",
@@ -4214,7 +4231,7 @@ const PERSONAL_INICIAL = [
   {
     id: 1004, nombre:"Osmar Bhalú Armijo Zúñiga", rut:"15.065.268-5",
     cargo:"Jardinero", contrato:"indefinido",
-    telefono:"+56 9 6756 0322", email:"bhalu.armijo@gmail.com",
+    telefono:"+56 9 6756 0322", email:"bhalu.armijo@gmail.com", claveFirebase:"Jard02",
     fechaIngreso:"2021-08-30", fechaNacimiento:"1996-11-22",
     nacionalidad:"Chileno", direccion:"Mar de Drake 402, Pudahuel",
     tallaPolera:"L", tallaPoleron:"L", tallaPantalon:"44", tallaZapato:"43",
@@ -4229,7 +4246,7 @@ const PERSONAL_INICIAL = [
   {
     id: 1005, nombre:"Sergio Esteban Peña Quintanilla", rut:"13.682.102-4",
     cargo:"Jardinero", contrato:"indefinido",
-    telefono:"+56 9 7541 9199", email:"bandiiiixx@gmail.com",
+    telefono:"+56 9 7541 9199", email:"bandiiiixx@gmail.com", claveFirebase:"Jard03",
     fechaIngreso:"2015-06-04", fechaNacimiento:"1979-07-19",
     nacionalidad:"Chileno", direccion:"Santa Teresa 1902, Estación Central",
     tallaPolera:"M", tallaPoleron:"M", tallaPantalon:"48", tallaZapato:"40",
@@ -4244,7 +4261,7 @@ const PERSONAL_INICIAL = [
   {
     id: 1006, nombre:"Saúl Molina Escalera", rut:"28.444.223-7",
     cargo:"Jardinero", contrato:"indefinido",
-    telefono:"+56 9 5922 6281", email:"saulmolina@gmail.com",
+    telefono:"+56 9 5922 6281", email:"saulmolina@gmail.com", claveFirebase:"Jard04",
     fechaIngreso:"2024-10-01", fechaNacimiento:"2002-06-29",
     nacionalidad:"Boliviano", direccion:"Los Loros 6720, Cerro Navia",
     tallaPolera:"XL", tallaPoleron:"L", tallaPantalon:"50", tallaZapato:"43",
