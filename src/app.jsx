@@ -541,7 +541,7 @@ const MACROZONAS_BASE = [
     ]
   },
   {
-    id: 28, nombre: "Torre 01", categoria: "Torres", icono: "🏢",
+    id: 28, nombre: "Torre 01", categoria: "Edificios", icono: "🏢",
     elementos: [
       { id: "e1", nombre: "Jardín perimetral", tipo: "arbustos" },
       { id: "e2", nombre: "Arbustos borde edificio", tipo: "arbustos" },
@@ -553,7 +553,7 @@ const MACROZONAS_BASE = [
     ]
   },
   {
-    id: 29, nombre: "Torre 02", categoria: "Torres", icono: "🏢",
+    id: 29, nombre: "Torre 02", categoria: "Edificios", icono: "🏢",
     elementos: [
       { id: "e1", nombre: "Jardín perimetral", tipo: "arbustos" },
       { id: "e2", nombre: "Arbustos borde edificio", tipo: "arbustos" },
@@ -565,7 +565,7 @@ const MACROZONAS_BASE = [
     ]
   },
   {
-    id: 30, nombre: "Torre 03", categoria: "Torres", icono: "🏢",
+    id: 30, nombre: "Torre 03", categoria: "Edificios", icono: "🏢",
     elementos: [
       { id: "e1", nombre: "Jardín perimetral", tipo: "arbustos" },
       { id: "e2", nombre: "Arbustos borde edificio", tipo: "arbustos" },
