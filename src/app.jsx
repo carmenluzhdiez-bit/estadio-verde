@@ -819,239 +819,213 @@ function ResponsableSelector({ value, personal, onChange, S, fontSize=14, inline
 // ─── REPORTE SEMANAL ─────────────────────────────────────────────────────────
 function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_BASE, personal, incidenciasFito=[] }) {
 
-  // Modo: semana | rango
   const [modoReporte, setModoReporte] = React.useState("semana");
-  const [fechaDesde, setFechaDesde] = React.useState(semanaBase||"");
-  const [fechaHasta, setFechaHasta] = React.useState(semanaBase||"");
+  const [fechaDesde, setFechaDesde]   = React.useState(semanaBase||"");
+  const [fechaHasta, setFechaHasta]   = React.useState(semanaBase||"");
+  const [filtroZona, setFiltroZona]   = React.useState("todas");
+  const [filtroResp, setFiltroResp]   = React.useState("todos");
 
-  // Calcular días lunes-domingo de la semana elegida
   const getDiasSemana = (lunesStr) => {
-    const lunes = new Date(lunesStr + "T12:00:00");
-    return Array.from({length:7}, (_,i) => {
-      const d = new Date(lunes); d.setDate(d.getDate()+i);
-      return d.toISOString().slice(0,10);
-    });
+    const lunes = new Date(lunesStr+"T12:00:00");
+    return Array.from({length:7},(_,i)=>{ const d=new Date(lunes); d.setDate(d.getDate()+i); return d.toISOString().slice(0,10); });
   };
-
-  // Calcular todos los días entre dos fechas
-  const getDiasRango = (desde, hasta) => {
+  const getDiasRango = (desde,hasta) => {
     if(!desde||!hasta) return [];
-    const dias = [];
-    const d = new Date(desde+"T12:00:00");
-    const fin = new Date(hasta+"T12:00:00");
-    while(d<=fin) { dias.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1); }
+    const dias=[]; const d=new Date(desde+"T12:00:00"); const fin=new Date(hasta+"T12:00:00");
+    while(d<=fin){ dias.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1); }
     return dias;
   };
 
-  const semanaAnterior = () => {
-    const d = new Date(semanaBase+"T12:00:00"); d.setDate(d.getDate()-7);
-    setSemanaBase(d.toISOString().slice(0,10));
-  };
-  const semanaSiguiente = () => {
-    const d = new Date(semanaBase+"T12:00:00"); d.setDate(d.getDate()+7);
-    setSemanaBase(d.toISOString().slice(0,10));
-  };
-  const semanaActual = () => {
-    const d = new Date(); const day = d.getDay(); const diff = (day===0?-6:1-day);
-    d.setDate(d.getDate()+diff); setSemanaBase(d.toISOString().slice(0,10));
-  };
+  const semanaAnterior  = ()=>{ const d=new Date(semanaBase+"T12:00:00"); d.setDate(d.getDate()-7); setSemanaBase(d.toISOString().slice(0,10)); };
+  const semanaSiguiente = ()=>{ const d=new Date(semanaBase+"T12:00:00"); d.setDate(d.getDate()+7); setSemanaBase(d.toISOString().slice(0,10)); };
+  const semanaActual    = ()=>{ const d=new Date(); const day=d.getDay(); const diff=(day===0?-6:1-day); d.setDate(d.getDate()+diff); setSemanaBase(d.toISOString().slice(0,10)); };
 
-  const dias = modoReporte==="semana"
-    ? getDiasSemana(semanaBase)
-    : getDiasRango(fechaDesde, fechaHasta);
-  const domingo = modoReporte==="semana" ? dias[6] : fechaHasta;
+  const dias = modoReporte==="semana" ? getDiasSemana(semanaBase) : getDiasRango(fechaDesde,fechaHasta);
   const DIAS_LABEL = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
 
-  // Todas las tareas del período
-  const tareasSemanales = dias.flatMap(d => (tareasProg[d]||[]).map(t=>({...t, fechaDia:d})));
+  // Todas las tareas del período (sin Golf separado)
+  const todasTareas = dias.flatMap(d=>(tareasProg[d]||[]).filter(t=>Array.isArray||true).map(t=>({...t,fechaDia:d})));
 
-  // Stats globales
-  const total    = tareasSemanales.length;
-  const hechas   = tareasSemanales.filter(t=>["hecha","completada"].includes(t.estado)).length;
-  const noPudo   = tareasSemanales.filter(t=>t.estado==="no_pudo").length;
-  const pend     = tareasSemanales.filter(t=>["pendiente","por_designar","haciendose","en_curso"].includes(t.estado)).length;
-  const pct      = total ? Math.round((hechas/total)*100) : 0;
+  // Aplicar filtros
+  const tareasFiltradas = todasTareas
+    .filter(t=> filtroZona==="todas" || t.zona===filtroZona)
+    .filter(t=> filtroResp==="todos" || t.responsable===filtroResp);
 
-  // Resumen por trabajador
+  // Stats
+  const esHecha = t => ["hecha","completada"].includes(t.estado);
+  const total   = tareasFiltradas.length;
+  const hechas  = tareasFiltradas.filter(esHecha).length;
+  const noPudo  = tareasFiltradas.filter(t=>t.estado==="no_pudo").length;
+  const pend    = tareasFiltradas.filter(t=>["pendiente","por_designar","haciendose"].includes(t.estado)).length;
+  const pct     = total ? Math.round(hechas/total*100) : 0;
+
+  // Por trabajador
   const porTrabajador = {};
-  tareasSemanales.forEach(t => {
-    const nombre = t.responsable || "Sin asignar";
-    if (!porTrabajador[nombre]) porTrabajador[nombre] = {total:0,hechas:0,noPudo:0,pend:0};
-    porTrabajador[nombre].total++;
-    if(["hecha","completada"].includes(t.estado)) porTrabajador[nombre].hechas++;
-    else if(t.estado==="no_pudo") porTrabajador[nombre].noPudo++;
-    else porTrabajador[nombre].pend++;
+  tareasFiltradas.forEach(t=>{
+    const n=t.responsable||"Sin asignar";
+    if(!porTrabajador[n]) porTrabajador[n]={total:0,hechas:0,noPudo:0,pend:0};
+    porTrabajador[n].total++;
+    if(esHecha(t)) porTrabajador[n].hechas++;
+    else if(t.estado==="no_pudo") porTrabajador[n].noPudo++;
+    else porTrabajador[n].pend++;
   });
 
-  // Resumen por zona
+  // Por macrozona
   const porZona = {};
-  tareasSemanales.forEach(t => {
-    const z = t.zona||"Sin zona";
-    if(!porZona[z]) porZona[z]={total:0,hechas:0,noPudo:0};
+  tareasFiltradas.forEach(t=>{
+    const z=t.zona||"Sin zona";
+    if(!porZona[z]) porZona[z]={total:0,hechas:0,noPudo:0,tareas:[]};
     porZona[z].total++;
-    if(["hecha","completada"].includes(t.estado)) porZona[z].hechas++;
-    if(t.estado==="no_pudo") porZona[z].noPudo++;
+    if(esHecha(t)) porZona[z].hechas++;
+    else if(t.estado==="no_pudo") porZona[z].noPudo++;
+    porZona[z].tareas.push(t);
   });
 
-  // Tareas "no se pudo" de la semana
-  const incidencias = tareasSemanales.filter(t=>t.estado==="no_pudo");
+  // Por tipo de tarea dentro de cada zona
+  const tiposPorZona = {};
+  Object.entries(porZona).forEach(([zona,dat])=>{
+    const tipos={};
+    dat.tareas.forEach(t=>{
+      const tipo = (t.tarea||"Sin tipo").replace("⛳ ","").split("—")[0].split("-")[0].trim();
+      if(!tipos[tipo]) tipos[tipo]={total:0,hechas:0};
+      tipos[tipo].total++;
+      if(esHecha(t)) tipos[tipo].hechas++;
+    });
+    tiposPorZona[zona]=tipos;
+  });
 
+  // Zonas y responsables únicos para filtros
+  const todasZonas = [...new Set(todasTareas.map(t=>t.zona).filter(Boolean))].sort();
+  const todosResp  = [...new Set(todasTareas.map(t=>t.responsable).filter(Boolean))].sort();
+
+  const fmtFecha = d => new Date(d+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"short",year:"numeric"});
+  const periodoLabel = modoReporte==="semana"
+    ? `Semana del ${fmtFecha(dias[0]||"")} al ${fmtFecha(dias[dias.length-1]||"")}`
+    : `Del ${fmtFecha(fechaDesde)} al ${fmtFecha(fechaHasta)}`;
+
+  // ── Función de impresión ─────────────────────────────────────────────────
   const imprimir = () => {
-    const lunes = new Date(semanaBase+"T12:00:00");
-    const dom   = new Date(domingo+"T12:00:00");
-    const fmtFecha = (d) => new Date(d+"T12:00:00").toLocaleDateString("es-CL",{weekday:"short",day:"numeric",month:"short"});
-    const fmtLargo = (d) => new Date(d+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"});
+    const colVerde="#1a5c35", colVerdeClaro="#d4edda", colBorde="#ccddcc";
 
-    const resumenDias = dias.map((d,i) => {
-      const td = tareasProg[d]||[];
-      const h  = td.filter(t=>["hecha","completada"].includes(t.estado)).length;
-      const np = td.filter(t=>t.estado==="no_pudo").length;
-      const p  = td.filter(t=>["pendiente","por_designar","haciendose","en_curso"].includes(t.estado)).length;
-      const pct2 = td.length ? Math.round((h/td.length)*100) : null;
-      const isDom = i===6;
-      return `<tr style="${isDom?"background:#fff8f0":""}">
-        <td style="font-weight:600;white-space:nowrap">${DIAS_LABEL[i]} ${fmtFecha(d)}</td>
-        <td style="text-align:center">${td.length||"—"}</td>
-        <td style="text-align:center;color:#166534">${h||"—"}</td>
-        <td style="text-align:center;color:${np>0?"#991b1b":"#6b7280"}">${np||"—"}</td>
-        <td style="text-align:center;color:${p>0?"#92400e":"#6b7280"}">${p||"—"}</td>
-        <td style="text-align:center;font-weight:700;color:${pct2===null?"#9ca3af":pct2===100?"#166534":pct2>50?"#92400e":"#991b1b"}">${pct2!==null?pct2+"%":"—"}</td>
-      </tr>`;
-    }).join("");
+    const kpiHtml = `
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
+        ${[["Total tareas",total,"#1a5c35"],["✅ Hechas",hechas,"#166534"],["🔴 No se pudo",noPudo,"#991b1b"],["Cumplimiento",pct+"%",pct>=80?"#166534":pct>=50?"#92400e":"#991b1b"]]
+          .map(([l,v,c])=>`<div style="border:1px solid ${colBorde};border-radius:8px;padding:12px;text-align:center">
+            <div style="font-size:22px;font-weight:700;color:${c}">${v}</div>
+            <div style="font-size:11px;color:#555">${l}</div>
+          </div>`).join("")}
+      </div>`;
 
-    const resumenTrabajadores = Object.entries(porTrabajador)
+    const trabajadoresHtml = `
+      <h3 style="color:${colVerde};border-bottom:2px solid ${colVerde};padding-bottom:4px;margin:16px 0 8px">Por trabajador</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <tr style="background:${colVerde};color:#fff">
+          <th style="padding:6px 10px;text-align:left">Trabajador</th>
+          <th style="padding:6px;text-align:center">Total</th>
+          <th style="padding:6px;text-align:center">✅ Hechas</th>
+          <th style="padding:6px;text-align:center">🔴 No pudo</th>
+          <th style="padding:6px;text-align:center">Pendientes</th>
+          <th style="padding:6px;text-align:center">Cumplimiento</th>
+        </tr>
+        ${Object.entries(porTrabajador).sort((a,b)=>b[1].hechas-a[1].hechas).map(([n,d],i)=>`
+          <tr style="background:${i%2===0?"#fff":"#f5fbf5"}">
+            <td style="padding:5px 10px;font-weight:600">${n}</td>
+            <td style="padding:5px;text-align:center">${d.total}</td>
+            <td style="padding:5px;text-align:center;color:#166534;font-weight:600">${d.hechas}</td>
+            <td style="padding:5px;text-align:center;color:${d.noPudo>0?"#991b1b":"#6b7280"}">${d.noPudo||"—"}</td>
+            <td style="padding:5px;text-align:center;color:${d.pend>0?"#92400e":"#6b7280"}">${d.pend||"—"}</td>
+            <td style="padding:5px;text-align:center;font-weight:700;color:${d.total?Math.round(d.hechas/d.total*100)>=80?"#166534":"#92400e":"#9ca3af"}">${d.total?Math.round(d.hechas/d.total*100)+"%":"—"}</td>
+          </tr>`).join("")}
+      </table>`;
+
+    const zonasHtml = Object.entries(porZona)
       .sort((a,b)=>b[1].total-a[1].total)
-      .map(([n,v])=>`<tr>
-        <td>${n}</td>
-        <td style="text-align:center">${v.total}</td>
-        <td style="text-align:center;color:#166534">${v.hechas}</td>
-        <td style="text-align:center;color:${v.noPudo>0?"#991b1b":"#6b7280"}">${v.noPudo||"—"}</td>
-        <td style="text-align:center;color:${v.pend>0?"#92400e":"#6b7280"}">${v.pend||"—"}</td>
-        <td style="text-align:center;font-weight:700;color:${v.total?v.hechas/v.total===1?"#166534":v.hechas/v.total>0.5?"#92400e":"#991b1b":"#9ca3af"}">${v.total?Math.round((v.hechas/v.total)*100)+"%":"—"}</td>
-      </tr>`).join("");
-
-    const resumenZonas = Object.entries(porZona)
-      .sort((a,b)=>b[1].total-a[1].total)
-      .map(([z,v])=>{
-        const icono = MACROZONAS_BASE.find(x=>x.nombre===z)?.icono||"📍";
-        return `<tr>
-          <td>${icono} ${z}</td>
-          <td style="text-align:center">${v.total}</td>
-          <td style="text-align:center;color:#166534">${v.hechas}</td>
-          <td style="text-align:center;color:${v.noPudo>0?"#991b1b":"#6b7280"}">${v.noPudo||"—"}</td>
-          <td style="text-align:center;font-weight:700">${v.total?Math.round((v.hechas/v.total)*100)+"%":"—"}</td>
-        </tr>`;
+      .map(([zona,dat])=>{
+        const pctZ=dat.total?Math.round(dat.hechas/dat.total*100):0;
+        const tipos = tiposPorZona[zona]||{};
+        const tiposHtml = Object.entries(tipos)
+          .sort((a,b)=>b[1].total-a[1].total)
+          .map(([tipo,td])=>`
+            <tr>
+              <td style="padding:3px 10px 3px 24px;color:#444">${tipo}</td>
+              <td style="padding:3px 6px;text-align:center;font-size:11px">${td.total}</td>
+              <td style="padding:3px 6px;text-align:center;font-size:11px;color:#166534">${td.hechas}</td>
+              <td style="padding:3px 6px;text-align:center;font-size:11px">${td.total-td.hechas||"—"}</td>
+              <td style="padding:3px 6px;text-align:center;font-size:11px;font-weight:600;color:${td.total?Math.round(td.hechas/td.total*100)>=80?"#166534":"#92400e":"#9ca3af"}">${td.total?Math.round(td.hechas/td.total*100)+"%":"—"}</td>
+            </tr>`).join("");
+        return `
+          <div style="margin-bottom:12px;border:1px solid ${colBorde};border-radius:8px;overflow:hidden;break-inside:avoid">
+            <div style="background:${colVerde};color:#fff;padding:7px 12px;display:flex;justify-content:space-between;align-items:center">
+              <span style="font-weight:700;font-size:13px">${zona}</span>
+              <span style="font-size:12px">${dat.hechas}/${dat.total} tareas · ${pctZ}% cumplimiento</span>
+            </div>
+            <table style="width:100%;border-collapse:collapse;font-size:12px">
+              <tr style="background:${colVerdeClaro}">
+                <th style="padding:4px 10px 4px 24px;text-align:left;font-size:11px">Tipo de tarea</th>
+                <th style="padding:4px 6px;text-align:center;font-size:11px">Total</th>
+                <th style="padding:4px 6px;text-align:center;font-size:11px">✅ Hechas</th>
+                <th style="padding:4px 6px;text-align:center;font-size:11px">Pendiente</th>
+                <th style="padding:4px 6px;text-align:center;font-size:11px">%</th>
+              </tr>
+              ${tiposHtml}
+            </table>
+            ${dat.tareas.filter(t=>t.estado==="no_pudo").length>0?`
+              <div style="padding:6px 12px;background:#fff8f0;border-top:1px solid #fcd34d">
+                <div style="font-size:11px;font-weight:600;color:#92400e;margin-bottom:3px">No se pudo realizar:</div>
+                ${dat.tareas.filter(t=>t.estado==="no_pudo").map(t=>`
+                  <div style="font-size:11px;color:#666;padding:1px 0">• ${t.tarea||""}${t.motivo?` — <em>${t.motivo}</em>`:""}</div>
+                `).join("")}
+              </div>`:""}
+          </div>`;
       }).join("");
 
-    const incidenciasRows = incidencias.length===0
-      ? "<tr><td colspan='5' style='text-align:center;color:#6b7280;padding:12px'>Sin incidencias registradas</td></tr>"
-      : incidencias.map(t=>`<tr>
-          <td style="white-space:nowrap">${new Date(t.fechaDia+"T12:00:00").toLocaleDateString("es-CL",{weekday:"short",day:"numeric",month:"short"})}</td>
-          <td>${t.tarea}</td>
-          <td>${MACROZONAS_BASE.find(z=>z.nombre===t.zona)?.icono||""} ${t.zona||"—"}</td>
-          <td>${t.responsable||"Sin asignar"}</td>
-          <td style="color:#991b1b;font-style:italic">${t.notaWorker||"Sin observación"}</td>
-        </tr>`).join("");
-
-    // Incidencias fitosanitarias de la semana
-    const incFitoSemana = incidenciasFito.filter(inc=>{
-      const f=inc.fechaObservacion||inc.fechaAplicacion||"";
-      return f>=semanaBase&&f<=domingo;
-    });
-    const TIPO_LABEL_PDF = {fitosanitario:"🦠 Fitosanitario",mantenimiento:"🔧 Mantenimiento",clima:"🌧️ Clima"};
-    const incFitoRows = incFitoSemana.length===0
-      ? "<tr><td colspan='6' style='text-align:center;color:#6b7280;padding:12px'>Sin incidencias fitosanitarias esta semana</td></tr>"
-      : incFitoSemana.map(inc=>{
-          const sectObs=(inc.sectoresObservados||[]).join(", ")||"—";
-          const sectCerr=(inc.sectoresCerrados||[]).join(", ")||"—";
-          const reap=inc.fechaReaperturaISO?new Date(inc.fechaReaperturaISO).toLocaleDateString("es-CL",{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}):"—";
-          const estLabel=inc.estado==="cerrada"?"🚫 Cerrada":inc.estado==="reabierta"?"✅ Reabierta":"⚠️ En obs.";
-          return `<tr>
-            <td style="white-space:nowrap">${inc.fechaObservacion||"—"}</td>
-            <td>${TIPO_LABEL_PDF[inc.tipoCierre]||"🚨"}</td>
-            <td style="font-weight:600">${inc.agenteCausal||inc.diagnostico||"—"}</td>
-            <td>${sectObs}</td>
-            <td style="color:#991b1b">${sectCerr}</td>
-            <td>${inc.productoAplicar||"—"}<br><small style="color:#6b7280">${inc.fechaAplicacion||""} ${inc.horaAplicacion||""}</small></td>
-            <td style="color:#166534">${reap}</td>
-            <td>${estLabel}</td>
-          </tr>`;
-        }).join("");
+    const incFitoHtml = incidenciasFito.filter(i=>i.fecha>=( dias[0]||"")&&i.fecha<=(dias[dias.length-1]||"")).length>0?`
+      <h3 style="color:${colVerde};border-bottom:2px solid ${colVerde};padding-bottom:4px;margin:20px 0 8px">Incidencias fitosanitarias</h3>
+      ${incidenciasFito.filter(i=>i.fecha>=(dias[0]||"")&&i.fecha<=(dias[dias.length-1]||"")).map(i=>`
+        <div style="border:1px solid #fcd34d;border-radius:6px;padding:8px 12px;margin-bottom:6px;background:#fffbeb;font-size:12px">
+          <strong>${i.fecha}</strong> · ${i.zona||""} · ${i.problema||""}
+          ${i.producto?`<br>Tratamiento: ${i.producto}${i.dosis?` ${i.dosis}`:""}`:""} 
+          ${i.ri?`· Reingreso: ${i.ri}h`:""}
+        </div>`).join("")}`:"";
 
     const win = window.open("","_blank","width=900,height=700");
     win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-    <title>Informe Semanal Áreas Verdes — Estadio Español</title>
-    <style>
-      body{font-family:Georgia,serif;color:#1a2e1a;padding:36px;max-width:860px;margin:0 auto;font-size:13px}
-      h1{font-size:20px;color:#0d3320;margin:0 0 4px}
-      h2{font-size:14px;color:#1a4a2e;margin:24px 0 8px;padding-bottom:4px;border-bottom:2px solid #1a4a2e;text-transform:uppercase;letter-spacing:0.8px}
-      .encabezado{background:#f0f7f0;border-radius:8px;padding:14px 18px;margin-bottom:20px}
-      .periodo{font-size:15px;font-weight:700;color:#0d3320;margin-bottom:4px}
-      .generado{font-size:11px;color:#6b7280}
-      .kpis{display:flex;gap:20px;margin-bottom:20px;flex-wrap:wrap}
-      .kpi{background:#f5fbf5;border-radius:8px;padding:12px 16px;text-align:center;min-width:100px;flex:1}
-      .kpi-num{font-size:26px;font-weight:700;font-family:Georgia,serif}
-      .kpi-lbl{font-size:11px;color:#4a7a4a;margin-top:2px}
-      .ok{color:#166534} .bad{color:#991b1b} .warn{color:#92400e} .gray{color:#6b7280}
-      table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:4px}
-      th{text-align:left;padding:7px 10px;background:#1a4a2e;color:#fff;font-size:10px;letter-spacing:0.7px;text-transform:uppercase;white-space:nowrap}
-      tr:nth-child(even){background:#f5fbf5}
-      td{padding:7px 10px;border-bottom:1px solid #dce8dc;vertical-align:top}
-      .bar-bg{background:#e0ede0;border-radius:4px;height:8px;overflow:hidden;margin-top:4px}
-      .bar{height:100%;border-radius:4px}
-      .pie{margin-top:28px;font-size:11px;color:#6b7280;border-top:1px solid #dce8dc;padding-top:12px;display:flex;justify-content:space-between}
-      @media print{body{padding:18px}h2{break-before:avoid}}
-    </style></head><body>
-    <div class="encabezado">
-      <div class="periodo">📋 Informe Semanal de Áreas Verdes</div>
-      <div style="font-size:14px;color:#2d6a3f;margin:4px 0">Período: ${fmtLargo(semanaBase)} al ${fmtLargo(domingo)}</div>
-      <div class="generado">Generado: ${new Date().toLocaleDateString("es-CL",{weekday:"long",day:"numeric",month:"long",year:"numeric"})} · ${new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"})} · Departamento de Áreas Verdes — Estadio Español de Las Condes</div>
-    </div>
-
-    <div class="kpis">
-      <div class="kpi"><div class="kpi-num">${total}</div><div class="kpi-lbl">Tareas totales</div></div>
-      <div class="kpi"><div class="kpi-num ok">${hechas}</div><div class="kpi-lbl">✅ Completadas</div></div>
-      <div class="kpi"><div class="kpi-num bad">${noPudo}</div><div class="kpi-lbl">🔴 No pudieron</div></div>
-      <div class="kpi"><div class="kpi-num warn">${pend}</div><div class="kpi-lbl">⏳ Pendientes</div></div>
-      <div class="kpi"><div class="kpi-num" style="color:${pct===100?"#166534":pct>70?"#2d6a3f":pct>40?"#92400e":"#991b1b"}">${pct}%</div><div class="kpi-lbl">Cumplimiento</div>
-        <div class="bar-bg"><div class="bar" style="width:${pct}%;background:${pct===100?"#166534":pct>70?"#16a34a":pct>40?"#d97706":"#dc2626"}"></div></div>
+      <title>Reporte Áreas Verdes · ${periodoLabel}</title>
+      <style>
+        *{box-sizing:border-box;font-family:Calibri,sans-serif}
+        body{margin:0;padding:20px;color:#222;font-size:13px}
+        @media print{
+          body{padding:10px}
+          .no-print{display:none!important}
+          div,table{break-inside:avoid}
+        }
+      </style></head><body>
+      <div style="text-align:center;margin-bottom:20px;border-bottom:3px solid ${colVerde};padding-bottom:12px">
+        <div style="font-size:22px;font-weight:700;color:${colVerde}">Estadio Español · Áreas Verdes</div>
+        <div style="font-size:15px;font-weight:600;color:#444;margin-top:4px">Reporte de Gestión · ${periodoLabel}</div>
+        <div style="font-size:11px;color:#777;margin-top:2px">Generado el ${new Date().toLocaleDateString("es-CL",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>
       </div>
-    </div>
-
-    <h2>📅 Resumen por Día</h2>
-    <table><thead><tr><th>Día</th><th>Total</th><th>✅ Hechas</th><th>🔴 No pudo</th><th>⏳ Pend.</th><th>%</th></tr></thead>
-    <tbody>${resumenDias}</tbody></table>
-
-    <h2>👷 Desempeño por Trabajador</h2>
-    <table><thead><tr><th>Trabajador</th><th>Total</th><th>✅ Hechas</th><th>🔴 No pudo</th><th>⏳ Pend.</th><th>%</th></tr></thead>
-    <tbody>${resumenTrabajadores||"<tr><td colspan='6' style='text-align:center;color:#6b7280'>Sin asignaciones registradas</td></tr>"}</tbody></table>
-
-    <h2>🗺️ Actividad por Zona</h2>
-    <table><thead><tr><th>Macrozona</th><th>Total</th><th>✅ Hechas</th><th>🔴 No pudo</th><th>%</th></tr></thead>
-    <tbody>${resumenZonas||"<tr><td colspan='4' style='text-align:center;color:#6b7280'>Sin actividad registrada</td></tr>"}</tbody></table>
-
-    <h2>⚠️ Incidencias — Tareas No Realizadas</h2>
-    <table><thead><tr><th>Día</th><th>Tarea</th><th>Zona</th><th>Responsable</th><th>Motivo</th></tr></thead>
-    <tbody>${incidenciasRows}</tbody></table>
-
-    <h2>🚨 Incidencias Fitosanitarias y Cierres de Cancha</h2>
-    <table><thead><tr><th>Fecha</th><th>Tipo</th><th>Agente / Causa</th><th>Sectores observados</th><th>Sectores cerrados</th><th>Producto / Aplicación</th><th>Reapertura estimada</th><th>Estado</th></tr></thead>
-    <tbody>${incFitoRows}</tbody></table>
-
-    <div class="pie">
-      <span>Estadio Español de Las Condes · Departamento de Áreas Verdes · Jefa Carmen Luz Hermosilla</span>
-      <span>${new Date().getFullYear()}</span>
-    </div>
-    <script>window.onload=()=>{window.print();}<\/script>
+      ${kpiHtml}
+      ${trabajadoresHtml}
+      <h3 style="color:${colVerde};border-bottom:2px solid ${colVerde};padding-bottom:4px;margin:20px 0 8px">Detalle por macrozona y tipo de tarea</h3>
+      ${zonasHtml}
+      ${incFitoHtml}
+      <div class="no-print" style="text-align:center;margin-top:20px">
+        <button onclick="window.print()" style="background:${colVerde};color:#fff;border:none;padding:10px 28px;border-radius:8px;font-size:14px;cursor:pointer;font-family:Calibri,sans-serif">
+          🖨️ Imprimir / Guardar PDF
+        </button>
+      </div>
+      <div style="text-align:center;margin-top:20px;font-size:10px;color:#999;border-top:1px solid ${colBorde};padding-top:8px">
+        Departamento de Áreas Verdes · Estadio Español de Las Condes · Carmen Luz Hermosilla Diez
+      </div>
     </body></html>`);
     win.document.close();
   };
 
   return (
     <div className="ein">
-      {/* Navegación — modo semana o rango libre */}
-      <div style={{...S.card,padding:"14px 18px",marginBottom:20}}>
-        {/* Selector de modo */}
+      {/* ── Selector modo + navegación ── */}
+      <div style={{...S.card,padding:"14px 18px",marginBottom:16}}>
         <div style={{display:"flex",gap:6,marginBottom:12}}>
           {[["semana","📅 Por semana"],["rango","📆 Rango de fechas"]].map(([m,l])=>(
             <button key={m} onClick={()=>setModoReporte(m)}
@@ -1064,251 +1038,177 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
           ))}
         </div>
         {modoReporte==="semana" ? (
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
-              <button onClick={semanaAnterior} style={{...S.btn,padding:"6px 14px",fontSize:16,background:"rgba(255,255,255,0.07)",color:"#a0c8a0",border:"1px solid rgba(255,255,255,0.12)"}}>‹</button>
+              <button onClick={semanaAnterior} style={{...S.btn,padding:"5px 12px",fontSize:16,background:"rgba(255,255,255,0.07)",color:"#a0c8a0"}}>‹</button>
               <div style={{textAlign:"center"}}>
-                <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700}}>
-                  {new Date(semanaBase+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"long"})} – {new Date(domingo+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"})}
-                </div>
-                <div style={{fontSize:12,color:"#6aaa7a",marginTop:2}}>{dias.length} días · {tareasSemanales.length} tareas</div>
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700}}>{periodoLabel}</div>
+                <div style={{fontSize:11,color:"#6aaa7a",marginTop:2}}>{tareasFiltradas.length} tareas · {dias.length} días</div>
               </div>
-              <button onClick={semanaSiguiente} style={{...S.btn,padding:"6px 14px",fontSize:16,background:"rgba(255,255,255,0.07)",color:"#a0c8a0",border:"1px solid rgba(255,255,255,0.12)"}}>›</button>
+              <button onClick={semanaSiguiente} style={{...S.btn,padding:"5px 12px",fontSize:16,background:"rgba(255,255,255,0.07)",color:"#a0c8a0"}}>›</button>
             </div>
-            <div style={{display:"flex",gap:8,alignItems:"center"}}>
-              <input type="date" value={semanaBase} onChange={e=>{const d=new Date(e.target.value+"T12:00:00");const day=d.getDay();const diff=(day===0?-6:1-day);d.setDate(d.getDate()+diff);setSemanaBase(d.toISOString().slice(0,10));}}
+            <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+              <input type="date" value={semanaBase}
+                onChange={e=>{const d=new Date(e.target.value+"T12:00:00");const day=d.getDay();const diff=(day===0?-6:1-day);d.setDate(d.getDate()+diff);setSemanaBase(d.toISOString().slice(0,10));}}
                 style={{...S.input,width:"auto",fontSize:13}}/>
-              <button onClick={semanaActual} style={{...S.btn,background:"transparent",color:"#6aaa7a",border:"1px solid rgba(255,255,255,0.1)",fontSize:12}}>Esta semana</button>
-              <button onClick={imprimir} style={{...S.btn,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)",fontSize:13}}>🖨️ Imprimir</button>
+              <button onClick={semanaActual} style={{...S.btn,fontSize:12,color:"#6aaa7a",background:"transparent",border:"1px solid rgba(255,255,255,0.1)"}}>Esta semana</button>
+              <button onClick={imprimir} style={{...S.btn,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}}>🖨️ Imprimir</button>
             </div>
           </div>
         ) : (
           <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
-            <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
               <label style={{fontSize:12,color:"#6aaa7a"}}>Desde:</label>
-              <input type="date" value={fechaDesde} onChange={e=>setFechaDesde(e.target.value)}
-                style={{...S.input,width:"auto",fontSize:13}}/>
+              <input type="date" value={fechaDesde} onChange={e=>setFechaDesde(e.target.value)} style={{...S.input,width:"auto",fontSize:13}}/>
             </div>
-            <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
               <label style={{fontSize:12,color:"#6aaa7a"}}>Hasta:</label>
-              <input type="date" value={fechaHasta} onChange={e=>setFechaHasta(e.target.value)}
-                style={{...S.input,width:"auto",fontSize:13}}/>
+              <input type="date" value={fechaHasta} onChange={e=>setFechaHasta(e.target.value)} style={{...S.input,width:"auto",fontSize:13}}/>
             </div>
-            {fechaDesde&&fechaHasta&&fechaDesde<=fechaHasta&&(
-              <div style={{fontSize:12,color:"#5a9a7a"}}>
-                {dias.length} días · {tareasSemanales.length} tareas
-              </div>
-            )}
-            <button onClick={imprimir} style={{...S.btn,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)",fontSize:13,marginLeft:"auto"}}>🖨️ Imprimir</button>
+            {dias.length>0&&<div style={{fontSize:12,color:"#5a9a7a"}}>{dias.length} días · {tareasFiltradas.length} tareas</div>}
+            <button onClick={imprimir} style={{...S.btn,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)",marginLeft:"auto"}}>🖨️ Imprimir</button>
           </div>
         )}
       </div>
 
-      {/* KPIs */}
+      {/* ── Filtros ── */}
+      <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+        <select style={{...S.input,fontSize:12,padding:"4px 8px",width:"auto"}} value={filtroZona} onChange={e=>setFiltroZona(e.target.value)}>
+          <option value="todas">Todas las zonas</option>
+          {todasZonas.map(z=><option key={z} value={z}>{z}</option>)}
+        </select>
+        <select style={{...S.input,fontSize:12,padding:"4px 8px",width:"auto"}} value={filtroResp} onChange={e=>setFiltroResp(e.target.value)}>
+          <option value="todos">Todos los trabajadores</option>
+          {todosResp.map(r=><option key={r} value={r}>{r}</option>)}
+        </select>
+        {(filtroZona!=="todas"||filtroResp!=="todos")&&(
+          <button onClick={()=>{setFiltroZona("todas");setFiltroResp("todos");}}
+            style={{...S.btn,fontSize:11,color:"#f87171",border:"1px solid rgba(248,113,113,0.3)",background:"transparent"}}>
+            ✕ Limpiar filtros
+          </button>
+        )}
+      </div>
+
       {total===0 ? (
-        <div style={{...S.card,padding:40,textAlign:"center",color:"#4a8a5a"}}>
-          <div style={{fontSize:36,marginBottom:10}}>📅</div>
-          <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,marginBottom:6}}>Sin tareas programadas esta semana</div>
-          <div style={{fontSize:13}}>Ve a 📆 Programa para agregar o generar tareas para los días de esta semana.</div>
+        <div style={{textAlign:"center",padding:40,color:"#4a7a5a",fontSize:14}}>Sin tareas en el período seleccionado</div>
+      ) : (<>
+
+        {/* ── KPIs ── */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:10,marginBottom:16}}>
+          {[
+            {label:"Total",val:total,color:"#34d399",bg:"rgba(52,211,153,0.08)"},
+            {label:"✅ Hechas",val:hechas,color:"#22c55e",bg:"rgba(34,197,94,0.08)"},
+            {label:"🔴 No pudo",val:noPudo,color:"#ef4444",bg:"rgba(239,68,68,0.08)"},
+            {label:"Pendientes",val:pend,color:"#f59e0b",bg:"rgba(245,158,11,0.08)"},
+            {label:"Cumplimiento",val:pct+"%",color:pct>=80?"#22c55e":pct>=50?"#f59e0b":"#ef4444",bg:"rgba(255,255,255,0.03)"},
+          ].map(k=>(
+            <div key={k.label} style={{background:k.bg,border:`1px solid ${k.color}25`,borderRadius:10,padding:"10px 12px",textAlign:"center"}}>
+              <div style={{fontSize:22,fontWeight:700,color:k.color}}>{k.val}</div>
+              <div style={{fontSize:11,color:"#5a9a7a"}}>{k.label}</div>
+            </div>
+          ))}
         </div>
-      ) : (
-        <>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12,marginBottom:20}}>
-            {[
-              {label:"Tareas totales",val:total,color:"#c0dac0",icon:"📋"},
-              {label:"Completadas",val:hechas,color:"#22c55e",icon:"✅"},
-              {label:"No pudieron",val:noPudo,color:"#ef4444",icon:"🔴"},
-              {label:"Pendientes",val:pend,color:"#f59e0b",icon:"⏳"},
-              {label:"Cumplimiento",val:pct+"%",color:pct===100?"#22c55e":pct>70?"#4ade80":pct>40?"#f59e0b":"#ef4444",icon:"📊"},
-            ].map(s=>(
-              <div key={s.label} style={{...S.card,padding:"14px 10px",textAlign:"center"}}>
-                <div style={{fontSize:22,marginBottom:4}}>{s.icon}</div>
-                <div style={{fontFamily:"'Playfair Display',serif",fontSize:26,fontWeight:700,color:s.color}}>{s.val}</div>
-                <div style={{fontSize:11,color:"#6aaa7a"}}>{s.label}</div>
+
+        {/* ── Por trabajador ── */}
+        <div style={{...S.card,marginBottom:14,padding:"12px 14px"}}>
+          <div style={{fontSize:12,fontWeight:600,color:"#34d399",marginBottom:8}}>Por trabajador</div>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+            <thead><tr style={{background:"rgba(52,211,153,0.1)"}}>
+              {["Trabajador","Total","✅ Hechas","🔴 No pudo","Pendiente","%"].map(h=>(
+                <th key={h} style={{padding:"5px 8px",textAlign:h==="Trabajador"?"left":"center",color:"#34d399",fontWeight:600}}>{h}</th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {Object.entries(porTrabajador).sort((a,b)=>b[1].hechas-a[1].hechas).map(([n,d],i)=>{
+                const p2=d.total?Math.round(d.hechas/d.total*100):0;
+                return (<tr key={n} style={{background:i%2===0?"transparent":"rgba(255,255,255,0.02)",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                  <td style={{padding:"5px 8px",fontWeight:600,color:"#ede9e0"}}>{n}</td>
+                  <td style={{padding:"5px",textAlign:"center",color:"#5a9a7a"}}>{d.total}</td>
+                  <td style={{padding:"5px",textAlign:"center",color:"#22c55e",fontWeight:600}}>{d.hechas}</td>
+                  <td style={{padding:"5px",textAlign:"center",color:d.noPudo>0?"#ef4444":"#4a7a5a"}}>{d.noPudo||"—"}</td>
+                  <td style={{padding:"5px",textAlign:"center",color:d.pend>0?"#f59e0b":"#4a7a5a"}}>{d.pend||"—"}</td>
+                  <td style={{padding:"5px",textAlign:"center",fontWeight:700,color:p2>=80?"#22c55e":p2>=50?"#f59e0b":"#ef4444"}}>{p2}%</td>
+                </tr>);
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* ── Por macrozona y tipo de tarea ── */}
+        <div style={{fontSize:12,fontWeight:600,color:"#34d399",marginBottom:8}}>Por macrozona y tipo de tarea</div>
+        {Object.entries(porZona).sort((a,b)=>b[1].total-a[1].total).map(([zona,dat])=>{
+          const pctZ=dat.total?Math.round(dat.hechas/dat.total*100):0;
+          const colZ=pctZ>=80?"#22c55e":pctZ>=50?"#f59e0b":"#ef4444";
+          const tipos=tiposPorZona[zona]||{};
+          const noPudoZona=dat.tareas.filter(t=>t.estado==="no_pudo");
+          return (
+            <div key={zona} style={{...S.card,marginBottom:8,padding:0,overflow:"hidden"}}>
+              {/* Cabecera zona */}
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                padding:"7px 12px",background:"rgba(52,211,153,0.08)",borderBottom:"1px solid rgba(52,211,153,0.15)"}}>
+                <div style={{fontWeight:700,fontSize:12,color:"#34d399"}}>{zona}</div>
+                <div style={{display:"flex",gap:12,alignItems:"center"}}>
+                  <span style={{fontSize:11,color:"#5a9a7a"}}>{dat.hechas}/{dat.total} tareas</span>
+                  <span style={{fontSize:12,fontWeight:700,color:colZ,background:`${colZ}15`,
+                    padding:"2px 8px",borderRadius:10,border:`1px solid ${colZ}30`}}>{pctZ}%</span>
+                </div>
+              </div>
+              {/* Tipos de tarea */}
+              <div style={{padding:"6px 12px"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+                  <thead><tr style={{borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
+                    {["Tipo de tarea","Total","✅","Pend.","%"].map(h=>(
+                      <th key={h} style={{padding:"3px 6px",textAlign:h==="Tipo de tarea"?"left":"center",color:"#4a8a6a",fontWeight:600,fontSize:10}}>{h}</th>
+                    ))}
+                  </tr></thead>
+                  <tbody>
+                    {Object.entries(tipos).sort((a,b)=>b[1].total-a[1].total).map(([tipo,td],i)=>{
+                      const p3=td.total?Math.round(td.hechas/td.total*100):0;
+                      return (<tr key={tipo} style={{borderBottom:"1px solid rgba(255,255,255,0.03)"}}>
+                        <td style={{padding:"3px 6px",color:"#cde8d4"}}>{tipo}</td>
+                        <td style={{padding:"3px 6px",textAlign:"center",color:"#5a9a7a"}}>{td.total}</td>
+                        <td style={{padding:"3px 6px",textAlign:"center",color:"#22c55e",fontWeight:600}}>{td.hechas}</td>
+                        <td style={{padding:"3px 6px",textAlign:"center",color:td.total-td.hechas>0?"#f59e0b":"#4a7a5a"}}>{td.total-td.hechas||"—"}</td>
+                        <td style={{padding:"3px 6px",textAlign:"center",fontWeight:700,fontSize:11,color:p3>=80?"#22c55e":p3>=50?"#f59e0b":"#ef4444"}}>{p3}%</td>
+                      </tr>);
+                    })}
+                  </tbody>
+                </table>
+                {noPudoZona.length>0&&(
+                  <div style={{marginTop:6,padding:"5px 8px",background:"rgba(239,68,68,0.05)",borderRadius:6,border:"1px solid rgba(239,68,68,0.15)"}}>
+                    <div style={{fontSize:10,fontWeight:600,color:"#f87171",marginBottom:2}}>No se pudo realizar:</div>
+                    {noPudoZona.map((t,i)=>(
+                      <div key={i} style={{fontSize:10,color:"#9ca3af"}}>• {t.tarea||""}{t.motivo?` — ${t.motivo}`:""}</div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* ── Incidencias fitosanitarias ── */}
+        {incidenciasFito.filter(i=>i.fecha>=(dias[0]||"")&&i.fecha<=(dias[dias.length-1]||"")).length>0&&(
+          <div style={{marginTop:12}}>
+            <div style={{fontSize:12,fontWeight:600,color:"#fbbf24",marginBottom:8}}>Incidencias fitosanitarias del período</div>
+            {incidenciasFito.filter(i=>i.fecha>=(dias[0]||"")&&i.fecha<=(dias[dias.length-1]||"")).map((inc,i)=>(
+              <div key={i} style={{...S.card,marginBottom:6,padding:"8px 12px",border:"1px solid rgba(251,191,36,0.2)"}}>
+                <div style={{display:"flex",gap:10,fontSize:11}}>
+                  <span style={{fontWeight:600,color:"#fbbf24"}}>{inc.fecha}</span>
+                  <span style={{color:"#34d399"}}>{inc.zona||""}</span>
+                  <span style={{color:"#ede9e0"}}>{inc.problema||""}</span>
+                  {inc.producto&&<span style={{color:"#5a9a7a"}}>→ {inc.producto}{inc.dosis?` ${inc.dosis}`:""}{inc.ri?` (RI: ${inc.ri}h)`:""}</span>}
+                </div>
               </div>
             ))}
           </div>
-
-          {/* Resumen días */}
-          <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,marginBottom:12}}>📅 Resumen por Día</div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:8,marginBottom:22}}>
-            {dias.map((d,i)=>{
-              const td=tareasProg[d]||[];
-              const h=td.filter(t=>["hecha","completada"].includes(t.estado)).length;
-              const np=td.filter(t=>t.estado==="no_pudo").length;
-              const p=td.length?Math.round((h/td.length)*100):null;
-              const isDom=i===6;
-              return (
-                <div key={d} style={{...S.card,padding:"10px 8px",textAlign:"center",opacity:isDom?0.7:1,borderColor:isDom?"rgba(245,158,11,0.3)":"rgba(255,255,255,0.10)"}}>
-                  <div style={{fontSize:11,color:isDom?"#f59e0b":"#6aaa7a",fontWeight:600,marginBottom:4}}>{DIAS_LABEL[i]}</div>
-                  <div style={{fontSize:11,color:"#4a7a6a",marginBottom:6}}>{new Date(d+"T12:00:00").getDate()}</div>
-                  {td.length===0 ? <div style={{fontSize:11,color:"#3a6a4a"}}>—</div> : (
-                    <>
-                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color:p===100?"#22c55e":p>50?"#f59e0b":"#ef4444"}}>{p!==null?p+"%":"—"}</div>
-                      <div style={{fontSize:10,color:"#5a8a6a",marginTop:2}}>{td.length} tar.</div>
-                      {np>0&&<div style={{fontSize:10,color:"#ef4444"}}>🔴 {np}</div>}
-                    </>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Por trabajador */}
-          <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,marginBottom:12}}>👷 Desempeño por Trabajador</div>
-          <div style={{...S.card,padding:0,marginBottom:22,overflow:"hidden"}}>
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
-              <thead>
-                <tr style={{background:"rgba(61,122,82,0.2)"}}>
-                  {["Trabajador","Total","✅ Hechas","🔴 No pudo","⏳ Pend.","% Cumplimiento"].map(h=>(
-                    <th key={h} style={{padding:"9px 12px",textAlign:h==="Trabajador"?"left":"center",fontSize:11,color:"#6aaa7a",fontWeight:600,letterSpacing:"0.5px",textTransform:"uppercase",whiteSpace:"nowrap"}}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(porTrabajador).sort((a,b)=>b[1].total-a[1].total).map(([nombre,v],i)=>{
-                  const p=v.total?Math.round((v.hechas/v.total)*100):0;
-                  return (
-                    <tr key={nombre} style={{borderBottom:"1px solid rgba(255,255,255,0.05)",background:i%2===0?"transparent":"rgba(255,255,255,0.018)"}}>
-                      <td style={{padding:"9px 12px",fontWeight:600}}>{nombre}</td>
-                      <td style={{padding:"9px 12px",textAlign:"center",color:"#8ab0c0"}}>{v.total}</td>
-                      <td style={{padding:"9px 12px",textAlign:"center",color:"#22c55e"}}>{v.hechas||"—"}</td>
-                      <td style={{padding:"9px 12px",textAlign:"center",color:v.noPudo>0?"#ef4444":"#4a7a6a"}}>{v.noPudo||"—"}</td>
-                      <td style={{padding:"9px 12px",textAlign:"center",color:v.pend>0?"#f59e0b":"#4a7a6a"}}>{v.pend||"—"}</td>
-                      <td style={{padding:"9px 12px",textAlign:"center"}}>
-                        <div style={{display:"flex",alignItems:"center",gap:6,justifyContent:"center"}}>
-                          <div style={{background:"rgba(255,255,255,0.07)",borderRadius:4,height:6,width:60,overflow:"hidden"}}>
-                            <div style={{width:`${p}%`,height:"100%",background:p===100?"#22c55e":p>70?"#4ade80":p>40?"#f59e0b":"#ef4444",borderRadius:4}}/>
-                          </div>
-                          <span style={{fontSize:12,fontWeight:700,color:p===100?"#22c55e":p>70?"#4ade80":p>40?"#f59e0b":"#ef4444"}}>{p}%</span>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Incidencias de tareas */}
-          {incidencias.length>0&&(
-            <>
-              <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,marginBottom:12,color:"#fca5a5"}}>⚠️ Incidencias — No se pudo realizar</div>
-              <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:22}}>
-                {incidencias.map(t=>(
-                  <div key={t.id} style={{...S.card,padding:"12px 16px",borderLeft:"3px solid rgba(239,68,68,0.6)"}}>
-                    <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",marginBottom:4}}>
-                      <span style={{fontSize:11,color:"#f59e0b",background:"rgba(245,158,11,0.1)",padding:"2px 8px",borderRadius:8}}>{new Date(t.fechaDia+"T12:00:00").toLocaleDateString("es-CL",{weekday:"short",day:"numeric",month:"short"})}</span>
-                      <span style={{fontSize:14,fontWeight:600}}>{t.tarea}</span>
-                      {t.elemento&&<span style={{fontSize:11,color:"#5a8a6a"}}>{t.elemento}</span>}
-                      <span style={{fontSize:11,color:"#5a7a7a"}}>{MACROZONAS_BASE.find(z=>z.nombre===t.zona)?.icono||"📍"} {t.zona}</span>
-                      {t.responsable&&<span style={{fontSize:11,color:"#7a9a8a"}}>👤 {t.responsable}</span>}
-                    </div>
-                    {t.notaWorker&&<div style={{fontSize:12,color:"#fca5a5",fontStyle:"italic",padding:"5px 10px",background:"rgba(239,68,68,0.08)",borderRadius:6}}>⚠️ {t.notaWorker}</div>}
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-
-          {/* ── INCIDENCIAS FITOSANITARIAS Y CIERRES DE CANCHA ── */}
-          {(()=>{
-            // Filtrar incidencias fitosanitarias de la semana actual
-            const incSemana = incidenciasFito.filter(inc => {
-              const f = inc.fechaObservacion||inc.fechaAplicacion||"";
-              return f >= semanaBase && f <= domingo;
-            });
-            if(!incSemana.length) return null;
-            const TIPO_ICON = {fitosanitario:"🦠",mantenimiento:"🔧",clima:"🌧️"};
-            const SEV_COLOR = {leve:"#f59e0b",media:"#f97316",alta:"#ef4444",critica:"#7c3aed"};
-            return (
-              <>
-                <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,marginBottom:12,color:"#fb923c"}}>
-                  🚨 Incidencias Fitosanitarias y Cierres de Cancha
-                </div>
-                <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:22}}>
-                  {incSemana.map(inc=>{
-                    const sevColor = SEV_COLOR[inc.severidad]||"#f59e0b";
-                    const ESTADO_COLOR = {observacion:"#f59e0b",cerrada:"#ef4444",reabierta:"#22c55e"};
-                    const estColor = ESTADO_COLOR[inc.estado]||"#f59e0b";
-                    return (
-                      <div key={inc.id} style={{...S.card,padding:16,borderLeft:`3px solid ${estColor}`}}>
-                        {/* Cabecera */}
-                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:8,marginBottom:10}}>
-                          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-                            <span style={{fontSize:20}}>{TIPO_ICON[inc.tipoCierre]||"🚨"}</span>
-                            <div>
-                              <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:"#ede9e0"}}>
-                                {inc.agenteCausal||inc.diagnostico||"Incidencia registrada"}
-                              </div>
-                              <div style={{fontSize:11,color:"#7aaa80",marginTop:2}}>
-                                📅 {inc.fechaObservacion} {inc.horaObservacion} · 👤 Observado por: {inc.observador}
-                              </div>
-                            </div>
-                          </div>
-                          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                            <span style={{...S.chip,background:`${sevColor}18`,color:sevColor,border:`1px solid ${sevColor}40`,fontSize:11}}>
-                              ⚡ {inc.severidad||"media"}
-                            </span>
-                            <span style={{...S.chip,background:`${estColor}18`,color:estColor,border:`1px solid ${estColor}40`,fontSize:11}}>
-                              {inc.estado==="cerrada"?"🚫 Cerrada":inc.estado==="reabierta"?"✅ Reabierta":"⚠️ En observación"}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Observación */}
-                        {inc.observacion&&(
-                          <div style={{fontSize:12,color:"#a0c0a0",fontStyle:"italic",background:"rgba(255,255,255,0.04)",borderRadius:8,padding:"8px 12px",marginBottom:8}}>
-                            "{inc.observacion}"
-                          </div>
-                        )}
-
-                        {/* Sectores */}
-                        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
-                          {(inc.sectoresObservados||[]).map(s=>(
-                            <span key={s} style={{...S.chip,background:"rgba(249,115,22,0.1)",color:"#fb923c",border:"1px solid rgba(249,115,22,0.25)",fontSize:10}}>⚠️ {s}</span>
-                          ))}
-                          {(inc.sectoresCerrados||[]).map(s=>(
-                            <span key={s} style={{...S.chip,background:"rgba(239,68,68,0.12)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.25)",fontSize:10}}>🚫 {s}</span>
-                          ))}
-                        </div>
-
-                        {/* Diagnóstico y tratamiento */}
-                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,fontSize:12}}>
-                          {inc.diagnosticadoPor&&<div style={{color:"#7aaa80"}}>🩺 Diagnóstico: <span style={{color:"#c0e0c0"}}>{inc.diagnosticadoPor}</span></div>}
-                          {inc.productoAplicar&&<div style={{color:"#7aaa80"}}>🧪 Producto: <span style={{color:"#c0e0c0"}}>{inc.productoAplicar}</span></div>}
-                          {inc.fechaAplicacion&&<div style={{color:"#7aaa80"}}>💉 Aplicación: <span style={{color:"#c0e0c0"}}>{inc.fechaAplicacion} {inc.horaAplicacion}</span></div>}
-                          {inc.tratamiento&&<div style={{color:"#7aaa80"}}>📋 Alcance: <span style={{color:"#c0e0c0"}}>{inc.tratamiento==="completo"?"Fumigación completa":inc.tratamiento==="sectores"?"Sectores afectados":inc.tratamiento}</span></div>}
-                        </div>
-
-                        {/* Reapertura */}
-                        {inc.fechaReaperturaISO&&(
-                          <div style={{marginTop:8,background:"rgba(34,197,94,0.08)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:8,padding:"8px 12px"}}>
-                            <span style={{fontSize:12,color:"#86efac",fontWeight:600}}>📅 Reapertura estimada: </span>
-                            <span style={{fontSize:12,color:"#4ade80"}}>{new Date(inc.fechaReaperturaISO).toLocaleDateString("es-CL",{weekday:"long",day:"numeric",month:"long"})} a las {new Date(inc.fechaReaperturaISO).toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"})}</span>
-                            {inc.notaReingreso&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:3,fontStyle:"italic"}}>{inc.notaReingreso}</div>}
-                          </div>
-                        )}
-
-                        {inc.motivoCierre&&(
-                          <div style={{marginTop:8,fontSize:12,color:"#fcd34d",background:"rgba(252,211,77,0.06)",borderRadius:6,padding:"6px 10px"}}>
-                            📢 {inc.motivoCierre}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            );
-          })()}
-        </>
-      )}
+        )}
+      </>)}
     </div>
   );
 }
 
-// ─── HISTORIAL DE PROGRAMACIÓN ───────────────────────────────────────────────
+
 function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, puedeCrear=false }) {
   const [filtroDia,    setFiltroDia]    = React.useState("");
   const [filtroEstado, setFiltroEstado] = React.useState("todos");
