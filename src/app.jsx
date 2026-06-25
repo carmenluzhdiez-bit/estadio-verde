@@ -8290,89 +8290,12 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               {esJefa&&<button style={{...S.btn,background:"rgba(251,191,36,0.12)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.25)"}} onClick={()=>{setSubTab("eventos");setShowEventoForm(true);}}>🏆 Cargar evento</button>}
             </div>
           </div>
-          {/* Estado greens hoy */}
-          <div style={{...S.card,padding:16}}>
-            <div style={{fontSize:13,fontWeight:700,color:"#34d399",marginBottom:10}}>⛳ Estado Greens — última medición{ultimaMed?` (${ultimaMed.fecha})`:""}</div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(100px,1fr))",gap:8}}>
-              {GREENS_DEF.map(g=>{
-                const alt = ultimaMed?.alturas?.[g.id];
-                const color = colorAltura(alt);
-                return (
-                  <div key={g.id} style={{background:`${color}10`,borderRadius:8,padding:"8px 10px",border:`1px solid ${color}30`,textAlign:"center",cursor:"pointer"}} onClick={()=>{setSubTab("greens");setSelectedGreen(g.id);}}>
-                    <div style={{fontSize:11,fontWeight:600,color:"#34d399"}}>{g.nombre}</div>
-                    <div style={{fontSize:10,color:"#5a9a7a",marginBottom:4}}>{g.hoyos}</div>
-                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color}}>{alt?`${alt}mm`:"—"}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* ── TAREAS GOLF HOY E HISTORIAL RECIENTE ── */}
-          {(()=>{
-            const tareasGolfHoy=(tareasProg[hoy]||[]).filter(t=>t.zona==="Golf");
-            const tareasGolfRecientes=Object.entries(tareasProg)
-              .filter(([f])=>f<=hoy)
-              .sort(([a],[b])=>b.localeCompare(a))
-              .slice(0,7)
-              .flatMap(([f,ts])=>ts.filter(t=>t.zona==="Golf").map(t=>({...t,fecha:f})));
-            if(!tareasGolfRecientes.length) return null;
-            const ESTADOS={pendiente:{c:"#f59e0b",l:"Pendiente"},realizada:{c:"#22c55e",l:"✓"},no_realizada:{c:"#ef4444",l:"✗"},por_designar:{c:"#5a9a7a",l:"Sin asignar"}};
-            return (
-              <div style={{...S.card,padding:16,marginBottom:14}}>
-                <div style={{fontSize:13,fontWeight:700,color:"#34d399",marginBottom:10}}>📋 Tareas Golf — Historial reciente</div>
-                {tareasGolfHoy.length>0&&(
-                  <div style={{marginBottom:10}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,flexWrap:"wrap",gap:6}}>
-                      <div style={{fontSize:11,color:"#fbbf24",fontWeight:600}}>HOY — {hoy}</div>
-                      {/* Cambio masivo de método de limpieza */}
-                      {esJefa&&tareasGolfHoy.some(t=>t.metodoLimpieza)&&(
-                        <div style={{display:"flex",alignItems:"center",gap:6}}>
-                          <span style={{fontSize:10,color:"#5a9a7a"}}>Método limpieza hoy:</span>
-                          {["sopladora","barrido","ambos"].map(m=>(
-                            <button key={m} onClick={()=>{
-                              setTareasProg(p=>({...p,[hoy]:(p[hoy]||[]).map(t=>t.metodoLimpieza?{...t,metodoLimpieza:m}:t)}));
-                            }} style={{cursor:"pointer",fontSize:10,padding:"2px 8px",borderRadius:10,border:"1px solid rgba(251,191,36,0.3)",background:"rgba(251,191,36,0.08)",color:"#fbbf24",fontFamily:"'Georgia',serif"}}>
-                              {m==="sopladora"?"🌬️":m==="barrido"?"🧹":"🌬️+🧹"}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    {tareasGolfHoy.map(t=>(
-                      <div key={t.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 8px",background:"rgba(251,191,36,0.05)",borderRadius:6,marginBottom:4,flexWrap:"wrap",gap:4}}>
-                        <div>
-                          <span style={{fontSize:12}}>{t.tarea}</span>
-                          {t.alturaCorte&&<span style={{fontSize:11,color:"#34d399",marginLeft:6}}>✂️ {t.alturaCorte}mm</span>}
-                          {t.elemento&&<span style={{fontSize:10,color:"#5a9a7a",marginLeft:6}}>{t.elemento}</span>}
-                        </div>
-                        <span style={{fontSize:10,fontWeight:600,color:ESTADOS[t.estado]?.c||"#5a9a7a"}}>{ESTADOS[t.estado]?.l||t.estado}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div style={{display:"flex",flexDirection:"column",gap:4}}>
-                  {tareasGolfRecientes.filter(t=>t.fecha!==hoy).slice(0,15).map(t=>(
-                    <div key={t.id+t.fecha} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 8px",borderBottom:"1px solid rgba(255,255,255,0.04)",flexWrap:"wrap",gap:4}}>
-                      <div>
-                        <span style={{fontSize:11,color:"#5a9a7a",marginRight:6}}>{t.fecha}</span>
-                        <span style={{fontSize:12}}>{t.tarea?.replace("⛳ ","")}</span>
-                        {t.alturaCorte&&<span style={{fontSize:10,color:"#34d399",marginLeft:6}}>✂️ {t.alturaCorte}mm</span>}
-                      </div>
-                      <span style={{fontSize:10,color:ESTADOS[t.estado]?.c||"#5a9a7a"}}>{ESTADOS[t.estado]?.l||t.estado}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
-
           {/* ── RESUMEN URGENCIA DE CORTE ── */}
           {(()=>{
             const ESCALA_URG={1:"#ef4444",2:"#ef4444",3:"#f97316",4:"#f59e0b",5:"#f59e0b",6:"#22c55e",7:"#22c55e",8:"#3b82f6"};
             const colorUrg={cortar:"#ef4444",urgente:"#f97316",pronto:"#f59e0b",normal:"#22c55e",ok:"#4ade80","sin-tasa":"#5a9a7a","sin-datos":"#3a6a5a"};
             const labelUrg={cortar:"✂️ Cortar ya",urgente:"⏰ Urgente",pronto:"📅 Pronto",normal:"✅ Normal",ok:"✅ OK","sin-tasa":"📏 Sin tasa","sin-datos":"— Sin datos"};
-            const urgencias=GREENS_DEF.map(g=>{
+            const urgencias=[...GREENS_DEF,{id:"vivero",nombre:"Vivero",hoyos:"Vivero"}].map(g=>{
               const alt=ultimaMed?.alturas?.[g.id];
               if(!alt) return {g,diasRestantes:null,urgencia:"sin-datos",alt:null,tasa:null,altObjetivo:null,infoCorte:null};
               const esTareaCorteG = t => t.zona==="Golf" &&
@@ -8380,7 +8303,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                 (t.elemento?.includes(g.nombre)||t.tarea?.includes(g.nombre)||
                  t.elemento?.toLowerCase().includes("todos")||t.tarea?.toLowerCase().includes("todos"));
               const cortesG=Object.values(tareasProg).flat()
-                .filter(esTareaCorteG)
+                .filter(t=>esTareaCorteG(t) && t.estado==="hecha" && (t.fecha||"")<=hoy)
                 .sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
               const infoCorte=cortesG[0]||null;
               const extraerAlturaCorte = (t) => {
@@ -8393,18 +8316,25 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               const histG=[...mediciones].filter(m=>m.alturas?.[g.id]&&m.fecha).sort((a,b)=>b.fecha.localeCompare(a.fecha));
               const histPost=infoCorte?.fecha?histG.filter(m=>m.fecha>=infoCorte.fecha):histG;
               let tasa=null;
+              // Tasa entre 2 mediciones post-corte
               if(histPost.length>=2){
                 const a1=Number(histPost[0].alturas[g.id]),a2=Number(histPost[1].alturas[g.id]);
                 const d=Math.round((new Date(histPost[0].fecha+"T12:00:00")-new Date(histPost[1].fecha+"T12:00:00"))/(1000*60*60*24));
                 if(d>0&&a1>a2) tasa=(a1-a2)/d;
               }
-              // Fallback: tasa desde altura de corte (campo o extraída del texto) hasta medición actual
+              // Fallback 1: desde altura de corte hasta medición más reciente
               if(!tasa&&altCorteReal&&infoCorte?.fecha){
-                const fechaRef = histG[0]?.fecha||hoy;
-                const altRef = histG.length>0?Number(histG[0].alturas[g.id]):Number(alt);
+                const fechaRef = histPost[0]?.fecha||histG[0]?.fecha||hoy;
+                const altRef = histPost.length>0?Number(histPost[0].alturas[g.id]):Number(alt);
                 const d=Math.round((new Date(fechaRef+"T12:00:00")-new Date(infoCorte.fecha+"T12:00:00"))/(1000*60*60*24));
                 const delta=altRef-altCorteReal;
                 if(d>0&&delta>0) tasa=delta/d;
+              }
+              // Fallback 2: desde última medición disponible aunque no haya corte
+              if(!tasa&&histG.length>=2){
+                const a1=Number(histG[0].alturas[g.id]),a2=Number(histG[1].alturas[g.id]);
+                const d=Math.round((new Date(histG[0].fecha+"T12:00:00")-new Date(histG[1].fecha+"T12:00:00"))/(1000*60*60*24));
+                if(d>0&&a1>a2) tasa=(a1-a2)/d;
               }
               const altN=Number(alt);
               if(altN>=altObjetivo) return {g,diasRestantes:0,urgencia:"cortar",alt:altN,tasa,altObjetivo,infoCorte};
@@ -8515,7 +8445,74 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
         </div>
       )}
 
-      {/* ── GREENS ── */}
+          {/* Estado greens hoy */}
+          <div style={{...S.card,padding:16}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#34d399",marginBottom:10}}>⛳ Estado Greens — última medición{ultimaMed?` (${ultimaMed.fecha})`:""}</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(100px,1fr))",gap:8}}>
+              {[...GREENS_DEF,{id:"vivero",nombre:"Vivero",hoyos:"Vivero"}].map(g=>{
+                const alt = ultimaMed?.alturas?.[g.id];
+                const color = colorAltura(alt);
+                return (
+                  <div key={g.id} style={{background:`${color}10`,borderRadius:8,padding:"8px 10px",border:`1px solid ${color}30`,textAlign:"center",cursor:"pointer"}} onClick={()=>{setSubTab("greens");setSelectedGreen(g.id);}}>
+                    <div style={{fontSize:11,fontWeight:600,color:"#34d399"}}>{g.nombre}</div>
+                    <div style={{fontSize:10,color:"#5a9a7a",marginBottom:4}}>{g.hoyos}</div>
+                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color}}>{alt?`${alt}mm`:"—"}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ── TAREAS GOLF HOY (comprimidas por tipo) ── */}
+          {(()=>{
+            const tareasGolfHoy=(tareasProg[hoy]||[]).filter(t=>t.zona==="Golf");
+            if(tareasGolfHoy.length===0) return null;
+            const grupos={};
+            tareasGolfHoy.forEach(t=>{
+              const tipo=(t.tarea||"").split("/")[0].replace("⛳ ","").trim()||"Otra";
+              if(!grupos[tipo]) grupos[tipo]=[];
+              grupos[tipo].push(t);
+            });
+            const colorEstado={pendiente:"#f59e0b",haciendose:"#60a5fa",hecha:"#22c55e",no_pudo:"#ef4444",por_designar:"#6b7280"};
+            return (
+              <div style={{marginBottom:12}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                  <div style={{fontSize:11,fontWeight:600,color:"#34d399"}}>Tareas Golf hoy — {hoy}</div>
+                  {esJefa&&tareasGolfHoy.some(t=>t.metodoLimpieza)&&(
+                    <select style={{...S.input,fontSize:10,padding:"2px 6px",width:"auto"}}
+                      onChange={e=>{
+                        const met=e.target.value;
+                        if(!met) return;
+                        const nuevoProg={...tareasProg};
+                        nuevoProg[hoy]=(nuevoProg[hoy]||[]).map(t=>
+                          t.zona==="Golf"&&t.metodoLimpieza?{...t,metodoLimpieza:met}:t);
+                        setTareasProg(nuevoProg);
+                      }}>
+                      <option value="">🧹 Método limpieza...</option>
+                      <option value="sopladora">Sopladora</option>
+                      <option value="barrido">Barrido</option>
+                      <option value="ambos">Ambos</option>
+                    </select>
+                  )}
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:3}}>
+                  {Object.entries(grupos).map(([tipo,tareas])=>{
+                    const hechas=tareas.filter(t=>t.estado==="hecha").length;
+                    const total=tareas.length;
+                    const pct=Math.round(hechas/total*100);
+                    const col=pct===100?"#22c55e":pct>0?"#60a5fa":"#f59e0b";
+                    return (
+                      <div key={tipo} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(255,255,255,0.03)",borderRadius:6,padding:"4px 10px",border:"1px solid rgba(255,255,255,0.06)"}}>
+                        <div style={{flex:1,fontSize:11,color:"#ede9e0"}}>{tipo}</div>
+                        <div style={{fontSize:10,color:"#5a9a7a"}}>{total} tareas</div>
+                        <div style={{fontSize:11,fontWeight:600,color:col}}>{pct===100?"✅":pct>0?"🔵":"⬜"} {hechas}/{total}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
       {subTab==="greens"&&(
         <div className="ein">
           <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
