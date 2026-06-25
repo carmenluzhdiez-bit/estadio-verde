@@ -4202,7 +4202,7 @@ const PERSONAL_INICIAL = [
   {
     id: 1006, nombre:"Saúl Molina Escalera", rut:"28.444.223-7",
     cargo:"Jardinero", contrato:"indefinido",
-    telefono:"+56 9 5922 6281", email:"marcelopolancopavez@gmail.com",
+    telefono:"+56 9 5922 6281", email:"saulmolina@gmail.com",
     fechaIngreso:"2024-10-01", fechaNacimiento:"2002-06-29",
     nacionalidad:"Boliviano", direccion:"Los Loros 6720, Cerro Navia",
     tallaPolera:"XL", tallaPoleron:"L", tallaPantalon:"50", tallaZapato:"43",
@@ -7635,12 +7635,44 @@ function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJe
       ultima:"2026-05-28", resp:bhaluNombre, notas:"Manualmente" },
   ];
 
-  const [ultimasFechas, setUltimasFechas] = React.useState(() => {
-    const init = {};
-    TAREAS_PERIODICAS.forEach(t => { init[t.id] = t.ultima; });
-    return init;
+  // Calcular última fecha real desde tareasProg (tareas marcadas como hechas)
+  // con fallback a la fecha hardcodeada en TAREAS_PERIODICAS
+  const ultimasFechasReales = React.useMemo(() => {
+    const resultado = {};
+    TAREAS_PERIODICAS.forEach(t => {
+      // Buscar en tareasProg la última tarea hecha que coincida con esta tarea periódica
+      let ultimaReal = null;
+      Object.entries(tareasProg||{}).forEach(([fecha, tareas]) => {
+        if(!Array.isArray(tareas)) return;
+        const coincide = tareas.some(tr =>
+          tr.estado === "hecha" &&
+          tr.zona === "Golf" &&
+          (tr.tarea||"").toLowerCase().includes(
+            t.nombre.toLowerCase().split(" ").slice(0,3).join(" ").toLowerCase()
+          )
+        );
+        if(coincide && (!ultimaReal || fecha > ultimaReal)) {
+          ultimaReal = fecha;
+        }
+      });
+      resultado[t.id] = ultimaReal || t.ultima;
+    });
+    return resultado;
+  }, [tareasProg]);
+
+  // Override manual de fechas (para correcciones puntuales)
+  const [fechasOverride, setFechasOverride] = React.useState({});
+  const ultimasFechas = React.useMemo(() => ({
+    ...ultimasFechasReales,
+    ...fechasOverride,
+  }), [ultimasFechasReales, fechasOverride]);
+  const setUltimasFechas = (fn) => setFechasOverride(prev => {
+    const next = typeof fn === "function" ? fn(prev) : fn;
+    return {...prev, ...next};
   });
   const [editandoFecha, setEditandoFecha] = React.useState(null);
+  const [editandoNota, setEditandoNota] = React.useState(null);
+  const [notasOverride, setNotasOverride] = React.useState({});
   const [filtroUrgencia, setFiltroUrgencia] = React.useState("todas");
 
   // ── Calcular próxima fecha y urgencia ──
@@ -7714,7 +7746,7 @@ function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJe
       tarea: `⛳ ${tarea.nombre}`,
       responsable: tarea.resp,
       estado: "pendiente",
-      notas: tarea.notas || "",
+      notas: notasOverride[tarea.id] ?? tarea.notas ?? "",
       auto: false,
       origen: "programacion_golf",
     };
@@ -7851,7 +7883,10 @@ function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJe
                     style={{...S.input,fontSize:11,padding:"2px 6px",width:130}}/>
                   <button onClick={()=>{
                     const v = document.getElementById(`fecha_${t.id}`)?.value;
-                    if(v) setUltimasFechas(p=>({...p,[t.id]:v}));
+                    if(v) {
+                      // Guardar como override manual (persiste sobre la detección automática)
+                      setFechasOverride(p=>({...p,[t.id]:v}));
+                    }
                     setEditandoFecha(null);
                   }} style={{cursor:"pointer",border:"none",borderRadius:6,padding:"2px 8px",background:"#3d7a52",color:"#fff",fontSize:11}}>✓</button>
                   <button onClick={()=>setEditandoFecha(null)} style={{cursor:"pointer",border:"1px solid rgba(255,255,255,0.15)",borderRadius:6,padding:"2px 8px",background:"transparent",color:"#6aaa7a",fontSize:11}}>✗</button>
@@ -7869,7 +7904,37 @@ function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJe
                 </button>
               )}
             </div>
-            {t.notas && <div style={{fontSize:11,color:"#4a7a5a",marginTop:4,fontStyle:"italic"}}>💡 {t.notas}</div>}
+            {/* Nota con edición inline para jefa */}
+            {editandoNota===t.id ? (
+              <div style={{marginTop:6,display:"flex",gap:6,alignItems:"flex-start"}}>
+                <span style={{fontSize:12,paddingTop:6}}>💡</span>
+                <textarea rows={2} autoFocus
+                  defaultValue={notasOverride[t.id]??t.notas??""} id={`nota_${t.id}`}
+                  placeholder="Instrucción para Bhalú..."
+                  style={{flex:1,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(251,191,36,0.4)",borderRadius:8,color:"#ede9e0",padding:"6px 10px",fontFamily:"'Georgia',serif",fontSize:12,resize:"vertical"}}
+                />
+                <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                  <button onClick={()=>{
+                    const v=document.getElementById(`nota_${t.id}`)?.value;
+                    setNotasOverride(p=>({...p,[t.id]:v}));
+                    setEditandoNota(null);
+                  }} style={{cursor:"pointer",border:"none",borderRadius:6,padding:"4px 8px",background:"#3d7a52",color:"#fff",fontSize:11}}>✓</button>
+                  <button onClick={()=>setEditandoNota(null)}
+                    style={{cursor:"pointer",border:"1px solid rgba(255,255,255,0.15)",borderRadius:6,padding:"4px 8px",background:"transparent",color:"#6aaa7a",fontSize:11}}>✗</button>
+                </div>
+              </div>
+            ) : (
+              <div style={{marginTop:4,display:"flex",alignItems:"flex-start",gap:6,cursor:esJefa?"pointer":"default"}}
+                onClick={()=>esJefa&&setEditandoNota(t.id)}>
+                <span style={{fontSize:11}}>💡</span>
+                <span style={{fontSize:11,color:"#4a7a5a",fontStyle:"italic",flex:1}}>
+                  {notasOverride[t.id]??t.notas??
+                    <span style={{color:"#2a5a3a",fontStyle:"normal"}}>{esJefa?"clic para agregar instrucción":"—"}</span>
+                  }
+                </span>
+                {esJefa&&<span style={{fontSize:9,color:"#2a5a3a"}}>✏️</span>}
+              </div>
+            )}
           </div>
         );
       })}
@@ -8375,43 +8440,56 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                       <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
                         <thead>
                           <tr style={{background:"rgba(52,211,153,0.1)"}}>
-                            {["Green","Alt. actual","Objetivo","Tasa","Proyección","Estado"].map(h=>(
-                              <th key={h} style={{padding:"6px 10px",textAlign:"left",color:"#34d399",fontSize:10,letterSpacing:"0.5px",fontWeight:600,whiteSpace:"nowrap"}}>{h.toUpperCase()}</th>
+                            {[["Green","left"],["Alt
+mm","center"],["Obj
+mm","center"],["Tasa
+mm/d","center"],["Próx
+corte","center"],["Estado","center"]].map(([h,a])=>(
+                              <th key={h} style={{padding:"4px 6px",textAlign:a,color:"#34d399",fontSize:9,letterSpacing:"0.3px",fontWeight:600,whiteSpace:"pre-line",lineHeight:1.2}}>{h.toUpperCase()}</th>
                             ))}
                           </tr>
                         </thead>
                         <tbody>
                           {urgencias.map((u,i)=>{
                             const c=colorUrg[u.urgencia]||"#5a9a7a";
+                            const proxFecha = u.diasRestantes>0
+                              ? new Date(new Date().getTime()+u.diasRestantes*86400000).toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit"})
+                              : null;
                             return (
-                              <tr key={u.g.id} style={{borderBottom:"1px solid rgba(255,255,255,0.05)",background:i%2===0?"transparent":"rgba(255,255,255,0.018)",cursor:"pointer"}}
+                              <tr key={u.g.id} style={{borderBottom:"1px solid rgba(255,255,255,0.04)",background:i%2===0?"transparent":"rgba(255,255,255,0.015)",cursor:"pointer"}}
                                 onClick={()=>{setSubTab("greens");setSelectedGreen(u.g.id);}}>
-                                <td style={{padding:"7px 10px",fontWeight:600,color:"#34d399"}}>
-                                  {u.g.nombre}
-                                  <div style={{fontSize:9,color:"#4a7a5a",fontWeight:400}}>{u.g.hoyos}</div>
+                                {/* Green */}
+                                <td style={{padding:"4px 8px",fontWeight:600,color:"#34d399",fontSize:11,whiteSpace:"nowrap"}}>
+                                  {u.g.nombre.replace("Green ","")}
+                                  <span style={{fontSize:9,color:"#4a7a5a",fontWeight:400,marginLeft:4}}>{u.g.hoyos.split("(")[1]?.replace(")","")}</span>
                                 </td>
-                                <td style={{padding:"7px 10px",fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:colorAltura(u.alt)}}>
-                                  {u.alt?`${u.alt}mm`:"—"}
+                                {/* Alt actual */}
+                                <td style={{padding:"4px 6px",textAlign:"center",fontSize:13,fontWeight:700,color:colorAltura(u.alt)}}>
+                                  {u.alt?`${u.alt}`:"—"}
                                 </td>
-                                <td style={{padding:"7px 10px",color:"#fbbf24",fontSize:12}}>
-                                  {u.altObjetivo?`${Number(u.altObjetivo).toFixed(1)}mm`:"—"}
-                                  <div style={{fontSize:9,color:u.infoCorte?.alturaObjetivo?"#5a9a7a":"#4a7a5a"}}>{u.infoCorte?.alturaObjetivo?"definido":"regla 1/3"}</div>
+                                {/* Objetivo */}
+                                <td style={{padding:"4px 6px",textAlign:"center",color:"#fbbf24",fontSize:11}}>
+                                  {u.altObjetivo?`${Number(u.altObjetivo).toFixed(1)}`:"—"}
                                 </td>
-                                <td style={{padding:"7px 10px",color:"#5a9a7a",fontSize:11}}>
-                                  {u.tasa?`${u.tasa.toFixed(2)}mm/d`:"—"}
+                                {/* Tasa */}
+                                <td style={{padding:"4px 6px",textAlign:"center",color:"#5a9a7a",fontSize:10}}>
+                                  {u.tasa?`${u.tasa.toFixed(2)}`:"—"}
                                 </td>
-                                <td style={{padding:"7px 10px"}}>
+                                {/* Proyección */}
+                                <td style={{padding:"4px 6px",textAlign:"center"}}>
                                   {u.urgencia==="sin-datos"||u.urgencia==="sin-tasa"?(
-                                    <span style={{fontSize:11,color:"#3a6a5a"}}>—</span>
+                                    <span style={{fontSize:10,color:"#3a6a5a"}}>—</span>
                                   ):u.diasRestantes===0?(
-                                    <span style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,color:"#ef4444"}}>✂️ HOY</span>
+                                    <span style={{fontSize:12,fontWeight:700,color:"#ef4444"}}>✂️</span>
                                   ):(
-                                    <span style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,color:c}}>{u.diasRestantes}d</span>
+                                    <span style={{fontSize:12,fontWeight:700,color:c}}>{u.diasRestantes}d</span>
                                   )}
-                                  {u.infoCorte&&<div style={{fontSize:9,color:"#4a7a5a"}}>✂️ {u.infoCorte.fecha}{u.infoCorte.alturaCorte&&` @ ${u.infoCorte.alturaCorte}mm`}</div>}
+                                  {proxFecha&&<div style={{fontSize:9,color:"#5a8a6a"}}>→{proxFecha}</div>}
+                                  {u.infoCorte?.fecha&&<div style={{fontSize:8,color:"#3a5a4a"}}>✂️{u.infoCorte.fecha.slice(8,10)}/{u.infoCorte.fecha.slice(5,7)}{u.infoCorte.alturaCorte?` ${u.infoCorte.alturaCorte}`:""}</div>}
                                 </td>
-                                <td style={{padding:"7px 10px"}}>
-                                  <span style={{fontSize:11,fontWeight:600,color:c,background:`${c}15`,padding:"2px 8px",borderRadius:20,border:`1px solid ${c}35`,whiteSpace:"nowrap"}}>
+                                {/* Estado */}
+                                <td style={{padding:"4px 6px",textAlign:"center"}}>
+                                  <span style={{fontSize:10,fontWeight:600,color:c,background:`${c}15`,padding:"2px 6px",borderRadius:10,border:`1px solid ${c}30`,whiteSpace:"nowrap"}}>
                                     {labelUrg[u.urgencia]}
                                   </span>
                                 </td>
