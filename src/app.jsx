@@ -8440,12 +8440,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                       <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
                         <thead>
                           <tr style={{background:"rgba(52,211,153,0.1)"}}>
-                            {[["Green","left"],["Alt
-mm","center"],["Obj
-mm","center"],["Tasa
-mm/d","center"],["Próx
-corte","center"],["Estado","center"]].map(([h,a])=>(
-                              <th key={h} style={{padding:"4px 6px",textAlign:a,color:"#34d399",fontSize:9,letterSpacing:"0.3px",fontWeight:600,whiteSpace:"pre-line",lineHeight:1.2}}>{h.toUpperCase()}</th>
+                            {[["Green","left"],["mm","center"],["Obj","center"],["mm/d","center"],["Prox","center"],["Estado","center"]].map(([h,a])=>(
+                              <th key={h} style={{padding:"4px 6px",textAlign:a,color:"#34d399",fontSize:9,letterSpacing:"0.3px",fontWeight:600,whiteSpace:"nowrap"}}>{h.toUpperCase()}</th>
                             ))}
                           </tr>
                         </thead>
