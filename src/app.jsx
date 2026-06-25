@@ -3740,15 +3740,57 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
           {/* ── SECCIÓN 5: ACCESO ── */}
           <div style={{...S.card,padding:18,marginBottom:12}}>
             <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:12,color:"#a0d8b0",borderBottom:"1px solid rgba(255,255,255,0.08)",paddingBottom:8}}>🔐 Acceso al Sistema</div>
-            <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
-              <div style={{flex:"0 0 auto"}}>
-                <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>PIN (4 DÍGITOS)</label>
-                <input type="password" maxLength={4} placeholder="••••"
-                  style={{...S.input,maxWidth:120,fontSize:20,letterSpacing:"0.5em",textAlign:"center"}}
-                  value={t.pin||""} onChange={e=>onUpdate({pin:e.target.value})}/>
-              </div>
-              <div style={{fontSize:12,color:"#5a8a6a",flex:1}}>El trabajador usa este PIN para acceder a 🌿 Mi Turno y ver sus tareas del día.</div>
-            </div>
+            {(()=>{
+              const [verPin, setVerPin] = React.useState(false);
+              return (
+                <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                  <div style={{display:"flex",alignItems:"flex-end",gap:10,flexWrap:"wrap"}}>
+                    <div>
+                      <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>PIN (4 DÍGITOS)</label>
+                      <div style={{display:"flex",alignItems:"center",gap:6}}>
+                        <input type={verPin?"text":"password"} maxLength={4} placeholder="••••"
+                          style={{...S.input,width:100,fontSize:20,letterSpacing:"0.5em",textAlign:"center"}}
+                          value={t.pin||""} onChange={e=>onUpdate({pin:e.target.value})}/>
+                        <button onClick={()=>setVerPin(v=>!v)}
+                          title={verPin?"Ocultar PIN":"Ver PIN"}
+                          style={{cursor:"pointer",border:"1px solid rgba(255,255,255,0.15)",borderRadius:8,
+                            padding:"6px 10px",background:"transparent",color:"#6aaa7a",fontSize:14}}>
+                          {verPin?"🙈":"👁️"}
+                        </button>
+                        {verPin&&t.pin&&(
+                          <span style={{fontSize:18,fontWeight:700,color:"#fbbf24",
+                            background:"rgba(251,191,36,0.1)",padding:"4px 12px",borderRadius:8,
+                            border:"1px solid rgba(251,191,36,0.3)",letterSpacing:"0.3em"}}>
+                            {t.pin}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div style={{fontSize:11,color:"#5a8a6a",maxWidth:300}}>
+                      PIN para acceder a 🌿 Mi Turno. Solo visible para la jefa.
+                    </div>
+                  </div>
+                  {t.email&&(
+                    <div>
+                      <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>EMAIL FIREBASE (ACCESO SISTEMA)</label>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <span style={{fontSize:12,color:"#ede9e0",background:"rgba(255,255,255,0.05)",
+                          padding:"6px 12px",borderRadius:8,border:"1px solid rgba(255,255,255,0.1)",
+                          fontFamily:"monospace"}}>
+                          {t.email}
+                        </span>
+                        <button onClick={()=>navigator.clipboard?.writeText(t.email)}
+                          title="Copiar email"
+                          style={{cursor:"pointer",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,
+                            padding:"4px 8px",background:"transparent",color:"#5a9a7a",fontSize:12}}>
+                          📋
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           {/* ── SECCIÓN 6: OBSERVACIONES ── */}
@@ -7985,6 +8027,116 @@ function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJe
   );
 }
 
+// ── Subcomponente acordeón tareas Golf del día ──────────────────────────────
+function TareasGolfPanel({ tareasGolfHoy, hoy, esJefa, setTareasProg, tareasProg, S }) {
+  const [abiertos, setAbiertos] = React.useState({});
+  if(tareasGolfHoy.length===0) return null;
+
+  // Agrupar por tipo de tarea
+  const ORDEN_TIPOS = ["Labores/DIARIA","Labores/CORTE","Labores/CAMBIO HOYOS","Labores/FERTILIZACIÓN",
+    "Labores/AIREACIÓN","Labores/ORILLADO","Labores/VERTICORTE","Control/DESMALEZADO",
+    "Control/FUMIGACIÓN","Revisión/PLAGASyENFERMEDADES","Revisión/HUMEDAD","Revisión/SISTEMA RIEGO",
+    "Reparar/SISTEMA RIEGO","Labores/PODA","Labores/REGAR","Limpiar/CÉSPED","Otros"];
+
+  const grupos = {};
+  tareasGolfHoy.forEach(t => {
+    // Intentar extraer tipo/subtipo del nombre de la tarea
+    const raw = (t.tarea||"").replace("⛳ ","").trim();
+    // Buscar en ORDEN_TIPOS si coincide
+    const tipoMatch = ORDEN_TIPOS.find(ot => raw.toLowerCase().includes(ot.split("/")[1]?.toLowerCase()||""));
+    const tipo = tipoMatch || raw.split(/[—–-]/)[0].trim() || "Otras tareas";
+    const label = tipo.includes("/") ? tipo.split("/")[1] : tipo;
+    const key = label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
+    if(!grupos[key]) grupos[key] = [];
+    grupos[key].push(t);
+  });
+
+  // Ordenar grupos según ORDEN_TIPOS
+  const gruposOrdenados = Object.entries(grupos).sort(([a],[b]) => {
+    const ia = ORDEN_TIPOS.findIndex(o => o.toLowerCase().includes(a.toLowerCase()));
+    const ib = ORDEN_TIPOS.findIndex(o => o.toLowerCase().includes(b.toLowerCase()));
+    return (ia===-1?99:ia) - (ib===-1?99:ib);
+  });
+
+  const colorEstado = {pendiente:"#f59e0b",haciendose:"#60a5fa",hecha:"#22c55e",no_pudo:"#ef4444",por_designar:"#6b7280"};
+  const iconoEstado = {pendiente:"⬜",haciendose:"🔵",hecha:"✅",no_pudo:"🔴",por_designar:"⬜"};
+
+  const toggle = (key) => setAbiertos(p => ({...p,[key]:!p[key]}));
+
+  return (
+    <div style={{marginBottom:12}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+        <div style={{fontSize:11,fontWeight:600,color:"#34d399"}}>
+          Tareas Golf hoy
+          <span style={{marginLeft:8,fontSize:10,color:"#5a9a7a",fontWeight:400}}>
+            {tareasGolfHoy.filter(t=>t.estado==="hecha").length}/{tareasGolfHoy.length} hechas
+          </span>
+        </div>
+        {esJefa&&tareasGolfHoy.some(t=>t.metodoLimpieza)&&(
+          <select style={{...S.input,fontSize:10,padding:"2px 6px",width:"auto"}}
+            onChange={e=>{
+              const met=e.target.value;
+              if(!met) return;
+              const nuevoProg={...tareasProg};
+              nuevoProg[hoy]=(nuevoProg[hoy]||[]).map(t=>
+                t.zona==="Golf"&&t.metodoLimpieza?{...t,metodoLimpieza:met}:t);
+              setTareasProg(nuevoProg);
+            }}>
+            <option value="">🧹 Método limpieza...</option>
+            <option value="sopladora">Sopladora eléctrica</option>
+            <option value="barrido">Barrido con vara</option>
+            <option value="ambos">Ambos</option>
+          </select>
+        )}
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:3}}>
+        {gruposOrdenados.map(([tipo, tareas]) => {
+          const hechas = tareas.filter(t=>t.estado==="hecha").length;
+          const total = tareas.length;
+          const pct = Math.round(hechas/total*100);
+          const col = pct===100?"#22c55e":pct>0?"#60a5fa":"#f59e0b";
+          const abierto = abiertos[tipo]||false;
+          return (
+            <div key={tipo} style={{border:`1px solid rgba(255,255,255,0.07)`,borderRadius:8,overflow:"hidden"}}>
+              {/* Cabecera del grupo — siempre visible */}
+              <div onClick={()=>toggle(tipo)}
+                style={{display:"flex",alignItems:"center",gap:8,padding:"5px 10px",
+                  background:abierto?"rgba(52,211,153,0.06)":"rgba(255,255,255,0.025)",
+                  cursor:"pointer",userSelect:"none"}}>
+                <span style={{fontSize:10,color:col}}>{pct===100?"✅":pct>0?"🔵":"⬜"}</span>
+                <span style={{flex:1,fontSize:11,fontWeight:600,color:"#ede9e0"}}>{tipo}</span>
+                <span style={{fontSize:10,color:"#5a9a7a"}}>{hechas}/{total}</span>
+                {pct===100&&<span style={{fontSize:10,color:"#22c55e",background:"rgba(34,197,94,0.1)",padding:"1px 6px",borderRadius:8}}>Listo</span>}
+                <span style={{fontSize:10,color:"#3a6a5a",transform:abierto?"rotate(180deg)":"none",transition:"transform 0.2s"}}>▼</span>
+              </div>
+              {/* Tareas individuales — solo cuando está abierto */}
+              {abierto&&(
+                <div style={{padding:"4px 6px",display:"flex",flexDirection:"column",gap:2,background:"rgba(0,0,0,0.15)"}}>
+                  {tareas.map(t=>{
+                    const col2 = colorEstado[t.estado]||"#6b7280";
+                    return (
+                      <div key={t.id} style={{display:"flex",alignItems:"center",gap:6,
+                        padding:"3px 8px",borderRadius:5,background:"rgba(255,255,255,0.02)"}}>
+                        <span style={{fontSize:10,color:col2}}>{iconoEstado[t.estado]||"⬜"}</span>
+                        <span style={{flex:1,fontSize:10,color:"#cde8d4"}}>
+                          {(t.tarea||"").replace("⛳ ","")}
+                          {t.elemento&&<span style={{color:"#5a9a7a",marginLeft:4}}>{t.elemento}</span>}
+                        </span>
+                        <span style={{fontSize:9,color:"#4a7a5a"}}>{t.responsable?.split(" ")[0]}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+
 function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado }) {
   const GOLF_ZONA_ID = 31; // ID macrozona Golf
   const sincronizarMacrozona = (tipo, detalle) => {
@@ -8463,56 +8615,12 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             </div>
           </div>
 
-          {/* ── TAREAS GOLF HOY (comprimidas por tipo) ── */}
-          {(()=>{
-            const tareasGolfHoy=(tareasProg[hoy]||[]).filter(t=>t.zona==="Golf");
-            if(tareasGolfHoy.length===0) return null;
-            const grupos={};
-            tareasGolfHoy.forEach(t=>{
-              const tipo=(t.tarea||"").split("/")[0].replace("⛳ ","").trim()||"Otra";
-              if(!grupos[tipo]) grupos[tipo]=[];
-              grupos[tipo].push(t);
-            });
-            const colorEstado={pendiente:"#f59e0b",haciendose:"#60a5fa",hecha:"#22c55e",no_pudo:"#ef4444",por_designar:"#6b7280"};
-            return (
-              <div style={{marginBottom:12}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                  <div style={{fontSize:11,fontWeight:600,color:"#34d399"}}>Tareas Golf hoy — {hoy}</div>
-                  {esJefa&&tareasGolfHoy.some(t=>t.metodoLimpieza)&&(
-                    <select style={{...S.input,fontSize:10,padding:"2px 6px",width:"auto"}}
-                      onChange={e=>{
-                        const met=e.target.value;
-                        if(!met) return;
-                        const nuevoProg={...tareasProg};
-                        nuevoProg[hoy]=(nuevoProg[hoy]||[]).map(t=>
-                          t.zona==="Golf"&&t.metodoLimpieza?{...t,metodoLimpieza:met}:t);
-                        setTareasProg(nuevoProg);
-                      }}>
-                      <option value="">🧹 Método limpieza...</option>
-                      <option value="sopladora">Sopladora</option>
-                      <option value="barrido">Barrido</option>
-                      <option value="ambos">Ambos</option>
-                    </select>
-                  )}
-                </div>
-                <div style={{display:"flex",flexDirection:"column",gap:3}}>
-                  {Object.entries(grupos).map(([tipo,tareas])=>{
-                    const hechas=tareas.filter(t=>t.estado==="hecha").length;
-                    const total=tareas.length;
-                    const pct=Math.round(hechas/total*100);
-                    const col=pct===100?"#22c55e":pct>0?"#60a5fa":"#f59e0b";
-                    return (
-                      <div key={tipo} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(255,255,255,0.03)",borderRadius:6,padding:"4px 10px",border:"1px solid rgba(255,255,255,0.06)"}}>
-                        <div style={{flex:1,fontSize:11,color:"#ede9e0"}}>{tipo}</div>
-                        <div style={{fontSize:10,color:"#5a9a7a"}}>{total} tareas</div>
-                        <div style={{fontSize:11,fontWeight:600,color:col}}>{pct===100?"✅":pct>0?"🔵":"⬜"} {hechas}/{total}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })()}
+          {/* ── TAREAS GOLF HOY ── */}
+          <TareasGolfPanel
+            tareasGolfHoy={(tareasProg[hoy]||[]).filter(t=>t.zona==="Golf")}
+            hoy={hoy} esJefa={esJefa}
+            setTareasProg={setTareasProg} tareasProg={tareasProg} S={S}
+          />
       {subTab==="greens"&&(
         <div className="ein">
           <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
