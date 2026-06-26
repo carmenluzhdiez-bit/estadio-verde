@@ -12523,17 +12523,39 @@ export default function App() {
                   {!showAddElem?(
                     <button style={{...S.btn,background:"rgba(61,122,82,0.25)",color:"#90d0a0",border:"1px solid rgba(61,122,82,0.35)"}} onClick={()=>setShowAddElem(true)}>➕ Agregar elemento a esta zona</button>
                   ):(
-                    <div>
-                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:14}}>Nuevo Elemento</div>
-                      <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:10}}>
-                        <input placeholder="Nombre del elemento..." value={newElem.nombre} onChange={e=>setNewElem(p=>({...p,nombre:e.target.value}))} style={{...S.input,flex:"2 1 200px"}}/>
+                    <div style={{background:"rgba(61,122,82,0.06)",border:"1px solid rgba(61,122,82,0.2)",borderRadius:10,padding:"14px 16px"}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                        <span style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#90d0a0"}}>➕ Agregar elementos</span>
+                        <span style={{fontSize:11,color:"#5a8a6a"}}>Puedes agregar varios seguidos</span>
+                      </div>
+                      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
+                        <input
+                          autoFocus
+                          placeholder="Nombre del elemento... (ej: Palma chilena)"
+                          value={newElem.nombre}
+                          onChange={e=>setNewElem(p=>({...p,nombre:e.target.value}))}
+                          onKeyDown={e=>{
+                            if(e.key==="Enter"&&newElem.nombre.trim()){
+                              addCustomElem(zonaId,newElem);
+                              setNewElem(p=>({...p,nombre:""}));
+                              e.target.focus();
+                            }
+                          }}
+                          style={{...S.input,flex:"2 1 200px"}}/>
                         <select value={newElem.tipo} onChange={e=>setNewElem(p=>({...p,tipo:e.target.value}))} style={{...S.input,flex:"1 1 150px",maxWidth:210}}>
-                          {(()=>{const vk=["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];const ok=["infraestructura","sistemas","pavimentos","mobiliario","bodegas"];return(<><optgroup label="🌿 Vegetación">{vk.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup><optgroup label="──────────">{ok.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup></>);})()}
+                          {(()=>{const vk=["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];const ok=["infraestructura","sistemas","pavimentos","mobiliario","bodegas"];return(<><optgroup label="🌿 Vegetación">{vk.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup><optgroup label="🏗️ Infraestructura">{ok.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup></>);})()}
                         </select>
                       </div>
-                      <div style={{display:"flex",gap:8}}>
-                        <button className="btn-p" style={S.btn} onClick={()=>{if(newElem.nombre.trim()){addCustomElem(zonaId,newElem);setNewElem({nombre:"",tipo:"arbustos"});setShowAddElem(false);}}}>✓ Agregar</button>
-                        <button className="btn-g" style={S.btn} onClick={()=>{setShowAddElem(false);setNewElem({nombre:"",tipo:"arbustos"});}}>Cancelar</button>
+                      <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                        <button className="btn-p" style={S.btn} onClick={()=>{
+                          if(newElem.nombre.trim()){
+                            addCustomElem(zonaId,newElem);
+                            setNewElem(p=>({...p,nombre:""}));
+                            // NO cerrar — limpiar solo el nombre para seguir agregando
+                          }
+                        }}>✓ Agregar</button>
+                        <span style={{fontSize:11,color:"#4a7a5a"}}>o presiona Enter</span>
+                        <button className="btn-g" style={{...S.btn,marginLeft:"auto"}} onClick={()=>{setShowAddElem(false);setNewElem({nombre:"",tipo:"arbustos"});}}>Listo ✓</button>
                       </div>
                     </div>
                   )}
