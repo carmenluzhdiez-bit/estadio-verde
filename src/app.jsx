@@ -4622,12 +4622,18 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
   const [expandIncid, setExpandIncid] = React.useState(null);
 
   const emptyIncid = {
+    flujo:"fitosanitario", // "fitosanitario" | "recuperacion" | "evento"
     fechaObservacion: hoy.toISOString().slice(0,10), horaObservacion: hoy.toTimeString().slice(0,5),
     observador:"Osmar Bhalú Armijo Zúñiga", observacion:"", sectoresObservados:[],
     tipoCierre:"fitosanitario", diagnostico:"", agenteCausal:"", severidad:"media",
     diagnosticadoPor:"", otrosDiagnosticos:"",
     tratamiento:"completo", productoAplicar:"", fechaAplicacion: hoy.toISOString().slice(0,10), horaAplicacion:"14:00",
     sectoresCerrados:[], motivoCierre:"", obs:"",
+    // Recuperación
+    tipoRecuperacion:"resiembra", diasRecuperacion:14,
+    // Evento
+    nombreEvento:"", organizador:"", fechaInicioEvento:hoy.toISOString().slice(0,10), fechaFinEvento:"",
+    // Común
     estado:"observacion", fechaReaperturaISO:"", notaReingreso:"",
   };
   const [incidForm, setIncidForm] = React.useState(emptyIncid);
@@ -4660,7 +4666,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
     // Tareas al programa del día
     const fp = incidForm.fechaAplicacion;
     if(fp && incidForm.productoAplicar) {
-      const sectLabel = incidForm.sectoresCerrados.join(", ") || "Cancha golf";
+      const sectLabel = incidForm.sectoresCerrados.join(", ") || "Sector no especificado";
       setTareasProg(prev=>({ ...prev, [fp]: [...(prev[fp]||[]), {
         id:Date.now()+Math.random(), fecha:fp,
         zona: sectLabel, elemento:"",
@@ -4675,9 +4681,15 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
       setTareasProg(prev=>({ ...prev, [fc]: [...(prev[fc]||[]), {
         id:Date.now()+Math.random()+1, fecha:fc,
         zona: incidForm.sectoresCerrados.join(", "), elemento:"",
-        tarea:`🚫 CIERRE: ${incidForm.sectoresCerrados.join(", ")} — ${incidForm.tipoCierre==="fitosanitario"?"Tratamiento fitosanitario":incidForm.tipoCierre==="clima"?"Condición climática adversa":"Mantenimiento"}`,
-        responsable:"", estado:"por_designar",
-        notas:`Reapertura estimada: ${reap.label||"por determinar"}`, auto:false, origenCierre:true,
+        tarea:`🚫 CIERRE: ${incidForm.sectoresCerrados.join(", ")} — ${
+          incidForm.flujo==="fitosanitario"?"Tratamiento fitosanitario":
+          incidForm.flujo==="recuperacion"?({resiembra:"Resiembra",aireacion:"Aireación",fertilizacion:"Fertilización",renovacion:"Renovación",recuperacion_general:"Recuperación"}[incidForm.tipoRecuperacion]||"Recuperación"):
+          incidForm.flujo==="evento"?(incidForm.nombreEvento||"Evento/Montaje"):
+          incidForm.tipoCierre==="clima"?"Condición climática":"Mantenimiento"}`,
+        responsable: incidForm.flujo==="evento"?(incidForm.organizador||""):incidForm.diagnosticadoPor||"",
+        estado:"por_designar",
+        notas:`${incidForm.flujo==="fitosanitario"?`Reapertura: ${reap.label||"por determinar"}`:incidForm.flujo==="recuperacion"?`Cierre estimado: ${incidForm.diasRecuperacion} días`:incidForm.flujo==="evento"?`Evento: ${incidForm.fechaInicioEvento} al ${incidForm.fechaFinEvento}. Org: ${incidForm.organizador}`:""}`,
+        auto:false, origenCierre:true, flujo:incidForm.flujo,
       }]}));
     }
     setIncidForm(emptyIncid); setShowIncidForm(false); setIncidPaso(1);
@@ -4769,7 +4781,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
 
       {/* Sub-tabs */}
       <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
-        {[["alerta","📅 Programa"],["incidencias","🚨 Incidencias"],["stock","📦 Stock"],["proveedor","🏪 Proveedor"],["registro","📝 Registrar"],["historial","🗂️ Historial"]].map(([t,l])=>{
+        {[["alerta","📅 Programa"],["incidencias","🚨 Incidencias y Cierres"],["stock","📦 Stock"],["proveedor","🏪 Proveedor"],["registro","📝 Registrar"],["historial","🗂️ Historial"]].map(([t,l])=>{
           const hayAlerta = t==="incidencias" && incidencias.some(i=>i.estado==="cerrada"||i.estado==="observacion");
           return (
             <button key={t} className={`tab${subTab===t?" on":""}`} onClick={()=>{setSubTab(t);setShowForm(false);}} style={{position:"relative"}}>
@@ -4801,13 +4813,35 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
           })()}
 
           <button className="btn-p" style={{...S.btn,marginBottom:16}} onClick={()=>{setShowIncidForm(true);setIncidPaso(1);setIncidForm(emptyIncid);}}>
-            🚨 Nueva incidencia / Cierre de cancha
+            🚨 Nueva incidencia / Cierre sectorial
           </button>
 
           {/* ── FORMULARIO PASO A PASO ── */}
           {showIncidForm&&(
             <div style={{...S.card,padding:20,marginBottom:20}} className="ein">
-              {/* Indicador de pasos */}
+              {/* ── Selector de tipo de cierre/incidencia ── */}
+              {incidPaso===1&&(
+                <div style={{marginBottom:16}}>
+                  <div style={{fontSize:12,color:"#6aaa7a",marginBottom:8,fontWeight:600}}>¿Qué tipo de registro necesitas?</div>
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                    {[
+                      ["fitosanitario","🦠 Fitosanitario","Plagas, enfermedades, aplicación pesticidas","#ef4444"],
+                      ["recuperacion","🌱 Recuperación","Resiembra, aireación, fertilización, recuperación césped","#22c55e"],
+                      ["evento","🎉 Evento / Montaje","Torneo, evento, montaje que restringe el uso de un área","#60a5fa"],
+                    ].map(([flujo,titulo,desc,color])=>(
+                      <div key={flujo} onClick={()=>setIncidForm(p=>({...p,flujo,tipoCierre:flujo==="fitosanitario"?"fitosanitario":flujo==="recuperacion"?"recuperacion":"evento"}))}
+                        style={{flex:"1 1 200px",cursor:"pointer",border:`2px solid ${incidForm.flujo===flujo?color:"rgba(255,255,255,0.1)"}`,
+                          borderRadius:10,padding:"10px 12px",
+                          background:incidForm.flujo===flujo?`${color}12`:"rgba(255,255,255,0.03)"}}>
+                        <div style={{fontSize:13,fontWeight:700,color:incidForm.flujo===flujo?color:"#ede9e0"}}>{titulo}</div>
+                        <div style={{fontSize:11,color:"#5a9a7a",marginTop:3}}>{desc}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Indicador de pasos — adaptado según flujo */}
               <div style={{display:"flex",gap:6,marginBottom:20,alignItems:"center"}}>
                 {[["1","🔍 Observación"],["2","🩺 Diagnóstico"],["3","🧪 Tratamiento"],["4","🚫 Cierre y reapertura"]].map(([n,lbl])=>(
                   <React.Fragment key={n}>
@@ -4844,9 +4878,58 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                       </select>
                     </div>
                     <div style={{gridColumn:"1/-1"}}>
-                      <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>Descripción de la observación</label>
-                      <textarea rows={3} style={{...S.input,resize:"vertical"}} placeholder="Ej: Se observan manchas irregulares amarillo-pardas en Green 02, 06 y 08. Parches difusos en fairway del Green 01..." value={incidForm.observacion} onChange={e=>setIncidForm(p=>({...p,observacion:e.target.value}))}/>
+                      <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>
+                        {incidForm.flujo==="fitosanitario"?"Descripción de la observación":incidForm.flujo==="recuperacion"?"Descripción del trabajo a realizar":"Descripción del evento / montaje"}
+                      </label>
+                      <textarea rows={3} style={{...S.input,resize:"vertical"}}
+                        placeholder={incidForm.flujo==="fitosanitario"?"Ej: Se observan manchas irregulares amarillo-pardas en Green 02...":incidForm.flujo==="recuperacion"?"Ej: Resiembra área oriente green 03 por desgaste excesivo. Se cortará, escarificará y sembrará...":"Ej: Torneo de golf institucional, requiere cancha completa sin acceso público..."}
+                        value={incidForm.observacion} onChange={e=>setIncidForm(p=>({...p,observacion:e.target.value}))}/>
                     </div>
+                    {/* Campos adicionales según flujo */}
+                    {incidForm.flujo==="recuperacion"&&(<>
+                      <div>
+                        <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>Tipo de recuperación</label>
+                        <select style={S.input} value={incidForm.tipoRecuperacion} onChange={e=>setIncidForm(p=>({...p,tipoRecuperacion:e.target.value}))}>
+                          <option value="resiembra">🌱 Resiembra</option>
+                          <option value="aireacion">💨 Aireación + Arena</option>
+                          <option value="fertilizacion">🌿 Fertilización post-trabajo</option>
+                          <option value="renovacion">🔧 Renovación / Refacción</option>
+                          <option value="recuperacion_general">🔄 Recuperación general</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>Días estimados de cierre</label>
+                        <input type="number" min="1" max="120" style={S.input}
+                          value={incidForm.diasRecuperacion}
+                          onChange={e=>setIncidForm(p=>({...p,diasRecuperacion:Number(e.target.value)}))}/>
+                      </div>
+                    </>)}
+                    {incidForm.flujo==="evento"&&(<>
+                      <div>
+                        <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>Nombre del evento</label>
+                        <input style={S.input} placeholder="Ej: Torneo Golf Institucional"
+                          value={incidForm.nombreEvento}
+                          onChange={e=>setIncidForm(p=>({...p,nombreEvento:e.target.value}))}/>
+                      </div>
+                      <div>
+                        <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>Organizador / Área</label>
+                        <input style={S.input} placeholder="Ej: Rama Golf, Dirección Deportes"
+                          value={incidForm.organizador}
+                          onChange={e=>setIncidForm(p=>({...p,organizador:e.target.value}))}/>
+                      </div>
+                      <div>
+                        <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>Fecha inicio</label>
+                        <input type="date" style={S.input}
+                          value={incidForm.fechaInicioEvento}
+                          onChange={e=>setIncidForm(p=>({...p,fechaInicioEvento:e.target.value}))}/>
+                      </div>
+                      <div>
+                        <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>Fecha fin / reapertura</label>
+                        <input type="date" style={S.input}
+                          value={incidForm.fechaFinEvento}
+                          onChange={e=>setIncidForm(p=>({...p,fechaFinEvento:e.target.value}))}/>
+                      </div>
+                    </>)}
                     <div style={{gridColumn:"1/-1"}}>
                       <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:6,textTransform:"uppercase"}}>Sectores con síntomas observados</label>
                       <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
@@ -4866,7 +4949,13 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                     </div>
                   </div>
                   <div style={{display:"flex",gap:10}}>
-                    <button className="btn-p" style={S.btn} onClick={()=>incidForm.observacion.trim()&&setIncidPaso(2)}>Siguiente → Diagnóstico</button>
+                    <button className="btn-p" style={S.btn} onClick={()=>{
+                        if(!incidForm.observacion.trim()&&incidForm.flujo==="fitosanitario") return;
+                        // Recuperación y evento van directo al paso de cierre
+                        setIncidPaso(incidForm.flujo==="fitosanitario"?2:4);
+                      }}>
+                        {incidForm.flujo==="fitosanitario"?"Siguiente → Diagnóstico":"Siguiente → Definir cierre"}
+                      </button>
                     <button className="btn-g" style={S.btn} onClick={()=>{setShowIncidForm(false);setIncidPaso(1);}}>Cancelar</button>
                   </div>
                 </div>
@@ -4881,7 +4970,11 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                       <select style={S.input} value={incidForm.tipoCierre} onChange={e=>setIncidForm(p=>({...p,tipoCierre:e.target.value}))}>
                         <option value="fitosanitario">🦠 Fitosanitario (plaga / enfermedad)</option>
                         <option value="mantenimiento">🔧 Mantenimiento programado</option>
+                        <option value="recuperacion">🌱 Recuperación de césped</option>
+                        <option value="evento">🎉 Evento / Torneo</option>
+                        <option value="obras">🏗️ Obras / Reparaciones</option>
                         <option value="clima">🌧️ Condición climática adversa</option>
+                        <option value="otro">📋 Otro motivo</option>
                       </select>
                     </div>
                     <div>
@@ -4998,13 +5091,39 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                 <div className="ein">
                   <div style={{marginBottom:12}}>
                     <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:8,textTransform:"uppercase"}}>Sectores a cerrar</label>
-                    <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}}>
-                      {["Cancha completa","Todos los greens","Todos los fairways"].map(s=>{
-                        const sel=incidForm.sectoresCerrados.includes(s);
-                        return <button key={s} style={{...S.btn,fontSize:12,padding:"5px 14px",background:sel?"rgba(239,68,68,0.2)":"rgba(255,255,255,0.06)",color:sel?"#fca5a5":"#7aaa80",border:`1px solid ${sel?"rgba(239,68,68,0.4)":"rgba(255,255,255,0.1)"}`}} onClick={()=>setIncidForm(p=>({...p,sectoresCerrados:sel?p.sectoresCerrados.filter(x=>x!==s):[...p.sectoresCerrados,s]}))}>
-                          {sel?"🚫 ":""}{s}
-                        </button>;
-                      })}
+                    {/* Grupos de sectores por área */}
+                    {[
+                      {titulo:"🏌️ Golf", sectores:["Cancha Golf completa","Todos los greens","Todos los fairways","Vivero Golf"]},
+                      {titulo:"⚽ Fútbol / Eventos", sectores:["Alameda Central — Cancha natural","Cancha Fútbol Sintética","Pista atletismo"]},
+                      {titulo:"🎾 Canchas Deportivas", sectores:["Canchas Tenis (todas)","Tenis Norte","Tenis Sur","Pádel","Básquetbol","Piscina"]},
+                      {titulo:"🌿 Jardines / Espacios", sectores:["Plaza Manuel de Falla","Rotonda Emigrante","Jardines Patrimoniales","Acceso Principal","Patio Andaluz"]},
+                    ].map(grupo=>(
+                      <div key={grupo.titulo} style={{marginBottom:10}}>
+                        <div style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.5px",marginBottom:5,fontWeight:600}}>{grupo.titulo}</div>
+                        <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                          {grupo.sectores.map(s=>{
+                            const sel=incidForm.sectoresCerrados.includes(s);
+                            return <button key={s} style={{...S.btn,fontSize:11,padding:"4px 12px",
+                              background:sel?"rgba(239,68,68,0.2)":"rgba(255,255,255,0.06)",
+                              color:sel?"#fca5a5":"#7aaa80",
+                              border:`1px solid ${sel?"rgba(239,68,68,0.4)":"rgba(255,255,255,0.1)"}`}}
+                              onClick={()=>setIncidForm(p=>({...p,sectoresCerrados:sel?p.sectoresCerrados.filter(x=>x!==s):[...p.sectoresCerrados,s]}))}>
+                              {sel?"🚫 ":""}{s}
+                            </button>;
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                    {/* Campo libre para otros sectores */}
+                    <div style={{marginTop:6}}>
+                      <input style={{...S.input,fontSize:11}} placeholder="Otro sector (escribir y presionar Enter)..."
+                        onKeyDown={e=>{
+                          if(e.key==="Enter"&&e.target.value.trim()){
+                            const s=e.target.value.trim();
+                            setIncidForm(p=>({...p,sectoresCerrados:[...p.sectoresCerrados,s]}));
+                            e.target.value="";
+                          }
+                        }}/>
                     </div>
                     <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
                       {Array.from({length:18},(_,i)=>`Green ${String(i+1).padStart(2,"0")}`).map(s=>{
@@ -8651,6 +8770,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             <div style={{fontSize:13,fontWeight:700,color:"#34d399",marginBottom:10}}>⚡ Acciones rápidas</div>
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               <button style={{...S.btn,background:"rgba(52,211,153,0.15)",color:"#34d399",border:"1px solid rgba(52,211,153,0.3)"}} onClick={()=>{setSubTab("mediciones");setShowMedForm(true);}}>📏 Nueva medición</button>
+              <button style={{...S.btn,background:"rgba(239,68,68,0.12)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}} onClick={()=>setVista("fungicidas")}>🚫 Registrar cierre sectorial</button>
               <button style={{...S.btn,background:"rgba(52,211,153,0.12)",color:"#6ee7b7",border:"1px solid rgba(52,211,153,0.2)"}} onClick={()=>{setSubTab("greens");setShowDiariaForm(true);}}>✅ Registro diario</button>
               <button style={{...S.btn,background:"rgba(52,211,153,0.12)",color:"#6ee7b7",border:"1px solid rgba(52,211,153,0.2)"}} onClick={()=>{setSubTab("greens");setShowTareaForm("green");}}>📋 Nueva tarea greens</button>
               {esJefa&&<button style={{...S.btn,background:"rgba(251,191,36,0.12)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.25)"}} onClick={()=>{setSubTab("eventos");setShowEventoForm(true);}}>🏆 Cargar evento</button>}
@@ -12646,6 +12766,7 @@ export default function App() {
                 <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:900,marginBottom:8}}>Bienvenida, Jefa de Áreas Verdes</h2>
                 <p style={{color:"#6aaa7a",fontSize:14,marginBottom:24}}>Usa el menú de navegación para acceder a todas las secciones.</p>
                 <button onClick={()=>setVista("programacion")} style={{...S.btn,background:"#3d7a52",color:"#fff",fontSize:15,padding:"12px 28px"}}>📆 Ir a Programación →</button>
+                <button onClick={()=>setVista("fungicidas")} style={{...S.btn,background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)",fontSize:13,padding:"10px 20px"}}>🚫 Registrar cierre sectorial</button>
                 <div style={{marginTop:12}}>
                   <button onClick={()=>{setWorkerPinInput("");}} style={{...S.btn,background:"transparent",color:"#6aaa7a",border:"1px solid rgba(255,255,255,0.1)",fontSize:13}}>← Cerrar sesión</button>
 
