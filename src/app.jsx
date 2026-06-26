@@ -817,12 +817,15 @@ function ResponsableSelector({ value, personal, onChange, S, fontSize=14, inline
 }
 
 // ─── REPORTE SEMANAL ─────────────────────────────────────────────────────────
-function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_BASE, personal, incidenciasFito=[] }) {
+function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_BASE, personal, incidenciasFito=[], esJefa=false }) {
 
   const IDS_DEPORTES = [31, 38];
   const IDS_GENERAL  = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,32,33,34,35,36,37];
 
   const [modoReporte, setModoReporte] = React.useState("semana");
+  const [tabReporte2, setTabReporte2] = React.useState("reporte"); // "reporte" | "consulta"
+  const [cBuscarZona, setCBuscarZona] = React.useState("");
+  const [cBuscarTipo, setCBuscarTipo] = React.useState("");
   const [fechaDesde, setFechaDesde]   = React.useState(semanaBase||"");
   const [fechaHasta, setFechaHasta]   = React.useState(()=>{
     const d=new Date((semanaBase||new Date().toISOString().slice(0,10))+"T12:00:00");
@@ -905,7 +908,13 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
     });
     return {total,hechas,noPudo,pend,pct,porTrab,porZona,porCategoria,porTipo,
       noPudoList:tareas.filter(t=>t.estado==="no_pudo"),
-      cierres:tareas.filter(t=>(t.tarea||"").toLowerCase().includes("cierre")&&(t.tarea||"").toLowerCase().includes("cancha"))};
+      // Cierres sectoriales: por origenCierre, por texto "cierre", o por tipo recuperación/fitosanitario
+      cierres:tareas.filter(t=>
+        t.origenCierre===true ||
+        (t.tarea||"").toLowerCase().includes("cierre") ||
+        (t.tarea||"").toLowerCase().includes("clausura") ||
+        (t.tarea||"").toLowerCase().includes("recuperac")
+      )};
   };
 
   const tareasDeportes = todasTareas.filter(t=>{
@@ -918,6 +927,37 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
   });
   const statsDeportes=calcStats(tareasDeportes), statsGeneral=calcStats(tareasGeneral), statsTotal=calcStats(todasTareas);
   const incFitoPeriodo=incidenciasFito.filter(i=>i.fecha>=(dias[0]||"")&&i.fecha<=(dias[dias.length-1]||""));
+
+  // ── Consulta histórica (Opción B en Reporte) ─────────────────────────
+  const calcConsultaReporte = () => {
+    if(!cBuscarZona && !cBuscarTipo) return null;
+    const normT=v=>{ if(!v)return []; if(Array.isArray(v))return v; if(typeof v==="object")return Object.values(v).filter(Boolean); return []; };
+    const CTIPO={Corte:["corte","cortad"],Poda:["poda","podar"],Fertilización:["fertili","abono","novatec","salitre"],
+      Riego:["riego","regar"],Fumigación:["fumig","hongos","plaga"],Limpieza:["limpie","limpieza","sopla","barrid"],
+      Aireación:["airead"],Desmalezado:["desmaleza","maleza"],Medición:["medici","altura","humedad"],
+      Revisión:["revisi"],Orillado:["orill"]};
+    const getTipo2=t=>{ const tl=(t.tarea||"").toLowerCase(); for(const [k,kws] of Object.entries(CTIPO)){ if(kws.some(kw=>tl.includes(kw)))return k; } return "Otros"; };
+    const hoyS=new Date().toISOString().slice(0,10);
+    const resultados=[];
+    Object.entries(tareasProg).sort((a,b)=>b[0].localeCompare(a[0])).forEach(([fecha,ts])=>{
+      normT(ts).forEach(t=>{
+        const zonaOk=!cBuscarZona||(t.zona||"").toLowerCase().includes(cBuscarZona.toLowerCase());
+        const tipoOk=!cBuscarTipo||getTipo2(t)===cBuscarTipo||(t.tarea||"").toLowerCase().includes(cBuscarTipo.toLowerCase());
+        if(zonaOk&&tipoOk) resultados.push({...t,fecha});
+      });
+    });
+    const pasadas=resultados.filter(t=>t.fecha<=hoyS&&["hecha","completada"].includes(t.estado));
+    const futuras=resultados.filter(t=>t.fecha>hoyS);
+    let frecProm=null;
+    if(pasadas.length>=2){
+      const fechas=pasadas.slice(0,5).map(t=>new Date(t.fecha+"T12:00:00").getTime());
+      const deltas=[];
+      for(let i=0;i<fechas.length-1;i++) deltas.push(Math.round((fechas[i]-fechas[i+1])/86400000));
+      if(deltas.length) frecProm=Math.round(deltas.reduce((a,b)=>a+b,0)/deltas.length);
+    }
+    return {pasadas,futuras,frecProm,total:resultados.length};
+  };
+  const resConsulta = tabReporte2==="consulta" ? calcConsultaReporte() : null;
 
   // ── HTML para reportes ───────────────────────────────────────────────
   const V="#1a5c35", VL="#d4edda", BO="#ccddcc";
@@ -936,7 +976,7 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
 
   const hFito=()=>{if(!incFitoPeriodo.length)return "";return `<h3 style="color:#92400e;border-bottom:2px solid #f59e0b;padding-bottom:3px;margin:14px 0 8px;font-size:13px">Incidencias fitosanitarias</h3><table style="width:100%;border-collapse:collapse;font-size:11px"><tr style="background:#92400e;color:#fff"><th style="padding:5px 8px;text-align:left">Fecha</th><th style="padding:5px;text-align:left">Zona</th><th style="padding:5px;text-align:left">Problema</th><th style="padding:5px;text-align:left">Tratamiento</th><th style="padding:5px;text-align:center">RI(h)</th></tr>${incFitoPeriodo.map((inc,i)=>`<tr style="background:${i%2===0?"#fff":"#fffbeb"}"><td style="padding:4px 8px;white-space:nowrap">${inc.fecha||""}</td><td style="padding:4px 8px">${inc.zona||""}</td><td style="padding:4px 8px;font-weight:600">${inc.problema||""}</td><td style="padding:4px 8px">${inc.producto||""}${inc.dosis?" · "+inc.dosis:""}</td><td style="padding:4px;text-align:center">${inc.ri||"—"}</td></tr>`).join("")}</table>`;};
 
-  const hCierres=(st)=>{if(!st.cierres.length)return "";return `<h3 style="color:#92400e;border-bottom:2px solid #f59e0b;padding-bottom:3px;margin:14px 0 8px;font-size:13px">Cierres de cancha</h3>${st.cierres.map(t=>`<div style="font-size:11px;padding:3px 0;border-bottom:1px solid #f3f4f6">${t.fechaDia} · ${t.tarea} · <strong>${t.estado}</strong></div>`).join("")}`;};
+  const hCierres=(st,titulo)=>{if(!st.cierres.length)return "";return `<h3 style="color:#92400e;border-bottom:2px solid #f59e0b;padding-bottom:3px;margin:14px 0 8px;font-size:13px">${titulo||"Cierres y restricciones sectoriales"}</h3><table style="width:100%;border-collapse:collapse;font-size:11px"><tr style="background:#92400e;color:#fff"><th style="padding:5px 8px;text-align:left">Fecha</th><th style="padding:5px;text-align:left">Zona/Sector</th><th style="padding:5px;text-align:left">Descripción</th><th style="padding:5px;text-align:left">Estado</th><th style="padding:5px;text-align:left">Notas</th></tr>${st.cierres.map((t,i)=>`<tr style="background:${i%2===0?"#fff":"#fffbeb"}"><td style="padding:4px 8px;white-space:nowrap">${t.fechaDia||""}</td><td style="padding:4px 8px;font-weight:600">${t.zona||""}</td><td style="padding:4px 8px">${t.tarea||""}</td><td style="padding:4px 8px;font-weight:600;color:${["hecha","completada"].includes(t.estado)?"#166534":"#92400e"}">${t.estado||""}</td><td style="padding:4px 8px;font-size:10px;color:#666">${t.notas||""}</td></tr>`).join("")}</table>`;};
 
   const hPie=`<div style="text-align:center;margin-top:24px;font-size:10px;color:#888;border-top:1px solid ${BO};padding-top:8px">Departamento de Áreas Verdes · Estadio Español de Las Condes · Carmen Luz Hermosilla Diez</div>`;
 
@@ -951,14 +991,20 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
     const sG=calcStats(tGolf), sF=calcStats(tFutbol);
     const cuerpo=hEnc("Reporte Gerencia Deportes","Golf + Cancha Fútbol · "+periodoLabel)+
       h2("🏌️ Campo de Golf")+
-      (sG.total>0?hKpi(sG)+hTrab(sG)+hTipos(sG)+hNoPudo(sG)+hFito():"<p style='color:#888;font-size:12px'>Sin tareas en el período.</p>")+
+      (sG.total>0?hKpi(sG)+hTipos(sG)+hNoPudo(sG)+hFito():"<p style='color:#888;font-size:12px'>Sin tareas en el período.</p>")+
       sep+h2("⚽ Cancha de Fútbol")+
-      (sF.total>0?hKpi(sF)+hTrab(sF)+hTipos(sF)+hNoPudo(sF)+hCierres(sF):"<p style='color:#888;font-size:12px'>Sin tareas en el período.</p>");
+      (sF.total>0?hKpi(sF)+hTipos(sF)+hNoPudo(sF)+hCierres(sF):"<p style='color:#888;font-size:12px'>Sin tareas en el período.</p>");
     const w=window.open("","_blank","width=960,height=750"); w.document.write(wrap(cuerpo)); w.document.close();
   };
 
   const imprimirGeneral = () => {
-    const cuerpo=hEnc("Reporte Gerencia General / Operaciones")+hKpi(statsGeneral)+hTrab(statsGeneral)+hCats(statsGeneral,"Resumen por área")+hNoPudo(statsGeneral);
+    const cuerpo=hEnc("Reporte Gerencia General / Operaciones")+
+      hKpi(statsGeneral)+
+      hTipos(statsGeneral)+
+      hCats(statsGeneral,"Detalle por área y tipo de actividad")+
+      hNoPudo(statsGeneral)+
+      hCierres(statsGeneral,"Cierres y restricciones sectoriales")+
+      hFito();
     const w=window.open("","_blank","width=960,height=750"); w.document.write(wrap(cuerpo)); w.document.close();
   };
 
@@ -986,6 +1032,111 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
 
   return (
     <div className="ein">
+      {/* Tabs principales */}
+      <div style={{display:"flex",gap:6,marginBottom:14}}>
+        {[["reporte","📋 Reporte"],["consulta","🔍 Consulta histórica"]].map(([t,l])=>(
+          <button key={t} onClick={()=>setTabReporte2(t)}
+            style={{cursor:"pointer",border:`1px solid ${tabReporte2===t?"#34d399":"rgba(255,255,255,0.12)"}`,
+              borderRadius:8,padding:"5px 14px",fontSize:12,
+              background:tabReporte2===t?"rgba(52,211,153,0.12)":"transparent",
+              color:tabReporte2===t?"#34d399":"#6aaa7a"}}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {tabReporte2==="consulta"&&(
+        <div>
+          <div style={{...S.card,padding:"12px 14px",marginBottom:12}}>
+            <div style={{fontSize:11,color:"#6aaa7a",marginBottom:8}}>
+              Consulta cuándo se realizó una actividad en el pasado y cuándo está programada a futuro — sin límite de fechas
+            </div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"flex-end"}}>
+              <div>
+                <label style={{fontSize:10,color:"#5a9a7a",display:"block",marginBottom:3}}>ZONA / ÁREA</label>
+                <input value={cBuscarZona} onChange={e=>setCBuscarZona(e.target.value)}
+                  placeholder="ej: Golf, Capilla, Tenis..."
+                  style={{...S.input,width:180,fontSize:12}}/>
+              </div>
+              <div>
+                <label style={{fontSize:10,color:"#5a9a7a",display:"block",marginBottom:3}}>TIPO DE ACTIVIDAD</label>
+                <select value={cBuscarTipo} onChange={e=>setCBuscarTipo(e.target.value)}
+                  style={{...S.input,width:160,fontSize:12}}>
+                  <option value="">Todas</option>
+                  {["Corte","Poda","Fertilización","Riego","Fumigación","Limpieza","Aireación","Desmalezado","Medición","Revisión","Orillado"].map(t=>(
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+              {(cBuscarZona||cBuscarTipo)&&(
+                <button onClick={()=>{setCBuscarZona("");setCBuscarTipo("");}}
+                  style={{...S.btn,fontSize:11,color:"#f87171",border:"1px solid rgba(248,113,113,0.3)",background:"transparent"}}>✕ Limpiar</button>
+              )}
+            </div>
+          </div>
+
+          {resConsulta&&(cBuscarZona||cBuscarTipo)&&(
+            <div>
+              {resConsulta.frecProm&&(
+                <div style={{...S.card,padding:"10px 14px",marginBottom:10,background:"rgba(52,211,153,0.05)",border:"1px solid rgba(52,211,153,0.15)"}}>
+                  <div style={{display:"flex",gap:20,flexWrap:"wrap"}}>
+                    <div style={{textAlign:"center"}}><div style={{fontSize:22,fontWeight:700,color:"#34d399"}}>{resConsulta.frecProm}d</div><div style={{fontSize:10,color:"#5a9a7a"}}>Frecuencia promedio</div></div>
+                    <div style={{textAlign:"center"}}><div style={{fontSize:22,fontWeight:700,color:"#22c55e"}}>{resConsulta.pasadas.length}</div><div style={{fontSize:10,color:"#5a9a7a"}}>Realizadas</div></div>
+                    <div style={{textAlign:"center"}}><div style={{fontSize:22,fontWeight:700,color:"#60a5fa"}}>{resConsulta.futuras.length}</div><div style={{fontSize:10,color:"#5a9a7a"}}>Programadas</div></div>
+                    {resConsulta.frecProm&&resConsulta.pasadas[0]&&(
+                      <div style={{textAlign:"center"}}>
+                        <div style={{fontSize:16,fontWeight:700,color:"#fbbf24"}}>
+                          {new Date(new Date(resConsulta.pasadas[0].fecha+"T12:00:00").getTime()+resConsulta.frecProm*86400000).toLocaleDateString("es-CL",{day:"numeric",month:"short",year:"numeric"})}
+                        </div>
+                        <div style={{fontSize:10,color:"#5a9a7a"}}>Próxima estimada</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              {resConsulta.futuras.length>0&&(
+                <div style={{...S.card,marginBottom:10,padding:"10px 14px",border:"1px solid rgba(96,165,250,0.2)"}}>
+                  <div style={{fontSize:12,fontWeight:600,color:"#60a5fa",marginBottom:8}}>📅 Programadas a futuro ({resConsulta.futuras.length})</div>
+                  {resConsulta.futuras.slice(0,15).map((t,i)=>(
+                    <div key={i} style={{fontSize:11,padding:"3px 0",borderBottom:"1px solid rgba(255,255,255,0.04)",display:"flex",gap:10}}>
+                      <span style={{color:"#60a5fa",minWidth:90}}>{t.fecha}</span>
+                      <span style={{color:"#ede9e0",flex:1}}>{t.tarea}</span>
+                      <span style={{color:"#5a9a7a"}}>{t.zona}</span>
+                      <span style={{color:"#9ca3af"}}>{t.responsable||""}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {resConsulta.pasadas.length>0&&(
+                <div style={{...S.card,marginBottom:10,padding:"10px 14px"}}>
+                  <div style={{fontSize:12,fontWeight:600,color:"#22c55e",marginBottom:8}}>✅ Historial de ejecuciones ({resConsulta.pasadas.length})</div>
+                  {resConsulta.pasadas.slice(0,20).map((t,i)=>(
+                    <div key={i} style={{fontSize:11,padding:"3px 0",borderBottom:"1px solid rgba(255,255,255,0.04)",display:"flex",gap:10}}>
+                      <span style={{color:"#6aaa7a",minWidth:90}}>{t.fecha}</span>
+                      <span style={{color:"#ede9e0",flex:1}}>{t.tarea}</span>
+                      <span style={{color:"#5a9a7a"}}>{t.zona}</span>
+                      <span style={{color:"#9ca3af"}}>{t.responsable||""}</span>
+                      {t.notas&&<span style={{color:"#4a7a5a",fontStyle:"italic",fontSize:10}}>{t.notas}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {resConsulta.total===0&&(
+                <div style={{textAlign:"center",padding:30,color:"#4a7a5a",fontSize:13}}>
+                  Sin resultados para esta búsqueda
+                </div>
+              )}
+            </div>
+          )}
+          {!cBuscarZona&&!cBuscarTipo&&(
+            <div style={{textAlign:"center",padding:40,color:"#4a7a5a",fontSize:13}}>
+              Ingresa una zona o tipo de actividad para consultar
+            </div>
+          )}
+        </div>
+      )}
+
+      {tabReporte2==="reporte"&&(<>
       {/* Navegación */}
       <div style={{...S.card,padding:"14px 18px",marginBottom:14}}>
         <div style={{display:"flex",gap:6,marginBottom:10}}>
@@ -1053,6 +1204,32 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
         {kpiCard(statsDeportes,"⚽🏌️ Deportes — Golf + Fútbol","#4ade80")}
         {kpiCard(statsGeneral,"🏛️ Áreas Generales / Operaciones","#c4b5fd")}
         {kpiCard(statsTotal,"📊 Total Áreas Verdes","#34d399")}
+        {/* Rendimiento por trabajador — solo jefa */}
+        {esJefa&&(
+          <div style={{...S.card,marginBottom:8,padding:"10px 14px"}}>
+            <div style={{fontSize:12,fontWeight:600,color:"#34d399",marginBottom:8}}>👷 Rendimiento por trabajador</div>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+              <thead><tr style={{background:"rgba(52,211,153,0.08)"}}>
+                {["Trabajador","Total","✅ Realizadas","🔴 No realizó","⏳ Pendiente","%"].map(h=>(
+                  <th key={h} style={{padding:"4px 8px",textAlign:h==="Trabajador"?"left":"center",color:"#34d399",fontSize:10}}>{h}</th>
+                ))}
+              </tr></thead>
+              <tbody>
+                {Object.entries(statsTotal.porTrab).sort((a,b)=>b[1].hechas-a[1].hechas).map(([n,d],i)=>{
+                  const p=d.total?Math.round(d.hechas/d.total*100):0;
+                  return (<tr key={n} style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                    <td style={{padding:"4px 8px",fontWeight:600,color:"#ede9e0"}}>{n}</td>
+                    <td style={{padding:"4px",textAlign:"center",color:"#5a9a7a"}}>{d.total}</td>
+                    <td style={{padding:"4px",textAlign:"center",color:"#22c55e",fontWeight:600}}>{d.hechas}</td>
+                    <td style={{padding:"4px",textAlign:"center",color:d.noPudo>0?"#ef4444":"#4a7a5a"}}>{d.noPudo||"—"}</td>
+                    <td style={{padding:"4px",textAlign:"center",color:d.pend>0?"#f59e0b":"#4a7a5a"}}>{d.pend||"—"}</td>
+                    <td style={{padding:"4px",textAlign:"center",fontWeight:700,color:p>=80?"#22c55e":p>=50?"#f59e0b":"#ef4444"}}>{p}%</td>
+                  </tr>);
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         {statsTotal.noPudoList.length>0&&(
           <div style={{...S.card,marginBottom:8,padding:"10px 14px",border:"1px solid rgba(239,68,68,0.2)"}}>
@@ -1092,6 +1269,7 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
           </div>
         )}
       </>)}
+      </>)}
     </div>
   );
 }
@@ -1103,6 +1281,9 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
   const [filtroTarea,  setFiltroTarea]  = React.useState("");
   const [filtroZona,   setFiltroZona]   = React.useState("todas");
   const [diaImpresion, setDiaImpresion] = React.useState("");
+  const [tabHist,      setTabHist]      = React.useState("historial"); // "historial" | "buscar"
+  const [buscarZona,   setBuscarZona]   = React.useState("");
+  const [buscarTipo,   setBuscarTipo]   = React.useState("");
 
   const EC = {
     hecha:       {color:"#22c55e", icon:"✅", label:"Hecha"},
@@ -1186,8 +1367,183 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
 
   const hayFiltros = filtroEstado!=="todos"||filtroTarea||filtroZona!=="todas"||filtroDia;
 
+  // ── Calcular historial de zona+tipo para el buscador ──────────────
+  const calcHistorialZona = () => {
+    if(!buscarZona && !buscarTipo) return null;
+    const normT = v => {
+      if(!v) return [];
+      if(Array.isArray(v)) return v;
+      if(typeof v==="object") return Object.values(v).filter(Boolean);
+      return [];
+    };
+    const CATS_TIPO = {
+      Corte:["corte","cortad"], Poda:["poda","podar"],
+      Fertilización:["fertili","abono","novatec","salitre"],
+      Riego:["riego","regar"], Fumigación:["fumig","hongos","plaga"],
+      Limpieza:["limpie","limpieza","sopla","barrid"], Aireación:["airead"],
+      Desmalezado:["desmaleza","maleza"], Medición:["medici","altura","humedad"],
+      Revisión:["revisi"], Orillado:["orill"],
+    };
+    const getTipo = (t) => {
+      const tl=(t.tarea||"").toLowerCase();
+      for(const [k,kws] of Object.entries(CATS_TIPO)){
+        if(kws.some(kw=>tl.includes(kw))) return k;
+      }
+      return "Otros";
+    };
+    // Recopilar todas las ejecuciones que coincidan
+    const resultados = [];
+    const hoy = new Date().toISOString().slice(0,10);
+    Object.entries(tareas).sort((a,b)=>b[0].localeCompare(a[0])).forEach(([fecha, ts])=>{
+      normT(ts).forEach(t=>{
+        const zonaOk = !buscarZona || (t.zona||"").toLowerCase().includes(buscarZona.toLowerCase());
+        const tipoOk = !buscarTipo || getTipo(t)===buscarTipo || (t.tarea||"").toLowerCase().includes(buscarTipo.toLowerCase());
+        if(zonaOk && tipoOk) resultados.push({...t, fecha});
+      });
+    });
+    // Separar pasadas y futuras
+    const pasadas  = resultados.filter(t=>t.fecha<=hoy && ["hecha","completada"].includes(t.estado));
+    const futuras  = resultados.filter(t=>t.fecha>hoy);
+    const pendHoy  = resultados.filter(t=>t.fecha<=hoy && !["hecha","completada"].includes(t.estado) && t.fecha>=new Date(Date.now()-7*86400000).toISOString().slice(0,10));
+    // Calcular frecuencia promedio de las últimas ejecuciones
+    let frecPromedio = null;
+    if(pasadas.length>=2){
+      const fechas=pasadas.slice(0,5).map(t=>new Date(t.fecha+"T12:00:00").getTime());
+      const deltas=[];
+      for(let i=0;i<fechas.length-1;i++) deltas.push(Math.round((fechas[i]-fechas[i+1])/86400000));
+      if(deltas.length) frecPromedio=Math.round(deltas.reduce((a,b)=>a+b,0)/deltas.length);
+    }
+    return {pasadas, futuras, pendHoy, frecPromedio, total:resultados.length};
+  };
+  const resHistorial = tabHist==="buscar" ? calcHistorialZona() : null;
+  const hoy = new Date().toISOString().slice(0,10);
+
   return (
     <div className="ein">
+      {/* Tabs */}
+      <div style={{display:"flex",gap:6,marginBottom:14}}>
+        {[["historial","📜 Historial"],["buscar","🔍 Consulta histórica"]].map(([t,l])=>(
+          <button key={t} onClick={()=>setTabHist(t)}
+            style={{cursor:"pointer",border:`1px solid ${tabHist===t?"#34d399":"rgba(255,255,255,0.12)"}`,
+              borderRadius:8,padding:"5px 14px",fontSize:12,
+              background:tabHist===t?"rgba(52,211,153,0.12)":"transparent",
+              color:tabHist===t?"#34d399":"#6aaa7a"}}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Panel de consulta histórica ── */}
+      {tabHist==="buscar"&&(
+        <div>
+          <div style={{...S.card,padding:"12px 14px",marginBottom:12}}>
+            <div style={{fontSize:11,color:"#6aaa7a",marginBottom:8}}>
+              Busca cuándo se realizó una tarea en el pasado y cuándo está programada a futuro
+            </div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"flex-end"}}>
+              <div>
+                <label style={{fontSize:10,color:"#5a9a7a",display:"block",marginBottom:3}}>ZONA / ÁREA</label>
+                <input value={buscarZona} onChange={e=>setBuscarZona(e.target.value)}
+                  placeholder="ej: Golf, Capilla, Tenis..."
+                  style={{...S.input,width:180,fontSize:12}}/>
+              </div>
+              <div>
+                <label style={{fontSize:10,color:"#5a9a7a",display:"block",marginBottom:3}}>TIPO DE ACTIVIDAD</label>
+                <select value={buscarTipo} onChange={e=>setBuscarTipo(e.target.value)}
+                  style={{...S.input,width:160,fontSize:12}}>
+                  <option value="">Todas</option>
+                  {["Corte","Poda","Fertilización","Riego","Fumigación","Limpieza","Aireación","Desmalezado","Medición","Revisión","Orillado"].map(t=>(
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+              {(buscarZona||buscarTipo)&&(
+                <button onClick={()=>{setBuscarZona("");setBuscarTipo("");}}
+                  style={{...S.btn,fontSize:11,color:"#f87171",border:"1px solid rgba(248,113,113,0.3)",background:"transparent"}}>
+                  ✕ Limpiar
+                </button>
+              )}
+            </div>
+          </div>
+
+          {resHistorial&&(buscarZona||buscarTipo)&&(
+            <div>
+              {/* Frecuencia estimada */}
+              {resHistorial.frecPromedio&&(
+                <div style={{...S.card,padding:"10px 14px",marginBottom:10,background:"rgba(52,211,153,0.05)",border:"1px solid rgba(52,211,153,0.15)"}}>
+                  <div style={{display:"flex",gap:20,flexWrap:"wrap"}}>
+                    <div style={{textAlign:"center"}}>
+                      <div style={{fontSize:22,fontWeight:700,color:"#34d399"}}>{resHistorial.frecPromedio}d</div>
+                      <div style={{fontSize:10,color:"#5a9a7a"}}>Frecuencia promedio</div>
+                    </div>
+                    <div style={{textAlign:"center"}}>
+                      <div style={{fontSize:22,fontWeight:700,color:"#22c55e"}}>{resHistorial.pasadas.length}</div>
+                      <div style={{fontSize:10,color:"#5a9a7a"}}>Ejecuciones pasadas</div>
+                    </div>
+                    <div style={{textAlign:"center"}}>
+                      <div style={{fontSize:22,fontWeight:700,color:"#60a5fa"}}>{resHistorial.futuras.length}</div>
+                      <div style={{fontSize:10,color:"#5a9a7a"}}>Programadas a futuro</div>
+                    </div>
+                    {resHistorial.frecPromedio&&resHistorial.pasadas[0]&&(
+                      <div style={{textAlign:"center"}}>
+                        <div style={{fontSize:16,fontWeight:700,color:"#fbbf24"}}>
+                          {new Date(new Date(resHistorial.pasadas[0].fecha+"T12:00:00").getTime()+resHistorial.frecPromedio*86400000).toLocaleDateString("es-CL",{day:"numeric",month:"short"})}
+                        </div>
+                        <div style={{fontSize:10,color:"#5a9a7a"}}>Próxima estimada</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Programadas a futuro */}
+              {resHistorial.futuras.length>0&&(
+                <div style={{...S.card,marginBottom:10,padding:"10px 14px",border:"1px solid rgba(96,165,250,0.2)"}}>
+                  <div style={{fontSize:12,fontWeight:600,color:"#60a5fa",marginBottom:8}}>📅 Programadas a futuro ({resHistorial.futuras.length})</div>
+                  {resHistorial.futuras.slice(0,10).map((t,i)=>(
+                    <div key={i} style={{fontSize:11,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,0.04)",display:"flex",gap:10}}>
+                      <span style={{color:"#60a5fa",minWidth:80}}>{t.fecha}</span>
+                      <span style={{color:"#ede9e0",flex:1}}>{t.tarea}</span>
+                      <span style={{color:"#5a9a7a"}}>{t.zona}</span>
+                      <span style={{color:"#9ca3af"}}>{t.responsable||""}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Historial pasado */}
+              {resHistorial.pasadas.length>0&&(
+                <div style={{...S.card,marginBottom:10,padding:"10px 14px"}}>
+                  <div style={{fontSize:12,fontWeight:600,color:"#22c55e",marginBottom:8}}>✅ Últimas ejecuciones realizadas ({resHistorial.pasadas.length})</div>
+                  {resHistorial.pasadas.slice(0,15).map((t,i)=>(
+                    <div key={i} style={{fontSize:11,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,0.04)",display:"flex",gap:10}}>
+                      <span style={{color:"#6aaa7a",minWidth:80}}>{t.fecha}</span>
+                      <span style={{color:"#ede9e0",flex:1}}>{t.tarea}</span>
+                      <span style={{color:"#5a9a7a"}}>{t.zona}</span>
+                      <span style={{color:"#9ca3af"}}>{t.responsable||""}</span>
+                      {t.notas&&<span style={{color:"#4a7a5a",fontStyle:"italic",fontSize:10}}>{t.notas}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {resHistorial.total===0&&(
+                <div style={{textAlign:"center",padding:30,color:"#4a7a5a",fontSize:13}}>
+                  Sin resultados para "{buscarZona}{buscarZona&&buscarTipo?" + ":""}{buscarTipo}"
+                </div>
+              )}
+            </div>
+          )}
+          {!buscarZona&&!buscarTipo&&(
+            <div style={{textAlign:"center",padding:40,color:"#4a7a5a",fontSize:13}}>
+              Ingresa una zona o tipo de actividad para consultar el historial
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Historial normal (solo si tab es historial) ── */}
+      {tabHist==="historial"&&(
       {/* Filtros */}
       <div style={{...S.card,padding:16,marginBottom:18}}>
         <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:12,color:"#a0d8b0"}}>🔍 Filtros</div>
@@ -1310,6 +1666,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
         <div style={{...S.card,padding:32,textAlign:"center",color:"#4a8a5a",fontSize:14}}>
           Sin tareas que coincidan con los filtros aplicados.
         </div>
+      )}
       )}
     </div>
   );
@@ -12041,7 +12398,7 @@ export default function App() {
               >🖨️ Imprimir Reporte</button>
             </div>
             {tabReporte==="semanal" && (
-              <ReporteSemanal S={S} tareasProg={tareasProg} semanaBase={semanaBase} setSemanaBase={setSemanaBase} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} incidenciasFito={incidenciasFito}/>
+              <ReporteSemanal S={S} tareasProg={tareasProg} semanaBase={semanaBase} setSemanaBase={setSemanaBase} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} incidenciasFito={incidenciasFito} esJefa={rolLogueado==="jefa"}/>
             )}
             {tabReporte==="general" && <>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(270px,1fr))",gap:18,marginBottom:26}}>
