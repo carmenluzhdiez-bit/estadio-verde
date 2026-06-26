@@ -77,11 +77,13 @@ const CATEGORIAS_ELEM = {
   infraestructura: { label: "Infraestructura",      color: "#f59e0b", icon: "🏗️" },
   sistemas:        { label: "Sistemas",             color: "#3b82f6", icon: "⚙️" },
   pavimentos:      { label: "Pavimentos y Suelos",  color: "#a78bfa", icon: "🪨" },
-  mobiliario:      { label: "Mobiliario Urbano",    color: "#fb923c", icon: "🪑" },
+  cesped_sintetico:{ label: "Césped Sintético",      color: "#7c3aed", icon: "🟪" },
+  canchas:         { label: "Canchas Deportivas",    color: "#0ea5e9", icon: "🏟️" },
+  mobiliario:      { label: "Mobiliario Urbano",     color: "#fb923c", icon: "🪑" },
   bodegas:         { label: "Bodegas",               color: "#94a3b8", icon: "🏚️" },
 };
 const VEGETACION_SUBS = ["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
-const OTRAS_CATS      = ["infraestructura","sistemas","pavimentos","mobiliario","bodegas"];
+const OTRAS_CATS      = ["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","bodegas"];
 // ─── ESTACIONES ──────────────────────────────────────────────────────────────
 const ESTACIONES = {
   verano:    { label:"Verano",    icon:"☀️",  color:"#f59e0b", meses:"Dic–Feb" },
@@ -1713,7 +1715,9 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   // Estado de grupos colapsables — objeto {key: bool}
   const [gruposAbiertos, setGruposAbiertos] = React.useState({diarias:true,corte:true,medicion:true,riego:true,fitosan:true,limpieza:true,otros:true});
   const toggleGrupo = (key) => setGruposAbiertos(p=>({...p,[key]:!p[key]}));
-  const [showRegistroDiarioWorker, setShowRegistroDiarioWorker] = React.useState(true); // abierto por defecto
+  const [showRegistroDiarioWorker, setShowRegistroDiarioWorker] = React.useState(true);
+  const [showEmergente, setShowEmergente] = React.useState(false);
+  const [emergenteForm, setEmergenteForm] = React.useState({zona:"",tarea:"",obs:""}); // abierto por defecto
   const [registroDiarioForm, setRegistroDiarioForm] = React.useState({tareas:{}, obsFito:"", obs:""});
 
   const ESTADOS_TAREA = {
@@ -1814,491 +1818,237 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   );
 
   return (
-    <div style={{minHeight:"100vh",background:"linear-gradient(150deg,#0a1f10 0%,#122d1a 100%)",color:"#ede9e0",fontFamily:"'Georgia',serif",padding:"0 0 40px"}}>
-      <style>{`.wtab{cursor:pointer;padding:8px 16px;border-radius:8px;font-size:13px;font-family:'Georgia',serif;transition:all .15s}.wtab.on{background:#3d7a52;color:#fff}.wtab:not(.on){color:#7aaa80}.wtab:not(.on):hover{background:rgba(61,122,82,0.2)}`}</style>
+    <div style={{minHeight:"100vh",background:"linear-gradient(150deg,#0a1f10 0%,#122d1a 100%)",color:"#ede9e0",fontFamily:"'Georgia',serif"}}>
+      <style>{`.wtab{cursor:pointer;padding:8px 16px;border-radius:8px;font-size:13px;font-family:'Georgia',serif;border:none;background:transparent;color:#7aaa80}.wtab.on{background:rgba(52,211,153,0.15);color:#34d399}`}</style>
 
-      {/* Header trabajador */}
-      <div style={{background:"rgba(0,0,0,0.5)",borderBottom:"1px solid rgba(160,200,140,0.15)",padding:"14px 20px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+      {/* ── HEADER ── */}
+      <div style={{background:"rgba(0,0,0,0.5)",borderBottom:"1px solid rgba(160,200,140,0.15)",padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",position:"sticky",top:0,zIndex:10}}>
         <div style={{display:"flex",alignItems:"center",gap:12}}>
-          <div style={{width:38,height:38,borderRadius:"50%",background:"linear-gradient(135deg,#3d7a52,#1a4a2e)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
+          <div style={{width:38,height:38,borderRadius:"50%",background:"linear-gradient(135deg,#1a5c35,#2d7a4f)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:700,color:"#fff",flexShrink:0}}>
             {trabajador.nombre[0].toUpperCase()}
           </div>
           <div>
-            <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700}}>{trabajador.nombre}</div>
-            <div style={{fontSize:11,color:"#6aaa7a"}}>{trabajador.cargo||"Jardinero"}</div>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700}}>{trabajador.nombre.split(" ")[0]} {trabajador.nombre.split(" ")[1]||""}</div>
+            <div style={{fontSize:11,color:"#6aaa7a"}}>{trabajador.cargo||"Jardinero"} · {fechaVer===hoy?"Hoy":new Date(fechaVer+"T12:00:00").toLocaleDateString("es-CL",{weekday:"short",day:"numeric",month:"short"})}</div>
           </div>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <input type="date" value={fechaVer} onChange={e=>setFechaVer(e.target.value)}
-            style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.14)",borderRadius:8,color:"#ede9e0",padding:"6px 10px",fontFamily:"'Georgia',serif",fontSize:13,outline:"none"}}/>
+            style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.14)",borderRadius:8,color:"#ede9e0",padding:"6px 10px",fontFamily:"'Georgia',serif",fontSize:12,outline:"none"}}/>
         </div>
       </div>
 
-      <div style={{padding:"20px 16px"}}>
-        {/* Progreso del día */}
-        {stats.total > 0 && (
-          <div style={{background:"rgba(255,255,255,0.055)",border:"1px solid rgba(255,255,255,0.10)",borderRadius:14,padding:"14px 18px",marginBottom:18}}>
-            <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
-              <span style={{fontSize:14,color:"#a0c8a0"}}>Mi progreso — {fechaVer===hoy?"hoy":fechaVer}</span>
-              <span style={{fontSize:14,fontWeight:700,color:pct===100?"#22c55e":pct>50?"#4ade80":"#f59e0b"}}>{pct}%</span>
+      <div style={{padding:"16px 14px",maxWidth:600,margin:"0 auto"}}>
+
+        {/* ── BARRA DE PROGRESO ── */}
+        {stats.total>0&&(
+          <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:"12px 14px",marginBottom:14}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+              <span style={{fontSize:13,color:"#a0c8a0"}}>Progreso del día</span>
+              <span style={{fontSize:14,fontWeight:700,color:pct===100?"#22c55e":pct>50?"#f59e0b":"#ede9e0"}}>{pct}%</span>
             </div>
-            <div style={{background:"rgba(255,255,255,0.07)",borderRadius:6,height:10,overflow:"hidden",marginBottom:8}}>
-              <div style={{width:`${pct}%`,height:"100%",background:pct===100?"#22c55e":"#3b82f6",borderRadius:6,transition:"width .4s"}}/>
+            <div style={{background:"rgba(255,255,255,0.07)",borderRadius:6,height:8,overflow:"hidden",marginBottom:8}}>
+              <div style={{width:`${pct}%`,height:"100%",background:pct===100?"#22c55e":"linear-gradient(90deg,#3d7a52,#4ade80)",transition:"width .4s",borderRadius:6}}/>
             </div>
-            <div style={{display:"flex",gap:14,fontSize:12,color:"#6aaa7a"}}>
+            <div style={{display:"flex",gap:12,fontSize:11,color:"#6aaa7a",flexWrap:"wrap"}}>
               <span>📋 {stats.total} tareas</span>
               <span style={{color:"#22c55e"}}>✅ {stats.hechas} hechas</span>
-              {stats.noPudo>0&&<span style={{color:"#ef4444"}}>❌ {stats.noPudo} no pudieron</span>}
+              {stats.noPudo>0&&<span style={{color:"#ef4444"}}>❌ {stats.noPudo} no pudo</span>}
+              <span style={{color:"#f59e0b"}}>⏳ {stats.total-stats.hechas-stats.noPudo} pendientes</span>
             </div>
           </div>
         )}
 
-        {/* Accesos rápidos para Bhalú */}
-        {fechaVer===hoy&&(
-          <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
-            <button onClick={()=>onAccesoRapido?.("medicion")}
-              style={{flex:1,minWidth:120,cursor:"pointer",border:"1px solid rgba(52,211,153,0.3)",borderRadius:10,padding:"9px 8px",background:"rgba(52,211,153,0.08)",color:"#34d399",fontFamily:"'Georgia',serif",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-              📏 Registrar alturas
-            </button>
-            <button onClick={()=>onAccesoRapido?.("humedad")}
-              style={{flex:1,minWidth:120,cursor:"pointer",border:"1px solid rgba(96,165,250,0.3)",borderRadius:10,padding:"9px 8px",background:"rgba(96,165,250,0.08)",color:"#60a5fa",fontFamily:"'Georgia',serif",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-              💧 Registrar humedad
-            </button>
-            <button onClick={()=>setShowRegistroDiarioWorker(v=>!v)}
-              style={{flex:1,minWidth:120,cursor:"pointer",border:"1px solid rgba(167,139,250,0.3)",borderRadius:10,padding:"9px 8px",background:showRegistroDiarioWorker?"rgba(167,139,250,0.18)":"rgba(167,139,250,0.08)",color:"#c4b5fd",fontFamily:"'Georgia',serif",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-              📋 {showRegistroDiarioWorker?"Cerrar registro":"Registro diario"}
-            </button>
-          </div>
-        )}
-
-        {/* ── Registro diario — SOLO observaciones (tareas van en bloque Diarias) ── */}
-        {showRegistroDiarioWorker&&(
-          <div style={{background:"rgba(52,211,153,0.05)",border:"1px solid rgba(52,211,153,0.25)",borderRadius:14,padding:16,marginBottom:14}} className="ein">
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#34d399"}}>✅ Registro diario — Greens</div>
-              <button onClick={()=>setShowRegistroDiarioWorker(false)}
-                style={{cursor:"pointer",border:"none",background:"transparent",color:"#5a9a7a",fontSize:18,lineHeight:1}}>✕</button>
-            </div>
-
-            {/* Tareas a marcar */}
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-              <div style={{fontSize:11,color:"#5a9a7a"}}>Marca lo que realizaste hoy:</div>
-              <button onClick={()=>{
-                const listaTareas = [...TAREAS_GREENS_DIARIAS,"Limpieza — Greens","Medición de alturas","Revisión humedad greens","Revisión sistema de riego"];
-                const todosMarcados = listaTareas.every(t=>registroDiarioForm.tareas[t]);
-                const nuevo = {};
-                listaTareas.forEach(t=>{ nuevo[t]=!todosMarcados; });
-                setRegistroDiarioForm(p=>({...p,tareas:nuevo}));
-              }} style={{cursor:"pointer",border:"1px solid rgba(52,211,153,0.3)",borderRadius:8,padding:"3px 10px",background:"transparent",color:"#34d399",fontSize:11}}>
-                {Object.values(registroDiarioForm.tareas).some(Boolean)?"✗ Desmarcar":"✓ Marcar todas"}
-              </button>
-            </div>
-            <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
-              {[...TAREAS_GREENS_DIARIAS,
-                "Limpieza — Greens",
-                "Medición de alturas",
-                "Revisión humedad greens",
-                "Revisión sistema de riego"
-              ].map(t=>{
-                const marcada = registroDiarioForm.tareas[t];
-                return (
-                  <div key={t} onClick={()=>setRegistroDiarioForm(p=>({...p,tareas:{...p.tareas,[t]:!p.tareas[t]}}))}
-                    style={{display:"flex",alignItems:"center",gap:6,padding:"6px 10px",borderRadius:8,
-                      background:marcada?"rgba(52,211,153,0.12)":"rgba(255,255,255,0.04)",
-                      border:`1px solid ${marcada?"rgba(52,211,153,0.4)":"rgba(255,255,255,0.08)"}`,
-                      cursor:"pointer",fontSize:12,userSelect:"none"}}>
-                    <div style={{width:14,height:14,borderRadius:3,
-                      border:`2px solid ${marcada?"#34d399":"rgba(255,255,255,0.2)"}`,
-                      background:marcada?"#34d399":"transparent",
-                      display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                      {marcada&&<span style={{color:"#000",fontSize:9,fontWeight:700}}>✓</span>}
-                    </div>
-                    <span>{t}</span>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Observación fitosanitaria */}
-            <div style={{background:"rgba(167,139,250,0.06)",borderRadius:8,padding:"10px 12px",marginBottom:10,border:"1px solid rgba(167,139,250,0.2)"}}>
-              <div style={{fontSize:11,color:"#c4b5fd",fontWeight:600,marginBottom:6}}>🔬 Observación fitosanitaria</div>
-              <input style={{...S.input,fontSize:12}}
-                placeholder="Sin novedades · Mancha sospechosa Green 03 · Presencia de trips..."
-                value={registroDiarioForm.obsFito||""}
-                onChange={e=>setRegistroDiarioForm(p=>({...p,obsFito:e.target.value}))}/>
-              <div style={{fontSize:10,color:"#5a7a9a",marginTop:4}}>
-                Si hay novedad relevante será registrada en Incidencias fitosanitarias
-              </div>
-            </div>
-
-            {/* Observaciones generales */}
-            <div style={{marginBottom:12}}>
-              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4}}>Observaciones generales</label>
-              <input style={{...S.input,fontSize:12}}
-                placeholder="Condiciones del día, novedades..."
-                value={registroDiarioForm.obs||""}
-                onChange={e=>setRegistroDiarioForm(p=>({...p,obs:e.target.value}))}/>
-            </div>
-
-            <div style={{display:"flex",gap:8}}>
-              <button onClick={()=>{
-                // Guardar registro vía onAddTarea como tarea especial de registro
-                const resumen = Object.entries(registroDiarioForm.tareas)
-                  .filter(([,v])=>v).map(([k])=>k).join(", ");
-                if(!resumen && !registroDiarioForm.obsFito && !registroDiarioForm.obs) {
-                  alert("Marca al menos una tarea o agrega una observación");
-                  return;
-                }
-                // Marcar tarea diaria de pediluvios/soplado como hecha si está entre las marcadas
-                const tareasRealizadasHoy = Object.entries(registroDiarioForm.tareas)
-                  .filter(([,v])=>v).map(([k])=>k);
-                const tareasArrGuardar = Array.isArray(tareas) ? tareas : [];
-                tareasRealizadasHoy.forEach(nombreTarea => {
-                  const td = tareasArrGuardar.find(t=>(t.tarea||"").toLowerCase().includes(nombreTarea.toLowerCase().slice(0,10)));
-                  if(td && td.estado!=="hecha") onUpdateTarea(fechaVer, td.id, {estado:"hecha"});
-                });
-
-                onAddTarea({
-                  id:Date.now(),
-                  fecha:fechaVer,
-                  zona:"Golf",
-                  subZona:"GREEN",
-                  elemento:"Greens",
-                  tarea:"⛳ Registro diario — Greens",
-                  responsable:trabajador?.nombre||"Bhalú",
-                  estado:"hecha",
-                  notas:`Tareas: ${resumen||"—"} | Fito: ${registroDiarioForm.obsFito||"Sin novedades"} | ${registroDiarioForm.obs||""}`,
-                  esRegistroDiario:true,
-                  tareasRealizadas:registroDiarioForm.tareas,
-                  obsFito:registroDiarioForm.obsFito||"",
-                  obs:registroDiarioForm.obs||"",
-                });
-                setRegistroDiarioForm({tareas:{},obsFito:"",obs:""});
-                setShowRegistroDiarioWorker(false);
-              }} className="btn-p" style={S.btn}>✓ Guardar registro</button>
-              <button onClick={()=>setShowRegistroDiarioWorker(false)} className="btn-g" style={S.btn}>Cancelar</button>
-            </div>
-          </div>
-        )}
-
-        {/* Nueva tarea emergente */}
-        {fechaVer===hoy && (
-          <div style={{marginBottom:16}}>
-            {!showNuevaTareaEmerg ? (
-              <button onClick={()=>setShowNuevaTareaEmerg(true)}
-                style={{width:"100%",cursor:"pointer",border:"1px dashed rgba(61,122,82,0.4)",borderRadius:12,padding:"10px",background:"rgba(61,122,82,0.08)",color:"#6aaa7a",fontFamily:"'Georgia',serif",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-                ➕ Agregar tarea emergente del turno
-              </button>
-            ) : (
-              <div style={{background:"rgba(255,255,255,0.055)",border:"1px solid rgba(61,122,82,0.3)",borderRadius:14,padding:16}} className="ein">
-                <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:12,color:"#90d4a0"}}>🆕 Nueva Tarea del Turno</div>
-                <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:12}}>
-                  {/* 1. Zona */}
-                  <div>
-                    <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>ZONA</label>
-                    <select style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.14)",borderRadius:8,color:"#ede9e0",padding:"8px 12px",fontFamily:"'Georgia',serif",fontSize:14,width:"100%",outline:"none"}}
-                      value={nuevaTareaEmerg.zona} onChange={e=>setNuevaTareaEmerg(p=>({...p,zona:e.target.value,tarea:""}))}>
-                      <option value="">Seleccionar zona...</option>
-                      {[...MACROZONAS_BASE].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(z=>(
-                        <option key={z.id} value={z.nombre}>{z.icono} {z.nombre}</option>
-                      ))}
-                    </select>
-                  </div>
-                  {/* 2. Tarea — solo muestra si hay zona seleccionada */}
-                  {nuevaTareaEmerg.zona && (
-                    <div>
-                      <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>TAREA</label>
-                      {getTareasDeZona(nuevaTareaEmerg.zona).length===0 ? (
-                        <div style={{fontSize:12,color:"#f59e0b",padding:"8px 12px",background:"rgba(245,158,11,0.1)",borderRadius:8,border:"1px solid rgba(245,158,11,0.2)"}}>
-                          ⚠️ Esta zona no tiene tareas definidas en sus elementos. Defínelas primero en la sección de Frecuencias de cada elemento.
-                        </div>
-                      ) : (
-                        <select style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.14)",borderRadius:8,color:"#ede9e0",padding:"8px 12px",fontFamily:"'Georgia',serif",fontSize:14,width:"100%",outline:"none"}}
-                          value={nuevaTareaEmerg.tarea} onChange={e=>setNuevaTareaEmerg(p=>({...p,tarea:e.target.value}))}>
-                          <option value="">Seleccionar tarea...</option>
-                          {getTareasDeZona(nuevaTareaEmerg.zona).map(t=>(
-                            <option key={t} value={t}>{t}</option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-                  )}
-                  {/* 3. Observaciones */}
-                  {nuevaTareaEmerg.tarea && (
-                    <div>
-                      <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>OBSERVACIONES (opcional)</label>
-                      <textarea rows={2} style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.14)",borderRadius:8,color:"#ede9e0",padding:"8px 12px",fontFamily:"'Georgia',serif",fontSize:13,width:"100%",outline:"none",resize:"vertical"}}
-                        value={nuevaTareaEmerg.notas} onChange={e=>setNuevaTareaEmerg(p=>({...p,notas:e.target.value}))}/>
-                    </div>
-                  )}
-                </div>
-                <div style={{display:"flex",gap:8}}>
-                  <button onClick={()=>{
-                    if(!nuevaTareaEmerg.zona||!nuevaTareaEmerg.tarea) return;
-                    onAddTarea({
-                      id: Date.now()+Math.random(),
-                      fecha: fechaVer,
-                      zona: nuevaTareaEmerg.zona,
-                      elemento: "",
-                      tarea: nuevaTareaEmerg.tarea,
-                      responsable: trabajador.nombre,
-                      estado: "haciendose",
-                      notas: nuevaTareaEmerg.notas,
-                      notaWorker: "",
-                      emergente: true,
-                    });
-                    setNuevaTareaEmerg({zona:"",tarea:"",notas:""});
-                    setShowNuevaTareaEmerg(false);
-                  }} style={{cursor:"pointer",border:"none",borderRadius:8,padding:"8px 18px",background:"#3d7a52",color:"#fff",fontFamily:"'Georgia',serif",fontSize:14}}>
-                    ✓ Registrar
-                  </button>
-                  <button onClick={()=>{setShowNuevaTareaEmerg(false);setNuevaTareaEmerg({zona:"",tarea:"",notas:""});}}
-                    style={{cursor:"pointer",border:"1px solid rgba(255,255,255,0.15)",borderRadius:8,padding:"8px 18px",background:"transparent",color:"#a0c8a0",fontFamily:"'Georgia',serif",fontSize:14}}>
-                    Cancelar
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── TAREAS DIARIAS ── */}
+        {/* ══════════════════════════════════════════════════════════
+             SECCIÓN 1 — TAREAS DIARIAS (con observaciones integradas)
+             ══════════════════════════════════════════════════════════ */}
         {misTareasDiarias.length>0&&(()=>{
-          const hechasDiarias = misTareasDiarias.filter(t=>t.estado==="hecha").length;
-          const todasHechas = hechasDiarias===misTareasDiarias.length;
-          const openDiarias = gruposAbiertos["diarias"]!==false;
+          const hechasDiarias=misTareasDiarias.filter(t=>t.estado==="hecha").length;
+          const todasHechas=hechasDiarias===misTareasDiarias.length;
+          const openDiarias=gruposAbiertos["diarias"]!==false;
           return (
-            <div style={{marginBottom:12}}>
-              {/* Cabecera colapsable */}
-              <div onClick={()=>toggleGrupo("diarias")}
-                style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-                  padding:"10px 14px",borderRadius:openDiarias?"10px 10px 0 0":"10px",
-                  background:todasHechas?"rgba(34,197,94,0.08)":"rgba(52,211,153,0.06)",
-                  border:`1px solid ${todasHechas?"rgba(34,197,94,0.25)":"rgba(52,211,153,0.2)"}`,
-                  cursor:"pointer",userSelect:"none"}}>
+            <div style={{marginBottom:14,border:`1px solid ${todasHechas?"rgba(34,197,94,0.3)":"rgba(52,211,153,0.2)"}`,borderRadius:12,overflow:"hidden"}}>
+              {/* Cabecera */}
+              <div onClick={()=>toggleGrupo("diarias")} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 14px",background:todasHechas?"rgba(34,197,94,0.08)":"rgba(52,211,153,0.06)",cursor:"pointer",userSelect:"none"}}>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <span style={{fontSize:16}}>📋</span>
-                  <span style={{fontSize:13,fontWeight:700,color:todasHechas?"#22c55e":"#34d399"}}>Tareas diarias</span>
-                  <span style={{fontSize:11,color:"#5a9a7a",background:"rgba(255,255,255,0.06)",padding:"1px 8px",borderRadius:20}}>
-                    {hechasDiarias}/{misTareasDiarias.length}
-                  </span>
+                  <span style={{fontSize:18}}>📋</span>
+                  <span style={{fontSize:14,fontWeight:700,color:todasHechas?"#22c55e":"#34d399"}}>Tareas diarias</span>
+                  <span style={{fontSize:11,color:"#5a9a7a",background:"rgba(255,255,255,0.06)",padding:"1px 8px",borderRadius:20}}>{hechasDiarias}/{misTareasDiarias.length}</span>
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  {todasHechas&&<span style={{fontSize:11,color:"#22c55e"}}>✓ Listo</span>}
-                  <span style={{fontSize:12,color:"#5a9a7a",transition:"transform .2s",display:"inline-block",transform:openDiarias?"rotate(90deg)":"rotate(0deg)"}}>▶</span>
+                  {todasHechas&&<span style={{fontSize:11,color:"#22c55e",fontWeight:600}}>✓ Listo</span>}
+                  <span style={{color:"#4a7a5a",fontSize:12,transform:openDiarias?"rotate(90deg)":"rotate(0deg)",transition:"transform .2s",display:"inline-block"}}>▶</span>
                 </div>
               </div>
-              {/* Lista colapsable */}
+              {/* Lista de tareas */}
               {openDiarias&&(
-                <div style={{border:"1px solid rgba(52,211,153,0.15)",borderTop:"none",borderRadius:"0 0 10px 10px",overflow:"hidden"}}>
+                <div>
                   {misTareasDiarias.map((t,i)=>{
-                    const est = ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente;
+                    const est=ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente;
                     return (
-                      <div key={t.id} style={{padding:"10px 14px",background:i%2===0?"rgba(255,255,255,0.025)":"rgba(255,255,255,0.04)",borderBottom:i<misTareasDiarias.length-1?"1px solid rgba(255,255,255,0.06)":"none"}}>
-                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,marginBottom:6}}>
+                      <div key={t.id} style={{padding:"10px 14px",background:i%2===0?"rgba(255,255,255,0.02)":"rgba(255,255,255,0.04)",borderBottom:i<misTareasDiarias.length-1?"1px solid rgba(255,255,255,0.05)":"none"}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:t.metodoLimpieza||t.notas?4:0}}>
                           <div style={{flex:1}}>
                             <span style={{fontSize:13,fontWeight:600}}>{t.tarea?.replace("⛳ ","")}</span>
-                            {/* Indicación de método — visible para todos, editable para jefa/supervisor */}
                             {t.metodoLimpieza&&(
-                              <div style={{marginTop:3,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                                <span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.08)",padding:"1px 8px",borderRadius:10,border:"1px solid rgba(251,191,36,0.2)"}}>
-                                  {t.metodoLimpieza==="sopladora"?"🌬️ Sopladora":
-                                   t.metodoLimpieza==="barrido"?"🧹 Barrido con vara":
-                                   t.metodoLimpieza==="ambos"?"🌬️ Sopladora + 🧹 Barrido":
-                                   t.metodoLimpieza}
+                              <div style={{marginTop:3}}>
+                                <span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.08)",padding:"2px 8px",borderRadius:8,border:"1px solid rgba(251,191,36,0.2)"}}>
+                                  {t.metodoLimpieza==="sopladora"?"🌬️ Sopladora":t.metodoLimpieza==="barrido"?"🧹 Barrido con vara":"🌬️+🧹 Sopladora + Barrido"}
                                 </span>
-                                {onCambiarMetodo&&(
-                                  <select
-                                    value={t.metodoLimpieza}
-                                    onChange={e=>onCambiarMetodo(fechaVer,t.id,e.target.value)}
-                                    style={{fontSize:10,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:6,color:"#6aaa7a",padding:"1px 4px",cursor:"pointer"}}>
-                                    <option value="sopladora">🌬️ Sopladora</option>
-                                    <option value="barrido">🧹 Barrido con vara</option>
-                                    <option value="ambos">🌬️+🧹 Ambos</option>
-                                  </select>
-                                )}
                               </div>
                             )}
-                            {t.indicacion&&(
-                              <div style={{fontSize:11,color:"#f59e0b",marginTop:3,fontStyle:"italic"}}>📌 {t.indicacion}</div>
-                            )}
+                            {t.notas&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:2,fontStyle:"italic"}}>💡 {t.notas}</div>}
+                            {t.indicacion&&<div style={{fontSize:11,color:"#f59e0b",marginTop:2}}>{t.indicacion}</div>}
                           </div>
-                          <span style={{fontSize:11,fontWeight:600,color:est.color,whiteSpace:"nowrap"}}>{est.icon} {est.label}</span>
+                          <span style={{fontSize:11,fontWeight:600,color:est.color,background:`${est.color}15`,padding:"2px 8px",borderRadius:8,border:`1px solid ${est.color}30`,whiteSpace:"nowrap",flexShrink:0}}>{est.icon} {est.label}</span>
                         </div>
-                        <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+                        <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                           {Object.entries(ESTADOS_TAREA).map(([k,v])=>(
                             <button key={k} onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:k,notaWorker:k!=="no_pudo"?t.notaWorker:""})}
-                              style={{cursor:"pointer",border:`1px solid ${t.estado===k?v.color:"rgba(255,255,255,0.12)"}`,borderRadius:16,padding:"3px 10px",background:t.estado===k?v.bg:"transparent",color:t.estado===k?v.color:"#6aaa7a",fontSize:11,fontFamily:"'Georgia',serif"}}>
+                              style={{cursor:"pointer",border:`1px solid ${t.estado===k?v.color+"60":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"4px 10px",fontSize:11,background:t.estado===k?`${v.color}15`:"transparent",color:t.estado===k?v.color:"#6aaa7a",fontFamily:"'Georgia',serif"}}>
                               {v.icon} {v.label}
                             </button>
                           ))}
                         </div>
                         {t.estado==="no_pudo"&&(
                           <div style={{marginTop:6}}>
-                            <textarea
-                              rows={2}
-                              placeholder="¿Por qué no se pudo? (obligatorio para guardar)"
-                              value={t.notaWorker||""}
-                              onChange={e=>onUpdateTarea(fechaVer,t.id,{notaWorker:e.target.value})}
-                              style={{width:"100%",background:"rgba(239,68,68,0.08)",border:`1px solid ${t.notaWorker?"rgba(239,68,68,0.4)":"rgba(239,68,68,0.6)"}`,borderRadius:8,color:"#fca5a5",padding:"7px 10px",fontFamily:"'Georgia',serif",fontSize:12,resize:"vertical",outline:"none",boxSizing:"border-box"}}
-                            />
-                            {!t.notaWorker&&(
-                              <div style={{fontSize:10,color:"#ef4444",marginTop:2}}>⚠️ Explica el motivo para registrar esta tarea</div>
-                            )}
+                            <textarea rows={2} placeholder="¿Por qué no se pudo? (obligatorio)" value={t.notaWorker||""} onChange={e=>onUpdateTarea(fechaVer,t.id,{notaWorker:e.target.value})} style={{width:"100%",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:8,color:"#ede9e0",padding:"6px 10px",fontFamily:"'Georgia',serif",fontSize:12,resize:"vertical"}}/>
+                            {!t.notaWorker&&<div style={{fontSize:10,color:"#ef4444",marginTop:2}}>⚠️ Explica el motivo para poder guardar</div>}
                           </div>
                         )}
                         {t.notaWorker&&t.estado!=="no_pudo"&&<div style={{fontSize:11,color:"#f59e0b",marginTop:4,fontStyle:"italic"}}>💬 {t.notaWorker}</div>}
                       </div>
                     );
                   })}
+                  {/* ── Observaciones del turno integradas ── */}
+                  <div style={{padding:"12px 14px",background:"rgba(52,211,153,0.03)",borderTop:"1px solid rgba(52,211,153,0.1)"}}>
+                    <div style={{fontSize:11,fontWeight:600,color:"#34d399",marginBottom:10}}>📝 Observaciones del turno</div>
+                    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                      <div>
+                        <label style={{fontSize:10,color:"#c4b5fd",display:"block",marginBottom:4,letterSpacing:"0.5px",textTransform:"uppercase"}}>🔬 Observación fitosanitaria</label>
+                        <input style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.14)",borderRadius:8,color:"#ede9e0",padding:"8px 12px",fontFamily:"'Georgia',serif",fontSize:12,outline:"none",boxSizing:"border-box"}}
+                          placeholder="Sin novedades · Mancha sospechosa Green 03 · Presencia de trips..."
+                          value={registroDiarioForm.obsFito||""}
+                          onChange={e=>setRegistroDiarioForm(p=>({...p,obsFito:e.target.value}))}/>
+                        <div style={{fontSize:10,color:"#5a7a9a",marginTop:3}}>Si hay novedad será registrada en Incidencias fitosanitarias</div>
+                      </div>
+                      <div>
+                        <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px",textTransform:"uppercase"}}>Observaciones generales</label>
+                        <input style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.14)",borderRadius:8,color:"#ede9e0",padding:"8px 12px",fontFamily:"'Georgia',serif",fontSize:12,outline:"none",boxSizing:"border-box"}}
+                          placeholder="Condiciones del día, novedades, situaciones especiales..."
+                          value={registroDiarioForm.obs||""}
+                          onChange={e=>setRegistroDiarioForm(p=>({...p,obs:e.target.value}))}/>
+                      </div>
+                      {(registroDiarioForm.obsFito||registroDiarioForm.obs)&&(
+                        <button onClick={()=>{
+                          const tareasRealizadas=Object.entries(registroDiarioForm.tareas).filter(([,v])=>v).map(([k])=>k);
+                          onAddTarea({id:Date.now(),fecha:fechaVer,tarea:"📋 Registro diario greens",responsable:trabajador.nombre,zona:"Golf",subZona:"Greens",estado:"hecha",notas:`Fito: ${registroDiarioForm.obsFito||"Sin novedad"} | General: ${registroDiarioForm.obs||"Sin novedad"}`,esDiario:true,auto:false});
+                          if(registroDiarioForm.obsFito?.trim()) alert("⚠️ Observación fitosanitaria registrada. La jefa será notificada.");
+                          setRegistroDiarioForm(p=>({...p,obsFito:"",obs:""}));
+                        }} style={{cursor:"pointer",border:"1px solid rgba(52,211,153,0.3)",borderRadius:10,padding:"8px 16px",background:"rgba(52,211,153,0.12)",color:"#34d399",fontSize:12,fontFamily:"'Georgia',serif",alignSelf:"flex-start"}}>
+                          💾 Guardar observaciones
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
-
-              {/* ── Observaciones del turno ── */}
-            <div style={{marginTop:8,padding:"12px 14px",background:"rgba(52,211,153,0.03)",border:"1px solid rgba(52,211,153,0.1)",borderRadius:"0 0 10px 10px"}}>
-              <div style={{fontSize:11,fontWeight:600,color:"#34d399",marginBottom:8}}>
-                📝 Observaciones del turno
-              </div>
-              <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                <div>
-                  <label style={{fontSize:10,color:"#c4b5fd",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>🔬 OBSERVACIÓN FITOSANITARIA</label>
-                  <input style={{...S.input,fontSize:12}}
-                    placeholder="Sin novedades · Mancha Green 03 · Presencia de trips..."
-                    value={registroDiarioForm.obsFito||""}
-                    onChange={e=>setRegistroDiarioForm(p=>({...p,obsFito:e.target.value}))}/>
-                  <div style={{fontSize:10,color:"#5a7a9a",marginTop:3}}>Si hay novedad será registrada en Incidencias fitosanitarias</div>
-                </div>
-                <div>
-                  <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>OBSERVACIONES GENERALES</label>
-                  <input style={{...S.input,fontSize:12}}
-                    placeholder="Condiciones del día, novedades, observaciones..."
-                    value={registroDiarioForm.obs||""}
-                    onChange={e=>setRegistroDiarioForm(p=>({...p,obs:e.target.value}))}/>
-                </div>
-                {(registroDiarioForm.obsFito||registroDiarioForm.obs)&&(
-                  <button onClick={()=>{
-                    const tareasRealizadasHoy = Object.entries(registroDiarioForm.tareas)
-                      .filter(([,v])=>v).map(([k])=>k);
-                    onAddTarea({
-                      id:Date.now(), fecha:fechaVer,
-                      tarea:`📋 Registro diario greens`,
-                      responsable:workerData?.nombre||"",
-                      zona:"Golf", subZona:"Greens", estado:"hecha",
-                      notas:`Tareas: ${tareasRealizadasHoy.join(", ")||"—"} | Fito: ${registroDiarioForm.obsFito||"Sin novedad"} | General: ${registroDiarioForm.obs||"Sin novedad"}`,
-                      esDiario:true, auto:false,
-                    });
-                    if(registroDiarioForm.obsFito?.trim()) {
-                      alert("⚠️ Observación fitosanitaria registrada. La jefa será notificada.");
-                    }
-                    setRegistroDiarioForm(p=>({...p,obsFito:"",obs:""}));
-                  }} style={{...S.btn,background:"rgba(52,211,153,0.15)",color:"#34d399",
-                    border:"1px solid rgba(52,211,153,0.3)",fontSize:12,alignSelf:"flex-start"}}>
-                    💾 Guardar observaciones
-                  </button>
-                )}
-              </div>
             </div>
-          </div>
           );
         })()}
 
-        {/* ── OTRAS TAREAS AGRUPADAS ── */}
-        {misTareasOtras.length>0&&(()=>{
-          // Clasificar por tipo
-          const GRUPOS = [
-            {key:"corte",   icon:"✂️", label:"Cortes",      match: t=>(t.tarea||"").toLowerCase().includes("corte")},
-            {key:"medicion",icon:"📏", label:"Mediciones",  match: t=>(t.tarea||"").toLowerCase().includes("medición")||(t.tarea||"").toLowerCase().includes("medicion")},
-            {key:"riego",   icon:"💧", label:"Riego",       match: t=>(t.tarea||"").toLowerCase().includes("riego")||(t.tarea||"").toLowerCase().includes("syringing")},
-            {key:"fitosan", icon:"🔬", label:"Fitosanitario",match: t=>(t.tarea||"").toLowerCase().includes("fungicida")||(t.tarea||"").toLowerCase().includes("plagas")||(t.tarea||"").toLowerCase().includes("fitosan")},
-            {key:"limpieza",icon:"🧹", label:"Limpieza",    match: t=>(t.tarea||"").toLowerCase().includes("limpieza")},
-            {key:"otros",   icon:"🌿", label:"Otros",       match: ()=>true},
-          ];
-          // Asignar grupo a cada tarea (primera coincidencia)
-          const asignarGrupo = (t) => GRUPOS.find(g=>g.match(t))?.key||"otros";
-          const porGrupo = {};
-          misTareasOtras.forEach(t=>{
-            const g = asignarGrupo(t);
-            if(!porGrupo[g]) porGrupo[g]=[];
-            porGrupo[g].push(t);
-          });
+        {/* ══════════════════════════════════════════════════════════
+             SECCIÓN 2 — REGISTROS GOLF (Alturas y Humedad)
+             ══════════════════════════════════════════════════════════ */}
+        {fechaVer===hoy&&(
+          <div style={{marginBottom:14,border:"1px solid rgba(96,165,250,0.2)",borderRadius:12,overflow:"hidden"}}>
+            <div style={{padding:"12px 14px",background:"rgba(96,165,250,0.05)",borderBottom:"1px solid rgba(96,165,250,0.15)"}}>
+              <div style={{fontSize:14,fontWeight:700,color:"#60a5fa",marginBottom:2}}>⛳ Registros Golf</div>
+              <div style={{fontSize:11,color:"#4a7a9a"}}>Medición de alturas y humedad de greens</div>
+            </div>
+            <div style={{padding:"12px 14px",display:"flex",gap:8,flexWrap:"wrap"}}>
+              <button onClick={()=>onAccesoRapido?.("medicion")}
+                style={{flex:1,minWidth:140,cursor:"pointer",border:"1px solid rgba(52,211,153,0.35)",borderRadius:10,padding:"12px 10px",background:"rgba(52,211,153,0.08)",color:"#34d399",fontFamily:"'Georgia',serif",fontSize:13,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+                <span style={{fontSize:22}}>📏</span>
+                <span style={{fontWeight:600}}>Registrar alturas</span>
+                <span style={{fontSize:10,color:"#5a9a7a"}}>Medir mm cada green</span>
+              </button>
+              <button onClick={()=>onAccesoRapido?.("humedad")}
+                style={{flex:1,minWidth:140,cursor:"pointer",border:"1px solid rgba(96,165,250,0.35)",borderRadius:10,padding:"12px 10px",background:"rgba(96,165,250,0.08)",color:"#60a5fa",fontFamily:"'Georgia',serif",fontSize:13,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+                <span style={{fontSize:22}}>💧</span>
+                <span style={{fontWeight:600}}>Registrar humedad</span>
+                <span style={{fontSize:10,color:"#4a7a9a"}}>Nivel húmedad greens</span>
+              </button>
+            </div>
+          </div>
+        )}
 
+        {/* ══════════════════════════════════════════════════════════
+             SECCIÓN 3 — OTRAS TAREAS DEL DÍA
+             ══════════════════════════════════════════════════════════ */}
+        {misTareasOtras.length>0&&(()=>{
+          const GRUPOS=[
+            {key:"corte",   icon:"✂️", label:"Cortes",       match:t=>(t.tarea||"").toLowerCase().includes("corte")||(t.tarea||"").toLowerCase().includes("cortad")},
+            {key:"medicion",icon:"📏", label:"Mediciones",   match:t=>(t.tarea||"").toLowerCase().includes("medic")||(t.tarea||"").toLowerCase().includes("altura")},
+            {key:"riego",   icon:"💧", label:"Riego",         match:t=>(t.tarea||"").toLowerCase().includes("riego")||(t.tarea||"").toLowerCase().includes("regar")},
+            {key:"fitosan", icon:"🔬", label:"Fitosanitario", match:t=>(t.tarea||"").toLowerCase().includes("fungicida")||(t.tarea||"").toLowerCase().includes("plagas")||(t.tarea||"").toLowerCase().includes("fitosan")},
+            {key:"limpieza",icon:"🧹", label:"Limpieza",      match:t=>(t.tarea||"").toLowerCase().includes("limpie")||(t.tarea||"").toLowerCase().includes("sopla")||(t.tarea||"").toLowerCase().includes("barrid")},
+            {key:"poda",    icon:"✂️", label:"Poda/Fertilización", match:t=>(t.tarea||"").toLowerCase().includes("poda")||(t.tarea||"").toLowerCase().includes("fertili")},
+            {key:"otros",   icon:"🌿", label:"Otras tareas",  match:t=>true},
+          ];
+          const grupos=[];
+          const asignadas=new Set();
+          GRUPOS.forEach(g=>{
+            const ts=misTareasOtras.filter(t=>!asignadas.has(t.id)&&g.match(t));
+            if(ts.length>0){ ts.forEach(t=>asignadas.add(t.id)); grupos.push({...g,tareas:ts}); }
+          });
           return (
-            <div style={{marginBottom:20}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                <div style={{fontSize:13,fontWeight:700,color:"#fbbf24",letterSpacing:"0.5px"}}>🌿 Otras tareas del día</div>
-                <div style={{fontSize:11,color:"#5a9a7a"}}>
-                  {misTareasOtras.filter(t=>t.estado==="hecha").length}/{misTareasOtras.length} hechas
-                </div>
-              </div>
-              {GRUPOS.filter(g=>porGrupo[g.key]?.length>0).map(grupo=>{
-                const tareaGrupo = porGrupo[grupo.key];
-                const hechasGrupo = tareaGrupo.filter(t=>t.estado==="hecha").length;
-                const todasHechas = hechasGrupo===tareaGrupo.length;
-                // Usar un ID único para el estado de colapso — guardado en sessionStorage
-                const open = gruposAbiertos[grupo.key]!==false;
-                const toggle = () => toggleGrupo(grupo.key);
+            <div style={{marginBottom:14}}>
+              <div style={{fontSize:12,fontWeight:600,color:"#34d399",marginBottom:8,paddingLeft:2}}>🌿 Otras tareas del día</div>
+              {grupos.map(g=>{
+                const hechas=g.tareas.filter(t=>t.estado==="hecha").length;
+                const open=gruposAbiertos[g.key]!==false;
+                const col=hechas===g.tareas.length?"#22c55e":"#34d399";
                 return (
-                  <div key={grupo.key} style={{marginBottom:8}}>
-                    {/* Cabecera del grupo — siempre visible */}
-                    <div onClick={toggle}
-                      style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-                        padding:"10px 14px",borderRadius:open?`10px 10px 0 0`:"10px",
-                        background:todasHechas?"rgba(34,197,94,0.08)":"rgba(255,255,255,0.05)",
-                        border:`1px solid ${todasHechas?"rgba(34,197,94,0.2)":"rgba(255,255,255,0.1)"}`,
-                        cursor:"pointer",userSelect:"none"}}>
-                      <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <span style={{fontSize:16}}>{grupo.icon}</span>
-                        <span style={{fontSize:13,fontWeight:600,color:todasHechas?"#22c55e":"#ede9e0"}}>{grupo.label}</span>
-                        <span style={{fontSize:11,color:"#5a9a7a",background:"rgba(255,255,255,0.06)",padding:"1px 8px",borderRadius:20}}>
-                          {hechasGrupo}/{tareaGrupo.length}
-                        </span>
+                  <div key={g.key} style={{marginBottom:8,border:`1px solid rgba(255,255,255,${hechas===g.tareas.length?0.1:0.07})`,borderRadius:10,overflow:"hidden"}}>
+                    <div onClick={()=>toggleGrupo(g.key)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 12px",background:"rgba(255,255,255,0.03)",cursor:"pointer",userSelect:"none"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:7}}>
+                        <span>{g.icon}</span>
+                        <span style={{fontSize:13,fontWeight:600,color:col}}>{g.label}</span>
+                        <span style={{fontSize:10,color:"#5a9a7a",background:"rgba(255,255,255,0.05)",padding:"1px 6px",borderRadius:10}}>{hechas}/{g.tareas.length}</span>
                       </div>
-                      <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        {todasHechas&&<span style={{fontSize:11,color:"#22c55e"}}>✓ Listo</span>}
-                        <span style={{fontSize:12,color:"#5a9a7a",transition:"transform .2s",display:"inline-block",transform:open?"rotate(90deg)":"rotate(0deg)"}}>▶</span>
-                      </div>
+                      <span style={{color:"#4a7a5a",fontSize:11,transform:open?"rotate(90deg)":"rotate(0deg)",transition:"transform .2s",display:"inline-block"}}>▶</span>
                     </div>
-                    {/* Tareas del grupo — colapsables */}
                     {open&&(
-                      <div style={{border:"1px solid rgba(255,255,255,0.08)",borderTop:"none",borderRadius:"0 0 10px 10px",overflow:"hidden"}}>
-                        {tareaGrupo.map((t,i)=>{
-                          const est = ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente;
+                      <div>
+                        {g.tareas.map((t,i)=>{
+                          const est=ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente;
                           return (
-                            <div key={t.id} style={{padding:"10px 14px",background:i%2===0?"rgba(255,255,255,0.025)":"rgba(255,255,255,0.04)",borderBottom:i<tareaGrupo.length-1?"1px solid rgba(255,255,255,0.06)":"none"}}>
-                              <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",gap:8,marginBottom:8}}>
+                            <div key={t.id} style={{padding:"9px 12px",background:i%2===0?"transparent":"rgba(255,255,255,0.02)",borderTop:"1px solid rgba(255,255,255,0.04)"}}>
+                              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:5}}>
                                 <div style={{flex:1}}>
                                   <div style={{fontSize:13,fontWeight:600}}>{t.tarea?.replace("⛳ ","")}</div>
-                                  {t.elemento&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:2}}>{t.elemento}</div>}
+                                  {t.zona&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:1}}>📍 {t.zona}{t.elemento?` · ${t.elemento}`:""}</div>}
+                                  {t.metodoLimpieza&&<span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.08)",padding:"1px 8px",borderRadius:8,border:"1px solid rgba(251,191,36,0.2)",display:"inline-block",marginTop:3}}>{t.metodoLimpieza==="sopladora"?"🌬️ Sopladora":t.metodoLimpieza==="barrido"?"🧹 Barrido":"🌬️+🧹 Sopladora + Barrido"}</span>}
+                                  {t.notas&&<div style={{fontSize:11,color:"#5a8a6a",marginTop:2,fontStyle:"italic"}}>💡 {t.notas}</div>}
                                 </div>
-                                <span style={{fontSize:11,fontWeight:600,color:est.color,whiteSpace:"nowrap"}}>{est.icon} {est.label}</span>
+                                <span style={{fontSize:10,fontWeight:600,color:est.color,background:`${est.color}12`,padding:"2px 7px",borderRadius:8,border:`1px solid ${est.color}25`,whiteSpace:"nowrap",flexShrink:0}}>{est.icon} {est.label}</span>
                               </div>
-                              <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+                              <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                                 {Object.entries(ESTADOS_TAREA).map(([k,v])=>(
-                                  <button key={k} onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:k})}
-                                    style={{cursor:"pointer",border:`1px solid ${t.estado===k?v.color:"rgba(255,255,255,0.12)"}`,borderRadius:16,padding:"3px 10px",background:t.estado===k?v.bg:"transparent",color:t.estado===k?v.color:"#6aaa7a",fontSize:11,fontFamily:"'Georgia',serif"}}>
+                                  <button key={k} onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:k,notaWorker:k!=="no_pudo"?t.notaWorker:""})}
+                                    style={{cursor:"pointer",border:`1px solid ${t.estado===k?v.color+"50":"rgba(255,255,255,0.08)"}`,borderRadius:8,padding:"3px 9px",fontSize:11,background:t.estado===k?`${v.color}12`:"transparent",color:t.estado===k?v.color:"#6aaa7a",fontFamily:"'Georgia',serif"}}>
                                     {v.icon} {v.label}
                                   </button>
                                 ))}
                               </div>
-                              {esRiegoOCorte(t.tarea)&&t.estado!=="hecha"&&(
-                                <button onClick={()=>handleHumedad(t)}
-                                  style={{marginTop:6,cursor:"pointer",border:"1px solid rgba(96,165,250,0.3)",borderRadius:8,padding:"3px 10px",background:"rgba(96,165,250,0.08)",color:"#93c5fd",fontSize:11,fontFamily:"'Georgia',serif"}}>
-                                  💧 Terreno húmedo
-                                </button>
-                              )}
                               {t.estado==="no_pudo"&&(
-                                <div style={{marginTop:6}}>
-                                  <textarea
-                                    rows={2}
-                                    placeholder="¿Por qué no se pudo? (obligatorio)"
-                                    value={t.notaWorker||""}
-                                    onChange={e=>onUpdateTarea(fechaVer,t.id,{notaWorker:e.target.value})}
-                                    style={{width:"100%",background:"rgba(239,68,68,0.08)",border:`1px solid ${t.notaWorker?"rgba(239,68,68,0.4)":"rgba(239,68,68,0.6)"}`,borderRadius:8,color:"#fca5a5",padding:"7px 10px",fontFamily:"'Georgia',serif",fontSize:12,resize:"vertical",outline:"none",boxSizing:"border-box"}}
-                                  />
-                                  {!t.notaWorker&&<div style={{fontSize:10,color:"#ef4444",marginTop:2}}>⚠️ Explica el motivo para registrar esta tarea</div>}
+                                <div style={{marginTop:5}}>
+                                  <textarea rows={2} placeholder="¿Por qué no se pudo? (obligatorio)" value={t.notaWorker||""} onChange={e=>onUpdateTarea(fechaVer,t.id,{notaWorker:e.target.value})} style={{width:"100%",background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:8,color:"#ede9e0",padding:"6px 10px",fontFamily:"'Georgia',serif",fontSize:12,resize:"vertical"}}/>
+                                  {!t.notaWorker&&<div style={{fontSize:10,color:"#ef4444",marginTop:2}}>⚠️ Motivo obligatorio</div>}
                                 </div>
                               )}
-                              {t.notaWorker&&t.estado!=="no_pudo"&&<div style={{fontSize:11,color:"#f59e0b",marginTop:4,fontStyle:"italic"}}>💬 {t.notaWorker}</div>}
+                              {t.notaWorker&&t.estado!=="no_pudo"&&<div style={{fontSize:11,color:"#f59e0b",marginTop:3,fontStyle:"italic"}}>💬 {t.notaWorker}</div>}
                             </div>
                           );
                         })}
@@ -2311,25 +2061,77 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
           );
         })()}
 
+        {/* ══════════════════════════════════════════════════════════
+             SECCIÓN 4 — TAREA EMERGENTE
+             ══════════════════════════════════════════════════════════ */}
+        {fechaVer===hoy&&(
+          <div style={{marginBottom:14}}>
+            {!showEmergente?(
+              <button onClick={()=>setShowEmergente(true)}
+                style={{width:"100%",cursor:"pointer",border:"1px dashed rgba(255,255,255,0.15)",borderRadius:10,padding:"10px",background:"transparent",color:"#5a8a6a",fontFamily:"'Georgia',serif",fontSize:12}}>
+                ➕ Agregar tarea emergente del turno
+              </button>
+            ):(
+              <div style={{border:"1px solid rgba(251,191,36,0.25)",borderRadius:10,padding:"12px 14px",background:"rgba(251,191,36,0.04)"}}>
+                <div style={{fontSize:13,fontWeight:600,color:"#fbbf24",marginBottom:10}}>➕ Tarea emergente</div>
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  <div>
+                    <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px",textTransform:"uppercase"}}>Zona</label>
+                    <select style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.14)",borderRadius:8,color:"#ede9e0",padding:"8px 12px",fontFamily:"'Georgia',serif",fontSize:13,outline:"none"}}
+                      value={emergenteForm.zona} onChange={e=>setEmergenteForm(p=>({...p,zona:e.target.value,tarea:""}))}>
+                      <option value="">Seleccionar zona...</option>
+                      {[...new Set((Array.isArray(tareas)?tareas:Object.values(tareas||{}).flat()).map(t=>t.zona).filter(Boolean))].sort().map(z=><option key={z} value={z}>{z}</option>)}
+                      <option value="Otra">Otra zona</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px",textTransform:"uppercase"}}>Descripción</label>
+                    <input style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.14)",borderRadius:8,color:"#ede9e0",padding:"8px 12px",fontFamily:"'Georgia',serif",fontSize:13,outline:"none",boxSizing:"border-box"}}
+                      placeholder="¿Qué tarea surgió?"
+                      value={emergenteForm.tarea} onChange={e=>setEmergenteForm(p=>({...p,tarea:e.target.value}))}/>
+                  </div>
+                  <div>
+                    <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px",textTransform:"uppercase"}}>Observaciones (opcional)</label>
+                    <input style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.14)",borderRadius:8,color:"#ede9e0",padding:"8px 12px",fontFamily:"'Georgia',serif",fontSize:13,outline:"none",boxSizing:"border-box"}}
+                      placeholder="Detalles adicionales..."
+                      value={emergenteForm.obs||""} onChange={e=>setEmergenteForm(p=>({...p,obs:e.target.value}))}/>
+                  </div>
+                  <div style={{display:"flex",gap:8}}>
+                    <button onClick={()=>{
+                      if(!emergenteForm.tarea.trim()) return;
+                      onAddTarea({id:Date.now(),fecha:fechaVer,tarea:emergenteForm.tarea,responsable:trabajador.nombre,zona:emergenteForm.zona||"Sin zona",estado:"hecha",notas:emergenteForm.obs||"Tarea emergente del turno",auto:false});
+                      setEmergenteForm({zona:"",tarea:"",obs:""});
+                      setShowEmergente(false);
+                    }} style={{cursor:"pointer",border:"none",borderRadius:10,padding:"8px 18px",background:"#3d7a52",color:"#fff",fontSize:13,fontFamily:"'Georgia',serif",fontWeight:600}}>
+                      ✓ Guardar
+                    </button>
+                    <button onClick={()=>{setShowEmergente(false);setEmergenteForm({zona:"",tarea:"",obs:""});}}
+                      style={{cursor:"pointer",border:"1px solid rgba(255,255,255,0.15)",borderRadius:10,padding:"8px 14px",background:"transparent",color:"#6aaa7a",fontSize:13,fontFamily:"'Georgia',serif"}}>
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Sin tareas */}
-        {misTargets.length===0 && (
-          <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:14,padding:32,textAlign:"center",color:"#4a8a5a"}}>
+        {misTargets.length===0&&(
+          <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:"32px 20px",textAlign:"center",marginBottom:14}}>
             <div style={{fontSize:36,marginBottom:10}}>🌿</div>
             <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,marginBottom:6}}>Sin tareas asignadas</div>
-            <div style={{fontSize:13,marginBottom:12}}>No hay tareas para este día o aún no han sido asignadas.</div>
-            {(tareas[fechaVer]||[]).length > 0 && (
-              <div style={{background:"rgba(255,255,255,0.05)",borderRadius:10,padding:"10px 14px",textAlign:"left",fontSize:12,color:"#6aaa7a"}}>
-                <div style={{marginBottom:6,fontWeight:600}}>Tareas del día ({(tareas[fechaVer]||[]).length} total):</div>
+            <div style={{fontSize:13,marginBottom:12,color:"#5a8a6a"}}>No hay tareas para este día o aún no están designadas.</div>
+            {(tareas[fechaVer]||[]).length>0&&(
+              <div style={{background:"rgba(255,255,255,0.05)",borderRadius:10,padding:"10px 14px",textAlign:"left",fontSize:12}}>
+                <div style={{marginBottom:6,fontWeight:600,color:"#6aaa7a"}}>Tareas del día ({(tareas[fechaVer]||[]).length}):</div>
                 {(tareas[fechaVer]||[]).slice(0,5).map((t,i)=>(
-                  <div key={i} style={{padding:"3px 0",borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
-                    <span style={{color:normalizar(t.responsable)===normalizar(trabajador.nombre)?"#22c55e":"#ef4444"}}>
-                      {normalizar(t.responsable)===normalizar(trabajador.nombre)?"✓":"✗"}
-                    </span>
+                  <div key={i} style={{padding:"3px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                    <span style={{color:normalizar(t.responsable)===normalizar(trabajador.nombre)?"#4ade80":"#ef4444"}}>{normalizar(t.responsable)===normalizar(trabajador.nombre)?"✓":"✗"}</span>
                     {" "}{t.tarea} — <span style={{color:"#94a3b8"}}>"{t.responsable||"sin asignar"}"</span>
                   </div>
                 ))}
-                {(tareas[fechaVer]||[]).length > 5 && <div style={{marginTop:4,color:"#5a7a6a"}}>...y {(tareas[fechaVer]||[]).length-5} más</div>}
-                <div style={{marginTop:8,fontSize:11,color:"#4a6a5a"}}>Tu nombre registrado: <b style={{color:"#a0c8a0"}}>"{trabajador.nombre}"</b></div>
+                <div style={{marginTop:8,fontSize:11,color:"#4a6a5a"}}>Tu nombre: "{trabajador.nombre}"</div>
               </div>
             )}
           </div>
@@ -12129,7 +11931,7 @@ export default function App() {
                     const ok=["infraestructura","sistemas","pavimentos","mobiliario","bodegas"];
                     return(<>
                       <optgroup label="🌿 Vegetación">{vk.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup>
-                      <optgroup label="🏗️ Infraestructura">{ok.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup>
+                      <optgroup label="🏗️ Infraestructura / Pavimentos">{ok.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup>
                     </>);
                   })()}
                 </select>
@@ -12608,7 +12410,7 @@ export default function App() {
                           }}
                           style={{...S.input,flex:"2 1 200px"}}/>
                         <select value={newElem.tipo} onChange={e=>setNewElem(p=>({...p,tipo:e.target.value}))} style={{...S.input,flex:"1 1 150px",maxWidth:210}}>
-                          {(()=>{const vk=["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];const ok=["infraestructura","sistemas","pavimentos","mobiliario","bodegas"];return(<><optgroup label="🌿 Vegetación">{vk.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup><optgroup label="🏗️ Infraestructura">{ok.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup></>);})()}
+                          {(()=>{const vk=["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];const ok=["infraestructura","sistemas","pavimentos","mobiliario","bodegas"];return(<><optgroup label="🌿 Vegetación">{vk.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup><optgroup label="🏗️ Infraestructura / Pavimentos">{ok.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup></>);})()}
                         </select>
                       </div>
                       <div style={{display:"flex",gap:8,alignItems:"center"}}>
