@@ -7524,6 +7524,8 @@ const DECISIONES_HUM=[
 ];
 
 function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasProg, setTareasProg, showHumForm, setShowHumForm, humForm, setHumForm, emptyHumForm, onRegistroGuardado, crearNotificacion }) {
+  // Auto-abrir formulario para trabajador
+  React.useEffect(()=>{ if(!esJefa && !showHumForm) setShowHumForm(true); },[esJefa]);
   const humedades = Array.isArray(golfData.humedades)?golfData.humedades:Object.values(golfData.humedades||{});
   const setHumedades = (arr) => setG({humedades:arr});
   const labelSt = {fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
@@ -7590,7 +7592,6 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
           </button>
         )}
       </div>
-      {!esJefa&&!showHumForm&&setShowHumForm(true)&&null}
       {esJefa&&<div style={{...S.card,padding:"10px 14px",marginBottom:14,display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
         <span style={{fontSize:11,color:"#5a9a7a",marginRight:4}}>Escala:</span>
         {[{v:1,l:"1-2 Seco",c:"#ef4444"},{v:3,l:"3-5 Ajustar",c:"#f59e0b"},{v:6,l:"6-7 Óptimo",c:"#22c55e"},{v:8,l:"8 Saturado",c:"#3b82f6"}].map(({v,l,c})=>(
@@ -8399,6 +8400,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
 
   const [subTabZona, setSubTabZona] = React.useState(null);
   const [subTab, setSubTab] = React.useState(initialSubTab||(rolLogueado==="trabajador"?"mediciones":"panel"));
+  // Auto-abrir formulario de medición para trabajador
+  React.useEffect(()=>{ if(rolLogueado==="trabajador" && subTab==="mediciones" && !showMedForm) setShowMedForm(true); },[subTab, rolLogueado]);
   // Exponer para acceso rápido desde VistaWorker
   React.useEffect(()=>{ window.__golfSubTab = setSubTab; return ()=>{ window.__golfSubTab=null; }; },[]);
 
@@ -9684,7 +9687,6 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               <button className="btn-p" style={S.btn} onClick={()=>setShowMedForm(true)}>📏 Nueva medición</button>
             </div>
           )}
-          {!esJefa&&!showMedForm&&setShowMedForm(true)&&null}
 
           {showMedForm&&(
             <div style={{...S.card,padding:20,marginBottom:14,background:"rgba(52,211,153,0.04)",borderColor:"rgba(52,211,153,0.2)"}} className="ein">
@@ -12843,11 +12845,13 @@ export default function App() {
                   S={S}
                   MACROZONAS_BASE={MACROZONAS_BASE}
                   onUpdateTarea={(fecha,tid,patch)=>{
-                    // Si marca no_pudo sin nota, solo actualizar estado pero no cerrar — textarea pedirá explicación
                     setTareasProg(prev=>{
-                      const updated={...prev,[fecha]:(prev[fecha]||[]).map(t=>t.id===tid?{...t,...patch}:t)};
+                      // Normalizar: Firebase puede devolver objeto en vez de array
+                      const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+                      const updated={...prev,[fecha]:normArr(prev[fecha]).map(t=>t.id===tid?{...t,...patch}:t)};
                       if(patch.estado==="no_pudo"||patch.estado==="hecha"||patch.estado==="haciendose"){
-                        const tarea=(prev[fecha]||[]).find(t=>t.id===tid);
+                        const normArr2 = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+                        const tarea=normArr2(prev[fecha]).find(t=>t.id===tid);
                         if(tarea){const z=MACROZONAS_BASE.find(z=>z.nombre===tarea.zona);if(z){const ico=patch.estado==="no_pudo"?"🔴":patch.estado==="hecha"?"✅":"🔵";addHistorial(z.id,`${ico} [${tarea.responsable||"?"}] ${tarea.tarea}${tarea.elemento?" — "+tarea.elemento:""}${patch.estado==="no_pudo"&&patch.notaWorker?": "+patch.notaWorker:""}`);}}
                       }
                       return updated;
@@ -12872,7 +12876,10 @@ export default function App() {
                   onSetFrecs={setElemFrecs}
                   onAddTarea={(nuevaTarea)=>{
                     const hoyKey=nuevaTarea.fecha||new Date().toISOString().slice(0,10);
-                    setTareasProg(prev=>({...prev,[hoyKey]:[...(prev[hoyKey]||[]),nuevaTarea]}));
+                    setTareasProg(prev=>{
+                      const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+                      return {...prev,[hoyKey]:[...normArr(prev[hoyKey]),nuevaTarea]};
+                    });
                     const z=MACROZONAS_BASE.find(z=>z.nombre===nuevaTarea.zona);
                     if(z) addHistorial(z.id,`🆕 [${nuevaTarea.responsable}] Tarea emergente: ${nuevaTarea.tarea}`);
                   }}
