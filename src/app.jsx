@@ -12342,101 +12342,123 @@ export default function App() {
               <div className="ein">
                 {(()=>{
                   const todosElems = getAllElems(zonaId);
-                  const VEGE_KEYS = ["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
+                  const VEGE_KEYS  = ["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
                   const INFRA_KEYS = ["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","bodegas"];
                   const vegeElems  = todosElems.filter(e=>VEGE_KEYS.includes(e.tipo));
                   const infraElems = todosElems.filter(e=>INFRA_KEYS.includes(e.tipo));
                   const otrosElems = todosElems.filter(e=>!VEGE_KEYS.includes(e.tipo)&&!INFRA_KEYS.includes(e.tipo));
 
-                  const SeccionGrupo = ({titulo, icono, color, borderColor, elems, subKeys}) => {
-                    if(elems.length===0) return null;
-                    return (
-                      <div style={{marginBottom:24}}>
-                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12,paddingBottom:8,borderBottom:`1px solid ${borderColor}`}}>
-                          <span style={{fontSize:20}}>{icono}</span>
-                          <span style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,color}}>{titulo}</span>
-                          <span style={{fontSize:11,color:"#5aaa70",background:"rgba(255,255,255,0.05)",padding:"1px 8px",borderRadius:10}}>{elems.length} elementos</span>
+                  return (<>
+                    {/* ── VEGETACIÓN ── */}
+                    {vegeElems.length>0&&(
+                      <div style={{marginBottom:20}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12,paddingBottom:8,borderBottom:"1px solid rgba(34,197,94,0.2)"}}>
+                          <span style={{fontSize:18}}>🌿</span>
+                          <span style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#86efac"}}>Vegetación</span>
+                          <span style={{fontSize:11,color:"#4ade80",background:"rgba(34,197,94,0.1)",padding:"1px 8px",borderRadius:10}}>{vegeElems.length} elementos</span>
                         </div>
-                        {subKeys ? (
-                          // Agrupar por subcategoría
-                          subKeys.map(subKey=>{
-                            const subMeta=CATEGORIAS_ELEM[subKey];
-                            const subElems=elems.filter(e=>e.tipo===subKey);
+                        {VEGE_KEYS.map(subKey=>{
+                          const subElems=vegeElems.filter(e=>e.tipo===subKey);
+                          if(subElems.length===0) return null;
+                          const subMeta=CATEGORIAS_ELEM[subKey];
+                          return (
+                            <div key={subKey} style={{marginBottom:12,paddingLeft:10,borderLeft:`2px solid ${subMeta.color}30`}}>
+                              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                                <span style={{fontSize:13}}>{subMeta.icon}</span>
+                                <span style={{fontSize:12,fontWeight:600,color:subMeta.color}}>{subMeta.label}</span>
+                                <span style={{fontSize:11,color:"#5aaa70"}}>({subElems.length})</span>
+                              </div>
+                              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                                {subElems.map(e=>renderElemCard(e))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* ── INFRAESTRUCTURA — colapsable ── */}
+                    {infraElems.length>0&&(
+                      <div style={{marginBottom:20}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:0,paddingBottom:8,borderBottom:"1px solid rgba(245,158,11,0.2)",cursor:"pointer",userSelect:"none"}}
+                          onClick={()=>{
+                            const el=document.getElementById(`infra-${zonaId}`);
+                            if(el) el.style.display=el.style.display==="none"?"block":"none";
+                            const arr=document.getElementById(`infra-arr-${zonaId}`);
+                            if(arr) arr.style.transform=arr.style.transform==="rotate(0deg)"?"rotate(-90deg)":"rotate(0deg)";
+                          }}>
+                          <span style={{fontSize:18}}>🏗️</span>
+                          <span style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#fcd34d"}}>Infraestructura</span>
+                          <span style={{fontSize:11,color:"#f59e0b",background:"rgba(245,158,11,0.1)",padding:"1px 8px",borderRadius:10}}>{infraElems.length} elementos</span>
+                          <span id={`infra-arr-${zonaId}`} style={{marginLeft:"auto",fontSize:12,color:"#6aaa7a",transition:"transform .2s",display:"inline-block",transform:"rotate(0deg)"}}>▼</span>
+                        </div>
+                        <div id={`infra-${zonaId}`} style={{display:"none",marginTop:8}}>
+                          {INFRA_KEYS.map(subKey=>{
+                            const subElems=infraElems.filter(e=>e.tipo===subKey);
                             if(subElems.length===0) return null;
+                            const subMeta=CATEGORIAS_ELEM[subKey];
                             return (
-                              <div key={subKey} style={{marginBottom:14,paddingLeft:12,borderLeft:`2px solid ${subMeta.color}30`}}>
-                                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
-                                  <span style={{fontSize:14}}>{subMeta.icon}</span>
-                                  <span style={{fontSize:13,fontWeight:600,color:subMeta.color}}>{subMeta.label}</span>
+                              <div key={subKey} style={{marginBottom:10,paddingLeft:10,borderLeft:`2px solid ${subMeta.color}30`}}>
+                                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                                  <span style={{fontSize:13}}>{subMeta.icon}</span>
+                                  <span style={{fontSize:12,fontWeight:600,color:subMeta.color}}>{subMeta.label}</span>
                                   <span style={{fontSize:11,color:"#5aaa70"}}>({subElems.length})</span>
                                 </div>
-                                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                                <div style={{display:"flex",flexDirection:"column",gap:6}}>
                                   {subElems.map(e=>renderElemCard(e))}
                                 </div>
                               </div>
                             );
-                          })
-                        ) : (
-                          <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                            {elems.map(e=>renderElemCard(e))}
-                          </div>
-                        )}
+                          })}
+                        </div>
                       </div>
-                    );
-                  };
+                    )}
 
-                  return (<>
-                    <SeccionGrupo
-                      titulo="Vegetación" icono="🌿" color="#86efac"
-                      borderColor="rgba(34,197,94,0.2)"
-                      elems={vegeElems} subKeys={VEGE_KEYS}/>
-                    <SeccionGrupo
-                      titulo="Infraestructura" icono="🏗️" color="#f59e0b"
-                      borderColor="rgba(245,158,11,0.2)"
-                      elems={infraElems} subKeys={INFRA_KEYS}/>
+                    {/* ── OTROS ── */}
                     {otrosElems.length>0&&(
-                      <div style={{marginBottom:22}}>
-                        <div style={{fontSize:14,fontWeight:600,color:"#6aaa7a",marginBottom:10}}>🔹 Otros</div>
-                        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                      <div style={{marginBottom:16}}>
+                        <div style={{fontSize:13,fontWeight:600,color:"#6aaa7a",marginBottom:8}}>🔹 Otros</div>
+                        <div style={{display:"flex",flexDirection:"column",gap:6}}>
                           {otrosElems.map(e=>renderElemCard(e))}
                         </div>
                       </div>
                     )}
                   </>);
                 })()}
-                {getAllElems(zonaId).filter(e=>!CATEGORIAS_ELEM[e.tipo]).length>0&&(
-                  <div style={{marginBottom:22}}>
-                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,marginBottom:12}}>🔹 Otros</div>
-                    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:10}}>
-                      {getAllElems(zonaId).filter(e=>!CATEGORIAS_ELEM[e.tipo]).map(e=>renderElemCard(e))}
-                    </div>
-                  </div>
-                )}
-                <div style={{...S.card,padding:18,marginTop:8}}>
+
+                {/* ── AGREGAR ELEMENTO ── */}
+                <div style={{...S.card,padding:14,marginTop:8}}>
                   {!showAddElem?(
-                    <button style={{...S.btn,background:"rgba(61,122,82,0.25)",color:"#90d0a0",border:"1px solid rgba(61,122,82,0.35)"}} onClick={()=>setShowAddElem(true)}>➕ Agregar elemento a esta zona</button>
+                    <button style={{...S.btn,background:"rgba(61,122,82,0.2)",color:"#90d0a0",border:"1px solid rgba(61,122,82,0.3)",width:"100%",justifyContent:"center"}} onClick={()=>setShowAddElem(true)}>
+                      ➕ Agregar elemento a esta zona
+                    </button>
                   ):(
                     <div style={{background:"rgba(61,122,82,0.06)",border:"1px solid rgba(61,122,82,0.2)",borderRadius:10,padding:"14px 16px"}}>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-                        <span style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#90d0a0"}}>➕ Agregar elementos</span>
-                        <span style={{fontSize:11,color:"#5a8a6a"}}>Puedes agregar varios seguidos</span>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                        <span style={{fontSize:13,fontWeight:600,color:"#90d0a0"}}>➕ Agregar elementos</span>
+                        <span style={{fontSize:11,color:"#5a8a6a"}}>Enter para agregar seguidos</span>
                       </div>
                       <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
                         <input
-                          autoFocus
-                          placeholder="Nombre del elemento... (ej: Palma chilena)"
+                          placeholder="Nombre del elemento..."
                           value={newElem.nombre}
                           onChange={e=>setNewElem(p=>({...p,nombre:e.target.value}))}
                           onKeyDown={e=>{
                             if(e.key==="Enter"&&newElem.nombre.trim()){
                               addCustomElem(zonaId,newElem);
                               setNewElem(p=>({...p,nombre:""}));
-                              e.target.focus();
                             }
                           }}
                           style={{...S.input,flex:"2 1 200px"}}/>
                         <select value={newElem.tipo} onChange={e=>setNewElem(p=>({...p,tipo:e.target.value}))} style={{...S.input,flex:"1 1 150px",maxWidth:210}}>
-                          {(()=>{const vk=["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];const ok=["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","bodegas"];return(<><optgroup label="🌿 Vegetación">{vk.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup><optgroup label="🏗️ Infraestructura / Pavimentos">{ok.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup></>);})()}
+                          {(()=>{
+                            const vk=["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
+                            const ok=["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","bodegas"];
+                            return(<>
+                              <optgroup label="🌿 Vegetación">{vk.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup>
+                              <optgroup label="🏗️ Infraestructura">{ok.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup>
+                            </>);
+                          })()}
                         </select>
                       </div>
                       <div style={{display:"flex",gap:8,alignItems:"center"}}>
@@ -12444,7 +12466,6 @@ export default function App() {
                           if(newElem.nombre.trim()){
                             addCustomElem(zonaId,newElem);
                             setNewElem(p=>({...p,nombre:""}));
-                            // NO cerrar — limpiar solo el nombre para seguir agregando
                           }
                         }}>✓ Agregar</button>
                         <span style={{fontSize:11,color:"#4a7a5a"}}>o presiona Enter</span>
