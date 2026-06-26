@@ -683,8 +683,9 @@ const MACROZONAS_BASE = [
   {
     id: 38, nombre: "Cancha de Fútbol Sintética", categoria: "Deportivo", icono: "🥅",
     elementos: [
-      { id: "e1", nombre: "Césped sintético", tipo: "cesped" },
-      { id: "e2", nombre: "Relleno de caucho / arena", tipo: "pavimentos" },
+      { id: "e1", nombre: "Césped sintético", tipo: "cesped_sintetico" },
+      { id: "e2", nombre: "Relleno EPDM / caucho", tipo: "cesped_sintetico" },
+      { id: "e7", nombre: "Marcaciones / líneas campo", tipo: "cesped_sintetico" },
       { id: "e3", nombre: "Jardines perimetrales", tipo: "arbustos" },
       { id: "e4", nombre: "Luminarias LED cancha", tipo: "infraestructura" },
       { id: "e5", nombre: "Malla perimetral", tipo: "infraestructura" },
@@ -11940,7 +11941,7 @@ export default function App() {
                   onChange={ev=>setEditElem(p=>({...p,tipoEdit:ev.target.value}))}>
                   {(()=>{
                     const vk=["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
-                    const ok=["infraestructura","sistemas","pavimentos","mobiliario","bodegas"];
+                    const ok=["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","bodegas"];
                     return(<>
                       <optgroup label="🌿 Vegetación">{vk.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup>
                       <optgroup label="🏗️ Infraestructura / Pavimentos">{ok.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup>
@@ -12422,7 +12423,7 @@ export default function App() {
                           }}
                           style={{...S.input,flex:"2 1 200px"}}/>
                         <select value={newElem.tipo} onChange={e=>setNewElem(p=>({...p,tipo:e.target.value}))} style={{...S.input,flex:"1 1 150px",maxWidth:210}}>
-                          {(()=>{const vk=["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];const ok=["infraestructura","sistemas","pavimentos","mobiliario","bodegas"];return(<><optgroup label="🌿 Vegetación">{vk.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup><optgroup label="🏗️ Infraestructura / Pavimentos">{ok.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup></>);})()}
+                          {(()=>{const vk=["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];const ok=["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","bodegas"];return(<><optgroup label="🌿 Vegetación">{vk.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup><optgroup label="🏗️ Infraestructura / Pavimentos">{ok.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup></>);})()}
                         </select>
                       </div>
                       <div style={{display:"flex",gap:8,alignItems:"center"}}>
