@@ -7680,7 +7680,26 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
         if(esHumedad && (esDelResponsable || !respHum)) return {...t, estado:"hecha"};
         return t;
       });
-      return {...prev, [fechaHum]: actualizadas};
+      // Si no existía tarea de humedad, crear una como hecha
+      const yaMarcadaH = actualizadas.some(t =>
+        ["hecha","completada"].includes(t.estado) &&
+        (t.tarea||"").toLowerCase().includes("humedad")
+      );
+      const listaFinalH = yaMarcadaH ? actualizadas : [
+        ...actualizadas,
+        {
+          id: Date.now()+Math.random(),
+          fecha: fechaHum,
+          tarea: "💧 Registro de humedad greens",
+          zona: "Golf",
+          responsable: humForm.responsable||"",
+          estado: "hecha",
+          notas: `Motivo: ${humForm.motivo||"rutina"}. ${humForm.obs||""}`.trim(),
+          auto: true,
+          esDiario: true,
+        }
+      ];
+      return {...prev, [fechaHum]: listaFinalH};
     });
     setHumForm(emptyHumForm);
     setShowHumForm(false);
@@ -7700,33 +7719,37 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
 
   return (
     <div className="ein">
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",marginBottom:16,flexWrap:"wrap",gap:12}}>
+      {/* Header con volver para trabajador */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:8}}>
         <div>
-          <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:900,marginBottom:4}}>💧 Humedad de Greens</h2>
-          <div style={{fontSize:13,color:"#6aaa7a"}}>
-            Estación: <strong style={{color:sectorColor}}>{ESTACIONES[estacionActual]?.icon} {ESTACIONES[estacionActual]?.label}</strong>
-            {" · "}Medir sector <strong style={{color:sectorColor}}>{sectorLabel}</strong>
-          </div>
+          <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:900,marginBottom:2}}>💧 Registrar humedad</h2>
+          {esJefa&&<div style={{fontSize:12,color:"#6aaa7a"}}>Estación: <strong style={{color:sectorColor}}>{ESTACIONES[estacionActual]?.icon} {ESTACIONES[estacionActual]?.label}</strong>{" · "}Sector: <strong style={{color:sectorColor}}>{sectorLabel}</strong></div>}
         </div>
-        {esJefa&&<button className="btn-p" style={S.btn} onClick={()=>setShowHumForm(true)}>💧 Nueva medición</button>}
         {!esJefa&&(
           <button onClick={()=>{if(onRegistroGuardado)onRegistroGuardado("miturno");}}
             style={{cursor:"pointer",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,padding:"6px 14px",background:"transparent",color:"#6aaa7a",fontSize:12,fontFamily:"'Georgia',serif"}}>
             ← Volver a Mi Turno
           </button>
         )}
+        {esJefa&&<button className="btn-p" style={S.btn} onClick={()=>setShowHumForm(true)}>💧 Nueva medición</button>}
       </div>
-      {esJefa&&(<><div style={{...S.card,padding:"10px 14px",marginBottom:14,display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
-        <span style={{fontSize:11,color:"#5a9a7a",marginRight:4}}>Escala:</span>
-        {[{v:1,l:"1-2 Seco",c:"#ef4444"},{v:3,l:"3-5 Ajustar",c:"#f59e0b"},{v:6,l:"6-7 Óptimo",c:"#22c55e"},{v:8,l:"8 Saturado",c:"#3b82f6"}].map(({v,l,c})=>(
-          <span key={v} style={{fontSize:11,background:`${c}15`,color:c,border:`1px solid ${c}35`,padding:"2px 8px",borderRadius:20,fontWeight:600}}>{l}</span>
-        ))}
-        <span style={{fontSize:10,color:"#4a7a5a",marginLeft:4}}>· Sector: {sectorLabel}</span>
-      </div></>)}
+
+      {/* Escala — solo jefa */}
+      {esJefa&&(
+        <div style={{...S.card,padding:"10px 14px",marginBottom:14,display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+          <span style={{fontSize:11,color:"#5a9a7a",marginRight:4}}>Escala:</span>
+          {[{v:1,l:"1-2 Seco",c:"#ef4444"},{v:3,l:"3-5 Ajustar",c:"#f59e0b"},{v:6,l:"6-7 Óptimo",c:"#22c55e"},{v:8,l:"8 Saturado",c:"#3b82f6"}].map(({v,l,c})=>(
+            <span key={v} style={{fontSize:11,background:`${c}15`,color:c,border:`1px solid ${c}30`,borderRadius:6,padding:"1px 8px"}}>{l}</span>
+          ))}
+          <span style={{fontSize:10,color:"#4a7a5a",marginLeft:4}}>· Sector: {sectorLabel}</span>
+        </div>
+      )}
+
+      {/* Formulario de medición */}
       {showHumForm&&(
-        <div style={{...S.card,padding:20,marginBottom:16,background:"rgba(96,165,250,0.04)",borderColor:"rgba(96,165,250,0.2)"}} className="ein">
-          <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#60a5fa",marginBottom:14}}>
-            💧 Nueva medición — sector {sectorLabel}
+        <div style={{...S.card,padding:20,marginBottom:16,background:"rgba(96,165,250,0.04)"}}>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#60a5fa",marginBottom:14,fontWeight:700}}>
+            💧 {esJefa?"Nueva medición de humedad — sector "+sectorLabel:"Registrar humedad"}
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
             <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={humForm.fecha} onChange={e=>setHumForm(p=>({...p,fecha:e.target.value}))}/></div>
@@ -7743,16 +7766,14 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
               </select>
             </div>
           </div>
-          <div style={{fontSize:11,color:"#60a5fa",fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.5px"}}>
-            Valores — sector {sectorLabel}
-          </div>
           <div style={{overflowX:"auto",marginBottom:14}}>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
               <thead>
                 <tr style={{background:"rgba(96,165,250,0.1)"}}>
-                  {["Green","Humedad (1-8)","Interpretación","Obs"].map(h=>(
-                    <th key={h} style={{padding:"6px 10px",textAlign:"left",color:"#60a5fa",fontSize:10}}>{h.toUpperCase()}</th>
-                  ))}
+                  <th style={{padding:"6px 10px",textAlign:"left",color:"#60a5fa",fontSize:10}}>GREEN</th>
+                  <th style={{padding:"6px 10px",textAlign:"center",color:"#60a5fa",fontSize:10}}>HUMEDAD (1-8)</th>
+                  {esJefa&&<th style={{padding:"6px 10px",textAlign:"left",color:"#60a5fa",fontSize:10}}>INTERPRETACIÓN</th>}
+                  <th style={{padding:"6px 10px",textAlign:"left",color:"#60a5fa",fontSize:10}}>OBS</th>
                 </tr>
               </thead>
               <tbody>
@@ -7766,7 +7787,7 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
                         <div style={{fontWeight:600,color:"#34d399",fontSize:12}}>{g.nombre}</div>
                         {g.hoyos&&<div style={{fontSize:9,color:"#4a7a5a"}}>{g.hoyos}</div>}
                       </td>
-                      <td style={{padding:"6px 8px"}}>
+                      <td style={{padding:"6px 8px",textAlign:"center"}}>
                         <input type="number" min="1" max="8" step="1"
                           style={{...S.input,width:60,fontSize:15,fontWeight:700,textAlign:"center",
                             borderColor:info?info.color:"rgba(255,255,255,0.14)",
@@ -7783,15 +7804,17 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
                           }}
                           placeholder="—"/>
                       </td>
-                      {esJefa&&<td style={{padding:"6px 8px"}}>
-                        {info?(
-                          <span style={{fontSize:11,fontWeight:600,color:info.color}}>
-                            {info.label}<br/><span style={{fontSize:9,fontWeight:400}}>{info.accion}</span>
-                          </span>
-                        ):(
-                          <span style={{fontSize:11,color:"#3a6a5a"}}>—</span>
-                        )}
-                      </td>}
+                      {esJefa&&(
+                        <td style={{padding:"6px 8px"}}>
+                          {info?(
+                            <span style={{fontSize:11,fontWeight:600,color:info.color}}>
+                              {info.label}<br/><span style={{fontSize:9,fontWeight:400}}>{info.accion}</span>
+                            </span>
+                          ):(
+                            <span style={{fontSize:11,color:"#3a6a5a"}}>—</span>
+                          )}
+                        </td>
+                      )}
                       <td style={{padding:"6px 8px"}}>
                         <input style={{...S.input,fontSize:11,padding:"4px 8px"}} placeholder="obs..."
                           value={g.id==="vivero"?(humForm.obsVivero||""):(humForm.valores[g.id]?.obs||"")}
@@ -7806,33 +7829,32 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
               </tbody>
             </table>
           </div>
+          {/* Decisión — solo jefa */}
           {esJefa&&(
-          <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"12px 14px",marginBottom:14}}>
-            <div style={{fontSize:11,color:"#6aaa7a",fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.5px"}}>📋 Decisión resultante</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-              <div>
-                <label style={labelSt}>Acción</label>
-                <select style={S.input} value={humForm.decision} onChange={e=>setHumForm(p=>({...p,decision:e.target.value}))}>
-                  {DECISIONES_HUM.map(d=><option key={d.value} value={d.value}>{d.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={labelSt}>Observaciones</label>
-                <input style={S.input} value={humForm.obs} onChange={e=>setHumForm(p=>({...p,obs:e.target.value}))} placeholder="Condiciones del día..."/>
-              </div>
-            </div>
-            {(humForm.decision==="cerrar-cancha"||humForm.decision==="abrir-cancha"||humForm.decision==="riego-urgente")&&(
-              <div style={{marginTop:10,display:"flex",alignItems:"center",gap:10,cursor:"pointer",padding:"8px 10px",background:"rgba(251,191,36,0.06)",borderRadius:8,border:"1px solid rgba(251,191,36,0.2)"}}
-                onClick={()=>setHumForm(p=>({...p,generarTarea:!p.generarTarea}))}>
-                <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${humForm.generarTarea?"#fbbf24":"rgba(255,255,255,0.2)"}`,background:humForm.generarTarea?"#fbbf24":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                  {humForm.generarTarea&&<span style={{color:"#000",fontSize:11,fontWeight:700}}>✓</span>}
+            <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"12px 16px",marginBottom:14}}>
+              <div style={{fontSize:11,color:"#6aaa7a",fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.5px"}}>Decisión</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <div><label style={labelSt}>Acción</label>
+                  <select style={S.input} value={humForm.decision} onChange={e=>setHumForm(p=>({...p,decision:e.target.value}))}>
+                    {DECISIONES_HUM.map(d=><option key={d.value} value={d.value}>{d.label}</option>)}
+                  </select>
                 </div>
-                <span style={{fontSize:13,color:"#fbbf24"}}>
-                  Generar tarea en Programación ({humForm.decision==="cerrar-cancha"?"🚫 Cierre":humForm.decision==="abrir-cancha"?"✅ Apertura":"💧 Riego urgente"})
-                </span>
+                <div><label style={labelSt}>Observaciones</label>
+                  <input style={S.input} value={humForm.obs} onChange={e=>setHumForm(p=>({...p,obs:e.target.value}))} placeholder="Notas adicionales..."/>
+                </div>
               </div>
-            )}
-          </div>
+              {(humForm.decision==="cerrar-cancha"||humForm.decision==="abrir-cancha"||humForm.decision==="riego-urgente")&&(
+                <div style={{marginTop:10,display:"flex",alignItems:"center",gap:10,cursor:"pointer"}}
+                  onClick={()=>setHumForm(p=>({...p,generarTarea:!p.generarTarea}))}>
+                  <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${humForm.generarTarea?"#fbbf24":"rgba(255,255,255,0.3)"}`,background:humForm.generarTarea?"#fbbf24":"transparent",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                    {humForm.generarTarea&&<span style={{color:"#000",fontSize:11,fontWeight:700}}>✓</span>}
+                  </div>
+                  <span style={{fontSize:13,color:"#fbbf24"}}>
+                    Generar tarea en Programación ({humForm.decision==="cerrar-cancha"?"🚫 Cierre cancha golf":humForm.decision==="abrir-cancha"?"✅ Apertura cancha golf":"💧 Riego urgente golf"})
+                  </span>
+                </div>
+              )}
+            </div>
           )}
           <div style={{display:"flex",gap:8}}>
             <button className="btn-p" style={S.btn} onClick={guardarHumedad} disabled={!humForm.responsable}>✓ Guardar</button>
@@ -7840,6 +7862,8 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
           </div>
         </div>
       )}
+
+      {/* Última medición y historial — solo jefa */}
       {esJefa&&ultimaHum&&(
         <div style={{...S.card,padding:16,marginBottom:16,borderLeft:"3px solid #60a5fa"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
@@ -7854,36 +7878,27 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
             </div>
             {ultimaHum.decision&&(()=>{
               const dec=DECISIONES_HUM.find(d=>d.value===ultimaHum.decision);
-              const c=ultimaHum.decision==="cerrar-cancha"?"#ef4444":ultimaHum.decision==="abrir-cancha"?"#22c55e":ultimaHum.decision==="riego-urgente"?"#ef4444":ultimaHum.decision==="ajustar-riego"?"#f59e0b":"#22c55e";
-              return <span style={{fontSize:12,fontWeight:600,color:c,background:`${c}12`,padding:"4px 12px",borderRadius:20}}>{dec?.label||ultimaHum.decision}</span>;
+              const c=ultimaHum.decision==="cerrar-cancha"?"#ef4444":ultimaHum.decision==="abrir-cancha"?"#22c55e":"#60a5fa";
+              return <span style={{fontSize:12,fontWeight:600,color:c,background:`${c}12`,border:`1px solid ${c}30`,borderRadius:8,padding:"3px 10px"}}>{dec?.label||ultimaHum.decision}</span>;
             })()}
           </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(88px,1fr))",gap:8}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(88px,1fr))",gap:6}}>
             {GREENS_DEF.map(g=>{
               const v=ultimaHum.valores?.[g.id]?.valor;
               const info=v?ESCALA_HUM_GOLF[Math.min(Math.max(Number(v),1),8)]:null;
               return (
-                <div key={g.id} style={{background:info?info.bg:"rgba(255,255,255,0.03)",borderRadius:8,padding:"8px 10px",border:`1px solid ${info?info.color+"35":"rgba(255,255,255,0.06)"}`,textAlign:"center"}}>
+                <div key={g.id} style={{background:info?info.bg:"rgba(255,255,255,0.03)",borderRadius:8,padding:"8px 10px",border:`1px solid ${info?info.color+"40":"rgba(255,255,255,0.08)"}`}}>
                   <div style={{fontSize:10,fontWeight:600,color:"#34d399",marginBottom:2}}>{g.nombre}</div>
-                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color:info?info.color:"#3a6a5a"}}>{v||"—"}</div>
+                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color:info?.color||"#ede9e0"}}>{v||"—"}</div>
                   {info&&<div style={{fontSize:9,color:info.color}}>{info.label}</div>}
                 </div>
               );
             })}
-            {ultimaHum.valorVivero&&(()=>{
-              const info=ESCALA_HUM_GOLF[Math.min(Math.max(Number(ultimaHum.valorVivero),1),8)];
-              return (
-                <div style={{background:info.bg,borderRadius:8,padding:"8px 10px",border:`1px solid ${info.color}35`,textAlign:"center"}}>
-                  <div style={{fontSize:10,fontWeight:600,color:"#4ade80",marginBottom:2}}>🌱 Vivero</div>
-                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color:info.color}}>{ultimaHum.valorVivero}</div>
-                  <div style={{fontSize:9,color:info.color}}>{info.label}</div>
-                </div>
-              );
-            })()}
           </div>
-          {ultimaHum.obs&&<div style={{fontSize:12,color:"#5a9a7a",marginTop:10,fontStyle:"italic",padding:"6px 10px",background:"rgba(255,255,255,0.03)",borderRadius:6}}>{ultimaHum.obs}</div>}
+          {ultimaHum.obs&&<div style={{fontSize:12,color:"#5a9a7a",marginTop:10,fontStyle:"italic"}}>{ultimaHum.obs}</div>}
         </div>
       )}
+
       {esJefa&&<><div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:10,color:"#60a5fa"}}>📜 Historial</div>
       {humedades.length===0&&!showHumForm&&(
         <div style={{...S.card,padding:36,textAlign:"center",color:"#3a6a5a"}}>
@@ -7894,13 +7909,13 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
         {[...humedades].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")).map(m=>{
           const dec=DECISIONES_HUM.find(d=>d.value===m.decision);
-          const colDec=m.decision==="cerrar-cancha"?"#ef4444":m.decision==="abrir-cancha"?"#22c55e":m.decision==="riego-urgente"?"#ef4444":m.decision==="ajustar-riego"?"#f59e0b":"#22c55e";
+          const colDec=m.decision==="cerrar-cancha"?"#ef4444":m.decision==="abrir-cancha"?"#22c55e":"#60a5fa";
           const vals=Object.values(m.valores||{}).map(v=>Number(v.valor||0)).filter(v=>v>0);
           const extremo=vals.length?(esSecaEstacion?Math.min(...vals):Math.max(...vals)):null;
           const infoExtremo=extremo?ESCALA_HUM_GOLF[Math.min(Math.max(extremo,1),8)]:null;
           return (
             <div key={m.id} style={{...S.card,padding:"12px 16px",borderLeft:`3px solid ${colDec}40`}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:8}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",gap:8}}>
                 <div style={{flex:1}}>
                   <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:4}}>
                     <span style={{fontSize:13,fontWeight:600}}>📅 {m.fecha}{m.hora&&` ${m.hora}`}</span>
@@ -7912,18 +7927,14 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
                       const v=m.valores?.[g.id]?.valor;
                       if(!v) return null;
                       const info=ESCALA_HUM_GOLF[Math.min(Math.max(Number(v),1),8)];
-                      return <span key={g.id} style={{fontSize:10,color:info.color,background:info.bg,padding:"1px 6px",borderRadius:8,border:`1px solid ${info.color}30`}}>{g.nombre.replace("Green ","")}:{v}</span>;
+                      return <span key={g.id} style={{fontSize:10,color:info.color,background:info.bg,border:`1px solid ${info.color}40`,borderRadius:6,padding:"1px 6px"}}>{g.nombre.replace("Green ","G")}: {v}</span>;
                     })}
-                    {m.valorVivero&&(()=>{
-                      const info=ESCALA_HUM_GOLF[Math.min(Math.max(Number(m.valorVivero),1),8)];
-                      return <span style={{fontSize:10,color:info.color,background:info.bg,padding:"1px 6px",borderRadius:8,border:`1px solid ${info.color}30`}}>🌱:{m.valorVivero}</span>;
-                    })()}
                   </div>
-                  {infoExtremo&&<div style={{fontSize:11,color:infoExtremo.color}}>{esSecaEstacion?"🏜️ Mín":"💦 Máx"}: {extremo}/8 — {infoExtremo.accion}</div>}
-                  {m.obs&&<div style={{fontSize:11,color:"#5a9a7a",fontStyle:"italic",marginTop:3}}>{m.obs}</div>}
+                  {infoExtremo&&<div style={{fontSize:11,color:infoExtremo.color}}>{esSecaEstacion?"Mín":"Máx"}: {infoExtremo.label}</div>}
+                  {m.obs&&<div style={{fontSize:11,color:"#5a9a7a",fontStyle:"italic",marginTop:4}}>{m.obs}</div>}
                 </div>
-                <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
-                  {dec&&<span style={{fontSize:11,fontWeight:600,color:colDec,background:`${colDec}15`,padding:"3px 10px",borderRadius:20,border:`1px solid ${colDec}35`,whiteSpace:"nowrap"}}>{dec.label}</span>}
+                <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
+                  {dec&&<span style={{fontSize:11,fontWeight:600,color:colDec,background:`${colDec}12`,border:`1px solid ${colDec}30`,borderRadius:8,padding:"2px 8px"}}>{dec.label}</span>}
                   {esJefa&&<button className="btn-d" style={{...S.btn,fontSize:11,padding:"3px 8px"}} onClick={()=>setHumedades(humedades.filter(x=>x.id!==m.id))}>🗑</button>}
                 </div>
               </div>
@@ -7932,15 +7943,11 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
         })}
       </div>
       </>}
-
     </div>
   );
 }
 
 
-// ══════════════════════════════════════════════════════════════════
-// PROGRAMACIÓN GOLF — módulo de tareas periódicas con frecuencia
-// ══════════════════════════════════════════════════════════════════
 function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJefa }) {
 
   // ── Definición de tareas periódicas con última fecha y frecuencia ──
@@ -8663,7 +8670,26 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
         if(esMedicion && (esDelResponsable || !respMed)) return {...t, estado:"hecha"};
         return t;
       });
-      return {...prev, [fechaMed]: actualizadas};
+      // Si no existía tarea de medición, crear una como hecha
+      const yaMarcada = actualizadas.some(t =>
+        ["hecha","completada"].includes(t.estado) &&
+        ((t.tarea||"").toLowerCase().includes("altura") || (t.tarea||"").toLowerCase().includes("medici"))
+      );
+      const listafinal = yaMarcada ? actualizadas : [
+        ...actualizadas,
+        {
+          id: Date.now()+Math.random(),
+          fecha: fechaMed,
+          tarea: "📏 Medición de alturas greens",
+          zona: "Golf",
+          responsable: medForm.responsable||"",
+          estado: "hecha",
+          notas: `Tipo: ${medForm.tipo||"rutinaria"}. Alturas registradas.`,
+          auto: true,
+          esDiario: true,
+        }
+      ];
+      return {...prev, [fechaMed]: listafinal};
     });
     setMedForm({...emptyMed, fecha:hoy});
     setShowMedForm(false);
