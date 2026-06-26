@@ -11559,10 +11559,10 @@ export default function App() {
   const [tab, setTab] = useState("elementos");
   const [filtroCat, setFiltroCat] = useState("Todas");
   const [filtroEst, setFiltroEst] = useState("Todos");
-  const [busq, setBusq] = useState(null);
+  const [busq, setBusq] = useState("");
   const [editElem, setEditElem] = useState(null);
   const [showAddElem, setShowAddElem] = useState(false);
-  const [newElem, setNewElem] = useState({ nombre:"", tipo:"vegetacion" });
+  const [newElem, setNewElem] = useState({ nombre:"", tipo:"arboles" });
   const [nuevaTarea, setNuevaTarea] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiText, setAiText] = useState("");
@@ -11769,7 +11769,11 @@ export default function App() {
   const filteredZonas = MACROZONAS_BASE.filter(z=>{
     const matchC=filtroCat==="Todas"||z.categoria===filtroCat;
     const matchE=filtroEst==="Todos"||getZD(z.id).estadoGeneral===filtroEst;
-    const matchB=!busq||z.nombre.toLowerCase().includes(busq.toLowerCase());
+    const q=(busq||"").trim().toLowerCase();
+    const matchB=!q||
+      z.nombre.toLowerCase().includes(q)||
+      z.categoria.toLowerCase().includes(q)||
+      (z.descripcion||"").toLowerCase().includes(q);
     return matchC&&matchE&&matchB;
   }).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
 
@@ -12337,60 +12341,69 @@ export default function App() {
             {tab==="elementos"&&(
               <div className="ein">
                 {(()=>{
-                  const vegeElems=getAllElems(zonaId).filter(e=>CATEGORIAS_ELEM[e.tipo]?.parent==="vegetacion");
-                  if(vegeElems.length===0) return null;
-                  return (
-                    <div style={{marginBottom:26}}>
-                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14,paddingBottom:8,borderBottom:"1px solid rgba(34,197,94,0.2)"}}>
-                        <span style={{fontSize:20}}>🌿</span>
-                        <span style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color:"#86efac"}}>Vegetación</span>
-                        <span style={{...S.chip,background:"rgba(34,197,94,0.1)",color:"#4ade80",border:"1px solid rgba(34,197,94,0.2)",fontSize:11}}>{vegeElems.length} elementos</span>
-                      </div>
-                      {VEGETACION_SUBS.map(subKey=>{
-                        const subMeta=CATEGORIAS_ELEM[subKey];
-                        const subElems=vegeElems.filter(e=>e.tipo===subKey);
-                        if(subElems.length===0) return null;
-                        // Solo mostrar si al menos un elemento tiene frecuencias definidas
-                        const tieneFrecs = subElems.some(e=>{
-                          const frecs = getElemFrecs(zonaId, e.id, e.tipo, e.isCustom);
-                          return frecs && frecs.length > 0;
-                        });
-                        if(!tieneFrecs) return null;
-                        return (
-                          <div key={subKey} style={{marginBottom:18,paddingLeft:14,borderLeft:`2px solid ${subMeta.color}30`}}>
-                            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10}}>
-                              <span style={{fontSize:15}}>{subMeta.icon}</span>
-                              <span style={{fontSize:14,fontWeight:600,color:subMeta.color}}>{subMeta.label}</span>
-                              <span style={{fontSize:11,color:"#5aaa70"}}>({subElems.length})</span>
-                            </div>
-                            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:10}}>
-                              {subElems.map(e=>renderElemCard(e))}
-                            </div>
+                  const todosElems = getAllElems(zonaId);
+                  const VEGE_KEYS = ["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
+                  const INFRA_KEYS = ["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","bodegas"];
+                  const vegeElems  = todosElems.filter(e=>VEGE_KEYS.includes(e.tipo));
+                  const infraElems = todosElems.filter(e=>INFRA_KEYS.includes(e.tipo));
+                  const otrosElems = todosElems.filter(e=>!VEGE_KEYS.includes(e.tipo)&&!INFRA_KEYS.includes(e.tipo));
+
+                  const SeccionGrupo = ({titulo, icono, color, borderColor, elems, subKeys}) => {
+                    if(elems.length===0) return null;
+                    return (
+                      <div style={{marginBottom:24}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12,paddingBottom:8,borderBottom:`1px solid ${borderColor}`}}>
+                          <span style={{fontSize:20}}>{icono}</span>
+                          <span style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,color}}>{titulo}</span>
+                          <span style={{fontSize:11,color:"#5aaa70",background:"rgba(255,255,255,0.05)",padding:"1px 8px",borderRadius:10}}>{elems.length} elementos</span>
+                        </div>
+                        {subKeys ? (
+                          // Agrupar por subcategoría
+                          subKeys.map(subKey=>{
+                            const subMeta=CATEGORIAS_ELEM[subKey];
+                            const subElems=elems.filter(e=>e.tipo===subKey);
+                            if(subElems.length===0) return null;
+                            return (
+                              <div key={subKey} style={{marginBottom:14,paddingLeft:12,borderLeft:`2px solid ${subMeta.color}30`}}>
+                                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
+                                  <span style={{fontSize:14}}>{subMeta.icon}</span>
+                                  <span style={{fontSize:13,fontWeight:600,color:subMeta.color}}>{subMeta.label}</span>
+                                  <span style={{fontSize:11,color:"#5aaa70"}}>({subElems.length})</span>
+                                </div>
+                                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                                  {subElems.map(e=>renderElemCard(e))}
+                                </div>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                            {elems.map(e=>renderElemCard(e))}
                           </div>
-                        );
-                      })}
-                    </div>
-                  );
+                        )}
+                      </div>
+                    );
+                  };
+
+                  return (<>
+                    <SeccionGrupo
+                      titulo="Vegetación" icono="🌿" color="#86efac"
+                      borderColor="rgba(34,197,94,0.2)"
+                      elems={vegeElems} subKeys={VEGE_KEYS}/>
+                    <SeccionGrupo
+                      titulo="Infraestructura" icono="🏗️" color="#f59e0b"
+                      borderColor="rgba(245,158,11,0.2)"
+                      elems={infraElems} subKeys={INFRA_KEYS}/>
+                    {otrosElems.length>0&&(
+                      <div style={{marginBottom:22}}>
+                        <div style={{fontSize:14,fontWeight:600,color:"#6aaa7a",marginBottom:10}}>🔹 Otros</div>
+                        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                          {otrosElems.map(e=>renderElemCard(e))}
+                        </div>
+                      </div>
+                    )}
+                  </>);
                 })()}
-                {OTRAS_CATS.map(tipoKey=>{
-                  const tipoMeta=CATEGORIAS_ELEM[tipoKey];
-                  const elems=getAllElems(zonaId).filter(e=>e.tipo===tipoKey);
-                  if(elems.length===0) return null;
-                  const tieneFrecs2=elems.some(e=>{const f=getElemFrecs(zonaId,e.id,e.tipo,e.isCustom);return f&&f.length>0;});
-                  if(!tieneFrecs2) return null;
-                  return (
-                    <div key={tipoKey} style={{marginBottom:22}}>
-                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-                        <span style={{fontSize:18}}>{tipoMeta.icon}</span>
-                        <span style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700}}>{tipoMeta.label}</span>
-                        <span style={{...S.chip,background:"rgba(255,255,255,0.07)",color:"#7aaa80",fontSize:11}}>{elems.length}</span>
-                      </div>
-                      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:10}}>
-                        {elems.map(e=>renderElemCard(e))}
-                      </div>
-                    </div>
-                  );
-                })}
                 {getAllElems(zonaId).filter(e=>!CATEGORIAS_ELEM[e.tipo]).length>0&&(
                   <div style={{marginBottom:22}}>
                     <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,marginBottom:12}}>🔹 Otros</div>
@@ -12435,7 +12448,7 @@ export default function App() {
                           }
                         }}>✓ Agregar</button>
                         <span style={{fontSize:11,color:"#4a7a5a"}}>o presiona Enter</span>
-                        <button className="btn-g" style={{...S.btn,marginLeft:"auto"}} onClick={()=>{setShowAddElem(false);setNewElem({nombre:"",tipo:"arbustos"});}}>Listo ✓</button>
+                        <button className="btn-g" style={{...S.btn,marginLeft:"auto"}} onClick={()=>{setShowAddElem(false);setNewElem({nombre:"",tipo:"arboles"});}}>Listo ✓</button>
                       </div>
                     </div>
                   )}
