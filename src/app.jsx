@@ -819,29 +819,24 @@ function ResponsableSelector({ value, personal, onChange, S, fontSize=14, inline
 // ─── REPORTE SEMANAL ─────────────────────────────────────────────────────────
 function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_BASE, personal, incidenciasFito=[] }) {
 
-  const [modoReporte, setModoReporte] = React.useState("semana");
-  // Inicializar rango con la semana actual si no viene semanaBase
-  const hoyStr = new Date().toISOString().slice(0,10);
-  const [fechaDesde, setFechaDesde]   = React.useState(semanaBase||hoyStr);
-  const [fechaHasta, setFechaHasta]   = React.useState(()=>{
-    // Por defecto hasta = 7 días después del desde
-    const d = new Date((semanaBase||hoyStr)+"T12:00:00");
-    d.setDate(d.getDate()+6);
-    return d.toISOString().slice(0,10);
-  });
-  const [filtroZona, setFiltroZona]   = React.useState("todas");
-  const [filtroResp, setFiltroResp]   = React.useState("todos");
-  const [tipoVista,  setTipoVista]    = React.useState("jefa"); // "gerencia" | "jefa"
+  const IDS_DEPORTES = [31, 38];
+  const IDS_GENERAL  = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,32,33,34,35,36,37];
 
-  const getDiasSemana = (lunesStr) => {
-    const lunes = new Date(lunesStr+"T12:00:00");
+  const [modoReporte, setModoReporte] = React.useState("semana");
+  const [fechaDesde, setFechaDesde]   = React.useState(semanaBase||"");
+  const [fechaHasta, setFechaHasta]   = React.useState(()=>{
+    const d=new Date((semanaBase||new Date().toISOString().slice(0,10))+"T12:00:00");
+    d.setDate(d.getDate()+6); return d.toISOString().slice(0,10);
+  });
+
+  const getDiasSemana = (ls) => {
+    const lunes=new Date(ls+"T12:00:00");
     return Array.from({length:7},(_,i)=>{ const d=new Date(lunes); d.setDate(d.getDate()+i); return d.toISOString().slice(0,10); });
   };
   const getDiasRango = (desde,hasta) => {
     if(!desde||!hasta||desde>hasta) return [];
     const dias=[]; const d=new Date(desde+"T12:00:00"); const fin=new Date(hasta+"T12:00:00");
-    // Limitar a 366 días para evitar loops
-    while(d<=fin && dias.length<366){ dias.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1); }
+    while(d<=fin&&dias.length<366){ dias.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1); }
     return dias;
   };
   const semanaAnterior  = ()=>{ const d=new Date(semanaBase+"T12:00:00"); d.setDate(d.getDate()-7); setSemanaBase(d.toISOString().slice(0,10)); };
@@ -849,307 +844,157 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
   const semanaActual    = ()=>{ const d=new Date(); const day=d.getDay(); const diff=(day===0?-6:1-day); d.setDate(d.getDate()+diff); setSemanaBase(d.toISOString().slice(0,10)); };
 
   const dias = modoReporte==="semana" ? getDiasSemana(semanaBase) : getDiasRango(fechaDesde,fechaHasta);
-  const DIAS_LABEL = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
 
-  // Firebase puede devolver {0:{...},1:{...}} en vez de array — normalizar
   const normDia = (d) => {
-    const v = tareasProg[d];
-    if(!v) return [];
+    const v=tareasProg[d]; if(!v) return [];
     if(Array.isArray(v)) return v;
     if(typeof v==="object") return Object.values(v).filter(Boolean);
     return [];
   };
   const todasTareas = dias.flatMap(d=>normDia(d).map(t=>({...t,fechaDia:d})));
-  const tareasFiltradas = todasTareas
-    .filter(t=> filtroZona==="todas" || t.zona===filtroZona)
-    .filter(t=> filtroResp==="todos" || t.responsable===filtroResp);
 
   const esHecha = t => ["hecha","completada"].includes(t.estado);
-  const total   = tareasFiltradas.length;
-  const hechas  = tareasFiltradas.filter(esHecha).length;
-  const noPudo  = tareasFiltradas.filter(t=>t.estado==="no_pudo").length;
-  const pend    = tareasFiltradas.filter(t=>["pendiente","por_designar","haciendose"].includes(t.estado)).length;
-  const pct     = total ? Math.round(hechas/total*100) : 0;
+  const fmtFecha = d => d?new Date(d+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"short",year:"numeric"}):"—";
+  const periodoLabel = dias.length>0 ? `${fmtFecha(dias[0])} al ${fmtFecha(dias[dias.length-1])}` : "Sin período";
 
-  // Por trabajador
-  const porTrabajador = {};
-  tareasFiltradas.forEach(t=>{
-    const n=t.responsable||"Sin asignar";
-    if(!porTrabajador[n]) porTrabajador[n]={total:0,hechas:0,noPudo:0,pend:0,noPudoList:[]};
-    porTrabajador[n].total++;
-    if(esHecha(t)) porTrabajador[n].hechas++;
-    else if(t.estado==="no_pudo"){ porTrabajador[n].noPudo++; porTrabajador[n].noPudoList.push(t); }
-    else porTrabajador[n].pend++;
-  });
-
-  // Por macrozona + tipos de tarea
-  const porZona = {};
-  tareasFiltradas.forEach(t=>{
-    const z=t.zona||"Sin zona";
-    if(!porZona[z]) porZona[z]={total:0,hechas:0,noPudo:0,tareas:[]};
-    porZona[z].total++;
-    if(esHecha(t)) porZona[z].hechas++;
-    else if(t.estado==="no_pudo") porZona[z].noPudo++;
-    porZona[z].tareas.push(t);
-  });
-
-  // Resumen por TIPO global (para gerencia)
-  const CATEGORIAS_TAREA = {
-    "Corte":     ["corte","cortad"],
-    "Poda":      ["poda","podar"],
-    "Fertilización": ["fertili","abono","novatec","salitre"],
-    "Riego":     ["riego","regar","irrigar"],
-    "Fumigación":["fumig","hongos","fungicid","plaga"],
-    "Limpieza":  ["limpie","limpieza","sopla","barrid"],
-    "Aireación": ["airead","aireac"],
-    "Desmalezado":["desmaleza","maleza","deshierb"],
-    "Medición":  ["medici","altura","humedad"],
-    "Revisión":  ["revisi","inspecc"],
-    "Orillado":  ["orill"],
-    "Otros":     [],
+  const CATS_TIPO = {
+    Corte:["corte","cortad"], Poda:["poda","podar"],
+    Fertilización:["fertili","abono","novatec","salitre"],
+    Riego:["riego","regar"], Fumigación:["fumig","hongos","plaga"],
+    Limpieza:["limpie","limpieza","sopla","barrid"], Aireación:["airead"],
+    Desmalezado:["desmaleza","maleza"], Medición:["medici","altura","humedad"],
+    Revisión:["revisi"], Orillado:["orill"], Otros:[]
   };
-  const porTipoGlobal = {};
-  Object.keys(CATEGORIAS_TAREA).forEach(k=>{ porTipoGlobal[k]={total:0,hechas:0}; });
-  tareasFiltradas.forEach(t=>{
-    const tnom = (t.tarea||"").toLowerCase();
-    let cat = "Otros";
-    for(const [k,kws] of Object.entries(CATEGORIAS_TAREA)){
+
+  const getTipo = (t) => {
+    const tl=(t.tarea||"").toLowerCase();
+    for(const [k,kws] of Object.entries(CATS_TIPO)){
       if(k==="Otros") continue;
-      if(kws.some(kw=>tnom.includes(kw))){ cat=k; break; }
+      if(kws.some(kw=>tl.includes(kw))) return k;
     }
-    porTipoGlobal[cat].total++;
-    if(esHecha(t)) porTipoGlobal[cat].hechas++;
-  });
-
-  // Tareas no realizadas (no_pudo) para incidencias
-  const tareasNoPudo = tareasFiltradas.filter(t=>t.estado==="no_pudo");
-
-  // Cierres de cancha (desde tareasFiltradas y desde incidenciasFito)
-  const cierresCancha = tareasFiltradas.filter(t=>(t.tarea||"").toLowerCase().includes("cierre")&&(t.tarea||"").toLowerCase().includes("cancha"));
-  const incFitoPeriodo = incidenciasFito.filter(i=>i.fecha>=(dias[0]||"")&&i.fecha<=(dias[dias.length-1]||""));
-
-  const todasZonas = [...new Set(todasTareas.map(t=>t.zona).filter(Boolean))].sort();
-  const todosResp  = [...new Set(todasTareas.map(t=>t.responsable).filter(Boolean))].sort();
-  const fmtFecha   = d => d?new Date(d+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"short",year:"numeric"}):"—";
-  const periodoLabel = dias.length>0
-    ? `${fmtFecha(dias[0])} al ${fmtFecha(dias[dias.length-1])}`
-    : "Sin período";
-
-  // ── IMPRIMIR ────────────────────────────────────────────────────────────
-  const imprimir = (modo) => {
-    const V="#1a5c35", VL="#d4edda", BO="#ccddcc";
-    const encabezado = `
-      <div style="text-align:center;margin-bottom:20px;border-bottom:3px solid ${V};padding-bottom:12px">
-        <div style="font-size:22px;font-weight:700;color:${V}">Estadio Español · Áreas Verdes</div>
-        <div style="font-size:15px;font-weight:600;color:#333;margin-top:4px">
-          ${modo==="gerencia"?"Reporte Ejecutivo de Gestión":"Reporte Operacional Detallado"}
-        </div>
-        <div style="font-size:13px;color:#555;margin-top:2px">Del ${periodoLabel}</div>
-        <div style="font-size:11px;color:#888;margin-top:2px">Generado el ${new Date().toLocaleDateString("es-CL",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>
-      </div>`;
-
-    const kpis = `
-      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px">
-        ${[["Total tareas",total,"#1a5c35"],["✅ Realizadas",hechas,"#166534"],["🔴 No realizadas",noPudo,"#991b1b"],["⏳ Pendientes",pend,"#92400e"],["Cumplimiento",pct+"%",pct>=80?"#166534":pct>=50?"#92400e":"#991b1b"]]
-          .map(([l,v,c])=>`<div style="border:1px solid ${BO};border-radius:8px;padding:10px;text-align:center">
-            <div style="font-size:20px;font-weight:700;color:${c}">${v}</div>
-            <div style="font-size:10px;color:#555">${l}</div></div>`).join("")}
-      </div>`;
-
-    // Tabla trabajadores (ambos modos)
-    const tabTrab = `
-      <h3 style="color:${V};border-bottom:2px solid ${V};padding-bottom:3px;margin:16px 0 8px;font-size:13px">Desempeño por trabajador</h3>
-      <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:8px">
-        <tr style="background:${V};color:#fff">
-          <th style="padding:5px 8px;text-align:left">Trabajador</th>
-          <th style="padding:5px;text-align:center">Total</th>
-          <th style="padding:5px;text-align:center">✅ Hechas</th>
-          <th style="padding:5px;text-align:center">🔴 No realizó</th>
-          <th style="padding:5px;text-align:center">⏳ Pendiente</th>
-          <th style="padding:5px;text-align:center">Cumplimiento</th>
-        </tr>
-        ${Object.entries(porTrabajador).sort((a,b)=>b[1].hechas-a[1].hechas).map(([n,d],i)=>{
-          const p2=d.total?Math.round(d.hechas/d.total*100):0;
-          return `<tr style="background:${i%2===0?"#fff":"#f5fbf5"}">
-            <td style="padding:4px 8px;font-weight:600">${n}</td>
-            <td style="padding:4px;text-align:center">${d.total}</td>
-            <td style="padding:4px;text-align:center;color:#166534;font-weight:600">${d.hechas}</td>
-            <td style="padding:4px;text-align:center;color:${d.noPudo>0?"#991b1b":"#6b7280"}">${d.noPudo||"—"}</td>
-            <td style="padding:4px;text-align:center;color:${d.pend>0?"#92400e":"#6b7280"}">${d.pend||"—"}</td>
-            <td style="padding:4px;text-align:center;font-weight:700;color:${p2>=80?"#166534":p2>=50?"#92400e":"#991b1b"}">${p2}%</td>
-          </tr>`;
-        }).join("")}
-      </table>`;
-
-    // Resumen por tipo global (GERENCIA)
-    const tiposActivos = Object.entries(porTipoGlobal).filter(([,d])=>d.total>0);
-    const tabTipos = `
-      <h3 style="color:${V};border-bottom:2px solid ${V};padding-bottom:3px;margin:16px 0 8px;font-size:13px">Resumen por tipo de actividad</h3>
-      <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:8px">
-        <tr style="background:${V};color:#fff">
-          <th style="padding:5px 8px;text-align:left">Tipo de actividad</th>
-          <th style="padding:5px;text-align:center">Total</th>
-          <th style="padding:5px;text-align:center">✅ Realizadas</th>
-          <th style="padding:5px;text-align:center">Cumplimiento</th>
-        </tr>
-        ${tiposActivos.sort((a,b)=>b[1].total-a[1].total).map(([tipo,d],i)=>{
-          const p2=d.total?Math.round(d.hechas/d.total*100):0;
-          return `<tr style="background:${i%2===0?"#fff":"#f5fbf5"}">
-            <td style="padding:4px 8px;font-weight:600">${tipo}</td>
-            <td style="padding:4px;text-align:center">${d.total}</td>
-            <td style="padding:4px;text-align:center;color:#166534;font-weight:600">${d.hechas}</td>
-            <td style="padding:4px;text-align:center;font-weight:700;color:${p2>=80?"#166534":p2>=50?"#92400e":"#991b1b"}">${p2}%</td>
-          </tr>`;
-        }).join("")}
-      </table>`;
-
-    // Detalle por zona (JEFA)
-    const tabZonas = Object.entries(porZona).sort((a,b)=>b[1].total-a[1].total).map(([zona,dat])=>{
-      const pctZ=dat.total?Math.round(dat.hechas/dat.total*100):0;
-      const tipos={};
-      dat.tareas.forEach(t=>{
-        const tnom=(t.tarea||"").toLowerCase();
-        let cat="Otros";
-        for(const [k,kws] of Object.entries(CATEGORIAS_TAREA)){
-          if(k==="Otros") continue;
-          if(kws.some(kw=>tnom.includes(kw))){ cat=k; break; }
-        }
-        if(!tipos[cat]) tipos[cat]={total:0,hechas:0};
-        tipos[cat].total++;
-        if(esHecha(t)) tipos[cat].hechas++;
-      });
-      const npZona=dat.tareas.filter(t=>t.estado==="no_pudo");
-      return `
-        <div style="margin-bottom:10px;border:1px solid ${BO};border-radius:6px;overflow:hidden;break-inside:avoid">
-          <div style="background:${V};color:#fff;padding:6px 10px;display:flex;justify-content:space-between">
-            <span style="font-weight:700;font-size:12px">${zona}</span>
-            <span style="font-size:11px">${dat.hechas}/${dat.total} · ${pctZ}%</span>
-          </div>
-          <table style="width:100%;border-collapse:collapse;font-size:10px">
-            <tr style="background:${VL}">
-              <th style="padding:3px 8px;text-align:left">Actividad</th>
-              <th style="padding:3px;text-align:center">Total</th>
-              <th style="padding:3px;text-align:center">✅</th>
-              <th style="padding:3px;text-align:center">%</th>
-            </tr>
-            ${Object.entries(tipos).filter(([,d])=>d.total>0).sort((a,b)=>b[1].total-a[1].total).map(([tipo,td],i)=>{
-              const p3=td.total?Math.round(td.hechas/td.total*100):0;
-              return `<tr style="background:${i%2===0?"#fff":"#f9fdf9"}">
-                <td style="padding:3px 8px">${tipo}</td>
-                <td style="padding:3px;text-align:center">${td.total}</td>
-                <td style="padding:3px;text-align:center;color:#166534;font-weight:600">${td.hechas}</td>
-                <td style="padding:3px;text-align:center;font-weight:700;color:${p3>=80?"#166534":p3>=50?"#92400e":"#991b1b"}">${p3}%</td>
-              </tr>`;
-            }).join("")}
-          </table>
-          ${npZona.length>0?`
-            <div style="padding:5px 10px;background:#fff8f0;border-top:1px solid #fcd34d;font-size:10px">
-              <strong style="color:#92400e">No realizadas:</strong>
-              ${npZona.map(t=>`<div style="margin-top:1px">• ${t.fechaDia} — ${t.tarea||""}${t.motivo?` <em>(${t.motivo})</em>`:""}</div>`).join("")}
-            </div>`:""}
-        </div>`;
-    }).join("");
-
-    // Incidencias tareas no realizadas (JEFA)
-    const incNoPudo = tareasNoPudo.length>0?`
-      <h3 style="color:#991b1b;border-bottom:2px solid #991b1b;padding-bottom:3px;margin:16px 0 8px;font-size:13px">Incidencias — Tareas no realizadas</h3>
-      <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:8px">
-        <tr style="background:#991b1b;color:#fff">
-          <th style="padding:5px 8px;text-align:left">Fecha</th>
-          <th style="padding:5px;text-align:left">Tarea</th>
-          <th style="padding:5px;text-align:left">Zona</th>
-          <th style="padding:5px;text-align:left">Responsable</th>
-          <th style="padding:5px;text-align:left">Motivo</th>
-        </tr>
-        ${tareasNoPudo.map((t,i)=>`
-          <tr style="background:${i%2===0?"#fff":"#fff5f5"}">
-            <td style="padding:4px 8px;white-space:nowrap">${t.fechaDia||""}</td>
-            <td style="padding:4px 8px">${t.tarea||""}</td>
-            <td style="padding:4px 8px">${t.zona||""}</td>
-            <td style="padding:4px 8px">${t.responsable||""}</td>
-            <td style="padding:4px 8px;color:#991b1b;font-style:italic">${t.motivo||"Sin motivo registrado"}</td>
-          </tr>`).join("")}
-      </table>`:"";
-
-    // Cierres de cancha (JEFA)
-    const incCierres = cierresCancha.length>0?`
-      <h3 style="color:#92400e;border-bottom:2px solid #92400e;padding-bottom:3px;margin:16px 0 8px;font-size:13px">Cierres de cancha del período</h3>
-      <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:8px">
-        <tr style="background:#92400e;color:#fff">
-          <th style="padding:5px 8px;text-align:left">Fecha</th>
-          <th style="padding:5px;text-align:left">Descripción</th>
-          <th style="padding:5px;text-align:left">Zona</th>
-          <th style="padding:5px;text-align:left">Estado</th>
-        </tr>
-        ${cierresCancha.map((t,i)=>`
-          <tr style="background:${i%2===0?"#fff":"#fffbeb"}">
-            <td style="padding:4px 8px">${t.fechaDia||""}</td>
-            <td style="padding:4px 8px">${t.tarea||""}</td>
-            <td style="padding:4px 8px">${t.zona||""}</td>
-            <td style="padding:4px 8px;font-weight:600;color:${esHecha(t)?"#166534":"#92400e"}">${t.estado||""}</td>
-          </tr>`).join("")}
-      </table>`:"";
-
-    // Incidencias fitosanitarias (ambos modos)
-    const incFito = incFitoPeriodo.length>0?`
-      <h3 style="color:#92400e;border-bottom:2px solid #f59e0b;padding-bottom:3px;margin:16px 0 8px;font-size:13px">Incidencias fitosanitarias</h3>
-      <table style="width:100%;border-collapse:collapse;font-size:11px">
-        <tr style="background:#92400e;color:#fff">
-          <th style="padding:5px 8px;text-align:left">Fecha</th>
-          <th style="padding:5px;text-align:left">Zona</th>
-          <th style="padding:5px;text-align:left">Problema</th>
-          <th style="padding:5px;text-align:left">Tratamiento</th>
-          <th style="padding:5px;text-align:center">RI (h)</th>
-          <th style="padding:5px;text-align:left">Estado</th>
-        </tr>
-        ${incFitoPeriodo.map((i,idx2)=>`
-          <tr style="background:${idx2%2===0?"#fff":"#fffbeb"}">
-            <td style="padding:4px 8px;white-space:nowrap">${i.fecha||""}</td>
-            <td style="padding:4px 8px">${i.zona||""}</td>
-            <td style="padding:4px 8px;font-weight:600">${i.problema||""}</td>
-            <td style="padding:4px 8px">${i.producto||""}${i.dosis?` · ${i.dosis}`:""}</td>
-            <td style="padding:4px;text-align:center">${i.ri||"—"}</td>
-            <td style="padding:4px 8px">${i.estado||""}</td>
-          </tr>`).join("")}
-      </table>`:"";
-
-    const pie = `
-      <div style="text-align:center;margin-top:24px;font-size:10px;color:#888;border-top:1px solid ${BO};padding-top:8px">
-        Departamento de Áreas Verdes · Estadio Español de Las Condes<br>
-        Carmen Luz Hermosilla Diez · Jefa Departamento Áreas Verdes
-      </div>`;
-
-    // Armar según modo
-    const cuerpo = modo==="gerencia"
-      ? kpis + tabTrab + tabTipos + (incFito||"<p style='font-size:11px;color:#888'>Sin incidencias fitosanitarias en el período.</p>")
-      : kpis + tabTrab + `<h3 style="color:${V};border-bottom:2px solid ${V};padding-bottom:3px;margin:16px 0 8px;font-size:13px">Detalle por macrozona</h3>` + tabZonas + incNoPudo + incCierres + incFito;
-
-    const win=window.open("","_blank","width=960,height=750");
-    win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-      <title>Reporte Áreas Verdes</title>
-      <style>*{box-sizing:border-box;font-family:Calibri,Arial,sans-serif}body{margin:0;padding:20px;color:#222}
-      @media print{body{padding:8px}.no-print{display:none!important}div,table{break-inside:avoid}}</style>
-      </head><body>${encabezado}${cuerpo}${pie}
-      <div class="no-print" style="text-align:center;margin-top:20px">
-        <button onclick="window.print()" style="background:${V};color:#fff;border:none;padding:10px 28px;border-radius:8px;font-size:14px;cursor:pointer">
-          🖨️ Imprimir / Guardar PDF
-        </button>
-      </div></body></html>`);
-    win.document.close();
+    return "Otros";
   };
+
+  const calcStats = (tareas) => {
+    const total=tareas.length, hechas=tareas.filter(esHecha).length,
+          noPudo=tareas.filter(t=>t.estado==="no_pudo").length,
+          pend=tareas.filter(t=>["pendiente","por_designar","haciendose"].includes(t.estado)).length,
+          pct=total?Math.round(hechas/total*100):0;
+    const porTrab={}, porZona={}, porCategoria={}, porTipo={};
+    Object.keys(CATS_TIPO).forEach(k=>{porTipo[k]={total:0,hechas:0};});
+    tareas.forEach(t=>{
+      const n=t.responsable||"Sin asignar";
+      if(!porTrab[n]) porTrab[n]={total:0,hechas:0,noPudo:0,pend:0};
+      porTrab[n].total++;
+      if(esHecha(t)) porTrab[n].hechas++;
+      else if(t.estado==="no_pudo") porTrab[n].noPudo++;
+      else porTrab[n].pend++;
+      const z=t.zona||"Sin zona";
+      if(!porZona[z]) porZona[z]={total:0,hechas:0,noPudo:0,tareas:[]};
+      porZona[z].total++; if(esHecha(t)) porZona[z].hechas++;
+      else if(t.estado==="no_pudo") porZona[z].noPudo++;
+      porZona[z].tareas.push(t);
+      const zonaObj=MACROZONAS_BASE.find(z2=>z2.nombre===t.zona);
+      const cat=zonaObj?.categoria||t.zona||"Sin categoría";
+      if(!porCategoria[cat]) porCategoria[cat]={total:0,hechas:0,noPudo:0,tareas:[]};
+      porCategoria[cat].total++; if(esHecha(t)) porCategoria[cat].hechas++;
+      else if(t.estado==="no_pudo") porCategoria[cat].noPudo++;
+      porCategoria[cat].tareas.push(t);
+      const tipo=getTipo(t);
+      porTipo[tipo].total++; if(esHecha(t)) porTipo[tipo].hechas++;
+    });
+    return {total,hechas,noPudo,pend,pct,porTrab,porZona,porCategoria,porTipo,
+      noPudoList:tareas.filter(t=>t.estado==="no_pudo"),
+      cierres:tareas.filter(t=>(t.tarea||"").toLowerCase().includes("cierre")&&(t.tarea||"").toLowerCase().includes("cancha"))};
+  };
+
+  const tareasDeportes = todasTareas.filter(t=>{
+    const z=MACROZONAS_BASE.find(z2=>z2.nombre===t.zona);
+    return z&&IDS_DEPORTES.includes(z.id);
+  });
+  const tareasGeneral = todasTareas.filter(t=>{
+    const z=MACROZONAS_BASE.find(z2=>z2.nombre===t.zona);
+    return !z||IDS_GENERAL.includes(z.id);
+  });
+  const statsDeportes=calcStats(tareasDeportes), statsGeneral=calcStats(tareasGeneral), statsTotal=calcStats(todasTareas);
+  const incFitoPeriodo=incidenciasFito.filter(i=>i.fecha>=(dias[0]||"")&&i.fecha<=(dias[dias.length-1]||""));
+
+  // ── HTML para reportes ───────────────────────────────────────────────
+  const V="#1a5c35", VL="#d4edda", BO="#ccddcc";
+
+  const hEnc=(titulo,sub)=>`<div style="text-align:center;margin-bottom:20px;border-bottom:3px solid ${V};padding-bottom:12px"><div style="font-size:22px;font-weight:700;color:${V}">Estadio Español · Áreas Verdes</div><div style="font-size:16px;font-weight:600;color:#333;margin-top:4px">${titulo}</div><div style="font-size:13px;color:#555;margin-top:2px">${sub||periodoLabel}</div><div style="font-size:11px;color:#888;margin-top:2px">Generado el ${new Date().toLocaleDateString("es-CL",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div></div>`;
+
+  const hKpi=(st)=>`<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:16px">${[["Total",st.total,"#1a5c35"],["Realizadas",st.hechas,"#166534"],["No realizadas",st.noPudo,"#991b1b"],["Pendientes",st.pend,"#92400e"],["Cumplimiento",st.pct+"%",st.pct>=80?"#166534":st.pct>=50?"#92400e":"#991b1b"]].map(([l,v,c])=>`<div style="border:1px solid ${BO};border-radius:8px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:700;color:${c}">${v}</div><div style="font-size:10px;color:#555">${l}</div></div>`).join("")}</div>`;
+
+  const hTrab=(st)=>`<h3 style="color:${V};border-bottom:2px solid ${V};padding-bottom:3px;margin:14px 0 8px;font-size:13px">Desempeño por trabajador</h3><table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:8px"><tr style="background:${V};color:#fff"><th style="padding:5px 8px;text-align:left">Trabajador</th><th style="padding:5px;text-align:center">Total</th><th style="padding:5px;text-align:center">Realizadas</th><th style="padding:5px;text-align:center">No realizó</th><th style="padding:5px;text-align:center">%</th></tr>${Object.entries(st.porTrab).sort((a,b)=>b[1].hechas-a[1].hechas).map(([n,d],i)=>{const p=d.total?Math.round(d.hechas/d.total*100):0;return `<tr style="background:${i%2===0?"#fff":"#f5fbf5"}"><td style="padding:4px 8px;font-weight:600">${n}</td><td style="padding:4px;text-align:center">${d.total}</td><td style="padding:4px;text-align:center;color:#166534;font-weight:600">${d.hechas}</td><td style="padding:4px;text-align:center;color:${d.noPudo>0?"#991b1b":"#6b7280"}">${d.noPudo||"—"}</td><td style="padding:4px;text-align:center;font-weight:700;color:${p>=80?"#166534":p>=50?"#92400e":"#991b1b"}">${p}%</td></tr>`;}).join("")}</table>`;
+
+  const hTipos=(st)=>{const a=Object.entries(st.porTipo).filter(([,d])=>d.total>0).sort((a,b)=>b[1].total-a[1].total);if(!a.length)return "";return `<h3 style="color:${V};border-bottom:2px solid ${V};padding-bottom:3px;margin:14px 0 8px;font-size:13px">Resumen por tipo de actividad</h3><table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:8px"><tr style="background:${V};color:#fff"><th style="padding:5px 8px;text-align:left">Actividad</th><th style="padding:5px;text-align:center">Total</th><th style="padding:5px;text-align:center">Realizadas</th><th style="padding:5px;text-align:center">%</th></tr>${a.map(([tipo,d],i)=>{const p=d.total?Math.round(d.hechas/d.total*100):0;return `<tr style="background:${i%2===0?"#fff":"#f5fbf5"}"><td style="padding:4px 8px;font-weight:600">${tipo}</td><td style="padding:4px;text-align:center">${d.total}</td><td style="padding:4px;text-align:center;color:#166534;font-weight:600">${d.hechas}</td><td style="padding:4px;text-align:center;font-weight:700;color:${p>=80?"#166534":p>=50?"#92400e":"#991b1b"}">${p}%</td></tr>`;}).join("")}</table>`;};
+
+  const hCats=(st,titulo)=>{const cats=Object.entries(st.porCategoria).filter(([,d])=>d.total>0).sort((a,b)=>b[1].total-a[1].total);if(!cats.length)return "";return `<h3 style="color:${V};border-bottom:2px solid ${V};padding-bottom:3px;margin:14px 0 8px;font-size:13px">${titulo}</h3>${cats.map(([cat,dat])=>{const pC=dat.total?Math.round(dat.hechas/dat.total*100):0;const tps={};dat.tareas.forEach(t=>{const tp=getTipo(t);if(!tps[tp])tps[tp]={total:0,hechas:0};tps[tp].total++;if(esHecha(t))tps[tp].hechas++;});const np=dat.tareas.filter(t=>t.estado==="no_pudo");return `<div style="margin-bottom:8px;border:1px solid ${BO};border-radius:6px;overflow:hidden;break-inside:avoid"><div style="background:${V};color:#fff;padding:6px 10px;display:flex;justify-content:space-between"><span style="font-weight:700;font-size:12px">${cat}</span><span style="font-size:11px">${dat.hechas}/${dat.total} · ${pC}%</span></div><table style="width:100%;border-collapse:collapse;font-size:10px;margin:4px 10px;width:calc(100% - 20px)"><tr style="background:${VL}"><th style="padding:3px 6px;text-align:left">Tipo</th><th style="padding:3px;text-align:center">Total</th><th style="padding:3px;text-align:center">Real.</th><th style="padding:3px;text-align:center">%</th></tr>${Object.entries(tps).filter(([,d])=>d.total>0).sort((a,b)=>b[1].total-a[1].total).map(([tp,td],i)=>{const p3=td.total?Math.round(td.hechas/td.total*100):0;return `<tr style="background:${i%2===0?"#fff":"#f9fdf9"}"><td style="padding:3px 6px">${tp}</td><td style="padding:3px;text-align:center">${td.total}</td><td style="padding:3px;text-align:center;color:#166534;font-weight:600">${td.hechas}</td><td style="padding:3px;text-align:center;font-weight:700;color:${p3>=80?"#166534":p3>=50?"#92400e":"#991b1b"}">${p3}%</td></tr>`;}).join("")}</table>${np.length>0?`<div style="padding:4px 10px;background:#fff8f0;font-size:10px;border-top:1px solid #fcd34d"><strong style="color:#92400e">No realizadas: </strong>${np.map(t=>`${t.fechaDia} ${t.tarea||""}${t.motivo?" ("+t.motivo+")":""}`).join(" · ")}</div>`:""}</div>`;}).join("")}`;};
+
+  const hNoPudo=(st)=>{if(!st.noPudoList.length)return "";return `<h3 style="color:#991b1b;border-bottom:2px solid #991b1b;padding-bottom:3px;margin:14px 0 8px;font-size:13px">Tareas no realizadas (${st.noPudoList.length})</h3><table style="width:100%;border-collapse:collapse;font-size:11px"><tr style="background:#991b1b;color:#fff"><th style="padding:5px 8px;text-align:left">Fecha</th><th style="padding:5px;text-align:left">Tarea</th><th style="padding:5px;text-align:left">Zona</th><th style="padding:5px;text-align:left">Responsable</th><th style="padding:5px;text-align:left">Motivo</th></tr>${st.noPudoList.map((t,i)=>`<tr style="background:${i%2===0?"#fff":"#fff5f5"}"><td style="padding:4px 8px;white-space:nowrap">${t.fechaDia}</td><td style="padding:4px 8px">${t.tarea||""}</td><td style="padding:4px 8px">${t.zona||""}</td><td style="padding:4px 8px">${t.responsable||""}</td><td style="padding:4px 8px;color:#991b1b;font-style:italic">${t.motivo||"Sin motivo"}</td></tr>`).join("")}</table>`;};
+
+  const hFito=()=>{if(!incFitoPeriodo.length)return "";return `<h3 style="color:#92400e;border-bottom:2px solid #f59e0b;padding-bottom:3px;margin:14px 0 8px;font-size:13px">Incidencias fitosanitarias</h3><table style="width:100%;border-collapse:collapse;font-size:11px"><tr style="background:#92400e;color:#fff"><th style="padding:5px 8px;text-align:left">Fecha</th><th style="padding:5px;text-align:left">Zona</th><th style="padding:5px;text-align:left">Problema</th><th style="padding:5px;text-align:left">Tratamiento</th><th style="padding:5px;text-align:center">RI(h)</th></tr>${incFitoPeriodo.map((inc,i)=>`<tr style="background:${i%2===0?"#fff":"#fffbeb"}"><td style="padding:4px 8px;white-space:nowrap">${inc.fecha||""}</td><td style="padding:4px 8px">${inc.zona||""}</td><td style="padding:4px 8px;font-weight:600">${inc.problema||""}</td><td style="padding:4px 8px">${inc.producto||""}${inc.dosis?" · "+inc.dosis:""}</td><td style="padding:4px;text-align:center">${inc.ri||"—"}</td></tr>`).join("")}</table>`;};
+
+  const hCierres=(st)=>{if(!st.cierres.length)return "";return `<h3 style="color:#92400e;border-bottom:2px solid #f59e0b;padding-bottom:3px;margin:14px 0 8px;font-size:13px">Cierres de cancha</h3>${st.cierres.map(t=>`<div style="font-size:11px;padding:3px 0;border-bottom:1px solid #f3f4f6">${t.fechaDia} · ${t.tarea} · <strong>${t.estado}</strong></div>`).join("")}`;};
+
+  const hPie=`<div style="text-align:center;margin-top:24px;font-size:10px;color:#888;border-top:1px solid ${BO};padding-top:8px">Departamento de Áreas Verdes · Estadio Español de Las Condes · Carmen Luz Hermosilla Diez</div>`;
+
+  const wrap=(cuerpo)=>`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><style>*{box-sizing:border-box;font-family:Calibri,Arial,sans-serif}body{margin:0;padding:20px;color:#222;font-size:13px}@media print{body{padding:8px}.no-print{display:none!important}div,table{break-inside:avoid}}</style></head><body>${cuerpo}<div class="no-print" style="text-align:center;margin-top:20px"><button onclick="window.print()" style="background:${V};color:#fff;border:none;padding:10px 28px;border-radius:8px;font-size:14px;cursor:pointer">🖨️ Imprimir / Guardar PDF</button></div>${hPie}</body></html>`;
+
+  const sep=`<div style="margin:20px 0;border-top:3px solid ${BO}"></div>`;
+  const h2=(txt)=>`<h2 style="color:${V};margin:16px 0 6px;font-size:15px;border-left:5px solid ${V};padding-left:10px">${txt}</h2>`;
+
+  const imprimirDeportes = () => {
+    const tGolf=tareasDeportes.filter(t=>t.zona==="Golf");
+    const tFutbol=tareasDeportes.filter(t=>t.zona!=="Golf");
+    const sG=calcStats(tGolf), sF=calcStats(tFutbol);
+    const cuerpo=hEnc("Reporte Gerencia Deportes","Golf + Cancha Fútbol · "+periodoLabel)+
+      h2("🏌️ Campo de Golf")+
+      (sG.total>0?hKpi(sG)+hTrab(sG)+hTipos(sG)+hNoPudo(sG)+hFito():"<p style='color:#888;font-size:12px'>Sin tareas en el período.</p>")+
+      sep+h2("⚽ Cancha de Fútbol")+
+      (sF.total>0?hKpi(sF)+hTrab(sF)+hTipos(sF)+hNoPudo(sF)+hCierres(sF):"<p style='color:#888;font-size:12px'>Sin tareas en el período.</p>");
+    const w=window.open("","_blank","width=960,height=750"); w.document.write(wrap(cuerpo)); w.document.close();
+  };
+
+  const imprimirGeneral = () => {
+    const cuerpo=hEnc("Reporte Gerencia General / Operaciones")+hKpi(statsGeneral)+hTrab(statsGeneral)+hCats(statsGeneral,"Resumen por área")+hNoPudo(statsGeneral);
+    const w=window.open("","_blank","width=960,height=750"); w.document.write(wrap(cuerpo)); w.document.close();
+  };
+
+  const imprimirJefa = () => {
+    const cuerpo=hEnc("Reporte Operacional Detallado · Jefatura")+hKpi(statsTotal)+
+      h2("🏌️ Golf + ⚽ Fútbol")+hKpi(statsDeportes)+hTrab(statsDeportes)+hTipos(statsDeportes)+
+      sep+h2("🌿 Áreas Generales")+hKpi(statsGeneral)+hTrab(statsGeneral)+hCats(statsGeneral,"Detalle por categoría y tipo de actividad")+
+      hNoPudo(statsTotal)+hCierres(statsTotal)+hFito();
+    const w=window.open("","_blank","width=960,height=750"); w.document.write(wrap(cuerpo)); w.document.close();
+  };
+
+  const kpiCard=(st,titulo,color)=>(
+    <div style={{...S.card,marginBottom:8,padding:"10px 14px"}}>
+      <div style={{fontSize:12,fontWeight:600,color,marginBottom:8}}>{titulo}</div>
+      <div style={{display:"flex",gap:16,flexWrap:"wrap"}}>
+        {[["Total",st.total],["✅ Realizadas",st.hechas],["🔴 No realizó",st.noPudo],["Cumplimiento",st.pct+"%"]].map(([l,v])=>(
+          <div key={l} style={{textAlign:"center",minWidth:70}}>
+            <div style={{fontSize:18,fontWeight:700,color}}>{v}</div>
+            <div style={{fontSize:10,color:"#5a9a7a"}}>{l}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <div className="ein">
-      {/* ── Selector modo + navegación ── */}
-      <div style={{...S.card,padding:"14px 18px",marginBottom:16}}>
-        <div style={{display:"flex",gap:6,marginBottom:12}}>
-          {[["semana","📅 Por semana"],["rango","📆 Rango de fechas"]].map(([m,l])=>(
+      {/* Navegación */}
+      <div style={{...S.card,padding:"14px 18px",marginBottom:14}}>
+        <div style={{display:"flex",gap:6,marginBottom:10}}>
+          {[["semana","📅 Por semana"],["rango","📆 Rango libre"]].map(([m,l])=>(
             <button key={m} onClick={()=>setModoReporte(m)}
               style={{cursor:"pointer",border:`1px solid ${modoReporte===m?"#34d399":"rgba(255,255,255,0.12)"}`,
                 borderRadius:8,padding:"4px 14px",fontSize:12,
                 background:modoReporte===m?"rgba(52,211,153,0.12)":"transparent",
-                color:modoReporte===m?"#34d399":"#6aaa7a"}}>
-              {l}
+                color:modoReporte===m?"#34d399":"#6aaa7a"}}>{l}
             </button>
           ))}
         </div>
@@ -1158,14 +1003,12 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
             <div style={{display:"flex",alignItems:"center",gap:8}}>
               <button onClick={semanaAnterior} style={{...S.btn,padding:"5px 12px",fontSize:16,background:"rgba(255,255,255,0.07)",color:"#a0c8a0"}}>‹</button>
               <div style={{textAlign:"center"}}>
-                <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700}}>
-                  {fmtFecha(dias[0]||"")} — {fmtFecha(dias[dias.length-1]||"")}
-                </div>
-                <div style={{fontSize:11,color:"#6aaa7a",marginTop:2}}>{dias.length} días · {tareasFiltradas.length} tareas</div>
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700}}>{periodoLabel}</div>
+                <div style={{fontSize:11,color:"#6aaa7a"}}>{dias.length} días · {todasTareas.length} tareas</div>
               </div>
               <button onClick={semanaSiguiente} style={{...S.btn,padding:"5px 12px",fontSize:16,background:"rgba(255,255,255,0.07)",color:"#a0c8a0"}}>›</button>
             </div>
-            <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               <input type="date" value={semanaBase}
                 onChange={e=>{const d=new Date(e.target.value+"T12:00:00");const day=d.getDay();const diff=(day===0?-6:1-day);d.setDate(d.getDate()+diff);setSemanaBase(d.toISOString().slice(0,10));}}
                 style={{...S.input,width:"auto",fontSize:13}}/>
@@ -1173,7 +1016,7 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
             </div>
           </div>
         ) : (
-          <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+          <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"}}>
             <div style={{display:"flex",alignItems:"center",gap:6}}>
               <label style={{fontSize:12,color:"#6aaa7a"}}>Desde:</label>
               <input type="date" value={fechaDesde} onChange={e=>setFechaDesde(e.target.value)} style={{...S.input,width:"auto",fontSize:13}}/>
@@ -1182,116 +1025,47 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
               <label style={{fontSize:12,color:"#6aaa7a"}}>Hasta:</label>
               <input type="date" value={fechaHasta} onChange={e=>setFechaHasta(e.target.value)} style={{...S.input,width:"auto",fontSize:13}}/>
             </div>
-            {dias.length>0&&<div style={{fontSize:12,color:"#5a9a7a"}}>{dias.length} días · {tareasFiltradas.length} tareas</div>}
+            {dias.length>0&&<div style={{fontSize:12,color:"#5a9a7a"}}>{dias.length} días · {todasTareas.length} tareas</div>}
           </div>
         )}
       </div>
 
-      {/* ── Botones de impresión por tipo ── */}
+      {/* Botones de reporte */}
       <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
-        <button onClick={()=>imprimir("gerencia")}
-          style={{...S.btn,background:"rgba(139,92,246,0.15)",color:"#c4b5fd",border:"1px solid rgba(139,92,246,0.35)",fontSize:13}}>
-          📊 Imprimir Reporte Gerencia
+        <button onClick={imprimirDeportes}
+          style={{...S.btn,background:"rgba(34,197,94,0.1)",color:"#4ade80",border:"1px solid rgba(34,197,94,0.3)"}}>
+          ⚽🏌️ Gerencia Deportes
         </button>
-        <button onClick={()=>imprimir("jefa")}
-          style={{...S.btn,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.35)",fontSize:13}}>
-          📋 Imprimir Reporte Detallado (Jefa)
+        <button onClick={imprimirGeneral}
+          style={{...S.btn,background:"rgba(139,92,246,0.1)",color:"#c4b5fd",border:"1px solid rgba(139,92,246,0.3)"}}>
+          🏛️ Gerencia General / Operaciones
         </button>
-        <div style={{marginLeft:"auto",display:"flex",gap:6}}>
-          <select style={{...S.input,fontSize:12,padding:"4px 8px",width:"auto"}} value={filtroZona} onChange={e=>setFiltroZona(e.target.value)}>
-            <option value="todas">Todas las zonas</option>
-            {todasZonas.map(z=><option key={z} value={z}>{z}</option>)}
-          </select>
-          <select style={{...S.input,fontSize:12,padding:"4px 8px",width:"auto"}} value={filtroResp} onChange={e=>setFiltroResp(e.target.value)}>
-            <option value="todos">Todos</option>
-            {todosResp.map(r=><option key={r} value={r}>{r}</option>)}
-          </select>
-          {(filtroZona!=="todas"||filtroResp!=="todos")&&(
-            <button onClick={()=>{setFiltroZona("todas");setFiltroResp("todos");}}
-              style={{...S.btn,fontSize:11,color:"#f87171",border:"1px solid rgba(248,113,113,0.3)",background:"transparent"}}>✕</button>
-          )}
-        </div>
+        <button onClick={imprimirJefa}
+          style={{...S.btn,background:"rgba(59,130,246,0.1)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}}>
+          📋 Reporte Detallado (Jefa)
+        </button>
       </div>
 
-      {total===0 ? (
+      {/* Vista previa en pantalla */}
+      {todasTareas.length===0 ? (
         <div style={{textAlign:"center",padding:40,color:"#4a7a5a",fontSize:14}}>Sin tareas en el período seleccionado</div>
       ) : (<>
+        {kpiCard(statsDeportes,"⚽🏌️ Deportes — Golf + Fútbol","#4ade80")}
+        {kpiCard(statsGeneral,"🏛️ Áreas Generales / Operaciones","#c4b5fd")}
+        {kpiCard(statsTotal,"📊 Total Áreas Verdes","#34d399")}
 
-        {/* ── KPIs ── */}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))",gap:10,marginBottom:14}}>
-          {[
-            {label:"Total tareas",val:total,color:"#34d399"},
-            {label:"✅ Hechas",val:hechas,color:"#22c55e"},
-            {label:"🔴 No realizadas",val:noPudo,color:"#ef4444"},
-            {label:"⏳ Pendientes",val:pend,color:"#f59e0b"},
-            {label:"Cumplimiento",val:pct+"%",color:pct>=80?"#22c55e":pct>=50?"#f59e0b":"#ef4444"},
-          ].map(k=>(
-            <div key={k.label} style={{background:`${k.color}08`,border:`1px solid ${k.color}25`,borderRadius:10,padding:"10px",textAlign:"center"}}>
-              <div style={{fontSize:22,fontWeight:700,color:k.color}}>{k.val}</div>
-              <div style={{fontSize:10,color:"#5a9a7a"}}>{k.label}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* ── Por trabajador (pantalla) ── */}
-        <div style={{...S.card,marginBottom:12,padding:"12px 14px"}}>
-          <div style={{fontSize:12,fontWeight:600,color:"#34d399",marginBottom:8}}>Desempeño por trabajador</div>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-            <thead><tr style={{background:"rgba(52,211,153,0.08)"}}>
-              {["Trabajador","Total","✅ Hechas","🔴 No realizó","⏳ Pendiente","%"].map(h=>(
-                <th key={h} style={{padding:"5px 8px",textAlign:h==="Trabajador"?"left":"center",color:"#34d399",fontWeight:600,fontSize:10}}>{h}</th>
-              ))}
-            </tr></thead>
-            <tbody>
-              {Object.entries(porTrabajador).sort((a,b)=>b[1].hechas-a[1].hechas).map(([n,d],i)=>{
-                const p2=d.total?Math.round(d.hechas/d.total*100):0;
-                return (<tr key={n} style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
-                  <td style={{padding:"4px 8px",fontWeight:600,color:"#ede9e0"}}>{n}</td>
-                  <td style={{padding:"4px",textAlign:"center",color:"#5a9a7a"}}>{d.total}</td>
-                  <td style={{padding:"4px",textAlign:"center",color:"#22c55e",fontWeight:600}}>{d.hechas}</td>
-                  <td style={{padding:"4px",textAlign:"center",color:d.noPudo>0?"#ef4444":"#4a7a5a"}}>{d.noPudo||"—"}</td>
-                  <td style={{padding:"4px",textAlign:"center",color:d.pend>0?"#f59e0b":"#4a7a5a"}}>{d.pend||"—"}</td>
-                  <td style={{padding:"4px",textAlign:"center",fontWeight:700,color:p2>=80?"#22c55e":p2>=50?"#f59e0b":"#ef4444"}}>{p2}%</td>
-                </tr>);
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {/* ── Resumen por tipo global ── */}
-        <div style={{...S.card,marginBottom:12,padding:"12px 14px"}}>
-          <div style={{fontSize:12,fontWeight:600,color:"#34d399",marginBottom:8}}>Resumen por tipo de actividad</div>
-          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-            {Object.entries(porTipoGlobal).filter(([,d])=>d.total>0).sort((a,b)=>b[1].total-a[1].total).map(([tipo,d])=>{
-              const p2=d.total?Math.round(d.hechas/d.total*100):0;
-              const col=p2>=80?"#22c55e":p2>=50?"#f59e0b":"#ef4444";
-              return (
-                <div key={tipo} style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",
-                  borderRadius:8,padding:"6px 10px",minWidth:110,textAlign:"center"}}>
-                  <div style={{fontSize:13,fontWeight:700,color:col}}>{d.hechas}/{d.total}</div>
-                  <div style={{fontSize:10,color:"#5a9a7a"}}>{tipo}</div>
-                  <div style={{fontSize:11,fontWeight:600,color:col}}>{p2}%</div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* ── Tareas no realizadas ── */}
-        {tareasNoPudo.length>0&&(
-          <div style={{...S.card,marginBottom:12,padding:"12px 14px",border:"1px solid rgba(239,68,68,0.2)"}}>
-            <div style={{fontSize:12,fontWeight:600,color:"#f87171",marginBottom:8}}>
-              🔴 Tareas no realizadas ({tareasNoPudo.length})
-            </div>
+        {statsTotal.noPudoList.length>0&&(
+          <div style={{...S.card,marginBottom:8,padding:"10px 14px",border:"1px solid rgba(239,68,68,0.2)"}}>
+            <div style={{fontSize:12,fontWeight:600,color:"#f87171",marginBottom:8}}>🔴 Tareas no realizadas ({statsTotal.noPudoList.length})</div>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-              <thead><tr style={{background:"rgba(239,68,68,0.08)"}}>
+              <thead><tr style={{background:"rgba(239,68,68,0.06)"}}>
                 {["Fecha","Tarea","Zona","Responsable","Motivo"].map(h=>(
-                  <th key={h} style={{padding:"4px 8px",textAlign:"left",color:"#f87171",fontWeight:600,fontSize:10}}>{h}</th>
+                  <th key={h} style={{padding:"4px 8px",textAlign:"left",color:"#f87171",fontSize:10}}>{h}</th>
                 ))}
               </tr></thead>
               <tbody>
-                {tareasNoPudo.map((t,i)=>(
-                  <tr key={i} style={{borderBottom:"1px solid rgba(239,68,68,0.08)"}}>
+                {statsTotal.noPudoList.map((t,i)=>(
+                  <tr key={i} style={{borderBottom:"1px solid rgba(239,68,68,0.06)"}}>
                     <td style={{padding:"3px 8px",color:"#9ca3af",whiteSpace:"nowrap"}}>{t.fechaDia}</td>
                     <td style={{padding:"3px 8px",color:"#ede9e0"}}>{t.tarea||""}</td>
                     <td style={{padding:"3px 8px",color:"#5a9a7a"}}>{t.zona||""}</td>
@@ -1304,45 +1078,17 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
           </div>
         )}
 
-        {/* ── Cierres de cancha ── */}
-        {cierresCancha.length>0&&(
-          <div style={{...S.card,marginBottom:12,padding:"12px 14px",border:"1px solid rgba(251,191,36,0.2)"}}>
-            <div style={{fontSize:12,fontWeight:600,color:"#fbbf24",marginBottom:8}}>
-              🏌️ Cierres de cancha ({cierresCancha.length})
-            </div>
-            {cierresCancha.map((t,i)=>(
-              <div key={i} style={{fontSize:11,padding:"3px 0",borderBottom:"1px solid rgba(255,255,255,0.04)",color:"#ede9e0"}}>
-                {t.fechaDia} · {t.tarea} · <span style={{color:esHecha(t)?"#22c55e":"#f59e0b"}}>{t.estado}</span>
+        {incFitoPeriodo.length>0&&(
+          <div style={{...S.card,marginBottom:8,padding:"10px 14px",border:"1px solid rgba(245,158,11,0.2)"}}>
+            <div style={{fontSize:12,fontWeight:600,color:"#fbbf24",marginBottom:8}}>🌿 Incidencias fitosanitarias ({incFitoPeriodo.length})</div>
+            {incFitoPeriodo.map((inc,i)=>(
+              <div key={i} style={{fontSize:11,padding:"3px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                <span style={{color:"#9ca3af",marginRight:8}}>{inc.fecha}</span>
+                <span style={{color:"#34d399",marginRight:8}}>{inc.zona}</span>
+                <span style={{fontWeight:600,color:"#ede9e0"}}>{inc.problema}</span>
+                {inc.producto&&<span style={{color:"#5a9a7a",marginLeft:8}}>→ {inc.producto}{inc.dosis?" "+inc.dosis:""}{inc.ri?" (RI:"+inc.ri+"h)":""}</span>}
               </div>
             ))}
-          </div>
-        )}
-
-        {/* ── Incidencias fitosanitarias ── */}
-        {incFitoPeriodo.length>0&&(
-          <div style={{...S.card,marginBottom:12,padding:"12px 14px",border:"1px solid rgba(245,158,11,0.2)"}}>
-            <div style={{fontSize:12,fontWeight:600,color:"#fbbf24",marginBottom:8}}>
-              🌿 Incidencias fitosanitarias ({incFitoPeriodo.length})
-            </div>
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-              <thead><tr style={{background:"rgba(245,158,11,0.08)"}}>
-                {["Fecha","Zona","Problema","Tratamiento","RI (h)","Estado"].map(h=>(
-                  <th key={h} style={{padding:"4px 8px",textAlign:"left",color:"#fbbf24",fontWeight:600,fontSize:10}}>{h}</th>
-                ))}
-              </tr></thead>
-              <tbody>
-                {incFitoPeriodo.map((inc,i)=>(
-                  <tr key={i} style={{borderBottom:"1px solid rgba(245,158,11,0.08)"}}>
-                    <td style={{padding:"3px 8px",color:"#9ca3af",whiteSpace:"nowrap"}}>{inc.fecha}</td>
-                    <td style={{padding:"3px 8px",color:"#34d399"}}>{inc.zona||""}</td>
-                    <td style={{padding:"3px 8px",color:"#ede9e0",fontWeight:600}}>{inc.problema||""}</td>
-                    <td style={{padding:"3px 8px",color:"#ede9e0"}}>{inc.producto||""}{inc.dosis?` · ${inc.dosis}`:""}</td>
-                    <td style={{padding:"3px 8px",textAlign:"center",color:"#f59e0b"}}>{inc.ri||"—"}</td>
-                    <td style={{padding:"3px 8px",color:"#5a9a7a"}}>{inc.estado||""}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         )}
       </>)}
