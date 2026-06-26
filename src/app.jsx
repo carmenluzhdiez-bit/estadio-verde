@@ -908,12 +908,14 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
     });
     return {total,hechas,noPudo,pend,pct,porTrab,porZona,porCategoria,porTipo,
       noPudoList:tareas.filter(t=>t.estado==="no_pudo"),
-      // Cierres sectoriales: por origenCierre, por texto "cierre", o por tipo recuperación/fitosanitario
+      // Cierres sectoriales: fitosanitario, recuperación, evento/montaje
       cierres:tareas.filter(t=>
         t.origenCierre===true ||
         (t.tarea||"").toLowerCase().includes("cierre") ||
         (t.tarea||"").toLowerCase().includes("clausura") ||
-        (t.tarea||"").toLowerCase().includes("recuperac")
+        (t.tarea||"").toLowerCase().includes("recuperac") ||
+        (t.tarea||"").startsWith("🌱") ||
+        (t.tarea||"").startsWith("🎉 EVENTO")
       )};
   };
 
@@ -976,7 +978,36 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
 
   const hFito=()=>{if(!incFitoPeriodo.length)return "";return `<h3 style="color:#92400e;border-bottom:2px solid #f59e0b;padding-bottom:3px;margin:14px 0 8px;font-size:13px">Incidencias fitosanitarias</h3><table style="width:100%;border-collapse:collapse;font-size:11px"><tr style="background:#92400e;color:#fff"><th style="padding:5px 8px;text-align:left">Fecha</th><th style="padding:5px;text-align:left">Zona</th><th style="padding:5px;text-align:left">Problema</th><th style="padding:5px;text-align:left">Tratamiento</th><th style="padding:5px;text-align:center">RI(h)</th></tr>${incFitoPeriodo.map((inc,i)=>`<tr style="background:${i%2===0?"#fff":"#fffbeb"}"><td style="padding:4px 8px;white-space:nowrap">${inc.fecha||""}</td><td style="padding:4px 8px">${inc.zona||""}</td><td style="padding:4px 8px;font-weight:600">${inc.problema||""}</td><td style="padding:4px 8px">${inc.producto||""}${inc.dosis?" · "+inc.dosis:""}</td><td style="padding:4px;text-align:center">${inc.ri||"—"}</td></tr>`).join("")}</table>`;};
 
-  const hCierres=(st,titulo)=>{if(!st.cierres.length)return "";return `<h3 style="color:#92400e;border-bottom:2px solid #f59e0b;padding-bottom:3px;margin:14px 0 8px;font-size:13px">${titulo||"Cierres y restricciones sectoriales"}</h3><table style="width:100%;border-collapse:collapse;font-size:11px"><tr style="background:#92400e;color:#fff"><th style="padding:5px 8px;text-align:left">Fecha</th><th style="padding:5px;text-align:left">Zona/Sector</th><th style="padding:5px;text-align:left">Descripción</th><th style="padding:5px;text-align:left">Estado</th><th style="padding:5px;text-align:left">Notas</th></tr>${st.cierres.map((t,i)=>`<tr style="background:${i%2===0?"#fff":"#fffbeb"}"><td style="padding:4px 8px;white-space:nowrap">${t.fechaDia||""}</td><td style="padding:4px 8px;font-weight:600">${t.zona||""}</td><td style="padding:4px 8px">${t.tarea||""}</td><td style="padding:4px 8px;font-weight:600;color:${["hecha","completada"].includes(t.estado)?"#166534":"#92400e"}">${t.estado||""}</td><td style="padding:4px 8px;font-size:10px;color:#666">${t.notas||""}</td></tr>`).join("")}</table>`;};
+  const hCierres=(st,titulo)=>{
+    if(!st.cierres.length) return "";
+    const FLUJO_LABEL={"fitosanitario":"🦠 Fitosanitario","recuperacion":"🌱 Recuperación","evento":"🎉 Evento/Montaje"};
+    const FLUJO_COLOR={"fitosanitario":"#991b1b","recuperacion":"#166534","evento":"#1e40af"};
+    return `<h3 style="color:#92400e;border-bottom:2px solid #f59e0b;padding-bottom:3px;margin:14px 0 8px;font-size:13px">${titulo||"Cierres y restricciones sectoriales"}</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:11px">
+      <tr style="background:#92400e;color:#fff">
+        <th style="padding:5px 8px;text-align:left">Fecha</th>
+        <th style="padding:5px;text-align:left">Tipo</th>
+        <th style="padding:5px;text-align:left">Sector</th>
+        <th style="padding:5px;text-align:left">Descripción</th>
+        <th style="padding:5px;text-align:left">Estado</th>
+        <th style="padding:5px;text-align:left">Reapertura / Notas</th>
+      </tr>
+      ${st.cierres.map((t,i)=>{
+        const flujo=t.flujo||"";
+        const flabel=FLUJO_LABEL[flujo]||"🚫 Cierre";
+        const fcolor=FLUJO_COLOR[flujo]||"#92400e";
+        const esHecho=["hecha","completada"].includes(t.estado);
+        return `<tr style="background:${i%2===0?"#fff":"#fffbeb"}">
+          <td style="padding:4px 8px;white-space:nowrap">${t.fechaDia||""}</td>
+          <td style="padding:4px 8px;font-weight:600;color:${fcolor}">${flabel}</td>
+          <td style="padding:4px 8px;font-weight:600">${t.zona||t.elemento||""}</td>
+          <td style="padding:4px 8px">${(t.tarea||"").replace("🚫 CIERRE: ","").replace("🌱 ","").replace("🎉 EVENTO: ","")}</td>
+          <td style="padding:4px 8px;font-weight:600;color:${esHecho?"#166534":"#92400e"}">${esHecho?"✅ Reabierto":"🚫 Cerrado"}</td>
+          <td style="padding:4px 8px;font-size:10px;color:#555">${t.notas||""}</td>
+        </tr>`;
+      }).join("")}
+    </table>`;
+  };
 
   const hPie=`<div style="text-align:center;margin-top:24px;font-size:10px;color:#888;border-top:1px solid ${BO};padding-top:8px">Departamento de Áreas Verdes · Estadio Español de Las Condes · Carmen Luz Hermosilla Diez</div>`;
 
@@ -991,7 +1022,7 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
     const sG=calcStats(tGolf), sF=calcStats(tFutbol);
     const cuerpo=hEnc("Reporte Gerencia Deportes","Golf + Cancha Fútbol · "+periodoLabel)+
       h2("🏌️ Campo de Golf")+
-      (sG.total>0?hKpi(sG)+hTipos(sG)+hNoPudo(sG)+hFito():"<p style='color:#888;font-size:12px'>Sin tareas en el período.</p>")+
+      (sG.total>0?hKpi(sG)+hTipos(sG)+hNoPudo(sG)+hCierres({...sG,cierres:sG.cierres||[]},"Cierres y restricciones en Golf")+hFito():"<p style='color:#888;font-size:12px'>Sin tareas en el período.</p>")+
       sep+h2("⚽ Cancha de Fútbol")+
       (sF.total>0?hKpi(sF)+hTipos(sF)+hNoPudo(sF)+hCierres(sF):"<p style='color:#888;font-size:12px'>Sin tareas en el período.</p>");
     const w=window.open("","_blank","width=960,height=750"); w.document.write(wrap(cuerpo)); w.document.close();
@@ -7632,7 +7663,7 @@ const DECISIONES_HUM=[
   {value:"monitorear",      label:"👁️ Monitorear"},
 ];
 
-function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasProg, setTareasProg, showHumForm, setShowHumForm, humForm, setHumForm, emptyHumForm , onRegistroGuardado }) {
+function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasProg, setTareasProg, showHumForm, setShowHumForm, humForm, setHumForm, emptyHumForm, onRegistroGuardado, crearNotificacion }) {
   const humedades = Array.isArray(golfData.humedades)?golfData.humedades:Object.values(golfData.humedades||{});
   const setHumedades = (arr) => setG({humedades:arr});
   const labelSt = {fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
@@ -7667,6 +7698,17 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
     }
     setHumForm(emptyHumForm);
     setShowHumForm(false);
+    if(crearNotificacion) {
+      const vals = Object.entries(nueva.valores||{})
+        .filter(([,v])=>v)
+        .map(([k,v])=>`${k.replace("green","G")}:${v}`)
+        .join(" · ");
+      crearNotificacion("humedad", {
+        responsable: nueva.responsable||"",
+        detalle: `Humedad registrada — ${vals||nueva.decision||"sin datos"}`,
+        decision: nueva.decision||"",
+      });
+    }
     if(onRegistroGuardado) onRegistroGuardado("humedad");
   };
 
@@ -8470,7 +8512,7 @@ function TareasGolfPanel({ tareasGolfHoy, hoy, esJefa, setTareasProg, tareasProg
 }
 
 
-function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado }) {
+function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion }) {
   const GOLF_ZONA_ID = 31; // ID macrozona Golf
   const sincronizarMacrozona = (tipo, detalle) => {
     if(!updateZona) return;
@@ -8604,7 +8646,19 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
     sincronizarMacrozona("Medición de alturas", `${medForm.tipo} — ${medForm.responsable||"Sin responsable"}`);
     setMedForm({...emptyMed, fecha:hoy});
     setShowMedForm(false);
-    // Si vino desde Mi Turno (trabajador), volver automáticamente
+    // Notificar a la jefa
+    if(crearNotificacion) {
+      const alturas = Object.entries(nueva.alturas||{})
+        .filter(([,v])=>v)
+        .map(([k,v])=>`${k.replace("green","G")}:${v}mm`)
+        .join(" · ");
+      crearNotificacion("medicion", {
+        responsable: nueva.responsable||"",
+        detalle: `Alturas registradas — ${alturas||"sin datos"}`,
+        valores: nueva.alturas||{},
+        tipo_medicion: nueva.tipo||"rutinaria",
+      });
+    }
     if(onRegistroGuardado) onRegistroGuardado("medicion");
   };
 
@@ -9935,6 +9989,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           tareasProg={tareasProg}
           setTareasProg={setTareasProg}
           onRegistroGuardado={onRegistroGuardado}
+          crearNotificacion={crearNotificacion}
           showHumForm={showHumForm}
           setShowHumForm={setShowHumForm}
           humForm={humForm}
@@ -11713,8 +11768,36 @@ export default function App() {
   });
   const [bonosMasivos,   setBonosMasivos,   bonosMasReady] = useFirebaseState("bonos-masivos", []);
   const [rendicionesRRHH, setRendicionesRRHH] = useFirebaseState("rendiciones-rrhh", []);
+  const [notificaciones, setNotificaciones]   = useFirebaseState("notificaciones", []);
 
   const appReady = dataReady && personalReady && progReady;
+
+  // ── Helper: registrar notificación en Firebase ───────────────────────
+  const crearNotificacion = React.useCallback((tipo, datos) => {
+    const nueva = {
+      id: Date.now() + Math.random(),
+      tipo,
+      fecha: new Date().toISOString().slice(0,10),
+      hora:  new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"}),
+      leida: false,
+      ...datos,
+    };
+    setNotificaciones(prev => {
+      const arr = Array.isArray(prev) ? prev : Object.values(prev||{});
+      return [nueva, ...arr].slice(0, 100);
+    });
+  }, [setNotificaciones]);
+
+  // Notificaciones no leídas para la jefa
+  const notifNoLeidas = React.useMemo(() => {
+    const arr = Array.isArray(notificaciones) ? notificaciones : Object.values(notificaciones||{});
+    return arr.filter(n => !n.leida);
+  }, [notificaciones]);
+
+  const marcarTodasLeidas = () => {
+    const arr = Array.isArray(notificaciones) ? notificaciones : Object.values(notificaciones||{});
+    setNotificaciones(arr.map(n => ({...n, leida:true})));
+  };
 
   // Migración: corregir tareas con responsable asignado pero estado "por_designar"
   useEffect(()=>{
@@ -12075,13 +12158,22 @@ export default function App() {
         </div>
         <div style={S.headerNav} className="headerNav">
           {(fbRol==="jefa"
-            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["fungicidas","🧪","Fungicidas"],["compras","🛒","Compras"],["bodegas","🏪","Bodegas"],["golf","🏌️","Golf"],["personal","👷","Personal"]]
+            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["fungicidas","🧪","Fungicidas"],["compras","🛒","Compras"],["bodegas","🏪","Bodegas"],["golf","🏌️","Golf"],["personal","👷","Personal"],["notificaciones","🔔","Alertas"]]
             : fbRol==="supervisor"
             ? [["dashboard","📊","Panel"],["programacion","📆","Programa"],["reporte","📋","Reporte"],["golf","🏌️","Golf"],["miturno","🌿","Mi Turno"]]
             : [["miturno","🌿","Mi Turno"]]
           ).map(([v,ico,lbl])=>(
-            <button key={v} onClick={()=>{setVista(v);setZonaId(null);setAiText("");}} style={{cursor:"pointer",border:"none",background:"transparent",color:vista===v?"#fff":"#7aaa80",fontFamily:"'Georgia',serif",fontSize:12,padding:"10px 14px",borderBottom:vista===v?"2px solid #4a9a64":"2px solid transparent",transition:"all .15s",whiteSpace:"nowrap",display:"flex",flexDirection:"column",alignItems:"center",gap:2,flexShrink:0}}>
-              <span style={{fontSize:16}}>{ico}</span>
+            <button key={v} onClick={()=>{setVista(v);setZonaId(null);setAiText("");if(v==="notificaciones")marcarTodasLeidas();}} style={{cursor:"pointer",border:"none",background:"transparent",color:vista===v?"#fff":"#7aaa80",fontFamily:"'Georgia',serif",fontSize:12,padding:"10px 14px",borderBottom:vista===v?"2px solid #4a9a64":"2px solid transparent",transition:"all .15s",whiteSpace:"nowrap",display:"flex",flexDirection:"column",alignItems:"center",gap:2,flexShrink:0,position:"relative"}}>
+              <span style={{fontSize:16,position:"relative"}}>
+                {ico}
+                {v==="notificaciones"&&notifNoLeidas.length>0&&(
+                  <span style={{position:"absolute",top:-6,right:-8,background:"#ef4444",color:"#fff",
+                    borderRadius:"50%",width:15,height:15,fontSize:9,fontWeight:700,
+                    display:"flex",alignItems:"center",justifyContent:"center"}}>
+                    {notifNoLeidas.length>9?"9+":notifNoLeidas.length}
+                  </span>
+                )}
+              </span>
               <span>{lbl}</span>
             </button>
           ))}
@@ -12793,11 +12885,9 @@ export default function App() {
         {/* GOLF */}
         {vista==="golf"&&(
           <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial}
+            crearNotificacion={crearNotificacion}
             onRegistroGuardado={(tipo)=>{
-              // Volver a Mi Turno después de registrar alturas o humedad
-              if(rolLogueado==="trabajador") {
-                setVista("miturno");
-              }
+              if(rolLogueado==="trabajador") setVista("miturno");
             }}
           />
         )}
@@ -12808,6 +12898,64 @@ export default function App() {
         )}
 
         {/* PERSONAL */}
+        {/* ── ALERTAS / NOTIFICACIONES ── */}
+        {vista==="notificaciones"&&(
+          <div className="ein">
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+              <div>
+                <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:700,marginBottom:2}}>🔔 Alertas de registros</h2>
+                <p style={{color:"#6aaa7a",fontSize:13}}>Mediciones de altura y humedad registradas por los jardineros</p>
+              </div>
+              {notifNoLeidas.length>0&&(
+                <button onClick={marcarTodasLeidas}
+                  style={{...S.btn,fontSize:12,color:"#6aaa7a",border:"1px solid rgba(255,255,255,0.1)",background:"transparent"}}>
+                  ✓ Marcar todas leídas
+                </button>
+              )}
+            </div>
+            {(()=>{
+              const arr = (Array.isArray(notificaciones)?notificaciones:Object.values(notificaciones||{}))
+                .sort((a,b)=>(b.fecha+b.hora).localeCompare(a.fecha+a.hora));
+              if(arr.length===0) return (
+                <div style={{...S.card,padding:40,textAlign:"center",color:"#4a7a5a"}}>
+                  <div style={{fontSize:36,marginBottom:10}}>🔔</div>
+                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:16}}>Sin alertas aún</div>
+                  <div style={{fontSize:13,color:"#4a7a5a",marginTop:6}}>Aparecerán aquí cuando un jardinero registre alturas o humedad</div>
+                </div>
+              );
+              return arr.map((n,i)=>{
+                const esMed=n.tipo==="medicion";
+                const col=esMed?"#34d399":"#60a5fa";
+                return (
+                  <div key={n.id||i} style={{...S.card,marginBottom:8,padding:"12px 16px",
+                    background:n.leida?"transparent":"rgba(52,211,153,0.04)",
+                    border:`1px solid ${n.leida?"rgba(255,255,255,0.07)":`${col}25`}`,
+                    opacity:n.leida?0.7:1}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
+                      <div style={{flex:1}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                          <span style={{fontSize:15}}>{esMed?"📏":"💧"}</span>
+                          <span style={{fontSize:13,fontWeight:700,color:col}}>
+                            {esMed?"Medición de alturas":"Humedad registrada"}
+                          </span>
+                          {!n.leida&&<span style={{fontSize:9,background:col,color:"#fff",padding:"2px 6px",borderRadius:8,fontWeight:700}}>NUEVO</span>}
+                        </div>
+                        <div style={{fontSize:12,color:"#ede9e0",marginBottom:3}}>👷 <strong>{n.responsable||"Sin nombre"}</strong></div>
+                        <div style={{fontSize:11,color:"#5a9a7a",marginBottom:2}}>{n.detalle}</div>
+                        {n.decision&&<div style={{fontSize:11,color:"#f59e0b"}}>→ {n.decision}</div>}
+                      </div>
+                      <div style={{textAlign:"right",minWidth:90}}>
+                        <div style={{fontSize:12,color:col,fontWeight:600}}>{n.fecha}</div>
+                        <div style={{fontSize:11,color:"#5a9a7a"}}>{n.hora}</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              });
+            })()}
+          </div>
+        )}
+
         {vista==="personal"&&personalVista==="lista"&&(
           <div className="ein">
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",marginBottom:22,flexWrap:"wrap",gap:12}}>
