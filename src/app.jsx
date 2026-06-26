@@ -7582,15 +7582,22 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
             {" · "}Medir sector <strong style={{color:sectorColor}}>{sectorLabel}</strong>
           </div>
         </div>
-        <button className="btn-p" style={S.btn} onClick={()=>setShowHumForm(true)}>💧 Nueva medición</button>
+        {esJefa&&<button className="btn-p" style={S.btn} onClick={()=>setShowHumForm(true)}>💧 Nueva medición</button>}
+        {!esJefa&&(
+          <button onClick={()=>{if(onRegistroGuardado)onRegistroGuardado("miturno");}}
+            style={{cursor:"pointer",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,padding:"6px 14px",background:"transparent",color:"#6aaa7a",fontSize:12,fontFamily:"'Georgia',serif"}}>
+            ← Volver a Mi Turno
+          </button>
+        )}
       </div>
-      <div style={{...S.card,padding:"10px 14px",marginBottom:14,display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+      {!esJefa&&!showHumForm&&setShowHumForm(true)&&null}
+      {esJefa&&<div style={{...S.card,padding:"10px 14px",marginBottom:14,display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
         <span style={{fontSize:11,color:"#5a9a7a",marginRight:4}}>Escala:</span>
         {[{v:1,l:"1-2 Seco",c:"#ef4444"},{v:3,l:"3-5 Ajustar",c:"#f59e0b"},{v:6,l:"6-7 Óptimo",c:"#22c55e"},{v:8,l:"8 Saturado",c:"#3b82f6"}].map(({v,l,c})=>(
           <span key={v} style={{fontSize:11,background:`${c}15`,color:c,border:`1px solid ${c}35`,padding:"2px 8px",borderRadius:20,fontWeight:600}}>{l}</span>
         ))}
         <span style={{fontSize:10,color:"#4a7a5a",marginLeft:4}}>· Sector: {sectorLabel}</span>
-      </div>
+      </div>}
       {showHumForm&&(
         <div style={{...S.card,padding:20,marginBottom:16,background:"rgba(96,165,250,0.04)",borderColor:"rgba(96,165,250,0.2)"}} className="ein">
           <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#60a5fa",marginBottom:14}}>
@@ -7706,7 +7713,7 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
           </div>
         </div>
       )}
-      {ultimaHum&&(
+      {esJefa&&ultimaHum&&(
         <div style={{...S.card,padding:16,marginBottom:16,borderLeft:"3px solid #60a5fa"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
             <div>
@@ -9661,11 +9668,20 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       {/* ── MEDICIONES ── */}
       {subTab==="mediciones"&&(
         <div className="ein">
-          <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
-            <button className="btn-p" style={S.btn} onClick={()=>{
-            setShowMedForm(true);
-          }}>📏 Nueva medición</button>
-          </div>
+          {!esJefa&&(
+            <div style={{marginBottom:12}}>
+              <button onClick={()=>{if(onRegistroGuardado)onRegistroGuardado("miturno");}}
+                style={{...S.btn,fontSize:12,color:"#6aaa7a",border:"1px solid rgba(255,255,255,0.1)",background:"transparent"}}>
+                ← Volver a Mi Turno
+              </button>
+            </div>
+          )}
+          {esJefa&&(
+            <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+              <button className="btn-p" style={S.btn} onClick={()=>setShowMedForm(true)}>📏 Nueva medición</button>
+            </div>
+          )}
+          {!esJefa&&!showMedForm&&setShowMedForm(true)&&null}
 
           {showMedForm&&(
             <div style={{...S.card,padding:20,marginBottom:14,background:"rgba(52,211,153,0.04)",borderColor:"rgba(52,211,153,0.2)"}} className="ein">
@@ -9846,14 +9862,16 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             </div>
           )}
 
-          {/* Historial mediciones + Gráfico */}
-          <MedicionesAnalisis
-            mediciones={mediciones} GREENS_DEF={GREENS_DEF} rango={rango}
-            colorAltura={colorAltura} S={S} esJefa={esJefa}
-            tareasProg={tareasProg}
-            onBorrar={(id)=>setG({mediciones:mediciones.filter(m=>m.id!==id)})}
-            onBorrarTodo={()=>setG({mediciones:[]})}
-          />
+          {/* Historial mediciones + Gráfico — solo jefa/supervisor */}
+          {esJefa&&(
+            <MedicionesAnalisis
+              mediciones={mediciones} GREENS_DEF={GREENS_DEF} rango={rango}
+              colorAltura={colorAltura} S={S} esJefa={esJefa}
+              tareasProg={tareasProg}
+              onBorrar={(id)=>setG({mediciones:mediciones.filter(m=>m.id!==id)})}
+              onBorrarTodo={()=>setG({mediciones:[]})}
+            />
+          )}
         </div>
       )}
 
@@ -12450,16 +12468,31 @@ export default function App() {
                             }
                           }}
                           style={{...S.input,flex:"2 1 200px"}}/>
-                        <select value={newElem.tipo} onChange={e=>setNewElem(p=>({...p,tipo:e.target.value}))} style={{...S.input,flex:"1 1 150px",maxWidth:210}}>
+                        <div style={{flex:"1 1 150px",maxWidth:220}}>
                           {(()=>{
                             const vk=["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
                             const ok=["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","bodegas"];
-                            return(<>
-                              <optgroup label="🌿 Vegetación">{vk.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup>
-                              <optgroup label="🏗️ Infraestructura">{ok.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup>
+                            const esVege = vk.includes(newElem.tipo);
+                            return (<>
+                              {/* Selector de grupo */}
+                              <div style={{display:"flex",gap:4,marginBottom:4}}>
+                                <button onClick={()=>setNewElem(p=>({...p,tipo:"arboles"}))}
+                                  style={{flex:1,cursor:"pointer",border:`1px solid ${esVege?"rgba(34,197,94,0.5)":"rgba(255,255,255,0.1)"}`,borderRadius:6,padding:"4px 6px",fontSize:11,background:esVege?"rgba(34,197,94,0.1)":"transparent",color:esVege?"#4ade80":"#6aaa7a",fontFamily:"'Georgia',serif"}}>
+                                  🌿 Vegetación
+                                </button>
+                                <button onClick={()=>setNewElem(p=>({...p,tipo:"infraestructura"}))}
+                                  style={{flex:1,cursor:"pointer",border:`1px solid ${!esVege?"rgba(245,158,11,0.5)":"rgba(255,255,255,0.1)"}`,borderRadius:6,padding:"4px 6px",fontSize:11,background:!esVege?"rgba(245,158,11,0.1)":"transparent",color:!esVege?"#fbbf24":"#6aaa7a",fontFamily:"'Georgia',serif"}}>
+                                  🏗️ Infraestructura
+                                </button>
+                              </div>
+                              {/* Selector de tipo específico */}
+                              <select value={newElem.tipo} onChange={e=>setNewElem(p=>({...p,tipo:e.target.value}))}
+                                style={{...S.input,width:"100%",fontSize:12}}>
+                                {(esVege?vk:ok).map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}
+                              </select>
                             </>);
                           })()}
-                        </select>
+                        </div>
                       </div>
                       <div style={{display:"flex",gap:8,alignItems:"center"}}>
                         <button className="btn-p" style={S.btn} onClick={()=>{
