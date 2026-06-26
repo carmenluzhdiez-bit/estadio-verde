@@ -11756,12 +11756,12 @@ export default function App() {
 
   // updateZona — actualiza una zona en el estado data
 
-  const updateZona = (id, patch) => setData(p => ({ ...p, [id]: { ...p[id], ...patch } }));
+  const updateZona = (id, patch) => setData(p => ({ ...p, [String(id)]: { ...p[String(id)], ...patch } }));
   const addHistorial = (id, txt) => setData(p => ({
-    ...p, [id]: { ...p[id], historial: [{ txt, fecha: new Date().toLocaleDateString("es-CL"), hora: new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"}) }, ...(p[id]?.historial||[])].slice(0,30) }
+    ...p, [String(id)]: { ...p[String(id)], historial: [{ txt, fecha: new Date().toLocaleDateString("es-CL"), hora: new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"}) }, ...(p[id]?.historial||[])].slice(0,30) }
   }));
 
-  const getZD = (zid) => data[zid] ?? { estadoGeneral:"bueno", ultimoMant:"", proximoMant:"", notas:"", elementos:{}, elementosCustom:[], tareas:[], historial:[] };
+  const getZD = (zid) => data[String(zid)] ?? { estadoGeneral:"bueno", ultimoMant:"", proximoMant:"", notas:"", elementos:{}, elementosCustom:[], tareas:[], historial:[] };
   const getElemFrecs = (zid, eid, tipo, isCustom) => {
     const zdat = getZD(zid);
     if (isCustom) { const ce=(zdat.elementosCustom||[]).find(e=>e.id===eid); if(ce?.frecuencias) return ce.frecuencias; }
@@ -11777,8 +11777,9 @@ export default function App() {
   const zd = zonaId ? getZD(zonaId) : null;
 
   const getAllElems = (zid) => {
-    const z = zonas.find(x=>x.id===zid);
-    const zdat = getZD(zid);
+    const zidS = String(zid);
+    const z = zonas.find(x=>String(x.id)===zidS);
+    const zdat = getZD(zidS);
     const base = (z?.elementos||[]).map(e=>({...e,isCustom:false,edData:zdat.elementos?.[e.id]||{estado:"bueno",notas:""}}));
     const custom = (zdat.elementosCustom||[]).map(e=>({...e,isCustom:true,edData:{estado:e.estado||"bueno",notas:e.notas||""}}));
     return [...base,...custom].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
@@ -11842,7 +11843,7 @@ export default function App() {
     if(isCustom) return (data[zid]?.elementosCustom||[]).find(e=>e.id===eid)?.nombre||"";
     return zonas.find(z=>z.id===zid)?.elementos.find(e=>e.id===eid)?.nombre||"";
   };
-  const addCustomElem = (zid,elem) => { const id="c"+Date.now(); const arr=[...(data[zid]?.elementosCustom||[]),{...elem,id,estado:"bueno",notas:""}]; updateZona(zid,{elementosCustom:arr}); addHistorial(zid,`Elemento agregado: ${elem.nombre}`); };
+  const addCustomElem = (zid,elem) => { const id="c"+Date.now(); const arr=[...(data[String(zid)]?.elementosCustom||[]),{...elem,id,estado:"bueno",notas:""}]; updateZona(zid,{elementosCustom:arr}); addHistorial(zid,`Elemento agregado: ${elem.nombre}`); };
   const removeCustomElem = (zid,eid) => { const arr=(data[zid]?.elementosCustom||[]).filter(e=>e.id!==eid); updateZona(zid,{elementosCustom:arr}); };
   const removeBaseElem = (zid,eid) => { setZonas(prev=>prev.map(z=>z.id===zid?{...z,elementos:z.elementos.filter(e=>e.id!==eid)}:z)); const elems={...data[zid]?.elementos}; delete elems[eid]; updateZona(zid,{elementos:elems}); addHistorial(zid,`Elemento eliminado`); };
 
@@ -12173,7 +12174,7 @@ export default function App() {
                 <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:10,color:"#fca5a5"}}>🚨 Zonas en Estado Crítico</div>
                 <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
                   {MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral==="critico").map(z=>(
-                    <span key={z.id} onClick={()=>{setZonaId(z.id);setVista("zonas");setTab("elementos");}} style={{...S.chip,background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)",cursor:"pointer"}}>{z.icono} {z.nombre}</span>
+                    <span key={z.id} onClick={()=>{setZonaId(String(z.id));setVista("zonas");setTab("elementos");}} style={{...S.chip,background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)",cursor:"pointer"}}>{z.icono} {z.nombre}</span>
                   ))}
                 </div>
               </div>
@@ -12236,7 +12237,7 @@ export default function App() {
                       transition:"all .15s",overflow:"hidden",position:"relative",
                     }}
                     className="hov"
-                    onClick={()=>{setZonaId(z.id);setTab("elementos");setAiText("");}}>
+                    onClick={()=>{setZonaId(String(z.id));setTab("elementos");setAiText("");}}>
                     {/* Banda lateral de estado */}
                     <div style={{position:"absolute",left:0,top:0,bottom:0,width:4,background:est.color,borderRadius:"12px 0 0 12px",opacity:0.8}}/>
                     <div style={{paddingLeft:6}}>
