@@ -1316,7 +1316,7 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
 }
 
 
-function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, puedeCrear=false }) {
+function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, puedeCrear=false, cierresTurno={}, onReabrirTurno }) {
   const [filtroDia,    setFiltroDia]    = React.useState("");
   const [filtroEstado, setFiltroEstado] = React.useState("todos");
   const [filtroTarea,  setFiltroTarea]  = React.useState("");
@@ -1685,15 +1685,49 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
                   <div key={t.id} style={{display:"flex",gap:10,padding:"8px 10px",borderRadius:8,background:"rgba(255,255,255,0.04)",borderLeft:`3px solid ${est.color}40`}}>
                     <span style={{flexShrink:0,fontSize:15}}>{est.icon}</span>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                      <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginBottom:2}}>
                         <span style={{fontSize:13,fontWeight:600}}>{t.tarea}</span>
-                        {t.elemento&&<span style={{fontSize:11,color:"#5a8a6a",background:"rgba(255,255,255,0.05)",padding:"1px 6px",borderRadius:8}}>{t.elemento}</span>}
+                        {t.elemento&&<span style={{fontSize:11,color:"#5a8a6a",background:"rgba(255,255,255,0.05)",padding:"1px 6px",borderRadius:6}}>{t.elemento}</span>}
+                        {(()=>{
+                          const resp=t.responsable||"";
+                          const key=`${d}_${resp.split(" ")[0]?.toLowerCase()||""}`;
+                          const cerrado=cierresTurno?.[key];
+                          return cerrado?(<span style={{fontSize:9,color:"#22c55e",background:"rgba(34,197,94,0.1)",padding:"1px 6px",borderRadius:8,border:"1px solid rgba(34,197,94,0.25)"}}>✅ Turno cerrado {cerrado.hora}</span>):null;
+                        })()}
                       </div>
                       <div style={{display:"flex",gap:8,marginTop:2,flexWrap:"wrap"}}>
-                        <span style={{fontSize:11,color:"#5a7a7a"}}>{MACROZONAS_BASE.find(z=>z.nombre===t.zona)?.icono||"📍"} {t.zona}</span>
+                        <span style={{fontSize:11,color:"#5a7a7a"}}>{MACROZONAS_BASE.find(z=>z.nombre===t.zona)?.icono||""} {t.zona}</span>
                         {t.responsable&&<span style={{fontSize:11,color:"#7a9a8a"}}>👤 {t.responsable}</span>}
                       </div>
-                      {t.notaWorker&&<div style={{fontSize:11,color:t.estado==="no_pudo"?"#fca5a5":"#7aaa80",marginTop:4,fontStyle:"italic",padding:"4px 8px",background:"rgba(255,255,255,0.04)",borderRadius:6}}>{t.estado==="no_pudo"?"⚠️ ":""}{t.notaWorker}</div>}
+                      {t.notaWorker&&<div style={{fontSize:11,color:t.estado==="no_pudo"?"#f87171":"#a0c8a0",marginTop:3,fontStyle:"italic"}}>💬 {t.notaWorker}</div>}
+                      {t.notaJefa&&<div style={{fontSize:10,color:"#fbbf24",marginTop:2,fontStyle:"italic"}}>📋 Revisión jefa: {t.notaJefa}</div>}
+                      {esJefa&&(
+                        <div style={{marginTop:6,display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
+                          <select value={t.estado}
+                            onChange={e=>{
+                              const nA=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+                              setTareas(prev=>({...prev,[d]:nA(prev[d]).map(x=>x.id===t.id?{...x,estado:e.target.value}:x)}));
+                            }}
+                            style={{fontSize:11,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:6,color:"#ede9e0",padding:"3px 6px",cursor:"pointer"}}>
+                            {Object.entries(EC).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
+                          </select>
+                          <input placeholder="Nota de revisión..."
+                            value={t.notaJefa||""}
+                            onChange={e=>{
+                              const nA=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+                              setTareas(prev=>({...prev,[d]:nA(prev[d]).map(x=>x.id===t.id?{...x,notaJefa:e.target.value}:x)}));
+                            }}
+                            style={{fontSize:11,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:6,color:"#ede9e0",padding:"3px 8px",flex:1,minWidth:100,fontFamily:"'Georgia',serif"}}/>
+                          <button onClick={()=>{
+                            if(window.confirm(`¿Eliminar la tarea "${t.tarea}" de ${t.responsable||"sin asignar"}?`)){
+                              const nA=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+                              setTareas(prev=>({...prev,[d]:nA(prev[d]).filter(x=>x.id!==t.id)}));
+                            }
+                          }} style={{cursor:"pointer",border:"1px solid rgba(239,68,68,0.3)",borderRadius:6,padding:"3px 8px",background:"rgba(239,68,68,0.07)",color:"#f87171",fontSize:11,fontFamily:"'Georgia',serif"}}>
+                            🗑
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -1715,7 +1749,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
 
 // ─── PROGRAMACIÓN DIARIA ─────────────────────────────────────────────────────
 // ─── VISTA TRABAJADOR ────────────────────────────────────────────────────────
-function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE, onAccesoRapido, onCambiarMetodo }) {
+function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE, onAccesoRapido, onCambiarMetodo, cierresTurno={}, onCerrarTurno, onReabrirTurno, esJefaApp=false }) {
   const hoy = new Date().toISOString().slice(0,10);
   const [fechaVer, setFechaVer] = React.useState(fecha || hoy);
   const [showNuevaTareaEmerg, setShowNuevaTareaEmerg] = React.useState(false);
@@ -1910,14 +1944,23 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                           </div>
                           <span style={{fontSize:11,fontWeight:600,color:est.color,background:`${est.color}15`,padding:"2px 8px",borderRadius:8,border:`1px solid ${est.color}30`,whiteSpace:"nowrap",flexShrink:0}}>{est.icon} {est.label}</span>
                         </div>
-                        <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-                          {Object.entries(ESTADOS_TAREA).map(([k,v])=>(
-                            <button key={k} onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:k,notaWorker:k!=="no_pudo"?t.notaWorker:""})}
-                              style={{cursor:"pointer",border:`1px solid ${t.estado===k?v.color+"60":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"4px 10px",fontSize:11,background:t.estado===k?`${v.color}15`:"transparent",color:t.estado===k?v.color:"#6aaa7a",fontFamily:"'Georgia',serif"}}>
-                              {v.icon} {v.label}
-                            </button>
-                          ))}
-                        </div>
+                        {puedeEditar ? (
+                          <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                            {Object.entries(ESTADOS_TAREA).map(([k,v])=>(
+                              <button key={k} onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:k,notaWorker:k!=="no_pudo"?t.notaWorker:""})}
+                                style={{cursor:"pointer",border:`1px solid ${t.estado===k?v.color+"60":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"4px 10px",fontSize:11,background:t.estado===k?`${v.color}15`:"transparent",color:t.estado===k?v.color:"#6aaa7a",fontFamily:"'Georgia',serif"}}>
+                                {v.icon} {v.label}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <div style={{display:"flex",alignItems:"center",gap:6}}>
+                            <span style={{fontSize:11,fontWeight:600,color:(ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente).color}}>
+                              {(ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente).icon} {(ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente).label}
+                            </span>
+                            <span style={{fontSize:10,color:"#4a7a5a"}}>· Turno cerrado</span>
+                          </div>
+                        )}
                         {t.estado==="no_pudo"&&(
                           <div style={{marginTop:6}}>
                             <textarea rows={2} placeholder="¿Por qué no se pudo? (obligatorio)" value={t.notaWorker||""} onChange={e=>onUpdateTarea(fechaVer,t.id,{notaWorker:e.target.value})} style={{width:"100%",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:8,color:"#ede9e0",padding:"6px 10px",fontFamily:"'Georgia',serif",fontSize:12,resize:"vertical"}}/>
@@ -2042,14 +2085,20 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                                 </div>
                                 <span style={{fontSize:10,fontWeight:600,color:est.color,background:`${est.color}12`,padding:"2px 7px",borderRadius:8,border:`1px solid ${est.color}25`,whiteSpace:"nowrap",flexShrink:0}}>{est.icon} {est.label}</span>
                               </div>
-                              <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-                                {Object.entries(ESTADOS_TAREA).map(([k,v])=>(
-                                  <button key={k} onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:k,notaWorker:k!=="no_pudo"?t.notaWorker:""})}
-                                    style={{cursor:"pointer",border:`1px solid ${t.estado===k?v.color+"50":"rgba(255,255,255,0.08)"}`,borderRadius:8,padding:"3px 9px",fontSize:11,background:t.estado===k?`${v.color}12`:"transparent",color:t.estado===k?v.color:"#6aaa7a",fontFamily:"'Georgia',serif"}}>
-                                    {v.icon} {v.label}
-                                  </button>
-                                ))}
-                              </div>
+                              {puedeEditar ? (
+                                <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                                  {Object.entries(ESTADOS_TAREA).map(([k,v])=>(
+                                    <button key={k} onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:k,notaWorker:k!=="no_pudo"?t.notaWorker:""})}
+                                      style={{cursor:"pointer",border:`1px solid ${t.estado===k?v.color+"50":"rgba(255,255,255,0.08)"}`,borderRadius:8,padding:"3px 9px",fontSize:11,background:t.estado===k?`${v.color}12`:"transparent",color:t.estado===k?v.color:"#6aaa7a",fontFamily:"'Georgia',serif"}}>
+                                      {v.icon} {v.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span style={{fontSize:11,fontWeight:600,color:(ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente).color}}>
+                                  {(ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente).icon} {(ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente).label}
+                                </span>
+                              )}
                               {t.estado==="no_pudo"&&(
                                 <div style={{marginTop:5}}>
                                   <textarea rows={2} placeholder="¿Por qué no se pudo? (obligatorio)" value={t.notaWorker||""} onChange={e=>onUpdateTarea(fechaVer,t.id,{notaWorker:e.target.value})} style={{width:"100%",background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:8,color:"#ede9e0",padding:"6px 10px",fontFamily:"'Georgia',serif",fontSize:12,resize:"vertical"}}/>
@@ -2068,6 +2117,56 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
             </div>
           );
         })()}
+
+        {/* ══════════════════════════════════════════════════════════
+             CIERRE DE TURNO
+             ══════════════════════════════════════════════════════════ */}
+        {fechaVer===hoy&&(
+          <div style={{marginBottom:14}}>
+            {turnoCerrado ? (
+              <div style={{border:"1px solid rgba(34,197,94,0.3)",borderRadius:12,padding:"14px 16px",background:"rgba(34,197,94,0.05)"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+                  <div>
+                    <div style={{fontSize:14,fontWeight:700,color:"#22c55e",marginBottom:2}}>✅ Turno cerrado</div>
+                    <div style={{fontSize:11,color:"#5a9a7a"}}>Cerrado a las {turnoCerrado.hora} por {turnoCerrado.nombre?.split(" ")[0]}</div>
+                    <div style={{fontSize:10,color:"#4a7a5a",marginTop:4}}>Las tareas han sido enviadas para revisión de la jefa.</div>
+                  </div>
+                  {esJefaApp&&(
+                    <button onClick={()=>onReabrirTurno?.(fechaVer,trabajador.nombre)}
+                      style={{cursor:"pointer",border:"1px solid rgba(245,158,11,0.4)",borderRadius:8,padding:"6px 14px",background:"rgba(245,158,11,0.08)",color:"#fbbf24",fontSize:12,fontFamily:"'Georgia',serif"}}>
+                      🔓 Reabrir turno
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div style={{border:"1px solid rgba(52,211,153,0.2)",borderRadius:12,padding:"14px 16px",background:"rgba(52,211,153,0.03)"}}>
+                <div style={{fontSize:13,color:"#5a9a7a",marginBottom:10}}>
+                  ¿Terminaste todas las tareas del día?
+                </div>
+                <button onClick={()=>{
+                  if(misTargets.some(t=>t.estado==="no_pudo"&&!t.notaWorker)){
+                    alert("Hay tareas marcadas como 'No se pudo' sin motivo. Por favor escribe el motivo antes de cerrar el turno.");
+                    return;
+                  }
+                  if(window.confirm(`¿Cerrar turno del ${fechaVer}?
+
+Una vez cerrado no podrás modificar las tareas. Solo la jefa puede reabrir el turno.`)){
+                    onCerrarTurno?.(fechaVer,trabajador.nombre);
+                  }
+                }} style={{cursor:"pointer",border:"none",borderRadius:10,padding:"10px 24px",
+                  background:"linear-gradient(135deg,#1a5c35,#2d7a4f)",color:"#fff",
+                  fontSize:14,fontFamily:"'Playfair Display',serif",fontWeight:700,
+                  boxShadow:"0 2px 8px rgba(0,0,0,0.3)"}}>
+                  ✅ Cerrar turno del día
+                </button>
+                <div style={{fontSize:10,color:"#4a7a5a",marginTop:8}}>
+                  Al cerrar, la jefa podrá revisar y validar tus tareas.
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ══════════════════════════════════════════════════════════
              SECCIÓN 4 — TAREA EMERGENTE
@@ -2150,7 +2249,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   );
 }
 
-function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACROZONAS_BASE, tareas, setTareas, tareasZonaHoy=0, esJefa=false, puedeCrear=false }) {
+function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACROZONAS_BASE, tareas, setTareas, tareasZonaHoy=0, esJefa=false, puedeCrear=false, cierresTurno={}, onReabrirTurno }) {
   const hoy = new Date().toISOString().slice(0,10);
   const [fecha, setFecha] = React.useState(hoy);
   const [tabProg, setTabProg] = React.useState("programa");
@@ -2263,7 +2362,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
 
       {/* ── HISTORIAL ── */}
       {tabProg==="historial" && (
-        <HistorialProg tareas={tareas} setTareas={setTareas} MACROZONAS_BASE={MACROZONAS_BASE} S={S} esJefa={esJefa} puedeCrear={puedeCrear}/>
+        <HistorialProg tareas={tareas} setTareas={setTareas} MACROZONAS_BASE={MACROZONAS_BASE} S={S} esJefa={esJefa} puedeCrear={puedeCrear} cierresTurno={cierresTurno} onReabrirTurno={onReabrirTurno}/>
       )}
 
       {/* ── PROGRAMAR ── */}
@@ -7592,13 +7691,13 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
           </button>
         )}
       </div>
-      {esJefa&&<div style={{...S.card,padding:"10px 14px",marginBottom:14,display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+      {esJefa&&(<><div style={{...S.card,padding:"10px 14px",marginBottom:14,display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
         <span style={{fontSize:11,color:"#5a9a7a",marginRight:4}}>Escala:</span>
         {[{v:1,l:"1-2 Seco",c:"#ef4444"},{v:3,l:"3-5 Ajustar",c:"#f59e0b"},{v:6,l:"6-7 Óptimo",c:"#22c55e"},{v:8,l:"8 Saturado",c:"#3b82f6"}].map(({v,l,c})=>(
           <span key={v} style={{fontSize:11,background:`${c}15`,color:c,border:`1px solid ${c}35`,padding:"2px 8px",borderRadius:20,fontWeight:600}}>{l}</span>
         ))}
         <span style={{fontSize:10,color:"#4a7a5a",marginLeft:4}}>· Sector: {sectorLabel}</span>
-      </div>}
+      </div></>)}
       {showHumForm&&(
         <div style={{...S.card,padding:20,marginBottom:16,background:"rgba(96,165,250,0.04)",borderColor:"rgba(96,165,250,0.2)"}} className="ein">
           <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#60a5fa",marginBottom:14}}>
@@ -7659,7 +7758,7 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
                           }}
                           placeholder="—"/>
                       </td>
-                      <td style={{padding:"6px 8px"}}>
+                      {esJefa&&<td style={{padding:"6px 8px"}}>
                         {info?(
                           <span style={{fontSize:11,fontWeight:600,color:info.color}}>
                             {info.label}<br/><span style={{fontSize:9,fontWeight:400}}>{info.accion}</span>
@@ -7667,7 +7766,7 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
                         ):(
                           <span style={{fontSize:11,color:"#3a6a5a"}}>—</span>
                         )}
-                      </td>
+                      </td>}
                       <td style={{padding:"6px 8px"}}>
                         <input style={{...S.input,fontSize:11,padding:"4px 8px"}} placeholder="obs..."
                           value={g.id==="vivero"?(humForm.obsVivero||""):(humForm.valores[g.id]?.obs||"")}
@@ -8400,8 +8499,11 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
 
   const [subTabZona, setSubTabZona] = React.useState(null);
   const [subTab, setSubTab] = React.useState(initialSubTab||(rolLogueado==="trabajador"?"mediciones":"panel"));
-  // Auto-abrir formulario de medición para trabajador
-  React.useEffect(()=>{ if(rolLogueado==="trabajador" && subTab==="mediciones" && !showMedForm) setShowMedForm(true); },[subTab, rolLogueado]);
+  // Trabajador no debe ver subTab "greens" — redirigir a mediciones
+  React.useEffect(()=>{
+    if(rolLogueado==="trabajador" && subTab==="greens") setSubTab("mediciones");
+    if(rolLogueado==="trabajador" && subTab==="mediciones" && !showMedForm) setShowMedForm(true);
+  },[subTab, rolLogueado]);
   // Exponer para acceso rápido desde VistaWorker
   React.useEffect(()=>{ window.__golfSubTab = setSubTab; return ()=>{ window.__golfSubTab=null; }; },[]);
 
@@ -8679,7 +8781,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
         {(()=>{
           // Tabs según rol: trabajador solo ve lo que le corresponde
           const todosTabs = [["panel","📊 Panel"],["greens","⛳ Greens"],["tees","🎯 Tees"],["bunkers","🏖️ Búnkers"],["fairways","🌾 Fairways"],["zonas","🌿 Zonas"],["arboles","🌳 Árboles"],["mediciones","📏 Alturas"],["humedad","💧 Humedad"],["eventos","🏆 Eventos"]];
-          const tabsWorker = [["greens","⛳ Greens"],["mediciones","📏 Alturas"],["humedad","💧 Humedad"]];
+          const tabsWorker = [["mediciones","📏 Alturas"],["humedad","💧 Humedad"]];
           // Agregar Programación solo para jefa/supervisor
           const todosTabs2 = [...todosTabs, ["programacion_golf","📅 Programación"]];
           const tabsVisibles = (rolLogueado==="trabajador") ? tabsWorker : todosTabs2;
@@ -9674,14 +9776,14 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       {/* ── MEDICIONES ── */}
       {subTab==="mediciones"&&(
         <div className="ein">
+          {/* Botón volver para trabajador */}
           {!esJefa&&(
-            <div style={{marginBottom:12}}>
-              <button onClick={()=>{if(onRegistroGuardado)onRegistroGuardado("miturno");}}
-                style={{...S.btn,fontSize:12,color:"#6aaa7a",border:"1px solid rgba(255,255,255,0.1)",background:"transparent"}}>
-                ← Volver a Mi Turno
-              </button>
-            </div>
+            <button onClick={()=>{if(onRegistroGuardado)onRegistroGuardado("miturno");}}
+              style={{...S.btn,fontSize:12,color:"#6aaa7a",border:"1px solid rgba(255,255,255,0.1)",background:"transparent",marginBottom:12}}>
+              ← Volver a Mi Turno
+            </button>
           )}
+          {/* Botón nueva medición — solo jefa/supervisor */}
           {esJefa&&(
             <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
               <button className="btn-p" style={S.btn} onClick={()=>setShowMedForm(true)}>📏 Nueva medición</button>
@@ -9689,9 +9791,12 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           )}
 
           {showMedForm&&(
-            <div style={{...S.card,padding:20,marginBottom:14,background:"rgba(52,211,153,0.04)",borderColor:"rgba(52,211,153,0.2)"}} className="ein">
-              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#34d399",marginBottom:14}}>📏 Medición de Alturas</div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+            <div style={{...S.card,padding:20,marginBottom:14,background:"rgba(52,211,153,0.03)"}}>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#34d399",marginBottom:14,fontWeight:700}}>
+                📏 {esJefa?"Registro de alturas — Greens":"Registrar alturas"}
+              </div>
+              {/* Fecha y responsable */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
                 <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={medForm.fecha} onChange={e=>setMedForm(p=>({...p,fecha:e.target.value}))}/></div>
                 {rolLogueado!=="trabajador"&&(
                   <div><label style={labelSt}>Responsable</label>
@@ -9709,13 +9814,21 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                   </select>
                 </div>
               </div>
-              <div style={{fontSize:11,color:"#34d399",marginBottom:10,fontWeight:600}}>Greens — Rango {rango.label}: {rango.min}–{rango.max}mm · Humedad: 1=seco / 8=saturado / óptimo 4-6</div>
+
+              {/* Info de rango solo para jefa */}
+              {esJefa&&(
+                <div style={{fontSize:11,color:"#34d399",marginBottom:10,fontWeight:600}}>
+                  Greens — Rango {rango.label}: {rango.min}–{rango.max}mm · Altura corte objetivo: {rango.corte}mm
+                </div>
+              )}
+
+              {/* TABLA — versión trabajador: solo Green + mm + Obs */}
               <div style={{overflowX:"auto",marginBottom:12}}>
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
                   <thead><tr style={{background:"rgba(52,211,153,0.1)"}}>
                     <th style={{padding:"6px 10px",textAlign:"left",color:"#34d399",fontSize:10}}>GREEN</th>
                     <th style={{padding:"6px 10px",textAlign:"center",color:"#34d399",fontSize:10}}>ALTURA (mm)</th>
-                    <th style={{padding:"6px 10px",textAlign:"center",color:"#fbbf24",fontSize:10}}>PROYECCIÓN</th>
+                    {esJefa&&<th style={{padding:"6px 10px",textAlign:"center",color:"#fbbf24",fontSize:10}}>PROYECCIÓN</th>}
                     <th style={{padding:"6px 10px",textAlign:"left",color:"#34d399",fontSize:10}}>OBS</th>
                   </tr></thead>
                   <tbody>
@@ -9723,69 +9836,19 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                       const alt=medForm.alturas?.[g.id]||"";
                       const diasCrecimiento=medForm.diasDesdeCorte?.[g.id]||"";
                       const color=colorAltura(alt);
-                      // ── Cálculo automático tasa y proyección ──
+                      // Cálculo tasa y proyección — solo necesario para jefa
                       let proyeccion=null,alturaMaxCorte=null,tasaCalculada=null,tasaFuente=null,infoCorte=null;
-                      if(alt){
-                        // 1. Último corte registrado para este green
-                        // Buscar tareas de corte — con o sin alturaCorte
-                        const esTareaCorte = t => t.zona==="Golf" &&
-                          (t.tarea?.toLowerCase().includes("corte")||t.tipo?.toLowerCase().includes("corte")) &&
-                          (t.elemento?.includes(g.nombre)||t.tarea?.includes(g.nombre)||
-                           t.elemento?.toLowerCase().includes("todos")||t.elemento?.toLowerCase().includes("vivero")||
-                           t.tarea?.toLowerCase().includes("todos"));
-                        const cortesG=Object.values(tareasProg).flat()
-                          .filter(esTareaCorte)
-                          .sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
-                        if(cortesG.length>0) infoCorte=cortesG[0];
-                        // 2. Altura objetivo
-                        alturaMaxCorte=infoCorte?.alturaObjetivo
-                          ?Number(infoCorte.alturaObjetivo)
-                          :(rango.min*1.5);
-                        alturaMaxCorte=Number(alturaMaxCorte).toFixed(1);
-                        // 3. Tasa desde mediciones
-                        const histG=[...mediciones]
-                          .filter(m=>m.alturas?.[g.id]&&m.fecha&&m.fecha!==medForm.fecha)
-                          .sort((a,b)=>b.fecha.localeCompare(a.fecha));
-                        const histPost=infoCorte?.fecha?histG.filter(m=>m.fecha>=infoCorte.fecha):histG;
-                        if(histPost.length>=1){
-                          const prev=histPost[0];
-                          const altPrev=Number(prev.alturas[g.id]);
-                          const altCurr=Number(alt);
-                          const d=Math.round((new Date(medForm.fecha+"T12:00:00")-new Date(prev.fecha+"T12:00:00"))/(1000*60*60*24));
-                          if(d>0&&altCurr>altPrev){tasaCalculada=(altCurr-altPrev)/d;tasaFuente="auto";}
-                        }
-                        // 4. Fallback: desde corte registrado (campo o extraído del texto)
-                        if(!tasaCalculada&&infoCorte?.fecha){
-                          const altC=infoCorte.alturaCorte?Number(infoCorte.alturaCorte):(()=>{
-                            const m=(infoCorte.tarea||infoCorte.descripcion||"").match(/(?:HOC|a)\s*([0-9]+(?:\.[0-9]+))\s*mm/i);
-                            return m?Number(m[1]):null;
-                          })();
-                          if(altC){
-                            const d=Math.round((new Date(medForm.fecha+"T12:00:00")-new Date(infoCorte.fecha+"T12:00:00"))/(1000*60*60*24));
-                            const delta=Number(alt)-altC;
-                            if(d>0&&delta>0){tasaCalculada=delta/d;tasaFuente="corte";}
-                          }
-                        }
-                        // 5. Fallback manual
-                        if(!tasaCalculada&&diasCrecimiento&&Number(diasCrecimiento)>0){
-                          const altDesde=infoCorte?.alturaCorte?Number(alt)-Number(infoCorte.alturaCorte):Number(alt)-rango.min;
-                          if(altDesde>0){tasaCalculada=altDesde/Number(diasCrecimiento);tasaFuente="manual";}
-                        }
-                        // 6. Fallback histórico
-                        if(!tasaCalculada){
-                          const histG2=[...mediciones].filter(m=>m.alturas?.[g.id]&&m.fecha).sort((a,b)=>b.fecha.localeCompare(a.fecha));
-                          if(histG2.length>=2){
-                            const a1=Number(histG2[0].alturas[g.id]),a2=Number(histG2[1].alturas[g.id]);
-                            const d=Math.round((new Date(histG2[0].fecha+"T12:00:00")-new Date(histG2[1].fecha+"T12:00:00"))/(1000*60*60*24));
-                            if(d>0&&a1>a2){tasaCalculada=(a1-a2)/d;tasaFuente="histórico";}
-                          }
-                        }
-                        // 7. Proyección final
+                      if(esJefa&&alt){
+                        const esTareaCorte=t=>t.zona==="Golf"&&(t.tarea?.toLowerCase().includes("corte")||t.tipo?.toLowerCase().includes("corte"))&&(t.elemento?.includes(g.nombre)||t.tarea?.includes(g.nombre)||t.elemento?.toLowerCase().includes("todos")||t.tarea?.toLowerCase().includes("todos"));
+                        const cortesG=Object.values(tareasProg).flat().filter(t=>esTareaCorte(t)&&["hecha","completada"].includes(t.estado)).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
+                        infoCorte=cortesG[0]||null;
+                        alturaMaxCorte=infoCorte?.alturaObjetivo||(rango.corte*1.1)||(rango.min*1.5);
+                        const histG=[...mediciones].filter(m=>m.alturas?.[g.id]&&m.fecha).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+                        if(diasCrecimiento&&Number(diasCrecimiento)>0&&Number(alt)>0){tasaCalculada=Number(alt)/Number(diasCrecimiento);tasaFuente="manual";}
+                        else if(infoCorte?.alturaCorte&&histG[0]){const d=Math.round((new Date(histG[0].fecha+"T12:00:00")-new Date(infoCorte.fecha+"T12:00:00"))/86400000);const a1=Number(histG[0].alturas?.[g.id]);const altC=Number(infoCorte.alturaCorte);if(d>0&&a1>altC){tasaCalculada=(a1-altC)/d;tasaFuente="auto";}}
+                        else if(histG.length>=2){const a1=Number(histG[0].alturas?.[g.id]);const a2=Number(histG[1].alturas?.[g.id]);const d=Math.round((new Date(histG[0].fecha+"T12:00:00")-new Date(histG[1].fecha+"T12:00:00"))/86400000);if(d>0&&a1>a2){tasaCalculada=(a1-a2)/d;tasaFuente="histórico";}}
                         if(Number(alt)>=Number(alturaMaxCorte)){proyeccion="⚠️ Cortar ya";}
-                        else if(tasaCalculada&&tasaCalculada>0){
-                          const dias=Math.round((Number(alturaMaxCorte)-Number(alt))/tasaCalculada);
-                          proyeccion=dias<=0?"⚠️ Cortar ya":dias<=2?`⏰ ${dias}d`:`${dias}d`;
-                        }
+                        else if(tasaCalculada&&tasaCalculada>0){const dias=Math.round((Number(alturaMaxCorte)-Number(alt))/tasaCalculada);proyeccion=dias<=0?"⚠️ Cortar ya":dias<=2?`⏰ ${dias}d`:`${dias}d → ${new Date(Date.now()+dias*86400000).toLocaleDateString("es-CL",{day:"numeric",month:"numeric"})}`;}
                       }
                       return (
                         <tr key={g.id} style={{borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
@@ -9795,40 +9858,29 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                           </td>
                           <td style={{padding:"5px 6px"}}>
                             <div style={{display:"flex",gap:4,alignItems:"center",justifyContent:"center"}}>
-                              <input type="number" step="0.1" min="0" max="20" style={{...S.input,width:65,fontSize:13,padding:"4px 6px",textAlign:"center",borderColor:alt&&color!=="#22c55e"?color:"",fontWeight:600,color:alt?color:"inherit"}} value={alt}
-                                onChange={e=>setMedForm(p=>({...p,alturas:{...p.alturas,[g.id]:e.target.value}}))} placeholder="mm"/>
-                              <div style={{width:4,height:4,borderRadius:"50%",background:color,flexShrink:0}}/>
+                              <input type="number" step="0.1" min="0" max="20"
+                                style={{...S.input,width:65,fontSize:15,fontWeight:700,textAlign:"center",borderColor:alt?color:"rgba(255,255,255,0.14)",color:alt?color:"#ede9e0",padding:"4px 6px"}}
+                                value={alt}
+                                onChange={e=>setMedForm(p=>({...p,alturas:{...p.alturas,[g.id]:e.target.value}}))}
+                                placeholder="—"/>
+                              {alt&&<div style={{width:4,height:4,borderRadius:"50%",background:color}}/>}
                             </div>
                           </td>
-                          <td style={{padding:"5px 6px",textAlign:"center"}}>
-                            {proyeccion?(
-                              <div style={{fontWeight:700,fontSize:12,color:proyeccion.includes("ya")?"#ef4444":proyeccion.includes("⏰")?"#f59e0b":"#22c55e",whiteSpace:"nowrap"}}>{proyeccion}</div>
-                            ):(
-                              <div style={{fontSize:10,color:"#3a6a5a"}}>—</div>
-                            )}
-                            {alturaMaxCorte&&(
-                              <div style={{fontSize:9,color:infoCorte?.alturaObjetivo?"#fbbf24":"#5a9a7a"}}>
-                                {infoCorte?.alturaObjetivo?"✂️":"→"} cortar en {alturaMaxCorte}mm
-                              </div>
-                            )}
-                            {tasaCalculada&&(
-                              <div style={{fontSize:9,color:tasaFuente==="auto"?"#4ade80":tasaFuente==="corte"?"#34d399":tasaFuente==="histórico"?"#f59e0b":"#5a9a7a"}}>
-                                {tasaCalculada.toFixed(2)}mm/d {tasaFuente==="auto"?"●":tasaFuente==="corte"?"◆":tasaFuente==="histórico"?"○":"*"}
-                              </div>
-                            )}
-                            {infoCorte&&(
-                              <div style={{fontSize:9,color:"#4a7a5a"}}>
-                                ✂️ {infoCorte.fecha}{infoCorte.alturaCorte&&` @ ${infoCorte.alturaCorte}mm`}
-                              </div>
-                            )}
-                            {!tasaCalculada&&(
-                              <input type="number" min="0" max="30"
-                                style={{...S.input,width:45,fontSize:10,padding:"2px 4px",textAlign:"center",marginTop:3}}
-                                value={diasCrecimiento}
-                                onChange={e=>setMedForm(p=>({...p,diasDesdeCorte:{...p.diasDesdeCorte,[g.id]:e.target.value}}))}
-                                placeholder="días"/>
-                            )}
-                          </td>
+                          {esJefa&&(
+                            <td style={{padding:"5px 6px",textAlign:"center"}}>
+                              {proyeccion?(<div style={{fontWeight:700,fontSize:12,color:proyeccion.includes("⚠️")?"#ef4444":proyeccion.includes("⏰")?"#f59e0b":"#34d399"}}>{proyeccion}</div>):(<div style={{fontSize:10,color:"#3a6a5a"}}>—</div>)}
+                              {esJefa&&alturaMaxCorte&&(<div style={{fontSize:9,color:infoCorte?.alturaObjetivo?"#fbbf24":"#5a9a7a"}}>{infoCorte?.alturaObjetivo?"✂️":"→"} cortar en {alturaMaxCorte}mm</div>)}
+                              {esJefa&&tasaCalculada&&(<div style={{fontSize:9,color:tasaFuente==="auto"?"#4ade80":"#6aaa7a"}}>{tasaCalculada.toFixed(2)}mm/d</div>)}
+                              {esJefa&&infoCorte&&(<div style={{fontSize:9,color:"#4a7a5a"}}>✂️ {infoCorte.fecha}{infoCorte.alturaCorte&&` @ ${infoCorte.alturaCorte}mm`}</div>)}
+                              {esJefa&&!tasaCalculada&&(
+                                <input type="number" min="0" max="30"
+                                  style={{...S.input,width:45,fontSize:10,padding:"2px 4px",textAlign:"center"}}
+                                  value={diasCrecimiento}
+                                  onChange={e=>setMedForm(p=>({...p,diasDesdeCorte:{...p.diasDesdeCorte,[g.id]:e.target.value}}))}
+                                  placeholder="días"/>
+                              )}
+                            </td>
+                          )}
                           <td style={{padding:"5px 6px"}}>
                             <input style={{...S.input,fontSize:11,padding:"4px 6px"}} value={medForm.obsGreen?.[g.id]||""} placeholder="obs..."
                               onChange={e=>setMedForm(p=>({...p,obsGreen:{...p.obsGreen,[g.id]:e.target.value}}))}/>
@@ -9837,29 +9889,25 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                       );
                     })}
                     {/* Vivero */}
-                    <tr style={{background:"rgba(74,222,128,0.04)",borderTop:"2px solid rgba(74,222,128,0.2)"}}>
-                      <td style={{padding:"5px 10px"}}>
-                        <div style={{fontWeight:600,color:"#4ade80"}}>🌱 Vivero</div>
-                        <div style={{fontSize:10,color:"#5a9a7a"}}>Altura variable</div>
-                      </td>
+                    <tr style={{background:"rgba(74,222,128,0.04)",borderTop:"2px solid rgba(74,222,128,0.15)"}}>
+                      <td style={{padding:"5px 10px"}}><div style={{fontWeight:600,color:"#4ade80"}}>🌱 Vivero</div></td>
                       <td style={{padding:"5px 6px",textAlign:"center"}}>
-                        <input type="number" step="0.1" min="0" max="30" style={{...S.input,width:65,fontSize:13,padding:"4px 6px",textAlign:"center"}} value={medForm.alturas?.vivero||""}
-                          onChange={e=>setMedForm(p=>({...p,alturas:{...p.alturas,vivero:e.target.value}}))} placeholder="mm"/>
+                        <input type="number" step="0.1" min="0" max="30"
+                          style={{...S.input,width:65,fontSize:15,fontWeight:700,textAlign:"center",padding:"4px 6px"}}
+                          value={medForm.alturas?.vivero||""}
+                          onChange={e=>setMedForm(p=>({...p,alturas:{...p.alturas,vivero:e.target.value}}))}
+                          placeholder="—"/>
                       </td>
-                      <td style={{padding:"5px 6px",textAlign:"center"}}>
-                        <input type="number" min="0" max="30" style={{...S.input,width:45,fontSize:11,padding:"3px 5px",textAlign:"center"}} value={medForm.diasDesdeCorte?.vivero||""}
-                          onChange={e=>setMedForm(p=>({...p,diasDesdeCorte:{...p.diasDesdeCorte,vivero:e.target.value}}))} placeholder="días"/>
-                        <div style={{fontSize:9,color:"#5a9a7a"}}>días desde corte</div>
-                      </td>
+                      {esJefa&&<td style={{padding:"5px 6px"}}><input type="number" min="0" max="30" style={{...S.input,width:45,fontSize:10,padding:"2px 4px",textAlign:"center"}} value={medForm.diasDesdeCorte?.vivero||""} onChange={e=>setMedForm(p=>({...p,diasDesdeCorte:{...p.diasDesdeCorte,vivero:e.target.value}}))} placeholder="días"/><div style={{fontSize:9,color:"#5a9a7a"}}>días desde corte</div></td>}
                       <td style={{padding:"5px 6px"}}>
-                        <input style={{...S.input,fontSize:11,padding:"4px 6px"}} value={medForm.obsGreen?.vivero||""} placeholder="siembra, resiembra..."
+                        <input style={{...S.input,fontSize:11,padding:"4px 6px"}} value={medForm.obsGreen?.vivero||""} placeholder="obs..."
                           onChange={e=>setMedForm(p=>({...p,obsGreen:{...p.obsGreen,vivero:e.target.value}}))}/>
                       </td>
                     </tr>
                   </tbody>
                 </table>
               </div>
-              <div><label style={labelSt}>Observaciones generales</label><input style={S.input} value={medForm.obs} onChange={e=>setMedForm(p=>({...p,obs:e.target.value}))} placeholder="Condiciones del día, novedades..."/></div>
+              <div><label style={labelSt}>Observaciones generales</label><input style={S.input} value={medForm.obs||""} placeholder="Condiciones generales, novedades..." onChange={e=>setMedForm(p=>({...p,obs:e.target.value}))}/></div>
               <div style={{display:"flex",gap:8,marginTop:12}}>
                 <button className="btn-p" style={S.btn} onClick={guardarMedicion}>✓ Guardar medición</button>
                 <button className="btn-g" style={S.btn} onClick={()=>setShowMedForm(false)}>Cancelar</button>
@@ -9879,8 +9927,6 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           )}
         </div>
       )}
-
-      {/* ── HUMEDAD ── */}
       {subTab==="humedad"&&(
         <SeccionHumedad
           S={S}
@@ -11672,6 +11718,7 @@ export default function App() {
   const [bonosMasivos,   setBonosMasivos,   bonosMasReady] = useFirebaseState("bonos-masivos", []);
   const [rendicionesRRHH, setRendicionesRRHH] = useFirebaseState("rendiciones-rrhh", []);
   const [notificaciones, setNotificaciones]   = useFirebaseState("notificaciones", []);
+  const [cierresTurno,  setCierresTurno]     = useFirebaseState("cierresTurno",   {});
 
   const appReady = dataReady && personalReady && progReady;
   const [golfInitTab, setGolfInitTab] = React.useState(null);
@@ -12811,6 +12858,11 @@ export default function App() {
             tareasZonaHoy={(tareasProg[new Date().toISOString().slice(0,10)]||[]).filter(t=>t.origenZona&&t.estado==="por_designar").length}
             esJefa={rolLogueado==="jefa"}
             puedeCrear={rolLogueado==="jefa"||rolLogueado==="supervisor"}
+            cierresTurno={cierresTurno}
+            onReabrirTurno={(fecha,nombre)=>{
+              const key=`${fecha}_${nombre.split(" ")[0].toLowerCase()}`;
+              setCierresTurno(prev=>{ const n={...prev}; delete n[key]; return n; });
+            }}
           />
         )}
 
@@ -12882,6 +12934,20 @@ export default function App() {
                     });
                     const z=MACROZONAS_BASE.find(z=>z.nombre===nuevaTarea.zona);
                     if(z) addHistorial(z.id,`🆕 [${nuevaTarea.responsable}] Tarea emergente: ${nuevaTarea.tarea}`);
+                  }}
+                  esJefaApp={rolLogueado==="jefa"}
+                  cierresTurno={cierresTurno}
+                  onCerrarTurno={(fecha,nombre)=>{
+                    const key=`${fecha}_${nombre.split(" ")[0].toLowerCase()}`;
+                    setCierresTurno(prev=>({...prev,[key]:{
+                      fecha,nombre,
+                      hora:new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"}),
+                      cerradoEn:new Date().toISOString(),
+                    }}));
+                  }}
+                  onReabrirTurno={(fecha,nombre)=>{
+                    const key=`${fecha}_${nombre.split(" ")[0].toLowerCase()}`;
+                    setCierresTurno(prev=>{ const n={...prev}; delete n[key]; return n; });
                   }}
                 />
               </div>
