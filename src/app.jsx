@@ -1543,7 +1543,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
       )}
 
       {/* ── Historial normal (solo si tab es historial) ── */}
-      {tabHist==="historial"&&(
+      {tabHist==="historial"&&(<>
       {/* Filtros */}
       <div style={{...S.card,padding:16,marginBottom:18}}>
         <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:12,color:"#a0d8b0"}}>🔍 Filtros</div>
@@ -1667,7 +1667,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
           Sin tareas que coincidan con los filtros aplicados.
         </div>
       )}
-      )}
+      </>)}
     </div>
   );
 }
