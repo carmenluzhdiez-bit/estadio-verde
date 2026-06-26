@@ -1752,6 +1752,10 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
 function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE, onAccesoRapido, onCambiarMetodo, cierresTurno={}, onCerrarTurno, onReabrirTurno, esJefaApp=false }) {
   const hoy = new Date().toISOString().slice(0,10);
   const [fechaVer, setFechaVer] = React.useState(fecha || hoy);
+  // Cierre de turno
+  const turnoCerradoKey = `${fechaVer}_${(trabajador?.nombre||"").split(" ")[0].toLowerCase()}`;
+  const turnoCerrado = (cierresTurno||{})[turnoCerradoKey] || null;
+  const puedeEditar = !turnoCerrado || esJefaApp;
   const [showNuevaTareaEmerg, setShowNuevaTareaEmerg] = React.useState(false);
   const [nuevaTareaEmerg, setNuevaTareaEmerg] = React.useState({ zona:"", tarea:"", notas:"" });
   // Estado de grupos colapsables — objeto {key: bool}
@@ -7657,6 +7661,27 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
         tarea:txt,responsable:humForm.responsable,estado:"pendiente",notas:humForm.obs||"",auto:false,
       }]}));
     }
+    // Marcar tarea de humedad/registro como hecha en el programa del día
+    const fechaHum = humForm.fecha || hoy;
+    const respHum = (humForm.responsable||"").trim().toLowerCase();
+    setTareasProg(prev => {
+      const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+      const tareasDelDia = normArr(prev[fechaHum]);
+      const actualizadas = tareasDelDia.map(t => {
+        if(["hecha","completada"].includes(t.estado)) return t;
+        const tNom = (t.tarea||"").toLowerCase();
+        const esHumedad = tNom.includes("humedad") || tNom.includes("registr") ||
+                          tNom.includes("golf") || tNom.includes("medici");
+        const tResp = (t.responsable||"").trim().toLowerCase();
+        const esDelResponsable = !t.responsable ||
+          tResp===respHum ||
+          (respHum && tResp.split(" ").some(w=>respHum.includes(w)&&w.length>3)) ||
+          (tResp && respHum.split(" ").some(w=>tResp.includes(w)&&w.length>3));
+        if(esHumedad && (esDelResponsable || !respHum)) return {...t, estado:"hecha"};
+        return t;
+      });
+      return {...prev, [fechaHum]: actualizadas};
+    });
     setHumForm(emptyHumForm);
     setShowHumForm(false);
     if(crearNotificacion) {
@@ -8621,16 +8646,21 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
     sincronizarMacrozona("Medición de alturas", `${medForm.tipo} — ${medForm.responsable||"Sin responsable"}`);
     // Marcar tarea de medición de alturas como hecha en el programa del día
     const fechaMed = medForm.fecha || hoy;
+    const respMed = (medForm.responsable||"").trim().toLowerCase();
     setTareasProg(prev => {
-      const tareasDelDia = Array.isArray(prev[fechaMed]) ? prev[fechaMed] :
-        typeof prev[fechaMed]==="object" ? Object.values(prev[fechaMed]||{}) : [];
+      const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+      const tareasDelDia = normArr(prev[fechaMed]);
       const actualizadas = tareasDelDia.map(t => {
         if(["hecha","completada"].includes(t.estado)) return t;
-        const esMedicion = (t.tarea||"").toLowerCase().includes("medici") ||
-                           (t.tarea||"").toLowerCase().includes("altura");
-        const esDelResponsable = !t.responsable || t.responsable===medForm.responsable ||
-                                  t.responsable?.includes("Bhalú") || t.responsable?.includes("Armijo");
-        if(esMedicion && esDelResponsable) return {...t, estado:"hecha"};
+        const tNom = (t.tarea||"").toLowerCase();
+        const esMedicion = tNom.includes("medici") || tNom.includes("altura") ||
+                           tNom.includes("registr") || tNom.includes("golf");
+        const tResp = (t.responsable||"").trim().toLowerCase();
+        const esDelResponsable = !t.responsable ||
+          tResp===respMed ||
+          (respMed && tResp.split(" ").some(w=>respMed.includes(w)&&w.length>3)) ||
+          (tResp && respMed.split(" ").some(w=>tResp.includes(w)&&w.length>3));
+        if(esMedicion && (esDelResponsable || !respMed)) return {...t, estado:"hecha"};
         return t;
       });
       return {...prev, [fechaMed]: actualizadas};
@@ -9000,7 +9030,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             hoy={hoy} esJefa={esJefa}
             setTareasProg={setTareasProg} tareasProg={tareasProg} S={S}
           />
-      {subTab==="greens"&&(
+      {subTab==="greens"&&rolLogueado!=="trabajador"&&(
         <div className="ein">
           <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
             {esJefa&&<button className="btn-p" style={S.btn} onClick={()=>setShowTareaForm("green")}>📋 Nueva tarea</button>}
@@ -9777,14 +9807,14 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       {subTab==="mediciones"&&(
         <div className="ein">
           {/* Botón volver para trabajador */}
-          {!esJefa&&(
+          {rolLogueado==="trabajador"&&(
             <button onClick={()=>{if(onRegistroGuardado)onRegistroGuardado("miturno");}}
               style={{...S.btn,fontSize:12,color:"#6aaa7a",border:"1px solid rgba(255,255,255,0.1)",background:"transparent",marginBottom:12}}>
               ← Volver a Mi Turno
             </button>
           )}
           {/* Botón nueva medición — solo jefa/supervisor */}
-          {esJefa&&(
+          {(esJefa||rolLogueado==="supervisor")&&(
             <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
               <button className="btn-p" style={S.btn} onClick={()=>setShowMedForm(true)}>📏 Nueva medición</button>
             </div>
@@ -9816,7 +9846,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               </div>
 
               {/* Info de rango solo para jefa */}
-              {esJefa&&(
+              {(esJefa||rolLogueado==="supervisor")&&(
                 <div style={{fontSize:11,color:"#34d399",marginBottom:10,fontWeight:600}}>
                   Greens — Rango {rango.label}: {rango.min}–{rango.max}mm · Altura corte objetivo: {rango.corte}mm
                 </div>
@@ -9828,7 +9858,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                   <thead><tr style={{background:"rgba(52,211,153,0.1)"}}>
                     <th style={{padding:"6px 10px",textAlign:"left",color:"#34d399",fontSize:10}}>GREEN</th>
                     <th style={{padding:"6px 10px",textAlign:"center",color:"#34d399",fontSize:10}}>ALTURA (mm)</th>
-                    {esJefa&&<th style={{padding:"6px 10px",textAlign:"center",color:"#fbbf24",fontSize:10}}>PROYECCIÓN</th>}
+                    {(esJefa||rolLogueado==="supervisor")&&<th style={{padding:"6px 10px",textAlign:"center",color:"#fbbf24",fontSize:10}}>PROYECCIÓN</th>}
                     <th style={{padding:"6px 10px",textAlign:"left",color:"#34d399",fontSize:10}}>OBS</th>
                   </tr></thead>
                   <tbody>
@@ -9838,7 +9868,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                       const color=colorAltura(alt);
                       // Cálculo tasa y proyección — solo necesario para jefa
                       let proyeccion=null,alturaMaxCorte=null,tasaCalculada=null,tasaFuente=null,infoCorte=null;
-                      if(esJefa&&alt){
+                      if((esJefa||rolLogueado==="supervisor")&&alt){
                         const esTareaCorte=t=>t.zona==="Golf"&&(t.tarea?.toLowerCase().includes("corte")||t.tipo?.toLowerCase().includes("corte"))&&(t.elemento?.includes(g.nombre)||t.tarea?.includes(g.nombre)||t.elemento?.toLowerCase().includes("todos")||t.tarea?.toLowerCase().includes("todos"));
                         const cortesG=Object.values(tareasProg).flat().filter(t=>esTareaCorte(t)&&["hecha","completada"].includes(t.estado)).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
                         infoCorte=cortesG[0]||null;
@@ -9866,13 +9896,13 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                               {alt&&<div style={{width:4,height:4,borderRadius:"50%",background:color}}/>}
                             </div>
                           </td>
-                          {esJefa&&(
+                          {(esJefa||rolLogueado==="supervisor")&&(
                             <td style={{padding:"5px 6px",textAlign:"center"}}>
                               {proyeccion?(<div style={{fontWeight:700,fontSize:12,color:proyeccion.includes("⚠️")?"#ef4444":proyeccion.includes("⏰")?"#f59e0b":"#34d399"}}>{proyeccion}</div>):(<div style={{fontSize:10,color:"#3a6a5a"}}>—</div>)}
-                              {esJefa&&alturaMaxCorte&&(<div style={{fontSize:9,color:infoCorte?.alturaObjetivo?"#fbbf24":"#5a9a7a"}}>{infoCorte?.alturaObjetivo?"✂️":"→"} cortar en {alturaMaxCorte}mm</div>)}
-                              {esJefa&&tasaCalculada&&(<div style={{fontSize:9,color:tasaFuente==="auto"?"#4ade80":"#6aaa7a"}}>{tasaCalculada.toFixed(2)}mm/d</div>)}
-                              {esJefa&&infoCorte&&(<div style={{fontSize:9,color:"#4a7a5a"}}>✂️ {infoCorte.fecha}{infoCorte.alturaCorte&&` @ ${infoCorte.alturaCorte}mm`}</div>)}
-                              {esJefa&&!tasaCalculada&&(
+                              {(esJefa||rolLogueado==="supervisor")&&alturaMaxCorte&&(<div style={{fontSize:9,color:infoCorte?.alturaObjetivo?"#fbbf24":"#5a9a7a"}}>{infoCorte?.alturaObjetivo?"✂️":"→"} cortar en {alturaMaxCorte}mm</div>)}
+                              {(esJefa||rolLogueado==="supervisor")&&tasaCalculada&&(<div style={{fontSize:9,color:tasaFuente==="auto"?"#4ade80":"#6aaa7a"}}>{tasaCalculada.toFixed(2)}mm/d</div>)}
+                              {(esJefa||rolLogueado==="supervisor")&&infoCorte&&(<div style={{fontSize:9,color:"#4a7a5a"}}>✂️ {infoCorte.fecha}{infoCorte.alturaCorte&&` @ ${infoCorte.alturaCorte}mm`}</div>)}
+                              {(esJefa||rolLogueado==="supervisor")&&!tasaCalculada&&(
                                 <input type="number" min="0" max="30"
                                   style={{...S.input,width:45,fontSize:10,padding:"2px 4px",textAlign:"center"}}
                                   value={diasCrecimiento}
@@ -9898,7 +9928,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                           onChange={e=>setMedForm(p=>({...p,alturas:{...p.alturas,vivero:e.target.value}}))}
                           placeholder="—"/>
                       </td>
-                      {esJefa&&<td style={{padding:"5px 6px"}}><input type="number" min="0" max="30" style={{...S.input,width:45,fontSize:10,padding:"2px 4px",textAlign:"center"}} value={medForm.diasDesdeCorte?.vivero||""} onChange={e=>setMedForm(p=>({...p,diasDesdeCorte:{...p.diasDesdeCorte,vivero:e.target.value}}))} placeholder="días"/><div style={{fontSize:9,color:"#5a9a7a"}}>días desde corte</div></td>}
+                      {(esJefa||rolLogueado==="supervisor")&&<td style={{padding:"5px 6px"}}><input type="number" min="0" max="30" style={{...S.input,width:45,fontSize:10,padding:"2px 4px",textAlign:"center"}} value={medForm.diasDesdeCorte?.vivero||""} onChange={e=>setMedForm(p=>({...p,diasDesdeCorte:{...p.diasDesdeCorte,vivero:e.target.value}}))} placeholder="días"/><div style={{fontSize:9,color:"#5a9a7a"}}>días desde corte</div></td>}
                       <td style={{padding:"5px 6px"}}>
                         <input style={{...S.input,fontSize:11,padding:"4px 6px"}} value={medForm.obsGreen?.vivero||""} placeholder="obs..."
                           onChange={e=>setMedForm(p=>({...p,obsGreen:{...p.obsGreen,vivero:e.target.value}}))}/>
@@ -9916,7 +9946,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           )}
 
           {/* Historial mediciones + Gráfico — solo jefa/supervisor */}
-          {esJefa&&(
+          {(esJefa||rolLogueado==="supervisor")&&(
             <MedicionesAnalisis
               mediciones={mediciones} GREENS_DEF={GREENS_DEF} rango={rango}
               colorAltura={colorAltura} S={S} esJefa={esJefa}
