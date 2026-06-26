@@ -2153,11 +2153,9 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                   })}
                 </div>
               )}
-            </div>
 
-            {/* ── Observaciones del turno (solo cuando hay tareas diarias) ── */}
-            <div style={{marginTop:8,padding:"12px 14px",background:"rgba(52,211,153,0.03)",
-              border:"1px solid rgba(52,211,153,0.1)",borderRadius:"0 0 10px 10px"}}>
+              {/* ── Observaciones del turno ── */}
+            <div style={{marginTop:8,padding:"12px 14px",background:"rgba(52,211,153,0.03)",border:"1px solid rgba(52,211,153,0.1)",borderRadius:"0 0 10px 10px"}}>
               <div style={{fontSize:11,fontWeight:600,color:"#34d399",marginBottom:8}}>
                 📝 Observaciones del turno
               </div>
