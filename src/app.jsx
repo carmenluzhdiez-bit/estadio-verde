@@ -3,7 +3,7 @@ import * as React from "react";
 
 // ─── FIREBASE ────────────────────────────────────────────────────────────────
 import { initializeApp } from "firebase/app";
-import { getDatabase, ref, onValue, set as fbSet } from "firebase/database";
+import { getDatabase, ref, onValue, set as fbSet, update as fbUpdate } from "firebase/database";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
 
 const firebaseConfig = {
@@ -1803,9 +1803,10 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
     return (a.zona||"").localeCompare(b.zona||"","es",{sensitivity:"base"});
   });
   // Leer siempre directamente del prop tareas para que React detecte cambios
-  const todasMisTareas = React.useMemo(()=>
-    (tareas[fechaVer]||[]).filter(t => t.responsable && normalizar(t.responsable) === normalizar(trabajador?.nombre||"")),
-    [tareas, fechaVer, trabajador]
+  const todasMisTareas = React.useMemo(()=>{
+    const normDia = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v).filter(Boolean):[]);
+    return normDia(tareas[fechaVer]).filter(t => t.responsable && normalizar(t.responsable) === normalizar(trabajador?.nombre||""));
+  }, [tareas, fechaVer, trabajador]
   );
   const misTareasDiarias  = React.useMemo(()=>sortTareas(todasMisTareas.filter(t=>esDiaria(t))),[todasMisTareas]);
   const misTareasOtras    = React.useMemo(()=>sortTareas(todasMisTareas.filter(t=>!esDiaria(t))),[todasMisTareas]);
@@ -1944,7 +1945,8 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                               </div>
                             )}
                             {t.notas&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:2,fontStyle:"italic"}}>💡 {t.notas}</div>}
-                            {t.indicacion&&<div style={{fontSize:11,color:"#f59e0b",marginTop:2}}>{t.indicacion}</div>}
+                            {t.indicacion&&<div style={{fontSize:11,color:"#f59e0b",marginTop:2}}>📋 {t.indicacion}</div>}
+                            {(t.alturaCorteObj||t.alturaCorte)&&<div style={{fontSize:11,color:"#fbbf24",marginTop:2,fontWeight:600}}>✂️ Altura de corte indicada: {t.alturaCorteObj||t.alturaCorte}mm</div>}
                           </div>
                           <span style={{fontSize:11,fontWeight:600,color:est.color,background:`${est.color}15`,padding:"2px 8px",borderRadius:8,border:`1px solid ${est.color}30`,whiteSpace:"nowrap",flexShrink:0}}>{est.icon} {est.label}</span>
                         </div>
@@ -1963,6 +1965,18 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                               {(ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente).icon} {(ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente).label}
                             </span>
                             <span style={{fontSize:10,color:"#4a7a5a"}}>· Turno cerrado</span>
+                          </div>
+                        )}
+                        {/* Campo altura real de corte — aparece al marcar como hecha si la tarea es de corte */}
+                        {t.estado==="hecha"&&(t.tarea||"").toLowerCase().includes("corte")&&t.zona==="Golf"&&(
+                          <div style={{marginTop:6,display:"flex",alignItems:"center",gap:8}}>
+                            <label style={{fontSize:11,color:"#fbbf24",whiteSpace:"nowrap"}}>✂️ Altura de corte real (mm):</label>
+                            <input type="number" step="0.1" min="2" max="20"
+                              value={t.alturaCorteReal||""}
+                              onChange={e=>onUpdateTarea(fechaVer,t.id,{alturaCorteReal:e.target.value})}
+                              placeholder={t.alturaCorteObj||t.alturaCorte||"mm"}
+                              style={{...{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(251,191,36,0.3)",borderRadius:6,color:"#fbbf24",padding:"4px 8px",fontSize:13,fontFamily:"'Georgia',serif",width:80,outline:"none"}}}/>
+                            {t.alturaCorteReal&&<span style={{fontSize:10,color:"#5a9a7a"}}>✓ {t.alturaCorteReal}mm registrado</span>}
                           </div>
                         )}
                         {t.estado==="no_pudo"&&(
@@ -12953,16 +12967,18 @@ export default function App() {
                   S={S}
                   MACROZONAS_BASE={MACROZONAS_BASE}
                   onUpdateTarea={(fecha,tid,patch)=>{
+                    const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
                     setTareasProg(prev=>{
-                      // Normalizar: Firebase puede devolver objeto en vez de array
-                      const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-                      const updated={...prev,[fecha]:normArr(prev[fecha]).map(t=>t.id===tid?{...t,...patch}:t)};
+                      const tareasDelDia = normArr(prev[fecha]);
+                      const actualizadas = tareasDelDia.map(t=>t.id===tid?{...t,...patch}:t);
+                      // Escribir solo la ruta de esa fecha en Firebase
+                      fbUpdate(ref(db, `${ROOT}/prog`), {[fecha]: actualizadas})
+                        .catch(e=>console.error("Error:", e));
                       if(patch.estado==="no_pudo"||patch.estado==="hecha"||patch.estado==="haciendose"){
-                        const normArr2 = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-                        const tarea=normArr2(prev[fecha]).find(t=>t.id===tid);
-                        if(tarea){const z=MACROZONAS_BASE.find(z=>z.nombre===tarea.zona);if(z){const ico=patch.estado==="no_pudo"?"🔴":patch.estado==="hecha"?"✅":"🔵";addHistorial(z.id,`${ico} [${tarea.responsable||"?"}] ${tarea.tarea}${tarea.elemento?" — "+tarea.elemento:""}${patch.estado==="no_pudo"&&patch.notaWorker?": "+patch.notaWorker:""}`);}}
+                        const tarea=tareasDelDia.find(t=>t.id===tid);
+                        if(tarea){const z=MACROZONAS_BASE.find(z=>z.nombre===tarea.zona);if(z){const ico=patch.estado==="no_pudo"?"🔴":patch.estado==="hecha"?"✅":"🔵";addHistorial(String(z.id),`${ico} [${tarea.responsable||"?"}] ${tarea.tarea}${patch.estado==="no_pudo"&&patch.notaWorker?" ("+patch.notaWorker+")":""}`);}}
                       }
-                      return updated;
+                      return {...prev,[fecha]:actualizadas};
                     });
                   }}
                   getFrecs={(zid,_eid,_tipo,_isCustom,nombreElem)=>{
