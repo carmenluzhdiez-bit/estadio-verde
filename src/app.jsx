@@ -820,22 +820,30 @@ function ResponsableSelector({ value, personal, onChange, S, fontSize=14, inline
 function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_BASE, personal, incidenciasFito=[] }) {
 
   const [modoReporte, setModoReporte] = React.useState("semana");
-  const [fechaDesde, setFechaDesde]   = React.useState(semanaBase||"");
-  const [fechaHasta, setFechaHasta]   = React.useState(semanaBase||"");
+  // Inicializar rango con la semana actual si no viene semanaBase
+  const hoyStr = new Date().toISOString().slice(0,10);
+  const [fechaDesde, setFechaDesde]   = React.useState(semanaBase||hoyStr);
+  const [fechaHasta, setFechaHasta]   = React.useState(()=>{
+    // Por defecto hasta = 7 días después del desde
+    const d = new Date((semanaBase||hoyStr)+"T12:00:00");
+    d.setDate(d.getDate()+6);
+    return d.toISOString().slice(0,10);
+  });
   const [filtroZona, setFiltroZona]   = React.useState("todas");
   const [filtroResp, setFiltroResp]   = React.useState("todos");
+  const [tipoVista,  setTipoVista]    = React.useState("jefa"); // "gerencia" | "jefa"
 
   const getDiasSemana = (lunesStr) => {
     const lunes = new Date(lunesStr+"T12:00:00");
     return Array.from({length:7},(_,i)=>{ const d=new Date(lunes); d.setDate(d.getDate()+i); return d.toISOString().slice(0,10); });
   };
   const getDiasRango = (desde,hasta) => {
-    if(!desde||!hasta) return [];
+    if(!desde||!hasta||desde>hasta) return [];
     const dias=[]; const d=new Date(desde+"T12:00:00"); const fin=new Date(hasta+"T12:00:00");
-    while(d<=fin){ dias.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1); }
+    // Limitar a 366 días para evitar loops
+    while(d<=fin && dias.length<366){ dias.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1); }
     return dias;
   };
-
   const semanaAnterior  = ()=>{ const d=new Date(semanaBase+"T12:00:00"); d.setDate(d.getDate()-7); setSemanaBase(d.toISOString().slice(0,10)); };
   const semanaSiguiente = ()=>{ const d=new Date(semanaBase+"T12:00:00"); d.setDate(d.getDate()+7); setSemanaBase(d.toISOString().slice(0,10)); };
   const semanaActual    = ()=>{ const d=new Date(); const day=d.getDay(); const diff=(day===0?-6:1-day); d.setDate(d.getDate()+diff); setSemanaBase(d.toISOString().slice(0,10)); };
@@ -843,15 +851,19 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
   const dias = modoReporte==="semana" ? getDiasSemana(semanaBase) : getDiasRango(fechaDesde,fechaHasta);
   const DIAS_LABEL = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
 
-  // Todas las tareas del período (sin Golf separado)
-  const todasTareas = dias.flatMap(d=>(tareasProg[d]||[]).filter(t=>Array.isArray||true).map(t=>({...t,fechaDia:d})));
-
-  // Aplicar filtros
+  // Firebase puede devolver {0:{...},1:{...}} en vez de array — normalizar
+  const normDia = (d) => {
+    const v = tareasProg[d];
+    if(!v) return [];
+    if(Array.isArray(v)) return v;
+    if(typeof v==="object") return Object.values(v).filter(Boolean);
+    return [];
+  };
+  const todasTareas = dias.flatMap(d=>normDia(d).map(t=>({...t,fechaDia:d})));
   const tareasFiltradas = todasTareas
     .filter(t=> filtroZona==="todas" || t.zona===filtroZona)
     .filter(t=> filtroResp==="todos" || t.responsable===filtroResp);
 
-  // Stats
   const esHecha = t => ["hecha","completada"].includes(t.estado);
   const total   = tareasFiltradas.length;
   const hechas  = tareasFiltradas.filter(esHecha).length;
@@ -863,14 +875,14 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
   const porTrabajador = {};
   tareasFiltradas.forEach(t=>{
     const n=t.responsable||"Sin asignar";
-    if(!porTrabajador[n]) porTrabajador[n]={total:0,hechas:0,noPudo:0,pend:0};
+    if(!porTrabajador[n]) porTrabajador[n]={total:0,hechas:0,noPudo:0,pend:0,noPudoList:[]};
     porTrabajador[n].total++;
     if(esHecha(t)) porTrabajador[n].hechas++;
-    else if(t.estado==="no_pudo") porTrabajador[n].noPudo++;
+    else if(t.estado==="no_pudo"){ porTrabajador[n].noPudo++; porTrabajador[n].noPudoList.push(t); }
     else porTrabajador[n].pend++;
   });
 
-  // Por macrozona
+  // Por macrozona + tipos de tarea
   const porZona = {};
   tareasFiltradas.forEach(t=>{
     const z=t.zona||"Sin zona";
@@ -881,144 +893,248 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
     porZona[z].tareas.push(t);
   });
 
-  // Por tipo de tarea dentro de cada zona
-  const tiposPorZona = {};
-  Object.entries(porZona).forEach(([zona,dat])=>{
-    const tipos={};
-    dat.tareas.forEach(t=>{
-      const tipo = (t.tarea||"Sin tipo").replace("⛳ ","").split("—")[0].split("-")[0].trim();
-      if(!tipos[tipo]) tipos[tipo]={total:0,hechas:0};
-      tipos[tipo].total++;
-      if(esHecha(t)) tipos[tipo].hechas++;
-    });
-    tiposPorZona[zona]=tipos;
+  // Resumen por TIPO global (para gerencia)
+  const CATEGORIAS_TAREA = {
+    "Corte":     ["corte","cortad"],
+    "Poda":      ["poda","podar"],
+    "Fertilización": ["fertili","abono","novatec","salitre"],
+    "Riego":     ["riego","regar","irrigar"],
+    "Fumigación":["fumig","hongos","fungicid","plaga"],
+    "Limpieza":  ["limpie","limpieza","sopla","barrid"],
+    "Aireación": ["airead","aireac"],
+    "Desmalezado":["desmaleza","maleza","deshierb"],
+    "Medición":  ["medici","altura","humedad"],
+    "Revisión":  ["revisi","inspecc"],
+    "Orillado":  ["orill"],
+    "Otros":     [],
+  };
+  const porTipoGlobal = {};
+  Object.keys(CATEGORIAS_TAREA).forEach(k=>{ porTipoGlobal[k]={total:0,hechas:0}; });
+  tareasFiltradas.forEach(t=>{
+    const tnom = (t.tarea||"").toLowerCase();
+    let cat = "Otros";
+    for(const [k,kws] of Object.entries(CATEGORIAS_TAREA)){
+      if(k==="Otros") continue;
+      if(kws.some(kw=>tnom.includes(kw))){ cat=k; break; }
+    }
+    porTipoGlobal[cat].total++;
+    if(esHecha(t)) porTipoGlobal[cat].hechas++;
   });
 
-  // Zonas y responsables únicos para filtros
+  // Tareas no realizadas (no_pudo) para incidencias
+  const tareasNoPudo = tareasFiltradas.filter(t=>t.estado==="no_pudo");
+
+  // Cierres de cancha (desde tareasFiltradas y desde incidenciasFito)
+  const cierresCancha = tareasFiltradas.filter(t=>(t.tarea||"").toLowerCase().includes("cierre")&&(t.tarea||"").toLowerCase().includes("cancha"));
+  const incFitoPeriodo = incidenciasFito.filter(i=>i.fecha>=(dias[0]||"")&&i.fecha<=(dias[dias.length-1]||""));
+
   const todasZonas = [...new Set(todasTareas.map(t=>t.zona).filter(Boolean))].sort();
   const todosResp  = [...new Set(todasTareas.map(t=>t.responsable).filter(Boolean))].sort();
+  const fmtFecha   = d => d?new Date(d+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"short",year:"numeric"}):"—";
+  const periodoLabel = dias.length>0
+    ? `${fmtFecha(dias[0])} al ${fmtFecha(dias[dias.length-1])}`
+    : "Sin período";
 
-  const fmtFecha = d => new Date(d+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"short",year:"numeric"});
-  const periodoLabel = modoReporte==="semana"
-    ? `Semana del ${fmtFecha(dias[0]||"")} al ${fmtFecha(dias[dias.length-1]||"")}`
-    : `Del ${fmtFecha(fechaDesde)} al ${fmtFecha(fechaHasta)}`;
-
-  // ── Función de impresión ─────────────────────────────────────────────────
-  const imprimir = () => {
-    const colVerde="#1a5c35", colVerdeClaro="#d4edda", colBorde="#ccddcc";
-
-    const kpiHtml = `
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
-        ${[["Total tareas",total,"#1a5c35"],["✅ Hechas",hechas,"#166534"],["🔴 No se pudo",noPudo,"#991b1b"],["Cumplimiento",pct+"%",pct>=80?"#166534":pct>=50?"#92400e":"#991b1b"]]
-          .map(([l,v,c])=>`<div style="border:1px solid ${colBorde};border-radius:8px;padding:12px;text-align:center">
-            <div style="font-size:22px;font-weight:700;color:${c}">${v}</div>
-            <div style="font-size:11px;color:#555">${l}</div>
-          </div>`).join("")}
+  // ── IMPRIMIR ────────────────────────────────────────────────────────────
+  const imprimir = (modo) => {
+    const V="#1a5c35", VL="#d4edda", BO="#ccddcc";
+    const encabezado = `
+      <div style="text-align:center;margin-bottom:20px;border-bottom:3px solid ${V};padding-bottom:12px">
+        <div style="font-size:22px;font-weight:700;color:${V}">Estadio Español · Áreas Verdes</div>
+        <div style="font-size:15px;font-weight:600;color:#333;margin-top:4px">
+          ${modo==="gerencia"?"Reporte Ejecutivo de Gestión":"Reporte Operacional Detallado"}
+        </div>
+        <div style="font-size:13px;color:#555;margin-top:2px">Del ${periodoLabel}</div>
+        <div style="font-size:11px;color:#888;margin-top:2px">Generado el ${new Date().toLocaleDateString("es-CL",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>
       </div>`;
 
-    const trabajadoresHtml = `
-      <h3 style="color:${colVerde};border-bottom:2px solid ${colVerde};padding-bottom:4px;margin:16px 0 8px">Por trabajador</h3>
-      <table style="width:100%;border-collapse:collapse;font-size:12px">
-        <tr style="background:${colVerde};color:#fff">
-          <th style="padding:6px 10px;text-align:left">Trabajador</th>
-          <th style="padding:6px;text-align:center">Total</th>
-          <th style="padding:6px;text-align:center">✅ Hechas</th>
-          <th style="padding:6px;text-align:center">🔴 No pudo</th>
-          <th style="padding:6px;text-align:center">Pendientes</th>
-          <th style="padding:6px;text-align:center">Cumplimiento</th>
+    const kpis = `
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px">
+        ${[["Total tareas",total,"#1a5c35"],["✅ Realizadas",hechas,"#166534"],["🔴 No realizadas",noPudo,"#991b1b"],["⏳ Pendientes",pend,"#92400e"],["Cumplimiento",pct+"%",pct>=80?"#166534":pct>=50?"#92400e":"#991b1b"]]
+          .map(([l,v,c])=>`<div style="border:1px solid ${BO};border-radius:8px;padding:10px;text-align:center">
+            <div style="font-size:20px;font-weight:700;color:${c}">${v}</div>
+            <div style="font-size:10px;color:#555">${l}</div></div>`).join("")}
+      </div>`;
+
+    // Tabla trabajadores (ambos modos)
+    const tabTrab = `
+      <h3 style="color:${V};border-bottom:2px solid ${V};padding-bottom:3px;margin:16px 0 8px;font-size:13px">Desempeño por trabajador</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:8px">
+        <tr style="background:${V};color:#fff">
+          <th style="padding:5px 8px;text-align:left">Trabajador</th>
+          <th style="padding:5px;text-align:center">Total</th>
+          <th style="padding:5px;text-align:center">✅ Hechas</th>
+          <th style="padding:5px;text-align:center">🔴 No realizó</th>
+          <th style="padding:5px;text-align:center">⏳ Pendiente</th>
+          <th style="padding:5px;text-align:center">Cumplimiento</th>
         </tr>
-        ${Object.entries(porTrabajador).sort((a,b)=>b[1].hechas-a[1].hechas).map(([n,d],i)=>`
-          <tr style="background:${i%2===0?"#fff":"#f5fbf5"}">
-            <td style="padding:5px 10px;font-weight:600">${n}</td>
-            <td style="padding:5px;text-align:center">${d.total}</td>
-            <td style="padding:5px;text-align:center;color:#166534;font-weight:600">${d.hechas}</td>
-            <td style="padding:5px;text-align:center;color:${d.noPudo>0?"#991b1b":"#6b7280"}">${d.noPudo||"—"}</td>
-            <td style="padding:5px;text-align:center;color:${d.pend>0?"#92400e":"#6b7280"}">${d.pend||"—"}</td>
-            <td style="padding:5px;text-align:center;font-weight:700;color:${d.total?Math.round(d.hechas/d.total*100)>=80?"#166534":"#92400e":"#9ca3af"}">${d.total?Math.round(d.hechas/d.total*100)+"%":"—"}</td>
-          </tr>`).join("")}
+        ${Object.entries(porTrabajador).sort((a,b)=>b[1].hechas-a[1].hechas).map(([n,d],i)=>{
+          const p2=d.total?Math.round(d.hechas/d.total*100):0;
+          return `<tr style="background:${i%2===0?"#fff":"#f5fbf5"}">
+            <td style="padding:4px 8px;font-weight:600">${n}</td>
+            <td style="padding:4px;text-align:center">${d.total}</td>
+            <td style="padding:4px;text-align:center;color:#166534;font-weight:600">${d.hechas}</td>
+            <td style="padding:4px;text-align:center;color:${d.noPudo>0?"#991b1b":"#6b7280"}">${d.noPudo||"—"}</td>
+            <td style="padding:4px;text-align:center;color:${d.pend>0?"#92400e":"#6b7280"}">${d.pend||"—"}</td>
+            <td style="padding:4px;text-align:center;font-weight:700;color:${p2>=80?"#166534":p2>=50?"#92400e":"#991b1b"}">${p2}%</td>
+          </tr>`;
+        }).join("")}
       </table>`;
 
-    const zonasHtml = Object.entries(porZona)
-      .sort((a,b)=>b[1].total-a[1].total)
-      .map(([zona,dat])=>{
-        const pctZ=dat.total?Math.round(dat.hechas/dat.total*100):0;
-        const tipos = tiposPorZona[zona]||{};
-        const tiposHtml = Object.entries(tipos)
-          .sort((a,b)=>b[1].total-a[1].total)
-          .map(([tipo,td])=>`
-            <tr>
-              <td style="padding:3px 10px 3px 24px;color:#444">${tipo}</td>
-              <td style="padding:3px 6px;text-align:center;font-size:11px">${td.total}</td>
-              <td style="padding:3px 6px;text-align:center;font-size:11px;color:#166534">${td.hechas}</td>
-              <td style="padding:3px 6px;text-align:center;font-size:11px">${td.total-td.hechas||"—"}</td>
-              <td style="padding:3px 6px;text-align:center;font-size:11px;font-weight:600;color:${td.total?Math.round(td.hechas/td.total*100)>=80?"#166534":"#92400e":"#9ca3af"}">${td.total?Math.round(td.hechas/td.total*100)+"%":"—"}</td>
-            </tr>`).join("");
-        return `
-          <div style="margin-bottom:12px;border:1px solid ${colBorde};border-radius:8px;overflow:hidden;break-inside:avoid">
-            <div style="background:${colVerde};color:#fff;padding:7px 12px;display:flex;justify-content:space-between;align-items:center">
-              <span style="font-weight:700;font-size:13px">${zona}</span>
-              <span style="font-size:12px">${dat.hechas}/${dat.total} tareas · ${pctZ}% cumplimiento</span>
-            </div>
-            <table style="width:100%;border-collapse:collapse;font-size:12px">
-              <tr style="background:${colVerdeClaro}">
-                <th style="padding:4px 10px 4px 24px;text-align:left;font-size:11px">Tipo de tarea</th>
-                <th style="padding:4px 6px;text-align:center;font-size:11px">Total</th>
-                <th style="padding:4px 6px;text-align:center;font-size:11px">✅ Hechas</th>
-                <th style="padding:4px 6px;text-align:center;font-size:11px">Pendiente</th>
-                <th style="padding:4px 6px;text-align:center;font-size:11px">%</th>
-              </tr>
-              ${tiposHtml}
-            </table>
-            ${dat.tareas.filter(t=>t.estado==="no_pudo").length>0?`
-              <div style="padding:6px 12px;background:#fff8f0;border-top:1px solid #fcd34d">
-                <div style="font-size:11px;font-weight:600;color:#92400e;margin-bottom:3px">No se pudo realizar:</div>
-                ${dat.tareas.filter(t=>t.estado==="no_pudo").map(t=>`
-                  <div style="font-size:11px;color:#666;padding:1px 0">• ${t.tarea||""}${t.motivo?` — <em>${t.motivo}</em>`:""}</div>
-                `).join("")}
-              </div>`:""}
-          </div>`;
-      }).join("");
+    // Resumen por tipo global (GERENCIA)
+    const tiposActivos = Object.entries(porTipoGlobal).filter(([,d])=>d.total>0);
+    const tabTipos = `
+      <h3 style="color:${V};border-bottom:2px solid ${V};padding-bottom:3px;margin:16px 0 8px;font-size:13px">Resumen por tipo de actividad</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:8px">
+        <tr style="background:${V};color:#fff">
+          <th style="padding:5px 8px;text-align:left">Tipo de actividad</th>
+          <th style="padding:5px;text-align:center">Total</th>
+          <th style="padding:5px;text-align:center">✅ Realizadas</th>
+          <th style="padding:5px;text-align:center">Cumplimiento</th>
+        </tr>
+        ${tiposActivos.sort((a,b)=>b[1].total-a[1].total).map(([tipo,d],i)=>{
+          const p2=d.total?Math.round(d.hechas/d.total*100):0;
+          return `<tr style="background:${i%2===0?"#fff":"#f5fbf5"}">
+            <td style="padding:4px 8px;font-weight:600">${tipo}</td>
+            <td style="padding:4px;text-align:center">${d.total}</td>
+            <td style="padding:4px;text-align:center;color:#166534;font-weight:600">${d.hechas}</td>
+            <td style="padding:4px;text-align:center;font-weight:700;color:${p2>=80?"#166534":p2>=50?"#92400e":"#991b1b"}">${p2}%</td>
+          </tr>`;
+        }).join("")}
+      </table>`;
 
-    const incFitoHtml = incidenciasFito.filter(i=>i.fecha>=( dias[0]||"")&&i.fecha<=(dias[dias.length-1]||"")).length>0?`
-      <h3 style="color:${colVerde};border-bottom:2px solid ${colVerde};padding-bottom:4px;margin:20px 0 8px">Incidencias fitosanitarias</h3>
-      ${incidenciasFito.filter(i=>i.fecha>=(dias[0]||"")&&i.fecha<=(dias[dias.length-1]||"")).map(i=>`
-        <div style="border:1px solid #fcd34d;border-radius:6px;padding:8px 12px;margin-bottom:6px;background:#fffbeb;font-size:12px">
-          <strong>${i.fecha}</strong> · ${i.zona||""} · ${i.problema||""}
-          ${i.producto?`<br>Tratamiento: ${i.producto}${i.dosis?` ${i.dosis}`:""}`:""} 
-          ${i.ri?`· Reingreso: ${i.ri}h`:""}
-        </div>`).join("")}`:"";
-
-    const win = window.open("","_blank","width=900,height=700");
-    win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-      <title>Reporte Áreas Verdes · ${periodoLabel}</title>
-      <style>
-        *{box-sizing:border-box;font-family:Calibri,sans-serif}
-        body{margin:0;padding:20px;color:#222;font-size:13px}
-        @media print{
-          body{padding:10px}
-          .no-print{display:none!important}
-          div,table{break-inside:avoid}
+    // Detalle por zona (JEFA)
+    const tabZonas = Object.entries(porZona).sort((a,b)=>b[1].total-a[1].total).map(([zona,dat])=>{
+      const pctZ=dat.total?Math.round(dat.hechas/dat.total*100):0;
+      const tipos={};
+      dat.tareas.forEach(t=>{
+        const tnom=(t.tarea||"").toLowerCase();
+        let cat="Otros";
+        for(const [k,kws] of Object.entries(CATEGORIAS_TAREA)){
+          if(k==="Otros") continue;
+          if(kws.some(kw=>tnom.includes(kw))){ cat=k; break; }
         }
-      </style></head><body>
-      <div style="text-align:center;margin-bottom:20px;border-bottom:3px solid ${colVerde};padding-bottom:12px">
-        <div style="font-size:22px;font-weight:700;color:${colVerde}">Estadio Español · Áreas Verdes</div>
-        <div style="font-size:15px;font-weight:600;color:#444;margin-top:4px">Reporte de Gestión · ${periodoLabel}</div>
-        <div style="font-size:11px;color:#777;margin-top:2px">Generado el ${new Date().toLocaleDateString("es-CL",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>
-      </div>
-      ${kpiHtml}
-      ${trabajadoresHtml}
-      <h3 style="color:${colVerde};border-bottom:2px solid ${colVerde};padding-bottom:4px;margin:20px 0 8px">Detalle por macrozona y tipo de tarea</h3>
-      ${zonasHtml}
-      ${incFitoHtml}
+        if(!tipos[cat]) tipos[cat]={total:0,hechas:0};
+        tipos[cat].total++;
+        if(esHecha(t)) tipos[cat].hechas++;
+      });
+      const npZona=dat.tareas.filter(t=>t.estado==="no_pudo");
+      return `
+        <div style="margin-bottom:10px;border:1px solid ${BO};border-radius:6px;overflow:hidden;break-inside:avoid">
+          <div style="background:${V};color:#fff;padding:6px 10px;display:flex;justify-content:space-between">
+            <span style="font-weight:700;font-size:12px">${zona}</span>
+            <span style="font-size:11px">${dat.hechas}/${dat.total} · ${pctZ}%</span>
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:10px">
+            <tr style="background:${VL}">
+              <th style="padding:3px 8px;text-align:left">Actividad</th>
+              <th style="padding:3px;text-align:center">Total</th>
+              <th style="padding:3px;text-align:center">✅</th>
+              <th style="padding:3px;text-align:center">%</th>
+            </tr>
+            ${Object.entries(tipos).filter(([,d])=>d.total>0).sort((a,b)=>b[1].total-a[1].total).map(([tipo,td],i)=>{
+              const p3=td.total?Math.round(td.hechas/td.total*100):0;
+              return `<tr style="background:${i%2===0?"#fff":"#f9fdf9"}">
+                <td style="padding:3px 8px">${tipo}</td>
+                <td style="padding:3px;text-align:center">${td.total}</td>
+                <td style="padding:3px;text-align:center;color:#166534;font-weight:600">${td.hechas}</td>
+                <td style="padding:3px;text-align:center;font-weight:700;color:${p3>=80?"#166534":p3>=50?"#92400e":"#991b1b"}">${p3}%</td>
+              </tr>`;
+            }).join("")}
+          </table>
+          ${npZona.length>0?`
+            <div style="padding:5px 10px;background:#fff8f0;border-top:1px solid #fcd34d;font-size:10px">
+              <strong style="color:#92400e">No realizadas:</strong>
+              ${npZona.map(t=>`<div style="margin-top:1px">• ${t.fechaDia} — ${t.tarea||""}${t.motivo?` <em>(${t.motivo})</em>`:""}</div>`).join("")}
+            </div>`:""}
+        </div>`;
+    }).join("");
+
+    // Incidencias tareas no realizadas (JEFA)
+    const incNoPudo = tareasNoPudo.length>0?`
+      <h3 style="color:#991b1b;border-bottom:2px solid #991b1b;padding-bottom:3px;margin:16px 0 8px;font-size:13px">Incidencias — Tareas no realizadas</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:8px">
+        <tr style="background:#991b1b;color:#fff">
+          <th style="padding:5px 8px;text-align:left">Fecha</th>
+          <th style="padding:5px;text-align:left">Tarea</th>
+          <th style="padding:5px;text-align:left">Zona</th>
+          <th style="padding:5px;text-align:left">Responsable</th>
+          <th style="padding:5px;text-align:left">Motivo</th>
+        </tr>
+        ${tareasNoPudo.map((t,i)=>`
+          <tr style="background:${i%2===0?"#fff":"#fff5f5"}">
+            <td style="padding:4px 8px;white-space:nowrap">${t.fechaDia||""}</td>
+            <td style="padding:4px 8px">${t.tarea||""}</td>
+            <td style="padding:4px 8px">${t.zona||""}</td>
+            <td style="padding:4px 8px">${t.responsable||""}</td>
+            <td style="padding:4px 8px;color:#991b1b;font-style:italic">${t.motivo||"Sin motivo registrado"}</td>
+          </tr>`).join("")}
+      </table>`:"";
+
+    // Cierres de cancha (JEFA)
+    const incCierres = cierresCancha.length>0?`
+      <h3 style="color:#92400e;border-bottom:2px solid #92400e;padding-bottom:3px;margin:16px 0 8px;font-size:13px">Cierres de cancha del período</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:8px">
+        <tr style="background:#92400e;color:#fff">
+          <th style="padding:5px 8px;text-align:left">Fecha</th>
+          <th style="padding:5px;text-align:left">Descripción</th>
+          <th style="padding:5px;text-align:left">Zona</th>
+          <th style="padding:5px;text-align:left">Estado</th>
+        </tr>
+        ${cierresCancha.map((t,i)=>`
+          <tr style="background:${i%2===0?"#fff":"#fffbeb"}">
+            <td style="padding:4px 8px">${t.fechaDia||""}</td>
+            <td style="padding:4px 8px">${t.tarea||""}</td>
+            <td style="padding:4px 8px">${t.zona||""}</td>
+            <td style="padding:4px 8px;font-weight:600;color:${esHecha(t)?"#166534":"#92400e"}">${t.estado||""}</td>
+          </tr>`).join("")}
+      </table>`:"";
+
+    // Incidencias fitosanitarias (ambos modos)
+    const incFito = incFitoPeriodo.length>0?`
+      <h3 style="color:#92400e;border-bottom:2px solid #f59e0b;padding-bottom:3px;margin:16px 0 8px;font-size:13px">Incidencias fitosanitarias</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <tr style="background:#92400e;color:#fff">
+          <th style="padding:5px 8px;text-align:left">Fecha</th>
+          <th style="padding:5px;text-align:left">Zona</th>
+          <th style="padding:5px;text-align:left">Problema</th>
+          <th style="padding:5px;text-align:left">Tratamiento</th>
+          <th style="padding:5px;text-align:center">RI (h)</th>
+          <th style="padding:5px;text-align:left">Estado</th>
+        </tr>
+        ${incFitoPeriodo.map((i,idx2)=>`
+          <tr style="background:${idx2%2===0?"#fff":"#fffbeb"}">
+            <td style="padding:4px 8px;white-space:nowrap">${i.fecha||""}</td>
+            <td style="padding:4px 8px">${i.zona||""}</td>
+            <td style="padding:4px 8px;font-weight:600">${i.problema||""}</td>
+            <td style="padding:4px 8px">${i.producto||""}${i.dosis?` · ${i.dosis}`:""}</td>
+            <td style="padding:4px;text-align:center">${i.ri||"—"}</td>
+            <td style="padding:4px 8px">${i.estado||""}</td>
+          </tr>`).join("")}
+      </table>`:"";
+
+    const pie = `
+      <div style="text-align:center;margin-top:24px;font-size:10px;color:#888;border-top:1px solid ${BO};padding-top:8px">
+        Departamento de Áreas Verdes · Estadio Español de Las Condes<br>
+        Carmen Luz Hermosilla Diez · Jefa Departamento Áreas Verdes
+      </div>`;
+
+    // Armar según modo
+    const cuerpo = modo==="gerencia"
+      ? kpis + tabTrab + tabTipos + (incFito||"<p style='font-size:11px;color:#888'>Sin incidencias fitosanitarias en el período.</p>")
+      : kpis + tabTrab + `<h3 style="color:${V};border-bottom:2px solid ${V};padding-bottom:3px;margin:16px 0 8px;font-size:13px">Detalle por macrozona</h3>` + tabZonas + incNoPudo + incCierres + incFito;
+
+    const win=window.open("","_blank","width=960,height=750");
+    win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+      <title>Reporte Áreas Verdes</title>
+      <style>*{box-sizing:border-box;font-family:Calibri,Arial,sans-serif}body{margin:0;padding:20px;color:#222}
+      @media print{body{padding:8px}.no-print{display:none!important}div,table{break-inside:avoid}}</style>
+      </head><body>${encabezado}${cuerpo}${pie}
       <div class="no-print" style="text-align:center;margin-top:20px">
-        <button onclick="window.print()" style="background:${colVerde};color:#fff;border:none;padding:10px 28px;border-radius:8px;font-size:14px;cursor:pointer;font-family:Calibri,sans-serif">
+        <button onclick="window.print()" style="background:${V};color:#fff;border:none;padding:10px 28px;border-radius:8px;font-size:14px;cursor:pointer">
           🖨️ Imprimir / Guardar PDF
         </button>
-      </div>
-      <div style="text-align:center;margin-top:20px;font-size:10px;color:#999;border-top:1px solid ${colBorde};padding-top:8px">
-        Departamento de Áreas Verdes · Estadio Español de Las Condes · Carmen Luz Hermosilla Diez
-      </div>
-    </body></html>`);
+      </div></body></html>`);
     win.document.close();
   };
 
@@ -1042,8 +1158,10 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
             <div style={{display:"flex",alignItems:"center",gap:8}}>
               <button onClick={semanaAnterior} style={{...S.btn,padding:"5px 12px",fontSize:16,background:"rgba(255,255,255,0.07)",color:"#a0c8a0"}}>‹</button>
               <div style={{textAlign:"center"}}>
-                <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700}}>{periodoLabel}</div>
-                <div style={{fontSize:11,color:"#6aaa7a",marginTop:2}}>{tareasFiltradas.length} tareas · {dias.length} días</div>
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700}}>
+                  {fmtFecha(dias[0]||"")} — {fmtFecha(dias[dias.length-1]||"")}
+                </div>
+                <div style={{fontSize:11,color:"#6aaa7a",marginTop:2}}>{dias.length} días · {tareasFiltradas.length} tareas</div>
               </div>
               <button onClick={semanaSiguiente} style={{...S.btn,padding:"5px 12px",fontSize:16,background:"rgba(255,255,255,0.07)",color:"#a0c8a0"}}>›</button>
             </div>
@@ -1052,7 +1170,6 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
                 onChange={e=>{const d=new Date(e.target.value+"T12:00:00");const day=d.getDay();const diff=(day===0?-6:1-day);d.setDate(d.getDate()+diff);setSemanaBase(d.toISOString().slice(0,10));}}
                 style={{...S.input,width:"auto",fontSize:13}}/>
               <button onClick={semanaActual} style={{...S.btn,fontSize:12,color:"#6aaa7a",background:"transparent",border:"1px solid rgba(255,255,255,0.1)"}}>Esta semana</button>
-              <button onClick={imprimir} style={{...S.btn,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}}>🖨️ Imprimir</button>
             </div>
           </div>
         ) : (
@@ -1066,27 +1183,34 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
               <input type="date" value={fechaHasta} onChange={e=>setFechaHasta(e.target.value)} style={{...S.input,width:"auto",fontSize:13}}/>
             </div>
             {dias.length>0&&<div style={{fontSize:12,color:"#5a9a7a"}}>{dias.length} días · {tareasFiltradas.length} tareas</div>}
-            <button onClick={imprimir} style={{...S.btn,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)",marginLeft:"auto"}}>🖨️ Imprimir</button>
           </div>
         )}
       </div>
 
-      {/* ── Filtros ── */}
+      {/* ── Botones de impresión por tipo ── */}
       <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
-        <select style={{...S.input,fontSize:12,padding:"4px 8px",width:"auto"}} value={filtroZona} onChange={e=>setFiltroZona(e.target.value)}>
-          <option value="todas">Todas las zonas</option>
-          {todasZonas.map(z=><option key={z} value={z}>{z}</option>)}
-        </select>
-        <select style={{...S.input,fontSize:12,padding:"4px 8px",width:"auto"}} value={filtroResp} onChange={e=>setFiltroResp(e.target.value)}>
-          <option value="todos">Todos los trabajadores</option>
-          {todosResp.map(r=><option key={r} value={r}>{r}</option>)}
-        </select>
-        {(filtroZona!=="todas"||filtroResp!=="todos")&&(
-          <button onClick={()=>{setFiltroZona("todas");setFiltroResp("todos");}}
-            style={{...S.btn,fontSize:11,color:"#f87171",border:"1px solid rgba(248,113,113,0.3)",background:"transparent"}}>
-            ✕ Limpiar filtros
-          </button>
-        )}
+        <button onClick={()=>imprimir("gerencia")}
+          style={{...S.btn,background:"rgba(139,92,246,0.15)",color:"#c4b5fd",border:"1px solid rgba(139,92,246,0.35)",fontSize:13}}>
+          📊 Imprimir Reporte Gerencia
+        </button>
+        <button onClick={()=>imprimir("jefa")}
+          style={{...S.btn,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.35)",fontSize:13}}>
+          📋 Imprimir Reporte Detallado (Jefa)
+        </button>
+        <div style={{marginLeft:"auto",display:"flex",gap:6}}>
+          <select style={{...S.input,fontSize:12,padding:"4px 8px",width:"auto"}} value={filtroZona} onChange={e=>setFiltroZona(e.target.value)}>
+            <option value="todas">Todas las zonas</option>
+            {todasZonas.map(z=><option key={z} value={z}>{z}</option>)}
+          </select>
+          <select style={{...S.input,fontSize:12,padding:"4px 8px",width:"auto"}} value={filtroResp} onChange={e=>setFiltroResp(e.target.value)}>
+            <option value="todos">Todos</option>
+            {todosResp.map(r=><option key={r} value={r}>{r}</option>)}
+          </select>
+          {(filtroZona!=="todas"||filtroResp!=="todos")&&(
+            <button onClick={()=>{setFiltroZona("todas");setFiltroResp("todos");}}
+              style={{...S.btn,fontSize:11,color:"#f87171",border:"1px solid rgba(248,113,113,0.3)",background:"transparent"}}>✕</button>
+          )}
+        </div>
       </div>
 
       {total===0 ? (
@@ -1094,113 +1218,131 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
       ) : (<>
 
         {/* ── KPIs ── */}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:10,marginBottom:16}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))",gap:10,marginBottom:14}}>
           {[
-            {label:"Total",val:total,color:"#34d399",bg:"rgba(52,211,153,0.08)"},
-            {label:"✅ Hechas",val:hechas,color:"#22c55e",bg:"rgba(34,197,94,0.08)"},
-            {label:"🔴 No pudo",val:noPudo,color:"#ef4444",bg:"rgba(239,68,68,0.08)"},
-            {label:"Pendientes",val:pend,color:"#f59e0b",bg:"rgba(245,158,11,0.08)"},
-            {label:"Cumplimiento",val:pct+"%",color:pct>=80?"#22c55e":pct>=50?"#f59e0b":"#ef4444",bg:"rgba(255,255,255,0.03)"},
+            {label:"Total tareas",val:total,color:"#34d399"},
+            {label:"✅ Hechas",val:hechas,color:"#22c55e"},
+            {label:"🔴 No realizadas",val:noPudo,color:"#ef4444"},
+            {label:"⏳ Pendientes",val:pend,color:"#f59e0b"},
+            {label:"Cumplimiento",val:pct+"%",color:pct>=80?"#22c55e":pct>=50?"#f59e0b":"#ef4444"},
           ].map(k=>(
-            <div key={k.label} style={{background:k.bg,border:`1px solid ${k.color}25`,borderRadius:10,padding:"10px 12px",textAlign:"center"}}>
+            <div key={k.label} style={{background:`${k.color}08`,border:`1px solid ${k.color}25`,borderRadius:10,padding:"10px",textAlign:"center"}}>
               <div style={{fontSize:22,fontWeight:700,color:k.color}}>{k.val}</div>
-              <div style={{fontSize:11,color:"#5a9a7a"}}>{k.label}</div>
+              <div style={{fontSize:10,color:"#5a9a7a"}}>{k.label}</div>
             </div>
           ))}
         </div>
 
-        {/* ── Por trabajador ── */}
-        <div style={{...S.card,marginBottom:14,padding:"12px 14px"}}>
-          <div style={{fontSize:12,fontWeight:600,color:"#34d399",marginBottom:8}}>Por trabajador</div>
+        {/* ── Por trabajador (pantalla) ── */}
+        <div style={{...S.card,marginBottom:12,padding:"12px 14px"}}>
+          <div style={{fontSize:12,fontWeight:600,color:"#34d399",marginBottom:8}}>Desempeño por trabajador</div>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-            <thead><tr style={{background:"rgba(52,211,153,0.1)"}}>
-              {["Trabajador","Total","✅ Hechas","🔴 No pudo","Pendiente","%"].map(h=>(
-                <th key={h} style={{padding:"5px 8px",textAlign:h==="Trabajador"?"left":"center",color:"#34d399",fontWeight:600}}>{h}</th>
+            <thead><tr style={{background:"rgba(52,211,153,0.08)"}}>
+              {["Trabajador","Total","✅ Hechas","🔴 No realizó","⏳ Pendiente","%"].map(h=>(
+                <th key={h} style={{padding:"5px 8px",textAlign:h==="Trabajador"?"left":"center",color:"#34d399",fontWeight:600,fontSize:10}}>{h}</th>
               ))}
             </tr></thead>
             <tbody>
               {Object.entries(porTrabajador).sort((a,b)=>b[1].hechas-a[1].hechas).map(([n,d],i)=>{
                 const p2=d.total?Math.round(d.hechas/d.total*100):0;
-                return (<tr key={n} style={{background:i%2===0?"transparent":"rgba(255,255,255,0.02)",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
-                  <td style={{padding:"5px 8px",fontWeight:600,color:"#ede9e0"}}>{n}</td>
-                  <td style={{padding:"5px",textAlign:"center",color:"#5a9a7a"}}>{d.total}</td>
-                  <td style={{padding:"5px",textAlign:"center",color:"#22c55e",fontWeight:600}}>{d.hechas}</td>
-                  <td style={{padding:"5px",textAlign:"center",color:d.noPudo>0?"#ef4444":"#4a7a5a"}}>{d.noPudo||"—"}</td>
-                  <td style={{padding:"5px",textAlign:"center",color:d.pend>0?"#f59e0b":"#4a7a5a"}}>{d.pend||"—"}</td>
-                  <td style={{padding:"5px",textAlign:"center",fontWeight:700,color:p2>=80?"#22c55e":p2>=50?"#f59e0b":"#ef4444"}}>{p2}%</td>
+                return (<tr key={n} style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                  <td style={{padding:"4px 8px",fontWeight:600,color:"#ede9e0"}}>{n}</td>
+                  <td style={{padding:"4px",textAlign:"center",color:"#5a9a7a"}}>{d.total}</td>
+                  <td style={{padding:"4px",textAlign:"center",color:"#22c55e",fontWeight:600}}>{d.hechas}</td>
+                  <td style={{padding:"4px",textAlign:"center",color:d.noPudo>0?"#ef4444":"#4a7a5a"}}>{d.noPudo||"—"}</td>
+                  <td style={{padding:"4px",textAlign:"center",color:d.pend>0?"#f59e0b":"#4a7a5a"}}>{d.pend||"—"}</td>
+                  <td style={{padding:"4px",textAlign:"center",fontWeight:700,color:p2>=80?"#22c55e":p2>=50?"#f59e0b":"#ef4444"}}>{p2}%</td>
                 </tr>);
               })}
             </tbody>
           </table>
         </div>
 
-        {/* ── Por macrozona y tipo de tarea ── */}
-        <div style={{fontSize:12,fontWeight:600,color:"#34d399",marginBottom:8}}>Por macrozona y tipo de tarea</div>
-        {Object.entries(porZona).sort((a,b)=>b[1].total-a[1].total).map(([zona,dat])=>{
-          const pctZ=dat.total?Math.round(dat.hechas/dat.total*100):0;
-          const colZ=pctZ>=80?"#22c55e":pctZ>=50?"#f59e0b":"#ef4444";
-          const tipos=tiposPorZona[zona]||{};
-          const noPudoZona=dat.tareas.filter(t=>t.estado==="no_pudo");
-          return (
-            <div key={zona} style={{...S.card,marginBottom:8,padding:0,overflow:"hidden"}}>
-              {/* Cabecera zona */}
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-                padding:"7px 12px",background:"rgba(52,211,153,0.08)",borderBottom:"1px solid rgba(52,211,153,0.15)"}}>
-                <div style={{fontWeight:700,fontSize:12,color:"#34d399"}}>{zona}</div>
-                <div style={{display:"flex",gap:12,alignItems:"center"}}>
-                  <span style={{fontSize:11,color:"#5a9a7a"}}>{dat.hechas}/{dat.total} tareas</span>
-                  <span style={{fontSize:12,fontWeight:700,color:colZ,background:`${colZ}15`,
-                    padding:"2px 8px",borderRadius:10,border:`1px solid ${colZ}30`}}>{pctZ}%</span>
+        {/* ── Resumen por tipo global ── */}
+        <div style={{...S.card,marginBottom:12,padding:"12px 14px"}}>
+          <div style={{fontSize:12,fontWeight:600,color:"#34d399",marginBottom:8}}>Resumen por tipo de actividad</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+            {Object.entries(porTipoGlobal).filter(([,d])=>d.total>0).sort((a,b)=>b[1].total-a[1].total).map(([tipo,d])=>{
+              const p2=d.total?Math.round(d.hechas/d.total*100):0;
+              const col=p2>=80?"#22c55e":p2>=50?"#f59e0b":"#ef4444";
+              return (
+                <div key={tipo} style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",
+                  borderRadius:8,padding:"6px 10px",minWidth:110,textAlign:"center"}}>
+                  <div style={{fontSize:13,fontWeight:700,color:col}}>{d.hechas}/{d.total}</div>
+                  <div style={{fontSize:10,color:"#5a9a7a"}}>{tipo}</div>
+                  <div style={{fontSize:11,fontWeight:600,color:col}}>{p2}%</div>
                 </div>
-              </div>
-              {/* Tipos de tarea */}
-              <div style={{padding:"6px 12px"}}>
-                <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                  <thead><tr style={{borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
-                    {["Tipo de tarea","Total","✅","Pend.","%"].map(h=>(
-                      <th key={h} style={{padding:"3px 6px",textAlign:h==="Tipo de tarea"?"left":"center",color:"#4a8a6a",fontWeight:600,fontSize:10}}>{h}</th>
-                    ))}
-                  </tr></thead>
-                  <tbody>
-                    {Object.entries(tipos).sort((a,b)=>b[1].total-a[1].total).map(([tipo,td],i)=>{
-                      const p3=td.total?Math.round(td.hechas/td.total*100):0;
-                      return (<tr key={tipo} style={{borderBottom:"1px solid rgba(255,255,255,0.03)"}}>
-                        <td style={{padding:"3px 6px",color:"#cde8d4"}}>{tipo}</td>
-                        <td style={{padding:"3px 6px",textAlign:"center",color:"#5a9a7a"}}>{td.total}</td>
-                        <td style={{padding:"3px 6px",textAlign:"center",color:"#22c55e",fontWeight:600}}>{td.hechas}</td>
-                        <td style={{padding:"3px 6px",textAlign:"center",color:td.total-td.hechas>0?"#f59e0b":"#4a7a5a"}}>{td.total-td.hechas||"—"}</td>
-                        <td style={{padding:"3px 6px",textAlign:"center",fontWeight:700,fontSize:11,color:p3>=80?"#22c55e":p3>=50?"#f59e0b":"#ef4444"}}>{p3}%</td>
-                      </tr>);
-                    })}
-                  </tbody>
-                </table>
-                {noPudoZona.length>0&&(
-                  <div style={{marginTop:6,padding:"5px 8px",background:"rgba(239,68,68,0.05)",borderRadius:6,border:"1px solid rgba(239,68,68,0.15)"}}>
-                    <div style={{fontSize:10,fontWeight:600,color:"#f87171",marginBottom:2}}>No se pudo realizar:</div>
-                    {noPudoZona.map((t,i)=>(
-                      <div key={i} style={{fontSize:10,color:"#9ca3af"}}>• {t.tarea||""}{t.motivo?` — ${t.motivo}`:""}</div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
+              );
+            })}
+          </div>
+        </div>
 
-        {/* ── Incidencias fitosanitarias ── */}
-        {incidenciasFito.filter(i=>i.fecha>=(dias[0]||"")&&i.fecha<=(dias[dias.length-1]||"")).length>0&&(
-          <div style={{marginTop:12}}>
-            <div style={{fontSize:12,fontWeight:600,color:"#fbbf24",marginBottom:8}}>Incidencias fitosanitarias del período</div>
-            {incidenciasFito.filter(i=>i.fecha>=(dias[0]||"")&&i.fecha<=(dias[dias.length-1]||"")).map((inc,i)=>(
-              <div key={i} style={{...S.card,marginBottom:6,padding:"8px 12px",border:"1px solid rgba(251,191,36,0.2)"}}>
-                <div style={{display:"flex",gap:10,fontSize:11}}>
-                  <span style={{fontWeight:600,color:"#fbbf24"}}>{inc.fecha}</span>
-                  <span style={{color:"#34d399"}}>{inc.zona||""}</span>
-                  <span style={{color:"#ede9e0"}}>{inc.problema||""}</span>
-                  {inc.producto&&<span style={{color:"#5a9a7a"}}>→ {inc.producto}{inc.dosis?` ${inc.dosis}`:""}{inc.ri?` (RI: ${inc.ri}h)`:""}</span>}
-                </div>
+        {/* ── Tareas no realizadas ── */}
+        {tareasNoPudo.length>0&&(
+          <div style={{...S.card,marginBottom:12,padding:"12px 14px",border:"1px solid rgba(239,68,68,0.2)"}}>
+            <div style={{fontSize:12,fontWeight:600,color:"#f87171",marginBottom:8}}>
+              🔴 Tareas no realizadas ({tareasNoPudo.length})
+            </div>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+              <thead><tr style={{background:"rgba(239,68,68,0.08)"}}>
+                {["Fecha","Tarea","Zona","Responsable","Motivo"].map(h=>(
+                  <th key={h} style={{padding:"4px 8px",textAlign:"left",color:"#f87171",fontWeight:600,fontSize:10}}>{h}</th>
+                ))}
+              </tr></thead>
+              <tbody>
+                {tareasNoPudo.map((t,i)=>(
+                  <tr key={i} style={{borderBottom:"1px solid rgba(239,68,68,0.08)"}}>
+                    <td style={{padding:"3px 8px",color:"#9ca3af",whiteSpace:"nowrap"}}>{t.fechaDia}</td>
+                    <td style={{padding:"3px 8px",color:"#ede9e0"}}>{t.tarea||""}</td>
+                    <td style={{padding:"3px 8px",color:"#5a9a7a"}}>{t.zona||""}</td>
+                    <td style={{padding:"3px 8px",color:"#ede9e0"}}>{t.responsable||""}</td>
+                    <td style={{padding:"3px 8px",color:"#f87171",fontStyle:"italic"}}>{t.motivo||"Sin motivo"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* ── Cierres de cancha ── */}
+        {cierresCancha.length>0&&(
+          <div style={{...S.card,marginBottom:12,padding:"12px 14px",border:"1px solid rgba(251,191,36,0.2)"}}>
+            <div style={{fontSize:12,fontWeight:600,color:"#fbbf24",marginBottom:8}}>
+              🏌️ Cierres de cancha ({cierresCancha.length})
+            </div>
+            {cierresCancha.map((t,i)=>(
+              <div key={i} style={{fontSize:11,padding:"3px 0",borderBottom:"1px solid rgba(255,255,255,0.04)",color:"#ede9e0"}}>
+                {t.fechaDia} · {t.tarea} · <span style={{color:esHecha(t)?"#22c55e":"#f59e0b"}}>{t.estado}</span>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* ── Incidencias fitosanitarias ── */}
+        {incFitoPeriodo.length>0&&(
+          <div style={{...S.card,marginBottom:12,padding:"12px 14px",border:"1px solid rgba(245,158,11,0.2)"}}>
+            <div style={{fontSize:12,fontWeight:600,color:"#fbbf24",marginBottom:8}}>
+              🌿 Incidencias fitosanitarias ({incFitoPeriodo.length})
+            </div>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+              <thead><tr style={{background:"rgba(245,158,11,0.08)"}}>
+                {["Fecha","Zona","Problema","Tratamiento","RI (h)","Estado"].map(h=>(
+                  <th key={h} style={{padding:"4px 8px",textAlign:"left",color:"#fbbf24",fontWeight:600,fontSize:10}}>{h}</th>
+                ))}
+              </tr></thead>
+              <tbody>
+                {incFitoPeriodo.map((inc,i)=>(
+                  <tr key={i} style={{borderBottom:"1px solid rgba(245,158,11,0.08)"}}>
+                    <td style={{padding:"3px 8px",color:"#9ca3af",whiteSpace:"nowrap"}}>{inc.fecha}</td>
+                    <td style={{padding:"3px 8px",color:"#34d399"}}>{inc.zona||""}</td>
+                    <td style={{padding:"3px 8px",color:"#ede9e0",fontWeight:600}}>{inc.problema||""}</td>
+                    <td style={{padding:"3px 8px",color:"#ede9e0"}}>{inc.producto||""}{inc.dosis?` · ${inc.dosis}`:""}</td>
+                    <td style={{padding:"3px 8px",textAlign:"center",color:"#f59e0b"}}>{inc.ri||"—"}</td>
+                    <td style={{padding:"3px 8px",color:"#5a9a7a"}}>{inc.estado||""}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </>)}
