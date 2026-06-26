@@ -11989,69 +11989,138 @@ export default function App() {
   };
 
   const renderElemCard = (e) => {
-    const est=ESTADOS_ELEM[e.edData.estado||"bueno"];
+    const est = ESTADOS_ELEM[e.edData.estado||"bueno"];
+    const abierto = editElem?.eid===e.id;
+    const frecs = getElemFrecs(zonaId,e.id,e.tipo,e.isCustom);
+    const mesAct = new Date().getMonth()+1;
+    const estacion = [12,1,2].includes(mesAct)?"verano":[3,4,5].includes(mesAct)?"otono":[6,7,8].includes(mesAct)?"invierno":"primavera";
+    const tareasActivas = frecs.filter(f=>f[estacion]&&f[estacion]!=="noaplica");
+    const catMeta = CATEGORIAS_ELEM[e.tipo]||{icon:"🌿",label:e.tipo};
+
     return (
-      <div key={e.id} className="ecard" style={{...S.card,padding:14}} onClick={()=>setEditElem(editElem?.eid===e.id?null:{zid:zonaId,eid:e.id,isCustom:e.isCustom})}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",marginBottom:8}}>
-          <span style={{fontSize:14,fontWeight:600,flex:1,paddingRight:8}}>{e.nombre}</span>
-          <span style={{...S.chip,background:est.bg,color:est.color,border:`1px solid ${est.color}35`,flexShrink:0,fontSize:11}}>{est.label}</span>
+      <div key={e.id} style={{
+        background: abierto?"rgba(61,122,82,0.08)":"rgba(255,255,255,0.025)",
+        border:`1px solid ${abierto?"rgba(61,122,82,0.35)":"rgba(255,255,255,0.08)"}`,
+        borderRadius:12,
+        overflow:"hidden",
+        transition:"all .2s",
+        marginBottom:8,
+      }}>
+        {/* Cabecera del elemento — siempre visible */}
+        <div style={{
+          display:"flex",alignItems:"center",gap:10,padding:"10px 14px",
+          cursor:"pointer",userSelect:"none",
+        }} onClick={()=>setEditElem(abierto?null:{zid:zonaId,eid:e.id,isCustom:e.isCustom})}>
+          <span style={{fontSize:20,flexShrink:0}}>{catMeta.icon}</span>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+              <span style={{fontSize:14,fontWeight:600,color:"#ede9e0"}}>{e.nombre}</span>
+              <span style={{fontSize:10,color:"#5a9a7a",background:"rgba(255,255,255,0.05)",padding:"1px 7px",borderRadius:10,border:"1px solid rgba(255,255,255,0.08)"}}>{catMeta.label}</span>
+            </div>
+            {e.edData.notas&&!abierto&&(
+              <div style={{fontSize:11,color:"#5a8a6a",fontStyle:"italic",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:300}}>{e.edData.notas}</div>
+            )}
+            {tareasActivas.length>0&&!abierto&&(
+              <div style={{display:"flex",gap:4,marginTop:4,flexWrap:"wrap"}}>
+                {tareasActivas.slice(0,3).map(f=>(
+                  <span key={f.tarea||f.id} style={{fontSize:10,color:"#4a8a6a",background:"rgba(61,122,82,0.1)",padding:"1px 6px",borderRadius:6,border:"1px solid rgba(61,122,82,0.18)"}}>
+                    {f.tarea}: {f[estacion]}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+            <span style={{
+              fontSize:11,fontWeight:600,color:est.color,
+              background:est.bg,border:`1px solid ${est.color}35`,
+              padding:"2px 8px",borderRadius:8,
+            }}>{est.label}</span>
+            <span style={{color:"#4a7a5a",fontSize:12,transition:"transform .2s",
+              transform:abierto?"rotate(180deg)":"none"}}>▼</span>
+          </div>
         </div>
-        {e.edData.notas&&<div style={{fontSize:12,color:"#7aaa80",fontStyle:"italic"}}>{e.edData.notas}</div>}
-        {(()=>{
-          const frecs=getElemFrecs(zonaId,e.id,e.tipo,e.isCustom);
-          const mes=new Date().getMonth()+1;
-          const est=[12,1,2].includes(mes)?"verano":[3,4,5].includes(mes)?"otono":[6,7,8].includes(mes)?"invierno":"primavera";
-          const tareasActivas=frecs.filter(f=>f[est]&&f[est]!=="noaplica");
-          if(tareasActivas.length===0) return null;
-          return <div style={{marginTop:4,display:"flex",gap:6,flexWrap:"wrap"}}>
-            {tareasActivas.slice(0,3).map(f=>(
-              <span key={f.tarea||f.id} style={{fontSize:10,color:"#5a9a7a",background:"rgba(61,122,82,0.12)",padding:"1px 6px",borderRadius:8,border:"1px solid rgba(61,122,82,0.2)"}}>
-                {f.tarea}: {f[est]}{f.obs?<span style={{color:"#fde68a",marginLeft:3}}>· {f.obs}</span>:""}
-              </span>
-            ))}
-          </div>;
-        })()}
-        {editElem?.eid===e.id&&(
-          <div style={{marginTop:12,borderTop:"1px solid rgba(255,255,255,0.08)",paddingTop:12}} onClick={ev=>ev.stopPropagation()}>
-            <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:8,marginBottom:10}}>
+
+        {/* Panel expandido de edición */}
+        {abierto&&(
+          <div style={{padding:"0 14px 14px",borderTop:"1px solid rgba(255,255,255,0.07)"}}
+            onClick={ev=>ev.stopPropagation()}>
+
+            {/* Nombre + Categoría en fila */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:12,marginBottom:10}}>
               <div>
-                <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>NOMBRE</label>
-                <input style={{...S.input,fontSize:13}} value={editElem.nombreEdit!==undefined?editElem.nombreEdit:e.nombre} onChange={ev=>setEditElem(p=>({...p,nombreEdit:ev.target.value}))}/>
+                <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.6px",textTransform:"uppercase"}}>Nombre</label>
+                <input style={{...S.input,fontSize:13}}
+                  value={editElem.nombreEdit!==undefined?editElem.nombreEdit:e.nombre}
+                  onChange={ev=>setEditElem(p=>({...p,nombreEdit:ev.target.value}))}/>
               </div>
               <div>
-                <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>CATEGORÍA</label>
-                <select style={{...S.input,fontSize:13,width:"auto"}} value={editElem.tipoEdit!==undefined?editElem.tipoEdit:e.tipo} onChange={ev=>setEditElem(p=>({...p,tipoEdit:ev.target.value}))}>
-                  {(()=>{const vk=["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];const ok=["infraestructura","sistemas","pavimentos","mobiliario","bodegas"];return(<><optgroup label="🌿 Vegetación">{vk.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup><optgroup label="──────────">{ok.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup></>);})()}
+                <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.6px",textTransform:"uppercase"}}>Categoría</label>
+                <select style={{...S.input,fontSize:13}}
+                  value={editElem.tipoEdit!==undefined?editElem.tipoEdit:e.tipo}
+                  onChange={ev=>setEditElem(p=>({...p,tipoEdit:ev.target.value}))}>
+                  {(()=>{
+                    const vk=["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
+                    const ok=["infraestructura","sistemas","pavimentos","mobiliario","bodegas"];
+                    return(<>
+                      <optgroup label="🌿 Vegetación">{vk.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup>
+                      <optgroup label="🏗️ Infraestructura">{ok.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup>
+                    </>);
+                  })()}
                 </select>
               </div>
             </div>
+
+            {/* Guardar si cambió nombre/tipo */}
             {((editElem.nombreEdit!==undefined&&editElem.nombreEdit!==e.nombre)||(editElem.tipoEdit!==undefined&&editElem.tipoEdit!==e.tipo))&&(
-              <div style={{marginBottom:10}}>
-                <button className="btn-p" style={{...S.btn,fontSize:12,padding:"5px 14px"}} onClick={()=>{
-                  const nn=editElem.nombreEdit!==undefined?editElem.nombreEdit:e.nombre;
-                  const nt=editElem.tipoEdit!==undefined?editElem.tipoEdit:e.tipo;
-                  if(e.isCustom){const arr=[...(data[zonaId].elementosCustom||[])];const i=arr.findIndex(x=>x.id===e.id);if(i>=0){arr[i]={...arr[i],nombre:nn,tipo:nt};updateZona(zonaId,{elementosCustom:arr});}}
-                  else{setZonas(prev=>prev.map(z=>z.id===zonaId?{...z,elementos:z.elementos.map(x=>x.id===e.id?{...x,nombre:nn,tipo:nt}:x)}:z));}
-                  addHistorial(zonaId,`Elemento modificado: "${e.nombre}" → "${nn}"`);
-                  setEditElem(p=>({...p,nombreEdit:undefined,tipoEdit:undefined}));
-                }}>✓ Guardar cambios</button>
-              </div>
+              <button className="btn-p" style={{...S.btn,fontSize:12,padding:"5px 14px",marginBottom:10}} onClick={()=>{
+                const nn=editElem.nombreEdit!==undefined?editElem.nombreEdit:e.nombre;
+                const nt=editElem.tipoEdit!==undefined?editElem.tipoEdit:e.tipo;
+                if(e.isCustom){const arr=[...(data[zonaId].elementosCustom||[])];const i=arr.findIndex(x=>x.id===e.id);if(i>=0){arr[i]={...arr[i],nombre:nn,tipo:nt};updateZona(zonaId,{elementosCustom:arr});}}
+                else{setZonas(prev=>prev.map(z=>z.id===zonaId?{...z,elementos:z.elementos.map(x=>x.id===e.id?{...x,nombre:nn,tipo:nt}:x)}:z));}
+                addHistorial(zonaId,`Elemento: "${e.nombre}" → "${nn}"`);
+                setEditElem(p=>({...p,nombreEdit:undefined,tipoEdit:undefined}));
+              }}>✓ Guardar nombre/categoría</button>
             )}
-            <div style={{marginBottom:8}}>
-              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>ESTADO</label>
+
+            {/* Estado con botones visuales */}
+            <div style={{marginBottom:12}}>
+              <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:6,letterSpacing:"0.6px",textTransform:"uppercase"}}>Estado actual</label>
               <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                 {Object.entries(ESTADOS_ELEM).map(([k,v])=>(
-                  <button key={k} style={{...S.btn,padding:"5px 12px",fontSize:12,background:e.edData.estado===k?v.bg:"rgba(255,255,255,0.05)",color:v.color,border:`1px solid ${v.color}40`}} onClick={()=>setElemEstado(zonaId,e.id,e.isCustom,k)}>{v.label}</button>
+                  <button key={k} style={{
+                    ...S.btn,padding:"6px 14px",fontSize:12,
+                    background:e.edData.estado===k?v.bg:"transparent",
+                    color:e.edData.estado===k?v.color:"#6aaa7a",
+                    border:`1px solid ${e.edData.estado===k?v.color+"60":"rgba(255,255,255,0.12)"}`,
+                    fontWeight:e.edData.estado===k?600:400,
+                  }} onClick={()=>setElemEstado(zonaId,e.id,e.isCustom,k)}>
+                    {e.edData.estado===k?"● ":""}{v.label}
+                  </button>
                 ))}
               </div>
             </div>
-            <div style={{marginBottom:10}}>
-              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>NOTAS</label>
-              <textarea rows={2} style={{...S.input,resize:"vertical",fontSize:13}} placeholder="Observaciones del elemento..." value={e.edData.notas||""} onChange={ev=>setElemNotas(zonaId,e.id,e.isCustom,ev.target.value)}/>
-              <FrecuenciasPanel zid={zonaId} eid={e.id} tipo={e.tipo} isCustom={e.isCustom} S={S} getFrecs={getElemFrecs} setFrecs={setElemFrecs}/>
+
+            {/* Notas */}
+            <div style={{marginBottom:12}}>
+              <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.6px",textTransform:"uppercase"}}>Observaciones</label>
+              <textarea rows={2} style={{...S.input,resize:"vertical",fontSize:13}}
+                placeholder="Observaciones del elemento..."
+                value={e.edData.notas||""}
+                onChange={ev=>setElemNotas(zonaId,e.id,e.isCustom,ev.target.value)}/>
             </div>
+
+            {/* Frecuencias de mantención */}
+            <FrecuenciasPanel zid={zonaId} eid={e.id} tipo={e.tipo} isCustom={e.isCustom} S={S} getFrecs={getElemFrecs} setFrecs={setElemFrecs}/>
+
+            {/* Eliminar */}
             {(e.isCustom||(zona?.elementos.find(x=>x.id===e.id)))&&(
-              <button className="btn-d" style={{...S.btn,fontSize:12,padding:"5px 12px"}} onClick={()=>{e.isCustom?removeCustomElem(zonaId,e.id):removeBaseElem(zonaId,e.id);setEditElem(null);}}>🗑 Eliminar elemento</button>
+              <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+                <button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 12px"}}
+                  onClick={()=>{e.isCustom?removeCustomElem(zonaId,e.id):removeBaseElem(zonaId,e.id);setEditElem(null);}}>
+                  🗑 Eliminar elemento
+                </button>
+              </div>
             )}
           </div>
         )}
@@ -12257,17 +12326,33 @@ export default function App() {
                 const criticos=allElems.filter(e=>e.edData.estado==="critico").length;
                 const pendTareas=(d.tareas||[]).filter(t=>!t.completada).length;
                 return (
-                  <div key={z.id} style={{...S.card,padding:16,cursor:"pointer"}} className="hov" onClick={()=>{setZonaId(z.id);setTab("elementos");setAiText("");}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",marginBottom:10}}>
-                      <span style={{fontSize:30}}>{z.icono}</span>
-                      <span style={{...S.chip,background:est.bg,color:est.color,border:`1px solid ${est.color}35`}}>{est.label}</span>
-                    </div>
-                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,marginBottom:3}}>{z.nombre}</div>
-                    <div style={{fontSize:12,color:"#6aaa7a",marginBottom:10}}>{z.categoria}</div>
-                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                      <span style={{...S.chip,background:"rgba(255,255,255,0.07)",color:"#9abaa0",border:"1px solid rgba(255,255,255,0.1)"}}>📋 {allElems.length} elem.</span>
-                      {criticos>0&&<span style={{...S.chip,background:"rgba(239,68,68,0.12)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.25)"}}>🔴 {criticos} crítico{criticos>1?"s":""}</span>}
-                      {pendTareas>0&&<span style={{...S.chip,background:"rgba(245,158,11,0.12)",color:"#fcd34d",border:"1px solid rgba(245,158,11,0.25)"}}>⚠️ {pendTareas}</span>}
+                  <div key={z.id}
+                    style={{
+                      background:"rgba(255,255,255,0.025)",
+                      border:`1px solid ${criticos>0?"rgba(239,68,68,0.25)":pendTareas>0?"rgba(245,158,11,0.2)":"rgba(255,255,255,0.08)"}`,
+                      borderRadius:12,padding:14,cursor:"pointer",
+                      transition:"all .15s",overflow:"hidden",position:"relative",
+                    }}
+                    className="hov"
+                    onClick={()=>{setZonaId(z.id);setTab("elementos");setAiText("");}}>
+                    {/* Banda lateral de estado */}
+                    <div style={{position:"absolute",left:0,top:0,bottom:0,width:4,background:est.color,borderRadius:"12px 0 0 12px",opacity:0.8}}/>
+                    <div style={{paddingLeft:6}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8}}>
+                          <span style={{fontSize:22}}>{z.icono}</span>
+                          <div>
+                            <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,lineHeight:1.2}}>{z.nombre}</div>
+                            <div style={{fontSize:10,color:"#5a8a6a",marginTop:1}}>{z.categoria}</div>
+                          </div>
+                        </div>
+                        <span style={{fontSize:10,fontWeight:600,color:est.color,background:est.bg,padding:"2px 7px",borderRadius:8,border:`1px solid ${est.color}35`,flexShrink:0}}>{est.label}</span>
+                      </div>
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+                        <span style={{fontSize:10,color:"#5a8a70"}}>📋 {allElems.length}</span>
+                        {criticos>0&&<span style={{fontSize:10,color:"#fca5a5",fontWeight:600}}>🔴 {criticos}</span>}
+                        {pendTareas>0&&<span style={{fontSize:10,color:"#fcd34d"}}>⚠️ {pendTareas}</span>}
+                      </div>
                     </div>
                   </div>
                 );
@@ -12280,24 +12365,69 @@ export default function App() {
         {zonaId&&zona&&zd&&(
           <div className="ein">
             <button style={{...S.btn,background:"transparent",color:"#a0c8a0",border:"1px solid rgba(160,200,140,0.22)",marginBottom:20}} onClick={()=>{setZonaId(null);setAiText("");}}>← Volver</button>
-            <div style={{...S.card,padding:22,marginBottom:18,display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:14}}>
-              <div style={{display:"flex",alignItems:"center",gap:16}}>
-                <span style={{fontSize:46}}>{zona.icono}</span>
-                <div>
-                  <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:900,marginBottom:4}}>{zona.nombre}</h2>
-                  <span style={{...S.chip,background:"rgba(255,255,255,0.07)",color:"#8abaa0",border:"1px solid rgba(255,255,255,0.1)"}}>📂 {zona.categoria}</span>
-                  <span style={{...S.chip,marginLeft:6,background:"rgba(255,255,255,0.07)",color:"#8ab0c0",border:"1px solid rgba(255,255,255,0.1)"}}>📋 {getAllElems(zonaId).length} elementos</span>
+            {(()=>{
+              const estZona = ESTADOS_ZONA[zd.estadoGeneral||"bueno"]||{color:"#22c55e",bg:"rgba(34,197,94,0.1)",label:"Bueno"};
+              const elemsZona = getAllElems(zonaId);
+              const criticosZona = elemsZona.filter(e=>e.estado==="critico").length;
+              const regularesZona = elemsZona.filter(e=>e.estado==="regular").length;
+              return (
+                <div style={{...S.card,padding:0,marginBottom:18,overflow:"hidden"}}>
+                  {/* Banda de color superior según estado */}
+                  <div style={{height:5,background:estZona.color,opacity:0.7}}/>
+                  <div style={{padding:"18px 20px"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12}}>
+                      {/* Izquierda: icono + nombre + chips */}
+                      <div style={{display:"flex",alignItems:"center",gap:14,flex:1,minWidth:200}}>
+                        <span style={{fontSize:44,lineHeight:1}}>{zona.icono}</span>
+                        <div>
+                          <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:21,fontWeight:900,marginBottom:6,lineHeight:1.2}}>{zona.nombre}</h2>
+                          <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+                            <span style={{fontSize:11,color:"#6aaa7a",background:"rgba(255,255,255,0.06)",padding:"2px 8px",borderRadius:6,border:"1px solid rgba(255,255,255,0.1)"}}>
+                              📂 {zona.categoria}
+                            </span>
+                            <span style={{fontSize:11,color:"#6ab0c0",background:"rgba(96,176,192,0.08)",padding:"2px 8px",borderRadius:6,border:"1px solid rgba(96,176,192,0.15)"}}>
+                              📋 {elemsZona.length} elementos
+                            </span>
+                            {criticosZona>0&&(
+                              <span style={{fontSize:11,color:"#fca5a5",background:"rgba(239,68,68,0.1)",padding:"2px 8px",borderRadius:6,border:"1px solid rgba(239,68,68,0.25)"}}>
+                                🔴 {criticosZona} crítico{criticosZona>1?"s":""}
+                              </span>
+                            )}
+                            {regularesZona>0&&(
+                              <span style={{fontSize:11,color:"#fcd34d",background:"rgba(245,158,11,0.1)",padding:"2px 8px",borderRadius:6,border:"1px solid rgba(245,158,11,0.2)"}}>
+                                ⚠️ {regularesZona} regular{regularesZona>1?"es":""}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      {/* Derecha: estado + IA */}
+                      <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:6,background:estZona.bg,border:`1px solid ${estZona.color}40`,borderRadius:8,padding:"4px 6px 4px 10px"}}>
+                          <span style={{fontSize:12,color:estZona.color,fontWeight:600}}>{estZona.label}</span>
+                          <select value={zd.estadoGeneral||"bueno"}
+                            onChange={e=>{updateZona(zonaId,{estadoGeneral:e.target.value});addHistorial(zonaId,`Estado zona → ${ESTADOS_ZONA[e.target.value].label}`);}}
+                            style={{background:"transparent",border:"none",color:estZona.color,fontSize:11,cursor:"pointer",padding:"2px 0"}}>
+                            {Object.entries(ESTADOS_ZONA).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
+                          </select>
+                        </div>
+                        <button style={{...S.btn,background:"rgba(61,122,82,0.2)",color:"#a0d8b0",border:"1px solid rgba(61,122,82,0.35)",fontSize:12}}
+                          onClick={getSugerenciaAI} disabled={aiLoading}>
+                          {aiLoading?<><span className="spin"/> Analizando...</>:"🤖 Sugerencia IA"}
+                        </button>
+                      </div>
+                    </div>
+                    {/* Fechas de mantenimiento si existen */}
+                    {(zd.ultimoMant||zd.proximoMant)&&(
+                      <div style={{display:"flex",gap:16,marginTop:12,paddingTop:10,borderTop:"1px solid rgba(255,255,255,0.06)",flexWrap:"wrap"}}>
+                        {zd.ultimoMant&&<span style={{fontSize:11,color:"#5a8a6a"}}>✅ Último mant.: <strong style={{color:"#7aaa80"}}>{new Date(zd.ultimoMant+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"short",year:"numeric"})}</strong></span>}
+                        {zd.proximoMant&&<span style={{fontSize:11,color:"#5a8a6a"}}>📅 Próximo: <strong style={{color:"#fbbf24"}}>{new Date(zd.proximoMant+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"short",year:"numeric"})}</strong></span>}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
-                <select value={zd.estadoGeneral||"bueno"} onChange={e=>{updateZona(zonaId,{estadoGeneral:e.target.value});addHistorial(zonaId,`Estado zona → ${ESTADOS_ZONA[e.target.value].label}`);}} style={{...S.input,width:"auto"}}>
-                  {Object.entries(ESTADOS_ZONA).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
-                </select>
-                <button style={{...S.btn,background:"rgba(61,122,82,0.3)",color:"#a0d8b0",border:"1px solid rgba(61,122,82,0.4)"}} onClick={getSugerenciaAI} disabled={aiLoading}>
-                  {aiLoading?<><span className="spin"/> Analizando...</>:"🤖 Sugerencia IA"}
-                </button>
-              </div>
-            </div>
+              );
+            })()}
             {(aiLoading||aiText)&&(
               <div style={{background:"rgba(40,100,60,0.15)",border:"1px solid rgba(61,122,82,0.35)",borderRadius:12,padding:18,marginBottom:18}}>
                 <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:10,color:"#90d4a0"}}>🤖 Recomendaciones del Asistente</div>
@@ -12305,9 +12435,22 @@ export default function App() {
                   :<div style={{fontSize:14,lineHeight:1.7,color:"#c8e0c8",whiteSpace:"pre-wrap"}}>{aiText}</div>}
               </div>
             )}
-            <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
-              {[["elementos","🌿 Elementos"],["info","📝 Info"],["tareas","✅ Tareas"],["historial","📜 Historial"],...(zona?.categoria==="Bodegas"?[["recursos","🏗️ Recursos"]]:[])].map(([t,l])=>(
-                <button key={t} className={`tab${tab===t?" on":""}`} onClick={()=>setTab(t)}>{l}</button>
+            <div style={{display:"flex",gap:4,marginBottom:16,borderBottom:"1px solid rgba(255,255,255,0.08)",paddingBottom:0,overflowX:"auto"}}>
+              {[["elementos","🌿","Elementos"],["info","📝","Info"],["tareas","✅","Tareas"],["historial","📜","Historial"],...(zona?.categoria==="Bodegas"?[["recursos","🏗️","Recursos"]]:[])].map(([t,ico,lbl])=>(
+                <button key={t} onClick={()=>setTab(t)} style={{
+                  cursor:"pointer",border:"none",background:"transparent",
+                  color:tab===t?"#34d399":"#6aaa7a",
+                  padding:"10px 16px",
+                  fontSize:13,fontFamily:"'Georgia',serif",
+                  borderBottom:tab===t?"2px solid #34d399":"2px solid transparent",
+                  marginBottom:-1,
+                  whiteSpace:"nowrap",
+                  display:"flex",alignItems:"center",gap:5,
+                  fontWeight:tab===t?600:400,
+                  transition:"all .15s",
+                }}>
+                  <span>{ico}</span><span>{lbl}</span>
+                </button>
               ))}
             </div>
 
