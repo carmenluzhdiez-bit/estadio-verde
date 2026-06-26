@@ -259,7 +259,7 @@ const MACROZONAS_BASE = [
     ]
   },
   {
-    id: 6, nombre: "Capilla", categoria: "Edificios", icono: "⛪",
+    id: 6, nombre: "Capilla", categoria: "Plazas y Rotondas", icono: "⛪",
     elementos: [
       { id: "e1", nombre: "Jardín perimetral", tipo: "arbustos" },
       { id: "e2", nombre: "Arbustos ornamentales", tipo: "arbustos" },
@@ -285,7 +285,7 @@ const MACROZONAS_BASE = [
     ]
   },
   {
-    id: 8, nombre: "Palitroque", categoria: "Deportivo", icono: "🎯",
+    id: 8, nombre: "Palitroque", categoria: "Patios y Jardines", icono: "🎯",
     elementos: [
       { id: "e1", nombre: "Césped perimetral", tipo: "cesped" },
       { id: "e2", nombre: "Arbustos borde", tipo: "arbustos" },
@@ -296,7 +296,7 @@ const MACROZONAS_BASE = [
     ]
   },
   {
-    id: 9, nombre: "Cruzeiro", categoria: "Deportivo", icono: "⚽",
+    id: 9, nombre: "Cruzeiro", categoria: "Edificios", icono: "🍽️",
     elementos: [
       { id: "e1", nombre: "Césped natural / sintético", tipo: "cesped" },
       { id: "e2", nombre: "Arbustos perimetrales", tipo: "arbustos" },
@@ -309,7 +309,7 @@ const MACROZONAS_BASE = [
     ]
   },
   {
-    id: 10, nombre: "Pérgola el Cid", categoria: "Patios y Jardines", icono: "🌸",
+    id: 10, nombre: "Pérgola el Cid", categoria: "Acuático", icono: "🌊",
     elementos: [
       { id: "e1", nombre: "Plantas trepadoras / glicinas", tipo: "herbaceas" },
       { id: "e2", nombre: "Macizos florales bajo pérgola", tipo: "herbaceas" },
@@ -322,7 +322,7 @@ const MACROZONAS_BASE = [
     ]
   },
   {
-    id: 11, nombre: "Terraza Quijote", categoria: "Patios y Jardines", icono: "🌄",
+    id: 11, nombre: "Terraza Quijote", categoria: "Edificios", icono: "🍽️",
     elementos: [
       { id: "e1", nombre: "Maceteros grandes", tipo: "macetas_piso" },
       { id: "e2", nombre: "Arbustos ornamentales", tipo: "arbustos" },
@@ -335,7 +335,7 @@ const MACROZONAS_BASE = [
     ]
   },
   {
-    id: 12, nombre: "Tenis Edificio", categoria: "Deportivo", icono: "🎾",
+    id: 12, nombre: "Tenis Edificio", categoria: "Edificios", icono: "🎾",
     elementos: [
       { id: "e1", nombre: "Jardines perimetrales", tipo: "arbustos" },
       { id: "e2", nombre: "Arbustos borde", tipo: "arbustos" },
@@ -447,7 +447,7 @@ const MACROZONAS_BASE = [
     ]
   },
   {
-    id: 21, nombre: "Piscina Temperada", categoria: "Acuático", icono: "🌊",
+    id: 21, nombre: "Piscina Temperada", categoria: "Edificios", icono: "🌊",
     elementos: [
       { id: "e1", nombre: "Jardines interiores / maceteros", tipo: "macetas_piso" },
       { id: "e2", nombre: "Plantas ornamentales borde", tipo: "herbaceas" },
@@ -460,7 +460,7 @@ const MACROZONAS_BASE = [
     ]
   },
   {
-    id: 22, nombre: "Plaza los Conquistadores", categoria: "Plazas y Rotondas", icono: "⚔️",
+    id: 22, nombre: "Plaza los Conquistadores", categoria: "Alamedas", icono: "⚔️",
     elementos: [
       { id: "e1", nombre: "Macizos florales", tipo: "herbaceas" },
       { id: "e2", nombre: "Setos", tipo: "arbustos" },
@@ -646,7 +646,7 @@ const MACROZONAS_BASE = [
     ]
   },
   {
-    id: 36, nombre: "Hórreo Andaluz", categoria: "Patios y Jardines", icono: "🌾",
+    id: 36, nombre: "Hórreo Andaluz", categoria: "Edificios", icono: "🌾",
     elementos: [
       { id: "e1", nombre: "Jardín perimetral", tipo: "arbustos" },
       { id: "e2", nombre: "Macizos florales", tipo: "herbaceas" },
@@ -672,6 +672,13 @@ const MACROZONAS_BASE = [
       { id: "e10", nombre: "Luminarias", tipo: "infraestructura" },
       { id: "e11", nombre: "Sistema de riego", tipo: "sistemas" },
     ]
+  },
+  {
+    id: 39, nombre: "Plaza Cervantes", categoria: "Plazas y Rotondas", icono: "📖",
+    descripcion: "Plaza Cervantes",
+    elementos: [
+      { id: "e1", nombre: "Vegetación general", tipo: "arbustos" },
+    ],
   },
   {
     id: 38, nombre: "Cancha de Fútbol Sintética", categoria: "Deportivo", icono: "🥅",
@@ -5725,6 +5732,11 @@ const BODEGAS_DEF = [
     descripcion:"Maquinaria, herramientas, materiales y fertilizantes específicos de Golf",
     categorias:["Maquinaria golf","Herramienta golf","Fertilizante golf","Arena golf","Semilla golf","Material cancha","Accesorio golf","Otro"],
     tareasTipo:["Inventario","Orden y limpieza","Revisión maquinaria","Mantención","Recepción","Registro uso combustible"],
+  },
+  { id:"b07", nombre:"Oficina Áreas Verdes", icono:"🏢", color:"#6aaa7a",
+    descripcion:"Documentos, equipos, materiales de oficina y archivo del departamento",
+    categorias:["Documentos","Equipos informáticos","Material de oficina","EPP y uniformes","Archivo","Llaves y accesos","Otro"],
+    tareasTipo:["Inventario","Orden y limpieza","Archivo","Revisión equipos","Recepción"],
   },
 ];
 const ESTADOS_MOV = {
