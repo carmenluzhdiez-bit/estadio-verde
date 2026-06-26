@@ -7681,6 +7681,7 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
               </tbody>
             </table>
           </div>
+          {esJefa&&(
           <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"12px 14px",marginBottom:14}}>
             <div style={{fontSize:11,color:"#6aaa7a",fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.5px"}}>📋 Decisión resultante</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
@@ -7707,6 +7708,7 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
               </div>
             )}
           </div>
+          )}
           <div style={{display:"flex",gap:8}}>
             <button className="btn-p" style={S.btn} onClick={guardarHumedad} disabled={!humForm.responsable}>✓ Guardar</button>
             <button className="btn-g" style={S.btn} onClick={()=>setShowHumForm(false)}>Cancelar</button>
@@ -7757,7 +7759,7 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
           {ultimaHum.obs&&<div style={{fontSize:12,color:"#5a9a7a",marginTop:10,fontStyle:"italic",padding:"6px 10px",background:"rgba(255,255,255,0.03)",borderRadius:6}}>{ultimaHum.obs}</div>}
         </div>
       )}
-      <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:10,color:"#60a5fa"}}>📜 Historial</div>
+      {esJefa&&<><div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:10,color:"#60a5fa"}}>📜 Historial</div>
       {humedades.length===0&&!showHumForm&&(
         <div style={{...S.card,padding:36,textAlign:"center",color:"#3a6a5a"}}>
           <div style={{fontSize:36,marginBottom:8}}>💧</div>
@@ -7804,6 +7806,7 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
           );
         })}
       </div>
+      </>}
 
     </div>
   );
@@ -8379,7 +8382,7 @@ function TareasGolfPanel({ tareasGolfHoy, hoy, esJefa, setTareasProg, tareasProg
 }
 
 
-function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion }) {
+function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab }) {
   const GOLF_ZONA_ID = 31; // ID macrozona Golf
   const sincronizarMacrozona = (tipo, detalle) => {
     if(!updateZona) return;
@@ -8395,7 +8398,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   const listaPersonal = [...personalArr].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
 
   const [subTabZona, setSubTabZona] = React.useState(null);
-  const [subTab, setSubTab] = React.useState(rolLogueado==="trabajador"?"greens":"panel");
+  const [subTab, setSubTab] = React.useState(initialSubTab||(rolLogueado==="trabajador"?"mediciones":"panel"));
   // Exponer para acceso rápido desde VistaWorker
   React.useEffect(()=>{ window.__golfSubTab = setSubTab; return ()=>{ window.__golfSubTab=null; }; },[]);
 
@@ -11669,6 +11672,7 @@ export default function App() {
   const [notificaciones, setNotificaciones]   = useFirebaseState("notificaciones", []);
 
   const appReady = dataReady && personalReady && progReady;
+  const [golfInitTab, setGolfInitTab] = React.useState(null);
 
   // ── Helper: registrar notificación en Firebase ───────────────────────
   const crearNotificacion = React.useCallback((tipo, datos) => {
@@ -12861,12 +12865,9 @@ export default function App() {
                     }));
                   }}
                   onAccesoRapido={(tipo)=>{
+                    const tab = tipo==="medicion"?"mediciones":tipo==="humedad"?"humedad":"greens";
+                    setGolfInitTab(tab);
                     setVista("golf");
-                    setTimeout(()=>{
-                      if(tipo==="medicion") window.__golfSubTab?.("mediciones");
-                      if(tipo==="humedad")  window.__golfSubTab?.("humedad");
-                      if(tipo==="diario")   window.__golfSubTab?.("greens");
-                    },300);
                   }}
                   onSetFrecs={setElemFrecs}
                   onAddTarea={(nuevaTarea)=>{
@@ -12999,8 +13000,9 @@ export default function App() {
         {vista==="golf"&&(
           <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial}
             crearNotificacion={crearNotificacion}
+            initialSubTab={golfInitTab}
             onRegistroGuardado={(tipo)=>{
-              if(rolLogueado==="trabajador") setVista("miturno");
+              if(rolLogueado==="trabajador"){ setVista("miturno"); setGolfInitTab(null); }
             }}
           />
         )}
