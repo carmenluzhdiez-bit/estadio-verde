@@ -1871,7 +1871,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
           </div>
         )}
 
-        {/* ── Registro diario inline para trabajador ── */}
+        {/* ── Registro diario — SOLO observaciones (tareas van en bloque Diarias) ── */}
         {showRegistroDiarioWorker&&(
           <div style={{background:"rgba(52,211,153,0.05)",border:"1px solid rgba(52,211,153,0.25)",borderRadius:14,padding:16,marginBottom:14}} className="ein">
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
@@ -2154,6 +2154,53 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                 </div>
               )}
             </div>
+
+            {/* ── Observaciones del turno (solo cuando hay tareas diarias) ── */}
+            <div style={{marginTop:8,padding:"12px 14px",background:"rgba(52,211,153,0.03)",
+              border:"1px solid rgba(52,211,153,0.1)",borderRadius:"0 0 10px 10px"}}>
+              <div style={{fontSize:11,fontWeight:600,color:"#34d399",marginBottom:8}}>
+                📝 Observaciones del turno
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                <div>
+                  <label style={{fontSize:10,color:"#c4b5fd",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>🔬 OBSERVACIÓN FITOSANITARIA</label>
+                  <input style={{...S.input,fontSize:12}}
+                    placeholder="Sin novedades · Mancha Green 03 · Presencia de trips..."
+                    value={registroDiarioForm.obsFito||""}
+                    onChange={e=>setRegistroDiarioForm(p=>({...p,obsFito:e.target.value}))}/>
+                  <div style={{fontSize:10,color:"#5a7a9a",marginTop:3}}>Si hay novedad será registrada en Incidencias fitosanitarias</div>
+                </div>
+                <div>
+                  <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>OBSERVACIONES GENERALES</label>
+                  <input style={{...S.input,fontSize:12}}
+                    placeholder="Condiciones del día, novedades, observaciones..."
+                    value={registroDiarioForm.obs||""}
+                    onChange={e=>setRegistroDiarioForm(p=>({...p,obs:e.target.value}))}/>
+                </div>
+                {(registroDiarioForm.obsFito||registroDiarioForm.obs)&&(
+                  <button onClick={()=>{
+                    const tareasRealizadasHoy = Object.entries(registroDiarioForm.tareas)
+                      .filter(([,v])=>v).map(([k])=>k);
+                    onAddTarea({
+                      id:Date.now(), fecha:fechaVer,
+                      tarea:`📋 Registro diario greens`,
+                      responsable:workerData?.nombre||"",
+                      zona:"Golf", subZona:"Greens", estado:"hecha",
+                      notas:`Tareas: ${tareasRealizadasHoy.join(", ")||"—"} | Fito: ${registroDiarioForm.obsFito||"Sin novedad"} | General: ${registroDiarioForm.obs||"Sin novedad"}`,
+                      esDiario:true, auto:false,
+                    });
+                    if(registroDiarioForm.obsFito?.trim()) {
+                      alert("⚠️ Observación fitosanitaria registrada. La jefa será notificada.");
+                    }
+                    setRegistroDiarioForm(p=>({...p,obsFito:"",obs:""}));
+                  }} style={{...S.btn,background:"rgba(52,211,153,0.15)",color:"#34d399",
+                    border:"1px solid rgba(52,211,153,0.3)",fontSize:12,alignSelf:"flex-start"}}>
+                    💾 Guardar observaciones
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
           );
         })()}
 
@@ -8644,6 +8691,22 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
     const nuevasMed = [nueva, ...mediciones].slice(0,100);
     setG({mediciones:nuevasMed});
     sincronizarMacrozona("Medición de alturas", `${medForm.tipo} — ${medForm.responsable||"Sin responsable"}`);
+    // Marcar tarea de medición de alturas como hecha en el programa del día
+    const fechaMed = medForm.fecha || hoy;
+    setTareasProg(prev => {
+      const tareasDelDia = Array.isArray(prev[fechaMed]) ? prev[fechaMed] :
+        typeof prev[fechaMed]==="object" ? Object.values(prev[fechaMed]||{}) : [];
+      const actualizadas = tareasDelDia.map(t => {
+        if(["hecha","completada"].includes(t.estado)) return t;
+        const esMedicion = (t.tarea||"").toLowerCase().includes("medici") ||
+                           (t.tarea||"").toLowerCase().includes("altura");
+        const esDelResponsable = !t.responsable || t.responsable===medForm.responsable ||
+                                  t.responsable?.includes("Bhalú") || t.responsable?.includes("Armijo");
+        if(esMedicion && esDelResponsable) return {...t, estado:"hecha"};
+        return t;
+      });
+      return {...prev, [fechaMed]: actualizadas};
+    });
     setMedForm({...emptyMed, fecha:hoy});
     setShowMedForm(false);
     // Notificar a la jefa
@@ -8825,7 +8888,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               <button style={{...S.btn,background:"rgba(52,211,153,0.15)",color:"#34d399",border:"1px solid rgba(52,211,153,0.3)"}} onClick={()=>{setSubTab("mediciones");setShowMedForm(true);}}>📏 Nueva medición</button>
               <button style={{...S.btn,background:"rgba(239,68,68,0.12)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}} onClick={()=>setVista("fungicidas")}>🚫 Registrar cierre sectorial</button>
-              <button style={{...S.btn,background:"rgba(52,211,153,0.12)",color:"#6ee7b7",border:"1px solid rgba(52,211,153,0.2)"}} onClick={()=>{setSubTab("greens");setShowDiariaForm(true);}}>✅ Registro diario</button>
+              <button style={{...S.btn,background:"rgba(52,211,153,0.12)",color:"#6ee7b7",border:"1px solid rgba(52,211,153,0.2)"}} onClick={()=>{setSubTab("greens");setShowDiariaForm(true);}}>✅ Registro diario jefa</button>
               <button style={{...S.btn,background:"rgba(52,211,153,0.12)",color:"#6ee7b7",border:"1px solid rgba(52,211,153,0.2)"}} onClick={()=>{setSubTab("greens");setShowTareaForm("green");}}>📋 Nueva tarea greens</button>
               {esJefa&&<button style={{...S.btn,background:"rgba(251,191,36,0.12)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.25)"}} onClick={()=>{setSubTab("eventos");setShowEventoForm(true);}}>🏆 Cargar evento</button>}
             </div>
@@ -9148,9 +9211,13 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                 {/* ── Últimos cortes registrados para este green ── */}
                 {(()=>{
                   const nombreG = g.nombre;
+                  const hoyStr = new Date().toISOString().slice(0,10);
                   const cortesEsteGreen = Object.entries(tareasProg)
-                    .flatMap(([fecha,tareas])=>tareas.map(t=>({...t,fecha})))
-                    .filter(t=>t.zona==="Golf"&&
+                    .flatMap(([fecha,ts])=>(Array.isArray(ts)?ts:Object.values(ts||{})).map(t=>({...t,fecha})))
+                    .filter(t=>
+                      t.zona==="Golf" &&
+                      t.fecha<=hoyStr &&
+                      ["hecha","completada"].includes(t.estado) &&
                       (t.tarea?.toLowerCase().includes("corte")||t.tipo?.toLowerCase().includes("corte"))&&
                       (t.elemento?.includes(nombreG)||t.tarea?.includes(nombreG)||
                        t.elemento?.toLowerCase().includes("todos")||t.tarea?.toLowerCase().includes("todos")))
