@@ -2076,7 +2076,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                               value={t.alturaCorteReal||""}
                               onChange={e=>onUpdateTarea(fechaVer,t.id,{alturaCorteReal:e.target.value})}
                               placeholder={t.alturaCorteObj||t.alturaCorte||"mm"}
-                              style={{...{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(251,191,36,0.3)",borderRadius:6,color:"#fbbf24",padding:"4px 8px",fontSize:13,fontFamily:"'Georgia',serif",width:80,outline:"none"}}}/>
+                              style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(251,191,36,0.3)",borderRadius:6,color:"#fbbf24",padding:"4px 8px",fontSize:13,fontFamily:"'Georgia',serif",width:80,outline:"none"}}/>
                             {t.alturaCorteReal&&<span style={{fontSize:10,color:"#5a9a7a"}}>✓ {t.alturaCorteReal}mm registrado</span>}
                           </div>
                         )}
