@@ -92,6 +92,51 @@ const ESTACIONES = {
   primavera: { label:"Primavera", icon:"🌸",  color:"#4ade80", meses:"Sep–Nov" },
 };
 
+const DIAS_SEMANA_GLOBAL = [
+  {v:1,l:"Lun",full:"Lunes"},{v:2,l:"Mar",full:"Martes"},{v:3,l:"Mié",full:"Miércoles"},
+  {v:4,l:"Jue",full:"Jueves"},{v:5,l:"Vie",full:"Viernes"},{v:6,l:"Sáb",full:"Sábado"},{v:0,l:"Dom",full:"Domingo"},
+];
+const frecToDiasGlobal = (frec) => {
+  const map = {diario:1,cada2dias:2,cada3dias:3,cada5dias:5,semanal:7,quincenal:15,mensual:30,bimestral:60,trimestral:90,semestral:180,anual:365,unavez:null,segunecesidad:null};
+  return map[frec]||null;
+};
+const estacionDeFecha = (fechaStr) => {
+  const m = new Date(fechaStr+"T12:00:00").getMonth()+1;
+  return [12,1,2].includes(m)?"verano":[3,4,5].includes(m)?"otono":[6,7,8].includes(m)?"invierno":"primavera";
+};
+// Calcula la próxima fecha en que corresponde una tarea de frecuencia f, evaluada respecto a una fecha de referencia (refFecha, normalmente "hoy")
+const calcProximaFrecGlobal = (f, refFecha) => {
+  const ref = new Date(refFecha+"T12:00:00");
+  if(f.modo==="diasSemana"){
+    if(!f.ultimaVez) return null;
+    const minimoDias = Number(f.diasMinimos)||0;
+    const prohibidos = f.diasProhibidos||[];
+    const hayDiasEspecificos = f.diasSemana && f.diasSemana.length>0;
+    const ultima = new Date(f.ultimaVez+"T12:00:00");
+    let base = new Date(ultima.getTime() + minimoDias*24*60*60*1000);
+    for(let i=0;i<400;i++){
+      const candidato = new Date(base.getTime() + i*24*60*60*1000);
+      const dow = candidato.getDay();
+      if(prohibidos.includes(dow)) continue;
+      if(hayDiasEspecificos && !f.diasSemana.includes(dow)) continue;
+      const diff = Math.round((candidato-ref)/(24*60*60*1000));
+      return { fecha: candidato.toISOString().slice(0,10), diff };
+    }
+    return null;
+  }
+  // modo estación
+  const est = estacionDeFecha(refFecha);
+  const frecVal = f[est];
+  if(!frecVal||frecVal==="noaplica"||frecVal==="unavez"||frecVal==="segunecesidad") return null;
+  if(!f.ultimaVez) return null;
+  const dias = frecToDiasGlobal(frecVal);
+  if(!dias) return null;
+  const ultima = new Date(f.ultimaVez+"T12:00:00");
+  const proxima = new Date(ultima.getTime() + dias*24*60*60*1000);
+  const diff = Math.round((proxima-ref)/(24*60*60*1000));
+  return { fecha: proxima.toISOString().slice(0,10), diff };
+};
+
 // ─── FRECUENCIAS DISPONIBLES ─────────────────────────────────────────────────
 const FRECUENCIAS = [
   { value:"diario",      label:"Diario",             dias:1   },
@@ -12345,23 +12390,23 @@ export default function App() {
 
   // Detección automática y centralizada: bono especializado por limpieza de Cancha de Fútbol Sintética.
   // Vigila tareasProg completo (sin importar desde qué pantalla se haya cambiado el estado).
-  const bonoCanchaDetectadosRef = React.useRef(new Set());
+  // Marca la tarea con bonoCanchaNotificado:true en Firebase para que la marca persista entre recargas.
   React.useEffect(()=>{
     if(!progReady) return;
     const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
     Object.entries(tareasProg).forEach(([fecha, tareasDelDia])=>{
-      normArr(tareasDelDia).forEach(t=>{
-        if(!t || !t.id) return;
+      const lista = normArr(tareasDelDia);
+      let huboCambios = false;
+      const listaActualizada = lista.map(t=>{
+        if(!t || !t.id) return t;
         const yaCompletada = t.estado==="hecha"||t.estado==="completada";
-        if(!yaCompletada) return;
-        const claveUnica = `${fecha}_${t.id}`;
-        if(bonoCanchaDetectadosRef.current.has(claveUnica)) return;
+        if(!yaCompletada) return t;
+        if(t.bonoCanchaNotificado) return t; // ya procesado anteriormente (persistido en Firebase)
         const tNom=(t.tarea||"").toLowerCase();
         const tZona=(t.zona||"").toLowerCase();
         const tElem=(t.elemento||"").toLowerCase();
         const esCanchaSint = tZona.includes("fútbol sintétic")||tZona.includes("futbol sintetic")||(tZona.includes("cancha")&&tZona.includes("sintétic"))||tElem.includes("césped sintético")||tElem.includes("cesped sintetico")||tElem.includes("alfombra");
         const esLimpieza = tNom.includes("limpie")||tNom.includes("sopla")||tNom.includes("barrid")||tNom.includes("cepill")||tNom.includes("aspirad")||tNom.includes("escobill");
-        bonoCanchaDetectadosRef.current.add(claveUnica);
         if(esCanchaSint && esLimpieza){
           crearNotificacion("bono_cancha",{
             titulo:"🎖️ Bono especializado disponible",
@@ -12371,7 +12416,12 @@ export default function App() {
             descripcionBono:`Limpieza profunda césped sintético — Cancha de Fútbol — ${fecha}`,
           });
         }
+        huboCambios = true;
+        return {...t, bonoCanchaNotificado:true};
       });
+      if(huboCambios){
+        fbUpdate(ref(db, `${ROOT}/prog`), {[fecha]: listaActualizada}).catch(e=>console.error("Error marcando bonoCanchaNotificado:", e));
+      }
     });
   }, [tareasProg, progReady, crearNotificacion]);
 
