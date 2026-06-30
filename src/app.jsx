@@ -3692,9 +3692,13 @@ function GestionRecursos({ zonaId, S, personal, recursos, setRecursos, esJefa })
 // ─── PANEL DE FRECUENCIAS DE MANTENCIÓN ─────────────────────────────────────
 function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
   const ESTACIONES_LIST = ["verano","otono","invierno","primavera"];
+  const DIAS_SEMANA = [
+    {v:1,l:"Lun",full:"Lunes"},{v:2,l:"Mar",full:"Martes"},{v:3,l:"Mié",full:"Miércoles"},
+    {v:4,l:"Jue",full:"Jueves"},{v:5,l:"Vie",full:"Viernes"},{v:6,l:"Sáb",full:"Sábado"},{v:0,l:"Dom",full:"Domingo"},
+  ];
   const frecuencias = getFrecs(zid, eid, tipo, isCustom);
   const updateFila = (idx, campo, valor) => { const arr = frecuencias.map((f,i)=>i===idx?{...f,[campo]:valor}:f); setFrecs(zid,eid,isCustom,arr); };
-  const addFila = () => { setFrecs(zid,eid,isCustom,[...frecuencias,{id:eid+"_"+Date.now(),tarea:"",verano:"semanal",otono:"semanal",invierno:"noaplica",primavera:"semanal",ultimaVez:""}]); };
+  const addFila = () => { setFrecs(zid,eid,isCustom,[...frecuencias,{id:eid+"_"+Date.now(),modo:"estacion",tarea:"",verano:"semanal",otono:"semanal",invierno:"noaplica",primavera:"semanal",ultimaVez:"",diasSemana:[],diasProhibidos:[0,6],diasMinimos:""}]); };
   const removeFila = (idx) => { setFrecs(zid,eid,isCustom,frecuencias.filter((_,i)=>i!==idx)); };
 
   // Convierte frecuencia a días
@@ -3707,8 +3711,8 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
   const mes = new Date().getMonth()+1;
   const estActual = [12,1,2].includes(mes)?"verano":[3,4,5].includes(mes)?"otono":[6,7,8].includes(mes)?"invierno":"primavera";
 
-  // Calcula próxima fecha y días
-  const calcProxima = (f) => {
+  // Calcula próxima fecha — modo "estación" (por días desde última vez)
+  const calcProximaEstacion = (f) => {
     const frecVal = f[estActual];
     if(!frecVal||frecVal==="noaplica"||frecVal==="unavez"||frecVal==="segunecesidad") return null;
     if(!f.ultimaVez) return null;
@@ -3720,14 +3724,41 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
     const diff = Math.round((proxima-hoy)/(24*60*60*1000));
     return { fecha: proxima.toISOString().slice(0,10), diff };
   };
-  const esSinFrecuencia = (f) => ["unavez","segunecesidad"].includes(f[estActual]);
+
+  // Calcula próxima fecha — modo "diasSemana" (día específico de la semana, respetando mínimo de días y prohibidos)
+  const calcProximaDiaSemana = (f) => {
+    if(!f.diasSemana || f.diasSemana.length===0) return null;
+    const hoy = new Date(); hoy.setHours(12,0,0,0);
+    const minimoDias = Number(f.diasMinimos)||0;
+    const prohibidos = f.diasProhibidos||[];
+    // Fecha base: última vez + mínimo de días (si hay última vez), o hoy
+    let base = hoy;
+    if(f.ultimaVez){
+      const ultima = new Date(f.ultimaVez+"T12:00:00");
+      const conMinimo = new Date(ultima.getTime() + minimoDias*24*60*60*1000);
+      base = conMinimo > hoy ? conMinimo : hoy;
+    }
+    // Buscar el próximo día permitido (de los diasSemana elegidos, que no esté en prohibidos) desde base
+    for(let i=0;i<14;i++){
+      const candidato = new Date(base.getTime() + i*24*60*60*1000);
+      const dow = candidato.getDay();
+      if(f.diasSemana.includes(dow) && !prohibidos.includes(dow)){
+        const diff = Math.round((candidato-hoy)/(24*60*60*1000));
+        return { fecha: candidato.toISOString().slice(0,10), diff, diaNombre: DIAS_SEMANA.find(d=>d.v===dow)?.full };
+      }
+    }
+    return null;
+  };
+
+  const calcProxima = (f) => f.modo==="diasSemana" ? calcProximaDiaSemana(f) : calcProximaEstacion(f);
+  const esSinFrecuencia = (f) => f.modo!=="diasSemana" && ["unavez","segunecesidad"].includes(f[estActual]);
 
   const inputSt = {background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:7,color:"#ede9e0",padding:"7px 10px",fontFamily:"'Georgia',serif",fontSize:13,width:"100%",outline:"none"};
   const labelSt = {fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
 
   return (
     <div style={{marginTop:14,borderTop:"1px solid rgba(255,255,255,0.08)",paddingTop:14}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:6}}>
         <div style={{fontFamily:"'Playfair Display',serif",fontSize:13,fontWeight:700,color:"#a0d8b0"}}>📅 Frecuencias de Mantención</div>
         <div style={{fontSize:11,color:"#5a8a6a"}}>
           Estación actual: <b style={{color:ESTACIONES[estActual].color}}>{ESTACIONES[estActual].icon} {ESTACIONES[estActual].label}</b>
@@ -3746,6 +3777,7 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
 
       <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:12}}>
         {frecuencias.map((f,idx)=>{
+          const modo = f.modo||"estacion";
           const prox = calcProxima(f);
           const diasColor = prox===null?"#5a8a7a":prox.diff<0?"#ef4444":prox.diff<=7?"#f59e0b":prox.diff<=30?"#fcd34d":"#22c55e";
           const diasLabel = prox===null?"—":prox.diff===0?"Hoy":prox.diff<0?`${Math.abs(prox.diff)}d atrás`:`${prox.diff}d`;
@@ -3767,28 +3799,105 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
                       {diasLabel}
                     </span>
                   )}
-                  {prox&&<div style={{fontSize:10,color:"#c084fc",textAlign:"center"}}>{new Date(prox.fecha+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"short"})}</div>}
+                  {prox&&(
+                    <div style={{fontSize:10,color:"#c084fc",textAlign:"center"}}>
+                      📌 {new Date(prox.fecha+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"short"})}
+                      {prox.diaNombre&&<div style={{fontSize:9,color:"#9a8acc"}}>{prox.diaNombre}</div>}
+                    </div>
+                  )}
                   <button onClick={()=>removeFila(idx)} style={{background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:6,color:"#fca5a5",cursor:"pointer",fontSize:12,padding:"3px 8px",marginTop:2}}>✕ Quitar</button>
                 </div>
               </div>
 
-              {/* Fila 2: Frecuencias por estación */}
-              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:10}}>
-                {ESTACIONES_LIST.map(est=>{
-                  const esNA=f[est]==="noaplica";
-                  return (
-                    <div key={est}>
-                      <label style={{...labelSt,color:ESTACIONES[est].color}}>{ESTACIONES[est].icon} {ESTACIONES[est].label}</label>
-                      <select value={f[est]||"noaplica"} onChange={e=>updateFila(idx,est,e.target.value)}
-                        style={{background:esNA?"rgba(255,255,255,0.04)":`${ESTACIONES[est].color}15`,border:`1px solid ${esNA?"rgba(255,255,255,0.08)":ESTACIONES[est].color+"35"}`,borderRadius:7,color:esNA?"#4a7a6a":ESTACIONES[est].color,padding:"6px 8px",fontFamily:"'Georgia',serif",fontSize:12,outline:"none",cursor:"pointer",width:"100%"}}>
-                        {FRECUENCIAS.map(fr=><option key={fr.value} value={fr.value}>{fr.label}</option>)}
-                      </select>
-                    </div>
-                  );
-                })}
+              {/* Selector de modo */}
+              <div style={{display:"flex",gap:6,marginBottom:10}}>
+                <button onClick={()=>updateFila(idx,"modo","estacion")}
+                  style={{flex:1,cursor:"pointer",border:`1px solid ${modo==="estacion"?"rgba(52,211,153,0.5)":"rgba(255,255,255,0.1)"}`,borderRadius:7,padding:"6px 10px",fontSize:12,background:modo==="estacion"?"rgba(52,211,153,0.1)":"transparent",color:modo==="estacion"?"#34d399":"#7aaa80",fontFamily:"'Georgia',serif"}}>
+                  🌦️ Por estación
+                </button>
+                <button onClick={()=>updateFila(idx,"modo","diasSemana")}
+                  style={{flex:1,cursor:"pointer",border:`1px solid ${modo==="diasSemana"?"rgba(96,165,250,0.5)":"rgba(255,255,255,0.1)"}`,borderRadius:7,padding:"6px 10px",fontSize:12,background:modo==="diasSemana"?"rgba(96,165,250,0.1)":"transparent",color:modo==="diasSemana"?"#60a5fa":"#7aaa80",fontFamily:"'Georgia',serif"}}>
+                  📆 Días específicos
+                </button>
               </div>
 
-              {/* Fila 3: Última vez + Observaciones */}
+              {/* Modo: Por estación */}
+              {modo==="estacion"&&(
+                <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:10}}>
+                  {ESTACIONES_LIST.map(est=>{
+                    const esNA=f[est]==="noaplica";
+                    return (
+                      <div key={est}>
+                        <label style={{...labelSt,color:ESTACIONES[est].color}}>{ESTACIONES[est].icon} {ESTACIONES[est].label}</label>
+                        <select value={f[est]||"noaplica"} onChange={e=>updateFila(idx,est,e.target.value)}
+                          style={{background:esNA?"rgba(255,255,255,0.04)":`${ESTACIONES[est].color}15`,border:`1px solid ${esNA?"rgba(255,255,255,0.08)":ESTACIONES[est].color+"35"}`,borderRadius:7,color:esNA?"#4a7a6a":ESTACIONES[est].color,padding:"6px 8px",fontFamily:"'Georgia',serif",fontSize:12,outline:"none",cursor:"pointer",width:"100%"}}>
+                          {FRECUENCIAS.map(fr=><option key={fr.value} value={fr.value}>{fr.label}</option>)}
+                        </select>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Modo: Días específicos de la semana */}
+              {modo==="diasSemana"&&(
+                <div style={{marginBottom:10}}>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                    <div>
+                      <label style={{...labelSt,color:"#60a5fa"}}>Días de la semana permitidos</label>
+                      <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                        {DIAS_SEMANA.map(d=>{
+                          const sel=(f.diasSemana||[]).includes(d.v);
+                          const prohibido=(f.diasProhibidos||[]).includes(d.v);
+                          return (
+                            <button key={d.v} disabled={prohibido}
+                              onClick={()=>{
+                                const arr=f.diasSemana||[];
+                                updateFila(idx,"diasSemana",sel?arr.filter(x=>x!==d.v):[...arr,d.v]);
+                              }}
+                              title={prohibido?`${d.full} está marcado como prohibido`:d.full}
+                              style={{cursor:prohibido?"not-allowed":"pointer",border:`1px solid ${sel?"rgba(96,165,250,0.5)":"rgba(255,255,255,0.12)"}`,borderRadius:6,padding:"5px 8px",fontSize:11,background:prohibido?"rgba(239,68,68,0.06)":sel?"rgba(96,165,250,0.15)":"transparent",color:prohibido?"#7a4a4a":sel?"#60a5fa":"#7aaa80",fontFamily:"'Georgia',serif",opacity:prohibido?0.5:1,textDecoration:prohibido?"line-through":"none"}}>
+                              {d.l}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div>
+                      <label style={{...labelSt,color:"#f87171"}}>Días prohibidos (nunca)</label>
+                      <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                        {DIAS_SEMANA.map(d=>{
+                          const proh=(f.diasProhibidos||[]).includes(d.v);
+                          return (
+                            <button key={d.v}
+                              onClick={()=>{
+                                const arr=f.diasProhibidos||[];
+                                const nuevosProh=proh?arr.filter(x=>x!==d.v):[...arr,d.v];
+                                // Si se prohíbe un día que estaba seleccionado como permitido, quitarlo también
+                                const nuevosSel=(f.diasSemana||[]).filter(x=>!nuevosProh.includes(x));
+                                updateFila(idx,"diasProhibidos",nuevosProh);
+                                if(nuevosSel.length!==(f.diasSemana||[]).length) updateFila(idx,"diasSemana",nuevosSel);
+                              }}
+                              style={{cursor:"pointer",border:`1px solid ${proh?"rgba(239,68,68,0.5)":"rgba(255,255,255,0.12)"}`,borderRadius:6,padding:"5px 8px",fontSize:11,background:proh?"rgba(239,68,68,0.15)":"transparent",color:proh?"#f87171":"#7aaa80",fontFamily:"'Georgia',serif"}}>
+                              {d.l}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{maxWidth:220}}>
+                    <label style={{...labelSt,color:"#fbbf24"}}>Mínimo de días entre repeticiones</label>
+                    <input type="number" min="0" max="60" value={f.diasMinimos||""}
+                      onChange={e=>updateFila(idx,"diasMinimos",e.target.value)}
+                      placeholder="Ej: 3"
+                      style={{...inputSt,color:"#fbbf24",border:"1px solid rgba(251,191,36,0.25)",background:"rgba(251,191,36,0.05)"}}/>
+                    <div style={{fontSize:10,color:"#5a8a6a",marginTop:3}}>Si pasan menos días desde la última vez, se posterga al siguiente día permitido.</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Fila: Última vez + Observaciones */}
               <div style={{display:"grid",gridTemplateColumns:"160px 1fr",gap:10}}>
                 <div>
                   <label style={{...labelSt,color:"#a0c8e0"}}>📅 Última realización</label>
