@@ -11515,7 +11515,7 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
 }
 
 // ─── BONO POR TAREA ──────────────────────────────────────────────────────────
-function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, setBonosMasivos, setPersonal, onVolver, esJefa }) {
+function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, setBonosMasivos, setPersonal, onVolver, esJefa, prefill }) {
   const hoy = new Date().toISOString().slice(0,10);
   const labelSt = {fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
 
@@ -11525,13 +11525,44 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
   const pctApoyo    = Number(bonosConfig.pctApoyo||20);
 
   const [showConfig, setShowConfig] = React.useState(false);
-  const [showForm,   setShowForm]   = React.useState(false);
+  const [showForm,   setShowForm]   = React.useState(!!prefill);
   const [editBonoId, setEditBonoId] = React.useState(null);
   const [editBonoForm, setEditBonoForm] = React.useState(null);
-  const [form, setForm] = React.useState({
-    fecha: hoy, descripcion:"", valorMercado:"",
-    ejecutor:"", ejecutorNombre:"", ayudante:"", ayudanteNombre:"", apoyos:[], obs:""
+  const [form, setForm] = React.useState(()=>{
+    if(prefill){
+      const personalArr0 = Array.isArray(personal) ? personal : Object.values(personal||{});
+      const trabajador = personalArr0.find(p=>p.nombre===prefill.trabajadorNombre);
+      return {
+        fecha: prefill.tareaFecha||hoy,
+        descripcion: prefill.descripcionBono||"",
+        valorMercado: "",
+        ejecutor: trabajador?String(trabajador.id):"",
+        ejecutorNombre: prefill.trabajadorNombre||"",
+        ayudante:"", ayudanteNombre:"", apoyos:[], obs:"⭐ Bono especializado — generado automáticamente al completar limpieza de Cancha de Fútbol Sintética"
+      };
+    }
+    return {
+      fecha: hoy, descripcion:"", valorMercado:"",
+      ejecutor:"", ejecutorNombre:"", ayudante:"", ayudanteNombre:"", apoyos:[], obs:""
+    };
   });
+  // Si llega prefill después del primer render, actualizar
+  React.useEffect(()=>{
+    if(prefill){
+      setShowForm(true);
+      const personalArr0 = Array.isArray(personal) ? personal : Object.values(personal||{});
+      const trabajador = personalArr0.find(p=>p.nombre===prefill.trabajadorNombre);
+      setForm({
+        fecha: prefill.tareaFecha||hoy,
+        descripcion: prefill.descripcionBono||"",
+        valorMercado: "",
+        ejecutor: trabajador?String(trabajador.id):"",
+        ejecutorNombre: prefill.trabajadorNombre||"",
+        ayudante:"", ayudanteNombre:"", apoyos:[], obs:"⭐ Bono especializado — generado automáticamente al completar limpieza de Cancha de Fútbol Sintética"
+      });
+    }
+  // eslint-disable-next-line
+  },[]);
 
   const personalArr = Array.isArray(personal) ? personal : Object.values(personal||{});
   const listaPersonal = [...personalArr].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
@@ -11707,6 +11738,15 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
       {/* Formulario nueva tarea con bono */}
       {showForm&&(
         <div style={{...S.card,padding:20,marginBottom:16}} className="ein">
+          {prefill&&(
+            <div style={{background:"rgba(251,191,36,0.08)",border:"1px solid rgba(251,191,36,0.3)",borderRadius:10,padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:10}}>
+              <span style={{fontSize:20}}>🎖️</span>
+              <div>
+                <div style={{fontSize:13,fontWeight:700,color:"#fbbf24"}}>Bono especializado — Limpieza Cancha de Fútbol Sintética</div>
+                <div style={{fontSize:11,color:"#a08040"}}>Datos precargados. Solo define el valor de mercado y confirma.</div>
+              </div>
+            </div>
+          )}
           <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#c4b5fd",marginBottom:14}}>➕ Nueva tarea con bono</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
             <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={form.fecha} onChange={e=>setForm(p=>({...p,fecha:e.target.value}))}/></div>
@@ -12014,6 +12054,7 @@ export default function App() {
 
   const appReady = dataReady && personalReady && progReady;
   const [golfInitTab, setGolfInitTab] = React.useState(null);
+  const [bonoPrefill, setBonoPrefill] = React.useState(null);
 
   // ── Helper: registrar notificación en Firebase ───────────────────────
   const crearNotificacion = React.useCallback((tipo, datos) => {
@@ -13210,7 +13251,23 @@ export default function App() {
                         .catch(e=>console.error("Error:", e));
                       if(patch.estado==="no_pudo"||patch.estado==="hecha"||patch.estado==="haciendose"){
                         const tarea=tareasDelDia.find(t=>t.id===tid);
-                        if(tarea){const z=MACROZONAS_BASE.find(z=>z.nombre===tarea.zona);if(z){const ico=patch.estado==="no_pudo"?"🔴":patch.estado==="hecha"?"✅":"🔵";addHistorial(String(z.id),`${ico} [${tarea.responsable||"?"}] ${tarea.tarea}${patch.estado==="no_pudo"&&patch.notaWorker?" ("+patch.notaWorker+")":""}`);}}
+                        if(tarea){const z=MACROZONAS_BASE.find(z=>z.nombre===tarea.zona);if(z){const ico=patch.estado==="no_pudo"?"🔴":patch.estado==="hecha"?"✅":"🔵";addHistorial(String(z.id),`${ico} [${tarea.responsable||"?"}] ${tarea.tarea}${patch.estado==="no_pudo"&&patch.notaWorker?" ("+patch.notaWorker+")":""}`);}
+                          // Bono especializado: limpieza Cancha de Fútbol Sintética (alfombra)
+                          if(patch.estado==="hecha"){
+                            const tNom=(tarea.tarea||"").toLowerCase();
+                            const esCanchaSint = tarea.zona==="Cancha de Fútbol Sintética" || (tarea.zona||"").toLowerCase().includes("fútbol sintétic") || (tarea.zona||"").toLowerCase().includes("futbol sintetic");
+                            const esLimpieza = tNom.includes("limpie")||tNom.includes("sopla")||tNom.includes("barrid")||tNom.includes("cepill");
+                            if(esCanchaSint && esLimpieza && crearNotificacion){
+                              crearNotificacion("bono_cancha",{
+                                titulo:"🎖️ Bono especializado disponible",
+                                mensaje:`${tarea.responsable||"Trabajador"} completó limpieza de la Cancha de Fútbol Sintética (alfombra) — generar bono especializado`,
+                                trabajadorNombre:tarea.responsable||"",
+                                tareaFecha:fecha,
+                                descripcionBono:`Limpieza profunda césped sintético — Cancha de Fútbol — ${fecha}`,
+                              });
+                            }
+                          }
+                        }
                       }
                       return {...prev,[fecha]:actualizadas};
                     });
@@ -13419,24 +13476,37 @@ export default function App() {
               );
               return arr.map((n,i)=>{
                 const esMed=n.tipo==="medicion";
-                const col=esMed?"#34d399":"#60a5fa";
+                const esBono=n.tipo==="bono_cancha";
+                const col=esBono?"#fbbf24":esMed?"#34d399":"#60a5fa";
                 return (
                   <div key={n.id||i} style={{...S.card,marginBottom:8,padding:"12px 16px",
-                    background:n.leida?"transparent":"rgba(52,211,153,0.04)",
+                    background:n.leida?"transparent":esBono?"rgba(251,191,36,0.06)":"rgba(52,211,153,0.04)",
                     border:`1px solid ${n.leida?"rgba(255,255,255,0.07)":`${col}25`}`,
                     opacity:n.leida?0.7:1}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
                       <div style={{flex:1}}>
                         <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
-                          <span style={{fontSize:15}}>{esMed?"📏":"💧"}</span>
+                          <span style={{fontSize:15}}>{esBono?"🎖️":esMed?"📏":"💧"}</span>
                           <span style={{fontSize:13,fontWeight:700,color:col}}>
-                            {esMed?"Medición de alturas":"Humedad registrada"}
+                            {esBono?(n.titulo||"Bono especializado disponible"):esMed?"Medición de alturas":"Humedad registrada"}
                           </span>
                           {!n.leida&&<span style={{fontSize:9,background:col,color:"#fff",padding:"2px 6px",borderRadius:8,fontWeight:700}}>NUEVO</span>}
                         </div>
+                        {esBono?(
+                          <div style={{fontSize:12,color:"#ede9e0",marginBottom:6}}>{n.mensaje}</div>
+                        ):(<>
                         <div style={{fontSize:12,color:"#ede9e0",marginBottom:3}}>👷 <strong>{n.responsable||"Sin nombre"}</strong></div>
                         <div style={{fontSize:11,color:"#5a9a7a",marginBottom:2}}>{n.detalle}</div>
                         {n.decision&&<div style={{fontSize:11,color:"#f59e0b"}}>→ {n.decision}</div>}
+                        </>)}
+                        {esBono&&(
+                          <button onClick={()=>{
+                            setBonoPrefill({trabajadorNombre:n.trabajadorNombre,tareaFecha:n.tareaFecha,descripcionBono:n.descripcionBono});
+                            setVista("personal");setPersonalVista("bono-masivo");
+                          }} style={{cursor:"pointer",border:"1px solid rgba(251,191,36,0.4)",borderRadius:8,padding:"6px 14px",background:"rgba(251,191,36,0.12)",color:"#fbbf24",fontSize:12,fontFamily:"'Georgia',serif",fontWeight:600,marginTop:4}}>
+                            🎖️ Generar bono ahora
+                          </button>
+                        )}
                       </div>
                       <div style={{textAlign:"right",minWidth:90}}>
                         <div style={{fontSize:12,color:col,fontWeight:600}}>{n.fecha}</div>
@@ -13506,8 +13576,9 @@ export default function App() {
             S={S} personal={personal} bonosConfig={bonosConfig} setBonosConfig={setBonosConfig}
             bonosMasivos={bonosMasivos} setBonosMasivos={setBonosMasivos}
             setPersonal={setPersonal}
-            onVolver={()=>setPersonalVista("lista")}
+            onVolver={()=>{setPersonalVista("lista");setBonoPrefill(null);}}
             esJefa={rolLogueado==="jefa"}
+            prefill={bonoPrefill}
           />
         )}
 
