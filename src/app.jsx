@@ -1463,7 +1463,8 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
     <div className="ein">
       {/* Tabs */}
       <div style={{display:"flex",gap:6,marginBottom:14}}>
-        {[["historial","📜 Historial"],["buscar","🔍 Consulta histórica"]].map(([t,l])=>(
+        {([["historial","📜 Historial"],["buscar","🔍 Consulta histórica"]]
+          .concat(esJefa?[["turnos","✅ Turnos trabajadores"]]:[])).map(([t,l])=>(
           <button key={t} onClick={()=>setTabHist(t)}
             style={{cursor:"pointer",border:`1px solid ${tabHist===t?"#34d399":"rgba(255,255,255,0.12)"}`,
               borderRadius:8,padding:"5px 14px",fontSize:12,
@@ -1743,6 +1744,106 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
         </div>
       )}
       </>)}
+
+      {/* ══ PANEL TURNOS TRABAJADORES ══ */}
+      {tabHist==="turnos"&&esJefa&&(()=>{
+        const nA=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+        const hoyT=new Date().toISOString().slice(0,10);
+        const dias=Object.keys(tareas)
+          .filter(d=>nA(tareas[d]).some(t=>t.responsable))
+          .sort((a,b)=>b.localeCompare(a)).slice(0,30);
+        return (
+          <div>
+            <div style={{marginBottom:12}}>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#34d399",marginBottom:3}}>✅ Revisión de turnos</div>
+              <div style={{fontSize:11,color:"#5a9a7a"}}>Últimos 30 días · Todas las tareas de trabajadores incluyendo Golf</div>
+            </div>
+            {dias.length===0&&<div style={{...S.card,padding:32,textAlign:"center",color:"#4a8a5a"}}>No hay turnos registrados.</div>}
+            {dias.map(dia=>{
+              const tDia=nA(tareas[dia]);
+              const porTrab={};
+              tDia.forEach(t=>{const r=t.responsable||"Sin asignar";if(!porTrab[r])porTrab[r]=[];porTrab[r].push(t);});
+              if(Object.keys(porTrab).length===0) return null;
+              return (
+                <div key={dia} style={{marginBottom:14,border:"1px solid rgba(52,211,153,0.15)",borderRadius:12,overflow:"hidden"}}>
+                  <div style={{background:"rgba(52,211,153,0.06)",padding:"9px 14px",borderBottom:"1px solid rgba(52,211,153,0.08)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <span style={{fontWeight:700,fontSize:13,color:"#34d399"}}>
+                      📅 {new Date(dia+"T12:00:00").toLocaleDateString("es-CL",{weekday:"short",day:"numeric",month:"short"})}
+                      {dia===hoyT&&<span style={{fontSize:10,color:"#fbbf24",marginLeft:8,background:"rgba(251,191,36,0.1)",padding:"1px 7px",borderRadius:8}}>Hoy</span>}
+                    </span>
+                    <span style={{fontSize:11,color:"#5a9a7a"}}>{tDia.length} tareas · {Object.keys(porTrab).length} trabajadores</span>
+                  </div>
+                  {Object.entries(porTrab).map(([resp,tds])=>{
+                    const key=`${dia}_${resp.split(" ")[0]?.toLowerCase()||""}`;
+                    const cerrado=cierresTurno?.[key];
+                    const hechas=tds.filter(t=>["hecha","completada"].includes(t.estado)).length;
+                    const pct=tds.length?Math.round((hechas/tds.length)*100):0;
+                    return (
+                      <div key={resp} style={{padding:"10px 14px",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                        {/* Header trabajador */}
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,flexWrap:"wrap",gap:6}}>
+                          <div style={{display:"flex",alignItems:"center",gap:7}}>
+                            <div style={{width:26,height:26,borderRadius:"50%",background:"linear-gradient(135deg,#1a5c35,#2d7a4f)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff"}}>
+                              {resp[0]?.toUpperCase()||"?"}
+                            </div>
+                            <div>
+                              <div style={{fontSize:13,fontWeight:700}}>{resp}</div>
+                              <div style={{fontSize:10,color:"#5a9a7a"}}>{hechas}/{tds.length} tareas · {pct}%</div>
+                            </div>
+                          </div>
+                          <div style={{display:"flex",gap:5,alignItems:"center"}}>
+                            {cerrado?(
+                              <span style={{fontSize:10,color:"#22c55e",background:"rgba(34,197,94,0.1)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:7,padding:"2px 9px"}}>✅ Cerrado {cerrado.hora}</span>
+                            ):(
+                              <span style={{fontSize:10,color:"#f59e0b",background:"rgba(245,158,11,0.06)",border:"1px solid rgba(245,158,11,0.2)",borderRadius:7,padding:"2px 9px"}}>⏳ Abierto</span>
+                            )}
+                            {cerrado&&<button onClick={()=>onReabrirTurno?.(dia,resp)} style={{cursor:"pointer",border:"1px solid rgba(245,158,11,0.3)",borderRadius:6,padding:"2px 7px",background:"rgba(245,158,11,0.06)",color:"#fbbf24",fontSize:10,fontFamily:"'Georgia',serif"}}>🔓 Reabrir</button>}
+                          </div>
+                        </div>
+                        {/* Barra progreso */}
+                        <div style={{background:"rgba(255,255,255,0.05)",borderRadius:4,height:4,marginBottom:7,overflow:"hidden"}}>
+                          <div style={{width:`${pct}%`,height:"100%",background:pct===100?"#22c55e":"linear-gradient(90deg,#3d7a52,#4ade80)",borderRadius:4}}/>
+                        </div>
+                        {/* Tareas */}
+                        <div style={{display:"flex",flexDirection:"column",gap:3}}>
+                          {tds.map(t=>{
+                            const est=EC[t.estado]||EC.pendiente;
+                            return (
+                              <div key={t.id} style={{display:"flex",gap:7,padding:"5px 8px",borderRadius:7,background:`${est.color}07`,border:`1px solid ${est.color}18`,alignItems:"flex-start"}}>
+                                <span style={{fontSize:12,flexShrink:0}}>{est.icon}</span>
+                                <div style={{flex:1,minWidth:0}}>
+                                  <div style={{fontSize:12,fontWeight:600}}>{(t.tarea||"").replace("⛳ ","")}</div>
+                                  {t.zona&&<div style={{fontSize:10,color:"#5a7a7a"}}>📍 {t.zona}{t.elemento?` · ${t.elemento}`:""}</div>}
+                                  {t.alturaCorte&&<div style={{fontSize:10,color:"#fbbf24"}}>✂️ HOC indicada: {t.alturaCorte}mm</div>}
+                                  {t.alturaCorteReal&&<div style={{fontSize:10,color:"#22c55e",fontWeight:600}}>✂️ HOC real: {t.alturaCorteReal}mm</div>}
+                                  {t.notaWorker&&<div style={{fontSize:10,color:t.estado==="no_pudo"?"#f87171":"#a0c8a0",fontStyle:"italic"}}>💬 {t.notaWorker}</div>}
+                                  {t.notaJefa&&<div style={{fontSize:10,color:"#fbbf24",fontStyle:"italic"}}>📋 {t.notaJefa}</div>}
+                                </div>
+                                <div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
+                                  <select value={t.estado}
+                                    onChange={e=>{const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);setTareas(prev=>({...prev,[dia]:nA2(prev[dia]).map(x=>x.id===t.id?{...x,estado:e.target.value}:x)}));}}
+                                    style={{fontSize:10,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:5,color:"#ede9e0",padding:"2px 3px",cursor:"pointer"}}>
+                                    {Object.entries(EC).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
+                                  </select>
+                                  <input placeholder="nota..." defaultValue={t.notaJefa||""}
+                                    onBlur={e=>{if(e.target.value!==t.notaJefa){const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);setTareas(prev=>({...prev,[dia]:nA2(prev[dia]).map(x=>x.id===t.id?{...x,notaJefa:e.target.value}:x)}));}}}
+                                    style={{fontSize:10,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:5,color:"#ede9e0",padding:"2px 4px",width:90}}/>
+                                  <button onClick={()=>{if(window.confirm(`¿Eliminar "${(t.tarea||"").replace("⛳ ","")}"?`)){const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);setTareas(prev=>({...prev,[dia]:nA2(prev[dia]).filter(x=>x.id!==t.id)}));}}}
+                                    style={{cursor:"pointer",border:"1px solid rgba(239,68,68,0.2)",borderRadius:5,padding:"1px 5px",background:"rgba(239,68,68,0.06)",color:"#f87171",fontSize:10}}>🗑</button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -8170,18 +8271,20 @@ function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJe
     if(!confirmando) return;
     const {tarea} = confirmando;
     const fechaStr = fechaElegida;
+    const esCorte = (tarea.nombre||"").toLowerCase().includes("corte");
     const nuevaTarea = {
       id: Date.now() + Math.random(),
       fecha: fechaStr,
       zona: "Golf",
       subZona: tarea.zona.replace("Golf/",""),
       elemento: tarea.subzona,
-      tarea: `⛳ ${tarea.nombre}`,
+      tarea: `⛳ ${tarea.nombre}${alturaCorteConfirm?` — HOC ${alturaCorteConfirm}mm`:""}`,
       responsable: tarea.resp,
       estado: "pendiente",
       notas: notasOverride[tarea.id] ?? tarea.notas ?? "",
       auto: false,
       origen: "programacion_golf",
+      ...(esCorte && alturaCorteConfirm ? {alturaCorte: alturaCorteConfirm} : {}),
     };
     setTareasProg(p => ({
       ...p,
@@ -8190,11 +8293,13 @@ function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJe
     // Actualizar la última fecha en el estado local
     setUltimasFechas(p => ({...p, [tarea.id]: fechaStr}));
     setConfirmando(null);
+    setAlturaCorteConfirm("");
   };
 
   const [catAbierta, setCatAbierta] = React.useState({});
   const [confirmando, setConfirmando] = React.useState(null); // {tarea, fechaSugerida}
   const [fechaElegida, setFechaElegida] = React.useState("");
+  const [alturaCorteConfirm, setAlturaCorteConfirm] = React.useState("");
 
 
   const resumen = {
@@ -8399,6 +8504,23 @@ function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJe
             {confirmando.tarea.notas&&(
               <div style={{fontSize:11,color:"#4a8a5a",marginBottom:14,fontStyle:"italic"}}>
                 💡 {confirmando.tarea.notas}
+              </div>
+            )}
+            {(confirmando.tarea.nombre||"").toLowerCase().includes("corte")&&(
+              <div style={{marginBottom:14}}>
+                <label style={{fontSize:12,color:"#fbbf24",display:"block",marginBottom:6,fontWeight:600}}>
+                  ✂️ Altura de corte HOC (mm):
+                </label>
+                <input type="number" step="0.1" min="2" max="15"
+                  value={alturaCorteConfirm}
+                  onChange={e=>setAlturaCorteConfirm(e.target.value)}
+                  placeholder="ej: 4.5"
+                  style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(251,191,36,0.4)",
+                    borderRadius:8,color:"#fbbf24",padding:"8px 12px",fontSize:15,fontWeight:700,
+                    fontFamily:"'Georgia',serif",outline:"none",boxSizing:"border-box"}}/>
+                <div style={{fontSize:10,color:"#5a9a7a",marginTop:4}}>
+                  La altura queda registrada en la tarea — Bhalú la verá y anotará la real
+                </div>
               </div>
             )}
             <div style={{display:"flex",gap:10,marginTop:8}}>
@@ -8828,6 +8950,104 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   };
 
   // ── RENDER ───────────────────────────────────────────────────────────────
+  // Para trabajador: solo el formulario activo, sin header ni tabs
+  if(rolLogueado==="trabajador") {
+    return (
+      <div className="ein">
+        {/* Botón volver */}
+        <button onClick={()=>{if(onRegistroGuardado)onRegistroGuardado("miturno");}}
+          style={{cursor:"pointer",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,
+            padding:"6px 14px",background:"transparent",color:"#6aaa7a",fontSize:12,
+            fontFamily:"'Georgia',serif",marginBottom:14,display:"block"}}>
+          ← Volver a Mi Turno
+        </button>
+        {/* Alturas */}
+        {subTab==="mediciones"&&showMedForm&&(
+          <div style={{...S.card,padding:20,background:"rgba(52,211,153,0.03)"}}>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#34d399",marginBottom:14,fontWeight:700}}>
+              📏 Registrar alturas
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+              <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={medForm.fecha} onChange={e=>setMedForm(p=>({...p,fecha:e.target.value}))}/></div>
+              <div><label style={labelSt}>Tipo</label>
+                <select style={S.input} value={medForm.tipo} onChange={e=>setMedForm(p=>({...p,tipo:e.target.value}))}>
+                  <option value="semanal">Semanal</option>
+                  <option value="puntual">Puntual</option>
+                  <option value="siembra">Post siembra</option>
+                </select>
+              </div>
+            </div>
+            <div style={{overflowX:"auto",marginBottom:12}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                <thead><tr style={{background:"rgba(52,211,153,0.1)"}}>
+                  <th style={{padding:"6px 10px",textAlign:"left",color:"#34d399",fontSize:10}}>GREEN</th>
+                  <th style={{padding:"6px 10px",textAlign:"center",color:"#34d399",fontSize:10}}>ALTURA (mm)</th>
+                  <th style={{padding:"6px 10px",textAlign:"left",color:"#34d399",fontSize:10}}>OBS</th>
+                </tr></thead>
+                <tbody>
+                  {GREENS_DEF.map(g=>{
+                    const alt=medForm.alturas?.[g.id]||"";
+                    const color=colorAltura(alt);
+                    return (
+                      <tr key={g.id} style={{borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                        <td style={{padding:"5px 10px"}}>
+                          <div style={{fontWeight:600,color:"#34d399"}}>{g.nombre}</div>
+                          <div style={{fontSize:10,color:"#5a9a7a"}}>{g.hoyos}</div>
+                        </td>
+                        <td style={{padding:"5px 6px",textAlign:"center"}}>
+                          <input type="number" step="0.1" min="0" max="20"
+                            style={{...S.input,width:70,fontSize:16,fontWeight:700,textAlign:"center",
+                              borderColor:alt?color:"rgba(255,255,255,0.14)",
+                              color:alt?color:"#ede9e0",padding:"4px 6px"}}
+                            value={alt}
+                            onChange={e=>setMedForm(p=>({...p,alturas:{...p.alturas,[g.id]:e.target.value}}))}
+                            placeholder="—"/>
+                        </td>
+                        <td style={{padding:"5px 6px"}}>
+                          <input style={{...S.input,fontSize:11,padding:"4px 6px"}} value={medForm.obsGreen?.[g.id]||""} placeholder="obs..."
+                            onChange={e=>setMedForm(p=>({...p,obsGreen:{...p.obsGreen,[g.id]:e.target.value}}))}/>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  <tr style={{background:"rgba(74,222,128,0.04)",borderTop:"2px solid rgba(74,222,128,0.15)"}}>
+                    <td style={{padding:"5px 10px"}}><div style={{fontWeight:600,color:"#4ade80"}}>🌱 Vivero</div></td>
+                    <td style={{padding:"5px 6px",textAlign:"center"}}>
+                      <input type="number" step="0.1" min="0" max="30"
+                        style={{...S.input,width:70,fontSize:16,fontWeight:700,textAlign:"center",padding:"4px 6px"}}
+                        value={medForm.alturas?.vivero||""}
+                        onChange={e=>setMedForm(p=>({...p,alturas:{...p.alturas,vivero:e.target.value}}))}
+                        placeholder="—"/>
+                    </td>
+                    <td style={{padding:"5px 6px"}}>
+                      <input style={{...S.input,fontSize:11,padding:"4px 6px"}} value={medForm.obsGreen?.vivero||""} placeholder="obs..."
+                        onChange={e=>setMedForm(p=>({...p,obsGreen:{...p.obsGreen,vivero:e.target.value}}))}/>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div style={{marginBottom:10}}>
+              <label style={labelSt}>Observaciones generales</label>
+              <input style={S.input} value={medForm.obs||""} placeholder="Condiciones, novedades..." onChange={e=>setMedForm(p=>({...p,obs:e.target.value}))}/>
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button className="btn-p" style={S.btn} onClick={guardarMedicion}>✓ Guardar medición</button>
+            </div>
+          </div>
+        )}
+        {/* Humedad */}
+        {subTab==="humedad"&&(
+          <SeccionHumedad S={S} golfData={golfData} setG={setG} listaPersonal={listaPersonal}
+            hoy={hoy} esJefa={false} tareasProg={tareasProg} setTareasProg={setTareasProg}
+            showHumForm={showHumForm} setShowHumForm={setShowHumForm}
+            humForm={humForm} setHumForm={setHumForm} emptyHumForm={emptyHumForm}
+            onRegistroGuardado={onRegistroGuardado} crearNotificacion={crearNotificacion}/>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="ein">
       <div style={{marginBottom:14}}>
@@ -9343,8 +9563,10 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                       </div>
                       <div><label style={labelSt}>Tarea</label>
                         <select style={S.input} value={tareaForm.tipo} onChange={e=>setTareaForm(p=>({...p,tipo:e.target.value}))}>
-                          <option value="">Seleccionar...</option>
-                          <optgroup label="── Periódicas ──">{TAREAS_GREENS_PERIODICAS.map(t=><option key={t}>{t}</option>)}</optgroup>
+                          <option value="">Seleccionar tipo...</option>
+                          <option value="Corte de greens">✂️ Corte de greens</option>
+                          <option value="Corte ante-greens">✂️ Corte ante-greens</option>
+                          <optgroup label="── Todas las tareas ──">{TAREAS_GREENS_PERIODICAS.map(t=><option key={t}>{t}</option>)}</optgroup>
                           <optgroup label="── Diarias ──">{TAREAS_GREENS_DIARIAS.map(t=><option key={t}>{t}</option>)}</optgroup>
                           <option value="Otra">Otra...</option>
                         </select>
@@ -9423,7 +9645,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                     })()}
 
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-                      {(tareaForm.tipo?.toLowerCase().includes("corte"))&&(
+                      {(tareaForm.tipo?.toLowerCase().includes("corte")||tareaForm.tipo==="Otra")&&(
                         <div style={{gridColumn:"1/-1",background:"rgba(52,211,153,0.06)",border:"1px solid rgba(52,211,153,0.2)",borderRadius:10,padding:"12px 14px"}}>
                           <div style={{fontSize:11,color:"#34d399",fontWeight:600,marginBottom:10,textTransform:"uppercase",letterSpacing:"0.5px"}}>✂️ Parámetros de corte</div>
                           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
@@ -12243,7 +12465,11 @@ export default function App() {
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
             <span style={{fontSize:11,color:fbRol==="jefa"?"#86efac":fbRol==="supervisor"?"#93c5fd":"#fcd34d",background:fbRol==="jefa"?"rgba(34,197,94,0.1)":fbRol==="supervisor"?"rgba(59,130,246,0.1)":"rgba(252,211,77,0.1)",padding:"4px 10px",borderRadius:20,border:`1px solid ${fbRol==="jefa"?"rgba(34,197,94,0.25)":fbRol==="supervisor"?"rgba(59,130,246,0.25)":"rgba(252,211,77,0.25)"}`}}>
-              {fbRol==="jefa"?"🌿 Jefa AV":fbRol==="supervisor"?"👷 Supervisor":"🌱 Jardinero"}
+              {fbRol==="jefa"?"🌿 Jefa AV":fbRol==="supervisor"?"👷 Supervisor":(()=>{
+                const arr=Array.isArray(personal)?personal:Object.values(personal||{});
+                const u=fbUser?arr.find(x=>x.email?.toLowerCase()===fbUser.email?.toLowerCase()):null;
+                return u?`🌱 ${u.nombre.split(" ")[0]}`:"🌱 Jardinero";
+              })()}
             </span>
             <button onClick={handleLogout}
               style={{background:"transparent",border:"1px solid rgba(255,255,255,0.1)",borderRadius:7,color:"#7aaa80",padding:"4px 10px",fontFamily:"'Georgia',serif",fontSize:11,cursor:"pointer"}}>
