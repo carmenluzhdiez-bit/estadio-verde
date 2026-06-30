@@ -2413,7 +2413,7 @@ Una vez cerrado no podrás modificar las tareas. Solo la jefa puede reabrir el t
   );
 }
 
-function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACROZONAS_BASE, tareas, setTareas, tareasZonaHoy=0, esJefa=false, puedeCrear=false, cierresTurno={}, onReabrirTurno }) {
+function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACROZONAS_BASE, tareas, setTareas, tareasZonaHoy=0, esJefa=false, puedeCrear=false, cierresTurno={}, onReabrirTurno, getElemFrecs, setElemFrecs }) {
   const hoy = new Date().toISOString().slice(0,10);
   const [fecha, setFecha] = React.useState(hoy);
   const [tabProg, setTabProg] = React.useState("programa");
@@ -2430,19 +2430,24 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     setTareasDelDia(fecha, [...getTareasDelDia(fecha), { ...t, id: Date.now(), fecha }]);
     if (esDomingo(fecha)) setAviso("⚠️ El día seleccionado es domingo. Considera mover esta tarea a otro día.");
   };
-  const updateTarea = (id, patch) => setTareasDelDia(fecha, getTareasDelDia(fecha).map(t => t.id===id ? {...t,...patch} : t));
+  const updateTarea = (id, patch) => {
+    const tareasDia = getTareasDelDia(fecha);
+    const tarea = tareasDia.find(t=>t.id===id);
+    setTareasDelDia(fecha, tareasDia.map(t => t.id===id ? {...t,...patch} : t));
+    // Si la tarea pasa a completada/hecha y tiene origen de frecuencia, actualizar "Última realización" automáticamente
+    const pasaACompletada = (patch.estado==="completada"||patch.estado==="hecha") && tarea && tarea.estado!=="completada" && tarea.estado!=="hecha";
+    if(pasaACompletada && tarea.origenZid && tarea.origenFrecId && getElemFrecs && setElemFrecs){
+      const frecsActuales = getElemFrecs(tarea.origenZid, tarea.origenEid, null, tarea.origenEsCustom);
+      const frecsActualizadas = frecsActuales.map(f => f.id===tarea.origenFrecId ? {...f, ultimaVez: fecha} : f);
+      setElemFrecs(tarea.origenZid, tarea.origenEid, tarea.origenEsCustom, frecsActualizadas);
+    }
+  };
   const deleteTarea = (id) => setTareasDelDia(fecha, getTareasDelDia(fecha).filter(t => t.id!==id));
 
   const proponerTareas = () => {
-    const estacionDelDia = (f) => {
-      const m = new Date(f).getMonth() + 1;
-      if([12,1,2].includes(m)) return "verano";
-      if([3,4,5].includes(m)) return "otono";
-      if([6,7,8].includes(m)) return "invierno";
-      return "primavera";
-    };
-    const est = estacionDelDia(fecha);
+    const est = estacionDeFecha(fecha);
     const propuestas = [];
+    const vencidas = [];
     const existentes = getTareasDelDia(fecha).map(t => t.zona+"_"+t.elemento+"_"+t.tarea);
     MACROZONAS_BASE.forEach(z => {
       const zdat = getZD(z.id);
@@ -2452,17 +2457,23 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
         const frecs = zdatElem?.frecuencias || [];
         if(frecs.length===0) return; // solo proponer si hay frecuencias definidas manualmente
         frecs.forEach(f => {
-          const frecVal = f[est];
-          if(!frecVal || frecVal==="noaplica" || frecVal==="unavez" || frecVal==="segunecesidad") return;
           const key = z.nombre+"_"+e.nombre+"_"+f.tarea;
           if(existentes.includes(key)) return;
-          propuestas.push({ id: Date.now()+Math.random(), fecha, zona:z.nombre, elemento:e.nombre, tarea:f.tarea, responsable:"", estado:"por_designar", notas:f.obs||"", frecuencia:frecVal, estacion:est, auto:true });
+          const prox = calcProximaFrecGlobal(f, fecha);
+          if(!prox) return; // sin frecuencia activa, sin última realización registrada, o "según necesidad"/"una vez"
+          // Solo proponer si la fecha calculada ya llegó (vencida o es hoy) — no proponer tareas futuras todavía lejanas
+          if(prox.diff > 0) return;
+          const esVencida = prox.diff < 0;
+          const item = { id: Date.now()+Math.random(), fecha, zona:z.nombre, elemento:e.nombre, tarea:f.tarea, responsable:"", estado:"por_designar", notas:f.obs||"", frecuencia:f.modo==="diasSemana"?`cada ${f.diasMinimos||"?"} días`:f[est], estacion:est, auto:true, fechaCorrespondiente:prox.fecha, origenZid:String(z.id), origenEid:e.id, origenFrecId:f.id, origenEsCustom:!!e.isCustom };
+          propuestas.push(item);
+          if(esVencida) vencidas.push(`${z.nombre} — ${f.tarea} (vencida desde ${prox.fecha})`);
         });
       });
     });
-    if(propuestas.length===0) return alert("No hay tareas nuevas que proponer para esta fecha.");
+    if(propuestas.length===0) return alert("No hay tareas pendientes según las frecuencias definidas para esta fecha.\n\nRevisa que las macrozonas tengan 'Última realización' registrada en sus frecuencias.");
     setTareasDelDia(fecha, [...getTareasDelDia(fecha), ...propuestas]);
     if(esDomingo(fecha)) setAviso("⚠️ El día seleccionado es domingo. Las tareas fueron cargadas igual, pero considera mover la programación a otro día.");
+    else if(vencidas.length>0) setAviso(`⚠️ ${vencidas.length} tarea(s) están vencidas según su frecuencia: ${vencidas.slice(0,3).join(" · ")}${vencidas.length>3?"...":""}`);
   };
 
   const ESTADOS_TAREA = {
@@ -13547,6 +13558,7 @@ export default function App() {
         {/* PROGRAMACIÓN */}
         {vista==="programacion"&&(
           <ProgramacionDiaria key="prog" S={S} zonas={zonas} data={data} personal={personal} getZD={getZD} getAllElems={getAllElems} MACROZONAS_BASE={MACROZONAS_BASE} tareas={tareasProg} setTareas={setTareasProg}
+            getElemFrecs={getElemFrecs} setElemFrecs={setElemFrecs}
             tareasZonaHoy={(tareasProg[new Date().toISOString().slice(0,10)]||[]).filter(t=>t.origenZona&&t.estado==="por_designar").length}
             esJefa={rolLogueado==="jefa"}
             puedeCrear={rolLogueado==="jefa"||rolLogueado==="supervisor"}
