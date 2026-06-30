@@ -3727,25 +3727,26 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
 
   // Calcula próxima fecha — modo "diasSemana" (día específico de la semana, respetando mínimo de días y prohibidos)
   const calcProximaDiaSemana = (f) => {
-    if(!f.diasSemana || f.diasSemana.length===0) return null;
     const hoy = new Date(); hoy.setHours(12,0,0,0);
     const minimoDias = Number(f.diasMinimos)||0;
     const prohibidos = f.diasProhibidos||[];
-    // Fecha base: última vez + mínimo de días (si hay última vez), o hoy
-    let base = hoy;
-    if(f.ultimaVez){
-      const ultima = new Date(f.ultimaVez+"T12:00:00");
-      const conMinimo = new Date(ultima.getTime() + minimoDias*24*60*60*1000);
-      base = conMinimo > hoy ? conMinimo : hoy;
-    }
-    // Buscar el próximo día permitido (de los diasSemana elegidos, que no esté en prohibidos) desde base
-    for(let i=0;i<14;i++){
+    const hayDiasEspecificos = f.diasSemana && f.diasSemana.length>0;
+    // Sin última vez registrada no se puede proyectar nada
+    if(!f.ultimaVez) return null;
+    const ultima = new Date(f.ultimaVez+"T12:00:00");
+    // Fecha base: última vez + mínimo de días
+    let base = new Date(ultima.getTime() + minimoDias*24*60*60*1000);
+    if(base < hoy) base = hoy>base?base:hoy; // proyecta desde la fecha calculada aunque ya haya pasado (se mostrará vencida)
+    // Buscar el próximo día válido:
+    // - si hay días de semana específicos marcados: debe caer en uno de esos días Y no estar prohibido
+    // - si NO hay días específicos: solo evita los días prohibidos (ej. nunca sábado/domingo)
+    for(let i=0;i<400;i++){
       const candidato = new Date(base.getTime() + i*24*60*60*1000);
       const dow = candidato.getDay();
-      if(f.diasSemana.includes(dow) && !prohibidos.includes(dow)){
-        const diff = Math.round((candidato-hoy)/(24*60*60*1000));
-        return { fecha: candidato.toISOString().slice(0,10), diff, diaNombre: DIAS_SEMANA.find(d=>d.v===dow)?.full };
-      }
+      if(prohibidos.includes(dow)) continue;
+      if(hayDiasEspecificos && !f.diasSemana.includes(dow)) continue;
+      const diff = Math.round((candidato-hoy)/(24*60*60*1000));
+      return { fecha: candidato.toISOString().slice(0,10), diff, diaNombre: DIAS_SEMANA.find(d=>d.v===dow)?.full };
     }
     return null;
   };
@@ -3844,7 +3845,7 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
                 <div style={{marginBottom:10}}>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
                     <div>
-                      <label style={{...labelSt,color:"#60a5fa"}}>Días de la semana permitidos</label>
+                      <label style={{...labelSt,color:"#60a5fa"}}>Días específicos (opcional — solo si DEBE ser justo ese día)</label>
                       <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                         {DIAS_SEMANA.map(d=>{
                           const sel=(f.diasSemana||[]).includes(d.v);
@@ -3892,7 +3893,7 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
                       onChange={e=>updateFila(idx,"diasMinimos",e.target.value)}
                       placeholder="Ej: 3"
                       style={{...inputSt,color:"#fbbf24",border:"1px solid rgba(251,191,36,0.25)",background:"rgba(251,191,36,0.05)"}}/>
-                    <div style={{fontSize:10,color:"#5a8a6a",marginTop:3}}>Si pasan menos días desde la última vez, se posterga al siguiente día permitido.</div>
+                    <div style={{fontSize:10,color:"#5a8a6a",marginTop:3}}>Ej: 183 días. Si no marcas días específicos arriba, solo evita los días prohibidos.</div>
                   </div>
                 </div>
               )}
@@ -11637,6 +11638,12 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
   const [showForm,   setShowForm]   = React.useState(!!prefill);
   const [editBonoId, setEditBonoId] = React.useState(null);
   const [editBonoForm, setEditBonoForm] = React.useState(null);
+  const [modoBono, setModoBono] = React.useState("tarea"); // "tarea" | "jornada"
+  const [formJornada, setFormJornada] = React.useState({
+    fecha: hoy, descripcion:"", valorJornada:"",
+    participantes: [{id:"p1", trabajadorId:"", jornadas:""}],
+    obs:""
+  });
   const [form, setForm] = React.useState(()=>{
     if(prefill){
       const personalArr0 = Array.isArray(personal) ? personal : Object.values(personal||{});
@@ -11797,6 +11804,57 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
     setShowForm(false);
   };
 
+  // ── Bono por jornada (construcción) ──────────────────────────────────────
+  const partJornadaValidos = formJornada.participantes.filter(p=>p.trabajadorId && Number(p.jornadas)>0);
+  const totalJornadas = partJornadaValidos.reduce((a,p)=>a+Number(p.jornadas||0),0);
+  const valorJornadaNum = Number(formJornada.valorJornada||0);
+  const totalBonoJornada = partJornadaValidos.reduce((a,p)=>a+(Number(p.jornadas||0)*valorJornadaNum),0);
+
+  const addParticipanteJornada = () => {
+    if(formJornada.participantes.length>=8) return;
+    setFormJornada(p=>({...p,participantes:[...p.participantes,{id:"p"+Date.now(),trabajadorId:"",jornadas:""}]}));
+  };
+  const removeParticipanteJornada = (id) => {
+    setFormJornada(p=>({...p,participantes:p.participantes.filter(x=>x.id!==id)}));
+  };
+  const updateParticipanteJornada = (id, campo, valor) => {
+    setFormJornada(p=>({...p,participantes:p.participantes.map(x=>x.id===id?{...x,[campo]:valor}:x)}));
+  };
+
+  const guardarJornada = () => {
+    if(!formJornada.descripcion.trim()||!formJornada.valorJornada||partJornadaValidos.length===0) return;
+    const participantes = partJornadaValidos.map(p=>({
+      trabajadorId: String(p.trabajadorId),
+      nombre: getNombre(p.trabajadorId),
+      rol: "Jornada",
+      jornadas: Number(p.jornadas),
+      valorJornada: valorJornadaNum,
+      monto: Number(p.jornadas)*valorJornadaNum,
+    }));
+    const nuevoBono = {
+      id: Date.now(), fecha: formJornada.fecha, descripcion: formJornada.descripcion,
+      modo: "jornada", valorJornada: valorJornadaNum, totalJornadas, fondoTotal: totalBonoJornada,
+      obs: formJornada.obs, estado: "generado", participantes,
+    };
+    setBonosMasivos(p=>[nuevoBono,...(Array.isArray(p)?p:Object.values(p||{}))]);
+    setPersonal(p=>{
+      const arr=Array.isArray(p)?p:Object.values(p||{});
+      return arr.map(t=>{
+        const partic = participantes.find(x=>String(x.trabajadorId)===String(t.id));
+        if(!partic) return t;
+        const nuevaEntrada = {
+          id:Date.now()+Math.random(), tipo:"bonoConstruccion",
+          fecha:formJornada.fecha, estado:"pendiente",
+          descripcion:`Jornada (${partic.jornadas}×$${partic.valorJornada.toLocaleString("es-CL")}) — ${formJornada.descripcion}`,
+          valor:String(partic.monto), horas:"",
+        };
+        return {...t, eventos:[...(t.eventos||[]),nuevaEntrada]};
+      });
+    });
+    setFormJornada({fecha:hoy,descripcion:"",valorJornada:"",participantes:[{id:"p1",trabajadorId:"",jornadas:""}],obs:""});
+    setShowForm(false);
+  };
+
   return (
     <div className="ein">
       <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:20,flexWrap:"wrap"}}>
@@ -11856,6 +11914,20 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
               </div>
             </div>
           )}
+          {!prefill&&(
+            <div style={{display:"flex",gap:8,marginBottom:16}}>
+              <button onClick={()=>setModoBono("tarea")}
+                style={{flex:1,cursor:"pointer",border:`1px solid ${modoBono==="tarea"?"rgba(192,132,252,0.5)":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"8px 12px",fontSize:13,background:modoBono==="tarea"?"rgba(192,132,252,0.1)":"transparent",color:modoBono==="tarea"?"#c4b5fd":"#7aaa80",fontFamily:"'Georgia',serif"}}>
+                🛠️ Bono por tarea/rol
+              </button>
+              <button onClick={()=>setModoBono("jornada")}
+                style={{flex:1,cursor:"pointer",border:`1px solid ${modoBono==="jornada"?"rgba(96,165,250,0.5)":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"8px 12px",fontSize:13,background:modoBono==="jornada"?"rgba(96,165,250,0.1)":"transparent",color:modoBono==="jornada"?"#60a5fa":"#7aaa80",fontFamily:"'Georgia',serif"}}>
+                🏗️ Bono por jornada (construcción)
+              </button>
+            </div>
+          )}
+
+          {modoBono==="tarea"&&(<>
           <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#c4b5fd",marginBottom:14}}>➕ Nueva tarea con bono</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
             <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={form.fecha} onChange={e=>setForm(p=>({...p,fecha:e.target.value}))}/></div>
@@ -11944,6 +12016,85 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
             </button>
             <button className="btn-g" style={S.btn} onClick={()=>setShowForm(false)}>Cancelar</button>
           </div>
+          </>)}
+
+          {modoBono==="jornada"&&(<>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#60a5fa",marginBottom:14}}>🏗️ Bono por jornada — Obra/Construcción</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+            <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={formJornada.fecha} onChange={e=>setFormJornada(p=>({...p,fecha:e.target.value}))}/></div>
+            <div><label style={labelSt}>Valor de mercado por jornada ($)</label>
+              <input type="number" min={0} style={S.input} placeholder="ej: 30000" value={formJornada.valorJornada} onChange={e=>setFormJornada(p=>({...p,valorJornada:e.target.value}))}/>
+            </div>
+            <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Descripción de la obra/construcción</label>
+              <input style={S.input} placeholder="ej: Construcción jardín lineal Avenida Madrid" value={formJornada.descripcion} onChange={e=>setFormJornada(p=>({...p,descripcion:e.target.value}))}/>
+            </div>
+          </div>
+
+          {/* Participantes con sus jornadas */}
+          <div style={{marginBottom:14}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+              <label style={labelSt}>Trabajadores y jornadas</label>
+              {formJornada.participantes.length<8&&(
+                <button onClick={addParticipanteJornada} style={{cursor:"pointer",border:"1px solid rgba(96,165,250,0.3)",borderRadius:6,padding:"3px 10px",background:"rgba(96,165,250,0.08)",color:"#60a5fa",fontSize:11,fontFamily:"'Georgia',serif"}}>
+                  + Agregar trabajador
+                </button>
+              )}
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {formJornada.participantes.map((p,i)=>{
+                const montoP = Number(p.jornadas||0)*valorJornadaNum;
+                return (
+                  <div key={p.id} style={{display:"flex",gap:8,alignItems:"center",background:"rgba(255,255,255,0.03)",borderRadius:8,padding:"8px 10px"}}>
+                    <select value={p.trabajadorId} onChange={e=>updateParticipanteJornada(p.id,"trabajadorId",e.target.value)}
+                      style={{...S.input,flex:2,fontSize:13}}>
+                      <option value="">Seleccionar trabajador...</option>
+                      {listaPersonal.map(t=><option key={t.id} value={t.id}>{t.nombre}</option>)}
+                    </select>
+                    <input type="number" min="0" step="0.5" placeholder="Jornadas"
+                      value={p.jornadas} onChange={e=>updateParticipanteJornada(p.id,"jornadas",e.target.value)}
+                      style={{...S.input,width:90,fontSize:13,textAlign:"center"}}/>
+                    <div style={{minWidth:90,textAlign:"right",fontSize:13,fontWeight:700,color:montoP>0?"#86efac":"#5a8a6a"}}>
+                      {montoP>0?`$${montoP.toLocaleString("es-CL")}`:"—"}
+                    </div>
+                    {formJornada.participantes.length>1&&(
+                      <button onClick={()=>removeParticipanteJornada(p.id)} style={{background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:6,color:"#fca5a5",cursor:"pointer",fontSize:12,padding:"4px 8px"}}>✕</button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Resumen */}
+          {valorJornadaNum>0&&partJornadaValidos.length>0&&(
+            <div style={{background:"rgba(96,165,250,0.08)",border:"1px solid rgba(96,165,250,0.2)",borderRadius:10,padding:"12px 16px",marginBottom:14}}>
+              <div style={{fontSize:11,color:"#60a5fa",marginBottom:8,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.5px"}}>💰 Resumen del bono</div>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:4}}>
+                <span style={{color:"#7aaa80"}}>Total jornadas trabajadas</span>
+                <span style={{fontWeight:700}}>{totalJornadas}</span>
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:4}}>
+                <span style={{color:"#7aaa80"}}>Valor por jornada</span>
+                <span style={{fontWeight:700}}>${valorJornadaNum.toLocaleString("es-CL")}</span>
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:15,paddingTop:8,borderTop:"1px solid rgba(96,165,250,0.2)",marginTop:4}}>
+                <span style={{color:"#60a5fa",fontWeight:600}}>Total bono obra</span>
+                <span style={{fontWeight:900,color:"#86efac"}}>${totalBonoJornada.toLocaleString("es-CL")}</span>
+              </div>
+            </div>
+          )}
+
+          <div style={{gridColumn:"1/-1",marginBottom:14}}><label style={labelSt}>Observaciones</label>
+            <input style={S.input} value={formJornada.obs} onChange={e=>setFormJornada(p=>({...p,obs:e.target.value}))} placeholder="Condiciones especiales, notas..."/>
+          </div>
+
+          <div style={{display:"flex",gap:8}}>
+            <button className="btn-p" style={S.btn} onClick={guardarJornada} disabled={!formJornada.descripcion||!formJornada.valorJornada||partJornadaValidos.length===0}>
+              ✓ Generar bono por jornada
+            </button>
+            <button className="btn-g" style={S.btn} onClick={()=>setShowForm(false)}>Cancelar</button>
+          </div>
+          </>)}
         </div>
       )}
 
@@ -11965,9 +12116,14 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
                 </div>
                 <div style={{display:"flex",gap:8,alignItems:"start",flexWrap:"wrap"}}>
                   <div style={{textAlign:"right"}}>
-                    <div style={{fontSize:11,color:"#7a6a9a"}}>Valor mercado</div>
-                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700}}>${Number(bono.valorMercado).toLocaleString("es-CL")}</div>
-                    <div style={{fontSize:11,color:"#c4b5fd"}}>Fondo: ${Number(bono.fondoTotal).toLocaleString("es-CL")}</div>
+                    {bono.modo==="jornada"?(<>
+                      <div style={{fontSize:11,color:"#60a5fa"}}>🏗️ {bono.totalJornadas} jornadas × ${Number(bono.valorJornada).toLocaleString("es-CL")}</div>
+                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:"#86efac"}}>${Number(bono.fondoTotal).toLocaleString("es-CL")}</div>
+                    </>):(<>
+                      <div style={{fontSize:11,color:"#7a6a9a"}}>Valor mercado</div>
+                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700}}>${Number(bono.valorMercado).toLocaleString("es-CL")}</div>
+                      <div style={{fontSize:11,color:"#c4b5fd"}}>Fondo: ${Number(bono.fondoTotal).toLocaleString("es-CL")}</div>
+                    </>)}
                   </div>
                   <button style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(255,255,255,0.06)",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)"}} onClick={()=>{setEditBonoId(bono.id);setEditBonoForm({...bono});}}>✏️ Editar</button>
                   <button style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}} onClick={()=>imprimirBono(bono)}>🖨️ Informe RRHH</button>
@@ -11982,7 +12138,7 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
                   return (
                   <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 10px",background:"rgba(255,255,255,0.03)",borderRadius:7,border:"1px solid rgba(255,255,255,0.06)"}}>
                     <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                      <span style={{fontSize:10,padding:"2px 8px",borderRadius:10,background:p.rol==="Ejecutor"?"rgba(74,222,128,0.12)":p.rol==="Ayudante"?"rgba(96,165,250,0.12)":"rgba(251,191,36,0.12)",color:p.rol==="Ejecutor"?"#4ade80":p.rol==="Ayudante"?"#60a5fa":"#fbbf24",fontWeight:600}}>{p.rol}</span>
+                      <span style={{fontSize:10,padding:"2px 8px",borderRadius:10,background:p.rol==="Ejecutor"?"rgba(74,222,128,0.12)":p.rol==="Ayudante"?"rgba(96,165,250,0.12)":"rgba(251,191,36,0.12)",color:p.rol==="Ejecutor"?"#4ade80":p.rol==="Ayudante"?"#60a5fa":"#fbbf24",fontWeight:600}}>{p.rol}{p.jornadas?` (${p.jornadas}j)`:""}</span>
                       <span style={{fontSize:13,color:nombreMostrar?"#ede9e0":"#ef4444"}}>{nombreMostrar||"⚠️ Sin nombre — usa Editar"}</span>
                     </div>
                     <span style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:p.rol==="Ejecutor"?"#4ade80":p.rol==="Ayudante"?"#60a5fa":"#fbbf24"}}>${Number(p.monto).toLocaleString("es-CL")}</span>
