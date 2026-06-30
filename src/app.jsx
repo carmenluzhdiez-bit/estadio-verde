@@ -13701,12 +13701,12 @@ export default function App() {
                     const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
                     setTareasProg(prev=>{
                       const tareasDelDia = normArr(prev[fecha]);
-                      const actualizadas = tareasDelDia.map(t=>t.id===tid?{...t,...patch}:t);
+                      const actualizadas = tareasDelDia.map(t=>String(t.id)===String(tid)?{...t,...patch}:t);
                       // Escribir solo la ruta de esa fecha en Firebase
                       fbUpdate(ref(db, `${ROOT}/prog`), {[fecha]: actualizadas})
                         .catch(e=>console.error("Error:", e));
                       if(patch.estado==="no_pudo"||patch.estado==="hecha"||patch.estado==="completada"||patch.estado==="haciendose"){
-                        const tarea=tareasDelDia.find(t=>t.id===tid);
+                        const tarea=tareasDelDia.find(t=>String(t.id)===String(tid));
                         if(tarea){
                           const z=MACROZONAS_BASE.find(z=>z.nombre===tarea.zona);
                           if(z){
