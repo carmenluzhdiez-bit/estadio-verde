@@ -10426,14 +10426,27 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
 
             {/* ── EVENTOS / TORNEOS ── */}
       {subTab==="programacion_golf"&&rolLogueado!=="trabajador"&&hoy&&(
-        <ProgramacionGolf
-          S={S}
-          tareasProg={tareasProg}
-          setTareasProg={setTareasProg}
-          hoy={hoy}
-          bhaluNombre={BHALÚ}
-          esJefa={esJefa}
+        <div>
+          {/* Banner de migración */}
+          <div style={{background:"rgba(96,165,250,0.08)",border:"1px solid rgba(96,165,250,0.25)",borderRadius:12,padding:"14px 18px",marginBottom:16,display:"flex",gap:12,alignItems:"flex-start"}}>
+            <span style={{fontSize:22}}>ℹ️</span>
+            <div>
+              <div style={{fontSize:14,fontWeight:700,color:"#60a5fa",marginBottom:4}}>Las frecuencias de Golf ahora se gestionan desde Macrozonas</div>
+              <div style={{fontSize:12,color:"#5a9a9a",lineHeight:1.6}}>
+                Ve a <strong>Macrozonas → Golf → Elementos</strong> para ver y editar las frecuencias de cada Green, Fairway, Antegreen y demás zonas.<br/>
+                El botón <strong>✨ Proponer del día</strong> en Programación genera automáticamente las tareas vencidas según esas frecuencias.
+              </div>
+            </div>
+          </div>
+          <ProgramacionGolf
+            S={S}
+            tareasProg={tareasProg}
+            setTareasProg={setTareasProg}
+            hoy={hoy}
+            bhaluNombre={BHALÚ}
+            esJefa={esJefa}
         />
+        </div>
       )}
 
       {subTab==="eventos"&&rolLogueado!=="trabajador"&&(
@@ -12459,6 +12472,71 @@ export default function App() {
     const arr = Array.isArray(notificaciones) ? notificaciones : Object.values(notificaciones||{});
     setNotificaciones(arr.map(n => ({...n, leida:true})));
   };
+
+  // Migración: cargar frecuencias de Golf en elementos de MACROZONAS_BASE (greens individuales etc.)
+  useEffect(()=>{
+    if(!dataReady) return;
+    const zid = "31"; // Golf
+    const zdat = data[zid];
+    if(!zdat) return;
+    // Frecuencias base de Golf extraídas de ProgramacionGolf — modo "diasSemana" con días mínimos
+    const FRECS_GOLF_BASE = {
+      // Greens individuales — comparten las mismas frecuencias globales de greens
+      "green_g1": [
+        {id:"green_g1_corte",     modo:"diasSemana", tarea:"Corte de green",           diasMinimos:"3", diasSemana:[], diasProhibidos:[0,6], ultimaVez:"2026-06-17", obs:"Cambiar dirección de corte. Registrar altura de corte."},
+        {id:"green_g1_fertil",    modo:"diasSemana", tarea:"Fertilización",             diasMinimos:"14",diasSemana:[], diasProhibidos:[0,6], ultimaVez:"2026-06-17", obs:"Alternar Novatec Premium / Salitre K según etapa"},
+        {id:"green_g1_plagas",    modo:"estacion",   tarea:"Revisión plagas y enfermedades", verano:"semanal", otono:"semanal", invierno:"semanal", primavera:"semanal", ultimaVez:"2026-06-19", obs:"Si se detecta: generar tarea de control inmediata"},
+        {id:"green_g1_desmaz",    modo:"estacion",   tarea:"Desmalezado bordes",        verano:"semanal", otono:"semanal", invierno:"semanal", primavera:"semanal", ultimaVez:"2026-06-19", obs:"Límites del borde con placa larga"},
+        {id:"green_g1_vert",      modo:"diasSemana", tarea:"Verticorte / Groomer fuerte",diasMinimos:"25",diasSemana:[], diasProhibidos:[0,6], ultimaVez:"2026-05-28", obs:"Pasar groomer fuerte con corte"},
+        {id:"green_g1_aire_ch",   modo:"estacion",   tarea:"Aireación púas chicas",     verano:"noaplica",otono:"unavez",invierno:"noaplica",primavera:"unavez", ultimaVez:"2026-03-16", obs:"2 veces/año: marzo y ago-sep. Con riego y fertilización."},
+        {id:"green_g1_aire_gr",   modo:"estacion",   tarea:"Aireación sacabocados grandes",verano:"noaplica",otono:"unavez",invierno:"noaplica",primavera:"noaplica",ultimaVez:"2026-04-13",obs:"1 vez/año: abril. Con fertilización y riego."},
+      ],
+      "green_vivero": [
+        {id:"vivero_corte",  modo:"diasSemana", tarea:"Corte de Vivero",    diasMinimos:"3", diasSemana:[], diasProhibidos:[0,6], ultimaVez:"2026-06-17", obs:"Mismo ciclo que greens"},
+        {id:"vivero_fertil", modo:"diasSemana", tarea:"Fertilización",      diasMinimos:"14",diasSemana:[], diasProhibidos:[0,6], ultimaVez:"2026-06-17", obs:"Alternar Novatec Premium / Salitre K"},
+        {id:"vivero_riego",  modo:"estacion",   tarea:"Riego",             verano:"diario",otono:"cada3dias",invierno:"semanal",primavera:"cada3dias",ultimaVez:"", obs:""},
+      ],
+      "e1": [ // Fairways
+        {id:"e1_corte",    modo:"diasSemana", tarea:"Corte de Fairways",      diasMinimos:"10",diasSemana:[], diasProhibidos:[0,6], ultimaVez:"2026-06-12", obs:"1,75cm"},
+        {id:"e1_fertil",   modo:"diasSemana", tarea:"Fertilización Fairways", diasMinimos:"45",diasSemana:[], diasProhibidos:[0,6], ultimaVez:"2026-04-14", obs:"Salitre Potásico después del corte"},
+        {id:"e1_plagas",   modo:"estacion",   tarea:"Revisión plagas y enfermedades",verano:"quincenal",otono:"quincenal",invierno:"quincenal",primavera:"quincenal",ultimaVez:"2026-06-10",obs:"Si se detecta: generar tarea de control inmediata"},
+        {id:"e1_aireacion",modo:"diasSemana", tarea:"Aireación sacabocados grandes",diasMinimos:"180",diasSemana:[],diasProhibidos:[0,6],ultimaVez:"2026-03-16",obs:"2 veces/año: marzo y septiembre. Con riego."},
+      ],
+      "antegreen_golf": [
+        {id:"ag_corte",  modo:"diasSemana", tarea:"Corte de Antegreens",     diasMinimos:"16",diasSemana:[], diasProhibidos:[0,6], ultimaVez:"2026-06-12", obs:"a 1cm, usar helicoidal"},
+        {id:"ag_orill",  modo:"diasSemana", tarea:"Orillado Antegreens",     diasMinimos:"17",diasSemana:[], diasProhibidos:[0,6], ultimaVez:"2026-05-27", obs:"1,5-2,5cm con orilladora"},
+        {id:"ag_desmaz", modo:"diasSemana", tarea:"Desmalezado bordes Antegreens",diasMinimos:"21",diasSemana:[],diasProhibidos:[0,6],ultimaVez:"2026-05-28",obs:"Manualmente"},
+      ],
+      "lomas_golf": [
+        {id:"lomas_corte",modo:"diasSemana",tarea:"Corte de Lomas",diasMinimos:"20",diasSemana:[],diasProhibidos:[0,6],ultimaVez:"2026-06-12",obs:"Con flotante, nivel más bajo"},
+      ],
+      "macizos_golf": [
+        {id:"mac_orill", modo:"diasSemana",tarea:"Orillado / perfilado macizos",diasMinimos:"21",diasSemana:[],diasProhibidos:[0,6],ultimaVez:"2026-06-12",obs:"Proteger troncos. Solo antes 12:00hrs"},
+      ],
+      "e8": [ // Sistema de riego
+        {id:"e8_riego_g",modo:"estacion",tarea:"Revisión sistema riego Greens",verano:"quincenal",otono:"quincenal",invierno:"quincenal",primavera:"quincenal",ultimaVez:"2026-06-06",obs:"Controlador C09 — verificar señal, programas, porcentajes"},
+        {id:"e8_riego_c",modo:"estacion",tarea:"Revisión sistema riego Cancha",verano:"quincenal",otono:"quincenal",invierno:"quincenal",primavera:"quincenal",ultimaVez:"2026-06-05",obs:"Controlador C10 — verificar señal, alcances, boquillas"},
+      ],
+    };
+    // Copiar las mismas frecuencias de green_g1 a los greens g2-g9
+    ["green_g2","green_g3","green_g4","green_g5","green_g6","green_g7","green_g8","green_g9"].forEach((gid,i)=>{
+      FRECS_GOLF_BASE[gid] = FRECS_GOLF_BASE["green_g1"].map(f=>({...f, id:f.id.replace("green_g1", gid)}));
+    });
+    // Verificar cuáles elementos ya tienen frecuencias cargadas para no sobreescribir
+    let necesitaActualizar = false;
+    const nuevosElem = {...(zdat.elementos||{})};
+    Object.entries(FRECS_GOLF_BASE).forEach(([eid, frecs])=>{
+      if(!nuevosElem[eid]?.frecuencias || nuevosElem[eid].frecuencias.length===0){
+        nuevosElem[eid] = {estado:"bueno", notas:"", ...(nuevosElem[eid]||{}), frecuencias: frecs};
+        necesitaActualizar = true;
+      }
+    });
+    if(necesitaActualizar){
+      fbUpdate(ref(db, `${ROOT}/data`), {[zid]: {...zdat, elementos: nuevosElem}})
+        .catch(e=>console.error("Error migrando frecuencias Golf:", e));
+    }
+  // eslint-disable-next-line
+  },[dataReady]);
 
   // Migración: corregir tareas con responsable asignado pero estado "por_designar"
   useEffect(()=>{
