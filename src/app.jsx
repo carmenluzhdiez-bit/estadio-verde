@@ -626,10 +626,29 @@ const MACROZONAS_BASE = [
   {
     id: 31, nombre: "Golf", categoria: "Deportivo", icono: "⛳",
     elementos: [
-      { id: "e1", nombre: "Fairway (calle de golf)", tipo: "cesped" },
-      { id: "e2", nombre: "Green / putting green", tipo: "cesped" },
+      // Greens individuales — cada uno con su propio panel de frecuencias
+      { id: "green_g1", nombre: "Green 01 (Hoyo 01-10)", tipo: "cesped" },
+      { id: "green_g2", nombre: "Green 02 (Hoyo 02-11)", tipo: "cesped" },
+      { id: "green_g3", nombre: "Green 03 (Hoyo 03-12)", tipo: "cesped" },
+      { id: "green_g4", nombre: "Green 04 (Hoyo 04-13)", tipo: "cesped" },
+      { id: "green_g5", nombre: "Green 05 (Hoyo 05-14)", tipo: "cesped" },
+      { id: "green_g6", nombre: "Green 06 (Hoyo 06-15)", tipo: "cesped" },
+      { id: "green_g7", nombre: "Green 07 (Hoyo 07-16)", tipo: "cesped" },
+      { id: "green_g8", nombre: "Green 08 (Hoyo 08-17)", tipo: "cesped" },
+      { id: "green_g9", nombre: "Green 09 (Hoyo 09-18)", tipo: "cesped" },
+      { id: "green_vivero", nombre: "Vivero de greens", tipo: "cesped" },
+      // Otras superficies del campo
+      { id: "e1", nombre: "Fairways (calles de golf)", tipo: "cesped" },
       { id: "e3", nombre: "Rough (zona alta)", tipo: "cesped" },
       { id: "e4", nombre: "Bunkers (arena)", tipo: "pavimentos" },
+      { id: "tees_golf", nombre: "Tees de salida", tipo: "cesped" },
+      // Zonas especiales
+      { id: "antegreen_golf", nombre: "Ante-greens", tipo: "cesped" },
+      { id: "lomas_golf", nombre: "Lomas", tipo: "cesped" },
+      { id: "macizos_golf", nombre: "Macizos (acceso/interior/exterior)", tipo: "arbustos" },
+      { id: "isla_golf", nombre: "Isla de Arena", tipo: "pavimentos" },
+      { id: "jaula_golf", nombre: "Jaula de práctica", tipo: "infraestructura" },
+      // Vegetación y otros
       { id: "e5", nombre: "Árboles y arboledas", tipo: "arboles" },
       { id: "e6", nombre: "Arbustos decorativos", tipo: "arbustos" },
       { id: "e7", nombre: "Banderines y hoyos", tipo: "infraestructura" },
