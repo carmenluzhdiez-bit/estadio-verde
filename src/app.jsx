@@ -12118,7 +12118,7 @@ export default function App() {
     else{setData(p=>({...p,[zid]:{...p[zid],elementos:{...p[zid]?.elementos,[eid]:{...(p[zid]?.elementos?.[eid]||{}),frecuencias}}}}));}
   };
 
-  const zona = zonas.find(z=>z.id===zonaId);
+  const zona = zonas.find(z=>String(z.id)===String(zonaId));
   const zd = zonaId ? getZD(zonaId) : null;
 
   const getAllElems = (zid) => {
@@ -12158,7 +12158,7 @@ export default function App() {
     addHistorial(zid, `Tarea añadida: ${texto}`);
     // 2. Agregar a programación diaria como tarea pendiente (hoy)
     const hoy = new Date().toISOString().slice(0,10);
-    const zona = zonas.find(z=>z.id===zid);
+    const zona = zonas.find(z=>String(z.id)===String(zid));
     const nuevaProg = {
       id: Date.now() + Math.random(),
       fecha: hoy,
@@ -12186,11 +12186,11 @@ export default function App() {
   };
   const getElemNombre = (zid,eid,isCustom) => {
     if(isCustom) return (data[zid]?.elementosCustom||[]).find(e=>e.id===eid)?.nombre||"";
-    return zonas.find(z=>z.id===zid)?.elementos.find(e=>e.id===eid)?.nombre||"";
+    return zonas.find(z=>String(z.id)===String(zid))?.elementos.find(e=>e.id===eid)?.nombre||"";
   };
   const addCustomElem = (zid,elem) => { const id="c"+Date.now(); const arr=[...(data[String(zid)]?.elementosCustom||[]),{...elem,id,estado:"bueno",notas:""}]; updateZona(zid,{elementosCustom:arr}); addHistorial(zid,`Elemento agregado: ${elem.nombre}`); };
   const removeCustomElem = (zid,eid) => { const arr=(data[zid]?.elementosCustom||[]).filter(e=>e.id!==eid); updateZona(zid,{elementosCustom:arr}); };
-  const removeBaseElem = (zid,eid) => { setZonas(prev=>prev.map(z=>z.id===zid?{...z,elementos:z.elementos.filter(e=>e.id!==eid)}:z)); const elems={...data[zid]?.elementos}; delete elems[eid]; updateZona(zid,{elementos:elems}); addHistorial(zid,`Elemento eliminado`); };
+  const removeBaseElem = (zid,eid) => { setZonas(prev=>prev.map(z=>String(z.id)===String(zid)?{...z,elementos:z.elementos.filter(e=>e.id!==eid)}:z)); const elems={...data[String(zid)]?.elementos}; delete elems[eid]; updateZona(zid,{elementos:elems}); addHistorial(zid,`Elemento eliminado`); };
 
   const addTrabajador = (t) => { const id=Date.now(); setPersonal(p=>[...(Array.isArray(p)?p:Object.values(p||{})),{...t,id,eventos:[]}]); };
   const updateTrabajador = (id,patch) => setPersonal(p=>(Array.isArray(p)?p:Object.values(p||{})).map(t=>t.id===id?{...t,...patch}:t));
@@ -12325,7 +12325,7 @@ export default function App() {
                 const nn=editElem.nombreEdit!==undefined?editElem.nombreEdit:e.nombre;
                 const nt=editElem.tipoEdit!==undefined?editElem.tipoEdit:e.tipo;
                 if(e.isCustom){const arr=[...(data[zonaId].elementosCustom||[])];const i=arr.findIndex(x=>x.id===e.id);if(i>=0){arr[i]={...arr[i],nombre:nn,tipo:nt};updateZona(zonaId,{elementosCustom:arr});}}
-                else{setZonas(prev=>prev.map(z=>z.id===zonaId?{...z,elementos:z.elementos.map(x=>x.id===e.id?{...x,nombre:nn,tipo:nt}:x)}:z));}
+                else{setZonas(prev=>prev.map(z=>String(z.id)===String(zonaId)?{...z,elementos:z.elementos.map(x=>x.id===e.id?{...x,nombre:nn,tipo:nt}:x)}:z));}
                 addHistorial(zonaId,`Elemento: "${e.nombre}" → "${nn}"`);
                 setEditElem(p=>({...p,nombreEdit:undefined,tipoEdit:undefined}));
               }}>✓ Guardar nombre/categoría</button>
@@ -13208,7 +13208,7 @@ export default function App() {
                     });
                   }}
                   getFrecs={(zid,_eid,_tipo,_isCustom,nombreElem)=>{
-                    const zdat=getZD(zid); const zona=zonas.find(z=>z.id===zid); if(!zona) return null;
+                    const zdat=getZD(zid); const zona=zonas.find(z=>String(z.id)===String(zid)); if(!zona) return null;
                     const elem=zona.elementos.find(e=>e.nombre===nombreElem); if(!elem) return null;
                     const frecs=zdat.elementos?.[elem.id]?.frecuencias||(TAREAS_DEFAULT[elem.tipo]||[]).map(t=>({...t}));
                     return {frecs,eid:elem.id,isCustom:false};
