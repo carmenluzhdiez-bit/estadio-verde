@@ -1528,7 +1528,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
       {/* Tabs */}
       <div style={{display:"flex",gap:6,marginBottom:14}}>
         {([["historial","📜 Historial"],["buscar","🔍 Consulta histórica"]]
-          .concat(esJefa?[["turnos","✅ Turnos trabajadores"]]:[])).map(([t,l])=>(
+          .concat(esJefa?[["turnos","✏️ Ver/editar turnos"]]:[])).map(([t,l])=>(
           <button key={t} onClick={()=>setTabHist(t)}
             style={{cursor:"pointer",border:`1px solid ${tabHist===t?"#34d399":"rgba(255,255,255,0.12)"}`,
               borderRadius:8,padding:"5px 14px",fontSize:12,
@@ -1820,7 +1820,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
           <div>
             <div style={{marginBottom:12}}>
               <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#34d399",marginBottom:3}}>✅ Revisión de turnos</div>
-              <div style={{fontSize:11,color:"#5a9a7a"}}>Últimos 30 días · Todas las tareas de trabajadores incluyendo Golf</div>
+              <div style={{fontSize:11,color:"#5a9a7a"}}>Últimos 30 días · Incluye Golf · Usa el selector de estado para editar directamente</div>
             </div>
             {dias.length===0&&<div style={{...S.card,padding:32,textAlign:"center",color:"#4a8a5a"}}>No hay turnos registrados.</div>}
             {dias.map(dia=>{
@@ -1857,7 +1857,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
                           </div>
                           <div style={{display:"flex",gap:5,alignItems:"center"}}>
                             {cerrado?(
-                              <span style={{fontSize:10,color:"#22c55e",background:"rgba(34,197,94,0.1)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:7,padding:"2px 9px"}}>✅ Cerrado {cerrado.hora}</span>
+                              <span style={{fontSize:10,color:"#22c55e",background:"rgba(34,197,94,0.1)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:7,padding:"2px 9px"}}>✅ Cerrado {cerrado.hora} · Puedes editar igual</span>
                             ):(
                               <span style={{fontSize:10,color:"#f59e0b",background:"rgba(245,158,11,0.06)",border:"1px solid rgba(245,158,11,0.2)",borderRadius:7,padding:"2px 9px"}}>⏳ Abierto</span>
                             )}
@@ -2562,6 +2562,16 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
       {/* ── PROGRAMAR ── */}
       {tabProg==="programa" && (
         <>
+          {/* Aviso turno cerrado hoy — acceso rápido para jefa */}
+          {esJefa&&Object.keys(cierresTurno||{}).some(k=>k.startsWith(new Date().toISOString().slice(0,10)))&&(
+            <div style={{background:"rgba(34,197,94,0.06)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:10,padding:"10px 14px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+              <div style={{fontSize:12,color:"#4ade80"}}>✅ Hay turno(s) cerrado(s) hoy — puedes revisar y editar las tareas</div>
+              <button onClick={()=>setTabProg("turnos")}
+                style={{cursor:"pointer",border:"1px solid rgba(74,222,128,0.3)",borderRadius:7,padding:"5px 12px",background:"rgba(74,222,128,0.1)",color:"#4ade80",fontSize:11,fontFamily:"'Georgia',serif",flexShrink:0}}>
+                ✏️ Ver/editar turnos →
+              </button>
+            </div>
+          )}
           {aviso && (
             <div style={{background:"rgba(245,158,11,0.12)",border:"1px solid rgba(245,158,11,0.3)",borderRadius:12,padding:"12px 16px",marginBottom:14,display:"flex",justifyContent:"space-between",alignItems:"start",gap:10}}>
               <div>
