@@ -2531,7 +2531,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                 {Object.entries(ESTADOS_TAREA).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
               </select>
               <select value={filtroZona} onChange={e=>setFiltroZona(e.target.value)} style={{...S.input,flex:"1 1 160px",maxWidth:220,fontSize:13}}>
-                <option value="todas">Todas las zonas</option>
+                <option value="todas">🔍 Filtrar: todas las zonas con tareas</option>
                 {zonasEnProg.filter(z=>z!=="Golf").map(z=><option key={z} value={z}>{z}</option>)}
                 {zonasEnProg.includes("Golf")&&<option value="Golf" disabled>⛳ Golf → programar en sección Golf</option>}
               </select>
