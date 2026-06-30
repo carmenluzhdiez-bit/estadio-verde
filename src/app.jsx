@@ -74,7 +74,7 @@ const CATEGORIAS_ELEM = {
   jardineras:      { label: "Jardineras",           color: "#f472b6", icon: "🪻", parent: "vegetacion" },
   macetas_piso:    { label: "Macetas a piso",       color: "#e879f9", icon: "🌷", parent: "vegetacion" },
   colgantes:       { label: "Colgantes",            color: "#c084fc", icon: "🌺", parent: "vegetacion" },
-  infraestructura: { label: "Infraestructura",      color: "#f59e0b", icon: "🏗️" },
+  infraestructura: { label: "Estructuras y Construcciones", color: "#f59e0b", icon: "🏗️" },
   sistemas:        { label: "Sistemas",             color: "#3b82f6", icon: "⚙️" },
   pavimentos:      { label: "Pavimentos y Suelos",  color: "#a78bfa", icon: "🪨" },
   cesped_sintetico:{ label: "Césped Sintético",      color: "#7c3aed", icon: "🟪" },
@@ -12765,14 +12765,22 @@ export default function App() {
                             const subElems=infraElems.filter(e=>e.tipo===subKey);
                             if(subElems.length===0) return null;
                             const subMeta=CATEGORIAS_ELEM[subKey];
+                            const subId=`infra-sub-${zonaId}-${subKey}`;
                             return (
-                              <div key={subKey} style={{marginBottom:10,paddingLeft:10,borderLeft:`2px solid ${subMeta.color}30`}}>
-                                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                              <div key={subKey} style={{marginBottom:8,borderLeft:`2px solid ${subMeta.color}30`,borderRadius:6,overflow:"hidden"}}>
+                                <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 8px",cursor:"pointer",userSelect:"none",background:`${subMeta.color}08`}}
+                                  onClick={()=>{
+                                    const el=document.getElementById(subId);
+                                    if(el) el.style.display=el.style.display==="none"?"flex":"none";
+                                    const arr=document.getElementById(subId+"-arr");
+                                    if(arr) arr.style.transform=arr.style.transform==="rotate(-90deg)"?"rotate(0deg)":"rotate(-90deg)";
+                                  }}>
                                   <span style={{fontSize:13}}>{subMeta.icon}</span>
                                   <span style={{fontSize:12,fontWeight:600,color:subMeta.color}}>{subMeta.label}</span>
                                   <span style={{fontSize:11,color:"#5aaa70"}}>({subElems.length})</span>
+                                  <span id={subId+"-arr"} style={{marginLeft:"auto",fontSize:10,color:"#6aaa7a",transition:"transform .2s",display:"inline-block",transform:"rotate(-90deg)"}}>▼</span>
                                 </div>
-                                <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                                <div id={subId} style={{display:"none",flexDirection:"column",gap:6,padding:"8px 8px 4px 10px"}}>
                                   {subElems.map(e=>renderElemCard(e))}
                                 </div>
                               </div>
