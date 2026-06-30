@@ -13251,13 +13251,20 @@ export default function App() {
                         .catch(e=>console.error("Error:", e));
                       if(patch.estado==="no_pudo"||patch.estado==="hecha"||patch.estado==="haciendose"){
                         const tarea=tareasDelDia.find(t=>t.id===tid);
-                        if(tarea){const z=MACROZONAS_BASE.find(z=>z.nombre===tarea.zona);if(z){const ico=patch.estado==="no_pudo"?"🔴":patch.estado==="hecha"?"✅":"🔵";addHistorial(String(z.id),`${ico} [${tarea.responsable||"?"}] ${tarea.tarea}${patch.estado==="no_pudo"&&patch.notaWorker?" ("+patch.notaWorker+")":""}`);}
-                          // Bono especializado: limpieza Cancha de Fútbol Sintética (alfombra)
+                        if(tarea){
+                          const z=MACROZONAS_BASE.find(z=>z.nombre===tarea.zona);
+                          if(z){
+                            const ico=patch.estado==="no_pudo"?"🔴":patch.estado==="hecha"?"✅":"🔵";
+                            addHistorial(String(z.id),`${ico} [${tarea.responsable||"?"}] ${tarea.tarea}${patch.estado==="no_pudo"&&patch.notaWorker?" ("+patch.notaWorker+")":""}`);
+                          }
+                          // Bono especializado: limpieza Cancha de Fútbol Sintética (alfombra) — independiente de si la zona existe en MACROZONAS_BASE
                           if(patch.estado==="hecha"){
                             const tNom=(tarea.tarea||"").toLowerCase();
-                            const esCanchaSint = tarea.zona==="Cancha de Fútbol Sintética" || (tarea.zona||"").toLowerCase().includes("fútbol sintétic") || (tarea.zona||"").toLowerCase().includes("futbol sintetic");
-                            const esLimpieza = tNom.includes("limpie")||tNom.includes("sopla")||tNom.includes("barrid")||tNom.includes("cepill");
-                            if(esCanchaSint && esLimpieza && crearNotificacion){
+                            const tZona=(tarea.zona||"").toLowerCase();
+                            const tElem=(tarea.elemento||"").toLowerCase();
+                            const esCanchaSint = tZona.includes("fútbol sintétic")||tZona.includes("futbol sintetic")||tZona.includes("cancha")&&tZona.includes("sintétic")||tElem.includes("césped sintético")||tElem.includes("cesped sintetico")||tElem.includes("alfombra");
+                            const esLimpieza = tNom.includes("limpie")||tNom.includes("sopla")||tNom.includes("barrid")||tNom.includes("cepill")||tNom.includes("aspirad");
+                            if(esCanchaSint && esLimpieza){
                               crearNotificacion("bono_cancha",{
                                 titulo:"🎖️ Bono especializado disponible",
                                 mensaje:`${tarea.responsable||"Trabajador"} completó limpieza de la Cancha de Fútbol Sintética (alfombra) — generar bono especializado`,
