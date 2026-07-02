@@ -2038,7 +2038,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
                                 </div>
                                 <div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
                                   <select value={t.estado}
-                                    onChange={e=>{const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);setTareas(prev=>({...prev,[dia]:nA2(prev[dia]).map(x=>x.id===t.id?{...x,estado:e.target.value}:x)}));}}
+                                    onChange={e=>{const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);setTareas(prev=>{const updated=nA2(prev[dia]).map(x=>x.id===t.id?{...x,estado:e.target.value}:x);const clean=updated.map(t=>{const c={};Object.entries(t).forEach(([k,v])=>{if(v!==undefined)c[k]=v;});return c;});return {...prev,[dia]:clean};});}}
                                     style={{fontSize:10,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:5,color:"#ede9e0",padding:"2px 3px",cursor:"pointer"}}>
                                     {Object.entries(EC).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
                                   </select>
@@ -2121,9 +2121,16 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
     return (a.zona||"").localeCompare(b.zona||"","es",{sensitivity:"base"});
   });
   // Leer siempre directamente del prop tareas para que React detecte cambios
+  // Buscar en fechaVer (hora local) Y en la fecha UTC del mismo día (por si se guardaron con toISOString)
   const todasMisTareas = React.useMemo(()=>{
     const normDia = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v).filter(Boolean):[]);
-    return normDia(tareas[fechaVer]).filter(t => t.responsable && normalizar(t.responsable) === normalizar(trabajador?.nombre||""));
+    const d=new Date(fechaVer+"T12:00:00"); // mediodía para evitar problemas de zona horaria
+    const utcStr=d.toISOString().slice(0,10);
+    const combinadas=[...normDia(tareas[fechaVer]||[])];
+    if(utcStr!==fechaVer){
+      normDia(tareas[utcStr]||[]).forEach(t=>{if(!combinadas.find(x=>String(x.id)===String(t.id)))combinadas.push(t);});
+    }
+    return combinadas.filter(t => t.responsable && normalizar(t.responsable) === normalizar(trabajador?.nombre||""));
   }, [tareas, fechaVer, trabajador]
   );
   const misTareasDiarias  = React.useMemo(()=>sortTareas(todasMisTareas.filter(t=>esDiaria(t))),[todasMisTareas]);
@@ -2271,7 +2278,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                         {puedeEditar ? (
                           <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                             {Object.entries(ESTADOS_TAREA).map(([k,v])=>(
-                              <button key={k} onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:k,notaWorker:k!=="no_pudo"?t.notaWorker:""})}
+                              <button key={k} onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:k,notaWorker:k!=="no_pudo"?(t.notaWorker||""):""})}
                                 style={{cursor:"pointer",border:`1px solid ${t.estado===k?v.color+"60":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"4px 10px",fontSize:11,background:t.estado===k?`${v.color}15`:"transparent",color:t.estado===k?v.color:"#6aaa7a",fontFamily:"'Georgia',serif"}}>
                                 {v.icon} {v.label}
                               </button>
@@ -2424,7 +2431,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                               {puedeEditar ? (
                                 <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                                   {Object.entries(ESTADOS_TAREA).map(([k,v])=>(
-                                    <button key={k} onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:k,notaWorker:k!=="no_pudo"?t.notaWorker:""})}
+                                    <button key={k} onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:k,notaWorker:k!=="no_pudo"?(t.notaWorker||""):""})}
                                       style={{cursor:"pointer",border:`1px solid ${t.estado===k?v.color+"50":"rgba(255,255,255,0.08)"}`,borderRadius:8,padding:"3px 9px",fontSize:11,background:t.estado===k?`${v.color}12`:"transparent",color:t.estado===k?v.color:"#6aaa7a",fontFamily:"'Georgia',serif"}}>
                                       {v.icon} {v.label}
                                     </button>
@@ -13202,7 +13209,8 @@ export default function App() {
                   setTareasProg(prev=>{
                     const lista=normArr(prev[fecha]);
                     const actualizadas=lista.map(t=>String(t.id)===String(tid)?{...t,...patch}:t);
-                    fbUpdate(ref(db,`${ROOT}/prog`),{[fecha]:actualizadas}).catch(e=>console.error(e));
+                    const actualizadasClean2=actualizadas.map(t=>{const c={};Object.entries(t).forEach(([k,v])=>{if(v!==undefined)c[k]=v;});return c;});
+                    fbUpdate(ref(db,`${ROOT}/prog`),{[fecha]:actualizadasClean2}).catch(e=>console.error(e));
                     return {...prev,[fecha]:actualizadas};
                   });
                 }}
@@ -14036,7 +14044,13 @@ export default function App() {
                       const tareasDelDia = normArr(prev[fecha]);
                       const actualizadas = tareasDelDia.map(t=>String(t.id)===String(tid)?{...t,...patch}:t);
                       // Escribir solo la ruta de esa fecha en Firebase
-                      fbUpdate(ref(db, `${ROOT}/prog`), {[fecha]: actualizadas})
+                      // Limpiar undefined antes de enviar a Firebase
+                      const actualizadasClean = actualizadas.map(t=>{
+                        const clean={};
+                        Object.entries(t).forEach(([k,v])=>{ if(v!==undefined) clean[k]=v; });
+                        return clean;
+                      });
+                      fbUpdate(ref(db, `${ROOT}/prog`), {[fecha]: actualizadasClean})
                         .catch(e=>console.error("Error:", e));
                       if(patch.estado==="no_pudo"||patch.estado==="hecha"||patch.estado==="completada"||patch.estado==="haciendose"){
                         const tarea=tareasDelDia.find(t=>String(t.id)===String(tid));
@@ -14070,10 +14084,12 @@ export default function App() {
                   }}
                   onSetFrecs={setElemFrecs}
                   onAddTarea={(nuevaTarea)=>{
-                    const hoyKey=nuevaTarea.fecha||new Date().toISOString().slice(0,10);
+                    const hoyKey=nuevaTarea.fecha||fechaLocal(); // siempre hora local Chile
                     setTareasProg(prev=>{
                       const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-                      return {...prev,[hoyKey]:[...normArr(prev[hoyKey]),nuevaTarea]};
+                      const lista=[...normArr(prev[hoyKey]),{...nuevaTarea,fecha:hoyKey}];
+                      fbUpdate(ref(db,`${ROOT}/prog`),{[hoyKey]:lista}).catch(e=>console.error(e));
+                      return {...prev,[hoyKey]:lista};
                     });
                     const z=MACROZONAS_BASE.find(z=>z.nombre===nuevaTarea.zona);
                     if(z) addHistorial(z.id,`🆕 [${nuevaTarea.responsable}] Tarea emergente: ${nuevaTarea.tarea}`);
@@ -14081,9 +14097,10 @@ export default function App() {
                   esJefaApp={rolLogueado==="jefa"}
                   cierresTurno={cierresTurno}
                   onCerrarTurno={(fecha,nombre)=>{
-                    const key=`${fecha}_${nombre.split(" ")[0].toLowerCase()}`;
+                    const fechaCierre=fechaLocal(); // siempre usar hora local Chile
+                    const key=`${fechaCierre}_${nombre.split(" ")[0].toLowerCase()}`;
                     setCierresTurno(prev=>({...prev,[key]:{
-                      fecha,nombre,
+                      fecha:fechaCierre,nombre,
                       hora:new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"}),
                       cerradoEn:new Date().toISOString(),
                     }}));
