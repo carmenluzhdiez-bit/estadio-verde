@@ -760,6 +760,152 @@ const MACROZONAS_BASE = [
       { id: "e9", nombre: "Bancas jugadores", tipo: "mobiliario" },
     ]
   },
+
+  {
+    id: 40, nombre: "Av. Navarra", categoria: "Calles y Accesos", icono: "🌿",
+    descripcion: "Av. Navarra",
+    elementos: [
+      { id: "e1", nombre: "Árboles de alineación", tipo: "arboles" },
+      { id: "e2", nombre: "Arbustos borde", tipo: "arbustos" },
+      { id: "e3", nombre: "Césped lateral", tipo: "cesped" },
+      { id: "e4", nombre: "Luminarias", tipo: "infraestructura" },
+      { id: "e5", nombre: "Pavimento", tipo: "pavimentos" },
+      { id: "e6", nombre: "Sistema de riego", tipo: "sistemas" },
+    ]
+  },
+  {
+    id: 41, nombre: "Av. Aragón", categoria: "Calles y Accesos", icono: "🌿",
+    descripcion: "Av. Aragón",
+    elementos: [
+      { id: "e1", nombre: "Árboles de alineación", tipo: "arboles" },
+      { id: "e2", nombre: "Arbustos borde", tipo: "arbustos" },
+      { id: "e3", nombre: "Césped lateral", tipo: "cesped" },
+      { id: "e4", nombre: "Luminarias", tipo: "infraestructura" },
+      { id: "e5", nombre: "Pavimento", tipo: "pavimentos" },
+      { id: "e6", nombre: "Sistema de riego", tipo: "sistemas" },
+    ]
+  },
+  {
+    id: 42, nombre: "Paseo Cantabria", categoria: "Calles y Accesos", icono: "🌿",
+    descripcion: "Paseo Cantabria",
+    elementos: [
+      { id: "e1", nombre: "Árboles de alineación", tipo: "arboles" },
+      { id: "e2", nombre: "Arbustos borde", tipo: "arbustos" },
+      { id: "e3", nombre: "Césped lateral", tipo: "cesped" },
+      { id: "e4", nombre: "Luminarias", tipo: "infraestructura" },
+      { id: "e5", nombre: "Pavimento", tipo: "pavimentos" },
+      { id: "e6", nombre: "Sistema de riego", tipo: "sistemas" },
+    ]
+  },
+  {
+    id: 43, nombre: "Paseo Chile", categoria: "Calles y Accesos", icono: "🌿",
+    descripcion: "Paseo Chile",
+    elementos: [
+      { id: "e1", nombre: "Árboles de alineación", tipo: "arboles" },
+      { id: "e2", nombre: "Arbustos borde", tipo: "arbustos" },
+      { id: "e3", nombre: "Césped lateral", tipo: "cesped" },
+      { id: "e4", nombre: "Luminarias", tipo: "infraestructura" },
+      { id: "e5", nombre: "Pavimento", tipo: "pavimentos" },
+      { id: "e6", nombre: "Sistema de riego", tipo: "sistemas" },
+    ]
+  },
+  {
+    id: 44, nombre: "Paseo Andalucía", categoria: "Calles y Accesos", icono: "🌿",
+    descripcion: "Paseo Andalucía",
+    elementos: [
+      { id: "e1", nombre: "Árboles de alineación", tipo: "arboles" },
+      { id: "e2", nombre: "Arbustos borde", tipo: "arbustos" },
+      { id: "e3", nombre: "Césped lateral", tipo: "cesped" },
+      { id: "e4", nombre: "Luminarias", tipo: "infraestructura" },
+      { id: "e5", nombre: "Pavimento", tipo: "pavimentos" },
+      { id: "e6", nombre: "Sistema de riego", tipo: "sistemas" },
+    ]
+  },
+  {
+    id: 45, nombre: "Av. La Rioja", categoria: "Calles y Accesos", icono: "🌿",
+    descripcion: "Av. La Rioja",
+    elementos: [
+      { id: "e1", nombre: "Árboles de alineación", tipo: "arboles" },
+      { id: "e2", nombre: "Arbustos borde", tipo: "arbustos" },
+      { id: "e3", nombre: "Césped lateral", tipo: "cesped" },
+      { id: "e4", nombre: "Luminarias", tipo: "infraestructura" },
+      { id: "e5", nombre: "Pavimento", tipo: "pavimentos" },
+      { id: "e6", nombre: "Sistema de riego", tipo: "sistemas" },
+    ]
+  },
+  {
+    id: 46, nombre: "Av. Cataluña", categoria: "Calles y Accesos", icono: "🌿",
+    descripcion: "Av. Cataluña",
+    elementos: [
+      { id: "e1", nombre: "Árboles de alineación", tipo: "arboles" },
+      { id: "e2", nombre: "Arbustos borde", tipo: "arbustos" },
+      { id: "e3", nombre: "Césped lateral", tipo: "cesped" },
+      { id: "e4", nombre: "Luminarias", tipo: "infraestructura" },
+      { id: "e5", nombre: "Pavimento", tipo: "pavimentos" },
+      { id: "e6", nombre: "Sistema de riego", tipo: "sistemas" },
+    ]
+  },
+  {
+    id: 47, nombre: "Av. Castilla y León", categoria: "Calles y Accesos", icono: "🌿",
+    descripcion: "Av. Castilla y León",
+    elementos: [
+      { id: "e1", nombre: "Árboles de alineación", tipo: "arboles" },
+      { id: "e2", nombre: "Arbustos borde", tipo: "arbustos" },
+      { id: "e3", nombre: "Césped lateral", tipo: "cesped" },
+      { id: "e4", nombre: "Luminarias", tipo: "infraestructura" },
+      { id: "e5", nombre: "Pavimento", tipo: "pavimentos" },
+      { id: "e6", nombre: "Sistema de riego", tipo: "sistemas" },
+    ]
+  },
+  {
+    id: 48, nombre: "Av. Extremadura", categoria: "Calles y Accesos", icono: "🌿",
+    descripcion: "Av. Extremadura",
+    elementos: [
+      { id: "e1", nombre: "Árboles de alineación", tipo: "arboles" },
+      { id: "e2", nombre: "Arbustos borde", tipo: "arbustos" },
+      { id: "e3", nombre: "Césped lateral", tipo: "cesped" },
+      { id: "e4", nombre: "Luminarias", tipo: "infraestructura" },
+      { id: "e5", nombre: "Pavimento", tipo: "pavimentos" },
+      { id: "e6", nombre: "Sistema de riego", tipo: "sistemas" },
+    ]
+  },
+  {
+    id: 49, nombre: "Comunidad Valenciana", categoria: "Calles y Accesos", icono: "🌿",
+    descripcion: "Comunidad Valenciana",
+    elementos: [
+      { id: "e1", nombre: "Árboles de alineación", tipo: "arboles" },
+      { id: "e2", nombre: "Arbustos borde", tipo: "arbustos" },
+      { id: "e3", nombre: "Césped lateral", tipo: "cesped" },
+      { id: "e4", nombre: "Luminarias", tipo: "infraestructura" },
+      { id: "e5", nombre: "Pavimento", tipo: "pavimentos" },
+      { id: "e6", nombre: "Sistema de riego", tipo: "sistemas" },
+    ]
+  },
+  {
+    id: 50, nombre: "Av. Madrid", categoria: "Calles y Accesos", icono: "🌿",
+    descripcion: "Av. Madrid",
+    elementos: [
+      { id: "e1", nombre: "Árboles de alineación", tipo: "arboles" },
+      { id: "e2", nombre: "Arbustos borde", tipo: "arbustos" },
+      { id: "e3", nombre: "Césped lateral", tipo: "cesped" },
+      { id: "e4", nombre: "Luminarias", tipo: "infraestructura" },
+      { id: "e5", nombre: "Pavimento", tipo: "pavimentos" },
+      { id: "e6", nombre: "Sistema de riego", tipo: "sistemas" },
+    ]
+  },
+  {
+    id: 51, nombre: "Plaza Asturias", categoria: "Plazas y Rotondas", icono: "🌸",
+    descripcion: "Plaza Asturias",
+    elementos: [
+      { id: "e1", nombre: "Césped central", tipo: "cesped" },
+      { id: "e2", nombre: "Árboles ornamentales", tipo: "arboles" },
+      { id: "e3", nombre: "Arbustos y macizos", tipo: "arbustos" },
+      { id: "e4", nombre: "Caminos y pavimentos", tipo: "pavimentos" },
+      { id: "e5", nombre: "Luminarias", tipo: "infraestructura" },
+      { id: "e6", nombre: "Mobiliario urbano", tipo: "mobiliario" },
+      { id: "e7", nombre: "Sistema de riego", tipo: "sistemas" },
+    ]
+  },
 ];
 
 const CATEGORIAS_ZONA = [...new Set(MACROZONAS_BASE.map(z => z.categoria))];
@@ -12330,10 +12476,15 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
 
 export default function App() {
   const [zonas, setZonas] = useState(MACROZONAS_BASE);
+  // Combinar zonas base con personalizadas para toda la app
+  const zonasConCust = React.useMemo(()=>[...zonas,...macrozonasCust],[zonas,macrozonasCust]);
   const [vista, setVista] = useState("dashboard");
   const [zonaId, setZonaId] = useState(null);
   const [tab, setTab] = useState("elementos");
   const [filtroCat, setFiltroCat] = useState("Todas");
+  const [showNuevaMacrozona, setShowNuevaMacrozona] = useState(false);
+  const [nuevaMacrozona, setNuevaMacrozona] = useState({nombre:"",categoria:"Calles y Accesos",icono:"🌿",descripcion:""});
+  const [macrozonasCust, setMacrozonasCust] = useState([]);
   const [filtroEst, setFiltroEst] = useState("Todos");
   const [busq, setBusq] = useState("");
   const [editElem, setEditElem] = useState(null);
@@ -12637,7 +12788,7 @@ export default function App() {
     else{setData(p=>({...p,[zid]:{...p[zid],elementos:{...p[zid]?.elementos,[eid]:{...(p[zid]?.elementos?.[eid]||{}),frecuencias}}}}));}
   };
 
-  const zona = zonas.find(z=>String(z.id)===String(zonaId));
+  const zona = zonasConCust.find(z=>String(z.id)===String(zonaId));
   const zd = zonaId ? getZD(zonaId) : null;
 
   const getAllElems = (zid) => {
@@ -12649,7 +12800,8 @@ export default function App() {
     return [...base,...custom].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
   };
 
-  const filteredZonas = MACROZONAS_BASE.filter(z=>{
+  const todasLasZonas = [...MACROZONAS_BASE, ...macrozonasCust];
+  const filteredZonas = todasLasZonas.filter(z=>{
     const matchC=filtroCat==="Todas"||z.categoria===filtroCat;
     const matchE=filtroEst==="Todos"||getZD(z.id).estadoGeneral===filtroEst;
     const q=(busq||"").trim().toLowerCase();
@@ -12677,7 +12829,7 @@ export default function App() {
     addHistorial(zid, `Tarea añadida: ${texto}`);
     // 2. Agregar a programación diaria como tarea pendiente (hoy)
     const hoy = fechaLocal();
-    const zona = zonas.find(z=>String(z.id)===String(zid));
+    const zona = zonasConCust.find(z=>String(z.id)===String(zid));
     const nuevaProg = {
       id: Date.now() + Math.random(),
       fecha: hoy,
@@ -12705,7 +12857,7 @@ export default function App() {
   };
   const getElemNombre = (zid,eid,isCustom) => {
     if(isCustom) return (data[zid]?.elementosCustom||[]).find(e=>e.id===eid)?.nombre||"";
-    return zonas.find(z=>String(z.id)===String(zid))?.elementos.find(e=>e.id===eid)?.nombre||"";
+    return zonasConCust.find(z=>String(z.id)===String(zid))?.elementos.find(e=>e.id===eid)?.nombre||"";
   };
   const addCustomElem = (zid,elem) => { const id="c"+Date.now(); const arr=[...(data[String(zid)]?.elementosCustom||[]),{...elem,id,estado:"bueno",notas:""}]; updateZona(zid,{elementosCustom:arr}); addHistorial(zid,`Elemento agregado: ${elem.nombre}`); };
   const removeCustomElem = (zid,eid) => { const arr=(data[zid]?.elementosCustom||[]).filter(e=>e.id!==eid); updateZona(zid,{elementosCustom:arr}); };
@@ -13064,7 +13216,7 @@ export default function App() {
                 }}
                 onSetFrecs={setElemFrecs}
                 getFrecs={(zid,eid,tipo,isCustom,nombreElem)=>{
-                  const zdat=getZD(zid);const zona=zonas.find(z=>String(z.id)===String(zid));if(!zona)return null;
+                  const zdat=getZD(zid);const zona=zonasConCust.find(z=>String(z.id)===String(zid));if(!zona)return null;
                   const elem=zona.elementos.find(e=>e.nombre===nombreElem);if(!elem)return null;
                   const frecs=zdat.elementos?.[elem.id]?.frecuencias||(TAREAS_DEFAULT[elem.tipo]||[]).map(t=>({...t}));
                   return {frecs,eid:elem.id,isCustom:false};
@@ -13178,9 +13330,65 @@ export default function App() {
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",marginBottom:20,flexWrap:"wrap",gap:12}}>
               <div>
                 <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:24,fontWeight:900}}>Macrozonas</h1>
-                <p style={{color:"#6aaa7a",fontSize:14}}>{filteredZonas.length} de {MACROZONAS_BASE.length} zonas</p>
+                <p style={{color:"#6aaa7a",fontSize:14}}>{filteredZonas.length} de {MACROZONAS_BASE.length+macrozonasCust.length} zonas</p>
               </div>
+              {esJefa&&(
+                <button onClick={()=>setShowNuevaMacrozona(true)}
+                  style={{...S.btn,background:"rgba(52,211,153,0.15)",color:"#34d399",border:"1px solid rgba(52,211,153,0.3)",fontSize:13}}>
+                  ＋ Nueva macrozona
+                </button>
+              )}
             </div>
+
+            {/* Modal nueva macrozona */}
+            {showNuevaMacrozona&&(
+              <div style={{...S.card,padding:20,marginBottom:16,border:"1px solid rgba(52,211,153,0.3)"}} className="ein">
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#34d399",marginBottom:14}}>＋ Nueva macrozona personalizada</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                  <div style={{gridColumn:"1/-1"}}>
+                    <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Nombre</label>
+                    <input style={S.input} value={nuevaMacrozona.nombre} onChange={e=>setNuevaMacrozona(p=>({...p,nombre:e.target.value}))} placeholder="Ej: Av. Vizcaya"/>
+                  </div>
+                  <div>
+                    <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Categoría</label>
+                    <select style={S.input} value={nuevaMacrozona.categoria} onChange={e=>setNuevaMacrozona(p=>({...p,categoria:e.target.value}))}>
+                      {[...new Set(MACROZONAS_BASE.map(z=>z.categoria))].map(c=><option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Ícono</label>
+                    <input style={S.input} value={nuevaMacrozona.icono} onChange={e=>setNuevaMacrozona(p=>({...p,icono:e.target.value}))} placeholder="🌿"/>
+                  </div>
+                  <div style={{gridColumn:"1/-1"}}>
+                    <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Descripción (opcional)</label>
+                    <input style={S.input} value={nuevaMacrozona.descripcion} onChange={e=>setNuevaMacrozona(p=>({...p,descripcion:e.target.value}))} placeholder="Descripción breve"/>
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:8}}>
+                  <button className="btn-p" style={S.btn} disabled={!nuevaMacrozona.nombre.trim()} onClick={()=>{
+                    const newId="cust_"+Date.now();
+                    const nueva={
+                      id:newId, nombre:nuevaMacrozona.nombre.trim(), categoria:nuevaMacrozona.categoria,
+                      icono:nuevaMacrozona.icono||"🌿", descripcion:nuevaMacrozona.descripcion,
+                      elementos:[
+                        {id:"e1",nombre:"Árboles",tipo:"arboles"},
+                        {id:"e2",nombre:"Arbustos",tipo:"arbustos"},
+                        {id:"e3",nombre:"Césped",tipo:"cesped"},
+                        {id:"e4",nombre:"Luminarias",tipo:"infraestructura"},
+                        {id:"e5",nombre:"Pavimento",tipo:"pavimentos"},
+                      ],
+                      esPersonalizada:true,
+                    };
+                    setMacrozonasCust(p=>[...p,nueva]);
+                    // Inicializar en Firebase
+                    fbUpdate(ref(db,`${ROOT}/data`),{[newId]:{estadoGeneral:"bueno",notas:"",ultimoMant:"",proximoMant:"",elementos:{},elementosCustom:[],tareas:[],historial:[]}}).catch(e=>console.error(e));
+                    setNuevaMacrozona({nombre:"",categoria:"Calles y Accesos",icono:"🌿",descripcion:""});
+                    setShowNuevaMacrozona(false);
+                  }}>✓ Crear macrozona</button>
+                  <button className="btn-g" style={S.btn} onClick={()=>setShowNuevaMacrozona(false)}>Cancelar</button>
+                </div>
+              </div>
+            )}
             <div style={{display:"flex",gap:10,marginBottom:18,flexWrap:"wrap"}}>
               <input placeholder="🔍 Buscar zona..." value={busq||""} onChange={e=>setBusq(e.target.value)} style={{...S.input,flex:"1 1 180px",maxWidth:260}}/>
               <select value={filtroCat} onChange={e=>setFiltroCat(e.target.value)} style={{...S.input,flex:"1 1 150px",maxWidth:200}}>
@@ -13845,7 +14053,7 @@ export default function App() {
                     });
                   }}
                   getFrecs={(zid,_eid,_tipo,_isCustom,nombreElem)=>{
-                    const zdat=getZD(zid); const zona=zonas.find(z=>String(z.id)===String(zid)); if(!zona) return null;
+                    const zdat=getZD(zid); const zona=zonasConCust.find(z=>String(z.id)===String(zid)); if(!zona) return null;
                     const elem=zona.elementos.find(e=>e.nombre===nombreElem); if(!elem) return null;
                     const frecs=zdat.elementos?.[elem.id]?.frecuencias||(TAREAS_DEFAULT[elem.tipo]||[]).map(t=>({...t}));
                     return {frecs,eid:elem.id,isCustom:false};
