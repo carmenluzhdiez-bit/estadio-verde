@@ -8937,6 +8937,10 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   const [showDiariaForm, setShowDiariaForm] = React.useState(false);
   // ── Estado sección Humedad ──
   const [showHumForm,    setShowHumForm]    = React.useState(false);
+  // Abrir formulario de humedad automáticamente cuando jefa navega a ese tab
+  React.useEffect(()=>{
+    if(subTab==="humedad" && esJefa) setShowHumForm(true);
+  },[subTab, esJefa]);
   const emptyHumForm = {fecha:hoy,hora:new Date().toTimeString().slice(0,5),motivo:"rutina",responsable:"",valores:{},valorVivero:"",decision:"sin-cambio",obs:"",generarTarea:false};
   const [humForm,        setHumForm]        = React.useState(emptyHumForm);
   const [selectedGreen,  setSelectedGreen]  = React.useState("g1");
@@ -9272,7 +9276,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           const tabsVisibles = (rolLogueado==="trabajador") ? tabsWorker : todosTabs2;
           return tabsVisibles;
         })().map(([t,l])=>(
-          <button key={t} className={`tab${subTab===t?" on":""}`} onClick={()=>setSubTab(t)} style={{fontFamily:"'Georgia',serif"}}>{l}</button>
+          <button key={t} className={`tab${subTab===t?" on":""}`} onClick={()=>{setSubTab(t);setSubTabZona(null);}} style={{fontFamily:"'Georgia',serif"}}>{l}</button>
         ))}
       </div>
 
