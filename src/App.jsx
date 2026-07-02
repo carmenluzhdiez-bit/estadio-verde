@@ -777,6 +777,12 @@ const TAREAS_PRESET = [
   "Pintura / retoque", "Revisión sistema riego", "Limpieza luminarias", "Reparación mobiliario",
 ];
 
+// Fecha local correcta para Chile (toISOString usa UTC y puede adelantar el día)
+const fechaLocal = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+};
+
 const initData = () => {
   // Build default data structure (usado solo si Firebase devuelve null)
   const d = {};
@@ -1499,7 +1505,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
     };
     // Recopilar todas las ejecuciones que coincidan
     const resultados = [];
-    const hoy = new Date().toISOString().slice(0,10);
+    const hoy = fechaLocal();
     Object.entries(tareas).sort((a,b)=>b[0].localeCompare(a[0])).forEach(([fecha, ts])=>{
       normT(ts).forEach(t=>{
         const zonaOk = !buscarZona || (t.zona||"").toLowerCase().includes(buscarZona.toLowerCase());
@@ -1522,7 +1528,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
     return {pasadas, futuras, pendHoy, frecPromedio, total:resultados.length};
   };
   const resHistorial = tabHist==="buscar" ? calcHistorialZona() : null;
-  const hoy = new Date().toISOString().slice(0,10);
+  const hoy = fechaLocal();
 
   return (
     <div className="ein">
@@ -1916,7 +1922,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
 // ─── PROGRAMACIÓN DIARIA ─────────────────────────────────────────────────────
 // ─── VISTA TRABAJADOR ────────────────────────────────────────────────────────
 function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE, onAccesoRapido, onCambiarMetodo, cierresTurno={}, onCerrarTurno, onReabrirTurno, esJefaApp=false }) {
-  const hoy = new Date().toISOString().slice(0,10);
+  const hoy = fechaLocal();
   const [fechaVer, setFechaVer] = React.useState(fecha || hoy);
   // Cierre de turno
   const turnoCerradoKey = `${fechaVer}_${(trabajador?.nombre||"").split(" ")[0].toLowerCase()}`;
@@ -2434,7 +2440,7 @@ Una vez cerrado no podrás modificar las tareas. Solo la jefa puede reabrir el t
 }
 
 function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACROZONAS_BASE, tareas, setTareas, tareasZonaHoy=0, esJefa=false, puedeCrear=false, cierresTurno={}, onReabrirTurno, getElemFrecs, setElemFrecs }) {
-  const hoy = new Date().toISOString().slice(0,10);
+  const hoy = fechaLocal();
   const [fecha, setFecha] = React.useState(hoy);
   const [tabProg, setTabProg] = React.useState("programa");
   const [showAgregar, setShowAgregar] = React.useState(false);
@@ -2835,7 +2841,7 @@ function PinConfig({ getPines, setPinRol, S }) {
 
 // ─── VISTA DESIGNACIÓN (SUPERVISOR) ─────────────────────────────────────────
 function VistaDesignacion({ S, tareasProg, setTareasProg, personal, MACROZONAS_BASE, onSalir }) {
-  const hoy = new Date().toISOString().slice(0,10);
+  const hoy = fechaLocal();
   const [fecha, setFecha] = React.useState(hoy);
   const [showAgregar, setShowAgregar] = React.useState(false);
   const [nuevaTarea, setNuevaTarea] = React.useState({ zona:"", tarea:"", elemento:"" });
@@ -7823,7 +7829,7 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
 
 // ─── ZONA GOLF SIMPLE (Búnkers, Fairways) ────────────────────────────────────
 function ZonaGolfSimple({ S, labelSt, zonas, tareas, titulo, colorAcento, golfData, setG, listaPersonal, setTareasProg, sincronizarMacrozona }) {
-  const hoy = new Date().toISOString().slice(0,10);
+  const hoy = fechaLocal();
   const [selZona, setSelZona] = React.useState(zonas[0]?.id||"");
   const [showForm, setShowForm] = React.useState(false);
   const [form, setForm] = React.useState({fecha:hoy,tipo:"",responsable:"",descripcion:"",obs:""});
@@ -8855,7 +8861,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
     updateZona(GOLF_ZONA_ID, {ultimoMant: new Date().toISOString().slice(0,10)});
     if(addHistorial) addHistorial(GOLF_ZONA_ID, `⛳ ${tipo}: ${detalle} — ${hoyFmt}`);
   };
-  const hoy = new Date().toISOString().slice(0,10);
+  const hoy = fechaLocal();
   const estacion = getMesEstacion();
   const rango = RANGOS_ALTURA[estacion];
   const labelSt = {fontSize:10,color:"#34d399",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
@@ -10599,7 +10605,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
 
 // ─── PANEL BODEGAS ───────────────────────────────────────────────────────────
 function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareasProg, setTareasProg, compras=[] }) {
-  const hoy = new Date().toISOString().slice(0,10);
+  const hoy = fechaLocal();
   const [bodegaActiva, setBodegaActiva] = React.useState("b01");
   const [subTab, setSubTab] = React.useState("stock");
   const [showItemForm, setShowItemForm] = React.useState(false);
@@ -11183,7 +11189,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
 
 // ─── TAREA PLANTACIÓN / TRASPLANTE ───────────────────────────────────────────
 function TareaPlantacion({ modo, zona, zonaId, bodegasData, setBodegasData, tareasProg, setTareasProg, personal, S, addTareaZona, addHistorial, onClose }) {
-  const hoy = new Date().toISOString().slice(0,10);
+  const hoy = fechaLocal();
   const labelSt = {fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
   const listaPersonal = [...personal].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
 
@@ -11730,7 +11736,7 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
 
 // ─── BONO POR TAREA ──────────────────────────────────────────────────────────
 function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, setBonosMasivos, setPersonal, onVolver, esJefa, prefill }) {
-  const hoy = new Date().toISOString().slice(0,10);
+  const hoy = fechaLocal();
   const labelSt = {fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
 
   const pctFondo    = Number(bonosConfig.pctFondo||50);
@@ -12669,7 +12675,7 @@ export default function App() {
     updateZona(zid, { tareas: [...(getZD(zid).tareas||[]), nuevaTareaZona] });
     addHistorial(zid, `Tarea añadida: ${texto}`);
     // 2. Agregar a programación diaria como tarea pendiente (hoy)
-    const hoy = new Date().toISOString().slice(0,10);
+    const hoy = fechaLocal();
     const zona = zonas.find(z=>String(z.id)===String(zid));
     const nuevaProg = {
       id: Date.now() + Math.random(),
@@ -13709,7 +13715,7 @@ export default function App() {
                       ? arr.find(x=>String(x.id)===String(workerLogueado))
                       : fbUser ? arr.find(x=>x.email?.toLowerCase()===fbUser.email?.toLowerCase()) : null;
                   })()}
-                  fecha={new Date().toISOString().slice(0,10)}
+                  fecha={fechaLocal()}
                   tareas={tareasProg}
                   S={S}
                   MACROZONAS_BASE={MACROZONAS_BASE}
