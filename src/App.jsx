@@ -12366,6 +12366,7 @@ export default function App() {
   const [fbUser,    setFbUser]    = useState(null);
   // Worker states — deben declararse antes de los useEffects que los usan
   const [vistaWorker,    setVistaWorker]    = useState(false);
+  const [workerARevisar, setWorkerARevisar] = useState(null); // id del trabajador que la jefa está revisando
   const [workerLogueado, setWorkerLogueado] = useState(null);
   const [workerPinError, setWorkerPinError] = useState(false);
   const [workerPinInput, setWorkerPinInput] = useState("");
@@ -13021,7 +13022,67 @@ export default function App() {
 
       <div style={S.main}>
         {/* DASHBOARD */}
-        {vista==="dashboard"&&!zonaId&&(
+        {/* ── JEFA REVISA TURNO DE UN TRABAJADOR ── */}
+        {workerARevisar&&rolLogueado==="jefa"&&(()=>{
+          const arr=Array.isArray(personal)?personal:Object.values(personal||{});
+          const trab=arr.find(x=>String(x.id)===String(workerARevisar));
+          if(!trab) return null;
+          return (
+            <div className="ein">
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+                <button className="btn-g" style={S.btn} onClick={()=>setWorkerARevisar(null)}>← Volver al Panel</button>
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700}}>
+                  📋 Turno de {trab.nombre} — revisión de jefa
+                </div>
+                <span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.1)",border:"1px solid rgba(251,191,36,0.2)",borderRadius:8,padding:"2px 10px"}}>
+                  Modo supervisión — puedes editar aunque el turno esté cerrado
+                </span>
+              </div>
+              <VistaWorker
+                trabajador={trab}
+                fecha={new Date().toISOString().slice(0,10)}
+                tareas={tareasProg}
+                S={S}
+                esJefaApp={true}
+                cierresTurno={cierresTurno}
+                onUpdateTarea={(fecha,tid,patch)=>{
+                  const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+                  setTareasProg(prev=>{
+                    const lista=normArr(prev[fecha]);
+                    const actualizadas=lista.map(t=>String(t.id)===String(tid)?{...t,...patch}:t);
+                    fbUpdate(ref(db,`${ROOT}/prog`),{[fecha]:actualizadas}).catch(e=>console.error(e));
+                    return {...prev,[fecha]:actualizadas};
+                  });
+                }}
+                onAddTarea={(t)=>{
+                  setTareasProg(prev=>{
+                    const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+                    const lista=[...normArr(prev[t.fecha]||[]),t];
+                    fbUpdate(ref(db,`${ROOT}/prog`),{[t.fecha]:lista}).catch(e=>console.error(e));
+                    return {...prev,[t.fecha]:lista};
+                  });
+                }}
+                onSetFrecs={setElemFrecs}
+                getFrecs={(zid,eid,tipo,isCustom,nombreElem)=>{
+                  const zdat=getZD(zid);const zona=zonas.find(z=>String(z.id)===String(zid));if(!zona)return null;
+                  const elem=zona.elementos.find(e=>e.nombre===nombreElem);if(!elem)return null;
+                  const frecs=zdat.elementos?.[elem.id]?.frecuencias||(TAREAS_DEFAULT[elem.tipo]||[]).map(t=>({...t}));
+                  return {frecs,eid:elem.id,isCustom:false};
+                }}
+                MACROZONAS_BASE={MACROZONAS_BASE}
+                onAccesoRapido={(vista,subTab)=>{setVista(vista);if(subTab)setGolfInitTab(subTab);setWorkerARevisar(null);}}
+                onCambiarMetodo={()=>{}}
+                onCerrarTurno={()=>{}}
+                onReabrirTurno={(fecha,nombre)=>{
+                  const key=`${fecha}_${nombre.split(" ")[0].toLowerCase()}`;
+                  setCierresTurno(prev=>{const n={...prev};delete n[key];return n;});
+                }}
+              />
+            </div>
+          );
+        })()}
+
+        {!workerARevisar&&vista==="dashboard"&&!zonaId&&(
           <div className="ein">
             <div style={{marginBottom:26}}>
               <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:26,fontWeight:900,marginBottom:3}}>Panel General</h1>
@@ -13046,6 +13107,48 @@ export default function App() {
                 </div>
               </div>
             )}
+            {/* ── Turnos de trabajadores hoy ── */}
+            {(()=>{
+              const tdHoy=new Date().toISOString().slice(0,10);
+              const tdNorm=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+              const tdTareas=tdNorm(tareasProg[tdHoy]);
+              const tdPersonal=Array.isArray(personal)?personal:Object.values(personal||{});
+              const tdTrabs=tdPersonal.filter(w=>tdTareas.some(x=>x.responsable===w.nombre));
+              if(tdTrabs.length===0) return null;
+              return (
+                <div style={{marginBottom:22}}>
+                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:19,fontWeight:700,marginBottom:10}}>👷 Turnos de hoy</div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+                    {tdTrabs.map(w=>{
+                      const tdKey=`${tdHoy}_${w.nombre.split(" ")[0].toLowerCase()}`;
+                      const tdCerrado=cierresTurno?.[tdKey];
+                      const tdTT=tdTareas.filter(x=>x.responsable===w.nombre);
+                      const tdHechas=tdTT.filter(t=>["hecha","completada"].includes(t.estado)).length;
+                      const tdPct=tdTT.length?Math.round((tdHechas/tdTT.length)*100):0;
+                      return (
+                        <button key={w.id} onClick={()=>setWorkerARevisar(w.id)}
+                          style={{cursor:"pointer",border:`1px solid ${tdCerrado?"rgba(34,197,94,0.3)":"rgba(255,255,255,0.12)"}`,borderRadius:10,padding:"10px 14px",background:tdCerrado?"rgba(34,197,94,0.06)":"rgba(255,255,255,0.04)",textAlign:"left",minWidth:160}}>
+                          <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:5}}>
+                            <div style={{width:24,height:24,borderRadius:"50%",background:"linear-gradient(135deg,#1a5c35,#2d7a4f)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",flexShrink:0}}>
+                              {w.nombre[0]?.toUpperCase()}
+                            </div>
+                            <div style={{fontSize:12,fontWeight:700}}>{w.nombre.split(" ")[0]}</div>
+                            {tdCerrado
+                              ? <span style={{fontSize:9,color:"#22c55e",background:"rgba(34,197,94,0.1)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:6,padding:"1px 6px",marginLeft:"auto"}}>✅ Cerrado</span>
+                              : <span style={{fontSize:9,color:"#f59e0b",background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.2)",borderRadius:6,padding:"1px 6px",marginLeft:"auto"}}>⏳ Activo</span>
+                            }
+                          </div>
+                          <div style={{background:"rgba(255,255,255,0.06)",borderRadius:4,height:4,marginBottom:4,overflow:"hidden"}}>
+                            <div style={{width:`${tdPct}%`,height:"100%",background:tdPct===100?"#22c55e":"#4ade80",borderRadius:4}}/>
+                          </div>
+                          <div style={{fontSize:10,color:"#5a9a7a"}}>{tdHechas}/{tdTT.length} tareas · {tdPct}%</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
             <div style={{marginBottom:12,fontFamily:"'Playfair Display',serif",fontSize:19,fontWeight:700}}>Por Categoría</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(210px,1fr))",gap:12}}>
               {[...new Set(MACROZONAS_BASE.map(z=>z.categoria))].map(cat=>{
