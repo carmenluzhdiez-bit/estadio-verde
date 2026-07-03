@@ -4219,10 +4219,10 @@ function TipoEventoSelector({ value, onChange, S, TIPO_EVENTO }) {
                   const tipoEvt=TIPO_EVENTO[k];
                   if(!tipoEvt) return null;
                   return (
-                    <div key={k} style={{padding:"9px 14px 9px 22px",cursor:"pointer",fontSize:13,color:value===k?t.color:"#ede9e0",background:value===k?`${t.color}18`:"transparent",borderLeft:value===k?`2px solid ${t.color}`:"2px solid transparent",display:"flex",alignItems:"center",gap:8}}
+                    <div key={k} style={{padding:"9px 14px 9px 22px",cursor:"pointer",fontSize:13,color:value===k?tipoEvt.color:"#ede9e0",background:value===k?`${tipoEvt.color}18`:"transparent",borderLeft:value===k?`2px solid ${tipoEvt.color}`:"2px solid transparent",display:"flex",alignItems:"center",gap:8}}
                       onClick={()=>{onChange(k);setOpen(false);}}>
-                      <span style={{fontSize:16}}>{t.icon}</span>
-                      <span>{t.label}</span>
+                      <span style={{fontSize:16}}>{tipoEvt.icon}</span>
+                      <span>{tipoEvt.label}</span>
                     </div>
                   );
                 })}
@@ -7928,11 +7928,11 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
               {zonasComparativas.map(id=>{
                 const medZ2=ZONAS.find(x=>x.id===id);
                 const medA2=analisisTasas(id);
-                return z?(
+                return medZ2?(
                   <div key={id} style={{display:"flex",alignItems:"center",gap:5,fontSize:11}}>
                     <div style={{width:12,height:3,background:COLORES_ZONA[id],borderRadius:2}}/>
-                    <span style={{color:"#7aaa80"}}>{z.nombre}</span>
-                    {a&&<span style={{color:colorCategoria(a.categoria),fontWeight:600}}>{a.tasaGlobal>0?"+":""}{a.tasaGlobal}mm/d {a.categoria.split(" ")[0]}</span>}
+                    <span style={{color:"#7aaa80"}}>{medZ2.nombre}</span>
+                    {medA2&&<span style={{color:colorCategoria(medA2.categoria),fontWeight:600}}>{medA2.tasaGlobal>0?"+":""}{medA2.tasaGlobal}mm/d {medA2.categoria.split(" ")[0]}</span>}
                   </div>
                 ):null;
               })}
@@ -9522,7 +9522,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               if(histPost.length>=2){
                 const a1=Number(histPost[0].alturas[g.id]),a2=Number(histPost[1].alturas[g.id]);
                 const dHist1=Math.round((new Date(histPost[0].fecha+"T12:00:00")-new Date(histPost[1].fecha+"T12:00:00"))/(1000*60*60*24));
-                if(d>0&&a1>a2) tasa=(a1-a2)/d;
+                if(dHist1>0&&a1>a2) tasa=(a1-a2)/dHist1;
               }
               // Fallback 1: desde altura de corte hasta medición más reciente
               if(!tasa&&altCorteReal&&infoCorte?.fecha){
@@ -9530,13 +9530,13 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                 const altRef = histPost.length>0?Number(histPost[0].alturas[g.id]):Number(alt);
                 const dHist2=Math.round((new Date(fechaRef+"T12:00:00")-new Date(infoCorte.fecha+"T12:00:00"))/(1000*60*60*24));
                 const delta=altRef-altCorteReal;
-                if(d>0&&delta>0) tasa=delta/d;
+                if(dHist2>0&&delta>0) tasa=delta/dHist2;
               }
               // Fallback 2: desde última medición disponible aunque no haya corte
               if(!tasa&&histG.length>=2){
                 const a1=Number(histG[0].alturas[g.id]),a2=Number(histG[1].alturas[g.id]);
                 const dHist3=Math.round((new Date(histG[0].fecha+"T12:00:00")-new Date(histG[1].fecha+"T12:00:00"))/(1000*60*60*24));
-                if(d>0&&a1>a2) tasa=(a1-a2)/d;
+                if(dHist1>0&&a1>a2) tasa=(a1-a2)/dHist1;
               }
               const altN=Number(alt);
               if(altN>=altObjetivo) return {g,diasRestantes:0,urgencia:"cortar",alt:altN,tasa,altObjetivo,infoCorte};
@@ -10518,7 +10518,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                         alturaMaxCorte=infoCorte?.alturaObjetivo||(rango.corte*1.1)||(rango.min*1.5);
                         const histG=[...mediciones].filter(m=>m.alturas?.[g.id]&&m.fecha).sort((a,b)=>b.fecha.localeCompare(a.fecha));
                         if(diasCrecimiento&&Number(diasCrecimiento)>0&&Number(alt)>0){tasaCalculada=Number(alt)/Number(diasCrecimiento);tasaFuente="manual";}
-                        else if(infoCorte?.alturaCorte&&histG[0]){const dDiasG=Math.round((new Date(histG[0].fecha+"T12:00:00")-new Date(infoCorte.fecha+"T12:00:00"))/86400000);const a1=Number(histG[0].alturas?.[g.id]);const altC=Number(infoCorte.alturaCorte);if(d>0&&a1>altC){tasaCalculada=(a1-altC)/d;tasaFuente="auto";}}
+                        else if(infoCorte?.alturaCorte&&histG[0]){const dDiasG=Math.round((new Date(histG[0].fecha+"T12:00:00")-new Date(infoCorte.fecha+"T12:00:00"))/86400000);const a1=Number(histG[0].alturas?.[g.id]);const altC=Number(infoCorte.alturaCorte);if(dDiasG>0&&a1>altC){tasaCalculada=(a1-altC)/dDiasG;tasaFuente="auto";}}
                         else if(histG.length>=2){const a1=Number(histG[0].alturas?.[g.id]);const a2=Number(histG[1].alturas?.[g.id]);const dDiasH=Math.round((new Date(histG[0].fecha+"T12:00:00")-new Date(histG[1].fecha+"T12:00:00"))/86400000);if(dDiasH>0&&a1>a2){tasaCalculada=(a1-a2)/dDiasH;tasaFuente="histórico";}}
                         if(Number(alt)>=Number(alturaMaxCorte)){proyeccion="⚠️ Cortar ya";}
                         else if(tasaCalculada&&tasaCalculada>0){const dias=Math.round((Number(alturaMaxCorte)-Number(alt))/tasaCalculada);proyeccion=dias<=0?"⚠️ Cortar ya":dias<=2?`⏰ ${dias}d`:`${dias}d → ${new Date(Date.now()+dias*86400000).toLocaleDateString("es-CL",{day:"numeric",month:"numeric"})}`;}
@@ -11577,8 +11577,8 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
       if(!bonosT.length&&!eventosT.length) return "";
 
       const totalBonos = bonosT.reduce((a,b)=>{
-        const bonoP=b.participantes?.find(bp=>String(p.trabajadorId)===String(t.id));
-        return a+Number(p?.monto||0);
+        const bonoP=b.participantes?.find(bp=>String(bp.trabajadorId)===String(t.id));
+        return a+Number(bonoP?.monto||0);
       },0) + eventosT.filter(e=>["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)).reduce((a,e)=>a+Number(e.valor||0),0);
       const totalHE = eventosT.filter(e=>e.tipo==="horaExtra"&&e.estado==="aprobado").reduce((a,e)=>a+Number(e.horas||0),0);
       const hePendientes = eventosT.filter(e=>e.tipo==="horaExtra"&&e.estado!=="aprobado");
