@@ -8380,7 +8380,7 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
               return (
                 <div key={g.id} style={{background:info?info.bg:"rgba(255,255,255,0.03)",borderRadius:8,padding:"8px 10px",border:`1px solid ${info?info.color+"40":"rgba(255,255,255,0.08)"}`}}>
                   <div style={{fontSize:10,fontWeight:600,color:"#34d399",marginBottom:2}}>{g.nombre}</div>
-                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color:info?.color||"#ede9e0"}}>{v||"—"}</div>
+                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color:info?.color||"#ede9e0"}}>{humV||"—"}</div>
                   {info&&<div style={{fontSize:9,color:info.color}}>{info.label}</div>}
                 </div>
               );
@@ -8419,7 +8419,7 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
                       if(!humV2) return null;
                       const info=ESCALA_HUM_GOLF[Math.min(Math.max(Number(humV2),1),8)];
                       if(!info) return null;
-                       return <span key={g.id} style={{fontSize:10,color:info.color,background:info.bg,border:`1px solid ${info.color}40`,borderRadius:6,padding:"1px 6px"}}>{g.nombre.replace("Green ","G")}: {v}</span>;
+                       return <span key={g.id} style={{fontSize:10,color:info.color,background:info.bg,border:`1px solid ${info.color}40`,borderRadius:6,padding:"1px 6px"}}>{g.nombre.replace("Green ","G")}: {humV2}</span>;
                     })}
                   </div>
                   {infoExtremo&&<div style={{fontSize:11,color:infoExtremo.color}}>{esSecaEstacion?"Mín":"Máx"}: {infoExtremo.label}</div>}
