@@ -13433,7 +13433,7 @@ export default function App() {
                 const dzd=getZD(z.id); const est=ESTADOS_ZONA[dzd.estadoGeneral||"bueno"];
                 const allElems=getAllElems(z.id);
                 const criticos=allElems.filter(e=>e.edData.estado==="critico").length;
-                const pendTareas=(d.tareas||[]).filter(t=>!t.completada).length;
+                const pendTareas=(dzd.tareas||[]).filter(t=>!t.completada).length;
                 return (
                   <div key={z.id}
                     style={{
@@ -13889,13 +13889,13 @@ export default function App() {
                     const dzd2=getZD(z.id);
                     const allE=getAllElems(z.id);
                     const crit=allE.filter(e=>e.edData.estado==="critico").length;
-                    const pend=(d.tareas||[]).filter(t=>!t.completada).length;
+                    const pend=(dzd2.tareas||[]).filter(t=>!t.completada).length;
                     const COLORES={bueno:"#166534",regular:"#92400e",critico:"#991b1b",mantenimiento:"#1e40af"};
                     const LABELS={bueno:"Bueno",regular:"Regular",critico:"Crítico",mantenimiento:"En Mantenimiento"};
                     return "<tr>"
                       +"<td>"+z.icono+" "+z.nombre+"</td>"
                       +"<td>"+z.categoria+"</td>"
-                      +"<td style='color:"+COLORES[d.estadoGeneral||"bueno"]+";font-weight:600'>"+LABELS[d.estadoGeneral||"bueno"]+"</td>"
+                      +"<td style='color:"+COLORES[dzd2.estadoGeneral||"bueno"]+";font-weight:600'>"+LABELS[dzd2.estadoGeneral||"bueno"]+"</td>"
                       +"<td style='text-align:center'>"+allE.length+"</td>"
                       +"<td style='text-align:center;color:"+(crit>0?"#991b1b":"#166534")+"'>"+(crit>0?"🔴 "+crit:"—")+"</td>"
                       +"<td>"+(d.ultimoMant||"—")+"</td>"
