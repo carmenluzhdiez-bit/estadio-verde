@@ -47,10 +47,10 @@ function useFirebaseState(path, defaultValue) {
 
   useEffect(() => {
     const fbRef = ref(db, fullPath);
-    const unsub = onValue(r, (snap) => {
+    const unsub = onValue(fbRef, (snap) => {
       if (skipRef.current) { skipRef.current = false; return; }
       const snapV = snap.val();
-      setValueLocal(v !== null && v !== undefined ? v : defaultValue);
+      setValueLocal(snapV !== null && snapV !== undefined ? snapV : defaultValue);
       setReady(true);
     });
     return () => unsub();
