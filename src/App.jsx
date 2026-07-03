@@ -1570,19 +1570,29 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
     .filter(dKey => !filtroDia || dKey === filtroDia)
     .sort((dA,dB)=>dB.localeCompare(dA));
 
-  const filtrarTareas = (tArr) => tArr.filter(tItem => {
-    if(tItem.zona==="Golf") return false; // Golf tiene módulo propio
-    const mE = filtroEstado==="todos" || tItem.estado===filtroEstado;
-    const mT = !filtroTarea || tItem.tarea===filtroTarea;
-    const mZ = filtroZona==="todas" || tItem.zona===filtroZona;
-    return mE && mT && mZ;
-  });
+  function filtrarTareasHist(tArr, filtroEstado, filtroTarea, filtroZona) {
+    const resultado = [];
+    for (let histIdx = 0; histIdx < tArr.length; histIdx++) {
+      const histItem = tArr[histIdx];
+      if(histItem.zona==="Golf") continue;
+      const okEst = filtroEstado==="todos" || histItem.estado===filtroEstado;
+      const okTar = !filtroTarea || histItem.tarea===filtroTarea;
+      const okZon = filtroZona==="todas" || histItem.zona===filtroZona;
+      if(okEst && okTar && okZon) resultado.push(histItem);
+    }
+    return resultado;
+  }
+  const filtrarTareas = (tArr) => filtrarTareasHist(tArr, filtroEstado, filtroTarea, filtroZona);
 
   const imprimirDia = (dia) => {
-    const hpTd = filtrarTareas(tareas[dia]||[]);
-    const hechas = hpTd.filter(hpTask=>["hecha","completada"].includes(hpTask.estado)).length;
-    const noPudo = hpTd.filter(hpTask=>hpTask.estado==="no_pudo").length;
-    const pct = hpTd.length ? Math.round((hechas/hpTd.length)*100) : 0;
+    const hpTdArr = filtrarTareas(tareas[dia]||[]);
+    const hpTdLen = hpTdArr.length;
+    let hechas = 0; let noPudo = 0;
+    for(let hpII=0;hpII<hpTdLen;hpII++){
+      if(["hecha","completada"].includes(hpTdArr[hpII].estado)) hechas++;
+      if(hpTdArr[hpII].estado==="no_pudo") noPudo++;
+    }
+    const pct = hpTdLen ? Math.round((hechas/hpTdLen)*100) : 0;
     const win = window.open("","_blank","width=800,height=600");
     win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
     <title>Programación ${dia} — Estadio Español</title>
@@ -1602,9 +1612,9 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
       @media print{body{padding:16px}.pie{position:fixed;bottom:20px;width:100%}}
     </style></head><body>
     <h1>📋 Programación Diaria — Estadio Español</h1>
-    <div class="sub">Fecha: <b>${dia}</b>${hpTd.length !== (tareas[dia]||[]).length ? " (filtrado)" : ""} · Generado: ${new Date().toLocaleDateString("es-CL")} ${new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"})}</div>
+    <div class="sub">Fecha: <b>${dia}</b>${hpTdArr.length !== (tareas[dia]||[]).length ? " (filtrado)" : ""} · Generado: ${new Date().toLocaleDateString("es-CL")} ${new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"})}</div>
     <div class="stats">
-      <span>Total: <b>${hpTd.length}</b></span>
+      <span>Total: <b>${hpTdArr.length}</b></span>
       <span class="stat-ok">✅ Hechas: ${hechas}</span>
       ${noPudo>0?"<span class=\"stat-bad\">🔴 No pudieron: "+noPudo+"</span>":""}
       <span class="stat-pct">${pct}% completado</span>
@@ -1612,7 +1622,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
     <table>
       <thead><tr><th>Estado</th><th>Tarea</th><th>Elemento</th><th>Zona</th><th>Responsable</th><th>Observación</th></tr></thead>
       <tbody>
-        ${hpTd.map(hpTask => {
+        ${hpTdArr.map(hpTask => {
           const estCls = ["hecha","completada"].includes(hpTask.estado)?"est-ok":hpTask.estado==="no_pudo"?"est-bad":["haciendose","en_curso"].includes(hpTask.estado)?"est-blue":["pendiente"].includes(hpTask.estado)?"est-pend":"est-gray";
           const estLabel = EC[hpTask.estado]?.label || hpTask.estado;
           const icono = MACROZONAS_BASE.find(z=>z.nombre===hpTask.zona)?.icono||""
