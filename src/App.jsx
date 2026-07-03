@@ -130,8 +130,8 @@ const calcProximaFrecGlobal = (f, refFecha) => {
     return null;
   }
   // modo estación
-  const est = estacionDeFecha(refFecha);
-  const frecVal = f[est];
+  const estCPFG = estacionDeFecha(refFecha);
+  const frecVal = f[estCPFG];
   if(!frecVal||frecVal==="noaplica"||frecVal==="unavez"||frecVal==="segunecesidad") return null;
   if(!f.ultimaVez) return null;
   const dias = frecToDiasGlobal(frecVal);
@@ -2118,22 +2118,29 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
 
   const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
   const ORDEN_ESTADO = {pendiente:0, haciendose:1, no_pudo:2, hecha:3, por_designar:4};
-  const esDiaria = (t) => {
-    if(t.diaria === true) return true;
-    const nombre = (t.tarea||"").toLowerCase();
-    // Tareas generadas por el registro diario de greens
-    const keywordsDiarias = [
+  function esDiariaVW(tareaObj) {
+    if(tareaObj.diaria === true) return true;
+    const nombreED = (tareaObj.tarea||"").toLowerCase();
+    const keywordsED = [
       "limpieza tee","limpieza —","revisión estado general","revisión humedad greens",
       "revisión estado fitosanitario","soplado","barrido","pediluvios",
       "limpieza general","riego manual","orden y limpieza","registro diario"
     ];
-    return keywordsDiarias.some(k => nombre.includes(k));
-  };
-  const sortTareas = (arr) => [...arr].sort((a,b)=>{
-    const ea = ORDEN_ESTADO[a.estado]??0, eb = ORDEN_ESTADO[b.estado]??0;
-    if(ea!==eb) return ea-eb;
-    return (a.zona||"").localeCompare(b.zona||"","es",{sensitivity:"base"});
-  });
+    for(let edI=0;edI<keywordsED.length;edI++){
+      if(nombreED.includes(keywordsED[edI])) return true;
+    }
+    return false;
+  }
+  const esDiaria = esDiariaVW;
+  function sortTareasVW(arr) {
+    return [...arr].sort(function(sortItemA, sortItemB){
+      const sortEA = ORDEN_ESTADO[sortItemA.estado]??0;
+      const sortEB = ORDEN_ESTADO[sortItemB.estado]??0;
+      if(sortEA!==sortEB) return sortEA-sortEB;
+      return (sortItemA.zona||"").localeCompare(sortItemB.zona||"","es",{sensitivity:"base"});
+    });
+  }
+  const sortTareas = sortTareasVW;
   // Leer siempre directamente del prop tareas para que React detecte cambios
   // Buscar en fechaVer (hora local) Y en la fecha UTC del mismo día (por si se guardaron con toISOString)
   const todasMisTareas = React.useMemo(()=>{
@@ -2170,10 +2177,10 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
     if (!zonaBase) return;
     // Find element in zona
     const estSig = (f) => {
-      const m = new Date(fechaVer).getMonth()+1;
-      if([12,1,2].includes(m)) return "verano";
-      if([3,4,5].includes(m)) return "otono";
-      if([6,7,8].includes(m)) return "invierno";
+      const vwMes = new Date(fechaVer).getMonth()+1;
+      if([12,1,2].includes(vwMes)) return "verano";
+      if([3,4,5].includes(vwMes)) return "otono";
+      if([6,7,8].includes(vwMes)) return "invierno";
       return "primavera";
     };
     const est = estSig(fechaVer);
@@ -2638,7 +2645,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
   const deleteTarea = (id) => setTareasDelDia(fecha, getTareasDelDia(fecha).filter(t => t.id!==id));
 
   const proponerTareas = () => {
-    const est = estacionDeFecha(fecha);
+    const estProp = estacionDeFecha(fecha);
     const propuestas = [];
     const vencidas = [];
     const existentes = getTareasDelDia(fecha).map(t => t.zona+"_"+t.elemento+"_"+t.tarea);
@@ -3967,8 +3974,8 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
   };
 
   // Estación actual (hemisferio sur)
-  const mes = new Date().getMonth()+1;
-  const estActual = [12,1,2].includes(mes)?"verano":[3,4,5].includes(mes)?"otono":[6,7,8].includes(mes)?"invierno":"primavera";
+  const fpMes = new Date().getMonth()+1;
+  const estActual = [12,1,2].includes(fpMes)?"verano":[3,4,5].includes(fpMes)?"otono":[6,7,8].includes(fpMes)?"invierno":"primavera";
 
   // Calcula próxima fecha — modo "estación" (por días desde última vez)
   const calcProximaEstacion = (f) => {
@@ -7468,10 +7475,10 @@ const RANGOS_ALTURA = {
   primavera: {min:4.5, max:4.8, label:"Primavera (Sep-Nov)"},
 };
 const getMesEstacion = () => {
-  const m = new Date().getMonth()+1;
-  if(m>=12||m<=2) return "verano";
-  if(m>=3&&m<=5)  return "otono";
-  if(m>=6&&m<=8)  return "invierno";
+  const gmesMes = new Date().getMonth()+1;
+  if(gmesMes>=12||gmesMes<=2) return "verano";
+  if(gmesMes>=3&&gmesMes<=5)  return "otono";
+  if(gmesMes>=6&&gmesMes<=8)  return "invierno";
   return "primavera";
 };
 const GREENS_DEF = [
