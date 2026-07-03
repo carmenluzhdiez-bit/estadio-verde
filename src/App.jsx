@@ -4217,7 +4217,7 @@ function TipoEventoSelector({ value, onChange, S, TIPO_EVENTO }) {
                 </div>
                 {g.keys.map(k=>{
                   const tipoEvt=TIPO_EVENTO[k];
-                  if(!t) return null;
+                  if(!tipoEvt) return null;
                   return (
                     <div key={k} style={{padding:"9px 14px 9px 22px",cursor:"pointer",fontSize:13,color:value===k?t.color:"#ede9e0",background:value===k?`${t.color}18`:"transparent",borderLeft:value===k?`2px solid ${t.color}`:"2px solid transparent",display:"flex",alignItems:"center",gap:8}}
                       onClick={()=>{onChange(k);setOpen(false);}}>
@@ -7673,7 +7673,7 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
     for(let i=1;i<puntos.length;i++) {
       const svgP = puntos[i];
       const pPrev = puntos[i-1];
-      const diasTotal = Math.round((new Date(p.fecha)-new Date(pPrev.fecha))/(1000*60*60*24));
+      const diasTotal = Math.round((new Date(svgP.fecha)-new Date(pPrev.fecha))/(1000*60*60*24));
       if(diasTotal<=0) continue;
 
       let delta, diasRef, metodo;
@@ -7859,7 +7859,7 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
             {(()=>{
               const medA = analisisTasas(zonaSelGrafico);
               const medZ = ZONAS.find(x=>x.id===zonaSelGrafico);
-              if(!a) return <div style={{fontSize:12,color:"#5a9a7a",marginTop:8}}>Insuficientes datos para calcular tasa</div>;
+             if(!medA) return <div style={{fontSize:12,color:"#5a9a7a",marginTop:8}}>Insuficientes datos para calcular tasa</div>;
               return (
                 <div style={{marginTop:12}}>
                   <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:10}}>
@@ -7947,8 +7947,8 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               {ZONAS.map(z=>{
                 const medA3=analisisTasas(z.id);
-                if(!a) return null;
-                const medW = Math.min(Math.abs(a.tasaGlobal)/1.5*100,100);
+                if(!medA3) return null;
+                const medW = Math.min(Math.abs(medA3.tasaGlobal)/1.5*100,100);
                 return (
                   <div key={z.id} style={{display:"flex",alignItems:"center",gap:10}}>
                     <div style={{width:100,fontSize:11,color:"#7aaa80",flexShrink:0,textAlign:"right"}}>{z.nombre}</div>
@@ -8370,13 +8370,13 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
             {ultimaHum.decision&&(()=>{
               const dec=DECISIONES_HUM.find(d=>d.value===ultimaHum.decision);
               const humC=ultimaHum.decision==="cerrar-cancha"?"#ef4444":ultimaHum.decision==="abrir-cancha"?"#22c55e":"#60a5fa";
-              return <span style={{fontSize:12,fontWeight:600,color:c,background:`${c}12`,border:`1px solid ${c}30`,borderRadius:8,padding:"3px 10px"}}>{dec?.label||ultimaHum.decision}</span>;
+              return <span style={{fontSize:12,fontWeight:600,color:humC,background:`${humC}12`,border:`1px solid ${humC}30`,borderRadius:8,padding:"3px 10px"}}>{dec?.label||ultimaHum.decision}</span>;
             })()}
           </div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(88px,1fr))",gap:6}}>
             {GREENS_DEF.map(g=>{
               const humV=ultimaHum.valores?.[g.id]?.valor;
-              const info=v?ESCALA_HUM_GOLF[Math.min(Math.max(Number(v),1),8)]:null;
+              const info=humV?ESCALA_HUM_GOLF[Math.min(Math.max(Number(humV),1),8)]:null;
               return (
                 <div key={g.id} style={{background:info?info.bg:"rgba(255,255,255,0.03)",borderRadius:8,padding:"8px 10px",border:`1px solid ${info?info.color+"40":"rgba(255,255,255,0.08)"}`}}>
                   <div style={{fontSize:10,fontWeight:600,color:"#34d399",marginBottom:2}}>{g.nombre}</div>
@@ -8416,8 +8416,8 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
                   <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:4}}>
                     {GREENS_DEF.map(g=>{
                       const humV2=m.valores?.[g.id]?.valor;
-                      if(!v) return null;
-                      const info=ESCALA_HUM_GOLF[Math.min(Math.max(Number(v),1),8)];
+                      if(!humV2) return null;
+                      const info=ESCALA_HUM_GOLF[Math.min(Math.max(Number(humV2),1),8)];
                       if(!info) return null;
                        return <span key={g.id} style={{fontSize:10,color:info.color,background:info.bg,border:`1px solid ${info.color}40`,borderRadius:6,padding:"1px 6px"}}>{g.nombre.replace("Green ","G")}: {v}</span>;
                     })}
@@ -10864,8 +10864,8 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
 
   const marcarRegreso = (id) => {
     const trasT = (bd.traslados||[]).find(x=>x.id===id);
-    if(!t) return;
-    const items = (bd.items||[]).map(i=>String(i.id)===String(t.itemId)?{...i,stockActual:(Number(i.stockActual)||0)+Number(t.cantidad)}:i);
+    if(!trasT) return;
+    const items = (bd.items||[]).map(i=>String(i.id)===String(trasT.itemId)?{...i,stockActual:(Number(i.stockActual)||0)+Number(t.cantidad)}:i);
     setbd({items,traslados:(bd.traslados||[]).map(x=>x.id===id?{...x,estado:"regresó",fechaRegresoReal:hoy}:x)});
   };
 
@@ -13930,7 +13930,7 @@ export default function App() {
                   const blob = new Blob([html], {type:"text/html;charset=utf-8"});
                   const url = URL.createObjectURL(blob);
                   const dlA = document.createElement("a");
-                  a.href = url; a.target = "_blank"; a.click();
+                  dlA.href = url; dlA.target = "_blank"; dlA.click();
                   setTimeout(()=>URL.revokeObjectURL(url), 10000);
                 }}
                 style={{...S.btn,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)",fontSize:13,flexShrink:0}}
@@ -14174,7 +14174,7 @@ export default function App() {
                         if(e.key!=="Enter") return;
                         if(rolSeleccionado==="trabajador"){
                           const wrkT=personal.find(x=>String(x.id)===String(workerLogueado));
-                          if(t&&String(t.pin)===String(workerPinInput)){setVistaWorker(true);setWorkerPinError(false);}
+                          if(wrkT&&String(wrkT.pin)===String(workerPinInput)){setVistaWorker(true);setWorkerPinError(false);}
                           else setWorkerPinError(true);
                         } else {
                           if(checkPin(rolSeleccionado,workerPinInput)){setWorkerPinError(false);}
@@ -14195,7 +14195,7 @@ export default function App() {
                     onClick={()=>{
                       if(rolSeleccionado==="trabajador"){
                         const wrkT2=personal.find(x=>String(x.id)===String(workerLogueado));
-                        if(t&&String(t.pin)===String(workerPinInput)){setVistaWorker(true);setWorkerPinError(false);}
+                        if(wrkT2&&String(wrkT2.pin)===String(workerPinInput)){setVistaWorker(true);setWorkerPinError(false);}
                         else setWorkerPinError(true);
                       } else {
                         if(checkPin(rolSeleccionado,workerPinInput)){setWorkerPinError(false);}
