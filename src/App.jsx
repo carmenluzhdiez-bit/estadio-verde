@@ -7623,7 +7623,7 @@ const PLANTILLA_PRE_TORNEO = {
 
 // ─── ANÁLISIS MEDICIONES GOLF ────────────────────────────────────────────────
 function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJefa, onBorrar, onBorrarTodo, tareasProg }) {
-  const ZONAS = [...GREENS_DEF, {id:"vivero", nombre:"Vivero", hoyos:""}];
+  const ZONAS = [...GREENS_DEF,{id:"vivero",nombre:"Vivero",hoyos:"Vivero"}].map((g,gi)=>({id:g.id,nombre:g.nombre,hoyos:g.hoyos,color:["#34d399","#60a5fa","#f59e0b","#a78bfa","#f472b6","#22d3ee","#fb923c","#86efac","#fcd34d","#4ade80"][gi]||"#34d399"}));
   const COLORES_ZONA = {
     g1:"#34d399",g2:"#60a5fa",g3:"#f59e0b",g4:"#a78bfa",g5:"#f472b6",
     g6:"#22d3ee",g7:"#fb923c",g8:"#86efac",g9:"#fcd34d",vivero:"#4ade80",
@@ -8374,7 +8374,7 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
             })()}
           </div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(88px,1fr))",gap:6}}>
-            {GREENS_DEF.map(g=>{
+            {[...GREENS_DEF,{id:"vivero",nombre:"Vivero",hoyos:"Vivero"}].map(g=>{
               const humV=ultimaHum.valores?.[g.id]?.valor;
               const info=humV?ESCALA_HUM_GOLF[Math.min(Math.max(Number(humV),1),8)]:null;
               return (
