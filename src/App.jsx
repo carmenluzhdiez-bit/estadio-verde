@@ -13167,7 +13167,7 @@ export default function App() {
               {fbRol==="jefa"?"🌿 Jefa AV":fbRol==="supervisor"?"👷 Supervisor":(()=>{
                 const arr=Array.isArray(personal)?personal:Object.values(personal||{});
                 const fbU=fbUser?arr.find(x=>x.email?.toLowerCase()===fbUser.email?.toLowerCase()):null;
-                return u?`🌱 ${u.nombre.split(" ")[0]}`:"🌱 Jardinero";
+                return fbU?`🌱 ${fbU.nombre.split(" ")[0]}`:"🌱 Jardinero";
               })()}
             </span>
             <button onClick={handleLogout}
