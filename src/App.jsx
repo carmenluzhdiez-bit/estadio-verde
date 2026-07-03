@@ -11585,11 +11585,11 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
 
       const filasBonosMasivos = bonosT.map(b=>{
         const bonoP3=b.participantes?.find(bp3=>String(bp3.trabajadorId)===String(t.id));
-        const nombre = p?.nombre&&p.nombre!=="—"?p.nombre:personalArr.find(x=>String(x.id)===String(p?.trabajadorId))?.nombre||p?.nombre||"—";
+        const nombre = bonoP3?.nombre&&bonoP3.nombre!=="—"?bonoP3.nombre:personalArr.find(x=>String(x.id)===String(bonoP3?.trabajadorId))?.nombre||bonoP3?.nombre||"—";
         return `<tr style="background:#f9f0ff">
           <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${b.fecha}</td>
-          <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${p?.rol||""} — ${b.descripcion}</td>
-          <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px;text-align:right;font-weight:700;color:#7b1fa2">$${Number(p?.monto||0).toLocaleString("es-CL")}</td>
+          <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${bonoP3?.rol||""} — ${b.descripcion}</td>
+          <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px;text-align:right;font-weight:700;color:#7b1fa2">$${Number(bonoP3?.monto||0).toLocaleString("es-CL")}</td>
         </tr>`;}).join("");
 
       const filasBonosInd = eventosT.filter(e=>["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)).map(e=>`
@@ -12765,8 +12765,8 @@ export default function App() {
       const arr = Array.isArray(personal)?personal:Object.values(personal||{});
       if(arr.length>0){
         const fbP = arr.find(x=>x.email?.toLowerCase()===fbUser.email?.toLowerCase());
-        if(p){
-          setWorkerLogueado(p.id);
+        if(fbP){
+          setWorkerLogueado(fbP.id);
           setVistaWorker(true);
           setVista("miturno");
         }
