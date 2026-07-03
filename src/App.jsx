@@ -9372,8 +9372,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                     return (
                       <tr key={g.id} style={{borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
                         <td style={{padding:"5px 10px"}}>
-                          <div style={{fontWeight:600,color:"#34d399"}}>{pgG.nombre}</div>
-                          <div style={{fontSize:10,color:"#5a9a7a"}}>{pgG.hoyos}</div>
+                          <div style={{fontWeight:600,color:"#34d399"}}>{g.nombre}</div>
+                          <div style={{fontSize:10,color:"#5a9a7a"}}>{g.hoyos}</div>
                         </td>
                         <td style={{padding:"5px 6px",textAlign:"center"}}>
                           <input type="number" step="0.1" min="0" max="20"
@@ -9656,8 +9656,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                 const color = colorAltura(alt);
                 return (
                   <div key={g.id} style={{background:`${color}10`,borderRadius:8,padding:"8px 10px",border:`1px solid ${color}30`,textAlign:"center",cursor:"pointer"}} onClick={()=>{setSubTab("greens");setSelectedGreen(g.id);}}>
-                    <div style={{fontSize:11,fontWeight:600,color:"#34d399"}}>{pgG.nombre}</div>
-                    <div style={{fontSize:10,color:"#5a9a7a",marginBottom:4}}>{pgG.hoyos}</div>
+                    <div style={{fontSize:11,fontWeight:600,color:"#34d399"}}>{g.nombre}</div>
+                    <div style={{fontSize:10,color:"#5a9a7a",marginBottom:4}}>{g.hoyos}</div>
                     <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color}}>{alt?`${alt}mm`:"—"}</div>
                   </div>
                 );
@@ -9687,7 +9687,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               return (
                 <button key={g.id} onClick={()=>setSelectedGreen(g.id)}
                   style={{background:selectedGreen===g.id?`${color}20`:"rgba(255,255,255,0.04)",border:`1px solid ${selectedGreen===g.id?color+"60":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"6px 12px",color:selectedGreen===g.id?color:"#5a9a7a",fontSize:11,cursor:"pointer",fontFamily:"'Georgia',serif"}}>
-                  {pgG.nombre}<br/><span style={{fontSize:9,color:"#5a9a7a"}}>{pgG.hoyos}</span>
+                  {g.nombre}<br/><span style={{fontSize:9,color:"#5a9a7a"}}>{g.hoyos}</span>
                 </button>
               );
             })}
