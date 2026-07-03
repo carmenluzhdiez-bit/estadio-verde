@@ -12515,12 +12515,12 @@ export default function App() {
   const [nuevaMacrozona, setNuevaMacrozona] = useState({nombre:"",categoria:"Calles y Accesos",icono:"🌿",descripcion:""});
   const [filtroEst, setFiltroEst] = useState("Todos");
   const [busq, setBusq] = useState("");
-  const [editElem, setEditElem] = useState(null);
   const [showAddElem, setShowAddElem] = useState(false);
   const [newElem, setNewElem] = useState({ nombre:"", tipo:"arboles" });
   const [nuevaTarea, setNuevaTarea] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiText, setAiText] = useState("");
+  const [editElem, setEditElem] = useState(null);
   const [showPlantacionForm, setShowPlantacionForm] = useState(null);
 
   const ejecutarDescuentoStock = (descuentos) => {
