@@ -46,10 +46,10 @@ function useFirebaseState(path, defaultValue) {
   const skipRef = useRef(false);
 
   useEffect(() => {
-    const r = ref(db, fullPath);
+    const fbRef = ref(db, fullPath);
     const unsub = onValue(r, (snap) => {
       if (skipRef.current) { skipRef.current = false; return; }
-      const v = snap.val();
+      const snapV = snap.val();
       setValueLocal(v !== null && v !== undefined ? v : defaultValue);
       setReady(true);
     });
@@ -1080,7 +1080,7 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
   const dias = modoReporte==="semana" ? getDiasSemana(semanaBase) : getDiasRango(fechaDesde,fechaHasta);
 
   const normDia = (d) => {
-    const v=tareasProg[d]; if(!v) return [];
+    const tvProg=tareasProg[tvD]; if(!tvProg) return [];
     if(Array.isArray(v)) return v;
     if(typeof v==="object") return Object.values(v).filter(Boolean);
     return [];
@@ -1117,13 +1117,13 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
     const porTrab={}, porZona={}, porCategoria={}, porTipo={};
     Object.keys(CATS_TIPO).forEach(k=>{porTipo[k]={total:0,hechas:0};});
     tareas.forEach(t=>{
-      const n=t.responsable||"Sin asignar";
+      const hpResp=t.responsable||"Sin asignar";
       if(!porTrab[n]) porTrab[n]={total:0,hechas:0,noPudo:0,pend:0};
       porTrab[n].total++;
       if(esHecha(t)) porTrab[n].hechas++;
       else if(t.estado==="no_pudo") porTrab[n].noPudo++;
       else porTrab[n].pend++;
-      const z=t.zona||"Sin zona";
+      const hpZona=t.zona||"Sin zona";
       if(!porZona[z]) porZona[z]={total:0,hechas:0,noPudo:0,tareas:[]};
       porZona[z].total++; if(esHecha(t)) porZona[z].hechas++;
       else if(t.estado==="no_pudo") porZona[z].noPudo++;
@@ -1151,11 +1151,11 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
   };
 
   const tareasDeportes = todasTareas.filter(t=>{
-    const z=MACROZONAS_BASE.find(z2=>z2.nombre===t.zona);
+    const hpZ=MACROZONAS_BASE.find(z2=>z2.nombre===t.zona);
     return z&&IDS_DEPORTES.includes(z.id);
   });
   const tareasGeneral = todasTareas.filter(t=>{
-    const z=MACROZONAS_BASE.find(z2=>z2.nombre===t.zona);
+    const hpZ=MACROZONAS_BASE.find(z2=>z2.nombre===t.zona);
     return !z||IDS_GENERAL.includes(z.id);
   });
   const statsDeportes=calcStats(tareasDeportes), statsGeneral=calcStats(tareasGeneral), statsTotal=calcStats(todasTareas);
@@ -1256,7 +1256,7 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
       (sG.total>0?hKpi(sG)+hTipos(sG)+hNoPudo(sG)+hCierres({...sG,cierres:sG.cierres||[]},"Cierres y restricciones en Golf")+hFito():"<p style='color:#888;font-size:12px'>Sin tareas en el período.</p>")+
       sep+h2("⚽ Cancha de Fútbol")+
       (sF.total>0?hKpi(sF)+hTipos(sF)+hNoPudo(sF)+hCierres(sF):"<p style='color:#888;font-size:12px'>Sin tareas en el período.</p>");
-    const w=window.open("","_blank","width=960,height=750"); w.document.write(wrap(cuerpo)); w.document.close();
+    const winP1=window.open("","_blank","width=960,height=750"); winP1.document.write(wrap(cuerpo)); w.document.close();
   };
 
   const imprimirGeneral = () => {
@@ -1267,7 +1267,7 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
       hNoPudo(statsGeneral)+
       hCierres(statsGeneral,"Cierres y restricciones sectoriales")+
       hFito();
-    const w=window.open("","_blank","width=960,height=750"); w.document.write(wrap(cuerpo)); w.document.close();
+    const winP2=window.open("","_blank","width=960,height=750"); winP2.document.write(wrap(cuerpo)); w.document.close();
   };
 
   const imprimirJefa = () => {
@@ -1275,7 +1275,7 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
       h2("🏌️ Golf + ⚽ Fútbol")+hKpi(statsDeportes)+hTrab(statsDeportes)+hTipos(statsDeportes)+
       sep+h2("🌿 Áreas Generales")+hKpi(statsGeneral)+hTrab(statsGeneral)+hCats(statsGeneral,"Detalle por categoría y tipo de actividad")+
       hNoPudo(statsTotal)+hCierres(statsTotal)+hFito();
-    const w=window.open("","_blank","width=960,height=750"); w.document.write(wrap(cuerpo)); w.document.close();
+    const winP3=window.open("","_blank","width=960,height=750"); winP3.document.write(wrap(cuerpo)); w.document.close();
   };
 
   const kpiCard=(st,titulo,color)=>(
@@ -1478,7 +1478,7 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
               </tr></thead>
               <tbody>
                 {Object.entries(statsTotal.porTrab).sort((a,b)=>b[1].hechas-a[1].hechas).map(([n,d],i)=>{
-                  const p=d.total?Math.round(d.hechas/d.total*100):0;
+                  const hpPct=hpD.total?Math.round(hpD.hechas/d.total*100):0;
                   return (<tr key={n} style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
                     <td style={{padding:"4px 8px",fontWeight:600,color:"#ede9e0"}}>{n}</td>
                     <td style={{padding:"4px",textAlign:"center",color:"#5a9a7a"}}>{d.total}</td>
@@ -2167,7 +2167,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
 
   const TAREAS_AGUA = ["riego","corte","corte de césped","corte cesped","orillado","orillad"];
   const esRiegoOCorte = (nombreTarea) => {
-    const n = (nombreTarea||"").toLowerCase();
+    const vtN = (nombreTarea||"").toLowerCase();
     return TAREAS_AGUA.some(k => n.includes(k));
   };
 
@@ -4216,7 +4216,7 @@ function TipoEventoSelector({ value, onChange, S, TIPO_EVENTO }) {
                   {g.label}
                 </div>
                 {g.keys.map(k=>{
-                  const t=TIPO_EVENTO[k];
+                  const tipoEvt=TIPO_EVENTO[k];
                   if(!t) return null;
                   return (
                     <div key={k} style={{padding:"9px 14px 9px 22px",cursor:"pointer",fontSize:13,color:value===k?t.color:"#ede9e0",background:value===k?`${t.color}18`:"transparent",borderLeft:value===k?`2px solid ${t.color}`:"2px solid transparent",display:"flex",alignItems:"center",gap:8}}
@@ -5543,7 +5543,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                         <input type="time" style={S.input} value={incidForm.horaAplicacion} onChange={e=>setIncidForm(p=>({...p,horaAplicacion:e.target.value}))}/>
                       </div>
                       {incidForm.productoAplicar&&(()=>{
-                        const r = calcReapertura(incidForm.productoAplicar, incidForm.fechaAplicacion, incidForm.horaAplicacion);
+                        const reapert1 = calcReapertura(incidForm.productoAplicar, incidForm.fechaAplicacion, incidForm.horaAplicacion);
                         if(!r.label) return null;
                         return (
                           <div style={{gridColumn:"1/-1",background:"rgba(34,197,94,0.08)",border:"1px solid rgba(34,197,94,0.25)",borderRadius:10,padding:"10px 14px"}}>
@@ -5599,7 +5599,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                       <input style={{...S.input,fontSize:11}} placeholder="Otro sector (escribir y presionar Enter)..."
                         onKeyDown={e=>{
                           if(e.key==="Enter"&&e.target.value.trim()){
-                            const s=e.target.value.trim();
+                            const prodS=e.target.value.trim();
                             setIncidForm(p=>({...p,sectoresCerrados:[...p.sectoresCerrados,s]}));
                             e.target.value="";
                           }
@@ -5619,7 +5619,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                     )}
                   </div>
                   {(()=>{
-                    const r = calcReapertura(incidForm.productoAplicar, incidForm.fechaAplicacion, incidForm.horaAplicacion);
+                    const reapert2 = calcReapertura(incidForm.productoAplicar, incidForm.fechaAplicacion, incidForm.horaAplicacion);
                     if(!r.label) return null;
                     return (
                       <div style={{...S.card,padding:14,marginBottom:12,background:"rgba(34,197,94,0.08)",borderColor:"rgba(34,197,94,0.25)"}}>
@@ -5659,7 +5659,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
               };
               const TIPO_INC = {fitosanitario:"🦠",mantenimiento:"🔧",clima:"🌧️"};
               const est = ESTADO_INC[inc.estado]||ESTADO_INC.observacion;
-              const r = calcReapertura(inc.productoAplicar, inc.fechaAplicacion, inc.horaAplicacion);
+              const reapert3 = calcReapertura(inc.productoAplicar, inc.fechaAplicacion, inc.horaAplicacion);
               return (
                 <div key={inc.id} style={{...S.card,padding:16,borderLeft:`3px solid ${est.color}`}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:10}}>
@@ -6708,7 +6708,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     <div class="noprint" style="text-align:center;margin-top:18px">
       <button onclick="window.print()" style="background:#1a5c2a;color:#fff;border:none;padding:10px 28px;border-radius:7px;font-size:13px;cursor:pointer">Imprimir / Guardar PDF</button>
     </div></body></html>`;
-    const w=window.open("","_blank"); w.document.write(html); w.document.close();
+    const winC=window.open("","_blank"); winC.document.write(html); w.document.close();
   };
   // Fondo disponible real = saldo anterior (si no hay reembolso pendiente → fondo base)
   // Si hay rendición pendiente de reembolso → el fondo real es el saldo anterior
@@ -6979,7 +6979,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                     <div class="noprint" style="text-align:center;margin-top:18px">
                       <button onclick="window.print()" style="background:#1a5c2a;color:#fff;border:none;padding:10px 28px;border-radius:7px;font-size:13px;cursor:pointer">Imprimir / Guardar PDF</button>
                     </div></body></html>`;
-                    const w=window.open("","_blank"); w.document.write(html); w.document.close();
+                    const winC2=window.open("","_blank"); winC2.document.write(html); w.document.close();
                   }}>
                   🖨️ Imprimir resumen
                 </button>
@@ -7671,7 +7671,7 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
 
     const tasas = [];
     for(let i=1;i<puntos.length;i++) {
-      const p = puntos[i];
+      const svgP = puntos[i];
       const pPrev = puntos[i-1];
       const diasTotal = Math.round((new Date(p.fecha)-new Date(pPrev.fecha))/(1000*60*60*24));
       if(diasTotal<=0) continue;
@@ -7845,7 +7845,7 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
           <div style={{...S.card,padding:16,marginBottom:14}}>
             <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
               {ZONAS.map(z=>{
-                const a=analisisTasas(z.id);
+                const medA=analisisTasas(z.id);
                 return (
                   <button key={z.id} onClick={()=>setZonaSelGrafico(z.id)}
                     style={{fontSize:11,padding:"4px 10px",borderRadius:8,background:zonaSelGrafico===z.id?`${COLORES_ZONA[z.id]}25`:"rgba(255,255,255,0.04)",border:`1px solid ${zonaSelGrafico===z.id?COLORES_ZONA[z.id]+"60":"rgba(255,255,255,0.1)"}`,color:zonaSelGrafico===z.id?COLORES_ZONA[z.id]:"#5a9a7a",cursor:"pointer"}}>
@@ -7857,8 +7857,8 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
             </div>
             {graficoLinea([zonaSelGrafico])}
             {(()=>{
-              const a = analisisTasas(zonaSelGrafico);
-              const z = ZONAS.find(x=>x.id===zonaSelGrafico);
+              const medA = analisisTasas(zonaSelGrafico);
+              const medZ = ZONAS.find(x=>x.id===zonaSelGrafico);
               if(!a) return <div style={{fontSize:12,color:"#5a9a7a",marginTop:8}}>Insuficientes datos para calcular tasa</div>;
               return (
                 <div style={{marginTop:12}}>
@@ -7926,8 +7926,8 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
             {/* Leyenda */}
             <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>
               {zonasComparativas.map(id=>{
-                const z=ZONAS.find(x=>x.id===id);
-                const a=analisisTasas(id);
+                const medZ2=ZONAS.find(x=>x.id===id);
+                const medA2=analisisTasas(id);
                 return z?(
                   <div key={id} style={{display:"flex",alignItems:"center",gap:5,fontSize:11}}>
                     <div style={{width:12,height:3,background:COLORES_ZONA[id],borderRadius:2}}/>
@@ -7946,9 +7946,9 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
             <div style={{fontSize:13,fontWeight:700,color:"#34d399",marginBottom:10}}>⚡ Clasificación por tasa de crecimiento (mm/día)</div>
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               {ZONAS.map(z=>{
-                const a=analisisTasas(z.id);
+                const medA3=analisisTasas(z.id);
                 if(!a) return null;
-                const w = Math.min(Math.abs(a.tasaGlobal)/1.5*100,100);
+                const medW = Math.min(Math.abs(a.tasaGlobal)/1.5*100,100);
                 return (
                   <div key={z.id} style={{display:"flex",alignItems:"center",gap:10}}>
                     <div style={{width:100,fontSize:11,color:"#7aaa80",flexShrink:0,textAlign:"right"}}>{z.nombre}</div>
@@ -8369,13 +8369,13 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
             </div>
             {ultimaHum.decision&&(()=>{
               const dec=DECISIONES_HUM.find(d=>d.value===ultimaHum.decision);
-              const c=ultimaHum.decision==="cerrar-cancha"?"#ef4444":ultimaHum.decision==="abrir-cancha"?"#22c55e":"#60a5fa";
+              const humC=ultimaHum.decision==="cerrar-cancha"?"#ef4444":ultimaHum.decision==="abrir-cancha"?"#22c55e":"#60a5fa";
               return <span style={{fontSize:12,fontWeight:600,color:c,background:`${c}12`,border:`1px solid ${c}30`,borderRadius:8,padding:"3px 10px"}}>{dec?.label||ultimaHum.decision}</span>;
             })()}
           </div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(88px,1fr))",gap:6}}>
             {GREENS_DEF.map(g=>{
-              const v=ultimaHum.valores?.[g.id]?.valor;
+              const humV=ultimaHum.valores?.[g.id]?.valor;
               const info=v?ESCALA_HUM_GOLF[Math.min(Math.max(Number(v),1),8)]:null;
               return (
                 <div key={g.id} style={{background:info?info.bg:"rgba(255,255,255,0.03)",borderRadius:8,padding:"8px 10px",border:`1px solid ${info?info.color+"40":"rgba(255,255,255,0.08)"}`}}>
@@ -8415,7 +8415,7 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
                   </div>
                   <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:4}}>
                     {GREENS_DEF.map(g=>{
-                      const v=m.valores?.[g.id]?.valor;
+                      const humV2=m.valores?.[g.id]?.valor;
                       if(!v) return null;
                       const info=ESCALA_HUM_GOLF[Math.min(Math.max(Number(v),1),8)];
                       if(!info) return null;
@@ -8797,7 +8797,7 @@ function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJe
                     id={`fecha_${t.id}`}
                     style={{...S.input,fontSize:11,padding:"2px 6px",width:130}}/>
                   <button onClick={()=>{
-                    const v = document.getElementById(`fecha_${t.id}`)?.value;
+                    const golfFechaV = document.getElementById(`fecha_${t.id}`)?.value;
                     if(v) {
                       // Guardar como override manual (persiste sobre la detección automática)
                       setFechasOverride(p=>({...p,[t.id]:v}));
@@ -8830,7 +8830,7 @@ function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJe
                 />
                 <div style={{display:"flex",flexDirection:"column",gap:4}}>
                   <button onClick={()=>{
-                    const v=document.getElementById(`nota_${t.id}`)?.value;
+                    const golfNotaV=document.getElementById(`nota_${t.id}`)?.value;
                     setNotasOverride(p=>({...p,[t.id]:v}));
                     setEditandoNota(null);
                   }} style={{cursor:"pointer",border:"none",borderRadius:6,padding:"4px 8px",background:"#3d7a52",color:"#fff",fontSize:11}}>✓</button>
@@ -9100,7 +9100,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
     // 3. Limpieza por green — diaria, con método variable (sopladora/barrido)
     if(!yaGeneradasOtras && (!esDomingo || hayTorneo)) {
       GREENS_DEF.forEach(g=>{
-        nuevas.push({...mkDiaria(`Limpieza — ${g.nombre}`), elemento:`${g.nombre} (${g.hoyos})`, metodoLimpieza:"sopladora"});
+        nuevas.push({...mkDiaria(`Limpieza — ${pgG.nombre}`), elemento:`${pgG.nombre} (${pgG.hoyos})`, metodoLimpieza:"sopladora"});
       });
       nuevas.push({...mkDiaria("Limpieza — Vivero"), elemento:"Vivero", metodoLimpieza:"sopladora"});
     }
@@ -9324,9 +9324,9 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
 
   const colorAltura = (v) => {
     if(!v) return "#5a8a6a";
-    const n=Number(v);
-    if(n<rango.min) return "#3b82f6";
-    if(n>rango.max) return "#ef4444";
+    const pgN=Number(v);
+    if(pgN<rango.min) return "#3b82f6";
+    if(pgN>rango.max) return "#ef4444";
     return "#22c55e";
   };
 
@@ -9372,8 +9372,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                     return (
                       <tr key={g.id} style={{borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
                         <td style={{padding:"5px 10px"}}>
-                          <div style={{fontWeight:600,color:"#34d399"}}>{g.nombre}</div>
-                          <div style={{fontSize:10,color:"#5a9a7a"}}>{g.hoyos}</div>
+                          <div style={{fontWeight:600,color:"#34d399"}}>{pgG.nombre}</div>
+                          <div style={{fontSize:10,color:"#5a9a7a"}}>{pgG.hoyos}</div>
                         </td>
                         <td style={{padding:"5px 6px",textAlign:"center"}}>
                           <input type="number" step="0.1" min="0" max="20"
@@ -9502,7 +9502,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               if(!alt) return {g,diasRestantes:null,urgencia:"sin-datos",alt:null,tasa:null,altObjetivo:null,infoCorte:null};
               const esTareaCorteG = t => t.zona==="Golf" &&
                 (t.tarea?.toLowerCase().includes("corte")||t.tipo?.toLowerCase().includes("corte")) &&
-                (t.elemento?.includes(g.nombre)||t.tarea?.includes(g.nombre)||
+                (t.elemento?.includes(pgG.nombre)||t.tarea?.includes(pgG.nombre)||
                  t.elemento?.toLowerCase().includes("todos")||t.tarea?.toLowerCase().includes("todos"));
               const cortesG=Object.values(tareasProg).flat()
                 .filter(t=>esTareaCorteG(t) && t.estado==="hecha" && (t.fecha||"")<=hoy)
@@ -9510,8 +9510,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               const infoCorte=cortesG[0]||null;
               const extraerAlturaCorte = (t) => {
                 if(t?.alturaCorte) return Number(t.alturaCorte);
-                const m=(t?.tarea||t?.descripcion||"").match(/(?:HOC|a)\s*([0-9]+(?:\.[0-9]+))\s*mm/i);
-                return m?Number(m[1]):null;
+                const pgM=(t?.tarea||t?.descripcion||"").match(/(?:HOC|a)\s*([0-9]+(?:\.[0-9]+))\s*mm/i);
+                return m?Number(pgM[1]):null;
               };
               const altCorteReal = extraerAlturaCorte(infoCorte);
               const altObjetivo=infoCorte?.alturaObjetivo?Number(infoCorte.alturaObjetivo):(rango.min*1.5);
@@ -9579,7 +9579,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                         </thead>
                         <tbody>
                           {urgencias.map((u,i)=>{
-                            const c=colorUrg[u.urgencia]||"#5a9a7a";
+                            const pgC=colorUrg[u.urgencia]||"#5a9a7a";
                             const proxFecha = u.diasRestantes>0
                               ? new Date(new Date().getTime()+u.diasRestantes*86400000).toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit"})
                               : null;
@@ -9588,8 +9588,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                                 onClick={()=>{setSubTab("greens");setSelectedGreen(u.g.id);}}>
                                 {/* Green */}
                                 <td style={{padding:"4px 8px",fontWeight:600,color:"#34d399",fontSize:11,whiteSpace:"nowrap"}}>
-                                  {u.g.nombre.replace("Green ","")}
-                                  <span style={{fontSize:9,color:"#4a7a5a",fontWeight:400,marginLeft:4}}>{u.g.hoyos.split("(")[1]?.replace(")","")}</span>
+                                  {u.pgG.nombre.replace("Green ","")}
+                                  <span style={{fontSize:9,color:"#4a7a5a",fontWeight:400,marginLeft:4}}>{u.pgG.hoyos.split("(")[1]?.replace(")","")}</span>
                                 </td>
                                 {/* Alt actual */}
                                 <td style={{padding:"4px 6px",textAlign:"center",fontSize:13,fontWeight:700,color:colorAltura(u.alt)}}>
@@ -9610,14 +9610,14 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                                   ):u.diasRestantes===0?(
                                     <span style={{fontSize:12,fontWeight:700,color:"#ef4444"}}>✂️</span>
                                   ):(
-                                    <span style={{fontSize:12,fontWeight:700,color:c}}>{u.diasRestantes}d</span>
+                                    <span style={{fontSize:12,fontWeight:700,color:pgC}}>{u.diasRestantes}d</span>
                                   )}
                                   {proxFecha&&<div style={{fontSize:9,color:"#5a8a6a"}}>→{proxFecha}</div>}
                                   {u.infoCorte?.fecha&&<div style={{fontSize:8,color:"#3a5a4a"}}>✂️{u.infoCorte.fecha.slice(8,10)}/{u.infoCorte.fecha.slice(5,7)}{u.infoCorte.alturaCorte?` ${u.infoCorte.alturaCorte}`:""}</div>}
                                 </td>
                                 {/* Estado */}
                                 <td style={{padding:"4px 6px",textAlign:"center"}}>
-                                  <span style={{fontSize:10,fontWeight:600,color:c,background:`${c}15`,padding:"2px 6px",borderRadius:10,border:`1px solid ${c}30`,whiteSpace:"nowrap"}}>
+                                  <span style={{fontSize:10,fontWeight:600,color:pgC,background:`${pgC}15`,padding:"2px 6px",borderRadius:10,border:`1px solid ${pgC}30`,whiteSpace:"nowrap"}}>
                                     {labelUrg[u.urgencia]}
                                   </span>
                                 </td>
@@ -9633,7 +9633,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                         <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                           {urgencias.filter(u=>u.urgencia==="cortar"||u.urgencia==="urgente").map(u=>(
                             <span key={u.g.id} style={{fontSize:11,background:`${colorUrg[u.urgencia]}15`,color:colorUrg[u.urgencia],border:`1px solid ${colorUrg[u.urgencia]}35`,padding:"3px 10px",borderRadius:20}}>
-                              {u.g.nombre} {u.urgencia==="cortar"?"— Cortar ya":`— ${u.diasRestantes}d`}
+                              {u.pgG.nombre} {u.urgencia==="cortar"?"— Cortar ya":`— ${u.diasRestantes}d`}
                             </span>
                           ))}
                         </div>
@@ -9656,8 +9656,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                 const color = colorAltura(alt);
                 return (
                   <div key={g.id} style={{background:`${color}10`,borderRadius:8,padding:"8px 10px",border:`1px solid ${color}30`,textAlign:"center",cursor:"pointer"}} onClick={()=>{setSubTab("greens");setSelectedGreen(g.id);}}>
-                    <div style={{fontSize:11,fontWeight:600,color:"#34d399"}}>{g.nombre}</div>
-                    <div style={{fontSize:10,color:"#5a9a7a",marginBottom:4}}>{g.hoyos}</div>
+                    <div style={{fontSize:11,fontWeight:600,color:"#34d399"}}>{pgG.nombre}</div>
+                    <div style={{fontSize:10,color:"#5a9a7a",marginBottom:4}}>{pgG.hoyos}</div>
                     <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color}}>{alt?`${alt}mm`:"—"}</div>
                   </div>
                 );
@@ -9687,7 +9687,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               return (
                 <button key={g.id} onClick={()=>setSelectedGreen(g.id)}
                   style={{background:selectedGreen===g.id?`${color}20`:"rgba(255,255,255,0.04)",border:`1px solid ${selectedGreen===g.id?color+"60":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"6px 12px",color:selectedGreen===g.id?color:"#5a9a7a",fontSize:11,cursor:"pointer",fontFamily:"'Georgia',serif"}}>
-                  {g.nombre}<br/><span style={{fontSize:9,color:"#5a9a7a"}}>{g.hoyos}</span>
+                  {pgG.nombre}<br/><span style={{fontSize:9,color:"#5a9a7a"}}>{pgG.hoyos}</span>
                 </button>
               );
             })}
@@ -9743,7 +9743,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                               background:todasV?"rgba(239,68,68,0.15)":"rgba(74,222,128,0.15)",
                               color:todasV?"#f87171":"#4ade80",
                               border:`1px solid ${todasV?"rgba(239,68,68,0.3)":"rgba(74,222,128,0.3)"}`}}
-                              onClick={()=>{const n={};tareasViv.forEach(t=>{n[t]=!todasV;});setDiariaForm(p=>({...p,tareas:{...p.tareas,...n}}));}}>
+                              onClick={()=>{const pgNN={};tareasViv.forEach(t=>{pgNN[t]=!todasV;});setDiariaForm(p=>({...p,tareas:{...p.tareas,...n}}));}}>
                               {todasV?"✗ Desmarcar todas":"✓ Marcar todas"}
                             </button>
                           </div>
@@ -9782,7 +9782,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               </div>
             );
           })():(()=>{
-            const g = GREENS_DEF.find(x=>x.id===selectedGreen);
+            const pgG = GREENS_DEF.find(x=>x.id===selectedGreen);
             const alt = ultimaMed?.alturas?.[selectedGreen];
             const color = colorAltura(alt);
             const tareasG = (golfData.tareasGreen||[]).filter(t=>t.greenId===selectedGreen);
@@ -9791,8 +9791,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                 <div style={{...S.card,padding:16,marginBottom:12,borderLeft:`3px solid ${color}`}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:8}}>
                     <div>
-                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700}}>{g.nombre}</div>
-                      <div style={{fontSize:12,color:"#5a9a7a"}}>{g.hoyos}</div>
+                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700}}>{pgG.nombre}</div>
+                      <div style={{fontSize:12,color:"#5a9a7a"}}>{pgG.hoyos}</div>
                     </div>
                     <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
                       <div style={{textAlign:"center",background:`${color}12`,borderRadius:8,padding:"8px 14px",border:`1px solid ${color}30`}}>
@@ -9809,7 +9809,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
 
                 {/* ── Últimos cortes registrados para este green ── */}
                 {(()=>{
-                  const nombreG = g.nombre;
+                  const nombreG = pgG.nombre;
                   const hoyStr = new Date().toISOString().slice(0,10);
                   const cortesEsteGreen = Object.entries(tareasProg)
                     .flatMap(([fecha,ts])=>(Array.isArray(ts)?ts:Object.values(ts||{})).map(t=>({...t,fecha})))
@@ -9954,7 +9954,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                       </div>
                       <div><label style={labelSt}>Aplicar a</label>
                         <select style={S.input} value={tareaForm.target} onChange={e=>setTareaForm(p=>({...p,target:e.target.value,greensSeleccionados:e.target.value==="todos"?GREENS_DEF.map(g=>g.id):e.target.value==="green"?[selectedGreen]:e.target.value==="vivero"?["vivero"]:e.target.value==="todos_vivero"?[...GREENS_DEF.map(g=>g.id),"vivero"]:[selectedGreen]}))}>
-                          <option value="green">Este green ({g.nombre})</option>
+                          <option value="green">Este green ({pgG.nombre})</option>
                           <option value="seleccion">Greens seleccionados...</option>
                           <option value="todos">Todos los greens (9)</option>
                           <option value="todos_vivero">Todos los greens + Vivero</option>
@@ -10110,7 +10110,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                         sincronizarMacrozona("Tarea programada", `${tareaForm.tipo} — ${zonas.length} zonas`);
                         setTareaForm(emptyTarea);
                         setShowTareaForm(null);
-                      }}>✓ Guardar {(()=>{const n=tareaForm.target==="todos"?9:tareaForm.target==="todos_vivero"?10:tareaForm.target==="vivero"?1:tareaForm.target==="seleccion"?(tareaForm.greensSeleccionados||[]).length:1;return n>1?`(${n} tareas)`:"";})()} y enviar al programa</button>
+                      }}>✓ Guardar {(()=>{const pgNT=tareaForm.target==="todos"?9:tareaForm.target==="todos_vivero"?10:tareaForm.target==="vivero"?1:tareaForm.target==="seleccion"?(tareaForm.greensSeleccionados||[]).length:1;return n>1?`(${n} tareas)`:"";})()} y enviar al programa</button>
                       <button className="btn-g" style={S.btn} onClick={()=>setShowTareaForm(null)}>Cancelar</button>
                     </div>
                   </div>
@@ -10328,8 +10328,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           {/* Resumen por tipo */}
           <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
             {TIPOS_ARBOL.map(tipo=>{
-              const n=arboles.filter(a=>a.tipo===tipo).length;
-              if(!n) return null;
+              const pgNA=arboles.filter(a=>a.tipo===tipo).length;
+              if(!pgNA) return null;
               return <div key={tipo} style={{...S.card,padding:"8px 14px",fontSize:12,color:"#4ade80"}}><strong>{n}</strong> {tipo}</div>;
             })}
             <div style={{...S.card,padding:"8px 14px",fontSize:12,color:"#34d399"}}><strong>{arboles.length}</strong> total individuos/grupos</div>
@@ -10512,7 +10512,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                       // Cálculo tasa y proyección — solo necesario para jefa
                       let proyeccion=null,alturaMaxCorte=null,tasaCalculada=null,tasaFuente=null,infoCorte=null;
                       if((esJefa||rolLogueado==="supervisor")&&alt){
-                        const esTareaCorte=t=>t.zona==="Golf"&&(t.tarea?.toLowerCase().includes("corte")||t.tipo?.toLowerCase().includes("corte"))&&(t.elemento?.includes(g.nombre)||t.tarea?.includes(g.nombre)||t.elemento?.toLowerCase().includes("todos")||t.tarea?.toLowerCase().includes("todos"));
+                        const esTareaCorte=t=>t.zona==="Golf"&&(t.tarea?.toLowerCase().includes("corte")||t.tipo?.toLowerCase().includes("corte"))&&(t.elemento?.includes(pgG.nombre)||t.tarea?.includes(pgG.nombre)||t.elemento?.toLowerCase().includes("todos")||t.tarea?.toLowerCase().includes("todos"));
                         const cortesG=Object.values(tareasProg).flat().filter(t=>esTareaCorte(t)&&["hecha","completada"].includes(t.estado)).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
                         infoCorte=cortesG[0]||null;
                         alturaMaxCorte=infoCorte?.alturaObjetivo||(rango.corte*1.1)||(rango.min*1.5);
@@ -10526,8 +10526,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                       return (
                         <tr key={g.id} style={{borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
                           <td style={{padding:"5px 10px"}}>
-                            <div style={{fontWeight:600,color:"#34d399"}}>{g.nombre}</div>
-                            <div style={{fontSize:10,color:"#5a9a7a"}}>{g.hoyos}</div>
+                            <div style={{fontWeight:600,color:"#34d399"}}>{pgG.nombre}</div>
+                            <div style={{fontSize:10,color:"#5a9a7a"}}>{pgG.hoyos}</div>
                           </td>
                           <td style={{padding:"5px 6px"}}>
                             <div style={{display:"flex",gap:4,alignItems:"center",justifyContent:"center"}}>
@@ -10863,7 +10863,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
   };
 
   const marcarRegreso = (id) => {
-    const t = (bd.traslados||[]).find(x=>x.id===id);
+    const trasT = (bd.traslados||[]).find(x=>x.id===id);
     if(!t) return;
     const items = (bd.items||[]).map(i=>String(i.id)===String(t.itemId)?{...i,stockActual:(Number(i.stockActual)||0)+Number(t.cantidad)}:i);
     setbd({items,traslados:(bd.traslados||[]).map(x=>x.id===id?{...x,estado:"regresó",fechaRegresoReal:hoy}:x)});
@@ -11577,14 +11577,14 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
       if(!bonosT.length&&!eventosT.length) return "";
 
       const totalBonos = bonosT.reduce((a,b)=>{
-        const p=b.participantes?.find(p=>String(p.trabajadorId)===String(t.id));
+        const bonoP=b.participantes?.find(bp=>String(p.trabajadorId)===String(t.id));
         return a+Number(p?.monto||0);
       },0) + eventosT.filter(e=>["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)).reduce((a,e)=>a+Number(e.valor||0),0);
       const totalHE = eventosT.filter(e=>e.tipo==="horaExtra"&&e.estado==="aprobado").reduce((a,e)=>a+Number(e.horas||0),0);
       const hePendientes = eventosT.filter(e=>e.tipo==="horaExtra"&&e.estado!=="aprobado");
 
       const filasBonosMasivos = bonosT.map(b=>{
-        const p=b.participantes?.find(p=>String(p.trabajadorId)===String(t.id));
+        const bonoP3=b.participantes?.find(bp3=>String(bp3.trabajadorId)===String(t.id));
         const nombre = p?.nombre&&p.nombre!=="—"?p.nombre:personalArr.find(x=>String(x.id)===String(p?.trabajadorId))?.nombre||p?.nombre||"—";
         return `<tr style="background:#f9f0ff">
           <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${b.fecha}</td>
@@ -11678,7 +11678,7 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
     <div class="noprint" style="text-align:center;padding:20px;background:#f5f5f5">
       <button onclick="window.print()" style="background:#1a5c2a;color:#fff;border:none;padding:10px 28px;border-radius:7px;font-size:13px;cursor:pointer">🖨️ Imprimir / Guardar PDF</button>
     </div></body></html>`;
-    const w=window.open("","_blank"); w.document.write(html); w.document.close();
+    const winB=window.open("","_blank"); winB.document.write(html); w.document.close();
   };
 
   const confirmarRendicion = () => {
@@ -12053,7 +12053,7 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
       <p style="font-size:12px;color:#666;margin-top:8px">Se imprimirá un comprobante por página para cada trabajador</p>
     </div>
     </body></html>`;
-    const w=window.open("","_blank"); w.document.write(html); w.document.close();
+    const winB2=window.open("","_blank"); winB2.document.write(html); w.document.close();
   };
 
   const guardar = () => {
@@ -12764,7 +12764,7 @@ export default function App() {
     if(fbRol==="trabajador" && fbUser) {
       const arr = Array.isArray(personal)?personal:Object.values(personal||{});
       if(arr.length>0){
-        const p = arr.find(x=>x.email?.toLowerCase()===fbUser.email?.toLowerCase());
+        const fbP = arr.find(x=>x.email?.toLowerCase()===fbUser.email?.toLowerCase());
         if(p){
           setWorkerLogueado(p.id);
           setVistaWorker(true);
@@ -12821,7 +12821,7 @@ export default function App() {
 
   const getAllElems = (zid) => {
     const zidS = String(zid);
-    const z = zonas.find(x=>String(x.id)===zidS);
+    const zonaZ = zonas.find(x=>String(x.id)===zidS);
     const zdat = getZD(zidS);
     const base = (z?.elementos||[]).map(e=>({...e,isCustom:false,edData:zdat.elementos?.[e.id]||{estado:"bueno",notas:""}}));
     const custom = (zdat.elementosCustom||[]).map(e=>({...e,isCustom:true,edData:{estado:e.estado||"bueno",notas:e.notas||""}}));
@@ -12832,7 +12832,7 @@ export default function App() {
   const filteredZonas = todasLasZonas.filter(z=>{
     const matchC=filtroCat==="Todas"||z.categoria===filtroCat;
     const matchE=filtroEst==="Todos"||getZD(z.id).estadoGeneral===filtroEst;
-    const q=(busq||"").trim().toLowerCase();
+    const filtQ=(busq||"").trim().toLowerCase();
     const matchB=!q||
       z.nombre.toLowerCase().includes(q)||
       z.categoria.toLowerCase().includes(q)||
@@ -13166,7 +13166,7 @@ export default function App() {
             <span style={{fontSize:11,color:fbRol==="jefa"?"#86efac":fbRol==="supervisor"?"#93c5fd":"#fcd34d",background:fbRol==="jefa"?"rgba(34,197,94,0.1)":fbRol==="supervisor"?"rgba(59,130,246,0.1)":"rgba(252,211,77,0.1)",padding:"4px 10px",borderRadius:20,border:`1px solid ${fbRol==="jefa"?"rgba(34,197,94,0.25)":fbRol==="supervisor"?"rgba(59,130,246,0.25)":"rgba(252,211,77,0.25)"}`}}>
               {fbRol==="jefa"?"🌿 Jefa AV":fbRol==="supervisor"?"👷 Supervisor":(()=>{
                 const arr=Array.isArray(personal)?personal:Object.values(personal||{});
-                const u=fbUser?arr.find(x=>x.email?.toLowerCase()===fbUser.email?.toLowerCase()):null;
+                const fbU=fbUser?arr.find(x=>x.email?.toLowerCase()===fbUser.email?.toLowerCase()):null;
                 return u?`🌱 ${u.nombre.split(" ")[0]}`:"🌱 Jardinero";
               })()}
             </span>
@@ -13904,7 +13904,7 @@ export default function App() {
                       +"</tr>";
                   }).join("");
                   const estadoStats = Object.entries({bueno:{label:"Bueno",color:"#166534"},regular:{label:"Regular",color:"#92400e"},critico:{label:"Crítico",color:"#991b1b"},mantenimiento:{label:"En Mant.",color:"#1e40af"}}).map(([k,v])=>{
-                    const c=MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral===k).length;
+                    const statC=MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral===k).length;
                     return "<span style='color:"+v.color+";font-weight:700'>"+v.label+": "+c+"</span>";
                   }).join(" &nbsp;·&nbsp; ");
                   const html = "<!DOCTYPE html><html lang='es'><head><meta charset='UTF-8'>"
@@ -13929,7 +13929,7 @@ export default function App() {
                     +"</body></html>";
                   const blob = new Blob([html], {type:"text/html;charset=utf-8"});
                   const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
+                  const dlA = document.createElement("a");
                   a.href = url; a.target = "_blank"; a.click();
                   setTimeout(()=>URL.revokeObjectURL(url), 10000);
                 }}
@@ -13944,7 +13944,7 @@ export default function App() {
               <div style={{...S.card,padding:20}}>
                 <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,marginBottom:14}}>📊 Zonas por Estado</div>
                 {Object.entries(ESTADOS_ZONA).map(([k,v])=>{
-                  const c=MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral===k).length;
+                  const statC2=MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral===k).length;
                   const pct=Math.round((c/MACROZONAS_BASE.length)*100);
                   return (
                     <div key={k} style={{marginBottom:10}}>
@@ -14069,7 +14069,7 @@ export default function App() {
                       if(patch.estado==="no_pudo"||patch.estado==="hecha"||patch.estado==="completada"||patch.estado==="haciendose"){
                         const tarea=tareasDelDia.find(t=>String(t.id)===String(tid));
                         if(tarea){
-                          const z=MACROZONAS_BASE.find(z=>z.nombre===tarea.zona);
+                          const onUpdZ=MACROZONAS_BASE.find(zz=>zz.nombre===tarea.zona);
                           if(z){
                             const ico=patch.estado==="no_pudo"?"🔴":patch.estado==="hecha"?"✅":"🔵";
                             addHistorial(String(z.id),`${ico} [${tarea.responsable||"?"}] ${tarea.tarea}${patch.estado==="no_pudo"&&patch.notaWorker?" ("+patch.notaWorker+")":""}`);
@@ -14105,7 +14105,7 @@ export default function App() {
                       fbUpdate(ref(db,`${ROOT}/prog`),{[hoyKey]:lista}).catch(e=>console.error(e));
                       return {...prev,[hoyKey]:lista};
                     });
-                    const z=MACROZONAS_BASE.find(z=>z.nombre===nuevaTarea.zona);
+                    const propZ=MACROZONAS_BASE.find(zz=>zz.nombre===nuevaTarea.zona);
                     if(z) addHistorial(z.id,`🆕 [${nuevaTarea.responsable}] Tarea emergente: ${nuevaTarea.tarea}`);
                   }}
                   esJefaApp={rolLogueado==="jefa"}
@@ -14173,7 +14173,7 @@ export default function App() {
                       onKeyDown={e=>{
                         if(e.key!=="Enter") return;
                         if(rolSeleccionado==="trabajador"){
-                          const t=personal.find(x=>String(x.id)===String(workerLogueado));
+                          const wrkT=personal.find(x=>String(x.id)===String(workerLogueado));
                           if(t&&String(t.pin)===String(workerPinInput)){setVistaWorker(true);setWorkerPinError(false);}
                           else setWorkerPinError(true);
                         } else {
@@ -14194,7 +14194,7 @@ export default function App() {
                   <button style={{...S.btn,width:"100%",padding:"12px",fontSize:15,background:"#3d7a52",color:"#fff",cursor:"pointer"}}
                     onClick={()=>{
                       if(rolSeleccionado==="trabajador"){
-                        const t=personal.find(x=>String(x.id)===String(workerLogueado));
+                        const wrkT2=personal.find(x=>String(x.id)===String(workerLogueado));
                         if(t&&String(t.pin)===String(workerPinInput)){setVistaWorker(true);setWorkerPinError(false);}
                         else setWorkerPinError(true);
                       } else {
