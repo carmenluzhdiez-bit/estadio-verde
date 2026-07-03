@@ -86,7 +86,7 @@ const CATEGORIAS_ELEM = {
 const VEGETACION_SUBS = ["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
 const OTRAS_CATS      = ["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","bodegas"];
 // ─── ESTACIONES ──────────────────────────────────────────────────────────────
-const limpiarUndef = (obj) => JSON.parse(JSON.stringify(obj, (_k,v) => v === undefined ? null : v));
+const limpiarUndef = (obj) => JSON.parse(JSON.stringify(obj, function(limpKey,limpVal){ return limpVal===undefined?null:limpVal; }));
 
 const ESTACIONES = {
   verano:    { label:"Verano",    icon:"☀️",  color:"#f59e0b", meses:"Dic–Feb" },
@@ -104,8 +104,8 @@ const frecToDiasGlobal = (frec) => {
   return map[frec]||null;
 };
 const estacionDeFecha = (fechaStr) => {
-  const m = new Date(fechaStr+"T12:00:00").getMonth()+1;
-  return [12,1,2].includes(m)?"verano":[3,4,5].includes(m)?"otono":[6,7,8].includes(m)?"invierno":"primavera";
+  const mesNum = new Date(fechaStr+"T12:00:00").getMonth()+1;
+  return [12,1,2].includes(mesNum)?"verano":[3,4,5].includes(mesNum)?"otono":[6,7,8].includes(mesNum)?"invierno":"primavera";
 };
 // Calcula la próxima fecha en que corresponde una tarea de frecuencia f, evaluada respecto a una fecha de referencia (refFecha, normalmente "hoy")
 const calcProximaFrecGlobal = (f, refFecha) => {
@@ -927,13 +927,13 @@ const TAREAS_PRESET = [
 
 // Fecha local correcta para Chile (toISOString usa UTC y puede adelantar el día)
 const fechaLocal = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const fechaHoy = new Date();
+  return `${fechaHoy.getFullYear()}-${String(fechaHoy.getMonth()+1).padStart(2,'0')}-${String(fechaHoy.getDate()).padStart(2,'0')}`;
 };
 
 const initData = () => {
   // Build default data structure (usado solo si Firebase devuelve null)
-  const d = {};
+  const initObj = {};
   MACROZONAS_BASE.forEach(z => {
     const elementos = {};
     z.elementos.forEach(e => {
@@ -950,7 +950,7 @@ const initData = () => {
       historial: [],
     };
   });
-  return d;
+  return initObj;
 };
 
 // ─── SELECTOR DE RESPONSABLE ─────────────────────────────────────────────────
@@ -12518,7 +12518,7 @@ export default function App() {
   const [fechaReporte, setFechaReporte] = useState(new Date().toISOString().slice(0,10));
   const [tabReporte, setTabReporte] = useState("general");
   const [semanaBase, setSemanaBase] = useState(()=>{
-    const d = new Date(); const day = d.getDay(); const diff = (day===0?-6:1-day);
+    const dSem = new Date(); const day = dSem.getDay(); const diff = (day===0?-6:1-day);
     d.setDate(d.getDate()+diff); return d.toISOString().slice(0,10);
   });
 
