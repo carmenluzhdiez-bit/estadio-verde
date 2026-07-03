@@ -9100,7 +9100,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
     // 3. Limpieza por green — diaria, con método variable (sopladora/barrido)
     if(!yaGeneradasOtras && (!esDomingo || hayTorneo)) {
       GREENS_DEF.forEach(g=>{
-        nuevas.push({...mkDiaria(`Limpieza — ${pgG.nombre}`), elemento:`${pgG.nombre} (${pgG.hoyos})`, metodoLimpieza:"sopladora"});
+        nuevas.push({...mkDiaria(`Limpieza — ${g.nombre}`), elemento:`${g.nombre} (${g.hoyos})`, metodoLimpieza:"sopladora"});
       });
       nuevas.push({...mkDiaria("Limpieza — Vivero"), elemento:"Vivero", metodoLimpieza:"sopladora"});
     }
@@ -9502,7 +9502,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               if(!alt) return {g,diasRestantes:null,urgencia:"sin-datos",alt:null,tasa:null,altObjetivo:null,infoCorte:null};
               const esTareaCorteG = t => t.zona==="Golf" &&
                 (t.tarea?.toLowerCase().includes("corte")||t.tipo?.toLowerCase().includes("corte")) &&
-                (t.elemento?.includes(pgG.nombre)||t.tarea?.includes(pgG.nombre)||
+                (t.elemento?.includes(g.nombre)||t.tarea?.includes(g.nombre)||
                  t.elemento?.toLowerCase().includes("todos")||t.tarea?.toLowerCase().includes("todos"));
               const cortesG=Object.values(tareasProg).flat()
                 .filter(t=>esTareaCorteG(t) && t.estado==="hecha" && (t.fecha||"")<=hoy)
@@ -9588,8 +9588,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                                 onClick={()=>{setSubTab("greens");setSelectedGreen(u.g.id);}}>
                                 {/* Green */}
                                 <td style={{padding:"4px 8px",fontWeight:600,color:"#34d399",fontSize:11,whiteSpace:"nowrap"}}>
-                                  {u.pgG.nombre.replace("Green ","")}
-                                  <span style={{fontSize:9,color:"#4a7a5a",fontWeight:400,marginLeft:4}}>{u.pgG.hoyos.split("(")[1]?.replace(")","")}</span>
+                                  {u.g.nombre.replace("Green ","")}
+                                  <span style={{fontSize:9,color:"#4a7a5a",fontWeight:400,marginLeft:4}}>{u.g.hoyos.split("(")[1]?.replace(")","")}</span>
                                 </td>
                                 {/* Alt actual */}
                                 <td style={{padding:"4px 6px",textAlign:"center",fontSize:13,fontWeight:700,color:colorAltura(u.alt)}}>
@@ -9633,7 +9633,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                         <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                           {urgencias.filter(u=>u.urgencia==="cortar"||u.urgencia==="urgente").map(u=>(
                             <span key={u.g.id} style={{fontSize:11,background:`${colorUrg[u.urgencia]}15`,color:colorUrg[u.urgencia],border:`1px solid ${colorUrg[u.urgencia]}35`,padding:"3px 10px",borderRadius:20}}>
-                              {u.pgG.nombre} {u.urgencia==="cortar"?"— Cortar ya":`— ${u.diasRestantes}d`}
+                              {u.g.nombre} {u.urgencia==="cortar"?"— Cortar ya":`— ${u.diasRestantes}d`}
                             </span>
                           ))}
                         </div>
