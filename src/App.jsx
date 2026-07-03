@@ -12503,7 +12503,7 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
 }
 
 export default function App() {
-  const [zonas, setZonas] = useState(MACROZONAS_BASE);
+  const [zonas, setZonas] = useState(()=>MACROZONAS_BASE);
   const [vista, setVista] = useState("dashboard");
   const [zonaId, setZonaId] = useState(null);
   const [tab, setTab] = useState("elementos");
@@ -12512,11 +12512,11 @@ export default function App() {
   // Combinar zonas base con personalizadas — debe ir después de ambos estados
   const zonasConCust = React.useMemo(()=>[...zonas,...macrozonasCust],[zonas,macrozonasCust]);
   const [showNuevaMacrozona, setShowNuevaMacrozona] = useState(false);
-  const [nuevaMacrozona, setNuevaMacrozona] = useState({nombre:"",categoria:"Calles y Accesos",icono:"🌿",descripcion:""});
+  const [nuevaMacrozona, setNuevaMacrozona] = useState(()=>({nombre:"",categoria:"Calles y Accesos",icono:"🌿",descripcion:""}));
   const [filtroEst, setFiltroEst] = useState("Todos");
   const [busq, setBusq] = useState("");
   const [showAddElem, setShowAddElem] = useState(false);
-  const [newElem, setNewElem] = useState({ nombre:"", tipo:"arboles" });
+  const [newElem, setNewElem] = useState(()=>({ nombre:"", tipo:"arboles" }));
   const [nuevaTarea, setNuevaTarea] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiText, setAiText] = useState("");
