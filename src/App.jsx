@@ -12833,10 +12833,10 @@ export default function App() {
     const matchC=filtroCat==="Todas"||z.categoria===filtroCat;
     const matchE=filtroEst==="Todos"||getZD(z.id).estadoGeneral===filtroEst;
     const filtQ=(busq||"").trim().toLowerCase();
-    const matchB=!q||
-      z.nombre.toLowerCase().includes(q)||
-      z.categoria.toLowerCase().includes(q)||
-      (z.descripcion||"").toLowerCase().includes(q);
+    const matchB=!filtQ||
+      z.nombre.toLowerCase().includes(filtQ)||
+      z.categoria.toLowerCase().includes(filtQ)||
+      (z.descripcion||"").toLowerCase().includes(filtQ);
     return matchC&&matchE&&matchB;
   }).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
 
