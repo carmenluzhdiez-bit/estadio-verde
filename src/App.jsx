@@ -942,7 +942,7 @@ const initData = () => {
       const defaultTareas = TAREAS_DEFAULT[e.tipo] ? TAREAS_DEFAULT[e.tipo].map(t=>({...t, id:e.id+"_"+t.tarea})) : [];
       elementos[e.id] = { estado: "bueno", notas: "", frecuencias: defaultTareas };
     });
-    d[z.id] = {
+    initObj[String(z.id)] = {
       estadoGeneral: "bueno",
       ultimoMant: "", proximoMant: "", notas: "",
       elementos,
@@ -6733,7 +6733,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   }).filter(x=>x.total>0).sort((a,b)=>b.total-a.total);
 
   const mesesDisp=[];
-  for(let i=5;i>=0;i--){const d=new Date(hoy.getFullYear(),hoy.getMonth()-i,1);mesesDisp.push({key:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`,label:`${MESES_COMPRAS[d.getMonth()]} ${d.getFullYear()}`});}
+  for(let i=5;i>=0;i--){const dMes=new Date(hoy.getFullYear(),hoy.getMonth()-i,1);mesesDisp.push({key:`${dMes.getFullYear()}-${String(dMes.getMonth()+1).padStart(2,"0")}`,label:`${MESES_COMPRAS[dMes.getMonth()]} ${dMes.getFullYear()}`});}
   const porMes=mesesDisp.map(m=>({...m,total:compras.filter(c=>(c.fecha||"").startsWith(m.key)).reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0)}));
   const maxMes=Math.max(...porMes.map(m=>m.total),1);
   const mesesUnicos=[...new Set(compras.map(c=>(c.fecha||"").slice(0,7)).filter(Boolean))].sort((a,b)=>b.localeCompare(a));
@@ -10518,8 +10518,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                         alturaMaxCorte=infoCorte?.alturaObjetivo||(rango.corte*1.1)||(rango.min*1.5);
                         const histG=[...mediciones].filter(m=>m.alturas?.[g.id]&&m.fecha).sort((a,b)=>b.fecha.localeCompare(a.fecha));
                         if(diasCrecimiento&&Number(diasCrecimiento)>0&&Number(alt)>0){tasaCalculada=Number(alt)/Number(diasCrecimiento);tasaFuente="manual";}
-                        else if(infoCorte?.alturaCorte&&histG[0]){const d=Math.round((new Date(histG[0].fecha+"T12:00:00")-new Date(infoCorte.fecha+"T12:00:00"))/86400000);const a1=Number(histG[0].alturas?.[g.id]);const altC=Number(infoCorte.alturaCorte);if(d>0&&a1>altC){tasaCalculada=(a1-altC)/d;tasaFuente="auto";}}
-                        else if(histG.length>=2){const a1=Number(histG[0].alturas?.[g.id]);const a2=Number(histG[1].alturas?.[g.id]);const d=Math.round((new Date(histG[0].fecha+"T12:00:00")-new Date(histG[1].fecha+"T12:00:00"))/86400000);if(d>0&&a1>a2){tasaCalculada=(a1-a2)/d;tasaFuente="histórico";}}
+                        else if(infoCorte?.alturaCorte&&histG[0]){const dDiasG=Math.round((new Date(histG[0].fecha+"T12:00:00")-new Date(infoCorte.fecha+"T12:00:00"))/86400000);const a1=Number(histG[0].alturas?.[g.id]);const altC=Number(infoCorte.alturaCorte);if(d>0&&a1>altC){tasaCalculada=(a1-altC)/d;tasaFuente="auto";}}
+                        else if(histG.length>=2){const a1=Number(histG[0].alturas?.[g.id]);const a2=Number(histG[1].alturas?.[g.id]);const dDiasH=Math.round((new Date(histG[0].fecha+"T12:00:00")-new Date(histG[1].fecha+"T12:00:00"))/86400000);if(dDiasH>0&&a1>a2){tasaCalculada=(a1-a2)/dDiasH;tasaFuente="histórico";}}
                         if(Number(alt)>=Number(alturaMaxCorte)){proyeccion="⚠️ Cortar ya";}
                         else if(tasaCalculada&&tasaCalculada>0){const dias=Math.round((Number(alturaMaxCorte)-Number(alt))/tasaCalculada);proyeccion=dias<=0?"⚠️ Cortar ya":dias<=2?`⏰ ${dias}d`:`${dias}d → ${new Date(Date.now()+dias*86400000).toLocaleDateString("es-CL",{day:"numeric",month:"numeric"})}`;}
                       }
