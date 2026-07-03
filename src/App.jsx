@@ -1059,23 +1059,23 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
   const [cBuscarTipo, setCBuscarTipo] = React.useState("");
   const [fechaDesde, setFechaDesde]   = React.useState(semanaBase||"");
   const [fechaHasta, setFechaHasta]   = React.useState(()=>{
-    const d=new Date((semanaBase||new Date().toISOString().slice(0,10))+"T12:00:00");
-    d.setDate(d.getDate()+6); return d.toISOString().slice(0,10);
+    const rsDate=new Date((semanaBase||new Date().toISOString().slice(0,10))+"T12:00:00");
+    rsDate.setDate(rsDate.getDate()+6); return rsDate.toISOString().slice(0,10);
   });
 
   const getDiasSemana = (ls) => {
     const lunes=new Date(ls+"T12:00:00");
-    return Array.from({length:7},(_,i)=>{ const d=new Date(lunes); d.setDate(d.getDate()+i); return d.toISOString().slice(0,10); });
+    return Array.from({length:7},(_,i)=>{ const rsD7=new Date(lunes); rsD7.setDate(rsD7.getDate()+i); return rsD7.toISOString().slice(0,10); });
   };
   const getDiasRango = (desde,hasta) => {
     if(!desde||!hasta||desde>hasta) return [];
-    const dias=[]; const d=new Date(desde+"T12:00:00"); const fin=new Date(hasta+"T12:00:00");
-    while(d<=fin&&dias.length<366){ dias.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1); }
+    const dias=[]; const rsDD=new Date(desde+"T12:00:00"); const fin=new Date(hasta+"T12:00:00");
+    while(d<=fin&&dias.length<366){ dias.push(rsDD.toISOString().slice(0,10)); rsDD.setDate(rsDD.getDate()+1); }
     return dias;
   };
-  const semanaAnterior  = ()=>{ const d=new Date(semanaBase+"T12:00:00"); d.setDate(d.getDate()-7); setSemanaBase(d.toISOString().slice(0,10)); };
-  const semanaSiguiente = ()=>{ const d=new Date(semanaBase+"T12:00:00"); d.setDate(d.getDate()+7); setSemanaBase(d.toISOString().slice(0,10)); };
-  const semanaActual    = ()=>{ const d=new Date(); const day=d.getDay(); const diff=(day===0?-6:1-day); d.setDate(d.getDate()+diff); setSemanaBase(d.toISOString().slice(0,10)); };
+  const semanaAnterior  = ()=>{ const rsDateA=new Date(semanaBase+"T12:00:00"); rsDateA.setDate(rsDateA.getDate()-7); setSemanaBase(rsDateA.toISOString().slice(0,10)); };
+  const semanaSiguiente = ()=>{ const rsDateS=new Date(semanaBase+"T12:00:00"); rsDateS.setDate(rsDateS.getDate()+7); setSemanaBase(rsDateS.toISOString().slice(0,10)); };
+  const semanaActual    = ()=>{ const rsDA=new Date(); const day=rsDA.getDay(); const diff=(day===0?-6:1-day); rsDA.setDate(rsDA.getDate()+diff); setSemanaBase(rsDA.toISOString().slice(0,10)); };
 
   const dias = modoReporte==="semana" ? getDiasSemana(semanaBase) : getDiasRango(fechaDesde,fechaHasta);
 
@@ -1423,7 +1423,7 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
             </div>
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               <input type="date" value={semanaBase}
-                onChange={e=>{const d=new Date(e.target.value+"T12:00:00");const day=d.getDay();const diff=(day===0?-6:1-day);d.setDate(d.getDate()+diff);setSemanaBase(d.toISOString().slice(0,10));}}
+                onChange={e=>{const rsDE=new Date(e.target.value+"T12:00:00");const day=rsDE.getDay();const diff=(day===0?-6:1-day);rsDE.setDate(rsDE.getDate()+diff);setSemanaBase(rsDE.toISOString().slice(0,10));}}
                 style={{...S.input,width:"auto",fontSize:13}}/>
               <button onClick={semanaActual} style={{...S.btn,fontSize:12,color:"#6aaa7a",background:"transparent",border:"1px solid rgba(255,255,255,0.1)"}}>Esta semana</button>
             </div>
@@ -2145,8 +2145,8 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   // Buscar en fechaVer (hora local) Y en la fecha UTC del mismo día (por si se guardaron con toISOString)
   const todasMisTareas = React.useMemo(()=>{
     const normDia = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v).filter(Boolean):[]);
-    const d=new Date(fechaVer+"T12:00:00"); // mediodía para evitar problemas de zona horaria
-    const utcStr=d.toISOString().slice(0,10);
+    const vwD=new Date(fechaVer+"T12:00:00"); // mediodía para evitar problemas de zona horaria
+    const utcStr=vwD.toISOString().slice(0,10);
     const combinadas=[...normDia(tareas[fechaVer]||[])];
     if(utcStr!==fechaVer){
       normDia(tareas[utcStr]||[]).forEach(t=>{if(!combinadas.find(x=>String(x.id)===String(t.id)))combinadas.push(t);});
@@ -9521,21 +9521,21 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               // Tasa entre 2 mediciones post-corte
               if(histPost.length>=2){
                 const a1=Number(histPost[0].alturas[g.id]),a2=Number(histPost[1].alturas[g.id]);
-                const d=Math.round((new Date(histPost[0].fecha+"T12:00:00")-new Date(histPost[1].fecha+"T12:00:00"))/(1000*60*60*24));
+                const dHist1=Math.round((new Date(histPost[0].fecha+"T12:00:00")-new Date(histPost[1].fecha+"T12:00:00"))/(1000*60*60*24));
                 if(d>0&&a1>a2) tasa=(a1-a2)/d;
               }
               // Fallback 1: desde altura de corte hasta medición más reciente
               if(!tasa&&altCorteReal&&infoCorte?.fecha){
                 const fechaRef = histPost[0]?.fecha||histG[0]?.fecha||hoy;
                 const altRef = histPost.length>0?Number(histPost[0].alturas[g.id]):Number(alt);
-                const d=Math.round((new Date(fechaRef+"T12:00:00")-new Date(infoCorte.fecha+"T12:00:00"))/(1000*60*60*24));
+                const dHist2=Math.round((new Date(fechaRef+"T12:00:00")-new Date(infoCorte.fecha+"T12:00:00"))/(1000*60*60*24));
                 const delta=altRef-altCorteReal;
                 if(d>0&&delta>0) tasa=delta/d;
               }
               // Fallback 2: desde última medición disponible aunque no haya corte
               if(!tasa&&histG.length>=2){
                 const a1=Number(histG[0].alturas[g.id]),a2=Number(histG[1].alturas[g.id]);
-                const d=Math.round((new Date(histG[0].fecha+"T12:00:00")-new Date(histG[1].fecha+"T12:00:00"))/(1000*60*60*24));
+                const dHist3=Math.round((new Date(histG[0].fecha+"T12:00:00")-new Date(histG[1].fecha+"T12:00:00"))/(1000*60*60*24));
                 if(d>0&&a1>a2) tasa=(a1-a2)/d;
               }
               const altN=Number(alt);
@@ -12538,7 +12538,7 @@ export default function App() {
   const [tabReporte, setTabReporte] = useState("general");
   const [semanaBase, setSemanaBase] = useState(()=>{
     const dSem = new Date(); const day = dSem.getDay(); const diff = (day===0?-6:1-day);
-    d.setDate(d.getDate()+diff); return d.toISOString().slice(0,10);
+    dSem.setDate(dSem.getDate()+diff); return dSem.toISOString().slice(0,10);
   });
 
   // ─── AUTENTICACIÓN FIREBASE ──────────────────────────────────────────────────
@@ -13430,7 +13430,7 @@ export default function App() {
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(230px,1fr))",gap:14}}>
               {filteredZonas.map(z=>{
-                const d=getZD(z.id); const est=ESTADOS_ZONA[d.estadoGeneral||"bueno"];
+                const dzd=getZD(z.id); const est=ESTADOS_ZONA[dzd.estadoGeneral||"bueno"];
                 const allElems=getAllElems(z.id);
                 const criticos=allElems.filter(e=>e.edData.estado==="critico").length;
                 const pendTareas=(d.tareas||[]).filter(t=>!t.completada).length;
@@ -13886,7 +13886,7 @@ export default function App() {
               <button
                 onClick={()=>{
                   const zonaRows = [...MACROZONAS_BASE].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(z=>{
-                    const d=getZD(z.id);
+                    const dzd2=getZD(z.id);
                     const allE=getAllElems(z.id);
                     const crit=allE.filter(e=>e.edData.estado==="critico").length;
                     const pend=(d.tareas||[]).filter(t=>!t.completada).length;
