@@ -12504,15 +12504,15 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
 
 export default function App() {
   const [zonas, setZonas] = useState(MACROZONAS_BASE);
-  // Combinar zonas base con personalizadas para toda la app
-  const zonasConCust = React.useMemo(()=>[...zonas,...macrozonasCust],[zonas,macrozonasCust]);
   const [vista, setVista] = useState("dashboard");
   const [zonaId, setZonaId] = useState(null);
   const [tab, setTab] = useState("elementos");
   const [filtroCat, setFiltroCat] = useState("Todas");
+  const [macrozonasCust, setMacrozonasCust] = useState([]);
+  // Combinar zonas base con personalizadas — debe ir después de ambos estados
+  const zonasConCust = React.useMemo(()=>[...zonas,...macrozonasCust],[zonas,macrozonasCust]);
   const [showNuevaMacrozona, setShowNuevaMacrozona] = useState(false);
   const [nuevaMacrozona, setNuevaMacrozona] = useState({nombre:"",categoria:"Calles y Accesos",icono:"🌿",descripcion:""});
-  const [macrozonasCust, setMacrozonasCust] = useState([]);
   const [filtroEst, setFiltroEst] = useState("Todos");
   const [busq, setBusq] = useState("");
   const [editElem, setEditElem] = useState(null);
