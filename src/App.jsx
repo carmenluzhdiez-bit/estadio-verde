@@ -1,5 +1,7 @@
 // build 2026-07-02 17:01
 import { useState, useEffect, useRef } from "react";
+// Reservar _ para evitar conflictos de minificación con Vite/Rollup
+const _RESERVED_ = null; void _RESERVED_;
 import * as React from "react";
 
 // ─── FIREBASE ────────────────────────────────────────────────────────────────
@@ -1557,30 +1559,30 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
   };
 
   // Opciones únicas para filtros
-  const allTareas   = Object.values(tareas).flat().filter(t => t.zona !== "Golf"); // Golf tiene módulo propio
-  const todasTareas = [...new Set(allTareas.map(t=>t.tarea))].sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
+  const allTareas   = Object.values(tareas).flat().filter(t => hpTask.zona !== "Golf"); // Golf tiene módulo propio
+  const todasTareas = [...new Set(allTareas.map(hpTask=>hpTask.tarea))].sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
   // Excluir tareas de Golf del programa general (Golf tiene su propio módulo)
-  const allTareasSinGolf = allTareas.filter(t => t.zona !== "Golf");
-  const todasZonas  = [...new Set(allTareasSinGolf.map(t=>t.zona).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
+  const allTareasSinGolf = allTareas.filter(t => hpTask.zona !== "Golf");
+  const todasZonas  = [...new Set(allTareasSinGolf.map(hpTask=>hpTask.zona).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
 
   const diasOrdenados = Object.keys(tareas)
-    .filter(d => (tareas[d]||[]).length > 0)
-    .filter(d => !filtroDia || d === filtroDia)
-    .sort((a,b)=>b.localeCompare(a));
+    .filter(dKey => (tareas[dKey]||[]).length > 0)
+    .filter(dKey => !filtroDia || dKey === filtroDia)
+    .sort((dA,dB)=>dB.localeCompare(dA));
 
-  const filtrarTareas = (td) => td.filter(t => {
-    if(t.zona==="Golf") return false; // Golf tiene módulo propio
-    const mE = filtroEstado==="todos" || t.estado===filtroEstado;
-    const mT = !filtroTarea || t.tarea===filtroTarea;
-    const mZ = filtroZona==="todas" || t.zona===filtroZona;
+  const filtrarTareas = (tArr) => tArr.filter(tItem => {
+    if(tItem.zona==="Golf") return false; // Golf tiene módulo propio
+    const mE = filtroEstado==="todos" || tItem.estado===filtroEstado;
+    const mT = !filtroTarea || tItem.tarea===filtroTarea;
+    const mZ = filtroZona==="todas" || tItem.zona===filtroZona;
     return mE && mT && mZ;
   });
 
   const imprimirDia = (dia) => {
-    const td = filtrarTareas(tareas[dia]||[]);
-    const hechas = td.filter(t=>["hecha","completada"].includes(t.estado)).length;
-    const noPudo = td.filter(t=>t.estado==="no_pudo").length;
-    const pct = td.length ? Math.round((hechas/td.length)*100) : 0;
+    const hpTd = filtrarTareas(tareas[dia]||[]);
+    const hechas = hpTd.filter(hpTask=>["hecha","completada"].includes(hpTask.estado)).length;
+    const noPudo = hpTd.filter(hpTask=>hpTask.estado==="no_pudo").length;
+    const pct = hpTd.length ? Math.round((hechas/hpTd.length)*100) : 0;
     const win = window.open("","_blank","width=800,height=600");
     win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
     <title>Programación ${dia} — Estadio Español</title>
@@ -1600,9 +1602,9 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
       @media print{body{padding:16px}.pie{position:fixed;bottom:20px;width:100%}}
     </style></head><body>
     <h1>📋 Programación Diaria — Estadio Español</h1>
-    <div class="sub">Fecha: <b>${dia}</b>${td.length !== (tareas[dia]||[]).length ? " (filtrado)" : ""} · Generado: ${new Date().toLocaleDateString("es-CL")} ${new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"})}</div>
+    <div class="sub">Fecha: <b>${dia}</b>${hpTd.length !== (tareas[dia]||[]).length ? " (filtrado)" : ""} · Generado: ${new Date().toLocaleDateString("es-CL")} ${new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"})}</div>
     <div class="stats">
-      <span>Total: <b>${td.length}</b></span>
+      <span>Total: <b>${hpTd.length}</b></span>
       <span class="stat-ok">✅ Hechas: ${hechas}</span>
       ${noPudo>0?"<span class=\"stat-bad\">🔴 No pudieron: "+noPudo+"</span>":""}
       <span class="stat-pct">${pct}% completado</span>
@@ -1610,11 +1612,11 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
     <table>
       <thead><tr><th>Estado</th><th>Tarea</th><th>Elemento</th><th>Zona</th><th>Responsable</th><th>Observación</th></tr></thead>
       <tbody>
-        ${td.map(t => {
-          const estCls = ["hecha","completada"].includes(t.estado)?"est-ok":t.estado==="no_pudo"?"est-bad":["haciendose","en_curso"].includes(t.estado)?"est-blue":["pendiente"].includes(t.estado)?"est-pend":"est-gray";
-          const estLabel = EC[t.estado]?.label || t.estado;
-          const icono = MACROZONAS_BASE.find(z=>z.nombre===t.zona)?.icono||""
-          return '<tr>'+'<td class="'+estCls+'">'+( EC[t.estado]?.icon||"-")+" "+estLabel+"</td>"+'<td><b>'+t.tarea+'</b></td>'+'<td>'+(t.elemento||"-")+"</td>"+'<td>'+icono+" "+(t.zona||"-")+"</td>"+'<td>'+(t.responsable||"<i>Sin asignar</i>")+"</td>"+'<td>'+(t.notaWorker?"⚠️ "+t.notaWorker:"-")+"</td>"+'</tr>';
+        ${hpTd.map(hpTask => {
+          const estCls = ["hecha","completada"].includes(hpTask.estado)?"est-ok":hpTask.estado==="no_pudo"?"est-bad":["haciendose","en_curso"].includes(hpTask.estado)?"est-blue":["pendiente"].includes(hpTask.estado)?"est-pend":"est-gray";
+          const estLabel = EC[hpTask.estado]?.label || hpTask.estado;
+          const icono = MACROZONAS_BASE.find(z=>z.nombre===hpTask.zona)?.icono||""
+          return '<tr>'+'<td class="'+estCls+'">'+( EC[hpTask.estado]?.icon||"-")+" "+estLabel+"</td>"+'<td><b>'+hpTask.tarea+'</b></td>'+'<td>'+(t.elemento||"-")+"</td>"+'<td>'+icono+" "+(hpTask.zona||"-")+"</td>"+'<td>'+(hpTask.responsable||"<i>Sin asignar</i>")+"</td>"+'<td>'+(t.notaWorker?"⚠️ "+t.notaWorker:"-")+"</td>"+'</tr>';
         }).join("")}
       </tbody>
     </table>
@@ -1645,7 +1647,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
       Revisión:["revisi"], Orillado:["orill"],
     };
     const getTipo = (t) => {
-      const tl=(t.tarea||"").toLowerCase();
+      const tl=(hpTask.tarea||"").toLowerCase();
       for(const [k,kws] of Object.entries(CATS_TIPO)){
         if(kws.some(kw=>tl.includes(kw))) return k;
       }
@@ -1654,21 +1656,21 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
     // Recopilar todas las ejecuciones que coincidan
     const resultados = [];
     const hoy = fechaLocal();
-    Object.entries(tareas).sort((a,b)=>b[0].localeCompare(a[0])).forEach(([fecha, ts])=>{
-      normT(ts).forEach(t=>{
-        const zonaOk = !buscarZona || (t.zona||"").toLowerCase().includes(buscarZona.toLowerCase());
-        const tipoOk = !buscarTipo || getTipo(t)===buscarTipo || (t.tarea||"").toLowerCase().includes(buscarTipo.toLowerCase());
+    Object.entries(tareas).sort((entA,entB)=>entB[0].localeCompare(entA[0])).forEach(([fecha, ts])=>{
+      normT(ts).forEach(hpTask=>{
+        const zonaOk = !buscarZona || (hpTask.zona||"").toLowerCase().includes(buscarZona.toLowerCase());
+        const tipoOk = !buscarTipo || getTipo(t)===buscarTipo || (hpTask.tarea||"").toLowerCase().includes(buscarTipo.toLowerCase());
         if(zonaOk && tipoOk) resultados.push({...t, fecha});
       });
     });
     // Separar pasadas y futuras
-    const pasadas  = resultados.filter(t=>t.fecha<=hoy && ["hecha","completada"].includes(t.estado));
-    const futuras  = resultados.filter(t=>t.fecha>hoy);
-    const pendHoy  = resultados.filter(t=>t.fecha<=hoy && !["hecha","completada"].includes(t.estado) && t.fecha>=new Date(Date.now()-7*86400000).toISOString().slice(0,10));
+    const pasadas  = resultados.filter(hpTask=>hpTask.fecha<=hoy && ["hecha","completada"].includes(hpTask.estado));
+    const futuras  = resultados.filter(hpTask=>hpTask.fecha>hoy);
+    const pendHoy  = resultados.filter(hpTask=>hpTask.fecha<=hoy && !["hecha","completada"].includes(hpTask.estado) && hpTask.fecha>=new Date(Date.now()-7*86400000).toISOString().slice(0,10));
     // Calcular frecuencia promedio de las últimas ejecuciones
     let frecPromedio = null;
     if(pasadas.length>=2){
-      const fechas=pasadas.slice(0,5).map(t=>new Date(t.fecha+"T12:00:00").getTime());
+      const fechas=pasadas.slice(0,5).map(hpTask=>new Date(hpTask.fecha+"T12:00:00").getTime());
       const deltas=[];
       for(let i=0;i<fechas.length-1;i++) deltas.push(Math.round((fechas[i]-fechas[i+1])/86400000));
       if(deltas.length) frecPromedio=Math.round(deltas.reduce((a,b)=>a+b,0)/deltas.length);
@@ -1713,7 +1715,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
                 <select value={buscarTipo} onChange={e=>setBuscarTipo(e.target.value)}
                   style={{...S.input,width:160,fontSize:12}}>
                   <option value="">Todas</option>
-                  {["Corte","Poda","Fertilización","Riego","Fumigación","Limpieza","Aireación","Desmalezado","Medición","Revisión","Orillado"].map(t=>(
+                  {["Corte","Poda","Fertilización","Riego","Fumigación","Limpieza","Aireación","Desmalezado","Medición","Revisión","Orillado"].map(hpTask=>(
                     <option key={t} value={t}>{t}</option>
                   ))}
                 </select>
@@ -1763,10 +1765,10 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
                   <div style={{fontSize:12,fontWeight:600,color:"#60a5fa",marginBottom:8}}>📅 Programadas a futuro ({resHistorial.futuras.length})</div>
                   {resHistorial.futuras.slice(0,10).map((t,i)=>(
                     <div key={i} style={{fontSize:11,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,0.04)",display:"flex",gap:10}}>
-                      <span style={{color:"#60a5fa",minWidth:80}}>{t.fecha}</span>
-                      <span style={{color:"#ede9e0",flex:1}}>{t.tarea}</span>
-                      <span style={{color:"#5a9a7a"}}>{t.zona}</span>
-                      <span style={{color:"#9ca3af"}}>{t.responsable||""}</span>
+                      <span style={{color:"#60a5fa",minWidth:80}}>{hpTask.fecha}</span>
+                      <span style={{color:"#ede9e0",flex:1}}>{hpTask.tarea}</span>
+                      <span style={{color:"#5a9a7a"}}>{hpTask.zona}</span>
+                      <span style={{color:"#9ca3af"}}>{hpTask.responsable||""}</span>
                     </div>
                   ))}
                 </div>
@@ -1778,10 +1780,10 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
                   <div style={{fontSize:12,fontWeight:600,color:"#22c55e",marginBottom:8}}>✅ Últimas ejecuciones realizadas ({resHistorial.pasadas.length})</div>
                   {resHistorial.pasadas.slice(0,15).map((t,i)=>(
                     <div key={i} style={{fontSize:11,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,0.04)",display:"flex",gap:10}}>
-                      <span style={{color:"#6aaa7a",minWidth:80}}>{t.fecha}</span>
-                      <span style={{color:"#ede9e0",flex:1}}>{t.tarea}</span>
-                      <span style={{color:"#5a9a7a"}}>{t.zona}</span>
-                      <span style={{color:"#9ca3af"}}>{t.responsable||""}</span>
+                      <span style={{color:"#6aaa7a",minWidth:80}}>{hpTask.fecha}</span>
+                      <span style={{color:"#ede9e0",flex:1}}>{hpTask.tarea}</span>
+                      <span style={{color:"#5a9a7a"}}>{hpTask.zona}</span>
+                      <span style={{color:"#9ca3af"}}>{hpTask.responsable||""}</span>
                       {t.notas&&<span style={{color:"#4a7a5a",fontStyle:"italic",fontSize:10}}>{t.notas}</span>}
                     </div>
                   ))}
@@ -1831,7 +1833,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
             <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>TAREA</label>
             <select style={{...S.input,fontSize:13}} value={filtroTarea} onChange={e=>setFiltroTarea(e.target.value)}>
               <option value="">Todas las tareas</option>
-              {todasTareas.map(t=><option key={t} value={t}>{t}</option>)}
+              {todasTareas.map(hpTask=><option key={t} value={t}>{t}</option>)}
             </select>
           </div>
           <div>
@@ -1862,10 +1864,10 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
       {diasOrdenados.map(dia => {
         const tdFiltradas = filtrarTareas(tareas[dia]||[]);
         if(tdFiltradas.length===0) return null;
-        const td = tareas[dia]||[];
-        const hechas = tdFiltradas.filter(t=>["hecha","completada"].includes(t.estado)).length;
-        const noPudo = tdFiltradas.filter(t=>t.estado==="no_pudo").length;
-        const pend   = tdFiltradas.filter(t=>["pendiente","por_designar","haciendose","en_curso"].includes(t.estado)).length;
+        const hpTd = tareas[dia]||[];
+        const hechas = tdFiltradas.filter(hpTask=>["hecha","completada"].includes(hpTask.estado)).length;
+        const noPudo = tdFiltradas.filter(hpTask=>hpTask.estado==="no_pudo").length;
+        const pend   = tdFiltradas.filter(hpTask=>["pendiente","por_designar","haciendose","en_curso"].includes(hpTask.estado)).length;
         const pct2   = tdFiltradas.length ? Math.round((hechas/tdFiltradas.length)*100) : 0;
         const esDom  = new Date(dia+"T12:00:00").getDay()===0;
         return (
@@ -1874,7 +1876,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
               <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
                 <span style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700}}>{dia}</span>
                 {esDom&&<span style={{fontSize:11,color:"#f59e0b",background:"rgba(245,158,11,0.12)",padding:"2px 8px",borderRadius:10}}>Domingo</span>}
-                <span style={{fontSize:12,color:"#6aaa7a"}}>{tdFiltradas.length}{tdFiltradas.length!==td.length?` / ${td.length}`:""} tareas</span>
+                <span style={{fontSize:12,color:"#6aaa7a"}}>{tdFiltradas.length}{tdFiltradas.length!==hpTd.length?` / ${hpTd.length}`:""} tareas</span>
               </div>
               <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
                 <span style={{fontSize:12,color:"#22c55e"}}>✅ {hechas}</span>
@@ -1899,34 +1901,34 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
               <div style={{width:`${pct2}%`,height:"100%",background:pct2===100?"#22c55e":"#3b82f6",borderRadius:4}}/>
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:6}}>
-              {tdFiltradas.map(t=>{
-                const est=EC[t.estado]||EC.pendiente;
+              {tdFiltradas.map(hpTask=>{
+                const est=EC[hpTask.estado]||EC.pendiente;
                 return (
-                  <div key={t.id} style={{display:"flex",gap:10,padding:"8px 10px",borderRadius:8,background:"rgba(255,255,255,0.04)",borderLeft:`3px solid ${est.color}40`}}>
+                  <div key={hpTask.id} style={{display:"flex",gap:10,padding:"8px 10px",borderRadius:8,background:"rgba(255,255,255,0.04)",borderLeft:`3px solid ${est.color}40`}}>
                     <span style={{flexShrink:0,fontSize:15}}>{est.icon}</span>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginBottom:2}}>
-                        <span style={{fontSize:13,fontWeight:600}}>{t.tarea}</span>
+                        <span style={{fontSize:13,fontWeight:600}}>{hpTask.tarea}</span>
                         {t.elemento&&<span style={{fontSize:11,color:"#5a8a6a",background:"rgba(255,255,255,0.05)",padding:"1px 6px",borderRadius:6}}>{t.elemento}</span>}
                         {(()=>{
-                          const resp=t.responsable||"";
+                          const resp=hpTask.responsable||"";
                           const key=`${d}_${resp.split(" ")[0]?.toLowerCase()||""}`;
                           const cerrado=cierresTurno?.[key];
                           return cerrado?(<span style={{fontSize:9,color:"#22c55e",background:"rgba(34,197,94,0.1)",padding:"1px 6px",borderRadius:8,border:"1px solid rgba(34,197,94,0.25)"}}>✅ Turno cerrado {cerrado.hora}</span>):null;
                         })()}
                       </div>
                       <div style={{display:"flex",gap:8,marginTop:2,flexWrap:"wrap"}}>
-                        <span style={{fontSize:11,color:"#5a7a7a"}}>{MACROZONAS_BASE.find(z=>z.nombre===t.zona)?.icono||""} {t.zona}</span>
-                        {t.responsable&&<span style={{fontSize:11,color:"#7a9a8a"}}>👤 {t.responsable}</span>}
+                        <span style={{fontSize:11,color:"#5a7a7a"}}>{MACROZONAS_BASE.find(z=>z.nombre===hpTask.zona)?.icono||""} {hpTask.zona}</span>
+                        {hpTask.responsable&&<span style={{fontSize:11,color:"#7a9a8a"}}>👤 {hpTask.responsable}</span>}
                       </div>
-                      {t.notaWorker&&<div style={{fontSize:11,color:t.estado==="no_pudo"?"#f87171":"#a0c8a0",marginTop:3,fontStyle:"italic"}}>💬 {t.notaWorker}</div>}
+                      {t.notaWorker&&<div style={{fontSize:11,color:hpTask.estado==="no_pudo"?"#f87171":"#a0c8a0",marginTop:3,fontStyle:"italic"}}>💬 {t.notaWorker}</div>}
                       {t.notaJefa&&<div style={{fontSize:10,color:"#fbbf24",marginTop:2,fontStyle:"italic"}}>📋 Revisión jefa: {t.notaJefa}</div>}
                       {esJefa&&(
                         <div style={{marginTop:6,display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
-                          <select value={t.estado}
+                          <select value={hpTask.estado}
                             onChange={e=>{
                               const nA=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-                              setTareas(prev=>({...prev,[d]:nA(prev[d]).map(x=>x.id===t.id?{...x,estado:e.target.value}:x)}));
+                              setTareas(prev=>({...prev,[d]:nA(prev[d]).map(x=>x.id===hpTask.id?{...x,estado:e.target.value}:x)}));
                             }}
                             style={{fontSize:11,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:6,color:"#ede9e0",padding:"3px 6px",cursor:"pointer"}}>
                             {Object.entries(EC).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
@@ -1935,13 +1937,13 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
                             value={t.notaJefa||""}
                             onChange={e=>{
                               const nA=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-                              setTareas(prev=>({...prev,[d]:nA(prev[d]).map(x=>x.id===t.id?{...x,notaJefa:e.target.value}:x)}));
+                              setTareas(prev=>({...prev,[d]:nA(prev[d]).map(x=>x.id===hpTask.id?{...x,notaJefa:e.target.value}:x)}));
                             }}
                             style={{fontSize:11,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:6,color:"#ede9e0",padding:"3px 8px",flex:1,minWidth:100,fontFamily:"'Georgia',serif"}}/>
                           <button onClick={()=>{
-                            if(window.confirm(`¿Eliminar la tarea "${t.tarea}" de ${t.responsable||"sin asignar"}?`)){
+                            if(window.confirm(`¿Eliminar la tarea "${hpTask.tarea}" de ${hpTask.responsable||"sin asignar"}?`)){
                               const nA=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-                              setTareas(prev=>({...prev,[d]:nA(prev[d]).filter(x=>x.id!==t.id)}));
+                              setTareas(prev=>({...prev,[d]:nA(prev[d]).filter(x=>x.id!==hpTask.id)}));
                             }
                           }} style={{cursor:"pointer",border:"1px solid rgba(239,68,68,0.3)",borderRadius:6,padding:"3px 8px",background:"rgba(239,68,68,0.07)",color:"#f87171",fontSize:11,fontFamily:"'Georgia',serif"}}>
                             🗑
@@ -1969,8 +1971,8 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
         const nA=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
         const hoyT=new Date().toISOString().slice(0,10);
         const dias=Object.keys(tareas)
-          .filter(d=>nA(tareas[d]).some(t=>t.responsable))
-          .sort((a,b)=>b.localeCompare(a)).slice(0,30);
+          .filter(diaKey=>nA(tareas[diaKey]).some(tTask=>tTask.responsable))
+          .sort((diaA,diaB)=>diaB.localeCompare(diaA)).slice(0,30);
         return (
           <div>
             <div style={{marginBottom:12}}>
@@ -1981,7 +1983,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
             {dias.map(dia=>{
               const tDia=nA(tareas[dia]);
               const porTrab={};
-              tDia.forEach(t=>{const r=t.responsable||"Sin asignar";if(!porTrab[r])porTrab[r]=[];porTrab[r].push(t);});
+              tDia.forEach(hpTask=>{const r=hpTask.responsable||"Sin asignar";if(!porTrab[r])porTrab[r]=[];porTrab[r].push(t);});
               if(Object.keys(porTrab).length===0) return null;
               return (
                 <div key={dia} style={{marginBottom:14,border:"1px solid rgba(52,211,153,0.15)",borderRadius:12,overflow:"hidden"}}>
@@ -1995,7 +1997,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
                   {Object.entries(porTrab).map(([resp,tds])=>{
                     const key=`${dia}_${resp.split(" ")[0]?.toLowerCase()||""}`;
                     const cerrado=cierresTurno?.[key];
-                    const hechas=tds.filter(t=>["hecha","completada"].includes(t.estado)).length;
+                    const hechas=tds.filter(hpTask=>["hecha","completada"].includes(hpTask.estado)).length;
                     const pct=tds.length?Math.round((hechas/tds.length)*100):0;
                     return (
                       <div key={resp} style={{padding:"10px 14px",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
@@ -2025,29 +2027,29 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
                         </div>
                         {/* Tareas */}
                         <div style={{display:"flex",flexDirection:"column",gap:3}}>
-                          {tds.map(t=>{
-                            const est=EC[t.estado]||EC.pendiente;
+                          {tds.map(hpTask=>{
+                            const est=EC[hpTask.estado]||EC.pendiente;
                             return (
-                              <div key={t.id} style={{display:"flex",gap:7,padding:"5px 8px",borderRadius:7,background:`${est.color}07`,border:`1px solid ${est.color}18`,alignItems:"flex-start"}}>
+                              <div key={hpTask.id} style={{display:"flex",gap:7,padding:"5px 8px",borderRadius:7,background:`${est.color}07`,border:`1px solid ${est.color}18`,alignItems:"flex-start"}}>
                                 <span style={{fontSize:12,flexShrink:0}}>{est.icon}</span>
                                 <div style={{flex:1,minWidth:0}}>
-                                  <div style={{fontSize:12,fontWeight:600}}>{(t.tarea||"").replace("⛳ ","")}</div>
-                                  {t.zona&&<div style={{fontSize:10,color:"#5a7a7a"}}>📍 {t.zona}{t.elemento?` · ${t.elemento}`:""}</div>}
+                                  <div style={{fontSize:12,fontWeight:600}}>{(hpTask.tarea||"").replace("⛳ ","")}</div>
+                                  {hpTask.zona&&<div style={{fontSize:10,color:"#5a7a7a"}}>📍 {hpTask.zona}{t.elemento?` · ${t.elemento}`:""}</div>}
                                   {t.alturaCorte&&<div style={{fontSize:10,color:"#fbbf24"}}>✂️ HOC indicada: {t.alturaCorte}mm</div>}
                                   {t.alturaCorteReal&&<div style={{fontSize:10,color:"#22c55e",fontWeight:600}}>✂️ HOC real: {t.alturaCorteReal}mm</div>}
-                                  {t.notaWorker&&<div style={{fontSize:10,color:t.estado==="no_pudo"?"#f87171":"#a0c8a0",fontStyle:"italic"}}>💬 {t.notaWorker}</div>}
+                                  {t.notaWorker&&<div style={{fontSize:10,color:hpTask.estado==="no_pudo"?"#f87171":"#a0c8a0",fontStyle:"italic"}}>💬 {t.notaWorker}</div>}
                                   {t.notaJefa&&<div style={{fontSize:10,color:"#fbbf24",fontStyle:"italic"}}>📋 {t.notaJefa}</div>}
                                 </div>
                                 <div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
-                                  <select value={t.estado}
-                                    onChange={e=>{const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);setTareas(prev=>{const updated=nA2(prev[dia]).map(x=>x.id===t.id?{...x,estado:e.target.value}:x);return {...prev,[dia]:updated.map(limpiarUndef)};});}}
+                                  <select value={hpTask.estado}
+                                    onChange={e=>{const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);setTareas(prev=>{const updated=nA2(prev[dia]).map(x=>x.id===hpTask.id?{...x,estado:e.target.value}:x);return {...prev,[dia]:updated.map(limpiarUndef)};});}}
                                     style={{fontSize:10,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:5,color:"#ede9e0",padding:"2px 3px",cursor:"pointer"}}>
                                     {Object.entries(EC).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
                                   </select>
                                   <input placeholder="nota..." defaultValue={t.notaJefa||""}
-                                    onBlur={e=>{if(e.target.value!==t.notaJefa){const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);setTareas(prev=>({...prev,[dia]:nA2(prev[dia]).map(x=>x.id===t.id?{...x,notaJefa:e.target.value}:x)}));}}}
+                                    onBlur={e=>{if(e.target.value!==t.notaJefa){const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);setTareas(prev=>({...prev,[dia]:nA2(prev[dia]).map(x=>x.id===hpTask.id?{...x,notaJefa:e.target.value}:x)}));}}}
                                     style={{fontSize:10,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:5,color:"#ede9e0",padding:"2px 4px",width:90}}/>
-                                  <button onClick={()=>{if(window.confirm(`¿Eliminar "${(t.tarea||"").replace("⛳ ","")}"?`)){const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);setTareas(prev=>({...prev,[dia]:nA2(prev[dia]).filter(x=>x.id!==t.id)}));}}}
+                                  <button onClick={()=>{if(window.confirm(`¿Eliminar "${(hpTask.tarea||"").replace("⛳ ","")}"?`)){const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);setTareas(prev=>({...prev,[dia]:nA2(prev[dia]).filter(x=>x.id!==hpTask.id)}));}}}
                                     style={{cursor:"pointer",border:"1px solid rgba(239,68,68,0.2)",borderRadius:5,padding:"1px 5px",background:"rgba(239,68,68,0.06)",color:"#f87171",fontSize:10}}>🗑</button>
                                 </div>
                               </div>
@@ -2666,16 +2668,16 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
   };
 
   const tareasHoy = getTareasDelDia(fecha);
-  const filtradas = tareasHoy.filter(t => {
-    const mE = filtroEstado==="todos" || t.estado===filtroEstado;
-    const mZ = filtroZona==="todas" || t.zona===filtroZona;
+  const filtradas = tareasHoy.filter(pdTask => {
+    const mE = filtroEstado==="todos" || pdTask.estado===filtroEstado;
+    const mZ = filtroZona==="todas" || pdTask.zona===filtroZona;
     return mE && mZ;
   });
   const stats = {
     total: tareasHoy.length,
-    completadas: tareasHoy.filter(t=>t.estado==="completada"||t.estado==="hecha").length,
-    pendientes: tareasHoy.filter(t=>["pendiente","en_curso","haciendose"].includes(t.estado)).length,
-    porDesignar: tareasHoy.filter(t=>t.estado==="por_designar").length,
+    completadas: tareasHoy.filter(pdTask=>pdTask.estado==="completada"||pdTask.estado==="hecha").length,
+    pendientes: tareasHoy.filter(pdTask=>["pendiente","en_curso","haciendose"].includes(pdTask.estado)).length,
+    porDesignar: tareasHoy.filter(pdTask=>pdTask.estado==="por_designar").length,
   };
   const pct = stats.total > 0 ? Math.round((stats.completadas/stats.total)*100) : 0;
   const zonasEnProg = [...new Set(tareasHoy.map(t=>t.zona))].sort();
