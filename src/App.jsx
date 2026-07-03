@@ -86,6 +86,8 @@ const CATEGORIAS_ELEM = {
 const VEGETACION_SUBS = ["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
 const OTRAS_CATS      = ["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","bodegas"];
 // ─── ESTACIONES ──────────────────────────────────────────────────────────────
+const limpiarUndef = (obj) => JSON.parse(JSON.stringify(obj, (_k,v) => v === undefined ? null : v));
+
 const ESTACIONES = {
   verano:    { label:"Verano",    icon:"☀️",  color:"#f59e0b", meses:"Dic–Feb" },
   otono:     { label:"Otoño",     icon:"🍂",  color:"#f97316", meses:"Mar–May" },
@@ -2038,7 +2040,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
                                 </div>
                                 <div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
                                   <select value={t.estado}
-                                    onChange={e=>{const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);setTareas(prev=>{const updated=nA2(prev[dia]).map(x=>x.id===t.id?{...x,estado:e.target.value}:x);const clean=updated.map(t=>{const c={};Object.entries(t).forEach(([k,v])=>{if(v!==undefined)c[k]=v;});return c;});return {...prev,[dia]:clean};});}}
+                                    onChange={e=>{const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);setTareas(prev=>{const updated=nA2(prev[dia]).map(x=>x.id===t.id?{...x,estado:e.target.value}:x);return {...prev,[dia]:updated.map(limpiarUndef)};});}}
                                     style={{fontSize:10,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:5,color:"#ede9e0",padding:"2px 3px",cursor:"pointer"}}>
                                     {Object.entries(EC).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
                                   </select>
@@ -13209,8 +13211,7 @@ export default function App() {
                   setTareasProg(prev=>{
                     const lista=normArr(prev[fecha]);
                     const actualizadas=lista.map(t=>String(t.id)===String(tid)?{...t,...patch}:t);
-                    const actualizadasClean2=actualizadas.map(t=>{const c={};Object.entries(t).forEach(([k,v])=>{if(v!==undefined)c[k]=v;});return c;});
-                    fbUpdate(ref(db,`${ROOT}/prog`),{[fecha]:actualizadasClean2}).catch(e=>console.error(e));
+                    fbUpdate(ref(db,`${ROOT}/prog`),{[fecha]:actualizadas.map(limpiarUndef)}).catch(e=>console.error(e));
                     return {...prev,[fecha]:actualizadas};
                   });
                 }}
@@ -14044,13 +14045,7 @@ export default function App() {
                       const tareasDelDia = normArr(prev[fecha]);
                       const actualizadas = tareasDelDia.map(t=>String(t.id)===String(tid)?{...t,...patch}:t);
                       // Escribir solo la ruta de esa fecha en Firebase
-                      // Limpiar undefined antes de enviar a Firebase
-                      const actualizadasClean = actualizadas.map(t=>{
-                        const clean={};
-                        Object.entries(t).forEach(([k,v])=>{ if(v!==undefined) clean[k]=v; });
-                        return clean;
-                      });
-                      fbUpdate(ref(db, `${ROOT}/prog`), {[fecha]: actualizadasClean})
+                      fbUpdate(ref(db, `${ROOT}/prog`), {[fecha]: actualizadas.map(limpiarUndef)})
                         .catch(e=>console.error("Error:", e));
                       if(patch.estado==="no_pudo"||patch.estado==="hecha"||patch.estado==="completada"||patch.estado==="haciendose"){
                         const tarea=tareasDelDia.find(t=>String(t.id)===String(tid));
