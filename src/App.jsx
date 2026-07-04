@@ -7840,6 +7840,61 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
 
   const colorCategoria = (cat) => cat?.includes("Rápido")?"#ef4444":cat?.includes("Medio")?"#f59e0b":"#22c55e";
 
+  const generarInforme = () => {
+    const win = window.open("","_blank","width=900,height=700");
+    const hoy = new Date().toLocaleDateString("es-CL",{day:"2-digit",month:"long",year:"numeric"});
+    const filas = ZONAS.map(z=>{
+      const analisis = analisisTasas(z.id);
+      const ultMed = [...medOrdenadas].reverse().find(m=>m.alturas?.[z.id]);
+      const ultAlt = ultMed ? Number(ultMed.alturas[z.id]).toFixed(1) : "—";
+      const ultFecha = ultMed ? new Date(ultMed.fecha+"T12:00:00").toLocaleDateString("es-CL",{day:"2-digit",month:"short"}) : "—";
+      const tasaG = analisis ? analisis.tasaGlobal : null;
+      const cat = analisis ? analisis.categoria : "Sin datos";
+      const color = !tasaG ? "#666" : tasaG < 0.3 ? "#166534" : tasaG < 0.6 ? "#92400e" : "#991b1b";
+      const porEst = analisis ? analisis.porEstacion : [];
+      return `<tr>
+        <td style="padding:8px 12px;font-weight:600;border-bottom:1px solid #e5e7eb">${z.nombre}</td>
+        <td style="padding:8px 12px;text-align:center;border-bottom:1px solid #e5e7eb">${ultAlt} mm</td>
+        <td style="padding:8px 12px;text-align:center;border-bottom:1px solid #e5e7eb;font-size:12px;color:#6b7280">${ultFecha}</td>
+        <td style="padding:8px 12px;text-align:center;border-bottom:1px solid #e5e7eb;font-weight:700;color:${color}">${tasaG ? (tasaG>0?"+":"")+tasaG+" mm/d" : "—"}</td>
+        <td style="padding:8px 12px;text-align:center;border-bottom:1px solid #e5e7eb;font-size:12px">${cat}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280">${porEst.map(e=>`${e.est}: ${e.tasa>0?"+":""}${e.tasa}`).join(" · ")||"—"}</td>
+      </tr>`;
+    }).join("");
+    win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+    <title>Informe Crecimiento Greens</title>
+    <style>body{font-family:Georgia,serif;color:#1a1a1a;padding:32px;max-width:920px;margin:0 auto}
+    h1{font-size:20px;color:#14532d;margin-bottom:2px}h2{font-size:13px;color:#6b7280;font-weight:normal;margin-top:0}
+    table{width:100%;border-collapse:collapse;margin-top:16px}
+    th{background:#14532d;color:#fff;padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+    tr:nth-child(even){background:#f9fafb}
+    .resumen{margin-top:20px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:14px}
+    .footer{margin-top:20px;font-size:11px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:10px}
+    @media print{button{display:none}}</style></head><body>
+    <h1>⛳ Informe de Crecimiento — Greens y Vivero</h1>
+    <h2>Estadio Español de Las Condes · ${hoy}</h2>
+    <table>
+      <thead><tr>
+        <th>Zona</th><th>Última altura</th><th>Fecha</th><th>Tasa global</th><th>Categoría</th><th>Por estación</th>
+      </tr></thead>
+      <tbody>${filas}</tbody>
+    </table>
+    <div class="resumen">
+      <strong style="color:#14532d">📊 Resumen del campo</strong>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:8px;font-size:13px">
+        <div>Zonas analizadas: <strong>${ZONAS.length}</strong></div>
+        <div>Con datos de tasa: <strong>${ZONAS.filter(z=>analisisTasas(z.id)).length}</strong></div>
+        <div>Total mediciones: <strong>${mediciones.length}</strong></div>
+      </div>
+    </div>
+    <div class="footer">🟢 Lento: &lt;0.3 mm/día · 🟡 Medio: 0.3–0.6 mm/día · 🔴 Rápido: &gt;0.6 mm/día</div>
+    <div style="margin-top:14px;text-align:center">
+      <button onclick="window.print()" style="background:#14532d;color:#fff;border:none;padding:9px 22px;border-radius:6px;cursor:pointer;font-size:13px">🖨️ Imprimir / Guardar PDF</button>
+    </div>
+    </body></html>`);
+    win.document.close();
+  };
+
   return (
     <div className="ein">
       {/* Encabezado historial */}
