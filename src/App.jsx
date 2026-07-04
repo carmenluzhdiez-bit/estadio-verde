@@ -7855,7 +7855,7 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
                   <button key={z.id} onClick={()=>setZonaSelGrafico(z.id)}
                     style={{fontSize:11,padding:"4px 10px",borderRadius:8,background:zonaSelGrafico===z.id?`${COLORES_ZONA[z.id]}25`:"rgba(255,255,255,0.04)",border:`1px solid ${zonaSelGrafico===z.id?COLORES_ZONA[z.id]+"60":"rgba(255,255,255,0.1)"}`,color:zonaSelGrafico===z.id?COLORES_ZONA[z.id]:"#5a9a7a",cursor:"pointer"}}>
                     {z.nombre}
-                    {a&&<span style={{marginLeft:4,color:colorCategoria(a.categoria),fontSize:9}}>{a.categoria.split(" ")[0]}</span>}
+                    {medA&&<span style={{marginLeft:4,color:colorCategoria(medA.categoria),fontSize:9}}>{a.categoria.split(" ")[0]}</span>}
                   </button>
                 );
               })}
@@ -7870,19 +7870,19 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
                   <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:10}}>
                     <div style={{background:"rgba(255,255,255,0.04)",borderRadius:8,padding:"8px 12px",textAlign:"center"}}>
                       <div style={{fontSize:10,color:"#5a9a7a"}}>Tasa global</div>
-                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color:COLORES_ZONA[zonaSelGrafico]}}>{a.tasaGlobal>0?"+":""}{a.tasaGlobal} mm/día</div>
+                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color:COLORES_ZONA[zonaSelGrafico]}}>{medA.tasaGlobal>0?"+":""}{medA.tasaGlobal} mm/día</div>
                     </div>
-                    <div style={{background:`${colorCategoria(a.categoria)}15`,borderRadius:8,padding:"8px 12px",textAlign:"center",border:`1px solid ${colorCategoria(a.categoria)}30`}}>
+                    <div style={{background:`${colorCategoria(medA.categoria)}15`,borderRadius:8,padding:"8px 12px",textAlign:"center",border:`1px solid ${colorCategoria(medA.categoria)}30`}}>
                       <div style={{fontSize:10,color:"#5a9a7a"}}>Categoría</div>
-                      <div style={{fontSize:16,fontWeight:700,color:colorCategoria(a.categoria)}}>{a.categoria}</div>
+                      <div style={{fontSize:16,fontWeight:700,color:colorCategoria(medA.categoria)}}>{medA.categoria}</div>
                     </div>
                   </div>
                   {/* Por estación */}
-                  {a.porEstacion.length>0&&(
+                  {medA.porEstacion.length>0&&(
                     <div style={{marginBottom:8}}>
                       <div style={{fontSize:11,color:"#34d399",fontWeight:600,marginBottom:5}}>Por estación</div>
                       <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                        {a.porEstacion.map(e=>(
+                        {medA.porEstacion.map(e=>(
                           <div key={e.est} style={{background:"rgba(255,255,255,0.04)",borderRadius:7,padding:"5px 10px",fontSize:11}}>
                             <span style={{color:"#5a9a7a",textTransform:"capitalize"}}>{e.est}: </span>
                             <span style={{fontWeight:700,color:e.tasa>0.5?"#ef4444":e.tasa>0.3?"#f59e0b":"#22c55e"}}>{e.tasa>0?"+":""}{e.tasa} mm/d</span>
@@ -7892,11 +7892,11 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
                     </div>
                   )}
                   {/* Por mes */}
-                  {a.porMes.length>0&&(
+                  {medA.porMes.length>0&&(
                     <div>
                       <div style={{fontSize:11,color:"#34d399",fontWeight:600,marginBottom:5}}>Por mes</div>
                       <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-                        {a.porMes.map(m=>(
+                        {medA.porMes.map(m=>(
                           <div key={m.mes} style={{background:"rgba(255,255,255,0.04)",borderRadius:7,padding:"4px 8px",fontSize:11}}>
                             <span style={{color:"#5a9a7a"}}>{m.mes}: </span>
                             <span style={{fontWeight:700,color:m.tasa>0.5?"#ef4444":m.tasa>0.3?"#f59e0b":"#22c55e"}}>{m.tasa>0?"+":""}{m.tasa}</span>
@@ -7958,12 +7958,12 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
                   <div key={z.id} style={{display:"flex",alignItems:"center",gap:10}}>
                     <div style={{width:100,fontSize:11,color:"#7aaa80",flexShrink:0,textAlign:"right"}}>{z.nombre}</div>
                     <div style={{flex:1,background:"rgba(255,255,255,0.06)",borderRadius:4,height:20,overflow:"hidden",position:"relative"}}>
-                      <div style={{width:`${w}%`,height:"100%",background:colorCategoria(a.categoria),borderRadius:4,transition:"width 0.3s",opacity:0.8}}/>
+                      <div style={{width:`${w}%`,height:"100%",background:colorCategoria(medA.categoria),borderRadius:4,transition:"width 0.3s",opacity:0.8}}/>
                     </div>
-                    <div style={{width:80,fontSize:11,fontWeight:700,color:colorCategoria(a.categoria),flexShrink:0}}>
-                      {a.tasaGlobal>0?"+":""}{a.tasaGlobal} mm/d
+                    <div style={{width:80,fontSize:11,fontWeight:700,color:colorCategoria(medA.categoria),flexShrink:0}}>
+                      {medA.tasaGlobal>0?"+":""}{medA.tasaGlobal} mm/d
                     </div>
-                    <div style={{fontSize:10,color:colorCategoria(a.categoria),flexShrink:0}}>{a.categoria}</div>
+                    <div style={{fontSize:10,color:colorCategoria(medA.categoria),flexShrink:0}}>{medA.categoria}</div>
                   </div>
                 );
               }).filter(Boolean)}
