@@ -660,6 +660,11 @@ const MACROZONAS_BASE = [
       { id: "e8", nombre: "Sistema de riego", tipo: "sistemas" },
       { id: "e9", nombre: "Caminos carros golf", tipo: "pavimentos" },
       { id: "e10", nombre: "Luminarias perimetrales", tipo: "infraestructura" },
+      // Infraestructura Golf
+      { id: "estanque_golf", nombre: "Estanque de agua", tipo: "sistemas" },
+      { id: "caseta_bomba", nombre: "Caseta de bombas", tipo: "infraestructura" },
+      { id: "sala_maquinas", nombre: "Sala de máquinas Golf", tipo: "infraestructura" },
+      { id: "bodega_insumos_golf", nombre: "Bodega de insumos Golf", tipo: "infraestructura" },
     ]
   },
   {
@@ -11097,7 +11102,15 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
                   </select>
                 </div>
                 <div><label style={labelSt}>Cantidad</label><input type="number" min={1} style={S.input} value={traslForm.cantidad} onChange={e=>setTraslForm(p=>({...p,cantidad:e.target.value}))}/></div>
-                <div><label style={labelSt}>Destino</label><input style={S.input} value={traslForm.destino} onChange={e=>setTraslForm(p=>({...p,destino:e.target.value}))} placeholder="ej: Cancha Golf, Taller externo..."/></div>
+                <div style={{gridColumn:"1/-1"}}>
+                  <label style={labelSt}>Destino (macrozona o lugar)</label>
+                  <select style={{...S.input,marginBottom:4}} value={MACROZONAS_BASE.find(z=>z.nombre===traslForm.destino)?traslForm.destino:traslForm.destino?"__otro__":""} onChange={e=>{if(e.target.value==="__otro__"){}else setTraslForm(p=>({...p,destino:e.target.value}));}}>
+                    <option value="">— Seleccionar macrozona —</option>
+                    {[...MACROZONAS_BASE].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(z=><option key={z.id} value={z.nombre}>{z.icono} {z.nombre}</option>)}
+                    <option value="__otro__">✏️ Otro destino (escribir)</option>
+                  </select>
+                  <input style={S.input} value={traslForm.destino} onChange={e=>setTraslForm(p=>({...p,destino:e.target.value}))} placeholder="o escribe directamente: Taller externo, Evento..."/>
+                </div>
                 <div><label style={labelSt}>Motivo</label><input style={S.input} value={traslForm.motivo} onChange={e=>setTraslForm(p=>({...p,motivo:e.target.value}))}/></div>
                 <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",cursor:"pointer"}} onClick={()=>setTraslForm(p=>({...p,conRegreso:!p.conRegreso}))}>
                   <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${traslForm.conRegreso?"#3d7a52":"rgba(255,255,255,0.2)"}`,background:traslForm.conRegreso?"#3d7a52":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
@@ -11381,6 +11394,7 @@ function TareaPlantacion({ modo, zona, zonaId, bodegasData, setBodegasData, tare
   const [cantidad, setCantidad] = React.useState(1);
   const [responsable, setResponsable] = React.useState("");
   const [obs,      setObs]      = React.useState("");
+  const [destinoPlanta, setDestinoPlanta] = React.useState(zona?.nombre||"");
   const [insumos,  setInsumos]  = React.useState([]);
   const [showInsumos, setShowInsumos] = React.useState(false);
 
@@ -11480,7 +11494,15 @@ function TareaPlantacion({ modo, zona, zonaId, bodegasData, setBodegasData, tare
               <input type="number" min={1} max={plantaSel?.stockActual||999} style={S.input} value={cantidad} onChange={e=>setCantidad(e.target.value)}/>
               {plantaSel&&Number(cantidad)>Number(plantaSel.stockActual)&&<div style={{fontSize:11,color:"#ef4444",marginTop:3}}>⚠️ Supera el stock disponible ({plantaSel.stockActual})</div>}
             </div>
-            <div><label style={labelSt}>Observaciones</label><input style={S.input} value={obs} onChange={e=>setObs(e.target.value)} placeholder="Sector de plantación, condiciones..."/></div>
+            <div style={{gridColumn:"1/-1"}}>
+              <label style={labelSt}>📍 Macrozona de destino</label>
+              <select style={{...S.input,marginBottom:4}} value={MACROZONAS_BASE.find(z=>z.nombre===destinoPlanta)?destinoPlanta:""} onChange={e=>setDestinoPlanta(e.target.value)}>
+                <option value="">— Seleccionar zona de destino —</option>
+                {[...MACROZONAS_BASE].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(z=><option key={z.id} value={z.nombre}>{z.icono} {z.nombre}</option>)}
+              </select>
+              <input style={{...S.input,fontSize:11}} value={destinoPlanta} onChange={e=>setDestinoPlanta(e.target.value)} placeholder="o especifica el lugar exacto..."/>
+            </div>
+            <div><label style={labelSt}>Observaciones</label><input style={S.input} value={obs} onChange={e=>setObs(e.target.value)} placeholder="Condiciones de plantación, notas..."/></div>
           </>
         ):(
           <>
