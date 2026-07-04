@@ -7855,7 +7855,7 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
                   <button key={z.id} onClick={()=>setZonaSelGrafico(z.id)}
                     style={{fontSize:11,padding:"4px 10px",borderRadius:8,background:zonaSelGrafico===z.id?`${COLORES_ZONA[z.id]}25`:"rgba(255,255,255,0.04)",border:`1px solid ${zonaSelGrafico===z.id?COLORES_ZONA[z.id]+"60":"rgba(255,255,255,0.1)"}`,color:zonaSelGrafico===z.id?COLORES_ZONA[z.id]:"#5a9a7a",cursor:"pointer"}}>
                     {z.nombre}
-                    {medA&&<span style={{marginLeft:4,color:colorCategoria(medA.categoria),fontSize:9}}>{a.categoria.split(" ")[0]}</span>}
+                    {medA&&<span style={{marginLeft:4,color:colorCategoria(medA.categoria),fontSize:9}}>{medA.categoria.split(" ")[0]}</span>}
                   </button>
                 );
               })}
