@@ -11384,10 +11384,13 @@ function TareaPlantacion({ modo, zona, zonaId, bodegasData, setBodegasData, tare
   const vivero = bodegasData["b01"]||{items:[]};
   const b03    = bodegasData["b03"]||{items:[]};
   const plantasDisp = (vivero.items||[]).filter(i=>Number(i.stockActual||0)>0);
-  const insumosDisp = [
-    ...(vivero.items||[]).filter(i=>Number(i.stockActual||0)>0&&["Contenedor/Macetero","Sustrato"].some(cat=>i.categoria?.includes(cat))),
-    ...(b03.items||[]).filter(i=>Number(i.stockActual||0)>0&&["Fertilizante","Maicillo","Arena","Compost","Malla","Material construcción"].some(cat=>i.categoria?.includes(cat)||i.nombre?.toLowerCase().includes(cat.toLowerCase()))),
-  ];
+  // Todos los items con stock de todas las bodegas disponibles como insumos
+  const allBodegas = Object.entries(bodegasData||{});
+  const insumosDisp = allBodegas.flatMap(([bodId, bod])=>
+    (bod.items||[])
+      .filter(i=>Number(i.stockActual||0)>0)
+      .map(i=>({...i, _bodegaId:bodId, _bodegaNombre:bod.nombre||bodId}))
+  );
 
   const [fecha,    setFecha]    = React.useState(hoy);
   const [planta,   setPlanta]   = React.useState("");
@@ -11526,13 +11529,16 @@ function TareaPlantacion({ modo, zona, zonaId, bodegasData, setBodegasData, tare
                 <select style={{...S.input,flex:2,fontSize:12,padding:"5px 8px"}}
                   value={ins.itemId}
                   onChange={e=>{
-                    const allItems=[...(vivero.items||[]).map(i=>({...i,_bod:"b01"})),...(b03.items||[]).map(i=>({...i,_bod:"b03"}))];
+                    const allItems=Object.entries(bodegasData||{}).flatMap(([bid,bod])=>(bod.items||[]).map(i=>({...i,_bod:bid})));
                     const sel=allItems.find(i=>String(i.id)===e.target.value);
-                    updInsumo(idx,{itemId:e.target.value,bodegaId:sel?._bod||"b03",nombre:sel?.nombre||"",unidad:sel?.unidad||"unidad"});
+                    updInsumo(idx,{itemId:e.target.value,bodegaId:sel?._bod||"b01",nombre:sel?.nombre||"",unidad:sel?.unidad||"unidad"});
                   }}>
                   <option value="">Seleccionar insumo...</option>
-                  <optgroup label="🌱 Vivero">{(vivero.items||[]).filter(i=>Number(i.stockActual||0)>0).map(i=><option key={i.id} value={i.id}>{i.nombre} (stock:{i.stockActual})</option>)}</optgroup>
-                  <optgroup label="🔧 Materiales y Herramientas">{(b03.items||[]).filter(i=>Number(i.stockActual||0)>0).map(i=><option key={i.id} value={i.id}>{i.nombre} (stock:{i.stockActual})</option>)}</optgroup>
+                  {Object.entries(bodegasData||{}).map(([bodId,bod])=>{
+                    const itemsCon = (bod.items||[]).filter(i=>Number(i.stockActual||0)>0);
+                    if(!itemsCon.length) return null;
+                    return <optgroup key={bodId} label={`${bod.nombre||bodId}`}>{itemsCon.map(i=><option key={i.id} value={i.id}>{i.nombre} (stock:{i.stockActual} {i.unidad||""})</option>)}</optgroup>;
+                  })}
                 </select>
                 <input type="number" min={1} style={{...S.input,width:70,fontSize:12,padding:"5px 8px"}} value={ins.cantidad} onChange={e=>updInsumo(idx,{cantidad:e.target.value})} placeholder="Cant."/>
                 <button className="btn-d" style={{...S.btn,fontSize:11,padding:"3px 8px"}} onClick={()=>delInsumo(idx)}>✕</button>
