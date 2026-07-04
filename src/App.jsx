@@ -7645,6 +7645,7 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
   const [zonaSelGrafico, setZonaSelGrafico] = React.useState("g1");
   const [zonasComparativas, setZonasComparativas] = React.useState(["g1","g3","vivero"]);
   const [confirmarBorrarTodo, setConfirmarBorrarTodo] = React.useState(false);
+  const [verInforme, setVerInforme] = React.useState(false);
 
   const medOrdenadas = [...mediciones].sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||""));
 
@@ -7871,6 +7872,7 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
               onClick={()=>setVistaGrafico(v)}>{l}</button>
           ))}
         </div>
+        <button style={{...S.btn,fontSize:11,padding:"4px 12px",background:"rgba(52,211,153,0.1)",color:"#34d399",border:"1px solid rgba(52,211,153,0.3)",marginBottom:8}} onClick={generarInforme}>📄 Informe de crecimiento</button>
 
         {/* Vista Individual */}
         {vistaGrafico==="individual"&&(
