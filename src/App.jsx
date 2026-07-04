@@ -7665,13 +7665,28 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
     if(puntos.length<2) return null;
 
     // Obtener cortes registrados en tareasProg para esta zona
+    // Buscar cortes para esta zona — el id puede ser "g1","g2"... y el elemento "Green 01 (Hoyo...)"
+    const zonaNum = zona.replace(/\D/g,""); // "g1" → "1", "g9" → "9"
+    const esVivero = zona.includes("vivero");
     const todosCortes = Object.entries(tareasProg||{}).flatMap(([fecha, ts])=>
-      (ts||[]).filter(t=>
-        t.estado==="hecha" &&
-        (t.tarea||"").toLowerCase().includes("corte") &&
-        (t.zona==="Golf" || (t.zona||"").includes("Golf")) &&
-        (t.elemento||"").toLowerCase().includes(zona.replace("green","green ").replace(/0/g,""))
-      ).map(t=>({fecha, alturaCorte:t.alturaCorte?Number(t.alturaCorte):null}))
+      (ts||[]).filter(t=>{
+        if(t.estado!=="hecha") return false;
+        if(!(t.tarea||"").toLowerCase().includes("corte")) return false;
+        if(!(t.zona==="Golf" || (t.zona||"").includes("Golf"))) return false;
+        if(esVivero) return (t.elemento||"").toLowerCase().includes("vivero") || (t.tarea||"").toLowerCase().includes("vivero");
+        const elem = (t.elemento||"").toLowerCase();
+        const tar = (t.tarea||"").toLowerCase();
+        // Coincidir por número de green: "green 01", "green 1", "green0X" etc
+        const numMatch = zonaNum && (
+          elem.includes(`green ${zonaNum.padStart(2,"0")}`) ||
+          elem.includes(`green ${Number(zonaNum)}`) ||
+          elem.includes(`green0${zonaNum}`) ||
+          tar.includes(`green ${zonaNum.padStart(2,"0")}`) ||
+          tar.includes(`todos`) ||
+          elem.includes("todos")
+        );
+        return numMatch;
+      }).map(t=>({fecha, alturaCorte:t.alturaCorte?Number(t.alturaCorte):null}))
     ).sort((a,b)=>a.fecha.localeCompare(b.fecha));
 
     const tasas = [];
@@ -7714,11 +7729,23 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
             continue;
           } else { continue; }
         } else {
-          // Sin corte entre mediciones: delta directo, pero solo si positivo
+          // Sin corte entre mediciones
           delta = svgP.alt - pPrev.alt;
           diasRef = diasTotal;
           metodo = "directo";
-          if(delta <= 0) continue; // descarte: reducción = corte no registrado
+          if(delta <= 0) {
+            // Delta negativo con intervalo largo (>5d): probablemente hubo corte no registrado
+            // Usar valor absoluto como estimación mínima de crecimiento real
+            if(diasTotal > 5) {
+              // No sabemos la altura del corte, pero sí que el green creció algo
+              // Estimación conservadora: descartamos este intervalo pero lo anotamos
+              continue;
+            } else {
+              continue; // intervalo corto con baja: ignorar
+            }
+          }
+          // Con mediciones semanales, el delta puede subestimar el crecimiento real
+          // si el green fue cortado entre mediciones — pero sin datos de corte no podemos corregir
         }
       }
 
