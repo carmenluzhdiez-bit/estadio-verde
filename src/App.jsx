@@ -2669,7 +2669,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           // Solo proponer si la fecha calculada ya llegó (vencida o es hoy) — no proponer tareas futuras todavía lejanas
           if(prox.diff > 0) return;
           const esVencida = prox.diff < 0;
-          const item = { id: Date.now()+Math.random(), fecha, zona:z.nombre, elemento:e.nombre, tarea:f.tarea, responsable:"", estado:"por_designar", notas:f.obs||"", frecuencia:f.modo==="diasSemana"?`cada ${f.diasMinimos||"?"} días`:f[est], estacion:est, auto:true, fechaCorrespondiente:prox.fecha, origenZid:String(z.id), origenEid:e.id, origenFrecId:f.id, origenEsCustom:!!e.isCustom };
+          const item = { id: Date.now()+Math.random(), fecha, zona:z.nombre, elemento:e.nombre, tarea:f.tarea, responsable:"", estado:"por_designar", notas:f.obs||"", frecuencia:f.modo==="diasSemana"?`cada ${f.diasMinimos||"?"} días`:f[estProp], estacion:estProp, auto:true, fechaCorrespondiente:prox.fecha, origenZid:String(z.id), origenEid:e.id, origenFrecId:f.id, origenEsCustom:!!e.isCustom };
           propuestas.push(item);
           if(esVencida) vencidas.push(`${z.nombre} — ${f.tarea} (vencida desde ${prox.fecha})`);
         });
