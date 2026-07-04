@@ -7683,30 +7683,30 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
 
       let delta, diasRef, metodo;
 
-      if(p.diasDesdeCorte && p.diasDesdeCorte > 0 && p.diasDesdeCorte <= diasTotal) {
+      if(svgP.diasDesdeCorte && svgP.diasDesdeCorte > 0 && svgP.diasDesdeCorte <= diasTotal) {
         // Bhalú registró días desde el último corte → usar ese dato
         // Buscar altura del corte más reciente antes de esta medición
-        const corteReciente = [...todosCortes].reverse().find(c=>c.fecha<p.fecha);
+        const corteReciente = [...todosCortes].reverse().find(c=>c.fecha<svgP.fecha);
         const altBase = corteReciente?.alturaCorte || null;
-        if(altBase && p.alt > altBase) {
-          delta = p.alt - altBase;
-          diasRef = p.diasDesdeCorte;
+        if(altBase && svgP.alt > altBase) {
+          delta = svgP.alt - altBase;
+          diasRef = svgP.diasDesdeCorte;
           metodo = "desde_corte";
         } else {
           // No tenemos alturaCorte registrada, usar días desde corte como referencia
-          delta = p.alt - pPrev.alt;
-          diasRef = p.diasDesdeCorte;
+          delta = svgP.alt - pPrev.alt;
+          diasRef = svgP.diasDesdeCorte;
           metodo = "dias_registrados";
         }
       } else {
         // Sin días desde corte: buscar si hubo corte entre las dos mediciones
-        const corteEntremedias = todosCortes.find(c=>c.fecha>pPrev.fecha && c.fecha<=p.fecha);
+        const corteEntremedias = todosCortes.find(c=>c.fecha>pPrev.fecha && c.fecha<=svgP.fecha);
         if(corteEntremedias) {
           // Hubo corte: calcular solo desde el corte hasta la medición actual
-          const diasDesdeCorte = Math.round((new Date(p.fecha)-new Date(corteEntremedias.fecha))/(1000*60*60*24));
+          const diasDesdeCorte = Math.round((new Date(svgP.fecha)-new Date(corteEntremedias.fecha))/(1000*60*60*24));
           const altBase = corteEntremedias.alturaCorte || null;
-          if(altBase && p.alt > altBase && diasDesdeCorte > 0) {
-            delta = p.alt - altBase;
+          if(altBase && svgP.alt > altBase && diasDesdeCorte > 0) {
+            delta = svgP.alt - altBase;
             diasRef = diasDesdeCorte;
             metodo = "corte_detectado";
           } else if(diasDesdeCorte > 0) {
@@ -7715,7 +7715,7 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
           } else { continue; }
         } else {
           // Sin corte entre mediciones: delta directo, pero solo si positivo
-          delta = p.alt - pPrev.alt;
+          delta = svgP.alt - pPrev.alt;
           diasRef = diasTotal;
           metodo = "directo";
           if(delta <= 0) continue; // descarte: reducción = corte no registrado
@@ -7724,10 +7724,10 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
 
       if(diasRef > 0 && delta > 0) {
         tasas.push({
-          fecha:p.fecha, dias:diasRef, delta,
+          fecha:svgP.fecha, dias:diasRef, delta,
           tasa: Math.round((delta/diasRef)*100)/100,
-          mes: p.fecha.slice(5,7),
-          estacion: ESTACIONES[p.fecha.slice(5,7)]||"—",
+          mes: svgP.fecha.slice(5,7),
+          estacion: ESTACIONES[svgP.fecha.slice(5,7)]||"—",
           metodo,
         });
       }
