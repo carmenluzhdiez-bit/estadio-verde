@@ -7958,7 +7958,7 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
                   <div key={z.id} style={{display:"flex",alignItems:"center",gap:10}}>
                     <div style={{width:100,fontSize:11,color:"#7aaa80",flexShrink:0,textAlign:"right"}}>{z.nombre}</div>
                     <div style={{flex:1,background:"rgba(255,255,255,0.06)",borderRadius:4,height:20,overflow:"hidden",position:"relative"}}>
-                      <div style={{width:`${w}%`,height:"100%",background:colorCategoria(medA.categoria),borderRadius:4,transition:"width 0.3s",opacity:0.8}}/>
+                      <div style={{width:`${medW}%`,height:"100%",background:colorCategoria(medA.categoria),borderRadius:4,transition:"width 0.3s",opacity:0.8}}/>
                     </div>
                     <div style={{width:80,fontSize:11,fontWeight:700,color:colorCategoria(medA.categoria),flexShrink:0}}>
                       {medA.tasaGlobal>0?"+":""}{medA.tasaGlobal} mm/d
