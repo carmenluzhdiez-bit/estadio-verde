@@ -14479,7 +14479,7 @@ export default function App() {
                   }).join("");
                   const estadoStats = Object.entries({bueno:{label:"Bueno",color:"#166534"},regular:{label:"Regular",color:"#92400e"},critico:{label:"Crítico",color:"#991b1b"},mantenimiento:{label:"En Mant.",color:"#1e40af"}}).map(([k,v])=>{
                     const statC=MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral===k).length;
-                    return "<span style='color:"+v.color+";font-weight:700'>"+v.label+": "+c+"</span>";
+                    return "<span style='color:"+v.color+";font-weight:700'>"+v.label+": "+statC+"</span>";
                   }).join(" &nbsp;·&nbsp; ");
                   const html = "<!DOCTYPE html><html lang='es'><head><meta charset='UTF-8'>"
                     +"<title>Reporte Áreas Verdes — Estadio Español</title>"
@@ -14519,7 +14519,7 @@ export default function App() {
                 <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,marginBottom:14}}>📊 Zonas por Estado</div>
                 {Object.entries(ESTADOS_ZONA).map(([k,v])=>{
                   const statC2=MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral===k).length;
-                  const pct=Math.round((c/MACROZONAS_BASE.length)*100);
+                  const pct=Math.round((statC2/MACROZONAS_BASE.length)*100);
                   return (
                     <div key={k} style={{marginBottom:10}}>
                       <div style={{display:"flex",justifyContent:"space-between",marginBottom:3,fontSize:13}}>
