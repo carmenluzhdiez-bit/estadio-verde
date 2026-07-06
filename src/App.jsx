@@ -927,7 +927,7 @@ const ESTADOS_ZONA = {
 };
 
 const TAREAS_PRESET = [
-  "Corte de césped", "Riego", "Poda arbustos", "Poda árboles", "Limpieza general",
+  "Corte de césped", "Riego", "Poda arbustos", "Poda árboles", "Limpieza general", "Plantar", "Trasplante",
   "Fertilización", "Control de plagas", "Reparación de caminos", "Replante", "Inspección",
   "Pintura / retoque", "Revisión sistema riego", "Limpieza luminarias", "Reparación mobiliario",
 ];
@@ -1330,7 +1330,7 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
                 <select value={cBuscarTipo} onChange={e=>setCBuscarTipo(e.target.value)}
                   style={{...S.input,width:160,fontSize:12}}>
                   <option value="">Todas</option>
-                  {["Corte","Poda","Fertilización","Riego","Fumigación","Limpieza","Aireación","Desmalezado","Medición","Revisión","Orillado"].map(t=>(
+                  {["Corte","Poda","Fertilización","Riego","Fumigación","Limpieza","Aireación","Desmalezado","Medición","Revisión","Orillado","Plantar","Trasplante","Tratamiento fitosanitario","Control plagas","Rastrillado","Perfilado"].map(t=>(
                     <option key={t} value={t}>{t}</option>
                   ))}
                 </select>
@@ -1730,7 +1730,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
                 <select value={buscarTipo} onChange={e=>setBuscarTipo(e.target.value)}
                   style={{...S.input,width:160,fontSize:12}}>
                   <option value="">Todas</option>
-                  {["Corte","Poda","Fertilización","Riego","Fumigación","Limpieza","Aireación","Desmalezado","Medición","Revisión","Orillado"].map(hpTask=>(
+                  {["Corte","Poda","Fertilización","Riego","Fumigación","Limpieza","Aireación","Desmalezado","Medición","Revisión","Orillado","Plantar","Trasplante","Tratamiento fitosanitario","Control plagas","Rastrillado","Perfilado"].map(hpTask=>(
                     <option key={t} value={t}>{t}</option>
                   ))}
                 </select>
@@ -11224,18 +11224,19 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
   };
 
   const guardarTrasl = () => {
-    if(!traslForm.itemId||!traslForm.destino) return;
+    if(!traslForm.itemId) return; // destino es opcional
     const cant = Number(traslForm.cantidad);
     const trasl = {...traslForm,id:Date.now(),cantidad:cant,bodegaOrigen:bodegaActiva};
     const items = (bd.items||[]).map(i=>String(i.id)===String(traslForm.itemId)?{...i,stockActual:Math.max(0,(Number(i.stockActual)||0)-cant)}:i);
-    setbd({items,traslados:[trasl,...(bd.traslados||[])].slice(0,100)});
+    const nuevoTrasl = limpiarUndef({...trasl, destino:trasl.destino||"Sin especificar"});
+    setbd(limpiarUndef({items,traslados:[nuevoTrasl,...(bd.traslados||[])].slice(0,100)}));
     setTraslForm(emptyTrasl); setShowTraslForm(false);
   };
 
   const marcarRegreso = (id) => {
     const trasT = (bd.traslados||[]).find(x=>x.id===id);
     if(!trasT) return;
-    const items = (bd.items||[]).map(i=>String(i.id)===String(trasT.itemId)?{...i,stockActual:(Number(i.stockActual)||0)+Number(t.cantidad)}:i);
+    const items = (bd.items||[]).map(i=>String(i.id)===String(trasT.itemId)?{...i,stockActual:(Number(i.stockActual)||0)+Number(trasT.cantidad)}:i);
     setbd({items,traslados:(bd.traslados||[]).map(x=>x.id===id?{...x,estado:"regresó",fechaRegresoReal:hoy}:x)});
   };
 
