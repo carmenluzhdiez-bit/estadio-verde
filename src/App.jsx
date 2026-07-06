@@ -12976,6 +12976,162 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
   );
 }
 
+function ModalCierreSectorial({ S, MACROZONAS_BASE, personal, tareasProg, setTareasProg, crearNotificacion, onClose }) {
+  const hoyCS = fechaLocal();
+  const [csZonas, setCsZonas] = React.useState([]);
+  const [csMotivoTipo, setCsMotivoTipo] = React.useState("fitosanitario");
+  const [csProducto, setCsProducto] = React.useState("");
+  const [csFecha, setCsFecha] = React.useState(hoyCS);
+  const [csHora, setCsHora] = React.useState(new Date().toTimeString().slice(0,5));
+  const [csHorasCarencia, setCsHorasCarencia] = React.useState(48);
+  const [csFechaReap, setCsFechaReap] = React.useState("");
+  const [csObs, setCsObs] = React.useState("");
+  const [csResp, setCsResp] = React.useState("");
+  const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
+
+  React.useEffect(()=>{
+    if(csMotivoTipo==="fitosanitario"&&csHorasCarencia&&csFecha&&csHora){
+      const inicio = new Date(`${csFecha}T${csHora}:00`);
+      inicio.setHours(inicio.getHours()+Number(csHorasCarencia));
+      setCsFechaReap(inicio.toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit",year:"numeric"})+" "+inicio.toTimeString().slice(0,5));
+    } else {
+      setCsFechaReap("");
+    }
+  },[csMotivoTipo,csHorasCarencia,csFecha,csHora]);
+
+  const todasZonas = [...MACROZONAS_BASE].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+
+  const MOTIVOS = [
+    {id:"fitosanitario", icon:"🧪", label:"Aplicación fitosanitaria", desc:"Fungicida, herbicida, insecticida"},
+    {id:"riego",         icon:"💧", label:"Riego profundo", desc:"Riego programado o emergencia"},
+    {id:"mantencion",    icon:"🔧", label:"Mantención / Reparación", desc:"Aireación, resiembra, obra civil"},
+    {id:"evento",        icon:"🏆", label:"Evento / Actividad", desc:"Torneo, acto, uso exclusivo"},
+    {id:"otro",          icon:"⚠️", label:"Otro motivo", desc:"Especificar manualmente"},
+  ];
+
+  const guardarCierre = () => {
+    if(!csZonas.length) return;
+    const mObj = MOTIVOS.find(m=>m.id===csMotivoTipo)||MOTIVOS[0];
+    const motivoLabel = `${mObj.icon} ${mObj.label}`;
+    const tarea = limpiarUndef({
+      id:Date.now()+Math.random(), fecha:csFecha,
+      zona:csZonas.join(", "), elemento:"",
+      tarea:`🚫 CIERRE: ${csZonas.join(", ")} — ${mObj.label}${csProducto?" ("+csProducto+")":""}`,
+      responsable:csResp||"", estado:csResp?"pendiente":"por_designar",
+      obs:`${motivoLabel}${csProducto?" — "+csProducto:""}. Reapertura: ${csFechaReap||"a confirmar"}. ${csObs}`.trim(),
+      motivoCierre:`${motivoLabel}${csProducto?" — "+csProducto:""}`,
+      reapertura:csFechaReap||"", tipoEvento:"cierre_sectorial",
+    });
+    setTareasProg(prev=>{
+      const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+      const lista=[tarea,...normArr(prev[csFecha]||[])];
+      fbUpdate(ref(db,`${ROOT}/prog`),{[csFecha]:lista.map(limpiarUndef)}).catch(e=>console.error(e));
+      return {...prev,[csFecha]:lista};
+    });
+    crearNotificacion?.("cierre",{
+      titulo:`🚫 Cierre sectorial: ${csZonas.join(", ")}`,
+      mensaje:`${motivoLabel}${csProducto?" — "+csProducto:""}. Reapertura: ${csFechaReap||"por confirmar"}.`,
+      fecha:csFecha,
+    });
+    onClose();
+  };
+
+  return (
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.7)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
+      <div style={{background:"#0f2417",border:"1px solid rgba(239,68,68,0.3)",borderRadius:14,padding:24,width:"100%",maxWidth:540,maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color:"#fca5a5"}}>🚫 Cierre Sectorial</div>
+          <button onClick={onClose} style={{background:"transparent",border:"none",color:"#5a9a7a",fontSize:20,cursor:"pointer"}}>✕</button>
+        </div>
+
+        <div style={{marginBottom:16}}>
+          <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.5px"}}>1. Zonas afectadas</label>
+          <div style={{display:"flex",flexWrap:"wrap",gap:5,maxHeight:130,overflowY:"auto",padding:4}}>
+            {todasZonas.map(z=>(
+              <button key={z.id} onClick={()=>setCsZonas(p=>p.includes(z.nombre)?p.filter(x=>x!==z.nombre):[...p,z.nombre])}
+                style={{...S.btn,fontSize:11,padding:"3px 10px",
+                  background:csZonas.includes(z.nombre)?"rgba(239,68,68,0.2)":"rgba(255,255,255,0.04)",
+                  color:csZonas.includes(z.nombre)?"#fca5a5":"#7aaa80",
+                  border:`1px solid ${csZonas.includes(z.nombre)?"rgba(239,68,68,0.4)":"rgba(255,255,255,0.1)"}`}}>
+                {z.icono} {z.nombre}
+              </button>
+            ))}
+          </div>
+          {csZonas.length>0&&<div style={{fontSize:11,color:"#fca5a5",marginTop:4}}>Seleccionadas: {csZonas.join(", ")}</div>}
+        </div>
+
+        <div style={{marginBottom:16}}>
+          <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.5px"}}>2. Motivo del cierre</label>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+            {MOTIVOS.map(csM=>(
+              <button key={csM.id} onClick={()=>setCsMotivoTipo(csM.id)}
+                style={{...S.btn,padding:"8px 12px",textAlign:"left",
+                  background:csMotivoTipo===csM.id?"rgba(239,68,68,0.15)":"rgba(255,255,255,0.03)",
+                  border:`1px solid ${csMotivoTipo===csM.id?"rgba(239,68,68,0.4)":"rgba(255,255,255,0.08)"}`,
+                  color:csMotivoTipo===csM.id?"#fca5a5":"#7aaa80"}}>
+                <div style={{fontSize:14}}>{csM.icon} {csM.label}</div>
+                <div style={{fontSize:10,color:"#5a9a7a",marginTop:2}}>{csM.desc}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+          <div>
+            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Fecha</label>
+            <input type="date" style={S.input} value={csFecha} onChange={e=>setCsFecha(e.target.value)}/>
+          </div>
+          <div>
+            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Hora</label>
+            <input type="time" style={S.input} value={csHora} onChange={e=>setCsHora(e.target.value)}/>
+          </div>
+          {csMotivoTipo==="fitosanitario"&&(<>
+            <div>
+              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Producto aplicado</label>
+              <input style={S.input} value={csProducto} onChange={e=>setCsProducto(e.target.value)} placeholder="ej: Daconil, Roundup..."/>
+            </div>
+            <div>
+              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Horas de carencia</label>
+              <select style={S.input} value={csHorasCarencia} onChange={e=>setCsHorasCarencia(e.target.value)}>
+                {[12,24,48,72,96,120,168].map(csH=><option key={csH} value={csH}>{csH}h ({csH>=48?`${csH/24} días`:`${csH} horas`})</option>)}
+              </select>
+            </div>
+            <div style={{gridColumn:"1/-1"}}>
+              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Reapertura estimada</label>
+              <input style={{...S.input,color:"#fbbf24",fontWeight:700}} value={csFechaReap} onChange={e=>setCsFechaReap(e.target.value)} placeholder="Se calcula automáticamente"/>
+            </div>
+          </>)}
+          {(csMotivoTipo==="evento"||csMotivoTipo==="mantencion")&&(
+            <div style={{gridColumn:"1/-1"}}>
+              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Descripción</label>
+              <input style={S.input} value={csProducto} onChange={e=>setCsProducto(e.target.value)} placeholder={csMotivoTipo==="evento"?"Nombre del evento...":"Tipo de mantención..."}/>
+            </div>
+          )}
+          <div style={{gridColumn:"1/-1"}}>
+            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Responsable</label>
+            <select style={S.input} value={csResp} onChange={e=>setCsResp(e.target.value)}>
+              <option value="">Sin asignar</option>
+              {personalArr.map(csP=><option key={csP.id} value={csP.nombre}>{csP.nombre}</option>)}
+            </select>
+          </div>
+          <div style={{gridColumn:"1/-1"}}>
+            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Observaciones</label>
+            <input style={S.input} value={csObs} onChange={e=>setCsObs(e.target.value)} placeholder="Notas adicionales..."/>
+          </div>
+        </div>
+
+        <div style={{display:"flex",gap:8}}>
+          <button className="btn-p" style={{...S.btn,flex:1,background:"rgba(239,68,68,0.2)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}}
+            disabled={!csZonas.length} onClick={guardarCierre}>
+            🚫 Registrar cierre
+          </button>
+          <button className="btn-g" style={S.btn} onClick={onClose}>Cancelar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [zonas, setZonas] = useState(()=>MACROZONAS_BASE);
   const [vista, setVista] = useState("dashboard");
@@ -14885,172 +15041,7 @@ export default function App() {
         )}
       </div>
 
-      {/* ── MODAL CIERRE SECTORIAL ── */}
-      {showCierreSectorial&&(()=>{
-        const hoyCS = fechaLocal();
-        const [csZonas, setCsZonas] = React.useState([]);
-        const [csMotivoTipo, setCsMotivoTipo] = React.useState("fitosanitario");
-        const [csMotivo, setCsMotivo] = React.useState("");
-        const [csProducto, setCsProducto] = React.useState("");
-        const [csFecha, setCsFecha] = React.useState(hoyCS);
-        const [csHora, setCsHora] = React.useState(new Date().toTimeString().slice(0,5));
-        const [csHorasCarencia, setCsHorasCarencia] = React.useState(48);
-        const [csFechaReap, setCsFechaReap] = React.useState("");
-        const [csObs, setCsObs] = React.useState("");
-        const [csResp, setCsResp] = React.useState("");
-        const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
-
-        // Calcular reapertura automática según carencia
-        React.useEffect(()=>{
-          if(csMotivoTipo==="fitosanitario"&&csHorasCarencia&&csFecha&&csHora){
-            const inicio = new Date(`${csFecha}T${csHora}:00`);
-            inicio.setHours(inicio.getHours()+Number(csHorasCarencia));
-            setCsFechaReap(inicio.toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit",year:"numeric"})+" "+inicio.toTimeString().slice(0,5));
-          }
-        },[csMotivoTipo,csHorasCarencia,csFecha,csHora]);
-
-        const todasZonas = [...MACROZONAS_BASE].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
-
-        const guardarCierre = () => {
-          if(!csZonas.length||!csMotivoTipo) return;
-          const motivoLabel = csMotivoTipo==="fitosanitario"?"🧪 Aplicación fitosanitaria":csMotivoTipo==="mantencion"?"🔧 Mantención/Reparación":csMotivoTipo==="evento"?"🏆 Evento":csMotivoTipo==="riego"?"💧 Riego":"⚠️ Otro";
-          const tarea = {
-            id:Date.now()+Math.random(),
-            fecha:csFecha,
-            zona:csZonas.join(", "),
-            elemento:"",
-            tarea:`🚫 CIERRE: ${csZonas.join(", ")} — ${motivoLabel}${csProducto?" ("+csProducto+")":""}`,
-            responsable:csResp||"",
-            estado:csResp?"pendiente":"por_designar",
-            obs:`${csMotivo||motivoLabel}. Reapertura: ${csFechaReap||"a confirmar"}. ${csObs}`.trim(),
-            motivoCierre:`${motivoLabel}${csProducto?" — "+csProducto:""}`,
-            reapertura:csFechaReap,
-            tipoEvento:"cierre_sectorial",
-          };
-          setTareasProg(prev=>{
-            const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-            const lista=[tarea,...normArr(prev[csFecha]||[])];
-            fbUpdate(ref(db,`${ROOT}/prog`),{[csFecha]:lista.map(limpiarUndef)}).catch(e=>console.error(e));
-            return {...prev,[csFecha]:lista};
-          });
-          // Notificación
-          crearNotificacion?.("cierre",{
-            titulo:`🚫 Cierre sectorial: ${csZonas.join(", ")}`,
-            mensaje:`${motivoLabel}${csProducto?" — "+csProducto:""}. Reapertura: ${csFechaReap||"por confirmar"}.`,
-            fecha:csFecha,
-          });
-          setShowCierreSectorial(false);
-        };
-
-        const MOTIVOS = [
-          {id:"fitosanitario", icon:"🧪", label:"Aplicación fitosanitaria", desc:"Fungicida, herbicida, insecticida"},
-          {id:"riego",         icon:"💧", label:"Riego profundo / anegamiento", desc:"Riego programado o emergencia"},
-          {id:"mantencion",   icon:"🔧", label:"Mantención / Reparación", desc:"Aireación, resiembra, obra civil"},
-          {id:"evento",        icon:"🏆", label:"Evento / Actividad", desc:"Torneo, acto, uso exclusivo"},
-          {id:"otro",          icon:"⚠️", label:"Otro motivo", desc:"Especificar manualmente"},
-        ];
-
-        return (
-          <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.7)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={()=>setShowCierreSectorial(false)}>
-            <div style={{background:"#0f2417",border:"1px solid rgba(239,68,68,0.3)",borderRadius:14,padding:24,width:"100%",maxWidth:540,maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
-                <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color:"#fca5a5"}}>🚫 Cierre Sectorial</div>
-                <button onClick={()=>setShowCierreSectorial(false)} style={{background:"transparent",border:"none",color:"#5a9a7a",fontSize:20,cursor:"pointer"}}>✕</button>
-              </div>
-
-              {/* Paso 1: Zonas afectadas */}
-              <div style={{marginBottom:16}}>
-                <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.5px"}}>1. Zonas afectadas</label>
-                <div style={{display:"flex",flexWrap:"wrap",gap:5,maxHeight:130,overflowY:"auto",padding:4}}>
-                  {todasZonas.map(z=>(
-                    <button key={z.id} onClick={()=>setCsZonas(p=>p.includes(z.nombre)?p.filter(x=>x!==z.nombre):[...p,z.nombre])}
-                      style={{...S.btn,fontSize:11,padding:"3px 10px",
-                        background:csZonas.includes(z.nombre)?"rgba(239,68,68,0.2)":"rgba(255,255,255,0.04)",
-                        color:csZonas.includes(z.nombre)?"#fca5a5":"#7aaa80",
-                        border:`1px solid ${csZonas.includes(z.nombre)?"rgba(239,68,68,0.4)":"rgba(255,255,255,0.1)"}`}}>
-                      {z.icono} {z.nombre}
-                    </button>
-                  ))}
-                </div>
-                {csZonas.length>0&&<div style={{fontSize:11,color:"#fca5a5",marginTop:4}}>Seleccionadas: {csZonas.join(", ")}</div>}
-              </div>
-
-              {/* Paso 2: Motivo */}
-              <div style={{marginBottom:16}}>
-                <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.5px"}}>2. Motivo del cierre</label>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
-                  {MOTIVOS.map(m=>(
-                    <button key={m.id} onClick={()=>setCsMotivoTipo(m.id)}
-                      style={{...S.btn,padding:"8px 12px",textAlign:"left",
-                        background:csMotivoTipo===m.id?"rgba(239,68,68,0.15)":"rgba(255,255,255,0.03)",
-                        border:`1px solid ${csMotivoTipo===m.id?"rgba(239,68,68,0.4)":"rgba(255,255,255,0.08)"}`,
-                        color:csMotivoTipo===m.id?"#fca5a5":"#7aaa80"}}>
-                      <div style={{fontSize:14}}>{m.icon} {m.label}</div>
-                      <div style={{fontSize:10,color:"#5a9a7a",marginTop:2}}>{m.desc}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Campos según motivo */}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
-                <div>
-                  <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Fecha</label>
-                  <input type="date" style={S.input} value={csFecha} onChange={e=>setCsFecha(e.target.value)}/>
-                </div>
-                <div>
-                  <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Hora</label>
-                  <input type="time" style={S.input} value={csHora} onChange={e=>setCsHora(e.target.value)}/>
-                </div>
-                {csMotivoTipo==="fitosanitario"&&(
-                  <>
-                    <div>
-                      <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Producto aplicado</label>
-                      <input style={S.input} value={csProducto} onChange={e=>setCsProducto(e.target.value)} placeholder="ej: Daconil, Roundup..."/>
-                    </div>
-                    <div>
-                      <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Horas de carencia</label>
-                      <select style={S.input} value={csHorasCarencia} onChange={e=>setCsHorasCarencia(e.target.value)}>
-                        {[12,24,48,72,96,120,168].map(h=><option key={h} value={h}>{h}h ({h>=48?`${h/24} días`:`${h} horas`})</option>)}
-                      </select>
-                    </div>
-                    <div style={{gridColumn:"1/-1"}}>
-                      <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Reapertura estimada</label>
-                      <input style={{...S.input,color:"#fbbf24",fontWeight:700}} value={csFechaReap} onChange={e=>setCsFechaReap(e.target.value)} placeholder="Se calcula automáticamente"/>
-                    </div>
-                  </>
-                )}
-                {(csMotivoTipo==="evento"||csMotivoTipo==="mantencion")&&(
-                  <div style={{gridColumn:"1/-1"}}>
-                    <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Descripción</label>
-                    <input style={S.input} value={csProducto} onChange={e=>setCsProducto(e.target.value)} placeholder={csMotivoTipo==="evento"?"Nombre del evento...":"Tipo de mantención..."}/>
-                  </div>
-                )}
-                <div style={{gridColumn:"1/-1"}}>
-                  <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Responsable</label>
-                  <select style={S.input} value={csResp} onChange={e=>setCsResp(e.target.value)}>
-                    <option value="">Sin asignar</option>
-                    {personalArr.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
-                  </select>
-                </div>
-                <div style={{gridColumn:"1/-1"}}>
-                  <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Observaciones</label>
-                  <input style={S.input} value={csObs} onChange={e=>setCsObs(e.target.value)} placeholder="Notas adicionales..."/>
-                </div>
-              </div>
-
-              <div style={{display:"flex",gap:8}}>
-                <button className="btn-p" style={{...S.btn,flex:1,background:"rgba(239,68,68,0.2)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}}
-                  disabled={!csZonas.length}
-                  onClick={guardarCierre}>
-                  🚫 Registrar cierre
-                </button>
-                <button className="btn-g" style={S.btn} onClick={()=>setShowCierreSectorial(false)}>Cancelar</button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {showCierreSectorial&&<ModalCierreSectorial S={S} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} tareasProg={tareasProg} setTareasProg={setTareasProg} crearNotificacion={crearNotificacion} onClose={()=>setShowCierreSectorial(false)}/>}
     </div>
   );
 }
