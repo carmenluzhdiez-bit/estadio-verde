@@ -164,6 +164,7 @@ const FRECUENCIAS = [
 // Cada tarea: { tarea, verano, otono, invierno, primavera }
 const TAREAS_DEFAULT = {
   arboles: [
+    { tarea:"Plantar desde Vivero", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
     { tarea:"Riego",               verano:"semanal",   otono:"quincenal",  invierno:"noaplica", primavera:"semanal"   },
     { tarea:"Poda de limpieza",    verano:"mensual",   otono:"mensual",    invierno:"noaplica", primavera:"mensual"   },
     { tarea:"Poda de formación",   verano:"noaplica",  otono:"noaplica",   invierno:"mensual",  primavera:"noaplica"  },
@@ -171,6 +172,7 @@ const TAREAS_DEFAULT = {
     { tarea:"Control de plagas",   verano:"mensual",   otono:"mensual",    invierno:"noaplica", primavera:"mensual"   },
   ],
   arbustos: [
+    { tarea:"Plantar desde Vivero", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
     { tarea:"Riego",               verano:"cada3dias", otono:"semanal",    invierno:"quincenal",primavera:"cada5dias" },
     { tarea:"Poda de limpieza",    verano:"semanal",   otono:"quincenal",  invierno:"noaplica", primavera:"semanal"   },
     { tarea:"Poda de formación",   verano:"noaplica",  otono:"noaplica",   invierno:"semanal",  primavera:"noaplica"  },
@@ -185,12 +187,14 @@ const TAREAS_DEFAULT = {
     { tarea:"Control de malezas",  verano:"quincenal", otono:"mensual",    invierno:"noaplica", primavera:"quincenal" },
   ],
   herbaceas: [
+    { tarea:"Plantar desde Vivero", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
     { tarea:"Riego",               verano:"cada2dias", otono:"cada3dias",  invierno:"semanal",  primavera:"cada3dias" },
     { tarea:"Deadheading (flores marchitas)", verano:"semanal", otono:"semanal", invierno:"noaplica", primavera:"semanal" },
     { tarea:"Fertilización",       verano:"quincenal", otono:"mensual",    invierno:"noaplica", primavera:"quincenal" },
     { tarea:"Control de plagas",   verano:"quincenal", otono:"mensual",    invierno:"noaplica", primavera:"quincenal" },
   ],
   trepadoras: [
+    { tarea:"Plantar desde Vivero", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
     { tarea:"Riego",               verano:"cada3dias", otono:"semanal",    invierno:"quincenal",primavera:"cada5dias" },
     { tarea:"Poda de limpieza",    verano:"mensual",   otono:"mensual",    invierno:"noaplica", primavera:"mensual"   },
     { tarea:"Poda de formación",   verano:"noaplica",  otono:"noaplica",   invierno:"mensual",  primavera:"noaplica"  },
@@ -198,12 +202,14 @@ const TAREAS_DEFAULT = {
     { tarea:"Fertilización",       verano:"mensual",   otono:"noaplica",   invierno:"noaplica", primavera:"mensual"   },
   ],
   rastreras: [
+    { tarea:"Plantar desde Vivero", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
     { tarea:"Riego",               verano:"cada3dias", otono:"semanal",    invierno:"quincenal",primavera:"cada5dias" },
     { tarea:"Poda de contención",  verano:"mensual",   otono:"mensual",    invierno:"noaplica", primavera:"mensual"   },
     { tarea:"Fertilización",       verano:"mensual",   otono:"noaplica",   invierno:"noaplica", primavera:"mensual"   },
     { tarea:"Control de malezas",  verano:"quincenal", otono:"mensual",    invierno:"noaplica", primavera:"quincenal" },
   ],
   jardineras: [
+    { tarea:"Plantar desde Vivero", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
     { tarea:"Riego",               verano:"cada2dias", otono:"cada3dias",  invierno:"semanal",  primavera:"cada3dias" },
     { tarea:"Poda / recorte",      verano:"quincenal", otono:"mensual",    invierno:"noaplica", primavera:"quincenal" },
     { tarea:"Fertilización",       verano:"quincenal", otono:"mensual",    invierno:"noaplica", primavera:"quincenal" },
@@ -211,6 +217,7 @@ const TAREAS_DEFAULT = {
     { tarea:"Limpieza recipiente", verano:"mensual",   otono:"mensual",    invierno:"mensual",  primavera:"mensual"   },
   ],
   macetas_piso: [
+    { tarea:"Plantar desde Vivero", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
     { tarea:"Riego",               verano:"cada2dias", otono:"cada3dias",  invierno:"semanal",  primavera:"cada3dias" },
     { tarea:"Poda / recorte",      verano:"quincenal", otono:"mensual",    invierno:"noaplica", primavera:"quincenal" },
     { tarea:"Fertilización",       verano:"quincenal", otono:"mensual",    invierno:"noaplica", primavera:"quincenal" },
@@ -218,6 +225,7 @@ const TAREAS_DEFAULT = {
     { tarea:"Limpieza recipiente", verano:"mensual",   otono:"mensual",    invierno:"mensual",  primavera:"mensual"   },
   ],
   colgantes: [
+    { tarea:"Plantar desde Vivero", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
     { tarea:"Riego",               verano:"diario",    otono:"cada3dias",  invierno:"semanal",  primavera:"cada2dias" },
     { tarea:"Poda / recorte",      verano:"quincenal", otono:"mensual",    invierno:"noaplica", primavera:"quincenal" },
     { tarea:"Fertilización",       verano:"quincenal", otono:"mensual",    invierno:"noaplica", primavera:"quincenal" },
@@ -226,6 +234,7 @@ const TAREAS_DEFAULT = {
   ],
   // Subcategorías especiales de arbustos — mismas frecuencias base pero con podas diferenciadas
   rosales: [
+    { tarea:"Plantar desde Vivero", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
     { tarea:"Riego",               verano:"cada3dias", otono:"semanal",    invierno:"quincenal",primavera:"cada5dias" },
     { tarea:"Poda de limpieza",    verano:"semanal",   otono:"quincenal",  invierno:"noaplica", primavera:"semanal"   },
     { tarea:"Poda de formación",   verano:"noaplica",  otono:"noaplica",   invierno:"semanal",  primavera:"noaplica"  },
@@ -2735,10 +2744,75 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
 
       {/* Tabs */}
       <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
-        {[["programa","📆 Programar"],["historial","📜 Historial"]].map(([t,l])=>(
+        {[["programa","📆 Programar"],["frecuencias","🔄 Frecuencias"],["historial","📜 Historial"]].map(([t,l])=>(
           <button key={t} className={`tab${tabProg===t?" on":""}`} onClick={()=>setTabProg(t)}>{l}</button>
         ))}
       </div>
+
+      {/* ── FRECUENCIAS POR MACROZONA ── */}
+      {tabProg==="frecuencias"&&(()=>{
+        const [zonaSelFrec, setZonaSelFrec] = React.useState("");
+        const [elemSelFrec, setElemSelFrec] = React.useState("");
+        const zonaActFrec = zonaSelFrec ? zonas.find(z=>String(z.id)===zonaSelFrec) : null;
+        const elemsActFrec = zonaActFrec ? getAllElems(String(zonaActFrec.id)) : [];
+        const zdActFrec = zonaActFrec ? getZD(String(zonaActFrec.id)) : {};
+        const elemActFrec = elemSelFrec ? elemsActFrec.find(e=>e.id===elemSelFrec) : null;
+        const frecsActuales = elemActFrec ? (zdActFrec.elementos?.[elemActFrec.id]?.frecuencias||[]) : [];
+
+        return (
+          <div className="ein">
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,marginBottom:14}}>🔄 Frecuencias de mantención</div>
+            <div style={{fontSize:12,color:"#5a9a7a",marginBottom:14}}>
+              Aquí se configuran las frecuencias de cada elemento. El botón <strong>✨ Proponer del día</strong> en Programar usa estos datos para sugerir las tareas vencidas.
+            </div>
+
+            {/* Selector de zona */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+              <div>
+                <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Macrozona</label>
+                <select style={S.input} value={zonaSelFrec} onChange={e=>{setZonaSelFrec(e.target.value);setElemSelFrec("");}}>
+                  <option value="">— Seleccionar zona —</option>
+                  {[...zonas].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(z=>(
+                    <option key={z.id} value={String(z.id)}>{z.icono} {z.nombre}</option>
+                  ))}
+                </select>
+              </div>
+              {zonaActFrec&&(
+                <div>
+                  <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Elemento</label>
+                  <select style={S.input} value={elemSelFrec} onChange={e=>setElemSelFrec(e.target.value)}>
+                    <option value="">— Seleccionar elemento —</option>
+                    {elemsActFrec.map(e=>(
+                      <option key={e.id} value={e.id}>{e.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* Panel de frecuencias del elemento seleccionado */}
+            {elemActFrec&&(
+              <FrecuenciasPanel
+                S={S}
+                zona={zonaActFrec}
+                elem={elemActFrec}
+                frecs={frecsActuales}
+                edData={zdActFrec.elementos?.[elemActFrec.id]||{}}
+                esJefa={esJefa}
+                onSave={(nuevasFrecs)=>{
+                  setElemFrecs(String(zonaActFrec.id), elemActFrec.id, nuevasFrecs, elemActFrec.isCustom||false);
+                }}
+              />
+            )}
+
+            {!zonaActFrec&&(
+              <div style={{...S.card,padding:24,textAlign:"center",color:"#3a7a5a",fontSize:13}}>
+                Selecciona una macrozona y un elemento para ver y editar sus frecuencias de mantención.
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ── HISTORIAL ── */}
       {tabProg==="historial" && (
@@ -2863,6 +2937,12 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                     <input style={{...S.input,fontSize:13,marginTop:6}} autoFocus
                       placeholder="Describir tarea..."
                       onChange={e=>setNuevaTarea(p=>({...p,tarea:e.target.value}))}/>
+                  )}
+                  {nuevaTarea.tarea==="Plantar desde Vivero"&&(
+                    <div style={{marginTop:8,padding:"10px 12px",background:"rgba(74,222,128,0.08)",border:"1px solid rgba(74,222,128,0.25)",borderRadius:8,fontSize:12,color:"#4ade80"}}>
+                      🌱 Para plantar desde Vivero con descuento de stock e insumos, usa el botón <strong>"🌱 Plantar desde Vivero"</strong> en la ficha de la macrozona → tab <strong>✅ Tareas</strong>.<br/>
+                      <span style={{color:"#5a9a7a",fontSize:11}}>Esta tarea se registrará aquí automáticamente al completar ese formulario.</span>
+                    </div>
                   )}
                 </div>
                 <div>
@@ -9856,7 +9936,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             <div style={{fontSize:13,fontWeight:700,color:"#34d399",marginBottom:10}}>⚡ Acciones rápidas</div>
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               <button style={{...S.btn,background:"rgba(52,211,153,0.15)",color:"#34d399",border:"1px solid rgba(52,211,153,0.3)"}} onClick={()=>{setSubTab("mediciones");setShowMedForm(true);}}>📏 Nueva medición</button>
-              <button style={{...S.btn,background:"rgba(239,68,68,0.12)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}} onClick={()=>setVista("fungicidas")}>🚫 Registrar cierre sectorial</button>
+              <button style={{...S.btn,background:"rgba(239,68,68,0.12)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}} onClick={()=>setShowCierreSectorial(true)}>🚫 Registrar cierre sectorial</button>
               <button style={{...S.btn,background:"rgba(52,211,153,0.12)",color:"#6ee7b7",border:"1px solid rgba(52,211,153,0.2)"}} onClick={()=>{setSubTab("greens");setShowDiariaForm(true);}}>✅ Registro diario jefa</button>
               <button style={{...S.btn,background:"rgba(52,211,153,0.12)",color:"#6ee7b7",border:"1px solid rgba(52,211,153,0.2)"}} onClick={()=>{setSubTab("greens");setShowTareaForm("green");}}>📋 Nueva tarea greens</button>
               {esJefa&&<button style={{...S.btn,background:"rgba(251,191,36,0.12)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.25)"}} onClick={()=>{setSubTab("eventos");setShowEventoForm(true);}}>🏆 Cargar evento</button>}
@@ -10997,9 +11077,9 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           <div style={{background:"rgba(96,165,250,0.08)",border:"1px solid rgba(96,165,250,0.25)",borderRadius:12,padding:"14px 18px",marginBottom:16,display:"flex",gap:12,alignItems:"flex-start"}}>
             <span style={{fontSize:22}}>ℹ️</span>
             <div>
-              <div style={{fontSize:14,fontWeight:700,color:"#60a5fa",marginBottom:4}}>Las frecuencias de Golf ahora se gestionan desde Macrozonas</div>
+              <div style={{fontSize:14,fontWeight:700,color:"#60a5fa",marginBottom:4}}>Las frecuencias de Golf se gestionan desde Programación</div>
               <div style={{fontSize:12,color:"#5a9a9a",lineHeight:1.6}}>
-                Ve a <strong>Macrozonas → Golf → Elementos</strong> para ver y editar las frecuencias de cada Green, Fairway, Antegreen y demás zonas.<br/>
+                Ve a <strong>Programa → 🔄 Frecuencias → Golf</strong> para ver y editar las frecuencias de cada Green, Fairway, Antegreen y demás zonas.<br/>
                 El botón <strong>✨ Proponer del día</strong> en Programación genera automáticamente las tareas vencidas según esas frecuencias.
               </div>
             </div>
@@ -12940,6 +13020,7 @@ export default function App() {
   // Worker states — deben declararse antes de los useEffects que los usan
   const [vistaWorker,    setVistaWorker]    = useState(false);
   const [workerARevisar, setWorkerARevisar] = useState(null); // id del trabajador que la jefa está revisando
+  const [showCierreSectorial, setShowCierreSectorial] = useState(false);
   const [workerLogueado, setWorkerLogueado] = useState(null);
   const [workerPinError, setWorkerPinError] = useState(false);
   const [workerPinInput, setWorkerPinInput] = useState("");
@@ -13939,7 +14020,7 @@ export default function App() {
               </div>
             )}
             <div style={{display:"flex",gap:4,marginBottom:16,borderBottom:"1px solid rgba(255,255,255,0.08)",paddingBottom:0,overflowX:"auto"}}>
-              {[["elementos","🌿","Elementos"],["info","📝","Info"],["tareas","✅","Tareas"],["historial","📜","Historial"],...(zona?.categoria==="Bodegas"?[["recursos","🏗️","Recursos"]]:[])].map(([t,ico,lbl])=>(
+              {[["elementos","🌿","Elementos"],["historial","📜","Historial"],["info","📝","Info"],...(zona?.categoria==="Bodegas"?[["recursos","🏗️","Recursos"]]:[])].map(([t,ico,lbl])=>(
                 <button key={t} onClick={()=>setTab(t)} style={{
                   cursor:"pointer",border:"none",background:"transparent",
                   color:tab===t?"#34d399":"#6aaa7a",
@@ -13961,161 +14042,104 @@ export default function App() {
               <div className="ein">
                 {(()=>{
                   const todosElems = getAllElems(zonaId);
-                  const VEGE_KEYS  = ["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
+                  const zdat = getZD(zonaId);
+                  const hoyStr = fechaLocal();
+                  const VEGE_KEYS = ["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes","rosales","palmeras","suculentas","bulbosas","acuaticas","bambus","helechos","bromelias","orquideas","cactus","vivero"];
                   const INFRA_KEYS = ["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","bodegas"];
-                  const vegeElems  = todosElems.filter(e=>VEGE_KEYS.includes(e.tipo));
-                  const infraElems = todosElems.filter(e=>INFRA_KEYS.includes(e.tipo));
-                  const otrosElems = todosElems.filter(e=>!VEGE_KEYS.includes(e.tipo)&&!INFRA_KEYS.includes(e.tipo));
+                  const elemsVege = todosElems.filter(e=>VEGE_KEYS.includes(e.tipo));
+                  const elemsInfra = todosElems.filter(e=>INFRA_KEYS.includes(e.tipo));
+
+                  // Calcular estado de mantención por elemento
+                  const calcEstadoMant = (elem) => {
+                    const edData = zdat.elementos?.[elem.id]||{};
+                    const frecs = edData.frecuencias||[];
+                    if(!frecs.length) return null;
+                    let atrasadas = 0, proximas = 0, alDia = 0;
+                    frecs.forEach(f=>{
+                      const prox = calcProximaFrecGlobal(f, hoyStr);
+                      if(!prox) return;
+                      const diasRest = Math.round((new Date(prox+"T12:00:00")-new Date(hoyStr+"T12:00:00"))/(1000*60*60*24));
+                      if(diasRest < 0) atrasadas++;
+                      else if(diasRest <= 3) proximas++;
+                      else alDia++;
+                    });
+                    return {atrasadas, proximas, alDia, total:frecs.length};
+                  };
+
+                  // Resumen general
+                  let totalAtrasadas = 0, totalProximas = 0;
+                  todosElems.forEach(e=>{
+                    const m = calcEstadoMant(e);
+                    if(m){totalAtrasadas+=m.atrasadas; totalProximas+=m.proximas;}
+                  });
+                  const elemsEnMal = todosElems.filter(e=>(zdat.elementos?.[e.id]?.estado||"bueno")==="critico").length;
+                  const elemsRegular = todosElems.filter(e=>(zdat.elementos?.[e.id]?.estado||"bueno")==="regular").length;
 
                   return (<>
-                    {/* ── VEGETACIÓN ── */}
-                    {vegeElems.length>0&&(
-                      <div style={{marginBottom:20}}>
-                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12,paddingBottom:8,borderBottom:"1px solid rgba(34,197,94,0.2)"}}>
-                          <span style={{fontSize:18}}>🌿</span>
-                          <span style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#86efac"}}>Vegetación</span>
-                          <span style={{fontSize:11,color:"#4ade80",background:"rgba(34,197,94,0.1)",padding:"1px 8px",borderRadius:10}}>{vegeElems.length} elementos</span>
+                    {/* Resumen estado general */}
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:8,marginBottom:16}}>
+                      {[
+                        {label:"Total elementos",val:todosElems.length,color:"#60a5fa",icon:"🌿"},
+                        {label:"Vegetación",val:elemsVege.length,color:"#4ade80",icon:"🌱"},
+                        {label:"Infraestructura",val:elemsInfra.length,color:"#94a3b8",icon:"🏗️"},
+                        {label:"Estado crítico",val:elemsEnMal,color:elemsEnMal>0?"#ef4444":"#22c55e",icon:"🔴"},
+                        {label:"Mant. atrasadas",val:totalAtrasadas,color:totalAtrasadas>0?"#ef4444":"#22c55e",icon:"⚠️"},
+                        {label:"Mant. próximas",val:totalProximas,color:totalProximas>0?"#f59e0b":"#22c55e",icon:"⏳"},
+                      ].map(s=>(
+                        <div key={s.label} style={{...S.card,padding:"10px 12px",textAlign:"center"}}>
+                          <div style={{fontSize:18,marginBottom:2}}>{s.icon}</div>
+                          <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:700,color:s.color}}>{s.val}</div>
+                          <div style={{fontSize:10,color:"#5a9a7a",lineHeight:1.2}}>{s.label}</div>
                         </div>
-                        {VEGE_KEYS.map(subKey=>{
-                          const subElems=vegeElems.filter(e=>e.tipo===subKey);
-                          if(subElems.length===0) return null;
-                          const subMeta=CATEGORIAS_ELEM[subKey];
-                          return (
-                            <div key={subKey} style={{marginBottom:12,paddingLeft:10,borderLeft:`2px solid ${subMeta.color}30`}}>
-                              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
-                                <span style={{fontSize:13}}>{subMeta.icon}</span>
-                                <span style={{fontSize:12,fontWeight:600,color:subMeta.color}}>{subMeta.label}</span>
-                                <span style={{fontSize:11,color:"#5aaa70"}}>({subElems.length})</span>
-                              </div>
-                              <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                                {subElems.map(e=>renderElemCard(e))}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
+                      ))}
+                    </div>
 
-                    {/* ── INFRAESTRUCTURA — colapsable ── */}
-                    {infraElems.length>0&&(
-                      <div style={{marginBottom:20}}>
-                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:0,paddingBottom:8,borderBottom:"1px solid rgba(245,158,11,0.2)",cursor:"pointer",userSelect:"none"}}
-                          onClick={()=>{
-                            const el=document.getElementById(`infra-${zonaId}`);
-                            if(el) el.style.display=el.style.display==="none"?"block":"none";
-                            const arr=document.getElementById(`infra-arr-${zonaId}`);
-                            if(arr) arr.style.transform=arr.style.transform==="rotate(0deg)"?"rotate(-90deg)":"rotate(0deg)";
-                          }}>
-                          <span style={{fontSize:18}}>🏗️</span>
-                          <span style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#fcd34d"}}>Infraestructura</span>
-                          <span style={{fontSize:11,color:"#f59e0b",background:"rgba(245,158,11,0.1)",padding:"1px 8px",borderRadius:10}}>{infraElems.length} elementos</span>
-                          <span id={`infra-arr-${zonaId}`} style={{marginLeft:"auto",fontSize:12,color:"#6aaa7a",transition:"transform .2s",display:"inline-block",transform:"rotate(0deg)"}}>▼</span>
-                        </div>
-                        <div id={`infra-${zonaId}`} style={{display:"none",marginTop:8}}>
-                          {INFRA_KEYS.map(subKey=>{
-                            const subElems=infraElems.filter(e=>e.tipo===subKey);
-                            if(subElems.length===0) return null;
-                            const subMeta=CATEGORIAS_ELEM[subKey];
-                            const subId=`infra-sub-${zonaId}-${subKey}`;
-                            return (
-                              <div key={subKey} style={{marginBottom:8,borderLeft:`2px solid ${subMeta.color}30`,borderRadius:6,overflow:"hidden"}}>
-                                <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 8px",cursor:"pointer",userSelect:"none",background:`${subMeta.color}08`}}
-                                  onClick={()=>{
-                                    const el=document.getElementById(subId);
-                                    if(el) el.style.display=el.style.display==="none"?"flex":"none";
-                                    const arr=document.getElementById(subId+"-arr");
-                                    if(arr) arr.style.transform=arr.style.transform==="rotate(-90deg)"?"rotate(0deg)":"rotate(-90deg)";
-                                  }}>
-                                  <span style={{fontSize:13}}>{subMeta.icon}</span>
-                                  <span style={{fontSize:12,fontWeight:600,color:subMeta.color}}>{subMeta.label}</span>
-                                  <span style={{fontSize:11,color:"#5aaa70"}}>({subElems.length})</span>
-                                  <span id={subId+"-arr"} style={{marginLeft:"auto",fontSize:10,color:"#6aaa7a",transition:"transform .2s",display:"inline-block",transform:"rotate(-90deg)"}}>▼</span>
+                    {/* Lista de elementos con estado */}
+                    {[{titulo:"🌿 Vegetación",elems:elemsVege},{titulo:"🏗️ Infraestructura",elems:elemsInfra}].map(grupo=>{
+                      if(!grupo.elems.length) return null;
+                      return (
+                        <div key={grupo.titulo} style={{marginBottom:14}}>
+                          <div style={{fontSize:11,color:"#6aaa7a",letterSpacing:"0.5px",textTransform:"uppercase",marginBottom:6}}>{grupo.titulo} ({grupo.elems.length})</div>
+                          <div style={{...S.card,padding:0,overflow:"hidden"}}>
+                            {grupo.elems.map((elem,i)=>{
+                              const edData = zdat.elementos?.[elem.id]||{};
+                              const estado = edData.estado||"bueno";
+                              const mant = calcEstadoMant(elem);
+                              const ESTADOS_E = {bueno:{color:"#22c55e",label:"Bueno"},regular:{color:"#f59e0b",label:"Regular"},critico:{color:"#ef4444",label:"Crítico"},mantenimiento:{color:"#3b82f6",label:"En mantención"}};
+                              const estColor = ESTADOS_E[estado]?.color||"#22c55e";
+                              return (
+                                <div key={elem.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 14px",borderBottom:i<grupo.elems.length-1?"1px solid rgba(255,255,255,0.05)":"none",background:estado==="critico"?"rgba(239,68,68,0.04)":"transparent"}}>
+                                  <div style={{width:8,height:8,borderRadius:"50%",background:estColor,flexShrink:0}}/>
+                                  <div style={{flex:1,fontSize:13}}>{elem.nombre}</div>
+                                  <div style={{fontSize:11,color:estColor}}>{ESTADOS_E[estado]?.label||"Bueno"}</div>
+                                  {mant&&mant.atrasadas>0&&<div style={{fontSize:10,color:"#ef4444",background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:6,padding:"1px 7px"}}>⚠️ {mant.atrasadas} atrasada{mant.atrasadas>1?"s":""}</div>}
+                                  {mant&&mant.atrasadas===0&&mant.proximas>0&&<div style={{fontSize:10,color:"#f59e0b",background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.2)",borderRadius:6,padding:"1px 7px"}}>⏳ {mant.proximas} próxima{mant.proximas>1?"s":""}</div>}
+                                  {mant&&mant.atrasadas===0&&mant.proximas===0&&mant.alDia>0&&<div style={{fontSize:10,color:"#22c55e",background:"rgba(34,197,94,0.08)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:6,padding:"1px 7px"}}>✅ Al día</div>}
+                                  {edData.notas&&<div style={{fontSize:10,color:"#5a9a7a",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{edData.notas}</div>}
+                                  {/* Cambiar estado rápido */}
+                                  <select value={estado} onChange={e=>updateZona(zonaId,{elementos:{...zdat.elementos,[elem.id]:{...edData,estado:e.target.value}}})}
+                                    style={{fontSize:10,background:"rgba(255,255,255,0.05)",color:"#5a9a7a",border:"1px solid rgba(255,255,255,0.1)",borderRadius:5,padding:"2px 4px",cursor:"pointer"}}>
+                                    <option value="bueno">Bueno</option>
+                                    <option value="regular">Regular</option>
+                                    <option value="critico">Crítico</option>
+                                    <option value="mantenimiento">Mantención</option>
+                                  </select>
                                 </div>
-                                <div id={subId} style={{display:"none",flexDirection:"column",gap:6,padding:"8px 8px 4px 10px"}}>
-                                  {subElems.map(e=>renderElemCard(e))}
-                                </div>
-                              </div>
-                            );
-                          })}
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })}
 
-                    {/* ── OTROS ── */}
-                    {otrosElems.length>0&&(
-                      <div style={{marginBottom:16}}>
-                        <div style={{fontSize:13,fontWeight:600,color:"#6aaa7a",marginBottom:8}}>🔹 Otros</div>
-                        <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                          {otrosElems.map(e=>renderElemCard(e))}
-                        </div>
+                    {todosElems.length===0&&(
+                      <div style={{...S.card,padding:24,textAlign:"center",color:"#3a7a5a",fontSize:13}}>
+                        Esta zona no tiene elementos registrados.<br/>
+                        <span style={{fontSize:11,color:"#4a6a5a"}}>Los elementos se configuran en Programación → Frecuencias.</span>
                       </div>
                     )}
                   </>);
                 })()}
-
-                {/* ── AGREGAR ELEMENTO ── */}
-                <div style={{...S.card,padding:14,marginTop:8}}>
-                  {!showAddElem?(
-                    <button style={{...S.btn,background:"rgba(61,122,82,0.2)",color:"#90d0a0",border:"1px solid rgba(61,122,82,0.3)",width:"100%",justifyContent:"center"}} onClick={()=>setShowAddElem(true)}>
-                      ➕ Agregar elemento a esta zona
-                    </button>
-                  ):(
-                    <div style={{background:"rgba(61,122,82,0.06)",border:"1px solid rgba(61,122,82,0.2)",borderRadius:10,padding:"14px 16px"}}>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                        <span style={{fontSize:13,fontWeight:600,color:"#90d0a0"}}>➕ Agregar elementos</span>
-                        <span style={{fontSize:11,color:"#5a8a6a"}}>Enter para agregar seguidos</span>
-                      </div>
-                      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
-                        <input
-                          placeholder="Nombre del elemento..."
-                          value={newElem.nombre}
-                          onChange={e=>setNewElem(p=>({...p,nombre:e.target.value}))}
-                          onKeyDown={e=>{
-                            if(e.key==="Enter"&&newElem.nombre.trim()){
-                              addCustomElem(zonaId,newElem);
-                              setNewElem(p=>({...p,nombre:""}));
-                            }
-                          }}
-                          style={{...S.input,flex:"2 1 200px"}}/>
-                        <div style={{flex:"1 1 150px",maxWidth:220}}>
-                          {(()=>{
-                            const vk=["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
-                            const ok=["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","bodegas"];
-                            const esVege = vk.includes(newElem.tipo);
-                            return (<>
-                              {/* Selector de grupo */}
-                              <div style={{display:"flex",gap:4,marginBottom:4}}>
-                                <button onClick={()=>setNewElem(p=>({...p,tipo:"arboles"}))}
-                                  style={{flex:1,cursor:"pointer",border:`1px solid ${esVege?"rgba(34,197,94,0.5)":"rgba(255,255,255,0.1)"}`,borderRadius:6,padding:"4px 6px",fontSize:11,background:esVege?"rgba(34,197,94,0.1)":"transparent",color:esVege?"#4ade80":"#6aaa7a",fontFamily:"'Georgia',serif"}}>
-                                  🌿 Vegetación
-                                </button>
-                                <button onClick={()=>setNewElem(p=>({...p,tipo:"infraestructura"}))}
-                                  style={{flex:1,cursor:"pointer",border:`1px solid ${!esVege?"rgba(245,158,11,0.5)":"rgba(255,255,255,0.1)"}`,borderRadius:6,padding:"4px 6px",fontSize:11,background:!esVege?"rgba(245,158,11,0.1)":"transparent",color:!esVege?"#fbbf24":"#6aaa7a",fontFamily:"'Georgia',serif"}}>
-                                  🏗️ Infraestructura
-                                </button>
-                              </div>
-                              {/* Selector de tipo específico */}
-                              <select value={newElem.tipo} onChange={e=>setNewElem(p=>({...p,tipo:e.target.value}))}
-                                style={{...S.input,width:"100%",fontSize:12}}>
-                                {(esVege?vk:ok).map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}
-                              </select>
-                            </>);
-                          })()}
-                        </div>
-                      </div>
-                      <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                        <button className="btn-p" style={S.btn} onClick={()=>{
-                          if(newElem.nombre.trim()){
-                            addCustomElem(zonaId,newElem);
-                            setNewElem(p=>({...p,nombre:""}));
-                          }
-                        }}>✓ Agregar</button>
-                        <span style={{fontSize:11,color:"#4a7a5a"}}>o presiona Enter</span>
-                        <button className="btn-g" style={{...S.btn,marginLeft:"auto"}} onClick={()=>{setShowAddElem(false);setNewElem({nombre:"",tipo:"arboles"});}}>Listo ✓</button>
-                      </div>
-                    </div>
-                  )}
-                </div>
               </div>
             )}
 
@@ -14613,7 +14637,7 @@ export default function App() {
                 <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:900,marginBottom:8}}>Bienvenida, Jefa de Áreas Verdes</h2>
                 <p style={{color:"#6aaa7a",fontSize:14,marginBottom:24}}>Usa el menú de navegación para acceder a todas las secciones.</p>
                 <button onClick={()=>setVista("programacion")} style={{...S.btn,background:"#3d7a52",color:"#fff",fontSize:15,padding:"12px 28px"}}>📆 Ir a Programación →</button>
-                <button onClick={()=>setVista("fungicidas")} style={{...S.btn,background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)",fontSize:13,padding:"10px 20px"}}>🚫 Registrar cierre sectorial</button>
+                <button onClick={()=>setShowCierreSectorial(true)} style={{...S.btn,background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)",fontSize:13,padding:"10px 20px"}}>🚫 Cierre sectorial</button>
                 <div style={{marginTop:12}}>
                   <button onClick={()=>{setWorkerPinInput("");}} style={{...S.btn,background:"transparent",color:"#6aaa7a",border:"1px solid rgba(255,255,255,0.1)",fontSize:13}}>← Cerrar sesión</button>
 
@@ -14860,6 +14884,173 @@ export default function App() {
           />
         )}
       </div>
+
+      {/* ── MODAL CIERRE SECTORIAL ── */}
+      {showCierreSectorial&&(()=>{
+        const hoyCS = fechaLocal();
+        const [csZonas, setCsZonas] = React.useState([]);
+        const [csMotivoTipo, setCsMotivoTipo] = React.useState("fitosanitario");
+        const [csMotivo, setCsMotivo] = React.useState("");
+        const [csProducto, setCsProducto] = React.useState("");
+        const [csFecha, setCsFecha] = React.useState(hoyCS);
+        const [csHora, setCsHora] = React.useState(new Date().toTimeString().slice(0,5));
+        const [csHorasCarencia, setCsHorasCarencia] = React.useState(48);
+        const [csFechaReap, setCsFechaReap] = React.useState("");
+        const [csObs, setCsObs] = React.useState("");
+        const [csResp, setCsResp] = React.useState("");
+        const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
+
+        // Calcular reapertura automática según carencia
+        React.useEffect(()=>{
+          if(csMotivoTipo==="fitosanitario"&&csHorasCarencia&&csFecha&&csHora){
+            const inicio = new Date(`${csFecha}T${csHora}:00`);
+            inicio.setHours(inicio.getHours()+Number(csHorasCarencia));
+            setCsFechaReap(inicio.toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit",year:"numeric"})+" "+inicio.toTimeString().slice(0,5));
+          }
+        },[csMotivoTipo,csHorasCarencia,csFecha,csHora]);
+
+        const todasZonas = [...MACROZONAS_BASE].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+
+        const guardarCierre = () => {
+          if(!csZonas.length||!csMotivoTipo) return;
+          const motivoLabel = csMotivoTipo==="fitosanitario"?"🧪 Aplicación fitosanitaria":csMotivoTipo==="mantencion"?"🔧 Mantención/Reparación":csMotivoTipo==="evento"?"🏆 Evento":csMotivoTipo==="riego"?"💧 Riego":"⚠️ Otro";
+          const tarea = {
+            id:Date.now()+Math.random(),
+            fecha:csFecha,
+            zona:csZonas.join(", "),
+            elemento:"",
+            tarea:`🚫 CIERRE: ${csZonas.join(", ")} — ${motivoLabel}${csProducto?" ("+csProducto+")":""}`,
+            responsable:csResp||"",
+            estado:csResp?"pendiente":"por_designar",
+            obs:`${csMotivo||motivoLabel}. Reapertura: ${csFechaReap||"a confirmar"}. ${csObs}`.trim(),
+            motivoCierre:`${motivoLabel}${csProducto?" — "+csProducto:""}`,
+            reapertura:csFechaReap,
+            tipoEvento:"cierre_sectorial",
+          };
+          setTareasProg(prev=>{
+            const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+            const lista=[tarea,...normArr(prev[csFecha]||[])];
+            fbUpdate(ref(db,`${ROOT}/prog`),{[csFecha]:lista.map(limpiarUndef)}).catch(e=>console.error(e));
+            return {...prev,[csFecha]:lista};
+          });
+          // Notificación
+          crearNotificacion?.("cierre",{
+            titulo:`🚫 Cierre sectorial: ${csZonas.join(", ")}`,
+            mensaje:`${motivoLabel}${csProducto?" — "+csProducto:""}. Reapertura: ${csFechaReap||"por confirmar"}.`,
+            fecha:csFecha,
+          });
+          setShowCierreSectorial(false);
+        };
+
+        const MOTIVOS = [
+          {id:"fitosanitario", icon:"🧪", label:"Aplicación fitosanitaria", desc:"Fungicida, herbicida, insecticida"},
+          {id:"riego",         icon:"💧", label:"Riego profundo / anegamiento", desc:"Riego programado o emergencia"},
+          {id:"mantencion",   icon:"🔧", label:"Mantención / Reparación", desc:"Aireación, resiembra, obra civil"},
+          {id:"evento",        icon:"🏆", label:"Evento / Actividad", desc:"Torneo, acto, uso exclusivo"},
+          {id:"otro",          icon:"⚠️", label:"Otro motivo", desc:"Especificar manualmente"},
+        ];
+
+        return (
+          <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.7)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={()=>setShowCierreSectorial(false)}>
+            <div style={{background:"#0f2417",border:"1px solid rgba(239,68,68,0.3)",borderRadius:14,padding:24,width:"100%",maxWidth:540,maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color:"#fca5a5"}}>🚫 Cierre Sectorial</div>
+                <button onClick={()=>setShowCierreSectorial(false)} style={{background:"transparent",border:"none",color:"#5a9a7a",fontSize:20,cursor:"pointer"}}>✕</button>
+              </div>
+
+              {/* Paso 1: Zonas afectadas */}
+              <div style={{marginBottom:16}}>
+                <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.5px"}}>1. Zonas afectadas</label>
+                <div style={{display:"flex",flexWrap:"wrap",gap:5,maxHeight:130,overflowY:"auto",padding:4}}>
+                  {todasZonas.map(z=>(
+                    <button key={z.id} onClick={()=>setCsZonas(p=>p.includes(z.nombre)?p.filter(x=>x!==z.nombre):[...p,z.nombre])}
+                      style={{...S.btn,fontSize:11,padding:"3px 10px",
+                        background:csZonas.includes(z.nombre)?"rgba(239,68,68,0.2)":"rgba(255,255,255,0.04)",
+                        color:csZonas.includes(z.nombre)?"#fca5a5":"#7aaa80",
+                        border:`1px solid ${csZonas.includes(z.nombre)?"rgba(239,68,68,0.4)":"rgba(255,255,255,0.1)"}`}}>
+                      {z.icono} {z.nombre}
+                    </button>
+                  ))}
+                </div>
+                {csZonas.length>0&&<div style={{fontSize:11,color:"#fca5a5",marginTop:4}}>Seleccionadas: {csZonas.join(", ")}</div>}
+              </div>
+
+              {/* Paso 2: Motivo */}
+              <div style={{marginBottom:16}}>
+                <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.5px"}}>2. Motivo del cierre</label>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                  {MOTIVOS.map(m=>(
+                    <button key={m.id} onClick={()=>setCsMotivoTipo(m.id)}
+                      style={{...S.btn,padding:"8px 12px",textAlign:"left",
+                        background:csMotivoTipo===m.id?"rgba(239,68,68,0.15)":"rgba(255,255,255,0.03)",
+                        border:`1px solid ${csMotivoTipo===m.id?"rgba(239,68,68,0.4)":"rgba(255,255,255,0.08)"}`,
+                        color:csMotivoTipo===m.id?"#fca5a5":"#7aaa80"}}>
+                      <div style={{fontSize:14}}>{m.icon} {m.label}</div>
+                      <div style={{fontSize:10,color:"#5a9a7a",marginTop:2}}>{m.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Campos según motivo */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+                <div>
+                  <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Fecha</label>
+                  <input type="date" style={S.input} value={csFecha} onChange={e=>setCsFecha(e.target.value)}/>
+                </div>
+                <div>
+                  <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Hora</label>
+                  <input type="time" style={S.input} value={csHora} onChange={e=>setCsHora(e.target.value)}/>
+                </div>
+                {csMotivoTipo==="fitosanitario"&&(
+                  <>
+                    <div>
+                      <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Producto aplicado</label>
+                      <input style={S.input} value={csProducto} onChange={e=>setCsProducto(e.target.value)} placeholder="ej: Daconil, Roundup..."/>
+                    </div>
+                    <div>
+                      <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Horas de carencia</label>
+                      <select style={S.input} value={csHorasCarencia} onChange={e=>setCsHorasCarencia(e.target.value)}>
+                        {[12,24,48,72,96,120,168].map(h=><option key={h} value={h}>{h}h ({h>=48?`${h/24} días`:`${h} horas`})</option>)}
+                      </select>
+                    </div>
+                    <div style={{gridColumn:"1/-1"}}>
+                      <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Reapertura estimada</label>
+                      <input style={{...S.input,color:"#fbbf24",fontWeight:700}} value={csFechaReap} onChange={e=>setCsFechaReap(e.target.value)} placeholder="Se calcula automáticamente"/>
+                    </div>
+                  </>
+                )}
+                {(csMotivoTipo==="evento"||csMotivoTipo==="mantencion")&&(
+                  <div style={{gridColumn:"1/-1"}}>
+                    <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Descripción</label>
+                    <input style={S.input} value={csProducto} onChange={e=>setCsProducto(e.target.value)} placeholder={csMotivoTipo==="evento"?"Nombre del evento...":"Tipo de mantención..."}/>
+                  </div>
+                )}
+                <div style={{gridColumn:"1/-1"}}>
+                  <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Responsable</label>
+                  <select style={S.input} value={csResp} onChange={e=>setCsResp(e.target.value)}>
+                    <option value="">Sin asignar</option>
+                    {personalArr.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                  </select>
+                </div>
+                <div style={{gridColumn:"1/-1"}}>
+                  <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Observaciones</label>
+                  <input style={S.input} value={csObs} onChange={e=>setCsObs(e.target.value)} placeholder="Notas adicionales..."/>
+                </div>
+              </div>
+
+              <div style={{display:"flex",gap:8}}>
+                <button className="btn-p" style={{...S.btn,flex:1,background:"rgba(239,68,68,0.2)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}}
+                  disabled={!csZonas.length}
+                  onClick={guardarCierre}>
+                  🚫 Registrar cierre
+                </button>
+                <button className="btn-g" style={S.btn} onClick={()=>setShowCierreSectorial(false)}>Cancelar</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
