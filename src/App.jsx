@@ -6748,7 +6748,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   // Fondo disponible real = saldo anterior (si no hay reembolso pendiente → fondo base)
   // Si hay rendición pendiente de reembolso → el fondo real es el saldo anterior
   // Cuando llega el reembolso → el fondo vuelve a $3.000.000
-  const totalGeneral = compras.reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
+  const totalGeneral = compras.reduce((a,c)=>a+(c.tipoDoc==="Nota de Crédito"?-1:1)*Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
   const totalReembolsado = rendiciones.reduce((a,r)=>a+(r.reembolso?Number(r.montoReembolso||0):0),0);
   const hayRendicionPendiente = rendiciones.some(r=>!r.reembolso);
   // Si hay saldo anterior ingresado → ese es el fondo actual (reembolso pendiente)
@@ -6756,7 +6756,11 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   const fondoActual = Number(saldoAnterior)>0 ? Number(saldoAnterior) : fondo;
   const gastadoPendiente = compras
     .filter(c=>["pendiente","pagada","pagada_efectivo","pagada_debito","en_rendicion"].includes(c.estado))
-    .reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
+    .reduce((a,c)=>{
+      const monto = Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
+      // Nota de Crédito descuenta del gasto (recuperación de dinero)
+      return a + (c.tipoDoc==="Nota de Crédito" ? -monto : monto);
+    },0);
   const saldoDisponible = fondoActual - gastadoPendiente;
   const pctUsado        = fondoActual?Math.round((gastadoPendiente/fondoActual)*100):0;
   const colorSaldo      = saldoDisponible>fondoActual*0.4?"#22c55e":saldoDisponible>fondoActual*0.15?"#f59e0b":"#ef4444";
@@ -6769,7 +6773,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
 
   const mesesDisp=[];
   for(let i=5;i>=0;i--){const dMes=new Date(hoy.getFullYear(),hoy.getMonth()-i,1);mesesDisp.push({key:`${dMes.getFullYear()}-${String(dMes.getMonth()+1).padStart(2,"0")}`,label:`${MESES_COMPRAS[dMes.getMonth()]} ${dMes.getFullYear()}`});}
-  const porMes=mesesDisp.map(m=>({...m,total:compras.filter(c=>(c.fecha||"").startsWith(m.key)).reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0)}));
+  const porMes=mesesDisp.map(m=>({...m,total:compras.filter(c=>(c.fecha||"").startsWith(m.key)).reduce((a,c)=>a+(c.tipoDoc==="Nota de Crédito"?-1:1)*Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0)}));
   const maxMes=Math.max(...porMes.map(m=>m.total),1);
   const mesesUnicos=[...new Set(compras.map(c=>(c.fecha||"").slice(0,7)).filter(Boolean))].sort((a,b)=>b.localeCompare(a));
   const listaPersonal=[...personal].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
@@ -7201,7 +7205,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
           {showRendForm&&(
             <div style={{...S.card,padding:16,marginBottom:14,background:"rgba(167,139,250,0.06)",borderColor:"rgba(167,139,250,0.25)"}}>
               <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,marginBottom:12,color:"#c4b5fd"}}>
-                📤 Crear rendición — {seleccionadas.length} compra{seleccionadas.length!==1?"s":""} · ${compras.filter(c=>seleccionadas.includes(c.id)).reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0).toLocaleString("es-CL")}
+                📤 Crear rendición — {seleccionadas.length} compra{seleccionadas.length!==1?"s":""} · ${compras.filter(c=>seleccionadas.includes(c.id)).reduce((a,c)=>a+(c.tipoDoc==="Nota de Crédito"?-1:1)*Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0).toLocaleString("es-CL")}
               </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
                 <div><label style={labelSt}>Fecha presentación</label><input type="date" style={S.input} value={rendForm.fecha} onChange={e=>setRendForm(p=>({...p,fecha:e.target.value}))}/></div>
