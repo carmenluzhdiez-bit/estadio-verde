@@ -14011,7 +14011,7 @@ export default function App() {
                   <div>
                     <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Categoría</label>
                     <select style={S.input} value={nuevaMacrozona.categoria} onChange={e=>setNuevaMacrozona(p=>({...p,categoria:e.target.value}))}>
-                      {[...new Set(MACROZONAS_BASE.map(z=>z.categoria))].map(c=><option key={c} value={c}>{c}</option>)}
+                      {[...new Set(MACROZONAS_BASE.map(z=>z.categoria))].map(catOpt=><option key={catOpt} value={catOpt}>{catOpt}</option>)}
                     </select>
                   </div>
                   <div>
@@ -14052,7 +14052,7 @@ export default function App() {
               <input placeholder="🔍 Buscar zona..." value={busq||""} onChange={e=>setBusq(e.target.value)} style={{...S.input,flex:"1 1 180px",maxWidth:260}}/>
               <select value={filtroCat} onChange={e=>setFiltroCat(e.target.value)} style={{...S.input,flex:"1 1 150px",maxWidth:200}}>
                 <option value="Todas">Todas las categorías</option>
-                {[...new Set(MACROZONAS_BASE.map(z=>z.categoria))].map(c=><option key={c} value={c}>{c}</option>)}
+                {[...new Set(MACROZONAS_BASE.map(z=>z.categoria))].map(catOpt=><option key={catOpt} value={catOpt}>{catOpt}</option>)}
               </select>
               <select value={filtroEst} onChange={e=>setFiltroEst(e.target.value)} style={{...S.input,flex:"1 1 130px",maxWidth:180}}>
                 <option value="Todos">Todos los estados</option>
@@ -14993,7 +14993,7 @@ export default function App() {
                   <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>CARGO</label>
                   <select style={S.input} value={nuevoTrabajador.cargo} onChange={e=>setNuevoTrabajador(p=>({...p,cargo:e.target.value}))}>
                     <option value="">Seleccionar...</option>
-                    {["Jefa de Áreas Verdes","Supervisor de Áreas Verdes","Jardinero","Jardinero Senior","Técnico en Riego","Operador Maquinaria","Capataz","Administrativo","Otro"].map(c=><option key={c} value={c}>{c}</option>)}
+                    {["Jefa de Áreas Verdes","Supervisor de Áreas Verdes","Jardinero","Jardinero Senior","Técnico en Riego","Operador Maquinaria","Capataz","Administrativo","Otro"].map(catOpt=><option key={catOpt} value={catOpt}>{catOpt}</option>)}
                   </select>
                 </div>
                 <div>
@@ -15006,7 +15006,7 @@ export default function App() {
                 <div>
                   <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>TIPO DE CONTRATO</label>
                   <select style={S.input} value={nuevoTrabajador.contrato} onChange={e=>setNuevoTrabajador(p=>({...p,contrato:e.target.value}))}>
-                    {["indefinido","plazo fijo","honorarios","part-time"].map(c=><option key={c} value={c}>{c}</option>)}
+                    {["indefinido","plazo fijo","honorarios","part-time"].map(catOpt=><option key={catOpt} value={catOpt}>{catOpt}</option>)}
                   </select>
                 </div>
               </div>
