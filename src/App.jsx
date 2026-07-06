@@ -7018,6 +7018,76 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                   }}>
                   🖨️ Imprimir resumen
                 </button>
+                <button style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(52,211,153,0.1)",color:"#34d399",border:"1px solid rgba(52,211,153,0.3)"}}
+                  onClick={()=>{
+                    // Informe de gastos por ítem con filtros de período
+                    const mesActual = new Date().toISOString().slice(0,7);
+                    const anioActual = new Date().getFullYear();
+                    // Recopilar todos los ítems de todas las compras del año
+                    const comprasAnio = compras.filter(c=>c.fecha?.startsWith(String(anioActual)) && c.tipoDoc!=="Nota de Crédito" && c.tipoDoc!=="Cotización" && c.tipoDoc!=="Nota de Pedido");
+                    // Construir tabla por ítem agrupado por descripcion+categoria
+                    const porItem = {};
+                    comprasAnio.forEach(comp=>{
+                      (comp.items||[]).forEach(it=>{
+                        if(!it.descripcion?.trim()) return;
+                        const key = it.descripcion.trim().toLowerCase();
+                        if(!porItem[key]) porItem[key]={desc:it.descripcion.trim(),cat:it.categoria||"Sin categoría",meses:{},totalAnio:0,cantTotal:0};
+                        const mes = comp.fecha?.slice(0,7)||"";
+                        const monto = Number(it.totalBruto||it.totalNeto||0) * (comp.tipoDoc==="Nota de Crédito"?-1:1);
+                        const cant = Number(it.cantidad||0);
+                        if(!porItem[key].meses[mes]) porItem[key].meses[mes]={monto:0,cant:0};
+                        porItem[key].meses[mes].monto += monto;
+                        porItem[key].meses[mes].cant += cant;
+                        porItem[key].totalAnio += monto;
+                        porItem[key].cantTotal += cant;
+                      });
+                    });
+                    const items = Object.values(porItem).sort((a,b)=>b.totalAnio-a.totalAnio);
+                    // Generar meses del año actual
+                    const MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+                    const mesesCols = Array.from({length:12},(_,i)=>`${anioActual}-${String(i+1).padStart(2,"0")}`);
+                    const mesesConDatos = mesesCols.filter(m=>items.some(it=>it.meses[m]));
+                    const totalPorMes = {};
+                    mesesConDatos.forEach(m=>{totalPorMes[m]=items.reduce((s,it)=>s+(it.meses[m]?.monto||0),0);});
+                    const filas = items.map(it=>`
+                      <tr>
+                        <td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;font-weight:500">${it.desc}</td>
+                        <td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;font-size:11px;color:#888">${it.cat}</td>
+                        ${mesesConDatos.map(m=>`<td style="padding:6px 8px;border-bottom:1px solid #f0f0f0;text-align:right;font-size:11px">${it.meses[m]?`$${it.meses[m].monto.toLocaleString("es-CL")}`:"—"}</td>`).join("")}
+                        <td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;text-align:right;font-weight:700;color:#1a5c2a">$${it.totalAnio.toLocaleString("es-CL")}</td>
+                      </tr>`).join("");
+                    const totFila = `<tr style="background:#f0fdf4;font-weight:700">
+                      <td colspan="2" style="padding:7px 10px;border-top:2px solid #16a34a">TOTAL MES</td>
+                      ${mesesConDatos.map(m=>`<td style="padding:7px 8px;border-top:2px solid #16a34a;text-align:right;color:#1a5c2a">$${(totalPorMes[m]||0).toLocaleString("es-CL")}</td>`).join("")}
+                      <td style="padding:7px 10px;border-top:2px solid #16a34a;text-align:right;color:#1a5c2a">$${items.reduce((s,it)=>s+it.totalAnio,0).toLocaleString("es-CL")}</td>
+                    </tr>`;
+                    const hoy = new Date().toLocaleDateString("es-CL",{day:"2-digit",month:"long",year:"numeric"});
+                    const winG = window.open("","_blank","width=1100,height=700");
+                    winG.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+                    <title>Informe de Gastos ${anioActual}</title>
+                    <style>body{font-family:Calibri,Arial,sans-serif;color:#222;padding:28px;font-size:13px}
+                    h1{font-size:19px;color:#1a5c2a;margin-bottom:2px}h2{font-size:12px;color:#888;font-weight:normal;margin-top:0}
+                    table{width:100%;border-collapse:collapse}th{background:#1a5c2a;color:#fff;padding:8px 8px;font-size:11px;text-align:left}
+                    th.num{text-align:right}tr:nth-child(even){background:#fafafa}
+                    .noprint{display:block}@media print{.noprint{display:none}}</style></head><body>
+                    <h1>📊 Informe de Gastos por Ítem — ${anioActual}</h1>
+                    <h2>Departamento de Áreas Verdes · Estadio Español de Las Condes · Generado el ${hoy}</h2>
+                    <table>
+                      <thead><tr>
+                        <th>Ítem / Producto</th><th>Categoría</th>
+                        ${mesesConDatos.map(m=>`<th class="num">${MESES[Number(m.slice(5))-1]}</th>`).join("")}
+                        <th class="num">Total ${anioActual}</th>
+                      </tr></thead>
+                      <tbody>${filas}${totFila}</tbody>
+                    </table>
+                    <div style="margin-top:14px;font-size:11px;color:#888">Incluye Facturas y Boletas. Notas de Crédito descuentan. No incluye Cotizaciones ni Notas de Pedido.</div>
+                    <div class="noprint" style="margin-top:16px;text-align:center">
+                      <button onclick="window.print()" style="background:#1a5c2a;color:#fff;border:none;padding:9px 22px;border-radius:6px;cursor:pointer;font-size:13px">🖨️ Imprimir / Guardar PDF</button>
+                    </div></body></html>`);
+                    winG.document.close();
+                  }}>
+                  📊 Informe gastos por ítem
+                </button>
               </div>
               <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,marginBottom:10}}>💰 Gasto por cuenta</div>
               {[{grupo:"Internas (Beneficio general socios)",cuentas:CUENTAS_INTERNAS},{grupo:"Externas (Beneficio área específica)",cuentas:CUENTAS_EXTERNAS}].map(g=>{
