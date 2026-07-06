@@ -6464,6 +6464,30 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   };
 
   // ── Categorías predefinidas ───────────────────────────────────────────────
+  const descontarItemsDeBodega = (docFecha, docRef, items) => {
+    // Nota de Crédito: descuenta stock de los items devueltos
+    const porBodega = {};
+    items.forEach(it=>{
+      if(!it.bodegaDestino||!it.descripcion?.trim()) return;
+      if(!porBodega[it.bodegaDestino]) porBodega[it.bodegaDestino]=[];
+      porBodega[it.bodegaDestino].push(it);
+    });
+    Object.entries(porBodega).forEach(([bodId, bItems])=>{
+      setBodegasData(prev=>{
+        const bod = prev[bodId]||{nombre:bodId,items:[],historial:[]};
+        const itemsAct = (bod.items||[]).map(bi=>{
+          const match = bItems.find(ni=>ni.descripcion?.toLowerCase()===bi.nombre?.toLowerCase()||bi.descripcion?.toLowerCase()===ni.descripcion?.toLowerCase());
+          if(!match) return bi;
+          const cant = Number(match.cantidad)||0;
+          return {...bi, stockActual:Math.max(0,(Number(bi.stockActual)||0)-cant)};
+        });
+        const histEntry = {fecha:docFecha, tipo:"nota_credito", ref:docRef,
+          items:bItems.map(i=>({nombre:i.descripcion,cant:i.cantidad,unidad:i.unidad||""}))};
+        return {...prev,[bodId]:{...bod,items:itemsAct,historial:[histEntry,...(bod.historial||[])]}};
+      });
+    });
+  };
+
   const CATEGORIAS = ["Caja chica","Combustible","Decoración Interior","Difusión/Educación","EPP / Uniforme","Fertilizante","Fletes","Herramienta","Maceteros","Maicillo","Maquinaria/Equipos","Material de construcción","Material de riego","Materiales/Herramientas","Mulch","Plaguicida","Planta","Repuesto maquinaria","Semilla","Servicio externo","Sustratos/Enmiendas","Otro"];
 
   // ── Cuentas a imputar según organigrama ──────────────────────────────────
@@ -6508,7 +6532,8 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     const cant = Number(item.cantidad)||1;
     const pu   = Number(item.precioUnitario)||0;
     const neto = Math.round(cant*pu);
-    const iva  = form.tipoDoc==="Boleta"?0:Math.round(neto*0.19);
+    const esNC = form.tipoDoc==="Nota de Crédito";
+    const iva  = (form.tipoDoc==="Boleta"||esNC)?0:Math.round(neto*0.19);
     return {...item, totalNeto:neto||"", iva:iva||"", totalBruto:(neto+iva)||""};
   };
 
@@ -6565,7 +6590,12 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     } else {
       set({compras:[doc,...compras.map(c=>notasVinculadas.includes(c.id)?{...c,estado:"facturada",facturaId:docId}:c)]});
       // Ingresar ítems a bodegas
-      ingresarItemsABodega(doc.fecha, `${doc.tipoDoc} ${doc.nDocumento||""} ${doc.proveedor||""}`, doc.items||[]);
+      if(doc.tipoDoc==="Nota de Crédito") {
+        // NC: descontar stock de bodega
+        descontarItemsDeBodega(doc.fecha, `NC ${doc.nDocumento||""} ${doc.proveedor||""}`, doc.items||[]);
+      } else {
+        ingresarItemsABodega(doc.fecha, `${doc.tipoDoc} ${doc.nDocumento||""} ${doc.proveedor||""}`, doc.items||[]);
+      }
     }
     setForm(emptyForm); setShowForm(false); setAlertaDuplicado(null);
   };
@@ -6910,7 +6940,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                           <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.tipoDoc} N°${c.nDocumento||"—"}</td>
                           <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.proveedor||"—"}</td>
                           <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.cuenta||"—"}</td>
-                          <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right;font-weight:600">$${Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0).toLocaleString("es-CL")}</td>
+                          <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right;font-weight:600;color:${c.tipoDoc==='Nota de Crédito'?'#ef4444':'inherit'}">${c.tipoDoc==="Nota de Crédito"?"-":""}$${Math.abs(Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0)).toLocaleString("es-CL")}</td>
                         </tr>`).join("");
                     // Rendiciones pendientes
                     const rendPend = rendiciones.filter(r=>!r.reembolso);
@@ -7186,7 +7216,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                 <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={form.fecha} onChange={e=>setForm(p=>({...p,fecha:e.target.value}))}/></div>
                 <div><label style={labelSt}>Tipo documento</label>
                   <select style={S.input} value={form.tipoDoc} onChange={e=>setForm(p=>({...p,tipoDoc:e.target.value}))}>
-                    {["Factura","Boleta","Nota de Pedido","Cotización","Orden de Compra","Otro"].map(t=><option key={t}>{t}</option>)}
+                    {["Factura","Boleta","Nota de Crédito","Nota de Pedido","Cotización","Orden de Compra","Otro"].map(t=><option key={t}>{t}</option>)}
                   </select>
                 </div>
                 <div><label style={labelSt}>Proveedor</label><input style={S.input} placeholder="Nombre empresa / persona" value={form.proveedor} onChange={e=>setForm(p=>({...p,proveedor:e.target.value}))}/></div>
