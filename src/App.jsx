@@ -12956,12 +12956,12 @@ function PanelFrecuenciasZona({ S, zonas, getAllElems, getZD, setElemFrecs, esJe
       {elemActFrec&&(
         <FrecuenciasPanel
           S={S}
-          zona={zonaActFrec}
-          elem={elemActFrec}
-          frecs={frecsActuales}
-          edData={zdActFrec.elementos?.[elemActFrec.id]||{}}
-          esJefa={esJefa}
-          onSave={(nuevasFrecs)=>{
+          zid={String(zonaActFrec.id)}
+          eid={elemActFrec.id}
+          tipo={elemActFrec.tipo||"arboles"}
+          isCustom={elemActFrec.isCustom||false}
+          getFrecs={()=> zdActFrec.elementos?.[elemActFrec.id]?.frecuencias||[]}
+          setFrecs={(nuevasFrecs)=>{
             setElemFrecs(String(zonaActFrec.id), elemActFrec.id, nuevasFrecs, elemActFrec.isCustom||false);
           }}
         />
