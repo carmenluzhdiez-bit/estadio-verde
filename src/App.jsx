@@ -2750,69 +2750,9 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
       </div>
 
       {/* ── FRECUENCIAS POR MACROZONA ── */}
-      {tabProg==="frecuencias"&&(()=>{
-        const [zonaSelFrec, setZonaSelFrec] = React.useState("");
-        const [elemSelFrec, setElemSelFrec] = React.useState("");
-        const zonaActFrec = zonaSelFrec ? zonas.find(z=>String(z.id)===zonaSelFrec) : null;
-        const elemsActFrec = zonaActFrec ? getAllElems(String(zonaActFrec.id)) : [];
-        const zdActFrec = zonaActFrec ? getZD(String(zonaActFrec.id)) : {};
-        const elemActFrec = elemSelFrec ? elemsActFrec.find(e=>e.id===elemSelFrec) : null;
-        const frecsActuales = elemActFrec ? (zdActFrec.elementos?.[elemActFrec.id]?.frecuencias||[]) : [];
-
-        return (
-          <div className="ein">
-            <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,marginBottom:14}}>🔄 Frecuencias de mantención</div>
-            <div style={{fontSize:12,color:"#5a9a7a",marginBottom:14}}>
-              Aquí se configuran las frecuencias de cada elemento. El botón <strong>✨ Proponer del día</strong> en Programar usa estos datos para sugerir las tareas vencidas.
-            </div>
-
-            {/* Selector de zona */}
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
-              <div>
-                <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Macrozona</label>
-                <select style={S.input} value={zonaSelFrec} onChange={e=>{setZonaSelFrec(e.target.value);setElemSelFrec("");}}>
-                  <option value="">— Seleccionar zona —</option>
-                  {[...zonas].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(z=>(
-                    <option key={z.id} value={String(z.id)}>{z.icono} {z.nombre}</option>
-                  ))}
-                </select>
-              </div>
-              {zonaActFrec&&(
-                <div>
-                  <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Elemento</label>
-                  <select style={S.input} value={elemSelFrec} onChange={e=>setElemSelFrec(e.target.value)}>
-                    <option value="">— Seleccionar elemento —</option>
-                    {elemsActFrec.map(e=>(
-                      <option key={e.id} value={e.id}>{e.nombre}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
-
-            {/* Panel de frecuencias del elemento seleccionado */}
-            {elemActFrec&&(
-              <FrecuenciasPanel
-                S={S}
-                zona={zonaActFrec}
-                elem={elemActFrec}
-                frecs={frecsActuales}
-                edData={zdActFrec.elementos?.[elemActFrec.id]||{}}
-                esJefa={esJefa}
-                onSave={(nuevasFrecs)=>{
-                  setElemFrecs(String(zonaActFrec.id), elemActFrec.id, nuevasFrecs, elemActFrec.isCustom||false);
-                }}
-              />
-            )}
-
-            {!zonaActFrec&&(
-              <div style={{...S.card,padding:24,textAlign:"center",color:"#3a7a5a",fontSize:13}}>
-                Selecciona una macrozona y un elemento para ver y editar sus frecuencias de mantención.
-              </div>
-            )}
-          </div>
-        );
-      })()}
+      {tabProg==="frecuencias"&&(
+        <PanelFrecuenciasZona S={S} zonas={zonas} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} esJefa={esJefa}/>
+      )}
 
       {/* ── HISTORIAL ── */}
       {tabProg==="historial" && (
@@ -12970,6 +12910,65 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
               )}
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PanelFrecuenciasZona({ S, zonas, getAllElems, getZD, setElemFrecs, esJefa }) {
+  const [zonaSelFrec, setZonaSelFrec] = React.useState("");
+  const [elemSelFrec, setElemSelFrec] = React.useState("");
+  const zonaActFrec = zonaSelFrec ? zonas.find(z=>String(z.id)===zonaSelFrec) : null;
+  const elemsActFrec = zonaActFrec ? getAllElems(String(zonaActFrec.id)) : [];
+  const zdActFrec = zonaActFrec ? getZD(String(zonaActFrec.id)) : {};
+  const elemActFrec = elemSelFrec ? elemsActFrec.find(e=>e.id===elemSelFrec) : null;
+  const frecsActuales = elemActFrec ? (zdActFrec.elementos?.[elemActFrec.id]?.frecuencias||[]) : [];
+
+  return (
+    <div className="ein">
+      <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,marginBottom:8}}>🔄 Frecuencias de mantención</div>
+      <div style={{fontSize:12,color:"#5a9a7a",marginBottom:14}}>
+        Configura aquí las frecuencias de cada elemento. El botón <strong>✨ Proponer del día</strong> usa estos datos para sugerir tareas vencidas.
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+        <div>
+          <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Macrozona</label>
+          <select style={S.input} value={zonaSelFrec} onChange={e=>{setZonaSelFrec(e.target.value);setElemSelFrec("");}}>
+            <option value="">— Seleccionar zona —</option>
+            {[...zonas].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(z=>(
+              <option key={z.id} value={String(z.id)}>{z.icono} {z.nombre}</option>
+            ))}
+          </select>
+        </div>
+        {zonaActFrec&&(
+          <div>
+            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Elemento</label>
+            <select style={S.input} value={elemSelFrec} onChange={e=>setElemSelFrec(e.target.value)}>
+              <option value="">— Seleccionar elemento —</option>
+              {elemsActFrec.map(e=>(
+                <option key={e.id} value={e.id}>{e.nombre}</option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+      {elemActFrec&&(
+        <FrecuenciasPanel
+          S={S}
+          zona={zonaActFrec}
+          elem={elemActFrec}
+          frecs={frecsActuales}
+          edData={zdActFrec.elementos?.[elemActFrec.id]||{}}
+          esJefa={esJefa}
+          onSave={(nuevasFrecs)=>{
+            setElemFrecs(String(zonaActFrec.id), elemActFrec.id, nuevasFrecs, elemActFrec.isCustom||false);
+          }}
+        />
+      )}
+      {!zonaActFrec&&(
+        <div style={{...S.card,padding:24,textAlign:"center",color:"#3a7a5a",fontSize:13}}>
+          Selecciona una macrozona y un elemento para ver y editar sus frecuencias.
         </div>
       )}
     </div>
