@@ -12976,6 +12976,340 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
   );
 }
 
+function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotificaciones, marcarTodasLeidas, notifNoLeidas, MACROZONAS_BASE, personal, tareasProg, setTareasProg, limpiarUndef, fechaLocal, crearNotificacion, esJefa }) {
+  const [tabAlerta, setTabAlerta] = React.useState("incidencias");
+  const [showNuevaAlerta, setShowNuevaAlerta] = React.useState(false);
+  const [alertaSelId, setAlertaSelId] = React.useState(null);
+
+  // Form nueva alerta
+  const emptyAlerta = {tipo:"enfermedad",zonas:[],origen:"interna",urgencia:"alta",descripcion:"",responsable:"",fecha:fechaLocal(),hora:new Date().toTimeString().slice(0,5)};
+  const [alertaForm, setAlertaForm] = React.useState(emptyAlerta);
+
+  const TIPOS_ALERTA = [
+    {id:"meteorologica", icon:"🌧️", label:"Meteorológica",    tareas:["🚧 Encintar zona afectada","Revisar drenaje y canales","Retirar obstáculos en caminos","Inspección post-evento"]},
+    {id:"enfermedad",    icon:"🦠", label:"Enfermedad/Plaga",  tareas:["🚧 Encintar zona afectada","Aplicar tratamiento fitosanitario","Registrar agente causal","Monitoreo diario","Retirar material vegetal afectado"]},
+    {id:"dano",          icon:"🔧", label:"Daño/Reparación",   tareas:["🚧 Encintar zona afectada","Evaluar magnitud del daño","Fotografiar y documentar","Solicitar reparación","Señalética de advertencia"]},
+    {id:"evento",        icon:"🏆", label:"Evento/Actividad",  tareas:["🚧 Encintar zona afectada","Instalar señalética","Coordinación con organizadores","Inspección previa al evento","Revisión post-evento"]},
+    {id:"riego",         icon:"💧", label:"Riego de emergencia",tareas:["🚧 Encintar zona afectada","Riego de emergencia","Revisión sistema de drenaje","Monitoreo de humedad"]},
+    {id:"riesgo",        icon:"⚠️", label:"Riesgo general",    tareas:["🚧 Encintar zona afectada","Inspección de seguridad","Notificar a administración","Señalética de peligro"]},
+  ];
+
+  const tipoActual = TIPOS_ALERTA.find(t=>t.id===alertaForm.tipo)||TIPOS_ALERTA[0];
+  const [tareasEditables, setTareasEditables] = React.useState([]);
+  React.useEffect(()=>{
+    setTareasEditables(tipoActual.tareas.map((t,i)=>({id:i,texto:t,incluir:true,responsable:"",urgencia:"pendiente"})));
+  },[alertaForm.tipo]);
+
+  const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
+  const incArr = Array.isArray(incidencias)?incidencias:Object.values(incidencias||{});
+  const incActivas = incArr.filter(i=>i.estado==="activa"||i.estado==="en_gestion").sort((a,b)=>(b.fecha+b.hora).localeCompare(a.fecha+a.hora));
+  const incResueltas = incArr.filter(i=>i.estado==="resuelta").sort((a,b)=>(b.fechaResolucion||b.fecha).localeCompare(a.fechaResolucion||a.fecha));
+
+  const URGENCIA_COLORS = {inmediata:"#ef4444",alta:"#f59e0b",media:"#60a5fa"};
+
+  const guardarAlerta = () => {
+    if(!alertaForm.zonas.length||!alertaForm.descripcion.trim()) return;
+    const tipoObj = TIPOS_ALERTA.find(t=>t.id===alertaForm.tipo);
+    const nuevaId = Date.now()+Math.random();
+    const nuevaAlerta = limpiarUndef({
+      id:nuevaId, estado:"activa",
+      tipo:alertaForm.tipo, tipoLabel:tipoObj?.label||alertaForm.tipo,
+      tipoIcon:tipoObj?.icon||"⚠️",
+      zonas:alertaForm.zonas, origen:alertaForm.origen,
+      urgencia:alertaForm.urgencia, descripcion:alertaForm.descripcion,
+      responsable:alertaForm.responsable, fecha:alertaForm.fecha,
+      hora:alertaForm.hora, fechaCreacion:new Date().toISOString(),
+      tareas:tareasEditables.filter(t=>t.incluir).map(t=>({texto:t.texto,responsable:t.responsable,estado:"pendiente"})),
+      historial:[{accion:"Alerta creada",fecha:alertaForm.fecha,hora:alertaForm.hora,responsable:alertaForm.responsable}],
+    });
+    // Guardar en Firebase
+    const arrActual = Array.isArray(incidencias)?incidencias:Object.values(incidencias||{});
+    const nuevoArr = [nuevaAlerta,...arrActual];
+    setIncidencias(nuevoArr);
+    // Generar cierre sectorial en tareasProg
+    const tareaCierre = limpiarUndef({
+      id:Date.now()+Math.random(), fecha:alertaForm.fecha,
+      zona:alertaForm.zonas.join(", "), elemento:"",
+      tarea:`🚫 CIERRE: ${alertaForm.zonas.join(", ")} — ${tipoObj?.icon} ${tipoObj?.label}`,
+      responsable:alertaForm.responsable||"", estado:"pendiente",
+      obs:`${alertaForm.descripcion}. Urgencia: ${alertaForm.urgencia}. Incidencia #${String(nuevaId).slice(-6)}`,
+      tipoEvento:"cierre_sectorial", incidenciaId:nuevaId,
+    });
+    // Generar tareas editables en programación
+    const tareasGen = tareasEditables.filter(t=>t.incluir).map(t=>limpiarUndef({
+      id:Date.now()+Math.random(), fecha:alertaForm.fecha,
+      zona:alertaForm.zonas.join(", "), elemento:"",
+      tarea:t.texto, responsable:t.responsable||alertaForm.responsable||"",
+      estado:t.responsable?"pendiente":"por_designar",
+      obs:`Generada por alerta: ${alertaForm.descripcion}`,
+      incidenciaId:nuevaId,
+    }));
+    setTareasProg(prev=>{
+      const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+      const lista=[tareaCierre,...tareasGen,...normArr(prev[alertaForm.fecha]||[])];
+      // setTareasProg usa useFirebaseState que persiste automáticamente en Firebase
+      return {...prev,[alertaForm.fecha]:lista};
+    });
+    crearNotificacion?.("alerta",{titulo:`${tipoObj?.icon} Nueva alerta: ${alertaForm.zonas.join(", ")}`,mensaje:alertaForm.descripcion,fecha:alertaForm.fecha});
+    setAlertaForm(emptyAlerta);
+    setShowNuevaAlerta(false);
+    setTabAlerta("incidencias");
+  };
+
+  const resolverAlerta = (inc) => {
+    const hoy = fechaLocal();
+    const actualizada = {...inc, estado:"resuelta", fechaResolucion:hoy, horaResolucion:new Date().toTimeString().slice(0,5),
+      historial:[...(inc.historial||[]),{accion:"Alerta resuelta",fecha:hoy,hora:new Date().toTimeString().slice(0,5)}]};
+    const arrActual = Array.isArray(incidencias)?incidencias:Object.values(incidencias||{});
+    setIncidencias(arrActual.map(i=>String(i.id)===String(inc.id)?actualizada:i));
+    setAlertaSelId(null);
+  };
+
+  const generarReporteAlerta = (inc) => {
+    const win = window.open("","_blank","width=800,height=650");
+    const tareasHtml = (inc.tareas||[]).map(t=>`<tr><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0">${t.texto}</td><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;text-align:center;color:${t.estado==="hecha"?"#16a34a":t.estado==="pendiente"?"#ca8a04":"#6b7280"}">${t.estado==="hecha"?"✅ Hecha":t.estado==="pendiente"?"⏳ Pendiente":"— Sin asignar"}</td><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;color:#6b7280">${t.responsable||"—"}</td></tr>`).join("");
+    const histHtml = (inc.historial||[]).map(h=>`<tr><td style="padding:5px 10px;border-bottom:1px solid #f0f0f0;font-size:12px">${h.fecha} ${h.hora||""}</td><td style="padding:5px 10px;border-bottom:1px solid #f0f0f0;font-size:12px">${h.accion}</td><td style="padding:5px 10px;border-bottom:1px solid #f0f0f0;font-size:12px;color:#6b7280">${h.responsable||"—"}</td></tr>`).join("");
+    win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Reporte Incidencia</title>
+    <style>body{font-family:Calibri,Arial,sans-serif;color:#222;padding:32px;font-size:13px}h1{font-size:19px;color:#14532d;margin-bottom:2px}h2{font-size:12px;color:#888;font-weight:normal;margin-top:0}h3{font-size:13px;color:#14532d;margin:16px 0 6px}table{width:100%;border-collapse:collapse}th{background:#14532d;color:#fff;padding:7px 10px;text-align:left;font-size:11px}tr:nth-child(even){background:#f9fafb}.badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:700}.resuelto{background:#dcfce7;color:#14532d}.activo{background:#fee2e2;color:#991b1b}@media print{button{display:none}}</style></head><body>
+    <h1>${inc.tipoIcon} Reporte de Incidencia — ${inc.tipoLabel}</h1>
+    <h2>Estadio Español de Las Condes · Depto. Áreas Verdes</h2>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0;background:#f9fafb;padding:14px;border-radius:8px">
+      <div><strong style="color:#888;font-size:11px">ESTADO</strong><br/><span class="badge ${inc.estado==="resuelta"?"resuelto":"activo"}">${inc.estado==="resuelta"?"✅ Resuelta":"🔴 Activa"}</span></div>
+      <div><strong style="color:#888;font-size:11px">ZONA(S)</strong><br/>${inc.zonas?.join(", ")||"—"}</div>
+      <div><strong style="color:#888;font-size:11px">URGENCIA</strong><br/>${inc.urgencia||"—"}</div>
+      <div><strong style="color:#888;font-size:11px">INICIO</strong><br/>${inc.fecha} ${inc.hora||""}</div>
+      <div><strong style="color:#888;font-size:11px">RESOLUCIÓN</strong><br/>${inc.fechaResolucion||"Sin resolver"} ${inc.horaResolucion||""}</div>
+      <div><strong style="color:#888;font-size:11px">ORIGEN</strong><br/>${inc.origen==="interna"?"Observación interna":"Externo"}</div>
+    </div>
+    <div style="margin:12px 0;padding:12px;background:#fefce8;border-left:3px solid #ca8a04;border-radius:4px"><strong>Descripción:</strong> ${inc.descripcion||"—"}</div>
+    <h3>Tareas generadas</h3>
+    <table><thead><tr><th>Tarea</th><th>Estado</th><th>Responsable</th></tr></thead><tbody>${tareasHtml||"<tr><td colspan=3 style='padding:10px;color:#888'>Sin tareas registradas</td></tr>"}</tbody></table>
+    <h3>Historial de gestión</h3>
+    <table><thead><tr><th>Fecha/Hora</th><th>Acción</th><th>Responsable</th></tr></thead><tbody>${histHtml}</tbody></table>
+    <div style="margin-top:20px;text-align:center"><button onclick="window.print()" style="background:#14532d;color:#fff;border:none;padding:9px 22px;border-radius:6px;cursor:pointer">🖨️ Imprimir / PDF</button></div>
+    </body></html>`);
+    win.document.close();
+  };
+
+  const alertaSel = alertaSelId ? incArr.find(i=>String(i.id)===String(alertaSelId)) : null;
+
+  return (
+    <div className="ein">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+        <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:700,margin:0}}>🔔 Alertas e Incidencias</h2>
+        {esJefa&&<button className="btn-p" style={{...S.btn,background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}} onClick={()=>setShowNuevaAlerta(true)}>+ Nueva alerta</button>}
+      </div>
+
+      {/* Tabs */}
+      <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>
+        {[["incidencias","🚨 Activas","incActivas"],["resueltas","✅ Resueltas","incResueltas"],["notifs","🔔 Registros","notifNoLeidas"]].map(([t,l,badge])=>(
+          <button key={t} className={`tab${tabAlerta===t?" on":""}`} onClick={()=>setTabAlerta(t)} style={{fontFamily:"'Georgia',serif",position:"relative"}}>
+            {l}
+            {t==="incidencias"&&incActivas.length>0&&<span style={{marginLeft:5,background:"#ef4444",color:"#fff",borderRadius:"50%",fontSize:9,padding:"1px 5px"}}>{incActivas.length}</span>}
+            {t==="notifs"&&notifNoLeidas.length>0&&<span style={{marginLeft:5,background:"#f59e0b",color:"#fff",borderRadius:"50%",fontSize:9,padding:"1px 5px"}}>{notifNoLeidas.length}</span>}
+          </button>
+        ))}
+      </div>
+
+      {/* FORMULARIO NUEVA ALERTA */}
+      {showNuevaAlerta&&(
+        <div style={{...S.card,padding:20,marginBottom:16,border:"1px solid rgba(239,68,68,0.3)"}}>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,color:"#fca5a5",marginBottom:14}}>+ Nueva alerta / incidencia</div>
+
+          {/* Tipo */}
+          <div style={{marginBottom:12}}>
+            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.5px"}}>Tipo de alerta</label>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
+              {TIPOS_ALERTA.map(t=>(
+                <button key={t.id} onClick={()=>setAlertaForm(p=>({...p,tipo:t.id}))}
+                  style={{...S.btn,padding:"7px 10px",textAlign:"left",fontSize:12,
+                    background:alertaForm.tipo===t.id?"rgba(239,68,68,0.12)":"rgba(255,255,255,0.03)",
+                    border:`1px solid ${alertaForm.tipo===t.id?"rgba(239,68,68,0.4)":"rgba(255,255,255,0.08)"}`,
+                    color:alertaForm.tipo===t.id?"#fca5a5":"#7aaa80"}}>
+                  {t.icon} {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Zonas */}
+          <div style={{marginBottom:12}}>
+            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.5px"}}>Zona(s) afectada(s)</label>
+            <div style={{display:"flex",flexWrap:"wrap",gap:4,maxHeight:110,overflowY:"auto"}}>
+              {[...MACROZONAS_BASE].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(z=>(
+                <button key={z.id} onClick={()=>setAlertaForm(p=>({...p,zonas:p.zonas.includes(z.nombre)?p.zonas.filter(x=>x!==z.nombre):[...p.zonas,z.nombre]}))}
+                  style={{...S.btn,fontSize:10,padding:"2px 8px",
+                    background:alertaForm.zonas.includes(z.nombre)?"rgba(239,68,68,0.15)":"rgba(255,255,255,0.03)",
+                    color:alertaForm.zonas.includes(z.nombre)?"#fca5a5":"#7aaa80",
+                    border:`1px solid ${alertaForm.zonas.includes(z.nombre)?"rgba(239,68,68,0.3)":"rgba(255,255,255,0.08)"}`}}>
+                  {z.icono} {z.nombre}
+                </button>
+              ))}
+            </div>
+            {alertaForm.zonas.length>0&&<div style={{fontSize:11,color:"#fca5a5",marginTop:4}}>{alertaForm.zonas.join(", ")}</div>}
+          </div>
+
+          {/* Datos básicos */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+            <div>
+              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Origen</label>
+              <select style={S.input} value={alertaForm.origen} onChange={e=>setAlertaForm(p=>({...p,origen:e.target.value}))}>
+                <option value="interna">🔍 Observación interna</option>
+                <option value="externa">📡 Reporte externo</option>
+                <option value="meteorologica">🌧️ Servicio meteorológico</option>
+                <option value="gerencia">🏢 Gerencia / Administración</option>
+              </select>
+            </div>
+            <div>
+              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Urgencia</label>
+              <select style={S.input} value={alertaForm.urgencia} onChange={e=>setAlertaForm(p=>({...p,urgencia:e.target.value}))}>
+                <option value="inmediata">🔴 Inmediata</option>
+                <option value="alta">🟠 Alta</option>
+                <option value="media">🟡 Media</option>
+              </select>
+            </div>
+            <div style={{gridColumn:"1/-1"}}>
+              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Descripción</label>
+              <input style={S.input} value={alertaForm.descripcion} onChange={e=>setAlertaForm(p=>({...p,descripcion:e.target.value}))} placeholder="Describe la situación..."/>
+            </div>
+            <div>
+              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Fecha</label>
+              <input type="date" style={S.input} value={alertaForm.fecha} onChange={e=>setAlertaForm(p=>({...p,fecha:e.target.value}))}/>
+            </div>
+            <div>
+              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Responsable</label>
+              <select style={S.input} value={alertaForm.responsable} onChange={e=>setAlertaForm(p=>({...p,responsable:e.target.value}))}>
+                <option value="">Sin asignar</option>
+                {personalArr.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Tareas editables */}
+          <div style={{marginBottom:14}}>
+            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.5px"}}>Tareas a generar (edita antes de confirmar)</label>
+            {tareasEditables.map((t,i)=>(
+              <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,padding:"6px 10px",background:"rgba(255,255,255,0.03)",borderRadius:8,border:"1px solid rgba(255,255,255,0.06)"}}>
+                <input type="checkbox" checked={t.incluir} onChange={()=>setTareasEditables(p=>p.map((x,j)=>j===i?{...x,incluir:!x.incluir}:x))} style={{cursor:"pointer"}}/>
+                <input style={{...S.input,flex:2,fontSize:12,padding:"3px 8px"}} value={t.texto} onChange={e=>setTareasEditables(p=>p.map((x,j)=>j===i?{...x,texto:e.target.value}:x))}/>
+                <select style={{...S.input,flex:1,fontSize:11,padding:"3px 6px"}} value={t.responsable} onChange={e=>setTareasEditables(p=>p.map((x,j)=>j===i?{...x,responsable:e.target.value}:x))}>
+                  <option value="">Sin asignar</option>
+                  {personalArr.map(p=><option key={p.id} value={p.nombre}>{p.nombre.split(" ")[0]}</option>)}
+                </select>
+                <button onClick={()=>setTareasEditables(p=>p.filter((_,j)=>j!==i))} style={{background:"transparent",border:"none",color:"#5a9a7a",cursor:"pointer",fontSize:14}}>✕</button>
+              </div>
+            ))}
+            <button onClick={()=>setTareasEditables(p=>[...p,{id:Date.now(),texto:"",incluir:true,responsable:""}])}
+              style={{...S.btn,fontSize:11,color:"#34d399",background:"rgba(52,211,153,0.06)",border:"1px solid rgba(52,211,153,0.2)"}}>
+              + Agregar tarea
+            </button>
+          </div>
+
+          <div style={{display:"flex",gap:8}}>
+            <button className="btn-p" style={{...S.btn,flex:1,background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}}
+              disabled={!alertaForm.zonas.length||!alertaForm.descripcion.trim()}
+              onClick={guardarAlerta}>🚨 Registrar alerta y generar cierre</button>
+            <button className="btn-g" style={S.btn} onClick={()=>setShowNuevaAlerta(false)}>Cancelar</button>
+          </div>
+        </div>
+      )}
+
+      {/* INCIDENCIAS ACTIVAS */}
+      {tabAlerta==="incidencias"&&(
+        incActivas.length===0?(
+          <div style={{...S.card,padding:36,textAlign:"center",color:"#4a7a5a"}}>
+            <div style={{fontSize:32,marginBottom:8}}>✅</div>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:15}}>Sin alertas activas</div>
+            <div style={{fontSize:12,color:"#4a7a5a",marginTop:4}}>El departamento opera con normalidad</div>
+          </div>
+        ):incActivas.map(inc=>(
+          <div key={inc.id} style={{...S.card,marginBottom:10,padding:"14px 16px",border:`1px solid ${URGENCIA_COLORS[inc.urgencia]||"#f59e0b"}30`,background:`${URGENCIA_COLORS[inc.urgencia]||"#f59e0b"}06`}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                <span style={{fontSize:20}}>{inc.tipoIcon}</span>
+                <div>
+                  <div style={{fontWeight:700,fontSize:14}}>{inc.tipoLabel}</div>
+                  <div style={{fontSize:11,color:"#5a9a7a"}}>{inc.zonas?.join(", ")} · {inc.fecha} {inc.hora}</div>
+                </div>
+              </div>
+              <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                <span style={{fontSize:10,padding:"2px 8px",borderRadius:10,background:`${URGENCIA_COLORS[inc.urgencia]}20`,color:URGENCIA_COLORS[inc.urgencia],border:`1px solid ${URGENCIA_COLORS[inc.urgencia]}40`,fontWeight:700}}>{inc.urgencia?.toUpperCase()}</span>
+                <span style={{fontSize:10,padding:"2px 8px",borderRadius:10,background:"rgba(239,68,68,0.1)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}}>{inc.estado==="en_gestion"?"🔄 En gestión":"🔴 Activa"}</span>
+              </div>
+            </div>
+            <div style={{fontSize:12,color:"#ede9e0",marginBottom:8}}>{inc.descripcion}</div>
+            <div style={{fontSize:11,color:"#5a9a7a",marginBottom:10}}>
+              {(inc.tareas||[]).length} tarea(s) · {(inc.tareas||[]).filter(t=>t.estado==="hecha").length} completada(s)
+            </div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              <button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(34,197,94,0.1)",color:"#22c55e",border:"1px solid rgba(34,197,94,0.3)"}}
+                onClick={()=>resolverAlerta(inc)}>✅ Resolver</button>
+              <button style={{...S.btn,fontSize:11,padding:"3px 10px"}} onClick={()=>setAlertaSelId(alertaSelId===inc.id?null:inc.id)}>
+                {alertaSelId===inc.id?"▲ Ocultar":"▼ Ver detalle"}
+              </button>
+              <button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(96,165,250,0.1)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.3)"}}
+                onClick={()=>generarReporteAlerta(inc)}>📋 Reporte</button>
+            </div>
+            {alertaSelId===inc.id&&(
+              <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+                <div style={{fontSize:11,color:"#6aaa7a",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.5px"}}>Tareas</div>
+                {(inc.tareas||[]).map((t,i)=>(
+                  <div key={i} style={{fontSize:12,padding:"5px 8px",marginBottom:4,background:"rgba(255,255,255,0.03)",borderRadius:6,display:"flex",justifyContent:"space-between"}}>
+                    <span>{t.texto}</span>
+                    <span style={{color:t.estado==="hecha"?"#22c55e":t.estado==="pendiente"?"#f59e0b":"#5a9a7a",fontSize:10}}>{t.estado==="hecha"?"✅":t.estado==="pendiente"?"⏳":"—"} {t.responsable||""}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))
+      )}
+
+      {/* RESUELTAS */}
+      {tabAlerta==="resueltas"&&(
+        incResueltas.length===0?(
+          <div style={{...S.card,padding:32,textAlign:"center",color:"#4a7a5a",fontSize:13}}>Sin incidencias resueltas aún</div>
+        ):incResueltas.map(inc=>(
+          <div key={inc.id} style={{...S.card,marginBottom:8,padding:"12px 16px",opacity:0.8}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                <span>{inc.tipoIcon}</span>
+                <div>
+                  <div style={{fontSize:13,fontWeight:600}}>{inc.tipoLabel} — {inc.zonas?.join(", ")}</div>
+                  <div style={{fontSize:11,color:"#5a9a7a"}}>{inc.fecha} → Resuelta: {inc.fechaResolucion||"—"}</div>
+                </div>
+              </div>
+              <button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(96,165,250,0.1)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.3)"}}
+                onClick={()=>generarReporteAlerta(inc)}>📋 Reporte</button>
+            </div>
+          </div>
+        ))
+      )}
+
+      {/* NOTIFICACIONES DE REGISTROS */}
+      {tabAlerta==="notifs"&&(()=>{
+        const arr = (Array.isArray(notificaciones)?notificaciones:Object.values(notificaciones||{})).sort((a,b)=>(b.fecha+b.hora).localeCompare(a.fecha+a.hora));
+        return (<>
+          {notifNoLeidas.length>0&&<button onClick={marcarTodasLeidas} style={{...S.btn,fontSize:11,marginBottom:10,color:"#6aaa7a",border:"1px solid rgba(255,255,255,0.1)"}}>✓ Marcar todas leídas</button>}
+          {arr.length===0?<div style={{...S.card,padding:32,textAlign:"center",color:"#4a7a5a"}}>Sin registros aún</div>:
+          arr.map((n,i)=>{
+            const col=n.tipo==="bono_cancha"?"#fbbf24":n.tipo==="medicion"?"#34d399":"#60a5fa";
+            return <div key={n.id||i} style={{...S.card,marginBottom:6,padding:"10px 14px",background:n.leida?"transparent":"rgba(52,211,153,0.03)",border:`1px solid ${n.leida?"rgba(255,255,255,0.06)":`${col}25`}`,opacity:n.leida?0.7:1}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:13,fontWeight:n.leida?400:600,color:n.leida?"#5a9a7a":col}}>{n.titulo||n.mensaje}</div>
+                  {n.titulo&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:2}}>{n.mensaje}</div>}
+                </div>
+                <div style={{fontSize:10,color:"#4a7a5a",marginLeft:8,whiteSpace:"nowrap"}}>{n.fecha} {n.hora}</div>
+              </div>
+            </div>;
+          })}
+        </>);
+      })()}
+    </div>
+  );
+}
+
 function ModalCierreSectorial({ S, MACROZONAS_BASE, personal, tareasProg, setTareasProg, crearNotificacion, onClose }) {
   const hoyCS = fechaLocal();
   const [csZonas, setCsZonas] = React.useState([]);
@@ -13236,6 +13570,7 @@ export default function App() {
   const [bonosMasivos,   setBonosMasivos,   bonosMasReady] = useFirebaseState("bonos-masivos", []);
   const [rendicionesRRHH, setRendicionesRRHH] = useFirebaseState("rendiciones-rrhh", []);
   const [notificaciones, setNotificaciones]   = useFirebaseState("notificaciones", []);
+  const [incidencias, setIncidencias]         = useFirebaseState("incidencias", []);
   const [cierresTurno,  setCierresTurno]     = useFirebaseState("cierresTurno",   {});
 
   const appReady = dataReady && personalReady && progReady;
@@ -14836,6 +15171,43 @@ export default function App() {
         {/* PERSONAL */}
         {/* ── ALERTAS / NOTIFICACIONES ── */}
         {vista==="notificaciones"&&(
+          <PanelAlertas
+            S={S}
+            incidencias={incidencias}
+            setIncidencias={setIncidencias}
+            notificaciones={notificaciones}
+            setNotificaciones={setNotificaciones}
+            marcarTodasLeidas={marcarTodasLeidas}
+            notifNoLeidas={notifNoLeidas}
+            MACROZONAS_BASE={MACROZONAS_BASE}
+            personal={personal}
+            tareasProg={tareasProg}
+            setTareasProg={setTareasProg}
+            limpiarUndef={limpiarUndef}
+            fechaLocal={fechaLocal}
+            crearNotificacion={crearNotificacion}
+            esJefa={esJefa}
+          />
+        )}
+
+        {vista==="golf"&&(
+          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial} setVista={setVista}
+            crearNotificacion={crearNotificacion}
+            initialSubTab={golfInitTab}
+            onRegistroGuardado={(tipo)=>{
+              if(rolLogueado==="trabajador"){ setVista("miturno"); setGolfInitTab(null); }
+            }}
+          />
+        )}
+
+        {/* BODEGAS */}
+        {vista==="bodegas"&&(
+          <PanelBodegas S={S} bodegasData={bodegasData} setBodegasData={setBodegasData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} compras={comprasData?.compras||[]} />
+        )}
+
+        {/* PERSONAL */}
+        {/* ── ALERTAS / NOTIFICACIONES ── */}
+        {vista==="notificaciones"&&(
           <div className="ein">
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
               <div>
@@ -14993,7 +15365,7 @@ export default function App() {
                   <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>CARGO</label>
                   <select style={S.input} value={nuevoTrabajador.cargo} onChange={e=>setNuevoTrabajador(p=>({...p,cargo:e.target.value}))}>
                     <option value="">Seleccionar...</option>
-                    {["Jefa de Áreas Verdes","Supervisor de Áreas Verdes","Jardinero","Jardinero Senior","Técnico en Riego","Operador Maquinaria","Capataz","Administrativo","Otro"].map(catOpt=><option key={catOpt} value={catOpt}>{catOpt}</option>)}
+                    {["Jefa de Áreas Verdes","Supervisor de Áreas Verdes","Jardinero","Jardinero Senior","Técnico en Riego","Operador Maquinaria","Capataz","Administrativo","Otro"].map(c=><option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <div>
@@ -15006,7 +15378,7 @@ export default function App() {
                 <div>
                   <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>TIPO DE CONTRATO</label>
                   <select style={S.input} value={nuevoTrabajador.contrato} onChange={e=>setNuevoTrabajador(p=>({...p,contrato:e.target.value}))}>
-                    {["indefinido","plazo fijo","honorarios","part-time"].map(catOpt=><option key={catOpt} value={catOpt}>{catOpt}</option>)}
+                    {["indefinido","plazo fijo","honorarios","part-time"].map(c=><option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
               </div>
@@ -15040,8 +15412,6 @@ export default function App() {
           />
         )}
       </div>
-
-      {showCierreSectorial&&<ModalCierreSectorial S={S} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} tareasProg={tareasProg} setTareasProg={setTareasProg} crearNotificacion={crearNotificacion} onClose={()=>setShowCierreSectorial(false)}/>}
     </div>
   );
 }
