@@ -7947,6 +7947,10 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
   const [zonasComparativas, setZonasComparativas] = React.useState(["g1","g3","vivero"]);
   const [confirmarBorrarTodo, setConfirmarBorrarTodo] = React.useState(false);
   const [verInforme, setVerInforme] = React.useState(false);
+  const [informePeriodo, setInformePeriodo] = React.useState("global");
+  const [informeAnio, setInformeAnio] = React.useState(String(new Date().getFullYear()));
+  const [informeMes, setInformeMes] = React.useState(String(new Date().getMonth()+1).padStart(2,"0"));
+  const [informeSemana, setInformeSemana] = React.useState(fechaLocal());
 
   const medOrdenadas = [...mediciones].sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||""));
 
@@ -8142,53 +8146,97 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
   const colorCategoria = (cat) => cat?.includes("Rápido")?"#ef4444":cat?.includes("Medio")?"#f59e0b":"#22c55e";
 
   const generarInforme = () => {
-    const win = window.open("","_blank","width=900,height=700");
+    const win = window.open("","_blank","width=960,height=750");
     const hoy = new Date().toLocaleDateString("es-CL",{day:"2-digit",month:"long",year:"numeric"});
+    const MESES_NOM = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+    const ESTACIONES_MAP = {verano:["12","01","02"],otono:["03","04","05"],invierno:["06","07","08"],primavera:["09","10","11"]};
+
+    // Filtrar mediciones según período seleccionado
+    let medsFiltradas = medOrdenadas;
+    let periodoLabel = "Global (todas las mediciones)";
+    if(informePeriodo==="anio"){
+      medsFiltradas = medOrdenadas.filter(m=>m.fecha?.startsWith(informeAnio));
+      periodoLabel = `Año ${informeAnio}`;
+    } else if(informePeriodo==="mes"){
+      medsFiltradas = medOrdenadas.filter(m=>m.fecha?.startsWith(`${informeAnio}-${informeMes}`));
+      periodoLabel = `${MESES_NOM[Number(informeMes)-1]} ${informeAnio}`;
+    } else if(informePeriodo==="estacion"){
+      const mesesEst = ESTACIONES_MAP[informeAnio]||[];
+      medsFiltradas = medOrdenadas.filter(m=>{
+        const mes = m.fecha?.slice(5,7);
+        return mesesEst.includes(mes);
+      });
+      periodoLabel = `${informeAnio.charAt(0).toUpperCase()+informeAnio.slice(1)} (${mesesEst.map(m=>MESES_NOM[Number(m)-1]).join(", ")})`;
+    } else if(informePeriodo==="semana"){
+      // Semana que contiene la fecha seleccionada
+      const fechaRef = new Date(informeSemana+"T12:00:00");
+      const diaSem = fechaRef.getDay()===0?6:fechaRef.getDay()-1;
+      const lunes = new Date(fechaRef); lunes.setDate(lunes.getDate()-diaSem);
+      const domingo = new Date(lunes); domingo.setDate(domingo.getDate()+6);
+      const lunesStr = lunes.toISOString().slice(0,10);
+      const domingoStr = domingo.toISOString().slice(0,10);
+      medsFiltradas = medOrdenadas.filter(m=>m.fecha>=lunesStr && m.fecha<=domingoStr);
+      periodoLabel = `Semana del ${lunes.toLocaleDateString("es-CL",{day:"2-digit",month:"short"})} al ${domingo.toLocaleDateString("es-CL",{day:"2-digit",month:"short",year:"numeric"})}`;
+    }
+
+    // Calcular tasa para cada zona con las mediciones filtradas
+    const calcTasaFiltrada = (zonaId) => {
+      const zonaMeds = medsFiltradas.filter(m=>m.alturas?.[zonaId]!==undefined).map(m=>({
+        fecha:m.fecha, alt:Number(m.alturas[zonaId])
+      })).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+      if(zonaMeds.length<2) return null;
+      const primera = zonaMeds[0];
+      const ultima = zonaMeds[zonaMeds.length-1];
+      const diasTotal = Math.round((new Date(ultima.fecha+"T12:00:00")-new Date(primera.fecha+"T12:00:00"))/(1000*60*60*24));
+      if(diasTotal<=0) return null;
+      const delta = ultima.alt - primera.alt;
+      const tasa = Math.round((delta/diasTotal)*100)/100;
+      return {tasa, primera, ultima, nMeds:zonaMeds.length, diasTotal};
+    };
+
     const filas = ZONAS.map(z=>{
-      const analisis = analisisTasas(z.id);
-      const ultMed = [...medOrdenadas].reverse().find(m=>m.alturas?.[z.id]);
+      const tasaData = calcTasaFiltrada(z.id);
+      const analisisGlobal = analisisTasas(z.id);
+      const ultMed = [...medsFiltradas].reverse().find(m=>m.alturas?.[z.id]!==undefined);
       const ultAlt = ultMed ? Number(ultMed.alturas[z.id]).toFixed(1) : "—";
       const ultFecha = ultMed ? new Date(ultMed.fecha+"T12:00:00").toLocaleDateString("es-CL",{day:"2-digit",month:"short"}) : "—";
-      const tasaG = analisis ? analisis.tasaGlobal : null;
-      const cat = analisis ? analisis.categoria : "Sin datos";
-      const color = !tasaG ? "#666" : tasaG < 0.3 ? "#166534" : tasaG < 0.6 ? "#92400e" : "#991b1b";
-      const porEst = analisis ? analisis.porEstacion : [];
+      const tasa = tasaData?.tasa;
+      const cat = tasa===null?"Sin datos":Math.abs(tasa)<0.3?"🐢 Lento":Math.abs(tasa)<0.6?"➡️ Medio":"🚀 Rápido";
+      const colorTasa = tasa===null?"#888":tasa<0?"#60a5fa":tasa<0.3?"#22c55e":tasa<0.6?"#f59e0b":"#ef4444";
+      const nMeds = tasaData?.nMeds||0;
       return `<tr>
-        <td style="padding:8px 12px;font-weight:600;border-bottom:1px solid #e5e7eb">${z.nombre}</td>
-        <td style="padding:8px 12px;text-align:center;border-bottom:1px solid #e5e7eb">${ultAlt} mm</td>
-        <td style="padding:8px 12px;text-align:center;border-bottom:1px solid #e5e7eb;font-size:12px;color:#6b7280">${ultFecha}</td>
-        <td style="padding:8px 12px;text-align:center;border-bottom:1px solid #e5e7eb;font-weight:700;color:${color}">${tasaG ? (tasaG>0?"+":"")+tasaG+" mm/d" : "—"}</td>
-        <td style="padding:8px 12px;text-align:center;border-bottom:1px solid #e5e7eb;font-size:12px">${cat}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280">${porEst.map(e=>`${e.est}: ${e.tasa>0?"+":""}${e.tasa}`).join(" · ")||"—"}</td>
+        <td style="padding:7px 12px;font-weight:600;border-bottom:1px solid #e5e7eb">${z.nombre}</td>
+        <td style="padding:7px 12px;text-align:center;border-bottom:1px solid #e5e7eb">${ultAlt} mm</td>
+        <td style="padding:7px 12px;text-align:center;border-bottom:1px solid #e5e7eb;font-size:11px;color:#888">${ultFecha}</td>
+        <td style="padding:7px 12px;text-align:center;border-bottom:1px solid #e5e7eb;font-size:11px;color:#888">${nMeds}</td>
+        <td style="padding:7px 12px;text-align:center;border-bottom:1px solid #e5e7eb;font-weight:700;color:${colorTasa}">${tasa!==null?(tasa>0?"+":"")+tasa+" mm/d":"—"}</td>
+        <td style="padding:7px 12px;text-align:center;border-bottom:1px solid #e5e7eb;font-size:12px">${cat}</td>
+        <td style="padding:7px 12px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#888">${analisisGlobal?analisisGlobal.porEstacion.map(e=>`${e.est}:${e.tasa>0?"+":""}${e.tasa}`).join(" · "):"—"}</td>
       </tr>`;
     }).join("");
     win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
     <title>Informe Crecimiento Greens</title>
-    <style>body{font-family:Georgia,serif;color:#1a1a1a;padding:32px;max-width:920px;margin:0 auto}
-    h1{font-size:20px;color:#14532d;margin-bottom:2px}h2{font-size:13px;color:#6b7280;font-weight:normal;margin-top:0}
-    table{width:100%;border-collapse:collapse;margin-top:16px}
-    th{background:#14532d;color:#fff;padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
-    tr:nth-child(even){background:#f9fafb}
-    .resumen{margin-top:20px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:14px}
-    .footer{margin-top:20px;font-size:11px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:10px}
+    <style>body{font-family:Calibri,Arial,sans-serif;color:#222;padding:32px;font-size:13px}
+    h1{font-size:19px;color:#14532d;margin-bottom:2px}h2{font-size:12px;color:#888;font-weight:normal;margin-top:0}
+    .periodo{background:#f0fdf4;border-left:3px solid #16a34a;padding:8px 14px;border-radius:4px;margin:12px 0;font-weight:600;color:#14532d}
+    table{width:100%;border-collapse:collapse;margin-top:14px}
+    th{background:#14532d;color:#fff;padding:8px 10px;font-size:11px;text-align:left}
+    th.r{text-align:center}tr:nth-child(even){background:#f9fafb}
+    .footer{margin-top:16px;font-size:11px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:10px}
     @media print{button{display:none}}</style></head><body>
     <h1>⛳ Informe de Crecimiento — Greens y Vivero</h1>
-    <h2>Estadio Español de Las Condes · ${hoy}</h2>
+    <h2>Estadio Español de Las Condes · Generado el ${hoy}</h2>
+    <div class="periodo">📅 Período: ${periodoLabel} · ${medsFiltradas.length} medición(es) incluida(s)</div>
     <table>
       <thead><tr>
-        <th>Zona</th><th>Última altura</th><th>Fecha</th><th>Tasa global</th><th>Categoría</th><th>Por estación</th>
+        <th>Zona</th><th class="r">Última altura</th><th class="r">Fecha</th><th class="r">N° meds</th><th class="r">Tasa período</th><th class="r">Categoría</th><th>Por estación (global)</th>
       </tr></thead>
       <tbody>${filas}</tbody>
     </table>
-    <div class="resumen">
-      <strong style="color:#14532d">📊 Resumen del campo</strong>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:8px;font-size:13px">
-        <div>Zonas analizadas: <strong>${ZONAS.length}</strong></div>
-        <div>Con datos de tasa: <strong>${ZONAS.filter(z=>analisisTasas(z.id)).length}</strong></div>
-        <div>Total mediciones: <strong>${mediciones.length}</strong></div>
-      </div>
+    <div class="footer">
+      Tasa período = crecimiento diario promedio en el período seleccionado (primera vs última medición).<br/>
+      Por estación = tasa global histórica. 🐢 Lento &lt;0.3 · ➡️ Medio 0.3–0.6 · 🚀 Rápido &gt;0.6 mm/día
     </div>
-    <div class="footer">🟢 Lento: &lt;0.3 mm/día · 🟡 Medio: 0.3–0.6 mm/día · 🔴 Rápido: &gt;0.6 mm/día</div>
     <div style="margin-top:14px;text-align:center">
       <button onclick="window.print()" style="background:#14532d;color:#fff;border:none;padding:9px 22px;border-radius:6px;cursor:pointer;font-size:13px">🖨️ Imprimir / Guardar PDF</button>
     </div>
@@ -8228,7 +8276,40 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
               onClick={()=>setVistaGrafico(v)}>{l}</button>
           ))}
         </div>
-        <button style={{...S.btn,fontSize:11,padding:"4px 12px",background:"rgba(52,211,153,0.1)",color:"#34d399",border:"1px solid rgba(52,211,153,0.3)",marginBottom:8}} onClick={generarInforme}>📄 Informe de crecimiento</button>
+        {/* Controles período informe */}
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center",marginBottom:8,padding:"8px 12px",background:"rgba(52,211,153,0.05)",borderRadius:8,border:"1px solid rgba(52,211,153,0.15)"}}>
+          <span style={{fontSize:11,color:"#5a9a7a",marginRight:2}}>📄 Informe:</span>
+          {[["global","🌐 Global"],["anio","📅 Año"],["estacion","🍂 Estación"],["mes","📆 Mes"],["semana","📋 Semana"]].map(([v,l])=>(
+            <button key={v} onClick={()=>setInformePeriodo(v)}
+              style={{...S.btn,fontSize:10,padding:"2px 8px",
+                background:informePeriodo===v?"rgba(52,211,153,0.2)":"transparent",
+                color:informePeriodo===v?"#34d399":"#5a9a7a",
+                border:`1px solid ${informePeriodo===v?"rgba(52,211,153,0.4)":"rgba(255,255,255,0.1)"}`}}>
+              {l}
+            </button>
+          ))}
+          {(informePeriodo==="anio"||informePeriodo==="mes")&&(
+            <select style={{...S.input,fontSize:11,padding:"2px 6px",width:"auto"}} value={informeAnio} onChange={e=>setInformeAnio(e.target.value)}>
+              {[...new Set(medOrdenadas.map(m=>m.fecha?.slice(0,4)).filter(Boolean))].sort().reverse().map(a=><option key={a} value={a}>{a}</option>)}
+            </select>
+          )}
+          {informePeriodo==="mes"&&(
+            <select style={{...S.input,fontSize:11,padding:"2px 6px",width:"auto"}} value={informeMes} onChange={e=>setInformeMes(e.target.value)}>
+              {["01","02","03","04","05","06","07","08","09","10","11","12"].map((m,i)=><option key={m} value={m}>{["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"][i]}</option>)}
+            </select>
+          )}
+          {informePeriodo==="estacion"&&(
+            <select style={{...S.input,fontSize:11,padding:"2px 6px",width:"auto"}} value={informeAnio} onChange={e=>setInformeAnio(e.target.value)}>
+              {["verano","otono","invierno","primavera"].map(e=><option key={e} value={e}>{e.charAt(0).toUpperCase()+e.slice(1)}</option>)}
+            </select>
+          )}
+          {informePeriodo==="semana"&&(
+            <input type="date" style={{...S.input,fontSize:11,padding:"2px 6px",width:"auto"}} value={informeSemana} onChange={e=>setInformeSemana(e.target.value)}/>
+          )}
+          <button style={{...S.btn,fontSize:11,padding:"3px 12px",background:"rgba(52,211,153,0.15)",color:"#34d399",border:"1px solid rgba(52,211,153,0.35)"}} onClick={generarInforme}>
+            Generar →
+          </button>
+        </div>
 
         {/* Vista Individual */}
         {vistaGrafico==="individual"&&(
