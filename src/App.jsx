@@ -15427,17 +15427,17 @@ export default function App() {
             <div style={{...S.card,padding:24,marginTop:16}}>
               <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:900,marginBottom:20}}>Nuevo Trabajador</h2>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
-                {[["Nombre completo","nombre","text"],["RUT","rut","text"],["Teléfono","telefono","tel"],["Email","email","email"],["Fecha de ingreso","fechaIngreso","date"]].map(([lbl,key,type])=>(
+                {[["Nombre completo","nombre","text"],["RUT","rut","text"],["Teléfono","telefono","tel"],["Email","email","text"],["Fecha de ingreso","fechaIngreso","date"]].map(([lbl,key,type])=>(
                   <div key={key}>
                     <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>{lbl.toUpperCase()}</label>
-                    <input type={type} style={S.input} value={nuevoTrabajador[key]||""} onChange={e=>setNuevoTrabajador(p=>({...p,[key]:e.target.value}))}/>
+                    <input type={type} autoComplete="off" style={S.input} value={nuevoTrabajador[key]||""} onChange={e=>setNuevoTrabajador(p=>({...p,[key]:e.target.value}))}/>
                   </div>
                 ))}
                 {/* PIN en fila propia */}
                 <div style={{gridColumn:"1/-1",background:"rgba(61,122,82,0.08)",border:"1px solid rgba(61,122,82,0.2)",borderRadius:10,padding:"12px 14px"}}>
                   <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:6,letterSpacing:"0.5px"}}>🔐 PIN DE ACCESO (4 DÍGITOS)</label>
                   <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
-                    <input type="password" maxLength={4} placeholder="••••"
+                    <input type="password" maxLength={4} placeholder="••••" autoComplete="new-password"
                       style={{...S.input,maxWidth:140,fontSize:20,letterSpacing:"0.5em",textAlign:"center"}}
                       value={nuevoTrabajador.pin||""} onChange={e=>setNuevoTrabajador(p=>({...p,pin:e.target.value}))}/>
                     <div style={{fontSize:12,color:"#5a8a6a"}}>El trabajador usa este PIN para acceder a sus tareas en 🌿 Mi Turno</div>
