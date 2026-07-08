@@ -8269,13 +8269,6 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
       )}
 
       {mediciones.length>=2&&(<>
-        {/* Selector modo gráfico */}
-        <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
-          {[["individual","📈 Individual"],["comparativo","📊 Comparativo"],["tasas","⚡ Tasas/día"]].map(([v,l])=>(
-            <button key={v} style={{...S.btn,fontSize:12,padding:"5px 12px",background:vistaGrafico===v?"rgba(52,211,153,0.2)":"rgba(255,255,255,0.05)",color:vistaGrafico===v?"#34d399":"#5a9a7a",border:`1px solid ${vistaGrafico===v?"rgba(52,211,153,0.4)":"rgba(255,255,255,0.1)"}`}}
-              onClick={()=>setVistaGrafico(v)}>{l}</button>
-          ))}
-        </div>
         {/* Controles período informe */}
         <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center",marginBottom:8,padding:"8px 12px",background:"rgba(52,211,153,0.05)",borderRadius:8,border:"1px solid rgba(52,211,153,0.15)"}}>
           <span style={{fontSize:11,color:"#5a9a7a",marginRight:2}}>📄 Informe:</span>
@@ -8309,6 +8302,15 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
           <button style={{...S.btn,fontSize:11,padding:"3px 12px",background:"rgba(52,211,153,0.15)",color:"#34d399",border:"1px solid rgba(52,211,153,0.35)"}} onClick={generarInforme}>
             Generar →
           </button>
+        </div>
+
+
+        {/* Selector modo gráfico */}
+        <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
+          {[["individual","📈 Individual"],["comparativo","📊 Comparativo"],["tasas","⚡ Tasas/día"]].map(([v,l])=>(
+            <button key={v} style={{...S.btn,fontSize:12,padding:"5px 12px",background:vistaGrafico===v?"rgba(52,211,153,0.2)":"rgba(255,255,255,0.05)",color:vistaGrafico===v?"#34d399":"#5a9a7a",border:`1px solid ${vistaGrafico===v?"rgba(52,211,153,0.4)":"rgba(255,255,255,0.1)"}`}}
+              onClick={()=>setVistaGrafico(v)}>{l}</button>
+          ))}
         </div>
 
         {/* Vista Individual */}
