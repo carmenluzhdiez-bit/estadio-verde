@@ -13269,9 +13269,12 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
 
       {/* FORMULARIO NUEVA ALERTA */}
       {showNuevaAlerta&&(
-        <div style={{...S.card,padding:20,marginBottom:16,border:"1px solid rgba(239,68,68,0.3)"}}>
-          <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,color:"#fca5a5",marginBottom:14}}>+ Nueva alerta / incidencia</div>
-
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.75)",zIndex:1000,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,overflowY:"auto"}} onClick={()=>setShowNuevaAlerta(false)}>
+          <div style={{background:"#0f2417",border:"1px solid rgba(239,68,68,0.3)",borderRadius:14,padding:24,width:"100%",maxWidth:560,marginTop:20,marginBottom:20}} onClick={e=>e.stopPropagation()}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#fca5a5"}}>+ Nueva alerta / incidencia</div>
+              <button onClick={()=>setShowNuevaAlerta(false)} style={{background:"transparent",border:"none",color:"#5a9a7a",fontSize:20,cursor:"pointer"}}>✕</button>
+            </div>
           {/* Tipo */}
           <div style={{marginBottom:12}}>
             <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.5px"}}>Tipo de alerta</label>
@@ -13366,6 +13369,8 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
               disabled={!alertaForm.zonas.length||!alertaForm.descripcion.trim()}
               onClick={guardarAlerta}>🚨 Registrar alerta y generar cierre</button>
             <button className="btn-g" style={S.btn} onClick={()=>setShowNuevaAlerta(false)}>Cancelar</button>
+          </div>
+
           </div>
         </div>
       )}
