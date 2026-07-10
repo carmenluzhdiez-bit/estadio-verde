@@ -13062,10 +13062,84 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
   const [tabAlerta, setTabAlerta] = React.useState("incidencias");
   const [showNuevaAlerta, setShowNuevaAlerta] = React.useState(false);
   const [alertaSelId, setAlertaSelId] = React.useState(null);
+  // Viento
+  const [vientoData, setVientoData] = React.useState(null);
+  const [vientoLoading, setVientoLoading] = React.useState(false);
+  const [vientoError, setVientoError] = React.useState(null);
+  const [vientoPronostico, setVientoPronostico] = React.useState([]);
 
   // Form nueva alerta
   const emptyAlerta = {tipo:"enfermedad",zonas:[],origen:"interna",urgencia:"alta",descripcion:"",responsable:"",fecha:fechaLocal(),hora:new Date().toTimeString().slice(0,5)};
   const [alertaForm, setAlertaForm] = React.useState(emptyAlerta);
+
+  // Protocolo de viento
+  const NIVELES_VIENTO = [
+    {nivel:0, label:"Normal",       rango:"< 40 km/h",   color:"#22c55e", bg:"rgba(34,197,94,0.1)",   min:0,  max:39,  icon:"🟢", acciones:[]},
+    {nivel:1, label:"Alerta temprana", rango:"40–59 km/h", color:"#f59e0b", bg:"rgba(245,158,11,0.1)", min:40, max:59,  icon:"🟡", acciones:[
+      "Asegurar macetas y elementos móviles en terrazas y jardines",
+      "Revisar y asegurar señalética y carteles",
+      "Alertar al equipo de posibles condiciones adversas",
+      "Suspender trabajos en altura (poda de árboles altos)",
+    ]},
+    {nivel:2, label:"Alerta media",    rango:"60–81 km/h", color:"#f97316", bg:"rgba(249,115,22,0.1)", min:60, max:81,  icon:"🟠", acciones:[
+      "Suspender todas las labores de jardinería en exterior",
+      "Retirar y guardar herramientas y equipos livianos",
+      "Encintar zonas de riesgo por caída de ramas",
+      "Revisar estado de árboles con riesgo de volcamiento",
+      "Notificar a administración del estadio",
+      "Cerrar sectorialmente las zonas arboladas",
+    ]},
+    {nivel:3, label:"Alerta alta",     rango:"> 82 km/h",  color:"#ef4444", bg:"rgba(239,68,68,0.1)",  min:82, max:999, icon:"🔴", acciones:[
+      "EVACUACIÓN INMEDIATA de todas las zonas verdes",
+      "Cerrar acceso al estadio y zonas deportivas",
+      "Activar protocolo de emergencia con administración",
+      "Contactar a Defensa Civil si corresponde",
+      "Documentar fotográficamente daños post-evento",
+      "Inspección completa antes de reabrir cualquier zona",
+    ]},
+  ];
+
+  const getNivelViento = (kmh) => NIVELES_VIENTO.slice().reverse().find(n=>kmh>=n.min)||NIVELES_VIENTO[0];
+
+  const fetchViento = React.useCallback(async()=>{
+    setVientoLoading(true); setVientoError(null);
+    try {
+      // Open-Meteo — coordenadas Estadio Español Las Condes
+      const url = "https://api.open-meteo.com/v1/forecast?latitude=-33.4127&longitude=-70.5775&current=wind_speed_10m,wind_gusts_10m,temperature_2m,weather_code&hourly=wind_speed_10m,wind_gusts_10m&wind_speed_unit=kmh&timezone=America/Santiago&forecast_days=1";
+      const res = await fetch(url);
+      if(!res.ok) throw new Error("Error al conectar con Open-Meteo");
+      const json = await res.json();
+      const curr = json.current;
+      setVientoData({
+        velocidad: Math.round(curr.wind_speed_10m),
+        rafaga: Math.round(curr.wind_gusts_10m),
+        temperatura: Math.round(curr.temperature_2m),
+        hora: curr.time?.slice(11,16)||"",
+        weatherCode: curr.weather_code,
+      });
+      // Próximas horas
+      const horas = json.hourly;
+      const ahora = new Date();
+      const pronostico = horas.time.slice(0,24).map((t,i)=>({
+        hora:t.slice(11,16),
+        velocidad:Math.round(horas.wind_speed_10m[i]),
+        rafaga:Math.round(horas.wind_gusts_10m[i]),
+      })).filter(h=>{
+        const [hh,mm] = h.hora.split(":").map(Number);
+        const dt = new Date(); dt.setHours(hh,mm,0,0);
+        return dt >= ahora;
+      }).slice(0,8);
+      setVientoPronostico(pronostico);
+    } catch(e) {
+      setVientoError("No se pudo obtener datos meteorológicos. Verificar conexión.");
+    } finally {
+      setVientoLoading(false);
+    }
+  },[]);
+
+  React.useEffect(()=>{
+    if(tabAlerta==="viento") fetchViento();
+  },[tabAlerta]);
 
   const TIPOS_ALERTA = [
     {id:"meteorologica", icon:"🌧️", label:"Meteorológica",    tareas:["🚧 Encintar zona afectada","Revisar drenaje y canales","Retirar obstáculos en caminos","Inspección post-evento"]},
@@ -13184,7 +13258,7 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
 
       {/* Tabs */}
       <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>
-        {[["incidencias","🚨 Activas","incActivas"],["resueltas","✅ Resueltas","incResueltas"],["notifs","🔔 Registros","notifNoLeidas"]].map(([t,l,badge])=>(
+        {[["incidencias","🚨 Activas",""],["viento","🌬️ Viento",""],["resueltas","✅ Resueltas",""],["notifs","🔔 Registros",""]].map(([t,l,badge])=>(
           <button key={t} className={`tab${tabAlerta===t?" on":""}`} onClick={()=>setTabAlerta(t)} style={{fontFamily:"'Georgia',serif",position:"relative"}}>
             {l}
             {t==="incidencias"&&incActivas.length>0&&<span style={{marginLeft:5,background:"#ef4444",color:"#fff",borderRadius:"50%",fontSize:9,padding:"1px 5px"}}>{incActivas.length}</span>}
@@ -13293,6 +13367,126 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
               onClick={guardarAlerta}>🚨 Registrar alerta y generar cierre</button>
             <button className="btn-g" style={S.btn} onClick={()=>setShowNuevaAlerta(false)}>Cancelar</button>
           </div>
+        </div>
+      )}
+
+      {/* PANEL VIENTO */}
+      {tabAlerta==="viento"&&(
+        <div>
+          {/* Botón actualizar */}
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+            <div style={{fontSize:12,color:"#5a9a7a"}}>Datos: Open-Meteo · Estadio Español, Las Condes</div>
+            <button style={{...S.btn,fontSize:11,padding:"4px 12px",color:"#60a5fa",background:"rgba(96,165,250,0.08)",border:"1px solid rgba(96,165,250,0.2)"}}
+              onClick={fetchViento} disabled={vientoLoading}>
+              {vientoLoading?"⏳ Actualizando...":"🔄 Actualizar"}
+            </button>
+          </div>
+
+          {vientoError&&<div style={{...S.card,padding:14,marginBottom:12,color:"#ef4444",fontSize:12,border:"1px solid rgba(239,68,68,0.3)"}}>{vientoError}</div>}
+
+          {!vientoData&&!vientoLoading&&!vientoError&&(
+            <div style={{...S.card,padding:32,textAlign:"center",color:"#4a7a5a"}}>
+              <div style={{fontSize:32,marginBottom:8}}>🌬️</div>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:8}}>Protocolo de Viento</div>
+              <div style={{fontSize:12,marginBottom:16}}>Consulta el estado del viento en tiempo real y el protocolo de acción según nivel.</div>
+              <button className="btn-p" style={{...S.btn,padding:"8px 20px"}} onClick={fetchViento}>Consultar ahora</button>
+            </div>
+          )}
+
+          {vientoData&&(()=>{
+            const nivelActual = getNivelViento(vientoData.velocidad);
+            const nivelRafaga = getNivelViento(vientoData.rafaga);
+            const nivelMayor = nivelRafaga.nivel > nivelActual.nivel ? nivelRafaga : nivelActual;
+            return (
+              <div>
+                {/* Card principal - velocidad actual */}
+                <div style={{...S.card,padding:20,marginBottom:12,background:nivelMayor.bg,border:`1px solid ${nivelMayor.color}40`}}>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:14}}>
+                    <div style={{textAlign:"center"}}>
+                      <div style={{fontSize:11,color:"#5a9a7a",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.5px"}}>Velocidad actual</div>
+                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:36,fontWeight:900,color:nivelActual.color}}>{vientoData.velocidad}</div>
+                      <div style={{fontSize:12,color:"#5a9a7a"}}>km/h</div>
+                    </div>
+                    <div style={{textAlign:"center"}}>
+                      <div style={{fontSize:11,color:"#5a9a7a",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.5px"}}>Ráfaga máxima</div>
+                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:36,fontWeight:900,color:nivelRafaga.color}}>{vientoData.rafaga}</div>
+                      <div style={{fontSize:12,color:"#5a9a7a"}}>km/h</div>
+                    </div>
+                    <div style={{textAlign:"center"}}>
+                      <div style={{fontSize:11,color:"#5a9a7a",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.5px"}}>Temperatura</div>
+                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:36,fontWeight:900,color:"#60a5fa"}}>{vientoData.temperatura}°</div>
+                      <div style={{fontSize:12,color:"#5a9a7a"}}>Hora: {vientoData.hora}</div>
+                    </div>
+                  </div>
+
+                  {/* Nivel activo */}
+                  <div style={{background:nivelMayor.bg,border:`2px solid ${nivelMayor.color}`,borderRadius:10,padding:"12px 16px",marginBottom:12}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+                      <span style={{fontSize:24}}>{nivelMayor.icon}</span>
+                      <div>
+                        <div style={{fontWeight:700,fontSize:15,color:nivelMayor.color}}>Nivel {nivelMayor.nivel} — {nivelMayor.label}</div>
+                        <div style={{fontSize:12,color:"#5a9a7a"}}>{nivelMayor.rango}</div>
+                      </div>
+                    </div>
+                    {nivelMayor.acciones.length>0&&(
+                      <div>
+                        <div style={{fontSize:11,color:"#6aaa7a",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.5px"}}>Protocolo de acción:</div>
+                        {nivelMayor.acciones.map((acc,i)=>(
+                          <div key={i} style={{fontSize:12,padding:"4px 8px",marginBottom:3,background:"rgba(0,0,0,0.1)",borderRadius:5,display:"flex",gap:6}}>
+                            <span style={{color:nivelMayor.color,flexShrink:0}}>▶</span>{acc}
+                          </div>
+                        ))}
+                        {nivelMayor.nivel>=1&&(
+                          <button style={{...S.btn,marginTop:8,fontSize:11,padding:"4px 12px",background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}}
+                            onClick={()=>{setAlertaForm(p=>({...p,tipo:"meteorologica",descripcion:`Viento Nivel ${nivelMayor.nivel} — ${nivelMayor.label}: ${vientoData.velocidad} km/h (ráfaga ${vientoData.rafaga} km/h)`}));setShowNuevaAlerta(true);setTabAlerta("incidencias");}}>
+                            🚨 Activar alerta por viento
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {nivelMayor.nivel===0&&<div style={{fontSize:12,color:"#22c55e",marginTop:4}}>✅ Sin restricciones. Operación normal.</div>}
+                  </div>
+                </div>
+
+                {/* Todos los niveles */}
+                <div style={{...S.card,padding:16,marginBottom:12}}>
+                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:10}}>📋 Tabla de niveles</div>
+                  {NIVELES_VIENTO.map(n=>(
+                    <div key={n.nivel} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",marginBottom:4,borderRadius:7,background:nivelMayor.nivel===n.nivel?n.bg:"rgba(255,255,255,0.02)",border:`1px solid ${nivelMayor.nivel===n.nivel?n.color+"50":"rgba(255,255,255,0.06)"}`}}>
+                      <span style={{fontSize:16,flexShrink:0}}>{n.icon}</span>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:12,fontWeight:700,color:n.color}}>Nivel {n.nivel} — {n.label}</div>
+                        <div style={{fontSize:11,color:"#5a9a7a"}}>{n.rango}</div>
+                      </div>
+                      {nivelMayor.nivel===n.nivel&&<span style={{fontSize:10,padding:"2px 8px",borderRadius:10,background:n.color,color:"#fff",fontWeight:700}}>ACTIVO</span>}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Pronóstico próximas horas */}
+                {vientoPronostico.length>0&&(
+                  <div style={{...S.card,padding:16}}>
+                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:10}}>⏱️ Pronóstico próximas horas</div>
+                    <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:4}}>
+                      {vientoPronostico.map((h,i)=>{
+                        const nv = getNivelViento(Math.max(h.velocidad,h.rafaga));
+                        return (
+                          <div key={i} style={{textAlign:"center",minWidth:60,padding:"8px 6px",borderRadius:8,background:nv.bg,border:`1px solid ${nv.color}30`,flexShrink:0}}>
+                            <div style={{fontSize:10,color:"#5a9a7a",marginBottom:4}}>{h.hora}</div>
+                            <div style={{fontWeight:700,fontSize:13,color:nv.color}}>{h.velocidad}</div>
+                            <div style={{fontSize:10,color:"#5a9a7a"}}>km/h</div>
+                            <div style={{fontSize:9,color:nv.color,marginTop:2}}>↑{h.rafaga}</div>
+                            <div style={{fontSize:9,marginTop:2}}>{nv.icon}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div style={{fontSize:10,color:"#4a7a5a",marginTop:6}}>↑ = ráfaga máxima · Colores según nivel de protocolo</div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 
