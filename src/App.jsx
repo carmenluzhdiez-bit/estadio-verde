@@ -4361,13 +4361,13 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
                 <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>CARGO</label>
                 <select style={S.input} value={t.cargo||""} onChange={e=>onUpdate({cargo:e.target.value})}>
                   <option value="">Seleccionar...</option>
-                  {CARGOS.map(c=><option key={c} value={c}>{c}</option>)}
+                  {CARGOS.map(cargoOpt=><option key={cargoOpt} value={cargoOpt}>{cargoOpt}</option>)}
                 </select>
               </div>
               <div>
                 <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>TIPO DE CONTRATO</label>
                 <select style={S.input} value={t.contrato||"indefinido"} onChange={e=>onUpdate({contrato:e.target.value})}>
-                  {CONTRATOS.map(c=><option key={c} value={c}>{c}</option>)}
+                  {CONTRATOS.map(cargoOpt=><option key={cargoOpt} value={cargoOpt}>{cargoOpt}</option>)}
                 </select>
               </div>
               <div><label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>FECHA DE INGRESO</label><input type="date" style={S.input} value={t.fechaIngreso||""} onChange={e=>onUpdate({fechaIngreso:e.target.value})}/></div>
@@ -5509,7 +5509,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                         <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>Condición climática</label>
                         <select style={S.input} value={incidForm.diagnostico} onChange={e=>setIncidForm(p=>({...p,diagnostico:e.target.value}))}>
                           <option value="">Seleccionar...</option>
-                          {["Helada — riesgo daño mecánico por pisadas","Lluvia intensa — suelo saturado","Post-lluvia — suelo blando (>24 hrs)","Viento extremo (>60 km/h)","Calor extremo — estrés hídrico","Granizo — daño mecánico al césped"].map(c=><option key={c} value={c}>{c}</option>)}
+                          {["Helada — riesgo daño mecánico por pisadas","Lluvia intensa — suelo saturado","Post-lluvia — suelo blando (>24 hrs)","Viento extremo (>60 km/h)","Calor extremo — estrés hídrico","Granizo — daño mecánico al césped"].map(clmOpt=><option key={clmOpt} value={clmOpt}>{clmOpt}</option>)}
                         </select>
                       </div>
                     )}
@@ -5853,7 +5853,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                   <label style={labelSt}>Condición climática</label>
                   <select style={S.input} value={form.clima} onChange={e=>setForm(p=>({...p,clima:e.target.value}))}>
                     <option value="">—</option>
-                    {["Soleado","Nublado","Parcialmente nublado","Sin viento","Viento leve","Post-lluvia (suelo húmedo)"].map(c=><option key={c} value={c}>{c}</option>)}
+                    {["Soleado","Nublado","Parcialmente nublado","Sin viento","Viento leve","Post-lluvia (suelo húmedo)"].map(condOpt=><option key={condOpt} value={condOpt}>{condOpt}</option>)}
                   </select>
                 </div>
 
@@ -5909,7 +5909,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                       <label style={labelSt}>Cuenta / Ítem presupuesto</label>
                       <select style={S.input} value={form.cuentaImputar} onChange={e=>setForm(p=>({...p,cuentaImputar:e.target.value}))}>
                         <option value="">Sin imputar</option>
-                        {["Insumos Áreas Verdes","Mantenimiento Canchas","Rama Golf","Mantenimiento Ornamental","Fitosanitarios General","Presupuesto Emergencia","Otro"].map(c=><option key={c} value={c}>{c}</option>)}
+                        {["Insumos Áreas Verdes","Mantenimiento Canchas","Rama Golf","Mantenimiento Ornamental","Fitosanitarios General","Presupuesto Emergencia","Otro"].map(cuentaOpt=><option key={cuentaOpt} value={cuentaOpt}>{cuentaOpt}</option>)}
                       </select>
                     </div>
                   </div>
@@ -6384,7 +6384,7 @@ function CuentaSelector({ value, onChange, S, CUENTAS_INTERNAS, CUENTAS_EXTERNAS
             <div style={{padding:"8px 14px 4px",fontSize:10,color:"#4ade80",fontWeight:700,letterSpacing:"1px",textTransform:"uppercase",background:"rgba(74,222,128,0.05)"}}>
               🏛️ Internas — Beneficio general socios
             </div>
-            {CUENTAS_INTERNAS.map(c=>(
+            {CUENTAS_INTERNAS.map(cuentaGrp=>(
               <div key={c} style={{padding:"9px 14px 9px 22px",cursor:"pointer",fontSize:13,color:value===c?"#86efac":"#ede9e0",background:value===c?"rgba(34,197,94,0.1)":"transparent",borderLeft:value===c?"2px solid #86efac":"2px solid transparent"}}
                 onClick={()=>{onChange(c);setOpen(false);}}>
                 {c}
@@ -6394,7 +6394,7 @@ function CuentaSelector({ value, onChange, S, CUENTAS_INTERNAS, CUENTAS_EXTERNAS
             <div style={{padding:"8px 14px 4px",fontSize:10,color:"#60a5fa",fontWeight:700,letterSpacing:"1px",textTransform:"uppercase",background:"rgba(96,165,250,0.05)",borderTop:"1px solid rgba(255,255,255,0.06)",marginTop:4}}>
               🏢 Externas — Beneficio área específica
             </div>
-            {CUENTAS_EXTERNAS.map(c=>(
+            {CUENTAS_EXTERNAS.map(cuentaGrp=>(
               <div key={c} style={{padding:"9px 14px 9px 22px",cursor:"pointer",fontSize:13,color:value===c?"#93c5fd":"#ede9e0",background:value===c?"rgba(59,130,246,0.1)":"transparent",borderLeft:value===c?"2px solid #93c5fd":"2px solid transparent"}}
                 onClick={()=>{onChange(c);setOpen(false);}}>
                 {c}
@@ -6454,7 +6454,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     });
     if(!Object.keys(porBodega).length) {
       // Igual guardar asignación aunque no haya bodegas (todo es servicio)
-      if(compraId) set({compras:compras.map(c=>c.id===compraId?{...c,items:(c.items||[]).map((it,i)=>({...it,bodegaDestino:items[i]?.bodegaDestino||""}))}:c)});
+      if(compraId) set({compras:compras.map(compraC=>compraC.id===compraId?{...c,items:(compraC.items||[]).map((it,i)=>({...it,bodegaDestino:items[i]?.bodegaDestino||""}))}:c)});
       return;
     }
     const nuevoBodegasData = {...bodegasData};
@@ -6480,7 +6480,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     });
     setBodegasData(nuevoBodegasData);
     // Guardar asignación en la compra para que persista al volver
-    if(compraId) set({compras:compras.map(c=>c.id===compraId?{...c,items:(c.items||[]).map((it,i)=>({...it,bodegaDestino:items[i]?.bodegaDestino||it.bodegaDestino||""}))}:c)});
+    if(compraId) set({compras:compras.map(compraC=>compraC.id===compraId?{...c,items:(compraC.items||[]).map((it,i)=>({...it,bodegaDestino:items[i]?.bodegaDestino||it.bodegaDestino||""}))}:c)});
   };
 
   // ── Categorías predefinidas ───────────────────────────────────────────────
@@ -6609,10 +6609,10 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     const notasVinculadas = form.notasVinculadas||[];
     console.log("GUARDANDO:", doc.tipoDoc, doc.nDocumento, "notas vinculadas:", notasVinculadas.length);
     if(editId) {
-      set({compras:compras.map(c=>c.id===editId?doc:c)});
+      set({compras:compras.map(compraC=>compraC.id===editId?doc:c)});
       setEditId(null);
     } else {
-      set({compras:[doc,...compras.map(c=>notasVinculadas.includes(c.id)?{...c,estado:"facturada",facturaId:docId}:c)]});
+      set({compras:[doc,...compras.map(compraC=>notasVinculadas.includes(compraC.id)?{...c,estado:"facturada",facturaId:docId}:c)]});
       // Ingresar ítems a bodegas
       if(doc.tipoDoc==="Nota de Crédito") {
         // NC: descontar stock de bodega
@@ -6639,7 +6639,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
       const estadoLabel = compra.estado==="pagada"?"ya fue pagada por transferencia":compra.estado==="pagada_efectivo"?"ya fue pagada en efectivo":compra.estado==="rendida"?"ya fue rendida":"está en proceso de rendición";
       if(!window.confirm(`⚠️ Esta factura ${estadoLabel}. ¿Deseas marcarla como pagada de todas formas?`)) return;
     }
-    set({compras:compras.map(c=>c.id===id?{...c,estado:"pagada",formaPago:forma,fechaPago:c.fechaPago||hoy.toISOString().slice(0,10)}:c)});
+    set({compras:compras.map(compraC=>compraC.id===id?{...compraC,estado:"pagada",formaPago:forma,fechaPago:c.fechaPago||hoy.toISOString().slice(0,10)}:c)});
   };
 
   // ── Rendición ─────────────────────────────────────────────────────────────
@@ -6648,7 +6648,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     const items = compras.filter(c=>seleccionadas.includes(c.id));
     const total = items.reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
     const nueva = {id:Date.now(),fecha:rendForm.fecha,obs:rendForm.obs,items:seleccionadas,total,estado:"presentada",reembolso:false,montoReembolso:0,fechaReembolso:"",nTransReembolso:""};
-    set({compras:compras.map(c=>seleccionadas.includes(c.id)?{...c,estado:"en_rendicion"}:c),rendiciones:[nueva,...rendiciones]});
+    set({compras:compras.map(compraC=>seleccionadas.includes(compraC.id)?{...compraC,estado:"en_rendicion"}:c),rendiciones:[nueva,...rendiciones]});
     setSeleccionadas([]); setRendForm({fecha:hoy.toISOString().slice(0,10),obs:""}); setShowRendForm(false);
   };
 
@@ -6656,7 +6656,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     if(!reembolsoForm.monto) return;
     set({
       rendiciones:rendiciones.map(r=>r.id===rendId?{...r,reembolso:true,estado:"reembolsada",montoReembolso:Number(reembolsoForm.monto),fechaReembolso:reembolsoForm.fecha,nTransReembolso:reembolsoForm.nTransferencia,bancoReembolso:reembolsoForm.banco,obsReembolso:reembolsoForm.obs}:r),
-      compras:compras.map(c=>rendiciones.find(r=>r.id===rendId)?.items?.includes(c.id)?{...c,estado:"rendida"}:c),
+      compras:compras.map(compraC=>rendiciones.find(r=>r.id===rendId)?.items?.includes(compraC.id)?{...compraC,estado:"rendida"}:c),
     });
     setReembolsoForm({fecha:hoy.toISOString().slice(0,10),monto:"",banco:"",nTransferencia:"",obs:""});
     setShowReembolsoForm(false);
@@ -6668,7 +6668,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     if(!rend) return;
     set({
       rendiciones: rendiciones.filter(r=>r.id!==rendId),
-      compras: compras.map(c=>rend.items?.includes(c.id)?{...c,estado:"pagada"}:c),
+      compras: compras.map(compraC=>rend.items?.includes(compraC.id)?{...compraC,estado:"pagada"}:c),
     });
   };
 
@@ -6683,7 +6683,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
       porCuentaRend[c.cuenta].total += Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
       porCuentaRend[c.cuenta].n++;
     });
-    const filas = itemsRend.map(c=>{
+    const filas = itemsRend.map(optC=>{
       const items = c.items||[{descripcion:c.descripcion,cantidad:c.cantidad||1,unidad:c.unidad||"unidad",totalNeto:c.totalNeto||0,iva:c.iva||0,totalBruto:c.totalBruto||0}];
       const totalDoc = Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
       const notasVinc = compras.filter(np=>np.facturaId===c.id);
@@ -6799,7 +6799,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   for(let i=5;i>=0;i--){const dMes=new Date(hoy.getFullYear(),hoy.getMonth()-i,1);mesesDisp.push({key:`${dMes.getFullYear()}-${String(dMes.getMonth()+1).padStart(2,"0")}`,label:`${MESES_COMPRAS[dMes.getMonth()]} ${dMes.getFullYear()}`});}
   const porMes=mesesDisp.map(m=>({...m,total:compras.filter(c=>(c.fecha||"").startsWith(m.key)).reduce((a,c)=>a+(c.tipoDoc==="Nota de Crédito"?-1:1)*Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0)}));
   const maxMes=Math.max(...porMes.map(m=>m.total),1);
-  const mesesUnicos=[...new Set(compras.map(c=>(c.fecha||"").slice(0,7)).filter(Boolean))].sort((a,b)=>b.localeCompare(a));
+  const mesesUnicos=[...new Set(compras.map(compraC=>(compraC.fecha||"").slice(0,7)).filter(Boolean))].sort((a,b)=>b.localeCompare(a));
   const listaPersonal=[...personal].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
 
   const ESTADO_C={
@@ -6942,7 +6942,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                     const fechaHoy = new Date().toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"});
                     const mesActual = new Date().toLocaleDateString("es-CL",{month:"long",year:"numeric"});
                     // Por cuenta con %
-                    const filasCuenta = porCuenta.map(c=>{
+                    const filasCuenta = porCuenta.map(optC=>{
                       const pct = totalGeneral?Math.round((c.total/totalGeneral)*100):0;
                       return `<tr>
                         <td style="padding:6px 10px;border:1px solid #e0e0e0">${c.cuenta}</td>
@@ -6963,7 +6963,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                     const pendientes = compras.filter(c=>c.estado==="pendiente");
                     const filasPend = pendientes.length===0
                       ? "<tr><td colspan='5' style='text-align:center;color:#888;padding:10px'>Sin compras pendientes</td></tr>"
-                      : pendientes.map(c=>`<tr>
+                      : pendientes.map(optC=>`<tr>
                           <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.fecha}</td>
                           <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.tipoDoc} N°${c.nDocumento||"—"}</td>
                           <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.proveedor||"—"}</td>
@@ -7200,7 +7200,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                     <div style={{padding:"5px 14px 3px",fontSize:10,color:"#3d7a52",fontWeight:700,letterSpacing:"0.8px",textTransform:"uppercase",borderTop:"1px solid rgba(255,255,255,0.06)",marginTop:2}}>
                       Internas — beneficio general socios
                     </div>
-                    {CUENTAS_INTERNAS.map(c=>(
+                    {CUENTAS_INTERNAS.map(cuentaGrp=>(
                       <div key={c} style={{padding:"7px 14px 7px 20px",cursor:"pointer",fontSize:12,color:filtroCuenta===c?"#86efac":"#ede9e0",background:filtroCuenta===c?"rgba(34,197,94,0.08)":"transparent"}}
                         onClick={()=>{setFiltroCuenta(c);setShowCuentaMenu(false);}}>
                         {c}
@@ -7209,7 +7209,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                     <div style={{padding:"5px 14px 3px",fontSize:10,color:"#3d6a7a",fontWeight:700,letterSpacing:"0.8px",textTransform:"uppercase",borderTop:"1px solid rgba(255,255,255,0.06)",marginTop:2}}>
                       Externas — beneficio área específica
                     </div>
-                    {CUENTAS_EXTERNAS.map(c=>(
+                    {CUENTAS_EXTERNAS.map(cuentaGrp=>(
                       <div key={c} style={{padding:"7px 14px 7px 20px",cursor:"pointer",fontSize:12,color:filtroCuenta===c?"#93c5fd":"#ede9e0",background:filtroCuenta===c?"rgba(59,130,246,0.08)":"transparent"}}
                         onClick={()=>{setFiltroCuenta(c);setShowCuentaMenu(false);}}>
                         {c}
@@ -7351,7 +7351,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                       <div><label style={labelSt}>Categoría</label>
                         <select style={S.input} value={item.categoria||""} onChange={e=>updateItem(idx,{categoria:e.target.value})}>
                           <option value="">Seleccionar...</option>
-                          {CATEGORIAS.map(c=><option key={c} value={c}>{c}</option>)}
+                          {CATEGORIAS.map(optC=><option key={optC} value={optC}>{optC}</option>)}
                         </select>
                       </div>
                     </div>
@@ -7436,7 +7436,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
             <div style={{...S.card,padding:36,textAlign:"center",color:"#4a8a5a"}}><div style={{fontSize:32,marginBottom:8}}>🛒</div><div>Sin compras registradas</div></div>
           ):(
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
-              {comprasFilt.map(c=>{
+              {comprasFilt.map(optC=>{
                 const est=ESTADO_C[c.estado]||ESTADO_C.pendiente;
                 const sel=seleccionadas.includes(c.id);
                 const selectable=["pendiente","pagada","pagada_efectivo"].includes(c.estado);
@@ -7573,7 +7573,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
               return {periodo:`${new Date(sem+"T12:00:00").toLocaleDateString("es-CL",{day:"2-digit",month:"short"})} – ${fin.toLocaleDateString("es-CL",{day:"2-digit",month:"short"})}`, ...val};
             });
           } else { // anual — por año
-            const anios = [...new Set(compras.map(c=>c.fecha?.slice(0,4)).filter(Boolean))].sort();
+            const anios = [...new Set(compras.map(compraC=>compraC.fecha?.slice(0,4)).filter(Boolean))].sort();
             filasDatos = anios.map(a=>{
               const cAnio = compras.filter(c=>c.fecha?.startsWith(a)&&(c.items||[]).some(it=>it.descripcion?.trim().toLowerCase()===gastoItemSel.toLowerCase()));
               const monto = cAnio.reduce((s,c)=>{
@@ -7608,7 +7608,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                 <div>
                   <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Año</label>
                   <select style={S.input} value={gastoAnio} onChange={e=>setGastoAnio(e.target.value)}>
-                    {[...new Set(compras.map(c=>c.fecha?.slice(0,4)).filter(Boolean))].sort().reverse().map(a=><option key={a} value={a}>{a}</option>)}
+                    {[...new Set(compras.map(compraC=>compraC.fecha?.slice(0,4)).filter(Boolean))].sort().reverse().map(a=><option key={a} value={a}>{a}</option>)}
                   </select>
                 </div>
               )}
@@ -7719,7 +7719,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                       </div>
                     </div>
                     <div style={{borderTop:"1px solid rgba(255,255,255,0.07)",paddingTop:10,marginBottom:10}}>
-                      {itemsRend.map(c=>{
+                      {itemsRend.map(optC=>{
                         const items=c.items||[{descripcion:c.descripcion}];
                         return <div key={c.id} style={{fontSize:12,color:"#7aaa80",padding:"3px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
                           <div style={{display:"flex",justifyContent:"space-between"}}>
@@ -9185,7 +9185,7 @@ function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJe
       {/* Filtros rápidos */}
       <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>
         {[["todas","Todas"],["urgentes","⚠️ Urgentes"],
-          ...categorias.map(c=>[c,c])
+          ...categorias.map(optC=>[optC,optC])
         ].map(([v,l])=>(
           <button key={v} onClick={()=>setFiltroUrgencia(v)}
             style={{cursor:"pointer",border:`1px solid ${filtroUrgencia===v?"#fbbf24":"rgba(255,255,255,0.12)"}`,
@@ -11436,7 +11436,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
                       <tr key={item.id} style={{borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
                         <td style={{padding:"4px 6px"}}><input style={{...S.input,fontSize:12,padding:"5px 8px"}} placeholder="Nombre" value={item.nombre} onChange={e=>setInventItems(p=>p.map((x,i)=>i===idx?{...x,nombre:e.target.value}:x))}/></td>
                         <td style={{padding:"4px 6px"}}><select style={{...S.input,fontSize:12,padding:"5px 8px"}} value={item.categoria} onChange={e=>setInventItems(p=>p.map((x,i)=>i===idx?{...x,categoria:e.target.value}:x))}>
-                          <option value="">—</option>{bodega.categorias.map(c=><option key={c}>{c}</option>)}</select></td>
+                          <option value="">—</option>{bodega.categorias.map(optC=><option key={optC}>{optC}</option>)}</select></td>
                         <td style={{padding:"4px 6px"}}><select style={{...S.input,fontSize:12,padding:"5px 8px"}} value={item.unidad} onChange={e=>setInventItems(p=>p.map((x,i)=>i===idx?{...x,unidad:e.target.value}:x))}>
                           {["unidad","kg","L","m","m²","saco","caja","bolsa","par","set"].map(u=><option key={u}>{u}</option>)}</select></td>
                         <td style={{padding:"4px 6px"}}><input type="number" min={0} style={{...S.input,fontSize:12,padding:"5px 8px",textAlign:"center"}} value={item.stockActual} onChange={e=>setInventItems(p=>p.map((x,i)=>i===idx?{...x,stockActual:Number(e.target.value)}:x))}/></td>
@@ -11463,7 +11463,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
                 <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Nombre</label><input style={S.input} value={itemForm.nombre} onChange={e=>setItemForm(p=>({...p,nombre:e.target.value}))} placeholder="Nombre del ítem"/></div>
                 <div><label style={labelSt}>Categoría</label>
                   <select style={S.input} value={itemForm.categoria} onChange={e=>setItemForm(p=>({...p,categoria:e.target.value}))}>
-                    <option value="">Seleccionar...</option>{bodega.categorias.map(c=><option key={c}>{c}</option>)}
+                    <option value="">Seleccionar...</option>{bodega.categorias.map(optC=><option key={optC}>{optC}</option>)}
                   </select>
                 </div>
                 <div><label style={labelSt}>Unidad</label>
@@ -13177,146 +13177,70 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
   const [vientoLoading, setVientoLoading] = React.useState(false);
   const [vientoError, setVientoError] = React.useState(null);
   const [vientoPronostico, setVientoPronostico] = React.useState([]);
-
   // Form nueva alerta
   const emptyAlerta = {tipo:"enfermedad",zonas:[],origen:"interna",urgencia:"alta",descripcion:"",responsable:"",fecha:fechaLocal(),hora:new Date().toTimeString().slice(0,5)};
   const [alertaForm, setAlertaForm] = React.useState(emptyAlerta);
+  const [tareasEditables, setTareasEditables] = React.useState([]);
 
-  // Protocolo de viento
-  const NIVELES_VIENTO = [
-    {nivel:0, label:"Normal",       rango:"< 40 km/h",   color:"#22c55e", bg:"rgba(34,197,94,0.1)",   min:0,  max:39,  icon:"🟢", acciones:[]},
-    {nivel:1, label:"Alerta temprana", rango:"40–59 km/h", color:"#f59e0b", bg:"rgba(245,158,11,0.1)", min:40, max:59,  icon:"🟡", acciones:[
-      "Asegurar macetas y elementos móviles en terrazas y jardines",
-      "Revisar y asegurar señalética y carteles",
-      "Alertar al equipo de posibles condiciones adversas",
-      "Suspender trabajos en altura (poda de árboles altos)",
-    ]},
-    {nivel:2, label:"Alerta media",    rango:"60–81 km/h", color:"#f97316", bg:"rgba(249,115,22,0.1)", min:60, max:81,  icon:"🟠", acciones:[
-      "Suspender todas las labores de jardinería en exterior",
-      "Retirar y guardar herramientas y equipos livianos",
-      "Encintar zonas de riesgo por caída de ramas",
-      "Revisar estado de árboles con riesgo de volcamiento",
-      "Notificar a administración del estadio",
-      "Cerrar sectorialmente las zonas arboladas",
-    ]},
-    {nivel:3, label:"Alerta alta",     rango:"> 82 km/h",  color:"#ef4444", bg:"rgba(239,68,68,0.1)",  min:82, max:999, icon:"🔴", acciones:[
-      "EVACUACIÓN INMEDIATA de todas las zonas verdes",
-      "Cerrar acceso al estadio y zonas deportivas",
-      "Activar protocolo de emergencia con administración",
-      "Contactar a Defensa Civil si corresponde",
-      "Documentar fotográficamente daños post-evento",
-      "Inspección completa antes de reabrir cualquier zona",
-    ]},
+  const TIPOS_ALERTA = [
+    {id:"meteorologica",icon:"🌧️",label:"Meteorológica",    tareas:["🚧 Encintar zona afectada","Revisar drenaje y canales","Retirar obstáculos en caminos","Inspección post-evento"]},
+    {id:"enfermedad",   icon:"🦠",label:"Enfermedad/Plaga", tareas:["🚧 Encintar zona afectada","Aplicar tratamiento fitosanitario","Registrar agente causal","Monitoreo diario"]},
+    {id:"dano",         icon:"🔧",label:"Daño/Reparación",  tareas:["🚧 Encintar zona afectada","Evaluar magnitud del daño","Fotografiar y documentar","Solicitar reparación"]},
+    {id:"evento",       icon:"🏆",label:"Evento/Actividad", tareas:["🚧 Encintar zona afectada","Instalar señalética","Coordinación con organizadores","Revisión post-evento"]},
+    {id:"riego",        icon:"💧",label:"Riego emergencia", tareas:["🚧 Encintar zona afectada","Riego de emergencia","Revisión sistema de drenaje"]},
+    {id:"riesgo",       icon:"⚠️",label:"Riesgo general",   tareas:["🚧 Encintar zona afectada","Inspección de seguridad","Notificar a administración"]},
   ];
 
-  const getNivelViento = (kmh) => NIVELES_VIENTO.slice().reverse().find(n=>kmh>=n.min)||NIVELES_VIENTO[0];
+  React.useEffect(()=>{
+    const tipo = TIPOS_ALERTA.find(t=>t.id===alertaForm.tipo)||TIPOS_ALERTA[0];
+    setTareasEditables(tipo.tareas.map((t,i)=>({id:i,texto:t,incluir:true,responsable:""})));
+  },[alertaForm.tipo]);
+
+  React.useEffect(()=>{ if(tabAlerta==="viento") fetchViento(); },[tabAlerta]);
+
+  const NIVELES_VIENTO = [
+    {nivel:0,label:"Normal",         rango:"< 40 km/h",  color:"#22c55e",bg:"rgba(34,197,94,0.08)",   min:0, max:39, icon:"🟢",acciones:[]},
+    {nivel:1,label:"Alerta temprana",rango:"40–59 km/h", color:"#f59e0b",bg:"rgba(245,158,11,0.08)", min:40,max:59, icon:"🟡",acciones:["Asegurar macetas y elementos móviles","Revisar y asegurar señalética","Alertar al equipo","Suspender trabajos en altura"]},
+    {nivel:2,label:"Alerta media",   rango:"60–81 km/h", color:"#f97316",bg:"rgba(249,115,22,0.08)", min:60,max:81, icon:"🟠",acciones:["Suspender labores de jardinería en exterior","Retirar herramientas y equipos livianos","Encintar zonas de riesgo por caída de ramas","Revisar árboles con riesgo de volcamiento","Notificar a administración del estadio","Cierre sectorial de zonas arboladas"]},
+    {nivel:3,label:"Alerta alta",    rango:"> 82 km/h",  color:"#ef4444",bg:"rgba(239,68,68,0.08)",  min:82,max:999,icon:"🔴",acciones:["EVACUACIÓN INMEDIATA de todas las zonas verdes","Cerrar acceso al estadio y zonas deportivas","Activar protocolo de emergencia con administración","Contactar Defensa Civil si corresponde","Documentar fotográficamente post-evento","Inspección completa antes de reabrir"]},
+  ];
+
+  const getNivelViento = (kmh) => [...NIVELES_VIENTO].reverse().find(n=>kmh>=n.min)||NIVELES_VIENTO[0];
 
   const fetchViento = React.useCallback(async()=>{
     setVientoLoading(true); setVientoError(null);
     try {
-      // Open-Meteo — coordenadas Estadio Español Las Condes
       const url = "https://api.open-meteo.com/v1/forecast?latitude=-33.4127&longitude=-70.5775&current=wind_speed_10m,wind_gusts_10m,temperature_2m,weather_code&hourly=wind_speed_10m,wind_gusts_10m&wind_speed_unit=kmh&timezone=America/Santiago&forecast_days=1";
       const res = await fetch(url);
-      if(!res.ok) throw new Error("Error al conectar con Open-Meteo");
+      if(!res.ok) throw new Error("Error API");
       const json = await res.json();
       const curr = json.current;
-      setVientoData({
-        velocidad: Math.round(curr.wind_speed_10m),
-        rafaga: Math.round(curr.wind_gusts_10m),
-        temperatura: Math.round(curr.temperature_2m),
-        hora: curr.time?.slice(11,16)||"",
-        weatherCode: curr.weather_code,
-      });
-      // Próximas horas
-      const horas = json.hourly;
+      setVientoData({velocidad:Math.round(curr.wind_speed_10m),rafaga:Math.round(curr.wind_gusts_10m),temperatura:Math.round(curr.temperature_2m),hora:curr.time?.slice(11,16)||""});
       const ahora = new Date();
-      const pronostico = horas.time.slice(0,24).map((t,i)=>({
-        hora:t.slice(11,16),
-        velocidad:Math.round(horas.wind_speed_10m[i]),
-        rafaga:Math.round(horas.wind_gusts_10m[i]),
-      })).filter(h=>{
-        const [hh,mm] = h.hora.split(":").map(Number);
-        const dt = new Date(); dt.setHours(hh,mm,0,0);
-        return dt >= ahora;
-      }).slice(0,8);
+      const pronostico = json.hourly.time.slice(0,24).map((t,i)=>({hora:t.slice(11,16),velocidad:Math.round(json.hourly.wind_speed_10m[i]),rafaga:Math.round(json.hourly.wind_gusts_10m[i])})).filter(h=>{const [hh]=h.hora.split(":").map(Number);const dt=new Date();dt.setHours(hh,0,0,0);return dt>=ahora;}).slice(0,8);
       setVientoPronostico(pronostico);
-    } catch(e) {
-      setVientoError("No se pudo obtener datos meteorológicos. Verificar conexión.");
-    } finally {
-      setVientoLoading(false);
-    }
+    } catch(e){ setVientoError("No se pudo conectar con Open-Meteo. Verificar conexión."); }
+    finally{ setVientoLoading(false); }
   },[]);
-
-  React.useEffect(()=>{
-    if(tabAlerta==="viento") fetchViento();
-  },[tabAlerta]);
-
-  const TIPOS_ALERTA = [
-    {id:"meteorologica", icon:"🌧️", label:"Meteorológica",    tareas:["🚧 Encintar zona afectada","Revisar drenaje y canales","Retirar obstáculos en caminos","Inspección post-evento"]},
-    {id:"enfermedad",    icon:"🦠", label:"Enfermedad/Plaga",  tareas:["🚧 Encintar zona afectada","Aplicar tratamiento fitosanitario","Registrar agente causal","Monitoreo diario","Retirar material vegetal afectado"]},
-    {id:"dano",          icon:"🔧", label:"Daño/Reparación",   tareas:["🚧 Encintar zona afectada","Evaluar magnitud del daño","Fotografiar y documentar","Solicitar reparación","Señalética de advertencia"]},
-    {id:"evento",        icon:"🏆", label:"Evento/Actividad",  tareas:["🚧 Encintar zona afectada","Instalar señalética","Coordinación con organizadores","Inspección previa al evento","Revisión post-evento"]},
-    {id:"riego",         icon:"💧", label:"Riego de emergencia",tareas:["🚧 Encintar zona afectada","Riego de emergencia","Revisión sistema de drenaje","Monitoreo de humedad"]},
-    {id:"riesgo",        icon:"⚠️", label:"Riesgo general",    tareas:["🚧 Encintar zona afectada","Inspección de seguridad","Notificar a administración","Señalética de peligro"]},
-  ];
-
-  const tipoActual = TIPOS_ALERTA.find(t=>t.id===alertaForm.tipo)||TIPOS_ALERTA[0];
-  const [tareasEditables, setTareasEditables] = React.useState([]);
-  React.useEffect(()=>{
-    setTareasEditables(tipoActual.tareas.map((t,i)=>({id:i,texto:t,incluir:true,responsable:"",urgencia:"pendiente"})));
-  },[alertaForm.tipo]);
 
   const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
   const incArr = Array.isArray(incidencias)?incidencias:Object.values(incidencias||{});
-  const incActivas = incArr.filter(i=>i.estado==="activa"||i.estado==="en_gestion").sort((a,b)=>(b.fecha+b.hora).localeCompare(a.fecha+a.hora));
-  const incResueltas = incArr.filter(i=>i.estado==="resuelta").sort((a,b)=>(b.fechaResolucion||b.fecha).localeCompare(a.fechaResolucion||a.fecha));
-
+  const incActivas = incArr.filter(i=>i.estado==="activa"||i.estado==="en_gestion").sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
+  const incResueltas = incArr.filter(i=>i.estado==="resuelta").sort((a,b)=>(b.fechaResolucion||b.fecha||"").localeCompare(a.fechaResolucion||a.fecha||""));
+  const notifArr = Array.isArray(notificaciones)?notificaciones:Object.values(notificaciones||{});
+  const notifSorted = notifArr.filter(n=>n&&n.titulo).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
   const URGENCIA_COLORS = {inmediata:"#ef4444",alta:"#f59e0b",media:"#60a5fa"};
 
   const guardarAlerta = () => {
     if(!alertaForm.zonas.length||!alertaForm.descripcion.trim()) return;
-    const tipoObj = TIPOS_ALERTA.find(t=>t.id===alertaForm.tipo);
+    const tipoObj = TIPOS_ALERTA.find(t=>t.id===alertaForm.tipo)||TIPOS_ALERTA[0];
     const nuevaId = Date.now()+Math.random();
-    const nuevaAlerta = limpiarUndef({
-      id:nuevaId, estado:"activa",
-      tipo:alertaForm.tipo, tipoLabel:tipoObj?.label||alertaForm.tipo,
-      tipoIcon:tipoObj?.icon||"⚠️",
-      zonas:alertaForm.zonas, origen:alertaForm.origen,
-      urgencia:alertaForm.urgencia, descripcion:alertaForm.descripcion,
-      responsable:alertaForm.responsable, fecha:alertaForm.fecha,
-      hora:alertaForm.hora, fechaCreacion:new Date().toISOString(),
-      tareas:tareasEditables.filter(t=>t.incluir).map(t=>({texto:t.texto,responsable:t.responsable,estado:"pendiente"})),
-      historial:[{accion:"Alerta creada",fecha:alertaForm.fecha,hora:alertaForm.hora,responsable:alertaForm.responsable}],
-    });
-    // Guardar en Firebase
-    const arrActual = Array.isArray(incidencias)?incidencias:Object.values(incidencias||{});
-    const nuevoArr = [nuevaAlerta,...arrActual];
-    setIncidencias(nuevoArr);
-    // Generar cierre sectorial en tareasProg
-    const tareaCierre = limpiarUndef({
-      id:Date.now()+Math.random(), fecha:alertaForm.fecha,
-      zona:alertaForm.zonas.join(", "), elemento:"",
-      tarea:`🚫 CIERRE: ${alertaForm.zonas.join(", ")} — ${tipoObj?.icon} ${tipoObj?.label}`,
-      responsable:alertaForm.responsable||"", estado:"pendiente",
-      obs:`${alertaForm.descripcion}. Urgencia: ${alertaForm.urgencia}. Incidencia #${String(nuevaId).slice(-6)}`,
-      tipoEvento:"cierre_sectorial", incidenciaId:nuevaId,
-    });
-    // Generar tareas editables en programación
-    const tareasGen = tareasEditables.filter(t=>t.incluir).map(t=>limpiarUndef({
-      id:Date.now()+Math.random(), fecha:alertaForm.fecha,
-      zona:alertaForm.zonas.join(", "), elemento:"",
-      tarea:t.texto, responsable:t.responsable||alertaForm.responsable||"",
-      estado:t.responsable?"pendiente":"por_designar",
-      obs:`Generada por alerta: ${alertaForm.descripcion}`,
-      incidenciaId:nuevaId,
-    }));
-    setTareasProg(prev=>{
-      const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-      const lista=[tareaCierre,...tareasGen,...normArr(prev[alertaForm.fecha]||[])];
-      // setTareasProg usa useFirebaseState que persiste automáticamente en Firebase
-      return {...prev,[alertaForm.fecha]:lista};
-    });
-    crearNotificacion?.("alerta",{titulo:`${tipoObj?.icon} Nueva alerta: ${alertaForm.zonas.join(", ")}`,mensaje:alertaForm.descripcion,fecha:alertaForm.fecha});
+    const nuevaAlerta = limpiarUndef({id:nuevaId,estado:"activa",tipo:alertaForm.tipo,tipoLabel:tipoObj.label,tipoIcon:tipoObj.icon,zonas:alertaForm.zonas,origen:alertaForm.origen,urgencia:alertaForm.urgencia,descripcion:alertaForm.descripcion,responsable:alertaForm.responsable,fecha:alertaForm.fecha,hora:alertaForm.hora,fechaCreacion:new Date().toISOString(),tareas:tareasEditables.filter(t=>t.incluir).map(t=>({texto:t.texto,responsable:t.responsable,estado:"pendiente"})),historial:[{accion:"Alerta creada",fecha:alertaForm.fecha,hora:alertaForm.hora,responsable:alertaForm.responsable}]});
+    setIncidencias([nuevaAlerta,...incArr]);
+    const tareaCierre = limpiarUndef({id:Date.now()+Math.random(),fecha:alertaForm.fecha,zona:alertaForm.zonas.join(", "),elemento:"",tarea:`🚫 CIERRE: ${alertaForm.zonas.join(", ")} — ${tipoObj.icon} ${tipoObj.label}`,responsable:alertaForm.responsable||"",estado:"pendiente",obs:alertaForm.descripcion,tipoEvento:"cierre_sectorial"});
+    const tareasGen = tareasEditables.filter(t=>t.incluir).map(t=>limpiarUndef({id:Date.now()+Math.random(),fecha:alertaForm.fecha,zona:alertaForm.zonas.join(", "),elemento:"",tarea:t.texto,responsable:t.responsable||alertaForm.responsable||"",estado:t.responsable?"pendiente":"por_designar",obs:`Generada por alerta: ${alertaForm.descripcion}`}));
+    setTareasProg(prev=>{const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);return {...prev,[alertaForm.fecha]:[tareaCierre,...tareasGen,...normArr(prev[alertaForm.fecha]||[])].map(limpiarUndef)};});
+    crearNotificacion?.("alerta",{titulo:`${tipoObj.icon} Nueva alerta: ${alertaForm.zonas.join(", ")}`,mensaje:alertaForm.descripcion,fecha:alertaForm.fecha});
     setAlertaForm(emptyAlerta);
     setShowNuevaAlerta(false);
     setTabAlerta("incidencias");
@@ -13324,35 +13248,44 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
 
   const resolverAlerta = (inc) => {
     const hoy = fechaLocal();
-    const actualizada = {...inc, estado:"resuelta", fechaResolucion:hoy, horaResolucion:new Date().toTimeString().slice(0,5),
-      historial:[...(inc.historial||[]),{accion:"Alerta resuelta",fecha:hoy,hora:new Date().toTimeString().slice(0,5)}]};
-    const arrActual = Array.isArray(incidencias)?incidencias:Object.values(incidencias||{});
-    setIncidencias(arrActual.map(i=>String(i.id)===String(inc.id)?actualizada:i));
+    const actualizada = {...inc,estado:"resuelta",fechaResolucion:hoy,horaResolucion:new Date().toTimeString().slice(0,5),historial:[...(inc.historial||[]),{accion:"Alerta resuelta",fecha:hoy,hora:new Date().toTimeString().slice(0,5)}]};
+    setIncidencias(incArr.map(i=>String(i.id)===String(inc.id)?actualizada:i));
     setAlertaSelId(null);
   };
 
   const generarReporteAlerta = (inc) => {
     const win = window.open("","_blank","width=800,height=650");
-    const tareasHtml = (inc.tareas||[]).map(t=>`<tr><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0">${t.texto}</td><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;text-align:center;color:${t.estado==="hecha"?"#16a34a":t.estado==="pendiente"?"#ca8a04":"#6b7280"}">${t.estado==="hecha"?"✅ Hecha":t.estado==="pendiente"?"⏳ Pendiente":"— Sin asignar"}</td><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;color:#6b7280">${t.responsable||"—"}</td></tr>`).join("");
+    const tareasHtml = (inc.tareas||[]).map(t=>`<tr><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0">${t.texto}</td><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;text-align:center;color:${t.estado==="hecha"?"#16a34a":"#ca8a04"}">${t.estado==="hecha"?"✅ Hecha":"⏳ Pendiente"}</td><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;color:#6b7280">${t.responsable||"—"}</td></tr>`).join("");
     const histHtml = (inc.historial||[]).map(h=>`<tr><td style="padding:5px 10px;border-bottom:1px solid #f0f0f0;font-size:12px">${h.fecha} ${h.hora||""}</td><td style="padding:5px 10px;border-bottom:1px solid #f0f0f0;font-size:12px">${h.accion}</td><td style="padding:5px 10px;border-bottom:1px solid #f0f0f0;font-size:12px;color:#6b7280">${h.responsable||"—"}</td></tr>`).join("");
-    win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Reporte Incidencia</title>
-    <style>body{font-family:Calibri,Arial,sans-serif;color:#222;padding:32px;font-size:13px}h1{font-size:19px;color:#14532d;margin-bottom:2px}h2{font-size:12px;color:#888;font-weight:normal;margin-top:0}h3{font-size:13px;color:#14532d;margin:16px 0 6px}table{width:100%;border-collapse:collapse}th{background:#14532d;color:#fff;padding:7px 10px;text-align:left;font-size:11px}tr:nth-child(even){background:#f9fafb}.badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:700}.resuelto{background:#dcfce7;color:#14532d}.activo{background:#fee2e2;color:#991b1b}@media print{button{display:none}}</style></head><body>
+    win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Reporte Incidencia</title><style>body{font-family:Calibri,Arial,sans-serif;color:#222;padding:32px;font-size:13px}h1{font-size:19px;color:#14532d;margin-bottom:2px}h2{font-size:12px;color:#888;font-weight:normal;margin-top:0}h3{font-size:13px;color:#14532d;margin:16px 0 6px}table{width:100%;border-collapse:collapse}th{background:#14532d;color:#fff;padding:7px 10px;text-align:left;font-size:11px}tr:nth-child(even){background:#f9fafb}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:14px 0;background:#f9fafb;padding:14px;border-radius:8px}.campo strong{font-size:10px;color:#888;display:block;margin-bottom:2px}@media print{button{display:none}}</style></head><body>
     <h1>${inc.tipoIcon} Reporte de Incidencia — ${inc.tipoLabel}</h1>
     <h2>Estadio Español de Las Condes · Depto. Áreas Verdes</h2>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0;background:#f9fafb;padding:14px;border-radius:8px">
-      <div><strong style="color:#888;font-size:11px">ESTADO</strong><br/><span class="badge ${inc.estado==="resuelta"?"resuelto":"activo"}">${inc.estado==="resuelta"?"✅ Resuelta":"🔴 Activa"}</span></div>
-      <div><strong style="color:#888;font-size:11px">ZONA(S)</strong><br/>${inc.zonas?.join(", ")||"—"}</div>
-      <div><strong style="color:#888;font-size:11px">URGENCIA</strong><br/>${inc.urgencia||"—"}</div>
-      <div><strong style="color:#888;font-size:11px">INICIO</strong><br/>${inc.fecha} ${inc.hora||""}</div>
-      <div><strong style="color:#888;font-size:11px">RESOLUCIÓN</strong><br/>${inc.fechaResolucion||"Sin resolver"} ${inc.horaResolucion||""}</div>
-      <div><strong style="color:#888;font-size:11px">ORIGEN</strong><br/>${inc.origen==="interna"?"Observación interna":"Externo"}</div>
+    <div class="grid">
+      <div class="campo"><strong>ESTADO</strong>${inc.estado==="resuelta"?"✅ Resuelta":"🔴 Activa"}</div>
+      <div class="campo"><strong>ZONA(S)</strong>${inc.zonas?.join(", ")||"—"}</div>
+      <div class="campo"><strong>URGENCIA</strong>${inc.urgencia||"—"}</div>
+      <div class="campo"><strong>INICIO</strong>${inc.fecha} ${inc.hora||""}</div>
+      <div class="campo"><strong>RESOLUCIÓN</strong>${inc.fechaResolucion||"Sin resolver"} ${inc.horaResolucion||""}</div>
+      <div class="campo"><strong>ORIGEN</strong>${inc.origen==="interna"?"Observación interna":"Externo"}</div>
     </div>
-    <div style="margin:12px 0;padding:12px;background:#fefce8;border-left:3px solid #ca8a04;border-radius:4px"><strong>Descripción:</strong> ${inc.descripcion||"—"}</div>
+    <div style="margin:10px 0;padding:10px 14px;background:#fefce8;border-left:3px solid #ca8a04;border-radius:4px"><strong>Descripción:</strong> ${inc.descripcion||"—"}</div>
     <h3>Tareas generadas</h3>
-    <table><thead><tr><th>Tarea</th><th>Estado</th><th>Responsable</th></tr></thead><tbody>${tareasHtml||"<tr><td colspan=3 style='padding:10px;color:#888'>Sin tareas registradas</td></tr>"}</tbody></table>
+    <table><thead><tr><th>Tarea</th><th>Estado</th><th>Responsable</th></tr></thead><tbody>${tareasHtml||"<tr><td colspan=3 style='padding:10px;color:#888'>Sin tareas</td></tr>"}</tbody></table>
     <h3>Historial de gestión</h3>
     <table><thead><tr><th>Fecha/Hora</th><th>Acción</th><th>Responsable</th></tr></thead><tbody>${histHtml}</tbody></table>
     <div style="margin-top:20px;text-align:center"><button onclick="window.print()" style="background:#14532d;color:#fff;border:none;padding:9px 22px;border-radius:6px;cursor:pointer">🖨️ Imprimir / PDF</button></div>
+    </body></html>`);
+    win.document.close();
+  };
+
+  const generarReporteRegistros = () => {
+    const win = window.open("","_blank","width=800,height=600");
+    const hoy = new Date().toLocaleDateString("es-CL",{day:"2-digit",month:"long",year:"numeric"});
+    const filas = notifSorted.map(n=>`<tr><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;font-size:11px">${n.fecha||"—"} ${n.hora||""}</td><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;font-weight:600">${n.titulo||"—"}</td><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;font-size:11px;color:#6b7280">${n.mensaje||"—"}</td></tr>`).join("");
+    win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Registros</title><style>body{font-family:Calibri,Arial,sans-serif;padding:28px;font-size:13px}h1{font-size:18px;color:#14532d;margin-bottom:2px}h2{font-size:12px;color:#888;font-weight:normal;margin-top:0}table{width:100%;border-collapse:collapse}th{background:#14532d;color:#fff;padding:8px 10px;font-size:11px;text-align:left}tr:nth-child(even){background:#f9fafb}@media print{button{display:none}}</style></head><body>
+    <h1>🔔 Registros del Sistema</h1><h2>Estadio Español · Áreas Verdes · ${hoy}</h2>
+    <table><thead><tr><th>Fecha/Hora</th><th>Título</th><th>Detalle</th></tr></thead><tbody>${filas||"<tr><td colspan=3 style='padding:12px;color:#888'>Sin registros</td></tr>"}</tbody></table>
+    <div style="margin-top:14px;text-align:center"><button onclick="window.print()" style="background:#14532d;color:#fff;border:none;padding:9px 22px;border-radius:6px;cursor:pointer">🖨️ Imprimir / PDF</button></div>
     </body></html>`);
     win.document.close();
   };
@@ -13361,161 +13294,26 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
 
   return (
     <div className="ein">
+      {/* Header */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
         <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:700,margin:0}}>🔔 Alertas e Incidencias</h2>
         {esJefa&&<button className="btn-p" style={{...S.btn,background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}} onClick={()=>setShowNuevaAlerta(true)}>+ Nueva alerta</button>}
       </div>
 
-      {/* MODAL NUEVA ALERTA — fuera del flujo para no mover contenido */}
-      {showNuevaAlerta&&(
-        <ModalNuevaAlerta
-          S={S}
-          alertaForm={alertaForm}
-          setAlertaForm={setAlertaForm}
-          TIPOS_ALERTA={TIPOS_ALERTA}
-          MACROZONAS_BASE={MACROZONAS_BASE}
-          personal={personal}
-          tareasEditables={tareasEditables}
-          setTareasEditables={setTareasEditables}
-          onGuardar={guardarAlerta}
-          onClose={()=>setShowNuevaAlerta(false)}
-        />
-      )}
+      {/* Modal nueva alerta */}
+      {showNuevaAlerta&&<ModalNuevaAlerta S={S} alertaForm={alertaForm} setAlertaForm={setAlertaForm} TIPOS_ALERTA={TIPOS_ALERTA} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} tareasEditables={tareasEditables} setTareasEditables={setTareasEditables} onGuardar={guardarAlerta} onClose={()=>setShowNuevaAlerta(false)}/>}
 
       {/* Tabs */}
-      <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>
-        {[["incidencias","🚨 Activas",""],["viento","🌬️ Viento",""],["resueltas","✅ Resueltas",""],["notifs","🔔 Registros",""]].map(([t,l,badge])=>(
+      <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
+        {[["incidencias","🚨 Activas"],["viento","🌬️ Viento"],["resueltas","✅ Resueltas"],["notifs","🔔 Registros"]].map(([t,l])=>(
           <button key={t} className={`tab${tabAlerta===t?" on":""}`} onClick={()=>setTabAlerta(t)} style={{fontFamily:"'Georgia',serif",position:"relative"}}>
             {l}
             {t==="incidencias"&&incActivas.length>0&&<span style={{marginLeft:5,background:"#ef4444",color:"#fff",borderRadius:"50%",fontSize:9,padding:"1px 5px"}}>{incActivas.length}</span>}
-            {t==="notifs"&&notifNoLeidas.length>0&&<span style={{marginLeft:5,background:"#f59e0b",color:"#fff",borderRadius:"50%",fontSize:9,padding:"1px 5px"}}>{notifNoLeidas.length}</span>}
           </button>
         ))}
       </div>
 
-
-
-      {/* PANEL VIENTO */}
-      {tabAlerta==="viento"&&(
-        <div>
-          {/* Botón actualizar */}
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-            <div style={{fontSize:12,color:"#5a9a7a"}}>Datos: Open-Meteo · Estadio Español, Las Condes</div>
-            <button style={{...S.btn,fontSize:11,padding:"4px 12px",color:"#60a5fa",background:"rgba(96,165,250,0.08)",border:"1px solid rgba(96,165,250,0.2)"}}
-              onClick={fetchViento} disabled={vientoLoading}>
-              {vientoLoading?"⏳ Actualizando...":"🔄 Actualizar"}
-            </button>
-          </div>
-
-          {vientoError&&<div style={{...S.card,padding:14,marginBottom:12,color:"#ef4444",fontSize:12,border:"1px solid rgba(239,68,68,0.3)"}}>{vientoError}</div>}
-
-          {!vientoData&&!vientoLoading&&!vientoError&&(
-            <div style={{...S.card,padding:32,textAlign:"center",color:"#4a7a5a"}}>
-              <div style={{fontSize:32,marginBottom:8}}>🌬️</div>
-              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:8}}>Protocolo de Viento</div>
-              <div style={{fontSize:12,marginBottom:16}}>Consulta el estado del viento en tiempo real y el protocolo de acción según nivel.</div>
-              <button className="btn-p" style={{...S.btn,padding:"8px 20px"}} onClick={fetchViento}>Consultar ahora</button>
-            </div>
-          )}
-
-          {vientoData&&(()=>{
-            const nivelActual = getNivelViento(vientoData.velocidad);
-            const nivelRafaga = getNivelViento(vientoData.rafaga);
-            const nivelMayor = nivelRafaga.nivel > nivelActual.nivel ? nivelRafaga : nivelActual;
-            return (
-              <div>
-                {/* Card principal - velocidad actual */}
-                <div style={{...S.card,padding:20,marginBottom:12,background:nivelMayor.bg,border:`1px solid ${nivelMayor.color}40`}}>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:14}}>
-                    <div style={{textAlign:"center"}}>
-                      <div style={{fontSize:11,color:"#5a9a7a",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.5px"}}>Velocidad actual</div>
-                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:36,fontWeight:900,color:nivelActual.color}}>{vientoData.velocidad}</div>
-                      <div style={{fontSize:12,color:"#5a9a7a"}}>km/h</div>
-                    </div>
-                    <div style={{textAlign:"center"}}>
-                      <div style={{fontSize:11,color:"#5a9a7a",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.5px"}}>Ráfaga máxima</div>
-                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:36,fontWeight:900,color:nivelRafaga.color}}>{vientoData.rafaga}</div>
-                      <div style={{fontSize:12,color:"#5a9a7a"}}>km/h</div>
-                    </div>
-                    <div style={{textAlign:"center"}}>
-                      <div style={{fontSize:11,color:"#5a9a7a",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.5px"}}>Temperatura</div>
-                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:36,fontWeight:900,color:"#60a5fa"}}>{vientoData.temperatura}°</div>
-                      <div style={{fontSize:12,color:"#5a9a7a"}}>Hora: {vientoData.hora}</div>
-                    </div>
-                  </div>
-
-                  {/* Nivel activo */}
-                  <div style={{background:nivelMayor.bg,border:`2px solid ${nivelMayor.color}`,borderRadius:10,padding:"12px 16px",marginBottom:12}}>
-                    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
-                      <span style={{fontSize:24}}>{nivelMayor.icon}</span>
-                      <div>
-                        <div style={{fontWeight:700,fontSize:15,color:nivelMayor.color}}>Nivel {nivelMayor.nivel} — {nivelMayor.label}</div>
-                        <div style={{fontSize:12,color:"#5a9a7a"}}>{nivelMayor.rango}</div>
-                      </div>
-                    </div>
-                    {nivelMayor.acciones.length>0&&(
-                      <div>
-                        <div style={{fontSize:11,color:"#6aaa7a",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.5px"}}>Protocolo de acción:</div>
-                        {nivelMayor.acciones.map((acc,i)=>(
-                          <div key={i} style={{fontSize:12,padding:"4px 8px",marginBottom:3,background:"rgba(0,0,0,0.1)",borderRadius:5,display:"flex",gap:6}}>
-                            <span style={{color:nivelMayor.color,flexShrink:0}}>▶</span>{acc}
-                          </div>
-                        ))}
-                        {nivelMayor.nivel>=1&&(
-                          <button style={{...S.btn,marginTop:8,fontSize:11,padding:"4px 12px",background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}}
-                            onClick={()=>{setAlertaForm(p=>({...p,tipo:"meteorologica",descripcion:`Viento Nivel ${nivelMayor.nivel} — ${nivelMayor.label}: ${vientoData.velocidad} km/h (ráfaga ${vientoData.rafaga} km/h)`}));setShowNuevaAlerta(true);setTabAlerta("incidencias");}}>
-                            🚨 Activar alerta por viento
-                          </button>
-                        )}
-                      </div>
-                    )}
-                    {nivelMayor.nivel===0&&<div style={{fontSize:12,color:"#22c55e",marginTop:4}}>✅ Sin restricciones. Operación normal.</div>}
-                  </div>
-                </div>
-
-                {/* Todos los niveles */}
-                <div style={{...S.card,padding:16,marginBottom:12}}>
-                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:10}}>📋 Tabla de niveles</div>
-                  {NIVELES_VIENTO.map(n=>(
-                    <div key={n.nivel} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",marginBottom:4,borderRadius:7,background:nivelMayor.nivel===n.nivel?n.bg:"rgba(255,255,255,0.02)",border:`1px solid ${nivelMayor.nivel===n.nivel?n.color+"50":"rgba(255,255,255,0.06)"}`}}>
-                      <span style={{fontSize:16,flexShrink:0}}>{n.icon}</span>
-                      <div style={{flex:1}}>
-                        <div style={{fontSize:12,fontWeight:700,color:n.color}}>Nivel {n.nivel} — {n.label}</div>
-                        <div style={{fontSize:11,color:"#5a9a7a"}}>{n.rango}</div>
-                      </div>
-                      {nivelMayor.nivel===n.nivel&&<span style={{fontSize:10,padding:"2px 8px",borderRadius:10,background:n.color,color:"#fff",fontWeight:700}}>ACTIVO</span>}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Pronóstico próximas horas */}
-                {vientoPronostico.length>0&&(
-                  <div style={{...S.card,padding:16}}>
-                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:10}}>⏱️ Pronóstico próximas horas</div>
-                    <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:4}}>
-                      {vientoPronostico.map((h,i)=>{
-                        const nv = getNivelViento(Math.max(h.velocidad,h.rafaga));
-                        return (
-                          <div key={i} style={{textAlign:"center",minWidth:60,padding:"8px 6px",borderRadius:8,background:nv.bg,border:`1px solid ${nv.color}30`,flexShrink:0}}>
-                            <div style={{fontSize:10,color:"#5a9a7a",marginBottom:4}}>{h.hora}</div>
-                            <div style={{fontWeight:700,fontSize:13,color:nv.color}}>{h.velocidad}</div>
-                            <div style={{fontSize:10,color:"#5a9a7a"}}>km/h</div>
-                            <div style={{fontSize:9,color:nv.color,marginTop:2}}>↑{h.rafaga}</div>
-                            <div style={{fontSize:9,marginTop:2}}>{nv.icon}</div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div style={{fontSize:10,color:"#4a7a5a",marginTop:6}}>↑ = ráfaga máxima · Colores según nivel de protocolo</div>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-        </div>
-      )}
-
-      {/* INCIDENCIAS ACTIVAS */}
+      {/* TAB: INCIDENCIAS ACTIVAS */}
       {tabAlerta==="incidencias"&&(
         incActivas.length===0?(
           <div style={{...S.card,padding:36,textAlign:"center",color:"#4a7a5a"}}>
@@ -13533,31 +13331,21 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
                   <div style={{fontSize:11,color:"#5a9a7a"}}>{inc.zonas?.join(", ")} · {inc.fecha} {inc.hora}</div>
                 </div>
               </div>
-              <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                <span style={{fontSize:10,padding:"2px 8px",borderRadius:10,background:`${URGENCIA_COLORS[inc.urgencia]}20`,color:URGENCIA_COLORS[inc.urgencia],border:`1px solid ${URGENCIA_COLORS[inc.urgencia]}40`,fontWeight:700}}>{inc.urgencia?.toUpperCase()}</span>
-                <span style={{fontSize:10,padding:"2px 8px",borderRadius:10,background:"rgba(239,68,68,0.1)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}}>{inc.estado==="en_gestion"?"🔄 En gestión":"🔴 Activa"}</span>
-              </div>
+              <span style={{fontSize:10,padding:"2px 8px",borderRadius:10,background:`${URGENCIA_COLORS[inc.urgencia]||"#f59e0b"}20`,color:URGENCIA_COLORS[inc.urgencia]||"#f59e0b",border:`1px solid ${URGENCIA_COLORS[inc.urgencia]||"#f59e0b"}40`,fontWeight:700}}>{(inc.urgencia||"").toUpperCase()}</span>
             </div>
             <div style={{fontSize:12,color:"#ede9e0",marginBottom:8}}>{inc.descripcion}</div>
-            <div style={{fontSize:11,color:"#5a9a7a",marginBottom:10}}>
-              {(inc.tareas||[]).length} tarea(s) · {(inc.tareas||[]).filter(t=>t.estado==="hecha").length} completada(s)
-            </div>
             <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-              <button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(34,197,94,0.1)",color:"#22c55e",border:"1px solid rgba(34,197,94,0.3)"}}
-                onClick={()=>resolverAlerta(inc)}>✅ Resolver</button>
-              <button style={{...S.btn,fontSize:11,padding:"3px 10px"}} onClick={()=>setAlertaSelId(alertaSelId===inc.id?null:inc.id)}>
-                {alertaSelId===inc.id?"▲ Ocultar":"▼ Ver detalle"}
-              </button>
-              <button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(96,165,250,0.1)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.3)"}}
-                onClick={()=>generarReporteAlerta(inc)}>📋 Reporte</button>
+              <button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(34,197,94,0.1)",color:"#22c55e",border:"1px solid rgba(34,197,94,0.3)"}} onClick={()=>resolverAlerta(inc)}>✅ Resolver</button>
+              <button style={{...S.btn,fontSize:11,padding:"3px 10px"}} onClick={()=>setAlertaSelId(alertaSelId===inc.id?null:inc.id)}>{alertaSelId===inc.id?"▲ Ocultar":"▼ Detalle"}</button>
+              <button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(96,165,250,0.1)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.3)"}} onClick={()=>generarReporteAlerta(inc)}>📋 Imprimir ficha</button>
             </div>
             {alertaSelId===inc.id&&(
-              <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
-                <div style={{fontSize:11,color:"#6aaa7a",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.5px"}}>Tareas</div>
+              <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+                <div style={{fontSize:11,color:"#6aaa7a",marginBottom:5}}>TAREAS GENERADAS:</div>
                 {(inc.tareas||[]).map((t,i)=>(
-                  <div key={i} style={{fontSize:12,padding:"5px 8px",marginBottom:4,background:"rgba(255,255,255,0.03)",borderRadius:6,display:"flex",justifyContent:"space-between"}}>
+                  <div key={i} style={{fontSize:12,padding:"4px 8px",marginBottom:3,background:"rgba(255,255,255,0.03)",borderRadius:5,display:"flex",justifyContent:"space-between"}}>
                     <span>{t.texto}</span>
-                    <span style={{color:t.estado==="hecha"?"#22c55e":t.estado==="pendiente"?"#f59e0b":"#5a9a7a",fontSize:10}}>{t.estado==="hecha"?"✅":t.estado==="pendiente"?"⏳":"—"} {t.responsable||""}</span>
+                    <span style={{color:t.estado==="hecha"?"#22c55e":"#f59e0b",fontSize:10}}>{t.estado==="hecha"?"✅":"⏳"} {t.responsable||""}</span>
                   </div>
                 ))}
               </div>
@@ -13566,2154 +13354,133 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
         ))
       )}
 
-      {/* RESUELTAS */}
+      {/* TAB: VIENTO */}
+      {tabAlerta==="viento"&&(
+        <div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+            <div style={{fontSize:12,color:"#5a9a7a"}}>Open-Meteo · Estadio Español, Las Condes</div>
+            <button style={{...S.btn,fontSize:11,padding:"4px 12px",color:"#60a5fa",background:"rgba(96,165,250,0.08)",border:"1px solid rgba(96,165,250,0.2)"}} onClick={fetchViento} disabled={vientoLoading}>{vientoLoading?"⏳ Actualizando...":"🔄 Actualizar"}</button>
+          </div>
+          {vientoError&&<div style={{...S.card,padding:12,color:"#ef4444",fontSize:12,marginBottom:12}}>{vientoError}</div>}
+          {!vientoData&&!vientoLoading&&!vientoError&&(
+            <div style={{...S.card,padding:32,textAlign:"center",color:"#4a7a5a"}}>
+              <div style={{fontSize:32,marginBottom:8}}>🌬️</div>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:12}}>Protocolo de Viento</div>
+              <button className="btn-p" style={{...S.btn,padding:"8px 20px"}} onClick={fetchViento}>Consultar ahora</button>
+            </div>
+          )}
+          {vientoData&&(()=>{
+            const nvVel = getNivelViento(vientoData.velocidad);
+            const nvRaf = getNivelViento(vientoData.rafaga);
+            const nvMax = nvRaf.nivel>nvVel.nivel?nvRaf:nvVel;
+            return (
+              <div>
+                <div style={{...S.card,padding:20,marginBottom:12,background:nvMax.bg,border:`1px solid ${nvMax.color}40`}}>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:14}}>
+                    {[["Velocidad",vientoData.velocidad,nvVel.color],["Ráfaga",vientoData.rafaga,nvRaf.color],["Temp.",`${vientoData.temperatura}°`,"#60a5fa"]].map(([lbl,val,col])=>(
+                      <div key={lbl} style={{textAlign:"center"}}>
+                        <div style={{fontSize:10,color:"#5a9a7a",marginBottom:2,textTransform:"uppercase"}}>{lbl}</div>
+                        <div style={{fontFamily:"'Playfair Display',serif",fontSize:32,fontWeight:900,color:col}}>{val}</div>
+                        {lbl!=="Temp."&&<div style={{fontSize:11,color:"#5a9a7a"}}>km/h</div>}
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{background:nvMax.bg,border:`2px solid ${nvMax.color}`,borderRadius:10,padding:"12px 16px",marginBottom:nvMax.acciones.length>0?10:0}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:nvMax.acciones.length>0?8:0}}>
+                      <span style={{fontSize:22}}>{nvMax.icon}</span>
+                      <div>
+                        <div style={{fontWeight:700,fontSize:14,color:nvMax.color}}>Nivel {nvMax.nivel} — {nvMax.label}</div>
+                        <div style={{fontSize:12,color:"#5a9a7a"}}>{nvMax.rango}</div>
+                      </div>
+                    </div>
+                    {nvMax.acciones.map((acc,i)=><div key={i} style={{fontSize:12,padding:"3px 8px",marginBottom:2,background:"rgba(0,0,0,0.1)",borderRadius:4}}><span style={{color:nvMax.color,marginRight:6}}>▶</span>{acc}</div>)}
+                    {nvMax.nivel===0&&<div style={{fontSize:12,color:"#22c55e"}}>✅ Operación normal. Sin restricciones.</div>}
+                    {nvMax.nivel>=1&&<button style={{...S.btn,marginTop:8,fontSize:11,padding:"4px 12px",background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}} onClick={()=>{setAlertaForm(p=>({...p,tipo:"meteorologica",descripcion:`Viento Nivel ${nvMax.nivel} — ${nvMax.label}: ${vientoData.velocidad} km/h (ráfaga ${vientoData.rafaga} km/h)`}));setShowNuevaAlerta(true);}}>🚨 Activar alerta</button>}
+                  </div>
+                </div>
+                <div style={{...S.card,padding:14,marginBottom:12}}>
+                  <div style={{fontSize:12,fontWeight:700,color:"#5a9a7a",marginBottom:8}}>📋 Tabla de niveles</div>
+                  {NIVELES_VIENTO.map(n=><div key={n.nivel} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",marginBottom:3,borderRadius:6,background:nvMax.nivel===n.nivel?n.bg:"rgba(255,255,255,0.02)",border:`1px solid ${nvMax.nivel===n.nivel?n.color+"50":"rgba(255,255,255,0.05)"}`}}>
+                    <span>{n.icon}</span>
+                    <div style={{flex:1}}>
+                      <span style={{fontSize:12,fontWeight:700,color:n.color}}>Nivel {n.nivel} — {n.label}</span>
+                      <span style={{fontSize:11,color:"#5a9a7a",marginLeft:8}}>{n.rango}</span>
+                    </div>
+                    {nvMax.nivel===n.nivel&&<span style={{fontSize:9,padding:"1px 7px",borderRadius:10,background:n.color,color:"#fff",fontWeight:700}}>ACTIVO</span>}
+                  </div>)}
+                </div>
+                {vientoPronostico.length>0&&(
+                  <div style={{...S.card,padding:14}}>
+                    <div style={{fontSize:12,fontWeight:700,color:"#5a9a7a",marginBottom:8}}>⏱️ Próximas horas</div>
+                    <div style={{display:"flex",gap:6,overflowX:"auto"}}>
+                      {vientoPronostico.map((h,i)=>{const nv2=getNivelViento(Math.max(h.velocidad,h.rafaga));return(
+                        <div key={i} style={{textAlign:"center",minWidth:54,padding:"7px 5px",borderRadius:7,background:nv2.bg,border:`1px solid ${nv2.color}30`,flexShrink:0}}>
+                          <div style={{fontSize:10,color:"#5a9a7a"}}>{h.hora}</div>
+                          <div style={{fontWeight:700,fontSize:13,color:nv2.color}}>{h.velocidad}</div>
+                          <div style={{fontSize:9,color:"#5a9a7a"}}>↑{h.rafaga}</div>
+                          <div style={{fontSize:10}}>{nv2.icon}</div>
+                        </div>
+                      );})}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* TAB: RESUELTAS */}
       {tabAlerta==="resueltas"&&(
         incResueltas.length===0?(
           <div style={{...S.card,padding:32,textAlign:"center",color:"#4a7a5a",fontSize:13}}>Sin incidencias resueltas aún</div>
         ):incResueltas.map(inc=>(
-          <div key={inc.id} style={{...S.card,marginBottom:8,padding:"12px 16px",opacity:0.8}}>
+          <div key={inc.id} style={{...S.card,marginBottom:8,padding:"12px 16px",opacity:0.85}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                <span>{inc.tipoIcon}</span>
+                <span style={{fontSize:16}}>{inc.tipoIcon}</span>
                 <div>
                   <div style={{fontSize:13,fontWeight:600}}>{inc.tipoLabel} — {inc.zonas?.join(", ")}</div>
                   <div style={{fontSize:11,color:"#5a9a7a"}}>{inc.fecha} → Resuelta: {inc.fechaResolucion||"—"}</div>
+                  <div style={{fontSize:11,color:"#4a7a5a",marginTop:2}}>{inc.descripcion}</div>
                 </div>
               </div>
-              <button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(96,165,250,0.1)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.3)"}}
-                onClick={()=>generarReporteAlerta(inc)}>📋 Reporte</button>
+              <button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(96,165,250,0.1)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.3)"}} onClick={()=>generarReporteAlerta(inc)}>📋 Imprimir ficha</button>
             </div>
           </div>
         ))
       )}
 
-      {/* NOTIFICACIONES DE REGISTROS */}
-      {tabAlerta==="notifs"&&(()=>{
-        const arr = (Array.isArray(notificaciones)?notificaciones:Object.values(notificaciones||{})).sort((a,b)=>(b.fecha+b.hora).localeCompare(a.fecha+a.hora));
-        return (<>
-          {notifNoLeidas.length>0&&<button onClick={marcarTodasLeidas} style={{...S.btn,fontSize:11,marginBottom:10,color:"#6aaa7a",border:"1px solid rgba(255,255,255,0.1)"}}>✓ Marcar todas leídas</button>}
-          {arr.length===0?<div style={{...S.card,padding:32,textAlign:"center",color:"#4a7a5a"}}>Sin registros aún</div>:
-          arr.map((n,i)=>{
-            const col=n.tipo==="bono_cancha"?"#fbbf24":n.tipo==="medicion"?"#34d399":"#60a5fa";
-            return <div key={n.id||i} style={{...S.card,marginBottom:6,padding:"10px 14px",background:n.leida?"transparent":"rgba(52,211,153,0.03)",border:`1px solid ${n.leida?"rgba(255,255,255,0.06)":`${col}25`}`,opacity:n.leida?0.7:1}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:13,fontWeight:n.leida?400:600,color:n.leida?"#5a9a7a":col}}>{n.titulo||n.mensaje}</div>
-                  {n.titulo&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:2}}>{n.mensaje}</div>}
+      {/* TAB: REGISTROS */}
+      {tabAlerta==="notifs"&&(
+        <div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#7aaa80"}}>🔔 Registros del sistema</div>
+            <div style={{display:"flex",gap:6}}>
+              {notifSorted.length>0&&<button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(96,165,250,0.1)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.2)"}} onClick={generarReporteRegistros}>📋 Imprimir registros</button>}
+              {notifArr.filter(n=>!n?.leida).length>0&&<button onClick={marcarTodasLeidas} style={{...S.btn,fontSize:11,color:"#6aaa7a",border:"1px solid rgba(255,255,255,0.1)"}}>✓ Marcar leídas</button>}
+            </div>
+          </div>
+          {notifSorted.length===0?(
+            <div style={{...S.card,padding:32,textAlign:"center",color:"#4a7a5a",fontSize:13}}>Sin registros del sistema aún</div>
+          ):notifSorted.map((notifN,i)=>{
+            const col=notifN.tipo==="bono_cancha"?"#fbbf24":notifN.tipo==="medicion"?"#34d399":notifN.tipo==="alerta"?"#f87171":"#60a5fa";
+            return (
+              <div key={notifN.id||i} style={{...S.card,marginBottom:6,padding:"10px 14px",background:notifN.leida?"transparent":"rgba(52,211,153,0.02)",border:`1px solid ${notifN.leida?"rgba(255,255,255,0.05)":`${col}25`}`}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:13,fontWeight:notifN.leida?400:600,color:notifN.leida?"#5a9a7a":col}}>{notifN.titulo||"Sin título"}</div>
+                    {notifN.mensaje&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:2}}>{notifN.mensaje}</div>}
+                  </div>
+                  <div style={{fontSize:10,color:"#4a7a5a",marginLeft:10,whiteSpace:"nowrap"}}>{notifN.fecha} {notifN.hora}</div>
                 </div>
-                <div style={{fontSize:10,color:"#4a7a5a",marginLeft:8,whiteSpace:"nowrap"}}>{n.fecha} {n.hora}</div>
               </div>
-            </div>;
+            );
           })}
-        </>);
-      })()}
+        </div>
+      )}
     </div>
   );
 }
 
-function ModalCierreSectorial({ S, MACROZONAS_BASE, personal, tareasProg, setTareasProg, crearNotificacion, onClose }) {
-  const hoyCS = fechaLocal();
-  const [csZonas, setCsZonas] = React.useState([]);
-  const [csMotivoTipo, setCsMotivoTipo] = React.useState("fitosanitario");
-  const [csProducto, setCsProducto] = React.useState("");
-  const [csFecha, setCsFecha] = React.useState(hoyCS);
-  const [csHora, setCsHora] = React.useState(new Date().toTimeString().slice(0,5));
-  const [csHorasCarencia, setCsHorasCarencia] = React.useState(48);
-  const [csFechaReap, setCsFechaReap] = React.useState("");
-  const [csObs, setCsObs] = React.useState("");
-  const [csResp, setCsResp] = React.useState("");
-  const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
-
-  React.useEffect(()=>{
-    if(csMotivoTipo==="fitosanitario"&&csHorasCarencia&&csFecha&&csHora){
-      const inicio = new Date(`${csFecha}T${csHora}:00`);
-      inicio.setHours(inicio.getHours()+Number(csHorasCarencia));
-      setCsFechaReap(inicio.toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit",year:"numeric"})+" "+inicio.toTimeString().slice(0,5));
-    } else {
-      setCsFechaReap("");
-    }
-  },[csMotivoTipo,csHorasCarencia,csFecha,csHora]);
-
-  const todasZonas = [...MACROZONAS_BASE].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
-
-  const MOTIVOS = [
-    {id:"fitosanitario", icon:"🧪", label:"Aplicación fitosanitaria", desc:"Fungicida, herbicida, insecticida"},
-    {id:"riego",         icon:"💧", label:"Riego profundo", desc:"Riego programado o emergencia"},
-    {id:"mantencion",    icon:"🔧", label:"Mantención / Reparación", desc:"Aireación, resiembra, obra civil"},
-    {id:"evento",        icon:"🏆", label:"Evento / Actividad", desc:"Torneo, acto, uso exclusivo"},
-    {id:"otro",          icon:"⚠️", label:"Otro motivo", desc:"Especificar manualmente"},
-  ];
-
-  const guardarCierre = () => {
-    if(!csZonas.length) return;
-    const mObj = MOTIVOS.find(m=>m.id===csMotivoTipo)||MOTIVOS[0];
-    const motivoLabel = `${mObj.icon} ${mObj.label}`;
-    const tarea = limpiarUndef({
-      id:Date.now()+Math.random(), fecha:csFecha,
-      zona:csZonas.join(", "), elemento:"",
-      tarea:`🚫 CIERRE: ${csZonas.join(", ")} — ${mObj.label}${csProducto?" ("+csProducto+")":""}`,
-      responsable:csResp||"", estado:csResp?"pendiente":"por_designar",
-      obs:`${motivoLabel}${csProducto?" — "+csProducto:""}. Reapertura: ${csFechaReap||"a confirmar"}. ${csObs}`.trim(),
-      motivoCierre:`${motivoLabel}${csProducto?" — "+csProducto:""}`,
-      reapertura:csFechaReap||"", tipoEvento:"cierre_sectorial",
-    });
-    setTareasProg(prev=>{
-      const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-      const lista=[tarea,...normArr(prev[csFecha]||[])];
-      fbUpdate(ref(db,`${ROOT}/prog`),{[csFecha]:lista.map(limpiarUndef)}).catch(e=>console.error(e));
-      return {...prev,[csFecha]:lista};
-    });
-    crearNotificacion?.("cierre",{
-      titulo:`🚫 Cierre sectorial: ${csZonas.join(", ")}`,
-      mensaje:`${motivoLabel}${csProducto?" — "+csProducto:""}. Reapertura: ${csFechaReap||"por confirmar"}.`,
-      fecha:csFecha,
-    });
-    onClose();
-  };
-
-  return (
-    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.7)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
-      <div style={{background:"#0f2417",border:"1px solid rgba(239,68,68,0.3)",borderRadius:14,padding:24,width:"100%",maxWidth:540,maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
-          <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color:"#fca5a5"}}>🚫 Cierre Sectorial</div>
-          <button onClick={onClose} style={{background:"transparent",border:"none",color:"#5a9a7a",fontSize:20,cursor:"pointer"}}>✕</button>
-        </div>
-
-        <div style={{marginBottom:16}}>
-          <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.5px"}}>1. Zonas afectadas</label>
-          <div style={{display:"flex",flexWrap:"wrap",gap:5,maxHeight:130,overflowY:"auto",padding:4}}>
-            {todasZonas.map(z=>(
-              <button key={z.id} onClick={()=>setCsZonas(p=>p.includes(z.nombre)?p.filter(x=>x!==z.nombre):[...p,z.nombre])}
-                style={{...S.btn,fontSize:11,padding:"3px 10px",
-                  background:csZonas.includes(z.nombre)?"rgba(239,68,68,0.2)":"rgba(255,255,255,0.04)",
-                  color:csZonas.includes(z.nombre)?"#fca5a5":"#7aaa80",
-                  border:`1px solid ${csZonas.includes(z.nombre)?"rgba(239,68,68,0.4)":"rgba(255,255,255,0.1)"}`}}>
-                {z.icono} {z.nombre}
-              </button>
-            ))}
-          </div>
-          {csZonas.length>0&&<div style={{fontSize:11,color:"#fca5a5",marginTop:4}}>Seleccionadas: {csZonas.join(", ")}</div>}
-        </div>
-
-        <div style={{marginBottom:16}}>
-          <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.5px"}}>2. Motivo del cierre</label>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
-            {MOTIVOS.map(csM=>(
-              <button key={csM.id} onClick={()=>setCsMotivoTipo(csM.id)}
-                style={{...S.btn,padding:"8px 12px",textAlign:"left",
-                  background:csMotivoTipo===csM.id?"rgba(239,68,68,0.15)":"rgba(255,255,255,0.03)",
-                  border:`1px solid ${csMotivoTipo===csM.id?"rgba(239,68,68,0.4)":"rgba(255,255,255,0.08)"}`,
-                  color:csMotivoTipo===csM.id?"#fca5a5":"#7aaa80"}}>
-                <div style={{fontSize:14}}>{csM.icon} {csM.label}</div>
-                <div style={{fontSize:10,color:"#5a9a7a",marginTop:2}}>{csM.desc}</div>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
-          <div>
-            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Fecha</label>
-            <input type="date" style={S.input} value={csFecha} onChange={e=>setCsFecha(e.target.value)}/>
-          </div>
-          <div>
-            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Hora</label>
-            <input type="time" style={S.input} value={csHora} onChange={e=>setCsHora(e.target.value)}/>
-          </div>
-          {csMotivoTipo==="fitosanitario"&&(<>
-            <div>
-              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Producto aplicado</label>
-              <input style={S.input} value={csProducto} onChange={e=>setCsProducto(e.target.value)} placeholder="ej: Daconil, Roundup..."/>
-            </div>
-            <div>
-              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Horas de carencia</label>
-              <select style={S.input} value={csHorasCarencia} onChange={e=>setCsHorasCarencia(e.target.value)}>
-                {[12,24,48,72,96,120,168].map(csH=><option key={csH} value={csH}>{csH}h ({csH>=48?`${csH/24} días`:`${csH} horas`})</option>)}
-              </select>
-            </div>
-            <div style={{gridColumn:"1/-1"}}>
-              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Reapertura estimada</label>
-              <input style={{...S.input,color:"#fbbf24",fontWeight:700}} value={csFechaReap} onChange={e=>setCsFechaReap(e.target.value)} placeholder="Se calcula automáticamente"/>
-            </div>
-          </>)}
-          {(csMotivoTipo==="evento"||csMotivoTipo==="mantencion")&&(
-            <div style={{gridColumn:"1/-1"}}>
-              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Descripción</label>
-              <input style={S.input} value={csProducto} onChange={e=>setCsProducto(e.target.value)} placeholder={csMotivoTipo==="evento"?"Nombre del evento...":"Tipo de mantención..."}/>
-            </div>
-          )}
-          <div style={{gridColumn:"1/-1"}}>
-            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Responsable</label>
-            <select style={S.input} value={csResp} onChange={e=>setCsResp(e.target.value)}>
-              <option value="">Sin asignar</option>
-              {personalArr.map(csP=><option key={csP.id} value={csP.nombre}>{csP.nombre}</option>)}
-            </select>
-          </div>
-          <div style={{gridColumn:"1/-1"}}>
-            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Observaciones</label>
-            <input style={S.input} value={csObs} onChange={e=>setCsObs(e.target.value)} placeholder="Notas adicionales..."/>
-          </div>
-        </div>
-
-        <div style={{display:"flex",gap:8}}>
-          <button className="btn-p" style={{...S.btn,flex:1,background:"rgba(239,68,68,0.2)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}}
-            disabled={!csZonas.length} onClick={guardarCierre}>
-            🚫 Registrar cierre
-          </button>
-          <button className="btn-g" style={S.btn} onClick={onClose}>Cancelar</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export default function App() {
-  const [zonas, setZonas] = useState(()=>MACROZONAS_BASE);
-  const [vista, setVista] = useState("dashboard");
-  const [zonaId, setZonaId] = useState(null);
-  const [tab, setTab] = useState("elementos");
-  const [filtroCat, setFiltroCat] = useState("Todas");
-  const [macrozonasCust, setMacrozonasCust] = useState([]);
-  // Combinar zonas base con personalizadas — debe ir después de ambos estados
-  const zonasConCust = React.useMemo(()=>[...zonas,...macrozonasCust],[zonas,macrozonasCust]);
-  const [showNuevaMacrozona, setShowNuevaMacrozona] = useState(false);
-  const [nuevaMacrozona, setNuevaMacrozona] = useState(()=>({nombre:"",categoria:"Calles y Accesos",icono:"🌿",descripcion:""}));
-  const [filtroEst, setFiltroEst] = useState("Todos");
-  const [busq, setBusq] = useState("");
-  const [showAddElem, setShowAddElem] = useState(false);
-  const [newElem, setNewElem] = useState(()=>({ nombre:"", tipo:"arboles" }));
-  const [nuevaTarea, setNuevaTarea] = useState("");
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiText, setAiText] = useState("");
-  const [editElem, setEditElem] = useState(null);
-  const [showPlantacionForm, setShowPlantacionForm] = useState(null);
-
-  const ejecutarDescuentoStock = (descuentos) => {
-    if(!descuentos||!descuentos.length) return;
-    const nuevoBodegasData = {...bodegasData};
-    descuentos.forEach(({bodegaId, itemId, cantidad, nombre, unidad, fecha})=>{
-      const bd = nuevoBodegasData[bodegaId]||{items:[],movimientos:[]};
-      const items = (bd.items||[]).map(i=>String(i.id)===String(itemId)?{...i,stockActual:Math.max(0,(Number(i.stockActual)||0)-Number(cantidad))}:i);
-      const movimientos = [{id:Date.now()+Math.random(),fecha:fecha||new Date().toISOString().slice(0,10),tipo:"salida",cantidad:Number(cantidad),unidad:unidad||"unidad",motivo:"Tarea completada — uso en macrozona",itemId:String(itemId),itemNombre:nombre},...(bd.movimientos||[])].slice(0,200);
-      nuevoBodegasData[bodegaId] = {...bd,items,movimientos};
-    });
-    setBodegasData(nuevoBodegasData);
-  };
-  const [fechaReporte, setFechaReporte] = useState(new Date().toISOString().slice(0,10));
-  const [tabReporte, setTabReporte] = useState("general");
-  const [semanaBase, setSemanaBase] = useState(()=>{
-    const dSem = new Date(); const day = dSem.getDay(); const diff = (day===0?-6:1-day);
-    dSem.setDate(dSem.getDate()+diff); return dSem.toISOString().slice(0,10);
-  });
-
-  // ─── AUTENTICACIÓN FIREBASE ──────────────────────────────────────────────────
-  const [fbUser,    setFbUser]    = useState(null);
-  // Worker states — deben declararse antes de los useEffects que los usan
-  const [vistaWorker,    setVistaWorker]    = useState(false);
-  const [workerARevisar, setWorkerARevisar] = useState(null); // id del trabajador que la jefa está revisando
-  const [showCierreSectorial, setShowCierreSectorial] = useState(false);
-  const [workerLogueado, setWorkerLogueado] = useState(null);
-  const [workerPinError, setWorkerPinError] = useState(false);
-  const [workerPinInput, setWorkerPinInput] = useState("");
-  const [rolSeleccionado, setRolSeleccionado] = useState("trabajador");
-  const [fbRol,     setFbRol]     = useState(null);
-  const [authReady, setAuthReady] = useState(false);
-  const [loginEmail, setLoginEmail] = useState("");
-  const [loginPass,  setLoginPass]  = useState("");
-  const [loginError, setLoginError] = useState("");
-  const [loginLoading, setLoginLoading] = useState(false);
-
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
-      setFbUser(user);
-      const rol = user ? getRolByEmail(user.email) : null;
-      setFbRol(rol);
-      setAuthReady(true);
-      // Si es trabajador, auto-activar vistaWorker con su id de personal
-      if(user && rol==="trabajador") {
-        // Buscar en personalArr por email (se carga después, usar setTimeout)
-        setTimeout(()=>{
-          setVistaWorker(true);
-        }, 500);
-      } else {
-        setVistaWorker(false);
-        setWorkerLogueado(null);
-      }
-    });
-    return () => unsub();
-  }, []);
-
-
-
-  const handleLogin = async (e) => {
-    e && e.preventDefault();
-    setLoginError(""); setLoginLoading(true);
-    try {
-      await signInWithEmailAndPassword(auth, loginEmail.trim(), loginPass);
-    } catch(err) {
-      setLoginError("Email o contraseña incorrectos.");
-    } finally { setLoginLoading(false); }
-  };
-
-  const handleLogout = () => signOut(auth);
-  const CUENTAS_DEFAULT = ["Rama Golf","Mantenimiento Jardines","Obras","Insumos Generales","Maquinaria y Equipos","Fitosanitarios","Semillas y Plantas","Uniformes y EPP"];
-  const [data,           setData,           dataReady]     = useFirebaseState("data",           initData());
-  const [personal, setPersonal, personalReady] = useFirebaseState("personal", PERSONAL_INICIAL);
-  const [tareasProg,     setTareasProg,     progReady]     = useFirebaseState("prog",           {});
-  const [aplicaciones,   setAplicaciones,   aplReady]      = useFirebaseState("fungicidas",     []);
-  const [incidenciasFito,setIncidenciasFito,incidReady]    = useFirebaseState("fung-incid",     []);
-  const [comprasData,    setComprasData,    comprasReady]  = useFirebaseState("compras",  {compras:[],cuentas:CUENTAS_DEFAULT});
-  const [bodegasData,    setBodegasData,    bodegasReady]  = useFirebaseState("bodegas",  {});
-  const [golfData,       setGolfData,       golfReady]     = useFirebaseState("golf", {greens:{},tees:{},arboles:[],eventos:[],mediciones:[]});
-  const [bonosConfig,    setBonosConfig,    bonosReady]    = useFirebaseState("bonos-config", {
-    pctFondo:50, pctEjecutor:50, pctAyudante:30, pctApoyo:20, año:new Date().getFullYear()
-  });
-  const [bonosMasivos,   setBonosMasivos,   bonosMasReady] = useFirebaseState("bonos-masivos", []);
-  const [rendicionesRRHH, setRendicionesRRHH] = useFirebaseState("rendiciones-rrhh", []);
-  const [notificaciones, setNotificaciones]   = useFirebaseState("notificaciones", []);
-  const [incidencias, setIncidencias]         = useFirebaseState("incidencias", []);
-  const [cierresTurno,  setCierresTurno]     = useFirebaseState("cierresTurno",   {});
-
-  const appReady = dataReady && personalReady && progReady;
-  const [golfInitTab, setGolfInitTab] = React.useState(null);
-  const [bonoPrefill, setBonoPrefill] = React.useState(null);
-
-  // ── Helper: registrar notificación en Firebase ───────────────────────
-  const crearNotificacion = React.useCallback((tipo, datos) => {
-    const nueva = {
-      id: Date.now() + Math.random(),
-      tipo,
-      fecha: new Date().toISOString().slice(0,10),
-      hora:  new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"}),
-      leida: false,
-      ...datos,
-    };
-    setNotificaciones(prev => {
-      const arr = Array.isArray(prev) ? prev : Object.values(prev||{});
-      return [nueva, ...arr].slice(0, 100);
-    });
-  }, [setNotificaciones]);
-
-  // Notificaciones no leídas para la jefa
-  const notifNoLeidas = React.useMemo(() => {
-    const arr = Array.isArray(notificaciones) ? notificaciones : Object.values(notificaciones||{});
-    return arr.filter(n => !n.leida);
-  }, [notificaciones]);
-
-  // Detección automática y centralizada: bono especializado por limpieza de Cancha de Fútbol Sintética.
-  // Vigila tareasProg completo (sin importar desde qué pantalla se haya cambiado el estado).
-  // Marca la tarea con bonoCanchaNotificado:true en Firebase para que la marca persista entre recargas.
-  React.useEffect(()=>{
-    if(!progReady) return;
-    const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-    Object.entries(tareasProg).forEach(([fecha, tareasDelDia])=>{
-      const lista = normArr(tareasDelDia);
-      let huboCambios = false;
-      const listaActualizada = lista.map(t=>{
-        if(!t || !t.id) return t;
-        const yaCompletada = t.estado==="hecha"||t.estado==="completada";
-        if(!yaCompletada) return t;
-        if(t.bonoCanchaNotificado) return t; // ya procesado anteriormente (persistido en Firebase)
-        const tNom=(t.tarea||"").toLowerCase();
-        const tZona=(t.zona||"").toLowerCase();
-        const tElem=(t.elemento||"").toLowerCase();
-        const esCanchaSint = tZona.includes("fútbol sintétic")||tZona.includes("futbol sintetic")||(tZona.includes("cancha")&&tZona.includes("sintétic"))||tElem.includes("césped sintético")||tElem.includes("cesped sintetico")||tElem.includes("alfombra");
-        const esLimpieza = tNom.includes("limpie")||tNom.includes("sopla")||tNom.includes("barrid")||tNom.includes("cepill")||tNom.includes("aspirad")||tNom.includes("escobill");
-        if(esCanchaSint && esLimpieza){
-          crearNotificacion("bono_cancha",{
-            titulo:"🎖️ Bono especializado disponible",
-            mensaje:`${t.responsable||"Trabajador"} completó limpieza de la Cancha de Fútbol Sintética (alfombra) — generar bono especializado`,
-            trabajadorNombre:t.responsable||"",
-            tareaFecha:fecha,
-            descripcionBono:`Limpieza profunda césped sintético — Cancha de Fútbol — ${fecha}`,
-          });
-        }
-        huboCambios = true;
-        return {...t, bonoCanchaNotificado:true};
-      });
-      if(huboCambios){
-        fbUpdate(ref(db, `${ROOT}/prog`), {[fecha]: listaActualizada}).catch(e=>console.error("Error marcando bonoCanchaNotificado:", e));
-      }
-    });
-  }, [tareasProg, progReady, crearNotificacion]);
-
-  const marcarTodasLeidas = () => {
-    const arr = Array.isArray(notificaciones) ? notificaciones : Object.values(notificaciones||{});
-    setNotificaciones(arr.map(n => ({...n, leida:true})));
-  };
-
-  // Migración: cargar frecuencias de Golf en elementos de MACROZONAS_BASE (greens individuales etc.)
-  useEffect(()=>{
-    if(!dataReady) return;
-    const zid = "31"; // Golf
-    const zdat = data[zid];
-    if(!zdat) return;
-    // Frecuencias base de Golf extraídas de ProgramacionGolf — modo "diasSemana" con días mínimos
-    const FRECS_GOLF_BASE = {
-      // Greens individuales — comparten las mismas frecuencias globales de greens
-      "green_g1": [
-        {id:"green_g1_corte",     modo:"diasSemana", tarea:"Corte de green",           diasMinimos:"3", diasSemana:[], diasProhibidos:[0,6], ultimaVez:"2026-06-17", obs:"Cambiar dirección de corte. Registrar altura de corte."},
-        {id:"green_g1_fertil",    modo:"diasSemana", tarea:"Fertilización",             diasMinimos:"14",diasSemana:[], diasProhibidos:[0,6], ultimaVez:"2026-06-17", obs:"Alternar Novatec Premium / Salitre K según etapa"},
-        {id:"green_g1_plagas",    modo:"estacion",   tarea:"Revisión plagas y enfermedades", verano:"semanal", otono:"semanal", invierno:"semanal", primavera:"semanal", ultimaVez:"2026-06-19", obs:"Si se detecta: generar tarea de control inmediata"},
-        {id:"green_g1_desmaz",    modo:"estacion",   tarea:"Desmalezado bordes",        verano:"semanal", otono:"semanal", invierno:"semanal", primavera:"semanal", ultimaVez:"2026-06-19", obs:"Límites del borde con placa larga"},
-        {id:"green_g1_vert",      modo:"diasSemana", tarea:"Verticorte / Groomer fuerte",diasMinimos:"25",diasSemana:[], diasProhibidos:[0,6], ultimaVez:"2026-05-28", obs:"Pasar groomer fuerte con corte"},
-        {id:"green_g1_aire_ch",   modo:"estacion",   tarea:"Aireación púas chicas",     verano:"noaplica",otono:"unavez",invierno:"noaplica",primavera:"unavez", ultimaVez:"2026-03-16", obs:"2 veces/año: marzo y ago-sep. Con riego y fertilización."},
-        {id:"green_g1_aire_gr",   modo:"estacion",   tarea:"Aireación sacabocados grandes",verano:"noaplica",otono:"unavez",invierno:"noaplica",primavera:"noaplica",ultimaVez:"2026-04-13",obs:"1 vez/año: abril. Con fertilización y riego."},
-      ],
-      "green_vivero": [
-        {id:"vivero_corte",  modo:"diasSemana", tarea:"Corte de Vivero",    diasMinimos:"3", diasSemana:[], diasProhibidos:[0,6], ultimaVez:"2026-06-17", obs:"Mismo ciclo que greens"},
-        {id:"vivero_fertil", modo:"diasSemana", tarea:"Fertilización",      diasMinimos:"14",diasSemana:[], diasProhibidos:[0,6], ultimaVez:"2026-06-17", obs:"Alternar Novatec Premium / Salitre K"},
-        {id:"vivero_riego",  modo:"estacion",   tarea:"Riego",             verano:"diario",otono:"cada3dias",invierno:"semanal",primavera:"cada3dias",ultimaVez:"", obs:""},
-      ],
-      "e1": [ // Fairways
-        {id:"e1_corte",    modo:"diasSemana", tarea:"Corte de Fairways",      diasMinimos:"10",diasSemana:[], diasProhibidos:[0,6], ultimaVez:"2026-06-12", obs:"1,75cm"},
-        {id:"e1_fertil",   modo:"diasSemana", tarea:"Fertilización Fairways", diasMinimos:"45",diasSemana:[], diasProhibidos:[0,6], ultimaVez:"2026-04-14", obs:"Salitre Potásico después del corte"},
-        {id:"e1_plagas",   modo:"estacion",   tarea:"Revisión plagas y enfermedades",verano:"quincenal",otono:"quincenal",invierno:"quincenal",primavera:"quincenal",ultimaVez:"2026-06-10",obs:"Si se detecta: generar tarea de control inmediata"},
-        {id:"e1_aireacion",modo:"diasSemana", tarea:"Aireación sacabocados grandes",diasMinimos:"180",diasSemana:[],diasProhibidos:[0,6],ultimaVez:"2026-03-16",obs:"2 veces/año: marzo y septiembre. Con riego."},
-      ],
-      "antegreen_golf": [
-        {id:"ag_corte",  modo:"diasSemana", tarea:"Corte de Antegreens",     diasMinimos:"16",diasSemana:[], diasProhibidos:[0,6], ultimaVez:"2026-06-12", obs:"a 1cm, usar helicoidal"},
-        {id:"ag_orill",  modo:"diasSemana", tarea:"Orillado Antegreens",     diasMinimos:"17",diasSemana:[], diasProhibidos:[0,6], ultimaVez:"2026-05-27", obs:"1,5-2,5cm con orilladora"},
-        {id:"ag_desmaz", modo:"diasSemana", tarea:"Desmalezado bordes Antegreens",diasMinimos:"21",diasSemana:[],diasProhibidos:[0,6],ultimaVez:"2026-05-28",obs:"Manualmente"},
-      ],
-      "lomas_golf": [
-        {id:"lomas_corte",modo:"diasSemana",tarea:"Corte de Lomas",diasMinimos:"20",diasSemana:[],diasProhibidos:[0,6],ultimaVez:"2026-06-12",obs:"Con flotante, nivel más bajo"},
-      ],
-      "macizos_golf": [
-        {id:"mac_orill", modo:"diasSemana",tarea:"Orillado / perfilado macizos",diasMinimos:"21",diasSemana:[],diasProhibidos:[0,6],ultimaVez:"2026-06-12",obs:"Proteger troncos. Solo antes 12:00hrs"},
-      ],
-      "e8": [ // Sistema de riego
-        {id:"e8_riego_g",modo:"estacion",tarea:"Revisión sistema riego Greens",verano:"quincenal",otono:"quincenal",invierno:"quincenal",primavera:"quincenal",ultimaVez:"2026-06-06",obs:"Controlador C09 — verificar señal, programas, porcentajes"},
-        {id:"e8_riego_c",modo:"estacion",tarea:"Revisión sistema riego Cancha",verano:"quincenal",otono:"quincenal",invierno:"quincenal",primavera:"quincenal",ultimaVez:"2026-06-05",obs:"Controlador C10 — verificar señal, alcances, boquillas"},
-      ],
-    };
-    // Copiar las mismas frecuencias de green_g1 a los greens g2-g9
-    ["green_g2","green_g3","green_g4","green_g5","green_g6","green_g7","green_g8","green_g9"].forEach((gid,i)=>{
-      FRECS_GOLF_BASE[gid] = FRECS_GOLF_BASE["green_g1"].map(f=>({...f, id:f.id.replace("green_g1", gid)}));
-    });
-    // Verificar cuáles elementos ya tienen frecuencias cargadas para no sobreescribir
-    let necesitaActualizar = false;
-    const nuevosElem = {...(zdat.elementos||{})};
-    Object.entries(FRECS_GOLF_BASE).forEach(([eid, frecs])=>{
-      if(!nuevosElem[eid]?.frecuencias || nuevosElem[eid].frecuencias.length===0){
-        nuevosElem[eid] = {estado:"bueno", notas:"", ...(nuevosElem[eid]||{}), frecuencias: frecs};
-        necesitaActualizar = true;
-      }
-    });
-    if(necesitaActualizar){
-      fbUpdate(ref(db, `${ROOT}/data`), {[zid]: {...zdat, elementos: nuevosElem}})
-        .catch(e=>console.error("Error migrando frecuencias Golf:", e));
-    }
-  // eslint-disable-next-line
-  },[dataReady]);
-
-  // Migración: corregir tareas con responsable asignado pero estado "por_designar"
-  useEffect(()=>{
-    if(!progReady) return;
-    let hayCorreccion = false;
-    const nuevoProg = {};
-    Object.entries(tareasProg).forEach(([fecha, tareas])=>{
-      if(!Array.isArray(tareas)) { nuevoProg[fecha] = tareas; return; }
-      nuevoProg[fecha] = tareas.map(t=>{
-        if(!t || t.zona==="Golf") return t; // Golf no participa en migración
-        if(t.estado==="por_designar" && t.responsable && t.responsable.trim()!=="") {
-          hayCorreccion = true;
-          return {...t, estado:"pendiente"};
-        }
-        return t;
-      });
-    });
-    if(hayCorreccion) setTareasProg(nuevoProg);
-  }, [progReady]);
-
-  // Cuando personal carga y el rol es trabajador, setear workerLogueado por email
-  useEffect(()=>{
-    if(fbRol==="trabajador" && fbUser) {
-      const arr = Array.isArray(personal)?personal:Object.values(personal||{});
-      if(arr.length>0){
-        const fbP = arr.find(x=>x.email?.toLowerCase()===fbUser.email?.toLowerCase());
-        if(fbP){
-          setWorkerLogueado(fbP.id);
-          setVistaWorker(true);
-          setVista("miturno");
-        }
-      }
-    }
-  }, [fbRol, fbUser, personal]);
-
-  // PINes siguen en localStorage (son locales por dispositivo)
-  const getPines    = () => { try { return JSON.parse(localStorage.getItem("ev2-pines")||"{}"); } catch { return {}; } };
-  const setPinRol   = (rol, pin) => { const p=getPines(); p[rol]=pin; localStorage.setItem("ev2-pines", JSON.stringify(p)); };
-  const [personalVista, setPersonalVista] = useState("lista");
-  const [personalId, setPersonalId] = useState(null);
-  const [personalTab, setPersonalTab] = useState("ficha");
-  const [showNuevoEvento, setShowNuevoEvento] = useState(false);
-  const [nuevoEvento, setNuevoEvento] = useState({ tipo:"permiso", fecha:"", fechaFin:"", horas:"", descripcion:"", estado:"pendiente" });
-  const [nuevoTrabajador, setNuevoTrabajador] = useState({ nombre:"", rut:"", cargo:"", zona:"", telefono:"", email:"", fechaIngreso:"", contrato:"indefinido", foto:"", pin:"" });
-  // [worker states moved up]
-  const rolLogueado = fbRol;
-  const esJefa = fbRol === "jefa";
-  const esSupervisor = fbRol === "supervisor";
-  const esTrabajador = fbRol === "trabajador";
-
-  // Trabajador siempre va a Mi Turno
-  useEffect(()=>{
-    if(esTrabajador && vista!=="miturno") setVista("miturno");
-  },[esTrabajador]);
-
-  // ─── FUNGICIDAS ──────────────────────────────────────────────────────────────
-  const checkPin = (rol, pin) => { const p=getPines(); return p[rol] && String(p[rol])===String(pin); };
-
-  // updateZona — actualiza una zona en el estado data
-
-  const updateZona = (id, patch) => setData(p => ({ ...p, [String(id)]: { ...p[String(id)], ...patch } }));
-  const addHistorial = (id, txt) => setData(p => ({
-    ...p, [String(id)]: { ...p[String(id)], historial: [{ txt, fecha: new Date().toLocaleDateString("es-CL"), hora: new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"}) }, ...(p[id]?.historial||[])].slice(0,30) }
-  }));
-
-  const getZD = (zid) => data[String(zid)] ?? { estadoGeneral:"bueno", ultimoMant:"", proximoMant:"", notas:"", elementos:{}, elementosCustom:[], tareas:[], historial:[] };
-  const getElemFrecs = (zid, eid, tipo, isCustom) => {
-    const zdat = getZD(zid);
-    if (isCustom) { const ce=(zdat.elementosCustom||[]).find(e=>e.id===eid); if(ce?.frecuencias) return ce.frecuencias; }
-    else { if(zdat.elementos?.[eid]?.frecuencias) return zdat.elementos[eid].frecuencias; }
-    return TAREAS_DEFAULT[tipo] ? TAREAS_DEFAULT[tipo].map(t=>({...t,id:eid+"_"+t.tarea})) : [];
-  };
-  const setElemFrecs = (zid, eid, isCustom, frecuencias) => {
-    if(isCustom){const arr=[...(data[zid]?.elementosCustom||[])];const i=arr.findIndex(e=>e.id===eid);if(i>=0){arr[i]={...arr[i],frecuencias};setData(p=>({...p,[zid]:{...p[zid],elementosCustom:arr}}));}}
-    else{setData(p=>({...p,[zid]:{...p[zid],elementos:{...p[zid]?.elementos,[eid]:{...(p[zid]?.elementos?.[eid]||{}),frecuencias}}}}));}
-  };
-
-  const zona = zonasConCust.find(z=>String(z.id)===String(zonaId));
-  const zd = zonaId ? getZD(zonaId) : null;
-
-  const getAllElems = (zid) => {
-    const zidS = String(zid);
-    const zonaZ = zonas.find(x=>String(x.id)===zidS);
-    const zdat = getZD(zidS);
-    const base = (zonaZ?.elementos||[]).map(e=>({...e,isCustom:false,edData:zdat.elementos?.[e.id]||{estado:"bueno",notas:""}}));
-    const custom = (zdat.elementosCustom||[]).map(e=>({...e,isCustom:true,edData:{estado:e.estado||"bueno",notas:e.notas||""}}));
-    return [...base,...custom].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
-  };
-
-  const todasLasZonas = [...MACROZONAS_BASE, ...macrozonasCust];
-  const filteredZonas = todasLasZonas.filter(z=>{
-    const matchC=filtroCat==="Todas"||z.categoria===filtroCat;
-    const matchE=filtroEst==="Todos"||getZD(z.id).estadoGeneral===filtroEst;
-    const filtQ=(busq||"").trim().toLowerCase();
-    const matchB=!filtQ||
-      z.nombre.toLowerCase().includes(filtQ)||
-      z.categoria.toLowerCase().includes(filtQ)||
-      (z.descripcion||"").toLowerCase().includes(filtQ);
-    return matchC&&matchE&&matchB;
-  }).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
-
-  const stats = {
-    total: MACROZONAS_BASE.length,
-    bueno: MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral==="bueno").length,
-    regular: MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral==="regular").length,
-    critico: MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral==="critico").length,
-    mantenimiento: MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral==="mantenimiento").length,
-  };
-  const totalElems = MACROZONAS_BASE.reduce((a,z)=>a+getAllElems(z.id).length,0);
-  const elemsOk = MACROZONAS_BASE.reduce((a,z)=>a+getAllElems(z.id).filter(e=>e.edData.estado==="bueno").length,0);
-
-  const addTareaZona = (zid, texto, tareaObj) => {
-    if(!texto.trim()) return;
-    const nuevaTareaZona = tareaObj || { id:Date.now(), texto, completada:false, fecha:new Date().toLocaleDateString("es-CL"), enviadaProg:true };
-    updateZona(zid, { tareas: [...(getZD(zid).tareas||[]), nuevaTareaZona] });
-    addHistorial(zid, `Tarea añadida: ${texto}`);
-    // 2. Agregar a programación diaria como tarea pendiente (hoy)
-    const hoy = fechaLocal();
-    const zona = zonasConCust.find(z=>String(z.id)===String(zid));
-    const nuevaProg = {
-      id: Date.now() + Math.random(),
-      fecha: hoy,
-      zona: zona?.nombre || "",
-      elemento: "",
-      tarea: texto,
-      responsable: "",
-      estado: "por_designar",
-      notas: "",
-      auto: false,
-      origenZona: true,
-    };
-    setTareasProg(prev => ({ ...prev, [hoy]: [...(prev[hoy]||[]), nuevaProg] }));
-  };
-  const toggleTareaZona = (zid, tid) => { const arr=(getZD(zid).tareas||[]).map(t=>t.id===tid?{...t,completada:!t.completada}:t); updateZona(zid,{tareas:arr}); };
-
-  const setElemEstado = (zid,eid,isCustom,estado) => {
-    if(isCustom){const arr=[...(data[zid].elementosCustom||[])];const i=arr.findIndex(e=>e.id===eid);if(i>=0){arr[i]={...arr[i],estado};updateZona(zid,{elementosCustom:arr});}}
-    else{updateZona(zid,{elementos:{...data[zid]?.elementos,[eid]:{...data[zid]?.elementos?.[eid],estado}}});}
-    addHistorial(zid,`Estado "${getElemNombre(zid,eid,isCustom)}" → ${ESTADOS_ELEM[estado]?.label}`);
-  };
-  const setElemNotas = (zid,eid,isCustom,notas) => {
-    if(isCustom){const arr=[...(data[zid].elementosCustom||[])];const i=arr.findIndex(e=>e.id===eid);if(i>=0){arr[i]={...arr[i],notas};updateZona(zid,{elementosCustom:arr});}}
-    else{updateZona(zid,{elementos:{...data[zid]?.elementos,[eid]:{...data[zid]?.elementos?.[eid],notas}}});}
-  };
-  const getElemNombre = (zid,eid,isCustom) => {
-    if(isCustom) return (data[zid]?.elementosCustom||[]).find(e=>e.id===eid)?.nombre||"";
-    return zonasConCust.find(z=>String(z.id)===String(zid))?.elementos.find(e=>e.id===eid)?.nombre||"";
-  };
-  const addCustomElem = (zid,elem) => { const id="c"+Date.now(); const arr=[...(data[String(zid)]?.elementosCustom||[]),{...elem,id,estado:"bueno",notas:""}]; updateZona(zid,{elementosCustom:arr}); addHistorial(zid,`Elemento agregado: ${elem.nombre}`); };
-  const removeCustomElem = (zid,eid) => { const arr=(data[zid]?.elementosCustom||[]).filter(e=>e.id!==eid); updateZona(zid,{elementosCustom:arr}); };
-  const removeBaseElem = (zid,eid) => { setZonas(prev=>prev.map(z=>String(z.id)===String(zid)?{...z,elementos:z.elementos.filter(e=>e.id!==eid)}:z)); const elems={...data[String(zid)]?.elementos}; delete elems[eid]; updateZona(zid,{elementos:elems}); addHistorial(zid,`Elemento eliminado`); };
-
-  const addTrabajador = (t) => { const id=Date.now(); setPersonal(p=>[...(Array.isArray(p)?p:Object.values(p||{})),{...t,id,eventos:[]}]); };
-  const updateTrabajador = (id,patch) => setPersonal(p=>(Array.isArray(p)?p:Object.values(p||{})).map(t=>t.id===id?{...t,...patch}:t));
-  const deleteTrabajador = (id) => setPersonal(p=>(Array.isArray(p)?p:Object.values(p||{})).filter(t=>t.id!==id));
-  const addEvento = (tid,ev) => setPersonal(p=>(Array.isArray(p)?p:Object.values(p||{})).map(t=>t.id===tid?{...t,eventos:[...(t.eventos||[]),{...ev,id:Date.now()}]}:t));
-  const deleteEvento = (tid,eid) => setPersonal(p=>(Array.isArray(p)?p:Object.values(p||{})).map(t=>t.id===tid?{...t,eventos:(t.eventos||[]).filter(e=>e.id!==eid)}:t));
-  const getTrabajador = (id) => personal.find(t=>t.id===id);
-
-  const getSugerenciaAI = async () => {
-    if(!zona) return;
-    setAiLoading(true); setAiText("");
-    const elems=getAllElems(zona.id).map(e=>`${e.nombre} (${ESTADOS_ELEM[e.edData.estado]?.label||"Bueno"})`).join(", ");
-    const prompt=`Eres experto en mantenimiento de parques y jardines de un club español en Chile. Analiza la macrozona "${zona.nombre}" con estos elementos: ${elems}. Estado general: ${ESTADOS_ZONA[zd?.estadoGeneral]?.label}. Notas: ${zd?.notas||"Ninguna"}. Da recomendaciones específicas de mantenimiento para cada elemento en estado regular o crítico, y un plan de acción priorizado. Responde en español con viñetas y secciones claras.`;
-    try {
-      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":"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","anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:prompt}]})});
-      const json=await res.json();
-      setAiText(json.content?.[0]?.text||"Sin respuesta.");
-    } catch { setAiText("Error al conectar con el asistente IA."); }
-    setAiLoading(false);
-  };
-
-  const S = {
-    app: { fontFamily:"'Georgia',serif", minHeight:"100vh", background:"linear-gradient(150deg,#0a1f10 0%,#122d1a 50%,#0d2414 100%)", color:"#ede9e0" },
-    header: { background:"rgba(0,0,0,0.45)", borderBottom:"1px solid rgba(160,200,140,0.15)" },
-    headerTop: { maxWidth:1600, margin:"0 auto", display:"flex", alignItems:"center", padding:"10px 20px", gap:10 },
-    headerNav: { background:"rgba(0,0,0,0.3)", borderTop:"1px solid rgba(160,200,140,0.08)", display:"flex", overflowX:"auto", padding:"0 8px", gap:2, scrollbarWidth:"none" },
-    logo: { display:"flex", alignItems:"center", gap:10, flex:1 },
-    logoCircle: { width:34, height:34, borderRadius:"50%", background:"linear-gradient(135deg,#3d7a52,#1e4d30)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, flexShrink:0 },
-    logoTitle: { fontFamily:"'Playfair Display',serif", fontSize:16, fontWeight:700 },
-    logoSub: { fontSize:9, color:"#6aaa7a", letterSpacing:"1.5px", textTransform:"uppercase" },
-    nav: { display:"flex", gap:2 },
-    main: { maxWidth:1600, margin:"0 auto", padding:"20px 20px" },
-    card: { background:"rgba(255,255,255,0.055)", border:"1px solid rgba(255,255,255,0.10)", borderRadius:14 },
-    btn: { cursor:"pointer", border:"none", borderRadius:8, padding:"8px 18px", fontFamily:"'Georgia',serif", fontSize:14, transition:"all .15s" },
-    chip: { display:"inline-flex", alignItems:"center", gap:4, padding:"3px 10px", borderRadius:20, fontSize:12, fontFamily:"'Georgia',serif" },
-    input: { background:"rgba(255,255,255,0.07)", border:"1px solid rgba(255,255,255,0.14)", borderRadius:8, color:"#ede9e0", padding:"8px 12px", fontFamily:"'Georgia',serif", fontSize:14, width:"100%", outline:"none" },
-  };
-
-  const ESTADOS_ZONA = {
-    bueno: { label:"Bueno", color:"#22c55e", bg:"rgba(34,197,94,0.12)" },
-    regular: { label:"Regular", color:"#f59e0b", bg:"rgba(245,158,11,0.12)" },
-    critico: { label:"Crítico", color:"#ef4444", bg:"rgba(239,68,68,0.12)" },
-    mantenimiento: { label:"En Mantenimiento", color:"#3b82f6", bg:"rgba(59,130,246,0.12)" },
-  };
-
-  const renderElemCard = (e) => {
-    const est = ESTADOS_ELEM[e.edData.estado||"bueno"];
-    const abierto = editElem?.eid===e.id;
-    const frecs = getElemFrecs(zonaId,e.id,e.tipo,e.isCustom);
-    const mesAct = new Date().getMonth()+1;
-    const estacion = [12,1,2].includes(mesAct)?"verano":[3,4,5].includes(mesAct)?"otono":[6,7,8].includes(mesAct)?"invierno":"primavera";
-    const tareasActivas = frecs.filter(f=>f[estacion]&&f[estacion]!=="noaplica");
-    const catMeta = CATEGORIAS_ELEM[e.tipo]||{icon:"🌿",label:e.tipo};
-
-    return (
-      <div key={e.id} style={{
-        background: abierto?"rgba(61,122,82,0.08)":"rgba(255,255,255,0.025)",
-        border:`1px solid ${abierto?"rgba(61,122,82,0.35)":"rgba(255,255,255,0.08)"}`,
-        borderRadius:12,
-        overflow:"hidden",
-        transition:"all .2s",
-        marginBottom:8,
-      }}>
-        {/* Cabecera del elemento — siempre visible */}
-        <div style={{
-          display:"flex",alignItems:"center",gap:10,padding:"10px 14px",
-          cursor:"pointer",userSelect:"none",
-        }} onClick={()=>setEditElem(abierto?null:{zid:zonaId,eid:e.id,isCustom:e.isCustom})}>
-          <span style={{fontSize:20,flexShrink:0}}>{catMeta.icon}</span>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-              <span style={{fontSize:14,fontWeight:600,color:"#ede9e0"}}>{e.nombre}</span>
-              <span style={{fontSize:10,color:"#5a9a7a",background:"rgba(255,255,255,0.05)",padding:"1px 7px",borderRadius:10,border:"1px solid rgba(255,255,255,0.08)"}}>{catMeta.label}</span>
-            </div>
-            {e.edData.notas&&!abierto&&(
-              <div style={{fontSize:11,color:"#5a8a6a",fontStyle:"italic",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:300}}>{e.edData.notas}</div>
-            )}
-            {tareasActivas.length>0&&!abierto&&(
-              <div style={{display:"flex",gap:4,marginTop:4,flexWrap:"wrap"}}>
-                {tareasActivas.slice(0,3).map(f=>(
-                  <span key={f.tarea||f.id} style={{fontSize:10,color:"#4a8a6a",background:"rgba(61,122,82,0.1)",padding:"1px 6px",borderRadius:6,border:"1px solid rgba(61,122,82,0.18)"}}>
-                    {f.tarea}: {f[estacion]}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-          <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-            <span style={{
-              fontSize:11,fontWeight:600,color:est.color,
-              background:est.bg,border:`1px solid ${est.color}35`,
-              padding:"2px 8px",borderRadius:8,
-            }}>{est.label}</span>
-            <span style={{color:"#4a7a5a",fontSize:12,transition:"transform .2s",
-              transform:abierto?"rotate(180deg)":"none"}}>▼</span>
-          </div>
-        </div>
-
-        {/* Panel expandido de edición */}
-        {abierto&&(
-          <div style={{padding:"0 14px 14px",borderTop:"1px solid rgba(255,255,255,0.07)"}}
-            onClick={ev=>ev.stopPropagation()}>
-
-            {/* Nombre + Categoría en fila */}
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:12,marginBottom:10}}>
-              <div>
-                <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.6px",textTransform:"uppercase"}}>Nombre</label>
-                <input style={{...S.input,fontSize:13}}
-                  value={editElem.nombreEdit!==undefined?editElem.nombreEdit:e.nombre}
-                  onChange={ev=>setEditElem(p=>({...p,nombreEdit:ev.target.value}))}/>
-              </div>
-              <div>
-                <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.6px",textTransform:"uppercase"}}>Categoría</label>
-                <select style={{...S.input,fontSize:13}}
-                  value={editElem.tipoEdit!==undefined?editElem.tipoEdit:e.tipo}
-                  onChange={ev=>setEditElem(p=>({...p,tipoEdit:ev.target.value}))}>
-                  {(()=>{
-                    const vk=["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
-                    const ok=["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","bodegas"];
-                    return(<>
-                      <optgroup label="🌿 Vegetación">{vk.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup>
-                      <optgroup label="🏗️ Infraestructura / Pavimentos">{ok.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup>
-                    </>);
-                  })()}
-                </select>
-              </div>
-            </div>
-
-            {/* Guardar si cambió nombre/tipo */}
-            {((editElem.nombreEdit!==undefined&&editElem.nombreEdit!==e.nombre)||(editElem.tipoEdit!==undefined&&editElem.tipoEdit!==e.tipo))&&(
-              <button className="btn-p" style={{...S.btn,fontSize:12,padding:"5px 14px",marginBottom:10}} onClick={()=>{
-                const nn=editElem.nombreEdit!==undefined?editElem.nombreEdit:e.nombre;
-                const nt=editElem.tipoEdit!==undefined?editElem.tipoEdit:e.tipo;
-                if(e.isCustom){const arr=[...(data[zonaId].elementosCustom||[])];const i=arr.findIndex(x=>x.id===e.id);if(i>=0){arr[i]={...arr[i],nombre:nn,tipo:nt};updateZona(zonaId,{elementosCustom:arr});}}
-                else{setZonas(prev=>prev.map(z=>String(z.id)===String(zonaId)?{...z,elementos:z.elementos.map(x=>x.id===e.id?{...x,nombre:nn,tipo:nt}:x)}:z));}
-                addHistorial(zonaId,`Elemento: "${e.nombre}" → "${nn}"`);
-                setEditElem(p=>({...p,nombreEdit:undefined,tipoEdit:undefined}));
-              }}>✓ Guardar nombre/categoría</button>
-            )}
-
-            {/* Estado con botones visuales */}
-            <div style={{marginBottom:12}}>
-              <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:6,letterSpacing:"0.6px",textTransform:"uppercase"}}>Estado actual</label>
-              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                {Object.entries(ESTADOS_ELEM).map(([k,v])=>(
-                  <button key={k} style={{
-                    ...S.btn,padding:"6px 14px",fontSize:12,
-                    background:e.edData.estado===k?v.bg:"transparent",
-                    color:e.edData.estado===k?v.color:"#6aaa7a",
-                    border:`1px solid ${e.edData.estado===k?v.color+"60":"rgba(255,255,255,0.12)"}`,
-                    fontWeight:e.edData.estado===k?600:400,
-                  }} onClick={()=>setElemEstado(zonaId,e.id,e.isCustom,k)}>
-                    {e.edData.estado===k?"● ":""}{v.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Notas */}
-            <div style={{marginBottom:12}}>
-              <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.6px",textTransform:"uppercase"}}>Observaciones</label>
-              <textarea rows={2} style={{...S.input,resize:"vertical",fontSize:13}}
-                placeholder="Observaciones del elemento..."
-                value={e.edData.notas||""}
-                onChange={ev=>setElemNotas(zonaId,e.id,e.isCustom,ev.target.value)}/>
-            </div>
-
-            {/* Frecuencias de mantención */}
-            <FrecuenciasPanel zid={zonaId} eid={e.id} tipo={e.tipo} isCustom={e.isCustom} S={S} getFrecs={getElemFrecs} setFrecs={setElemFrecs}/>
-
-            {/* Eliminar */}
-            {(e.isCustom||(zona?.elementos.find(x=>x.id===e.id)))&&(
-              <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
-                <button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 12px"}}
-                  onClick={()=>{e.isCustom?removeCustomElem(zonaId,e.id):removeBaseElem(zonaId,e.id);setEditElem(null);}}>
-                  🗑 Eliminar elemento
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // ── Esperando Firebase Auth ───────────────────────────────────────────────
-  if (!authReady) return (
-    <div style={{minHeight:"100vh",background:"#0d1f13",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
-      <div style={{fontSize:48}}>🌿</div>
-      <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,color:"#a0d8b0",fontWeight:700}}>Estadio Español</div>
-      <div style={{width:40,height:40,border:"3px solid #1a3a22",borderTop:"3px solid #4a9a64",borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-    </div>
-  );
-
-  // ── Login ─────────────────────────────────────────────────────────────────
-  if (!fbUser) return (
-    <div style={{minHeight:"100vh",background:"#0d1f13",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&display=swap');*{box-sizing:border-box;margin:0;padding:0}`}</style>
-      <div style={{background:"#0f2517",border:"1px solid #1e3a22",borderRadius:20,padding:40,width:"100%",maxWidth:380,boxShadow:"0 20px 60px rgba(0,0,0,0.5)"}}>
-        <div style={{textAlign:"center",marginBottom:32}}>
-          <div style={{fontSize:52,marginBottom:12}}>🌿</div>
-          <div style={{fontFamily:"'Playfair Display',serif",fontSize:26,fontWeight:900,color:"#ede9e0",marginBottom:4}}>Estadio Español</div>
-          <div style={{fontSize:12,color:"#4a8a5a",letterSpacing:"2px",textTransform:"uppercase"}}>Gestión · Áreas Verdes</div>
-        </div>
-        <div style={{display:"flex",flexDirection:"column",gap:14}}>
-          <div>
-            <label style={{fontSize:11,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:6,textTransform:"uppercase"}}>Correo electrónico</label>
-            <input type="email" autoComplete="email" style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"12px 14px",color:"#ede9e0",fontSize:14,outline:"none"}}
-              value={loginEmail} onChange={e=>setLoginEmail(e.target.value)}
-              onKeyDown={e=>e.key==="Enter"&&handleLogin()}
-              placeholder="tu@email.com"/>
-          </div>
-          <div>
-            <label style={{fontSize:11,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:6,textTransform:"uppercase"}}>Contraseña</label>
-            <input type="password" autoComplete="current-password" style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"12px 14px",color:"#ede9e0",fontSize:14,outline:"none"}}
-              value={loginPass} onChange={e=>setLoginPass(e.target.value)}
-              onKeyDown={e=>e.key==="Enter"&&handleLogin()}
-              placeholder="••••••••"/>
-          </div>
-          {loginError&&<div style={{fontSize:13,color:"#fca5a5",background:"rgba(239,68,68,0.1)",borderRadius:8,padding:"8px 12px",textAlign:"center"}}>{loginError}</div>}
-          <button onClick={handleLogin} disabled={loginLoading}
-            style={{background:"#2d6a3f",color:"#fff",border:"none",borderRadius:10,padding:"14px",fontSize:15,fontWeight:700,cursor:"pointer",marginTop:6,opacity:loginLoading?0.7:1}}>
-            {loginLoading?"Ingresando...":"Ingresar →"}
-          </button>
-        </div>
-        <div style={{textAlign:"center",marginTop:20,fontSize:11,color:"#2a5a35"}}>Acceso restringido · Personal autorizado</div>
-      </div>
-    </div>
-  );
-
-  // ── Pantalla de carga Firebase ────────────────────────────────────────────
-  if (!appReady) return (
-    <div style={{minHeight:"100vh",background:"#0d1f13",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
-      <div style={{fontSize:48}}>🌿</div>
-      <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,color:"#a0d8b0",fontWeight:700}}>Estadio Español</div>
-      <div style={{fontSize:13,color:"#4a8a5a",marginBottom:8}}>Conectando con Firebase...</div>
-      <div style={{width:40,height:40,border:"3px solid #1a3a22",borderTop:"3px solid #4a9a64",borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-    </div>
-  );
-
-  return (
-    <div style={S.app}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&display=swap');
-        *{box-sizing:border-box;margin:0;padding:0}
-        ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:#0a1f10}::-webkit-scrollbar-thumb{background:#3d7a52;border-radius:3px}
-        .hov:hover{background:rgba(255,255,255,0.09)!important;border-color:rgba(150,210,140,0.3)!important;transform:translateY(-1px)}
-        .btn-p{background:#3d7a52;color:#fff}.btn-p:hover{background:#4c9464}
-        .btn-g{background:transparent;color:#a0c8a0;border:1px solid rgba(160,200,140,0.25)}.btn-g:hover{background:rgba(160,200,140,0.1)}
-        .btn-d{background:rgba(239,68,68,0.22);color:#fca5a5;border:1px solid rgba(239,68,68,0.45);font-weight:600}.btn-d:hover{background:rgba(239,68,68,0.4);color:#fff;border-color:rgba(239,68,68,0.7)}
-        .tab{cursor:pointer;padding:7px 16px;border-radius:8px;font-family:'Georgia',serif;font-size:14px;transition:all .15s}
-        .tab.on{background:#3d7a52;color:#fff}.tab:not(.on){color:#7aaa80}.tab:not(.on):hover{background:rgba(61,122,82,0.2);color:#a0c8a0}
-        input:focus,select:focus,textarea:focus{border-color:#3d7a52!important;background:rgba(255,255,255,0.12)!important}
-        select option{background:#122d1a;color:#ede9e0}
-        .ein{animation:ein .25s ease}@keyframes ein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-        .spin{width:18px;height:18px;border:2px solid rgba(255,255,255,0.15);border-top-color:#3d7a52;border-radius:50%;animation:rot .7s linear infinite;display:inline-block}@keyframes rot{to{transform:rotate(360deg)}}
-        .ecard{transition:all .2s;cursor:pointer}.ecard:hover{background:rgba(255,255,255,0.09)!important}
-        .headerNav::-webkit-scrollbar{display:none}
-      `}</style>
-
-      {/* HEADER */}
-      <div style={S.header}>
-        <div style={S.headerTop}>
-          <div style={S.logo}>
-            <div style={S.logoCircle}>🌿</div>
-            <div>
-              <div style={S.logoTitle}>Estadio Español</div>
-              <div style={S.logoSub}>Gestión · Áreas Verdes</div>
-            </div>
-          </div>
-          <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-            <span style={{fontSize:11,color:fbRol==="jefa"?"#86efac":fbRol==="supervisor"?"#93c5fd":"#fcd34d",background:fbRol==="jefa"?"rgba(34,197,94,0.1)":fbRol==="supervisor"?"rgba(59,130,246,0.1)":"rgba(252,211,77,0.1)",padding:"4px 10px",borderRadius:20,border:`1px solid ${fbRol==="jefa"?"rgba(34,197,94,0.25)":fbRol==="supervisor"?"rgba(59,130,246,0.25)":"rgba(252,211,77,0.25)"}`}}>
-              {fbRol==="jefa"?"🌿 Jefa AV":fbRol==="supervisor"?"👷 Supervisor":(()=>{
-                const arr=Array.isArray(personal)?personal:Object.values(personal||{});
-                const fbU=fbUser?arr.find(x=>x.email?.toLowerCase()===fbUser.email?.toLowerCase()):null;
-                return fbU?`🌱 ${fbU.nombre.split(" ")[0]}`:"🌱 Jardinero";
-              })()}
-            </span>
-            <button onClick={handleLogout}
-              style={{background:"transparent",border:"1px solid rgba(255,255,255,0.1)",borderRadius:7,color:"#7aaa80",padding:"4px 10px",fontFamily:"'Georgia',serif",fontSize:11,cursor:"pointer"}}>
-              Salir
-            </button>
-          </div>
-        </div>
-        <div style={S.headerNav} className="headerNav">
-          {(fbRol==="jefa"
-            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["fungicidas","🧪","Fungicidas"],["compras","🛒","Compras"],["bodegas","🏪","Bodegas"],["golf","🏌️","Golf"],["personal","👷","Personal"],["notificaciones","🔔","Alertas"]]
-            : fbRol==="supervisor"
-            ? [["dashboard","📊","Panel"],["programacion","📆","Programa"],["reporte","📋","Reporte"],["golf","🏌️","Golf"],["miturno","🌿","Mi Turno"]]
-            : [["miturno","🌿","Mi Turno"]]
-          ).map(([v,ico,lbl])=>(
-            <button key={v} onClick={()=>{setVista(v);setZonaId(null);setAiText("");if(v==="notificaciones")marcarTodasLeidas();}} style={{cursor:"pointer",border:"none",background:"transparent",color:vista===v?"#fff":"#7aaa80",fontFamily:"'Georgia',serif",fontSize:12,padding:"10px 14px",borderBottom:vista===v?"2px solid #4a9a64":"2px solid transparent",transition:"all .15s",whiteSpace:"nowrap",display:"flex",flexDirection:"column",alignItems:"center",gap:2,flexShrink:0,position:"relative"}}>
-              <span style={{fontSize:16,position:"relative"}}>
-                {ico}
-                {v==="notificaciones"&&notifNoLeidas.length>0&&(
-                  <span style={{position:"absolute",top:-6,right:-8,background:"#ef4444",color:"#fff",
-                    borderRadius:"50%",width:15,height:15,fontSize:9,fontWeight:700,
-                    display:"flex",alignItems:"center",justifyContent:"center"}}>
-                    {notifNoLeidas.length>9?"9+":notifNoLeidas.length}
-                  </span>
-                )}
-              </span>
-              <span>{lbl}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div style={S.main}>
-        {/* DASHBOARD */}
-        {/* ── JEFA REVISA TURNO DE UN TRABAJADOR ── */}
-        {workerARevisar&&rolLogueado==="jefa"&&(()=>{
-          const arr=Array.isArray(personal)?personal:Object.values(personal||{});
-          const trab=arr.find(x=>String(x.id)===String(workerARevisar));
-          if(!trab) return null;
-          return (
-            <div className="ein">
-              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
-                <button className="btn-g" style={S.btn} onClick={()=>setWorkerARevisar(null)}>← Volver al Panel</button>
-                <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700}}>
-                  📋 Turno de {trab.nombre} — revisión de jefa
-                </div>
-                <span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.1)",border:"1px solid rgba(251,191,36,0.2)",borderRadius:8,padding:"2px 10px"}}>
-                  Modo supervisión — puedes editar aunque el turno esté cerrado
-                </span>
-              </div>
-              <VistaWorker
-                trabajador={trab}
-                fecha={new Date().toISOString().slice(0,10)}
-                tareas={tareasProg}
-                S={S}
-                esJefaApp={true}
-                cierresTurno={cierresTurno}
-                onUpdateTarea={(fecha,tid,patch)=>{
-                  const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-                  setTareasProg(prev=>{
-                    const lista=normArr(prev[fecha]);
-                    const actualizadas=lista.map(t=>String(t.id)===String(tid)?{...t,...patch}:t);
-                    fbUpdate(ref(db,`${ROOT}/prog`),{[fecha]:actualizadas.map(limpiarUndef)}).catch(e=>console.error(e));
-                    return {...prev,[fecha]:actualizadas};
-                  });
-                }}
-                onAddTarea={(t)=>{
-                  setTareasProg(prev=>{
-                    const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-                    const lista=[...normArr(prev[t.fecha]||[]),t];
-                    fbUpdate(ref(db,`${ROOT}/prog`),{[t.fecha]:lista}).catch(e=>console.error(e));
-                    return {...prev,[t.fecha]:lista};
-                  });
-                }}
-                onSetFrecs={setElemFrecs}
-                getFrecs={(zid,eid,tipo,isCustom,nombreElem)=>{
-                  const zdat=getZD(zid);const zona=zonasConCust.find(z=>String(z.id)===String(zid));if(!zona)return null;
-                  const elem=zona.elementos.find(e=>e.nombre===nombreElem);if(!elem)return null;
-                  const frecs=zdat.elementos?.[elem.id]?.frecuencias||(TAREAS_DEFAULT[elem.tipo]||[]).map(t=>({...t}));
-                  return {frecs,eid:elem.id,isCustom:false};
-                }}
-                MACROZONAS_BASE={MACROZONAS_BASE}
-                onAccesoRapido={(vista,subTab)=>{setVista(vista);if(subTab)setGolfInitTab(subTab);setWorkerARevisar(null);}}
-                onCambiarMetodo={()=>{}}
-                onCerrarTurno={()=>{}}
-                onReabrirTurno={(fecha,nombre)=>{
-                  const key=`${fecha}_${nombre.split(" ")[0].toLowerCase()}`;
-                  setCierresTurno(prev=>{const n={...prev};delete n[key];return n;});
-                }}
-              />
-            </div>
-          );
-        })()}
-
-        {!workerARevisar&&vista==="dashboard"&&!zonaId&&(
-          <div className="ein">
-            <div style={{marginBottom:26}}>
-              <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:26,fontWeight:900,marginBottom:3}}>Panel General</h1>
-              <p style={{color:"#6aaa7a",fontSize:15}}>Estado global de las {stats.total} macrozonas</p>
-            </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:14,marginBottom:28}}>
-              {[{label:"Total Zonas",val:stats.total,color:"#c0dab0",icon:"🗺️"},{label:"Buen estado",val:stats.bueno,color:"#22c55e",icon:"✅"},{label:"Estado regular",val:stats.regular,color:"#f59e0b",icon:"⚠️"},{label:"Estado crítico",val:stats.critico,color:"#ef4444",icon:"🔴"},{label:"Total elementos",val:totalElems,color:"#a0c8e0",icon:"📋"},{label:"Elementos OK",val:elemsOk,color:"#22c55e",icon:"🌿"}].map(s=>(
-                <div key={s.label} style={{...S.card,padding:"18px 14px",textAlign:"center"}}>
-                  <div style={{fontSize:24,marginBottom:4}}>{s.icon}</div>
-                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:28,fontWeight:700,color:s.color}}>{s.val}</div>
-                  <div style={{fontSize:12,color:"#7aaa80"}}>{s.label}</div>
-                </div>
-              ))}
-            </div>
-            {stats.critico>0&&(
-              <div style={{background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:12,padding:16,marginBottom:22}}>
-                <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:10,color:"#fca5a5"}}>🚨 Zonas en Estado Crítico</div>
-                <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-                  {MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral==="critico").map(z=>(
-                    <span key={z.id} onClick={()=>{setZonaId(String(z.id));setVista("zonas");setTab("elementos");}} style={{...S.chip,background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)",cursor:"pointer"}}>{z.icono} {z.nombre}</span>
-                  ))}
-                </div>
-              </div>
-            )}
-            {/* ── Turnos de trabajadores hoy ── */}
-            {(()=>{
-              const tdHoy=new Date().toISOString().slice(0,10);
-              const tdNorm=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-              const tdTareas=tdNorm(tareasProg[tdHoy]);
-              const tdPersonal=Array.isArray(personal)?personal:Object.values(personal||{});
-              const tdTrabs=tdPersonal.filter(w=>tdTareas.some(x=>x.responsable===w.nombre));
-              if(tdTrabs.length===0) return null;
-              return (
-                <div style={{marginBottom:22}}>
-                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:19,fontWeight:700,marginBottom:10}}>👷 Turnos de hoy</div>
-                  <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-                    {tdTrabs.map(w=>{
-                      const tdKey=`${tdHoy}_${w.nombre.split(" ")[0].toLowerCase()}`;
-                      const tdCerrado=cierresTurno?.[tdKey];
-                      const tdTT=tdTareas.filter(x=>x.responsable===w.nombre);
-                      const tdHechas=tdTT.filter(t=>["hecha","completada"].includes(t.estado)).length;
-                      const tdPct=tdTT.length?Math.round((tdHechas/tdTT.length)*100):0;
-                      return (
-                        <button key={w.id} onClick={()=>setWorkerARevisar(w.id)}
-                          style={{cursor:"pointer",border:`1px solid ${tdCerrado?"rgba(34,197,94,0.3)":"rgba(255,255,255,0.12)"}`,borderRadius:10,padding:"10px 14px",background:tdCerrado?"rgba(34,197,94,0.06)":"rgba(255,255,255,0.04)",textAlign:"left",minWidth:160}}>
-                          <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:5}}>
-                            <div style={{width:24,height:24,borderRadius:"50%",background:"linear-gradient(135deg,#1a5c35,#2d7a4f)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",flexShrink:0}}>
-                              {w.nombre[0]?.toUpperCase()}
-                            </div>
-                            <div style={{fontSize:12,fontWeight:700}}>{w.nombre.split(" ")[0]}</div>
-                            {tdCerrado
-                              ? <span style={{fontSize:9,color:"#22c55e",background:"rgba(34,197,94,0.1)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:6,padding:"1px 6px",marginLeft:"auto"}}>✅ Cerrado</span>
-                              : <span style={{fontSize:9,color:"#f59e0b",background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.2)",borderRadius:6,padding:"1px 6px",marginLeft:"auto"}}>⏳ Activo</span>
-                            }
-                          </div>
-                          <div style={{background:"rgba(255,255,255,0.06)",borderRadius:4,height:4,marginBottom:4,overflow:"hidden"}}>
-                            <div style={{width:`${tdPct}%`,height:"100%",background:tdPct===100?"#22c55e":"#4ade80",borderRadius:4}}/>
-                          </div>
-                          <div style={{fontSize:10,color:"#5a9a7a"}}>{tdHechas}/{tdTT.length} tareas · {tdPct}%</div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })()}
-            <div style={{marginBottom:12,fontFamily:"'Playfair Display',serif",fontSize:19,fontWeight:700}}>Por Categoría</div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(210px,1fr))",gap:12}}>
-              {[...new Set(MACROZONAS_BASE.map(z=>z.categoria))].map(cat=>{
-                const zc=[...MACROZONAS_BASE].filter(z=>z.categoria===cat).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
-                const ok=zc.filter(z=>getZD(z.id).estadoGeneral==="bueno").length;
-                const pct=Math.round((ok/zc.length)*100);
-                return (
-                  <div key={cat} style={{...S.card,padding:16,cursor:"pointer"}} className="hov" onClick={()=>{setFiltroCat(cat);setVista("zonas");}}>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
-                      <div style={{fontSize:14,fontWeight:600}}>{cat}</div>
-                      <span style={{fontSize:11,color:"#6aaa7a"}}>{zc.length} zonas</span>
-                    </div>
-                    <div style={{background:"rgba(255,255,255,0.07)",borderRadius:4,height:7,overflow:"hidden",marginBottom:5}}>
-                      <div style={{width:`${pct}%`,height:"100%",background:pct>70?"#22c55e":pct>40?"#f59e0b":"#ef4444",borderRadius:4,transition:"width .5s"}}/>
-                    </div>
-                    <div style={{fontSize:12,color:"#6aaa7a"}}>{pct}% en buen estado</div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* ZONAS LIST */}
-        {vista==="zonas"&&!zonaId&&(
-          <div className="ein">
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",marginBottom:20,flexWrap:"wrap",gap:12}}>
-              <div>
-                <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:24,fontWeight:900}}>Macrozonas</h1>
-                <p style={{color:"#6aaa7a",fontSize:14}}>{filteredZonas.length} de {MACROZONAS_BASE.length+macrozonasCust.length} zonas</p>
-              </div>
-              {esJefa&&(
-                <button onClick={()=>setShowNuevaMacrozona(true)}
-                  style={{...S.btn,background:"rgba(52,211,153,0.15)",color:"#34d399",border:"1px solid rgba(52,211,153,0.3)",fontSize:13}}>
-                  ＋ Nueva macrozona
-                </button>
-              )}
-            </div>
-
-            {/* Modal nueva macrozona */}
-            {showNuevaMacrozona&&(
-              <div style={{...S.card,padding:20,marginBottom:16,border:"1px solid rgba(52,211,153,0.3)"}} className="ein">
-                <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#34d399",marginBottom:14}}>＋ Nueva macrozona personalizada</div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-                  <div style={{gridColumn:"1/-1"}}>
-                    <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Nombre</label>
-                    <input style={S.input} value={nuevaMacrozona.nombre} onChange={e=>setNuevaMacrozona(p=>({...p,nombre:e.target.value}))} placeholder="Ej: Av. Vizcaya"/>
-                  </div>
-                  <div>
-                    <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Categoría</label>
-                    <select style={S.input} value={nuevaMacrozona.categoria} onChange={e=>setNuevaMacrozona(p=>({...p,categoria:e.target.value}))}>
-                      {[...new Set(MACROZONAS_BASE.map(z=>z.categoria))].map(catOpt=><option key={catOpt} value={catOpt}>{catOpt}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Ícono</label>
-                    <input style={S.input} value={nuevaMacrozona.icono} onChange={e=>setNuevaMacrozona(p=>({...p,icono:e.target.value}))} placeholder="🌿"/>
-                  </div>
-                  <div style={{gridColumn:"1/-1"}}>
-                    <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Descripción (opcional)</label>
-                    <input style={S.input} value={nuevaMacrozona.descripcion} onChange={e=>setNuevaMacrozona(p=>({...p,descripcion:e.target.value}))} placeholder="Descripción breve"/>
-                  </div>
-                </div>
-                <div style={{display:"flex",gap:8}}>
-                  <button className="btn-p" style={S.btn} disabled={!nuevaMacrozona.nombre.trim()} onClick={()=>{
-                    const newId="cust_"+Date.now();
-                    const nueva={
-                      id:newId, nombre:nuevaMacrozona.nombre.trim(), categoria:nuevaMacrozona.categoria,
-                      icono:nuevaMacrozona.icono||"🌿", descripcion:nuevaMacrozona.descripcion,
-                      elementos:[
-                        {id:"e1",nombre:"Árboles",tipo:"arboles"},
-                        {id:"e2",nombre:"Arbustos",tipo:"arbustos"},
-                        {id:"e3",nombre:"Césped",tipo:"cesped"},
-                        {id:"e4",nombre:"Luminarias",tipo:"infraestructura"},
-                        {id:"e5",nombre:"Pavimento",tipo:"pavimentos"},
-                      ],
-                      esPersonalizada:true,
-                    };
-                    setMacrozonasCust(p=>[...p,nueva]);
-                    // Inicializar en Firebase
-                    fbUpdate(ref(db,`${ROOT}/data`),{[newId]:{estadoGeneral:"bueno",notas:"",ultimoMant:"",proximoMant:"",elementos:{},elementosCustom:[],tareas:[],historial:[]}}).catch(e=>console.error(e));
-                    setNuevaMacrozona({nombre:"",categoria:"Calles y Accesos",icono:"🌿",descripcion:""});
-                    setShowNuevaMacrozona(false);
-                  }}>✓ Crear macrozona</button>
-                  <button className="btn-g" style={S.btn} onClick={()=>setShowNuevaMacrozona(false)}>Cancelar</button>
-                </div>
-              </div>
-            )}
-            <div style={{display:"flex",gap:10,marginBottom:18,flexWrap:"wrap"}}>
-              <input placeholder="🔍 Buscar zona..." value={busq||""} onChange={e=>setBusq(e.target.value)} style={{...S.input,flex:"1 1 180px",maxWidth:260}}/>
-              <select value={filtroCat} onChange={e=>setFiltroCat(e.target.value)} style={{...S.input,flex:"1 1 150px",maxWidth:200}}>
-                <option value="Todas">Todas las categorías</option>
-                {[...new Set(MACROZONAS_BASE.map(z=>z.categoria))].map(catOpt=><option key={catOpt} value={catOpt}>{catOpt}</option>)}
-              </select>
-              <select value={filtroEst} onChange={e=>setFiltroEst(e.target.value)} style={{...S.input,flex:"1 1 130px",maxWidth:180}}>
-                <option value="Todos">Todos los estados</option>
-                {Object.entries(ESTADOS_ZONA).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
-              </select>
-            </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(230px,1fr))",gap:14}}>
-              {filteredZonas.map(z=>{
-                const dzd=getZD(z.id); const est=ESTADOS_ZONA[dzd.estadoGeneral||"bueno"];
-                const allElems=getAllElems(z.id);
-                const criticos=allElems.filter(e=>e.edData.estado==="critico").length;
-                const pendTareas=(dzd.tareas||[]).filter(t=>!t.completada).length;
-                return (
-                  <div key={z.id}
-                    style={{
-                      background:"rgba(255,255,255,0.025)",
-                      border:`1px solid ${criticos>0?"rgba(239,68,68,0.25)":pendTareas>0?"rgba(245,158,11,0.2)":"rgba(255,255,255,0.08)"}`,
-                      borderRadius:12,padding:14,cursor:"pointer",
-                      transition:"all .15s",overflow:"hidden",position:"relative",
-                    }}
-                    className="hov"
-                    onClick={()=>{setZonaId(String(z.id));setTab("elementos");setAiText("");}}>
-                    {/* Banda lateral de estado */}
-                    <div style={{position:"absolute",left:0,top:0,bottom:0,width:4,background:est.color,borderRadius:"12px 0 0 12px",opacity:0.8}}/>
-                    <div style={{paddingLeft:6}}>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
-                        <div style={{display:"flex",alignItems:"center",gap:8}}>
-                          <span style={{fontSize:22}}>{z.icono}</span>
-                          <div>
-                            <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,lineHeight:1.2}}>{z.nombre}</div>
-                            <div style={{fontSize:10,color:"#5a8a6a",marginTop:1}}>{z.categoria}</div>
-                          </div>
-                        </div>
-                        <span style={{fontSize:10,fontWeight:600,color:est.color,background:est.bg,padding:"2px 7px",borderRadius:8,border:`1px solid ${est.color}35`,flexShrink:0}}>{est.label}</span>
-                      </div>
-                      <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
-                        <span style={{fontSize:10,color:"#5a8a70"}}>📋 {allElems.length}</span>
-                        {criticos>0&&<span style={{fontSize:10,color:"#fca5a5",fontWeight:600}}>🔴 {criticos}</span>}
-                        {pendTareas>0&&<span style={{fontSize:10,color:"#fcd34d"}}>⚠️ {pendTareas}</span>}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* DETALLE ZONA */}
-        {zonaId&&zona&&zd&&(
-          <div className="ein">
-            <button style={{...S.btn,background:"transparent",color:"#a0c8a0",border:"1px solid rgba(160,200,140,0.22)",marginBottom:20}} onClick={()=>{setZonaId(null);setAiText("");}}>← Volver</button>
-            {(()=>{
-              const estZona = ESTADOS_ZONA[zd.estadoGeneral||"bueno"]||{color:"#22c55e",bg:"rgba(34,197,94,0.1)",label:"Bueno"};
-              const elemsZona = getAllElems(zonaId);
-              const criticosZona = elemsZona.filter(e=>e.estado==="critico").length;
-              const regularesZona = elemsZona.filter(e=>e.estado==="regular").length;
-              return (
-                <div style={{...S.card,padding:0,marginBottom:18,overflow:"hidden"}}>
-                  {/* Banda de color superior según estado */}
-                  <div style={{height:5,background:estZona.color,opacity:0.7}}/>
-                  <div style={{padding:"18px 20px"}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12}}>
-                      {/* Izquierda: icono + nombre + chips */}
-                      <div style={{display:"flex",alignItems:"center",gap:14,flex:1,minWidth:200}}>
-                        <span style={{fontSize:44,lineHeight:1}}>{zona.icono}</span>
-                        <div>
-                          <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:21,fontWeight:900,marginBottom:6,lineHeight:1.2}}>{zona.nombre}</h2>
-                          <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
-                            <span style={{fontSize:11,color:"#6aaa7a",background:"rgba(255,255,255,0.06)",padding:"2px 8px",borderRadius:6,border:"1px solid rgba(255,255,255,0.1)"}}>
-                              📂 {zona.categoria}
-                            </span>
-                            <span style={{fontSize:11,color:"#6ab0c0",background:"rgba(96,176,192,0.08)",padding:"2px 8px",borderRadius:6,border:"1px solid rgba(96,176,192,0.15)"}}>
-                              📋 {elemsZona.length} elementos
-                            </span>
-                            {criticosZona>0&&(
-                              <span style={{fontSize:11,color:"#fca5a5",background:"rgba(239,68,68,0.1)",padding:"2px 8px",borderRadius:6,border:"1px solid rgba(239,68,68,0.25)"}}>
-                                🔴 {criticosZona} crítico{criticosZona>1?"s":""}
-                              </span>
-                            )}
-                            {regularesZona>0&&(
-                              <span style={{fontSize:11,color:"#fcd34d",background:"rgba(245,158,11,0.1)",padding:"2px 8px",borderRadius:6,border:"1px solid rgba(245,158,11,0.2)"}}>
-                                ⚠️ {regularesZona} regular{regularesZona>1?"es":""}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      {/* Derecha: estado + IA */}
-                      <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-                        <div style={{display:"flex",alignItems:"center",gap:6,background:estZona.bg,border:`1px solid ${estZona.color}40`,borderRadius:8,padding:"4px 6px 4px 10px"}}>
-                          <span style={{fontSize:12,color:estZona.color,fontWeight:600}}>{estZona.label}</span>
-                          <select value={zd.estadoGeneral||"bueno"}
-                            onChange={e=>{updateZona(zonaId,{estadoGeneral:e.target.value});addHistorial(zonaId,`Estado zona → ${ESTADOS_ZONA[e.target.value].label}`);}}
-                            style={{background:"transparent",border:"none",color:estZona.color,fontSize:11,cursor:"pointer",padding:"2px 0"}}>
-                            {Object.entries(ESTADOS_ZONA).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
-                          </select>
-                        </div>
-                        <button style={{...S.btn,background:"rgba(61,122,82,0.2)",color:"#a0d8b0",border:"1px solid rgba(61,122,82,0.35)",fontSize:12}}
-                          onClick={getSugerenciaAI} disabled={aiLoading}>
-                          {aiLoading?<><span className="spin"/> Analizando...</>:"🤖 Sugerencia IA"}
-                        </button>
-                      </div>
-                    </div>
-                    {/* Fechas de mantenimiento si existen */}
-                    {(zd.ultimoMant||zd.proximoMant)&&(
-                      <div style={{display:"flex",gap:16,marginTop:12,paddingTop:10,borderTop:"1px solid rgba(255,255,255,0.06)",flexWrap:"wrap"}}>
-                        {zd.ultimoMant&&<span style={{fontSize:11,color:"#5a8a6a"}}>✅ Último mant.: <strong style={{color:"#7aaa80"}}>{new Date(zd.ultimoMant+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"short",year:"numeric"})}</strong></span>}
-                        {zd.proximoMant&&<span style={{fontSize:11,color:"#5a8a6a"}}>📅 Próximo: <strong style={{color:"#fbbf24"}}>{new Date(zd.proximoMant+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"short",year:"numeric"})}</strong></span>}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })()}
-            {(aiLoading||aiText)&&(
-              <div style={{background:"rgba(40,100,60,0.15)",border:"1px solid rgba(61,122,82,0.35)",borderRadius:12,padding:18,marginBottom:18}}>
-                <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:10,color:"#90d4a0"}}>🤖 Recomendaciones del Asistente</div>
-                {aiLoading?<div style={{color:"#6aaa7a",display:"flex",gap:8,alignItems:"center"}}><span className="spin"/> Generando...</div>
-                  :<div style={{fontSize:14,lineHeight:1.7,color:"#c8e0c8",whiteSpace:"pre-wrap"}}>{aiText}</div>}
-              </div>
-            )}
-            <div style={{display:"flex",gap:4,marginBottom:16,borderBottom:"1px solid rgba(255,255,255,0.08)",paddingBottom:0,overflowX:"auto"}}>
-              {[["elementos","🌿","Elementos"],["historial","📜","Historial"],["info","📝","Info"],...(zona?.categoria==="Bodegas"?[["recursos","🏗️","Recursos"]]:[])].map(([t,ico,lbl])=>(
-                <button key={t} onClick={()=>setTab(t)} style={{
-                  cursor:"pointer",border:"none",background:"transparent",
-                  color:tab===t?"#34d399":"#6aaa7a",
-                  padding:"10px 16px",
-                  fontSize:13,fontFamily:"'Georgia',serif",
-                  borderBottom:tab===t?"2px solid #34d399":"2px solid transparent",
-                  marginBottom:-1,
-                  whiteSpace:"nowrap",
-                  display:"flex",alignItems:"center",gap:5,
-                  fontWeight:tab===t?600:400,
-                  transition:"all .15s",
-                }}>
-                  <span>{ico}</span><span>{lbl}</span>
-                </button>
-              ))}
-            </div>
-
-            {tab==="elementos"&&(
-              <div className="ein">
-                {(()=>{
-                  const todosElems = getAllElems(zonaId);
-                  const zdat = getZD(zonaId);
-                  const hoyStr = fechaLocal();
-                  const VEGE_KEYS = ["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes","rosales","palmeras","suculentas","bulbosas","acuaticas","bambus","helechos","bromelias","orquideas","cactus","vivero"];
-                  const INFRA_KEYS = ["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","bodegas"];
-                  const elemsVege = todosElems.filter(e=>VEGE_KEYS.includes(e.tipo));
-                  const elemsInfra = todosElems.filter(e=>INFRA_KEYS.includes(e.tipo));
-
-                  // Calcular estado de mantención por elemento
-                  const calcEstadoMant = (elem) => {
-                    const edData = zdat.elementos?.[elem.id]||{};
-                    const frecs = edData.frecuencias||[];
-                    if(!frecs.length) return null;
-                    let atrasadas = 0, proximas = 0, alDia = 0;
-                    frecs.forEach(f=>{
-                      const prox = calcProximaFrecGlobal(f, hoyStr);
-                      if(!prox) return;
-                      const diasRest = Math.round((new Date(prox+"T12:00:00")-new Date(hoyStr+"T12:00:00"))/(1000*60*60*24));
-                      if(diasRest < 0) atrasadas++;
-                      else if(diasRest <= 3) proximas++;
-                      else alDia++;
-                    });
-                    return {atrasadas, proximas, alDia, total:frecs.length};
-                  };
-
-                  // Resumen general
-                  let totalAtrasadas = 0, totalProximas = 0;
-                  todosElems.forEach(e=>{
-                    const m = calcEstadoMant(e);
-                    if(m){totalAtrasadas+=m.atrasadas; totalProximas+=m.proximas;}
-                  });
-                  const elemsEnMal = todosElems.filter(e=>(zdat.elementos?.[e.id]?.estado||"bueno")==="critico").length;
-                  const elemsRegular = todosElems.filter(e=>(zdat.elementos?.[e.id]?.estado||"bueno")==="regular").length;
-
-                  return (<>
-                    {/* Resumen estado general */}
-                    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:8,marginBottom:16}}>
-                      {[
-                        {label:"Total elementos",val:todosElems.length,color:"#60a5fa",icon:"🌿"},
-                        {label:"Vegetación",val:elemsVege.length,color:"#4ade80",icon:"🌱"},
-                        {label:"Infraestructura",val:elemsInfra.length,color:"#94a3b8",icon:"🏗️"},
-                        {label:"Estado crítico",val:elemsEnMal,color:elemsEnMal>0?"#ef4444":"#22c55e",icon:"🔴"},
-                        {label:"Mant. atrasadas",val:totalAtrasadas,color:totalAtrasadas>0?"#ef4444":"#22c55e",icon:"⚠️"},
-                        {label:"Mant. próximas",val:totalProximas,color:totalProximas>0?"#f59e0b":"#22c55e",icon:"⏳"},
-                      ].map(s=>(
-                        <div key={s.label} style={{...S.card,padding:"10px 12px",textAlign:"center"}}>
-                          <div style={{fontSize:18,marginBottom:2}}>{s.icon}</div>
-                          <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:700,color:s.color}}>{s.val}</div>
-                          <div style={{fontSize:10,color:"#5a9a7a",lineHeight:1.2}}>{s.label}</div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Lista de elementos con estado */}
-                    {[{titulo:"🌿 Vegetación",elems:elemsVege},{titulo:"🏗️ Infraestructura",elems:elemsInfra}].map(grupo=>{
-                      if(!grupo.elems.length) return null;
-                      return (
-                        <div key={grupo.titulo} style={{marginBottom:14}}>
-                          <div style={{fontSize:11,color:"#6aaa7a",letterSpacing:"0.5px",textTransform:"uppercase",marginBottom:6}}>{grupo.titulo} ({grupo.elems.length})</div>
-                          <div style={{...S.card,padding:0,overflow:"hidden"}}>
-                            {grupo.elems.map((elem,i)=>{
-                              const edData = zdat.elementos?.[elem.id]||{};
-                              const estado = edData.estado||"bueno";
-                              const mant = calcEstadoMant(elem);
-                              const ESTADOS_E = {bueno:{color:"#22c55e",label:"Bueno"},regular:{color:"#f59e0b",label:"Regular"},critico:{color:"#ef4444",label:"Crítico"},mantenimiento:{color:"#3b82f6",label:"En mantención"}};
-                              const estColor = ESTADOS_E[estado]?.color||"#22c55e";
-                              return (
-                                <div key={elem.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 14px",borderBottom:i<grupo.elems.length-1?"1px solid rgba(255,255,255,0.05)":"none",background:estado==="critico"?"rgba(239,68,68,0.04)":"transparent"}}>
-                                  <div style={{width:8,height:8,borderRadius:"50%",background:estColor,flexShrink:0}}/>
-                                  <div style={{flex:1,fontSize:13}}>{elem.nombre}</div>
-                                  <div style={{fontSize:11,color:estColor}}>{ESTADOS_E[estado]?.label||"Bueno"}</div>
-                                  {mant&&mant.atrasadas>0&&<div style={{fontSize:10,color:"#ef4444",background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:6,padding:"1px 7px"}}>⚠️ {mant.atrasadas} atrasada{mant.atrasadas>1?"s":""}</div>}
-                                  {mant&&mant.atrasadas===0&&mant.proximas>0&&<div style={{fontSize:10,color:"#f59e0b",background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.2)",borderRadius:6,padding:"1px 7px"}}>⏳ {mant.proximas} próxima{mant.proximas>1?"s":""}</div>}
-                                  {mant&&mant.atrasadas===0&&mant.proximas===0&&mant.alDia>0&&<div style={{fontSize:10,color:"#22c55e",background:"rgba(34,197,94,0.08)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:6,padding:"1px 7px"}}>✅ Al día</div>}
-                                  {edData.notas&&<div style={{fontSize:10,color:"#5a9a7a",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{edData.notas}</div>}
-                                  {/* Cambiar estado rápido */}
-                                  <select value={estado} onChange={e=>updateZona(zonaId,{elementos:{...zdat.elementos,[elem.id]:{...edData,estado:e.target.value}}})}
-                                    style={{fontSize:10,background:"rgba(255,255,255,0.05)",color:"#5a9a7a",border:"1px solid rgba(255,255,255,0.1)",borderRadius:5,padding:"2px 4px",cursor:"pointer"}}>
-                                    <option value="bueno">Bueno</option>
-                                    <option value="regular">Regular</option>
-                                    <option value="critico">Crítico</option>
-                                    <option value="mantenimiento">Mantención</option>
-                                  </select>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })}
-
-                    {todosElems.length===0&&(
-                      <div style={{...S.card,padding:24,textAlign:"center",color:"#3a7a5a",fontSize:13}}>
-                        Esta zona no tiene elementos registrados.<br/>
-                        <span style={{fontSize:11,color:"#4a6a5a"}}>Los elementos se configuran en Programación → Frecuencias.</span>
-                      </div>
-                    )}
-                  </>);
-                })()}
-              </div>
-            )}
-
-            {tab==="info"&&(
-              <div className="ein" style={{...S.card,padding:22}}>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
-                  <div>
-                    <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:5,letterSpacing:"0.5px"}}>ÚLTIMO MANTENIMIENTO</label>
-                    <input type="date" value={zd.ultimoMant||""} onChange={e=>updateZona(zonaId,{ultimoMant:e.target.value})} style={S.input}/>
-                  </div>
-                  <div>
-                    <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:5,letterSpacing:"0.5px"}}>PRÓXIMO MANTENIMIENTO</label>
-                    <input type="date" value={zd.proximoMant||""} onChange={e=>updateZona(zonaId,{proximoMant:e.target.value})} style={S.input}/>
-                  </div>
-                </div>
-                <div style={{marginBottom:16}}>
-                  <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:5,letterSpacing:"0.5px"}}>NOTAS Y OBSERVACIONES</label>
-                  <textarea rows={4} style={{...S.input,resize:"vertical"}} value={zd.notas||""} onChange={e=>updateZona(zonaId,{notas:e.target.value})}/>
-                </div>
-                <button className="btn-p" style={S.btn} onClick={()=>addHistorial(zonaId,"Información general actualizada")}>💾 Guardar</button>
-              </div>
-            )}
-
-            {tab==="tareas"&&(
-              <div className="ein">
-                <div style={{...S.card,padding:16,marginBottom:14}}>
-                  <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
-                    <input placeholder="Escribir tarea..." value={nuevaTarea} onChange={e=>setNuevaTarea(e.target.value)} style={{...S.input,flex:"2 1 180px"}} onKeyDown={e=>{if(e.key==="Enter"){addTareaZona(zonaId,nuevaTarea);setNuevaTarea("");}}}/>
-                    <button className="btn-p" style={S.btn} onClick={()=>{addTareaZona(zonaId,nuevaTarea);setNuevaTarea("");}}>➕ Agregar</button>
-                  </div>
-                  {/* Botones especiales */}
-                  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                    <button style={{...S.btn,background:"rgba(74,222,128,0.12)",color:"#4ade80",border:"1px solid rgba(74,222,128,0.3)",fontSize:12}}
-                      onClick={()=>setShowPlantacionForm(p=>p==="plantar"?null:"plantar")}>
-                      🌱 Plantar desde Vivero
-                    </button>
-                    <button style={{...S.btn,background:"rgba(251,191,36,0.12)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.3)",fontSize:12}}
-                      onClick={()=>setShowPlantacionForm(p=>p==="trasplantar"?null:"trasplantar")}>
-                      🔄 Trasplantar a Vivero
-                    </button>
-                  </div>
-                  <div style={{fontSize:11,color:"#5a8a6a",marginTop:8}}>💡 Las tareas aparecen en 📆 Programación como Por designar — listas para asignar responsable y fecha.</div>
-                </div>
-
-                {/* Formulario Plantación desde Vivero */}
-                {showPlantacionForm==="plantar"&&(
-                  <TareaPlantacion
-                    modo="plantar" zona={zona} zonaId={zonaId}
-                    bodegasData={bodegasData} setBodegasData={setBodegasData}
-                    tareasProg={tareasProg} setTareasProg={setTareasProg}
-                    personal={personal} S={S}
-                    addTareaZona={addTareaZona} addHistorial={addHistorial}
-                    onClose={()=>setShowPlantacionForm(null)}
-                  />
-                )}
-
-                {/* Formulario Trasplante a Vivero */}
-                {showPlantacionForm==="trasplantar"&&(
-                  <TareaPlantacion
-                    modo="trasplantar" zona={zona} zonaId={zonaId}
-                    bodegasData={bodegasData} setBodegasData={setBodegasData}
-                    tareasProg={tareasProg} setTareasProg={setTareasProg}
-                    personal={personal} S={S}
-                    addTareaZona={addTareaZona} addHistorial={addHistorial}
-                    onClose={()=>setShowPlantacionForm(null)}
-                  />
-                )}
-
-                <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                  {(zd.tareas||[]).length===0&&<div style={{textAlign:"center",color:"#4a8a5a",padding:32,fontSize:15}}>Sin tareas registradas.</div>}
-                  {(zd.tareas||[]).map(t=>(
-                    <div key={t.id} style={{...S.card,padding:"11px 16px",display:"flex",alignItems:"center",gap:12,opacity:t.completada?0.55:1}}>
-                      <input type="checkbox" checked={t.completada} onChange={()=>{
-                        toggleTareaZona(zonaId,t.id);
-                        addHistorial(zonaId,`Tarea ${t.completada?"reabierta":"completada"}: ${t.texto}`);
-                        // Si la tarea tiene descuento de stock pendiente, ejecutarlo al completar
-                        if(!t.completada && t.descuentoStock) {
-                          ejecutarDescuentoStock(t.descuentoStock);
-                        }
-                      }} style={{width:17,height:17,accentColor:"#3d7a52",cursor:"pointer",flexShrink:0}}/>
-                      <div style={{flex:1}}>
-                        <span style={{fontSize:14,textDecoration:t.completada?"line-through":"none"}}>{t.texto}</span>
-                        {t.insumos&&t.insumos.length>0&&(
-                          <div style={{fontSize:11,color:"#6aaa7a",marginTop:3}}>
-                            📦 Insumos: {t.insumos.map(i=>`${i.nombre} (${i.cantidad} ${i.unidad})`).join(", ")}
-                            {!t.completada&&<span style={{color:"#fbbf24"}}> — se descontarán al confirmar</span>}
-                            {t.completada&&<span style={{color:"#4ade80"}}> ✅ descontados</span>}
-                          </div>
-                        )}
-                      </div>
-                      <span style={{fontSize:11,color:"#4a8a5a"}}>{t.fecha}</span>
-                      {t.enviadaProg&&<span style={{fontSize:10,color:"#c084fc",background:"rgba(192,132,252,0.1)",padding:"1px 6px",borderRadius:8,border:"1px solid rgba(192,132,252,0.2)",flexShrink:0}}>📆 En prog.</span>}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {tab==="historial"&&(
-              <div className="ein">
-                {(zd.historial||[]).length===0?<div style={{textAlign:"center",color:"#4a8a5a",padding:40,fontSize:15}}>Sin registros aún.</div>:(
-                  <div style={{display:"flex",flexDirection:"column",gap:7}}>
-                    {rolLogueado==="jefa"&&(
-                      <div style={{display:"flex",justifyContent:"flex-end",marginBottom:8}}>
-                        <button onClick={()=>{if(window.confirm("¿Borrar todo el historial de esta zona?"))updateZona(zonaId,{historial:[]});}}
-                          style={{...S.btn,background:"rgba(239,68,68,0.12)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.25)",fontSize:12,padding:"5px 12px"}}>
-                          🗑 Borrar todo el historial
-                        </button>
-                      </div>
-                    )}
-                    {(zd.historial||[]).map((h,i)=>(
-                      <div key={i} style={{...S.card,padding:"11px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
-                        <div style={{display:"flex",alignItems:"center",gap:10}}>
-                          <span style={{fontSize:16,flexShrink:0}}>📌</span>
-                          <span style={{fontSize:14}}>{h.txt}</span>
-                        </div>
-                        <div style={{display:"flex",alignItems:"center",gap:8}}>
-                          <div style={{fontSize:11,color:"#4a8a5a",whiteSpace:"nowrap"}}>{h.fecha} {h.hora}</div>
-                          {rolLogueado==="jefa"&&(
-                            <button onClick={()=>updateZona(zonaId,{historial:(zd.historial||[]).filter((_,j)=>j!==i)})}
-                              style={{background:"transparent",border:"none",color:"#7a5a5a",cursor:"pointer",fontSize:13,padding:"2px 4px",flexShrink:0}}>🗑</button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* REPORTE */}
-        {vista==="reporte"&&(
-          <div className="ein">
-            <div style={{marginBottom:24,display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:12}}>
-              <div>
-                <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:24,fontWeight:900,marginBottom:4}}>Reporte General</h1>
-                <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap"}}>
-                  {[["general","📋 Estado Actual"],["semanal","📅 Reporte Semanal"]].map(([t,l])=>(
-                    <button key={t} className={`tab${tabReporte===t?" on":""}`} onClick={()=>setTabReporte(t)} style={{fontSize:13}}>{l}</button>
-                  ))}
-                </div>
-                <p style={{color:"#6aaa7a",fontSize:15}}>
-                  Estado completo de macrozonas y elementos
-                </p>
-                {tabReporte==="general" && <div style={{display:"flex",alignItems:"center",gap:8,marginTop:6,flexWrap:"wrap"}}>
-                  <label style={{fontSize:12,color:"#6aaa7a"}}>📅 Fecha del reporte:</label>
-                  <input type="date" value={fechaReporte} onChange={e=>setFechaReporte(e.target.value)}
-                    style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.14)",borderRadius:8,color:"#ede9e0",padding:"5px 10px",fontFamily:"'Georgia',serif",fontSize:13,outline:"none"}}/>
-                  <span style={{fontSize:13,color:"#4a8a6a"}}>
-                    {new Date(fechaReporte+"T12:00:00").toLocaleDateString("es-CL",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}
-                  </span>
-                  {fechaReporte!==new Date().toISOString().slice(0,10)&&(
-                    <button onClick={()=>setFechaReporte(new Date().toISOString().slice(0,10))}
-                      style={{background:"transparent",border:"1px solid rgba(255,255,255,0.1)",borderRadius:6,color:"#6aaa7a",padding:"3px 8px",fontFamily:"'Georgia',serif",fontSize:11,cursor:"pointer"}}>
-                      Hoy
-                    </button>
-                  )}
-                </div>}
-              </div>
-              <button
-                onClick={()=>{
-                  const zonaRows = [...MACROZONAS_BASE].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(z=>{
-                    const dzd2=getZD(z.id);
-                    const allE=getAllElems(z.id);
-                    const crit=allE.filter(e=>e.edData.estado==="critico").length;
-                    const pend=(dzd2.tareas||[]).filter(t=>!t.completada).length;
-                    const COLORES={bueno:"#166534",regular:"#92400e",critico:"#991b1b",mantenimiento:"#1e40af"};
-                    const LABELS={bueno:"Bueno",regular:"Regular",critico:"Crítico",mantenimiento:"En Mantenimiento"};
-                    return "<tr>"
-                      +"<td>"+z.icono+" "+z.nombre+"</td>"
-                      +"<td>"+z.categoria+"</td>"
-                      +"<td style='color:"+COLORES[dzd2.estadoGeneral||"bueno"]+";font-weight:600'>"+LABELS[dzd2.estadoGeneral||"bueno"]+"</td>"
-                      +"<td style='text-align:center'>"+allE.length+"</td>"
-                      +"<td style='text-align:center;color:"+(crit>0?"#991b1b":"#166534")+"'>"+(crit>0?"🔴 "+crit:"—")+"</td>"
-                      +"<td>"+(d.ultimoMant||"—")+"</td>"
-                      +"<td>"+(d.proximoMant||"—")+"</td>"
-                      +"<td style='text-align:center;color:"+(pend>0?"#92400e":"#166534")+"'>"+(pend>0?"⚠️ "+pend:"✅ 0")+"</td>"
-                      +"</tr>";
-                  }).join("");
-                  const estadoStats = Object.entries({bueno:{label:"Bueno",color:"#166534"},regular:{label:"Regular",color:"#92400e"},critico:{label:"Crítico",color:"#991b1b"},mantenimiento:{label:"En Mant.",color:"#1e40af"}}).map(([k,v])=>{
-                    const statC=MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral===k).length;
-                    return "<span style='color:"+v.color+";font-weight:700'>"+v.label+": "+statC+"</span>";
-                  }).join(" &nbsp;·&nbsp; ");
-                  const html = "<!DOCTYPE html><html lang='es'><head><meta charset='UTF-8'>"
-                    +"<title>Reporte Áreas Verdes — Estadio Español</title>"
-                    +"<style>"
-                    +"body{font-family:Georgia,serif;color:#1a2e1a;padding:32px;max-width:900px;margin:0 auto}"
-                    +"h1{font-size:22px;color:#0d3320;margin-bottom:4px}"
-                    +".sub{font-size:13px;color:#4a7a4a;margin-bottom:6px}"
-                    +".stats{font-size:13px;margin-bottom:20px;padding:10px 14px;background:#f0f7f0;border-radius:8px}"
-                    +"table{width:100%;border-collapse:collapse;font-size:12px}"
-                    +"th{text-align:left;padding:8px 10px;background:#1a4a2e;color:#fff;font-size:10px;letter-spacing:0.8px;text-transform:uppercase;white-space:nowrap}"
-                    +"tr:nth-child(even){background:#f5fbf5}"
-                    +"td{padding:7px 10px;border-bottom:1px solid #dce8dc;vertical-align:top}"
-                    +".pie{margin-top:24px;font-size:11px;color:#6b7280;border-top:1px solid #dce8dc;padding-top:12px;display:flex;justify-content:space-between}"
-                    +"@media print{body{padding:16px}}"
-                    +"</style></head><body>"
-                    +"<h1>📋 Reporte General de Áreas Verdes — Estadio Español</h1>"
-                    +"<div class='sub'>Fecha del reporte: "+new Date(fechaReporte+"T12:00:00").toLocaleDateString("es-CL",{weekday:"long",year:"numeric",month:"long",day:"numeric"})+" · Generado: "+new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"})+"</div>"
-                    +"<div class='stats'>"+estadoStats+" &nbsp;·&nbsp; <b>Total zonas: "+MACROZONAS_BASE.length+"</b></div>"
-                    +"<table><thead><tr><th>Zona</th><th>Categoría</th><th>Estado</th><th>Elementos</th><th>Críticos</th><th>Últ. Mant.</th><th>Próx. Mant.</th><th>Tareas Pend.</th></tr></thead><tbody>"+zonaRows+"</tbody></table>"
-                    +"<div class='pie'><span>Estadio Español de Las Condes · Departamento de Áreas Verdes</span><span>"+new Date().getFullYear()+"</span></div>"
-                    +"</body></html>";
-                  const blob = new Blob([html], {type:"text/html;charset=utf-8"});
-                  const url = URL.createObjectURL(blob);
-                  const dlA = document.createElement("a");
-                  dlA.href = url; dlA.target = "_blank"; dlA.click();
-                  setTimeout(()=>URL.revokeObjectURL(url), 10000);
-                }}
-                style={{...S.btn,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)",fontSize:13,flexShrink:0}}
-              >🖨️ Imprimir Reporte</button>
-            </div>
-            {tabReporte==="semanal" && (
-              <ReporteSemanal S={S} tareasProg={tareasProg} semanaBase={semanaBase} setSemanaBase={setSemanaBase} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} incidenciasFito={incidenciasFito} esJefa={rolLogueado==="jefa"}/>
-            )}
-            {tabReporte==="general" && <>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(270px,1fr))",gap:18,marginBottom:26}}>
-              <div style={{...S.card,padding:20}}>
-                <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,marginBottom:14}}>📊 Zonas por Estado</div>
-                {Object.entries(ESTADOS_ZONA).map(([k,v])=>{
-                  const statC2=MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral===k).length;
-                  const pct=Math.round((statC2/MACROZONAS_BASE.length)*100);
-                  return (
-                    <div key={k} style={{marginBottom:10}}>
-                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:3,fontSize:13}}>
-                        <span style={{color:v.color}}>{v.label}</span>
-                        <span style={{color:"#6aaa7a"}}>{c} ({pct}%)</span>
-                      </div>
-                      <div style={{background:"rgba(255,255,255,0.07)",borderRadius:4,height:7,overflow:"hidden"}}>
-                        <div style={{width:`${pct}%`,height:"100%",background:v.color,borderRadius:4}}/>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div style={{...S.card,padding:20}}>
-                <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,marginBottom:14}}>📅 Próximos Mantenimientos</div>
-                {MACROZONAS_BASE.filter(z=>getZD(z.id).proximoMant).sort((a,b)=>new Date(getZD(a.id).proximoMant)-new Date(getZD(b.id).proximoMant)).slice(0,8).map(z=>(
-                  <div key={z.id} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
-                    <span style={{fontSize:14}}>{z.icono} {z.nombre}</span>
-                    <span style={{fontSize:12,color:"#5a8a6a"}}>{getZD(z.id).proximoMant}</span>
-                  </div>
-                ))}
-                {MACROZONAS_BASE.filter(z=>getZD(z.id).proximoMant).length===0&&<div style={{color:"#4a7a5a",fontSize:13,textAlign:"center",padding:16}}>Sin fechas programadas</div>}
-              </div>
-            </div>
-            {/* Detalle actividad del día del reporte */}
-            {(()=>{
-              const tareasDelDia = tareasProg[fechaReporte]||[];
-              // Agrupar por zona, solo zonas con actividad
-              const zonaMap = {};
-              tareasDelDia.forEach(t=>{
-                if(!t.zona) return;
-                if(!zonaMap[t.zona]) zonaMap[t.zona]=[];
-                zonaMap[t.zona].push(t);
-              });
-              const zonasConActividad = Object.entries(zonaMap).sort(([a],[b])=>a.localeCompare(b,"es",{sensitivity:"base"}));
-
-              const EC={hecha:{color:"#22c55e",icon:"✅",label:"Hecha"},completada:{color:"#22c55e",icon:"✅",label:"Hecha"},no_pudo:{color:"#ef4444",icon:"🔴",label:"No se pudo"},haciendose:{color:"#3b82f6",icon:"🔵",label:"Haciéndose"},en_curso:{color:"#3b82f6",icon:"🔵",label:"En curso"},pendiente:{color:"#f59e0b",icon:"🟡",label:"Pendiente"},por_designar:{color:"#94a3b8",icon:"⬜",label:"Por designar"},cancelada:{color:"#ef4444",icon:"❌",label:"Cancelada"}};
-
-              return (
-                <>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:8}}>
-                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700}}>
-                      Actividad del {new Date(fechaReporte+"T12:00:00").toLocaleDateString("es-CL",{weekday:"long",day:"numeric",month:"long"})}
-                    </div>
-                    {zonasConActividad.length>0 && (
-                      <span style={{...S.chip,background:"rgba(255,255,255,0.07)",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)"}}>
-                        {zonasConActividad.length} zona{zonasConActividad.length!==1?"s":""} · {tareasDelDia.length} tarea{tareasDelDia.length!==1?"s":""}
-                      </span>
-                    )}
-                  </div>
-
-                  {zonasConActividad.length===0 ? (
-                    <div style={{...S.card,padding:32,textAlign:"center",color:"#4a8a5a"}}>
-                      <div style={{fontSize:32,marginBottom:8}}>📋</div>
-                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:6}}>Sin actividad registrada para esta fecha</div>
-                      <div style={{fontSize:13}}>Las tareas programadas en 📆 Programación aparecerán aquí.</div>
-                    </div>
-                  ) : (
-                    <ActividadDelDia zonas={zonasConActividad} MACROZONAS_BASE={MACROZONAS_BASE} S={S} EC={EC} tareasDelDia={tareasDelDia} />
-                  )}
-                </>
-              );
-            })()}
-            </>}
-          </div>
-        )}
-
-        {/* PROGRAMACIÓN */}
-        {vista==="programacion"&&(
-          <ProgramacionDiaria key="prog" S={S} zonas={zonas} data={data} personal={personal} getZD={getZD} getAllElems={getAllElems} MACROZONAS_BASE={MACROZONAS_BASE} tareas={tareasProg} setTareas={setTareasProg}
-            getElemFrecs={getElemFrecs} setElemFrecs={setElemFrecs}
-            tareasZonaHoy={(tareasProg[new Date().toISOString().slice(0,10)]||[]).filter(t=>t.origenZona&&t.estado==="por_designar").length}
-            esJefa={rolLogueado==="jefa"}
-            puedeCrear={rolLogueado==="jefa"||rolLogueado==="supervisor"}
-            cierresTurno={cierresTurno}
-            onReabrirTurno={(fecha,nombre)=>{
-              const key=`${fecha}_${nombre.split(" ")[0].toLowerCase()}`;
-              setCierresTurno(prev=>{ const n={...prev}; delete n[key]; return n; });
-            }}
-          />
-        )}
-
-        {/* MI TURNO */}
-        {vista==="miturno"&&(
-          <div className="ein">
-            {/* ── Logged in as supervisor ── */}
-            {rolLogueado==="supervisor"&&(
-              <VistaDesignacion
-                S={S}
-                tareasProg={tareasProg}
-                setTareasProg={setTareasProg}
-                personal={personal}
-                MACROZONAS_BASE={MACROZONAS_BASE}
-                onSalir={()=>{setWorkerPinInput("");setWorkerLogueado(null);setVistaWorker(false);}}
-              />
-            )}
-
-            {/* ── Logged in as worker ── */}
-            {rolLogueado==="trabajador"&&(vistaWorker||fbUser)&&(
-              <div>
-                <button className="btn-g" style={{...S.btn,marginBottom:16}} onClick={()=>{setVistaWorker(false);setWorkerPinInput("");setWorkerLogueado(null);}}>← Salir</button>
-                <VistaWorker
-                  trabajador={(()=>{
-                    const arr=Array.isArray(personal)?personal:Object.values(personal||{});
-                    return workerLogueado
-                      ? arr.find(x=>String(x.id)===String(workerLogueado))
-                      : fbUser ? arr.find(x=>x.email?.toLowerCase()===fbUser.email?.toLowerCase()) : null;
-                  })()}
-                  fecha={fechaLocal()}
-                  tareas={tareasProg}
-                  S={S}
-                  MACROZONAS_BASE={MACROZONAS_BASE}
-                  onUpdateTarea={(fecha,tid,patch)=>{
-                    const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-                    setTareasProg(prev=>{
-                      const tareasDelDia = normArr(prev[fecha]);
-                      const actualizadas = tareasDelDia.map(t=>String(t.id)===String(tid)?{...t,...patch}:t);
-                      // Escribir solo la ruta de esa fecha en Firebase
-                      fbUpdate(ref(db, `${ROOT}/prog`), {[fecha]: actualizadas.map(limpiarUndef)})
-                        .catch(e=>console.error("Error:", e));
-                      if(patch.estado==="no_pudo"||patch.estado==="hecha"||patch.estado==="completada"||patch.estado==="haciendose"){
-                        const tarea=tareasDelDia.find(t=>String(t.id)===String(tid));
-                        if(tarea){
-                          const onUpdZ=MACROZONAS_BASE.find(zz=>zz.nombre===tarea.zona);
-                          if(z){
-                            const ico=patch.estado==="no_pudo"?"🔴":patch.estado==="hecha"?"✅":"🔵";
-                            addHistorial(String(z.id),`${ico} [${tarea.responsable||"?"}] ${tarea.tarea}${patch.estado==="no_pudo"&&patch.notaWorker?" ("+patch.notaWorker+")":""}`);
-                          }
-                          // Bono especializado: la detección ahora es centralizada en un useEffect que vigila tareasProg
-                        }
-                      }
-                      return {...prev,[fecha]:actualizadas};
-                    });
-                  }}
-                  getFrecs={(zid,_eid,_tipo,_isCustom,nombreElem)=>{
-                    const zdat=getZD(zid); const zona=zonasConCust.find(z=>String(z.id)===String(zid)); if(!zona) return null;
-                    const elem=zona.elementos.find(e=>e.nombre===nombreElem); if(!elem) return null;
-                    const frecs=zdat.elementos?.[elem.id]?.frecuencias||(TAREAS_DEFAULT[elem.tipo]||[]).map(t=>({...t}));
-                    return {frecs,eid:elem.id,isCustom:false};
-                  }}
-                  onCambiarMetodo={(fecha,tid,metodo)=>{
-                    setTareasProg(prev=>({...prev,
-                      [fecha]:(prev[fecha]||[]).map(t=>t.id===tid?{...t,metodoLimpieza:metodo}:t)
-                    }));
-                  }}
-                  onAccesoRapido={(tipo)=>{
-                    const tab = tipo==="medicion"?"mediciones":tipo==="humedad"?"humedad":"greens";
-                    setGolfInitTab(tab);
-                    setVista("golf");
-                  }}
-                  onSetFrecs={setElemFrecs}
-                  onAddTarea={(nuevaTarea)=>{
-                    const hoyKey=nuevaTarea.fecha||fechaLocal(); // siempre hora local Chile
-                    setTareasProg(prev=>{
-                      const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-                      const lista=[...normArr(prev[hoyKey]),{...nuevaTarea,fecha:hoyKey}];
-                      fbUpdate(ref(db,`${ROOT}/prog`),{[hoyKey]:lista}).catch(e=>console.error(e));
-                      return {...prev,[hoyKey]:lista};
-                    });
-                    const propZ=MACROZONAS_BASE.find(zz=>zz.nombre===nuevaTarea.zona);
-                    if(z) addHistorial(z.id,`🆕 [${nuevaTarea.responsable}] Tarea emergente: ${nuevaTarea.tarea}`);
-                  }}
-                  esJefaApp={rolLogueado==="jefa"}
-                  cierresTurno={cierresTurno}
-                  onCerrarTurno={(fecha,nombre)=>{
-                    const fechaCierre=fechaLocal(); // siempre usar hora local Chile
-                    const key=`${fechaCierre}_${nombre.split(" ")[0].toLowerCase()}`;
-                    setCierresTurno(prev=>({...prev,[key]:{
-                      fecha:fechaCierre,nombre,
-                      hora:new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"}),
-                      cerradoEn:new Date().toISOString(),
-                    }}));
-                  }}
-                  onReabrirTurno={(fecha,nombre)=>{
-                    const key=`${fecha}_${nombre.split(" ")[0].toLowerCase()}`;
-                    setCierresTurno(prev=>{ const n={...prev}; delete n[key]; return n; });
-                  }}
-                />
-              </div>
-            )}
-
-            {/* ── Login screen ── */}
-            {!rolLogueado&&(
-              <div style={{maxWidth:380,margin:"50px auto 0"}}>
-                <div style={{textAlign:"center",marginBottom:28}}>
-                  <div style={{fontSize:48,marginBottom:12}}>🌿</div>
-                  <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:900,marginBottom:6}}>Acceso por Rol</h2>
-                  <p style={{color:"#6aaa7a",fontSize:14}}>Selecciona tu rol e ingresa tu PIN</p>
-                </div>
-
-                {/* Role selector */}
-                <div style={{display:"flex",gap:8,marginBottom:20,justifyContent:"center"}}>
-                  {[
-                    {key:"trabajador",label:"👷 Trabajador",color:"#3d7a52"},
-                    {key:"supervisor",label:"🎯 Supervisor",color:"#2563eb"},
-                    {key:"jefa",     label:"🌿 Jefa AV",   color:"#7c3aed"},
-                  ].map(r=>(
-                    <button key={r.key} onClick={()=>{setRolSeleccionado(r.key);setWorkerPinInput("");setWorkerPinError(false);setWorkerLogueado(null);}}
-                      style={{flex:1,cursor:"pointer",border:`2px solid ${rolSeleccionado===r.key?r.color:"rgba(255,255,255,0.1)"}`,borderRadius:10,padding:"10px 6px",background:rolSeleccionado===r.key?`${r.color}22`:"rgba(255,255,255,0.04)",color:rolSeleccionado===r.key?"#fff":"#7aaa80",fontFamily:"'Georgia',serif",fontSize:12,transition:"all .15s"}}>
-                      {r.label}
-                    </button>
-                  ))}
-                </div>
-
-                <div style={{background:"rgba(255,255,255,0.055)",border:"1px solid rgba(255,255,255,0.10)",borderRadius:14,padding:24}}>
-                  {/* Worker: select from list */}
-                  {rolSeleccionado==="trabajador"&&(
-                    <div style={{marginBottom:14}}>
-                      <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:5,letterSpacing:"0.5px"}}>TRABAJADOR</label>
-                      <select style={S.input} value={workerLogueado||""} onChange={e=>{setWorkerLogueado(e.target.value);setWorkerPinError(false);setWorkerPinInput("");}}>
-                        <option value="">Seleccionar...</option>
-                        {personal.filter(p=>p.cargo!=="Jefa de Áreas Verdes"&&p.cargo!=="Supervisor de Áreas Verdes")
-                          .sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}))
-                          .map(t=><option key={t.id} value={t.id}>{t.nombre} {t.cargo?" · "+t.cargo:""}</option>)}
-                      </select>
-                    </div>
-                  )}
-
-                  <div style={{marginBottom:18}}>
-                    <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:5,letterSpacing:"0.5px"}}>PIN (4 DÍGITOS)</label>
-                    <input type="password" maxLength={4} placeholder="••••"
-                      style={{...S.input,fontSize:22,letterSpacing:"0.6em",textAlign:"center"}}
-                      value={workerPinInput}
-                      onChange={e=>{setWorkerPinInput(e.target.value);setWorkerPinError(false);}}
-                      onKeyDown={e=>{
-                        if(e.key!=="Enter") return;
-                        if(rolSeleccionado==="trabajador"){
-                          const wrkT=personal.find(x=>String(x.id)===String(workerLogueado));
-                          if(wrkT&&String(wrkT.pin)===String(workerPinInput)){setVistaWorker(true);setWorkerPinError(false);}
-                          else setWorkerPinError(true);
-                        } else {
-                          if(checkPin(rolSeleccionado,workerPinInput)){setWorkerPinError(false);}
-                          else setWorkerPinError(true);
-                        }
-                      }}
-                    />
-                    {workerPinError&&<div style={{color:"#fca5a5",fontSize:12,marginTop:6,textAlign:"center"}}>PIN incorrecto. Intenta nuevamente.</div>}
-                    {rolSeleccionado==="trabajador"&&workerLogueado&&!personal.find(x=>String(x.id)===String(workerLogueado))?.pin&&(
-                      <div style={{color:"#f59e0b",fontSize:11,marginTop:6,textAlign:"center"}}>⚠️ Sin PIN configurado. Configúralo en la ficha.</div>
-                    )}
-                    {(rolSeleccionado==="supervisor"||rolSeleccionado==="jefa")&&!getPines()[rolSeleccionado]&&(
-                      <div style={{color:"#f59e0b",fontSize:11,marginTop:6,textAlign:"center"}}>⚠️ PIN no configurado aún.</div>
-                    )}
-                  </div>
-
-                  <button style={{...S.btn,width:"100%",padding:"12px",fontSize:15,background:"#3d7a52",color:"#fff",cursor:"pointer"}}
-                    onClick={()=>{
-                      if(rolSeleccionado==="trabajador"){
-                        const wrkT2=personal.find(x=>String(x.id)===String(workerLogueado));
-                        if(wrkT2&&String(wrkT2.pin)===String(workerPinInput)){setVistaWorker(true);setWorkerPinError(false);}
-                        else setWorkerPinError(true);
-                      } else {
-                        if(checkPin(rolSeleccionado,workerPinInput)){setWorkerPinError(false);}
-                        else setWorkerPinError(true);
-                      }
-                    }}>
-                    Ingresar →
-                  </button>
-                </div>
-
-                {/* PIN config for jefa/supervisor roles */}
-                {/* Configuración de PINs — siempre disponible en modo setup */}
-                <PinConfig getPines={getPines} setPinRol={setPinRol} S={S}/>
-              </div>
-            )}
-
-            {/* ── Jefa logged in → redirect to main app ── */}
-            {rolLogueado==="jefa"&&(
-              <div className="ein" style={{textAlign:"center",paddingTop:40}}>
-                <div style={{fontSize:48,marginBottom:16}}>🌿</div>
-                <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:900,marginBottom:8}}>Bienvenida, Jefa de Áreas Verdes</h2>
-                <p style={{color:"#6aaa7a",fontSize:14,marginBottom:24}}>Usa el menú de navegación para acceder a todas las secciones.</p>
-                <button onClick={()=>setVista("programacion")} style={{...S.btn,background:"#3d7a52",color:"#fff",fontSize:15,padding:"12px 28px"}}>📆 Ir a Programación →</button>
-                <button onClick={()=>setShowCierreSectorial(true)} style={{...S.btn,background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)",fontSize:13,padding:"10px 20px"}}>🚫 Cierre sectorial</button>
-                <div style={{marginTop:12}}>
-                  <button onClick={()=>{setWorkerPinInput("");}} style={{...S.btn,background:"transparent",color:"#6aaa7a",border:"1px solid rgba(255,255,255,0.1)",fontSize:13}}>← Cerrar sesión</button>
-
-                <div style={{maxWidth:380,margin:"24px auto 0"}}>
-                  <PinConfig getPines={getPines} setPinRol={setPinRol} S={S}/>
-                </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-
-        {/* FUNGICIDAS */}
-        {vista==="fungicidas"&&(
-          <PanelFungicidas S={S} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} />
-        )}
-
-        {/* COMPRAS */}
-        {vista==="compras"&&(
-          <PanelCompras S={S} comprasData={comprasData} setComprasData={setComprasData} personal={personal} esJefa={esJefa} data={data} updateZona={updateZona} MACROZONAS_BASE={MACROZONAS_BASE} bodegasData={bodegasData} setBodegasData={setBodegasData} />
-        )}
-
-        {/* GOLF */}
-        {vista==="golf"&&(
-          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial} setVista={setVista}
-            crearNotificacion={crearNotificacion}
-            initialSubTab={golfInitTab}
-            onRegistroGuardado={(tipo)=>{
-              if(rolLogueado==="trabajador"){ setVista("miturno"); setGolfInitTab(null); }
-            }}
-          />
-        )}
-
-        {/* BODEGAS */}
-        {vista==="bodegas"&&(
-          <PanelBodegas S={S} bodegasData={bodegasData} setBodegasData={setBodegasData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} compras={comprasData?.compras||[]} />
-        )}
-
-        {/* PERSONAL */}
-        {/* ── ALERTAS / NOTIFICACIONES ── */}
-        {vista==="notificaciones"&&(
-          <PanelAlertas
-            S={S}
-            incidencias={incidencias}
-            setIncidencias={setIncidencias}
-            notificaciones={notificaciones}
-            setNotificaciones={setNotificaciones}
-            marcarTodasLeidas={marcarTodasLeidas}
-            notifNoLeidas={notifNoLeidas}
-            MACROZONAS_BASE={MACROZONAS_BASE}
-            personal={personal}
-            tareasProg={tareasProg}
-            setTareasProg={setTareasProg}
-            limpiarUndef={limpiarUndef}
-            fechaLocal={fechaLocal}
-            crearNotificacion={crearNotificacion}
-            esJefa={esJefa}
-          />
-        )}
-
-        {vista==="golf"&&(
-          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial} setVista={setVista}
-            crearNotificacion={crearNotificacion}
-            initialSubTab={golfInitTab}
-            onRegistroGuardado={(tipo)=>{
-              if(rolLogueado==="trabajador"){ setVista("miturno"); setGolfInitTab(null); }
-            }}
-          />
-        )}
-
-        {/* BODEGAS */}
-        {vista==="bodegas"&&(
-          <PanelBodegas S={S} bodegasData={bodegasData} setBodegasData={setBodegasData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} compras={comprasData?.compras||[]} />
-        )}
-
-        {/* PERSONAL */}
-        {/* ── ALERTAS / NOTIFICACIONES ── */}
-        {vista==="notificaciones"&&(
-          <div className="ein">
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-              <div>
-                <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:700,marginBottom:2}}>🔔 Alertas de registros</h2>
-                <p style={{color:"#6aaa7a",fontSize:13}}>Mediciones de altura y humedad registradas por los jardineros</p>
-              </div>
-              {notifNoLeidas.length>0&&(
-                <button onClick={marcarTodasLeidas}
-                  style={{...S.btn,fontSize:12,color:"#6aaa7a",border:"1px solid rgba(255,255,255,0.1)",background:"transparent"}}>
-                  ✓ Marcar todas leídas
-                </button>
-              )}
-            </div>
-            {(()=>{
-              const arr = (Array.isArray(notificaciones)?notificaciones:Object.values(notificaciones||{}))
-                .sort((a,b)=>(b.fecha+b.hora).localeCompare(a.fecha+a.hora));
-              if(arr.length===0) return (
-                <div style={{...S.card,padding:40,textAlign:"center",color:"#4a7a5a"}}>
-                  <div style={{fontSize:36,marginBottom:10}}>🔔</div>
-                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:16}}>Sin alertas aún</div>
-                  <div style={{fontSize:13,color:"#4a7a5a",marginTop:6}}>Aparecerán aquí cuando un jardinero registre alturas o humedad</div>
-                </div>
-              );
-              return arr.map((n,i)=>{
-                const esMed=n.tipo==="medicion";
-                const esBono=n.tipo==="bono_cancha";
-                const col=esBono?"#fbbf24":esMed?"#34d399":"#60a5fa";
-                return (
-                  <div key={n.id||i} style={{...S.card,marginBottom:8,padding:"12px 16px",
-                    background:n.leida?"transparent":esBono?"rgba(251,191,36,0.06)":"rgba(52,211,153,0.04)",
-                    border:`1px solid ${n.leida?"rgba(255,255,255,0.07)":`${col}25`}`,
-                    opacity:n.leida?0.7:1}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
-                      <div style={{flex:1}}>
-                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
-                          <span style={{fontSize:15}}>{esBono?"🎖️":esMed?"📏":"💧"}</span>
-                          <span style={{fontSize:13,fontWeight:700,color:col}}>
-                            {esBono?(n.titulo||"Bono especializado disponible"):esMed?"Medición de alturas":"Humedad registrada"}
-                          </span>
-                          {!n.leida&&<span style={{fontSize:9,background:col,color:"#fff",padding:"2px 6px",borderRadius:8,fontWeight:700}}>NUEVO</span>}
-                        </div>
-                        {esBono?(
-                          <div style={{fontSize:12,color:"#ede9e0",marginBottom:6}}>{n.mensaje}</div>
-                        ):(<>
-                        <div style={{fontSize:12,color:"#ede9e0",marginBottom:3}}>👷 <strong>{n.responsable||"Sin nombre"}</strong></div>
-                        <div style={{fontSize:11,color:"#5a9a7a",marginBottom:2}}>{n.detalle}</div>
-                        {n.decision&&<div style={{fontSize:11,color:"#f59e0b"}}>→ {n.decision}</div>}
-                        </>)}
-                        {esBono&&(
-                          <button onClick={()=>{
-                            setBonoPrefill({trabajadorNombre:n.trabajadorNombre,tareaFecha:n.tareaFecha,descripcionBono:n.descripcionBono});
-                            setVista("personal");setPersonalVista("bono-masivo");
-                          }} style={{cursor:"pointer",border:"1px solid rgba(251,191,36,0.4)",borderRadius:8,padding:"6px 14px",background:"rgba(251,191,36,0.12)",color:"#fbbf24",fontSize:12,fontFamily:"'Georgia',serif",fontWeight:600,marginTop:4}}>
-                            🎖️ Generar bono ahora
-                          </button>
-                        )}
-                      </div>
-                      <div style={{textAlign:"right",minWidth:90}}>
-                        <div style={{fontSize:12,color:col,fontWeight:600}}>{n.fecha}</div>
-                        <div style={{fontSize:11,color:"#5a9a7a"}}>{n.hora}</div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              });
-            })()}
-          </div>
-        )}
-
-        {vista==="personal"&&personalVista==="lista"&&(
-          <div className="ein">
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",marginBottom:22,flexWrap:"wrap",gap:12}}>
-              <div>
-                <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:24,fontWeight:900,marginBottom:3}}>Personal</h1>
-                <p style={{color:"#6aaa7a",fontSize:14}}>{personal.length} trabajador{personal.length!==1?"es":""} registrado{personal.length!==1?"s":""}</p>
-              </div>
-              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                <button style={{...S.btn,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}} onClick={()=>setPersonalVista("informe-rrhh")}>📄 Informe RRHH</button>
-                <button style={{...S.btn,background:"rgba(196,181,253,0.15)",color:"#c4b5fd",border:"1px solid rgba(196,181,253,0.3)"}} onClick={()=>setPersonalVista("bono-masivo")}>💰 Bono por Tarea</button>
-                <button className="btn-p" style={S.btn} onClick={()=>setPersonalVista("nuevo")}>➕ Nuevo Trabajador</button>
-              </div>
-            </div>
-            {personal.length===0&&(
-              <div style={{...S.card,padding:48,textAlign:"center",color:"#4a8a5a"}}>
-                <div style={{fontSize:48,marginBottom:12}}>👷</div>
-                <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,marginBottom:8}}>Sin personal registrado</div>
-              </div>
-            )}
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:14}}>
-              {personal.sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(t=>{
-                const eventosAbiertos=(t.eventos||[]).filter(e=>e.estado==="pendiente").length;
-                const vacDias=(t.eventos||[]).filter(e=>e.tipo==="vacaciones"&&e.estado==="aprobado").reduce((a,e)=>{if(!e.fecha||!e.fechaFin) return a;return a+Math.round((new Date(e.fechaFin)-new Date(e.fecha))/(1000*60*60*24))+1;},0);
-                const heHoras=(t.eventos||[]).filter(e=>e.tipo==="horaExtra"&&e.estado==="aprobado").reduce((a,e)=>a+Number(e.horas||0),0);
-                return (
-                  <div key={t.id} className="hov" style={{...S.card,padding:18,cursor:"pointer"}} onClick={()=>{setPersonalId(t.id);setPersonalVista("ficha");setPersonalTab("ficha");}}>
-                    <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
-                      <div style={{width:44,height:44,borderRadius:"50%",background:"linear-gradient(135deg,#3d7a52,#1a4a2e)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{t.nombre?t.nombre[0].toUpperCase():"?"}</div>
-                      <div>
-                        <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700}}>{t.nombre}</div>
-                        <div style={{fontSize:12,color:"#6aaa7a"}}>{t.cargo||"Sin cargo"}</div>
-                      </div>
-                    </div>
-                    <div style={{fontSize:12,color:"#5a8a6a",marginBottom:10}}>{t.zona||"Sin zona asignada"}</div>
-                    <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                      <span style={{...S.chip,background:"rgba(255,255,255,0.07)",color:"#8ab0c0",border:"1px solid rgba(255,255,255,0.1)",fontSize:11}}>📄 {t.contrato||"—"}</span>
-                      {eventosAbiertos>0&&<span style={{...S.chip,background:"rgba(245,158,11,0.12)",color:"#fcd34d",border:"1px solid rgba(245,158,11,0.25)",fontSize:11}}>⏳ {eventosAbiertos} pend.</span>}
-                      {vacDias>0&&<span style={{...S.chip,background:"rgba(59,130,246,0.12)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.25)",fontSize:11}}>🏖️ {vacDias}d</span>}
-                      {heHoras>0&&<span style={{...S.chip,background:"rgba(34,197,94,0.12)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)",fontSize:11}}>⏰ {heHoras}h</span>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {vista==="personal"&&personalVista==="informe-rrhh"&&(
-          <InformeRRHH S={S} personal={personal} bonosMasivos={bonosMasivos} setBonosMasivos={setBonosMasivos} setPersonal={setPersonal} rendicionesRRHH={rendicionesRRHH} setRendicionesRRHH={setRendicionesRRHH} onVolver={()=>setPersonalVista("lista")}/>
-        )}
-
-        {vista==="personal"&&personalVista==="bono-masivo"&&(
-          <BonoMasivo
-            S={S} personal={personal} bonosConfig={bonosConfig} setBonosConfig={setBonosConfig}
-            bonosMasivos={bonosMasivos} setBonosMasivos={setBonosMasivos}
-            setPersonal={setPersonal}
-            onVolver={()=>{setPersonalVista("lista");setBonoPrefill(null);}}
-            esJefa={rolLogueado==="jefa"}
-            prefill={bonoPrefill}
-          />
-        )}
-
-        {vista==="personal"&&personalVista==="nuevo"&&(
-          <div className="ein">
-            <button className="btn-g" style={S.btn} onClick={()=>setPersonalVista("lista")}>← Volver</button>
-            <div style={{...S.card,padding:24,marginTop:16}}>
-              <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:900,marginBottom:20}}>Nuevo Trabajador</h2>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
-                {[["Nombre completo","nombre","text"],["RUT","rut","text"],["Teléfono","telefono","tel"],["Email","email","text"],["Fecha de ingreso","fechaIngreso","date"]].map(([lbl,key,type])=>(
-                  <div key={key}>
-                    <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>{lbl.toUpperCase()}</label>
-                    <input type={type} autoComplete="off" style={S.input} value={nuevoTrabajador[key]||""} onChange={e=>setNuevoTrabajador(p=>({...p,[key]:e.target.value}))}/>
-                  </div>
-                ))}
-                {/* PIN en fila propia */}
-                <div style={{gridColumn:"1/-1",background:"rgba(61,122,82,0.08)",border:"1px solid rgba(61,122,82,0.2)",borderRadius:10,padding:"12px 14px"}}>
-                  <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:6,letterSpacing:"0.5px"}}>🔐 PIN DE ACCESO (4 DÍGITOS)</label>
-                  <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
-                    <input type="password" maxLength={4} placeholder="••••" autoComplete="new-password"
-                      style={{...S.input,maxWidth:140,fontSize:20,letterSpacing:"0.5em",textAlign:"center"}}
-                      value={nuevoTrabajador.pin||""} onChange={e=>setNuevoTrabajador(p=>({...p,pin:e.target.value}))}/>
-                    <div style={{fontSize:12,color:"#5a8a6a"}}>El trabajador usa este PIN para acceder a sus tareas en 🌿 Mi Turno</div>
-                  </div>
-                </div>
-                <div>
-                  <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>CARGO</label>
-                  <select style={S.input} value={nuevoTrabajador.cargo} onChange={e=>setNuevoTrabajador(p=>({...p,cargo:e.target.value}))}>
-                    <option value="">Seleccionar...</option>
-                    {["Jefa de Áreas Verdes","Supervisor de Áreas Verdes","Jardinero","Jardinero Senior","Técnico en Riego","Operador Maquinaria","Capataz","Administrativo","Otro"].map(c=><option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>MACROZONA ASIGNADA</label>
-                  <select style={S.input} value={nuevoTrabajador.zona} onChange={e=>setNuevoTrabajador(p=>({...p,zona:e.target.value}))}>
-                    <option value="">Sin zona</option>
-                    {[...MACROZONAS_BASE].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(z=><option key={z.id} value={z.nombre}>{z.icono} {z.nombre}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>TIPO DE CONTRATO</label>
-                  <select style={S.input} value={nuevoTrabajador.contrato} onChange={e=>setNuevoTrabajador(p=>({...p,contrato:e.target.value}))}>
-                    {["indefinido","plazo fijo","honorarios","part-time"].map(c=><option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div style={{marginBottom:16}}>
-                <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>OBSERVACIONES</label>
-                <textarea rows={3} style={{...S.input,resize:"vertical"}} value={nuevoTrabajador.notas||""} onChange={e=>setNuevoTrabajador(p=>({...p,notas:e.target.value}))}/>
-              </div>
-              <div style={{display:"flex",gap:10}}>
-                <button className="btn-p" style={S.btn} onClick={()=>{
-                  if(!nuevoTrabajador.nombre.trim()) return;
-                  addTrabajador(nuevoTrabajador);
-                  setNuevoTrabajador({nombre:"",rut:"",cargo:"",zona:"",telefono:"",email:"",fechaIngreso:"",contrato:"indefinido",notas:"",pin:""});
-                  setPersonalVista("lista");
-                }}>✓ Guardar Trabajador</button>
-                <button className="btn-g" style={S.btn} onClick={()=>setPersonalVista("lista")}>Cancelar</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {vista==="personal"&&personalVista==="ficha"&&personalId&&getTrabajador(personalId)&&(
-          <FichaTrabajador
-            t={getTrabajador(personalId)}
-            S={S}
-            onVolver={()=>{setPersonalVista("lista");setPersonalId(null);}}
-            onDelete={()=>{deleteTrabajador(personalId);setPersonalVista("lista");setPersonalId(null);}}
-            onUpdate={(patch)=>updateTrabajador(personalId,patch)}
-            onAddEvento={(ev)=>addEvento(personalId,ev)}
-            onDeleteEvento={(eid)=>deleteEvento(personalId,eid)}
-            onUpdateEvento={(eid,patch)=>setPersonal(p=>(Array.isArray(p)?p:Object.values(p||{})).map(t=>t.id===personalId?{...t,eventos:(t.eventos||[]).map(e=>e.id===eid?{...e,...patch}:e)}:t))}
-          />
-        )}
-      </div>
-    </div>
-  );
-}
 
