@@ -6454,7 +6454,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     });
     if(!Object.keys(porBodega).length) {
       // Igual guardar asignación aunque no haya bodegas (todo es servicio)
-      if(compraId) set({compras:compras.map(compraC=>compraC.id===compraId?{...c,items:(compraC.items||[]).map((it,i)=>({...it,bodegaDestino:items[i]?.bodegaDestino||""}))}:c)});
+      if(compraId) set({compras:compras.map(compraC=>compraC.id===compraId?{...compraC,items:(compraC.items||[]).map((it,i)=>({...it,bodegaDestino:items[i]?.bodegaDestino||""}))}:compraC)});
       return;
     }
     const nuevoBodegasData = {...bodegasData};
@@ -6480,7 +6480,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     });
     setBodegasData(nuevoBodegasData);
     // Guardar asignación en la compra para que persista al volver
-    if(compraId) set({compras:compras.map(compraC=>compraC.id===compraId?{...c,items:(compraC.items||[]).map((it,i)=>({...it,bodegaDestino:items[i]?.bodegaDestino||it.bodegaDestino||""}))}:c)});
+    if(compraId) set({compras:compras.map(compraC=>compraC.id===compraId?{...compraC,items:(compraC.items||[]).map((it,i)=>({...it,bodegaDestino:items[i]?.bodegaDestino||it.bodegaDestino||""}))}:compraC)});
   };
 
   // ── Categorías predefinidas ───────────────────────────────────────────────
@@ -6609,10 +6609,10 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     const notasVinculadas = form.notasVinculadas||[];
     console.log("GUARDANDO:", doc.tipoDoc, doc.nDocumento, "notas vinculadas:", notasVinculadas.length);
     if(editId) {
-      set({compras:compras.map(compraC=>compraC.id===editId?doc:c)});
+      set({compras:compras.map(compraC=>compraC.id===editId?doc:compraC)});
       setEditId(null);
     } else {
-      set({compras:[doc,...compras.map(compraC=>notasVinculadas.includes(compraC.id)?{...c,estado:"facturada",facturaId:docId}:c)]});
+      set({compras:[doc,...compras.map(compraC=>notasVinculadas.includes(compraC.id)?{...compraC,estado:"facturada",facturaId:docId}:compraC)]});
       // Ingresar ítems a bodegas
       if(doc.tipoDoc==="Nota de Crédito") {
         // NC: descontar stock de bodega
@@ -6639,7 +6639,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
       const estadoLabel = compra.estado==="pagada"?"ya fue pagada por transferencia":compra.estado==="pagada_efectivo"?"ya fue pagada en efectivo":compra.estado==="rendida"?"ya fue rendida":"está en proceso de rendición";
       if(!window.confirm(`⚠️ Esta factura ${estadoLabel}. ¿Deseas marcarla como pagada de todas formas?`)) return;
     }
-    set({compras:compras.map(compraC=>compraC.id===id?{...compraC,estado:"pagada",formaPago:forma,fechaPago:c.fechaPago||hoy.toISOString().slice(0,10)}:c)});
+    set({compras:compras.map(compraC=>compraC.id===id?{...compraC,estado:"pagada",formaPago:forma,fechaPago:c.fechaPago||hoy.toISOString().slice(0,10)}:compraC)});
   };
 
   // ── Rendición ─────────────────────────────────────────────────────────────
@@ -6648,7 +6648,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     const items = compras.filter(c=>seleccionadas.includes(c.id));
     const total = items.reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
     const nueva = {id:Date.now(),fecha:rendForm.fecha,obs:rendForm.obs,items:seleccionadas,total,estado:"presentada",reembolso:false,montoReembolso:0,fechaReembolso:"",nTransReembolso:""};
-    set({compras:compras.map(compraC=>seleccionadas.includes(compraC.id)?{...compraC,estado:"en_rendicion"}:c),rendiciones:[nueva,...rendiciones]});
+    set({compras:compras.map(compraC=>seleccionadas.includes(compraC.id)?{...compraC,estado:"en_rendicion"}:compraC),rendiciones:[nueva,...rendiciones]});
     setSeleccionadas([]); setRendForm({fecha:hoy.toISOString().slice(0,10),obs:""}); setShowRendForm(false);
   };
 
@@ -6656,7 +6656,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     if(!reembolsoForm.monto) return;
     set({
       rendiciones:rendiciones.map(r=>r.id===rendId?{...r,reembolso:true,estado:"reembolsada",montoReembolso:Number(reembolsoForm.monto),fechaReembolso:reembolsoForm.fecha,nTransReembolso:reembolsoForm.nTransferencia,bancoReembolso:reembolsoForm.banco,obsReembolso:reembolsoForm.obs}:r),
-      compras:compras.map(compraC=>rendiciones.find(r=>r.id===rendId)?.items?.includes(compraC.id)?{...compraC,estado:"rendida"}:c),
+      compras:compras.map(compraC=>rendiciones.find(r=>r.id===rendId)?.items?.includes(compraC.id)?{...compraC,estado:"rendida"}:compraC),
     });
     setReembolsoForm({fecha:hoy.toISOString().slice(0,10),monto:"",banco:"",nTransferencia:"",obs:""});
     setShowReembolsoForm(false);
@@ -6668,7 +6668,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     if(!rend) return;
     set({
       rendiciones: rendiciones.filter(r=>r.id!==rendId),
-      compras: compras.map(compraC=>rend.items?.includes(compraC.id)?{...compraC,estado:"pagada"}:c),
+      compras: compras.map(compraC=>rend.items?.includes(compraC.id)?{...compraC,estado:"pagada"}:compraC),
     });
   };
 
