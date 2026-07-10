@@ -13058,6 +13058,116 @@ function PanelFrecuenciasZona({ S, zonas, getAllElems, getZD, setElemFrecs, esJe
   );
 }
 
+function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZONAS_BASE, personal, tareasEditables, setTareasEditables, onGuardar, onClose }) {
+  const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
+  return (
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.8)",zIndex:2000,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,overflowY:"auto"}} onClick={onClose}>
+      <div style={{background:"#0f2417",border:"1px solid rgba(239,68,68,0.3)",borderRadius:14,padding:24,width:"100%",maxWidth:560,marginTop:20,marginBottom:20}} onClick={e=>e.stopPropagation()}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#fca5a5"}}>+ Nueva alerta / incidencia</div>
+          <button onClick={onClose} style={{background:"transparent",border:"none",color:"#5a9a7a",fontSize:20,cursor:"pointer"}}>✕</button>
+        </div>
+
+        {/* Tipo */}
+        <div style={{marginBottom:12}}>
+          <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.5px"}}>Tipo de alerta</label>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
+            {TIPOS_ALERTA.map(t=>(
+              <button key={t.id} onClick={()=>setAlertaForm(p=>({...p,tipo:t.id}))}
+                style={{...S.btn,padding:"7px 10px",textAlign:"left",fontSize:12,
+                  background:alertaForm.tipo===t.id?"rgba(239,68,68,0.12)":"rgba(255,255,255,0.03)",
+                  border:`1px solid ${alertaForm.tipo===t.id?"rgba(239,68,68,0.4)":"rgba(255,255,255,0.08)"}`,
+                  color:alertaForm.tipo===t.id?"#fca5a5":"#7aaa80"}}>
+                {t.icon} {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Zonas */}
+        <div style={{marginBottom:12}}>
+          <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.5px"}}>Zona(s) afectada(s)</label>
+          <div style={{display:"flex",flexWrap:"wrap",gap:4,maxHeight:110,overflowY:"auto"}}>
+            {[...MACROZONAS_BASE].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(z=>(
+              <button key={z.id} onClick={()=>setAlertaForm(p=>({...p,zonas:p.zonas.includes(z.nombre)?p.zonas.filter(x=>x!==z.nombre):[...p.zonas,z.nombre]}))}
+                style={{...S.btn,fontSize:10,padding:"2px 8px",
+                  background:alertaForm.zonas.includes(z.nombre)?"rgba(239,68,68,0.15)":"rgba(255,255,255,0.03)",
+                  color:alertaForm.zonas.includes(z.nombre)?"#fca5a5":"#7aaa80",
+                  border:`1px solid ${alertaForm.zonas.includes(z.nombre)?"rgba(239,68,68,0.3)":"rgba(255,255,255,0.08)"}`}}>
+                {z.icono} {z.nombre}
+              </button>
+            ))}
+          </div>
+          {alertaForm.zonas.length>0&&<div style={{fontSize:11,color:"#fca5a5",marginTop:4}}>{alertaForm.zonas.join(", ")}</div>}
+        </div>
+
+        {/* Datos básicos */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+          <div>
+            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Origen</label>
+            <select style={S.input} value={alertaForm.origen} onChange={e=>setAlertaForm(p=>({...p,origen:e.target.value}))}>
+              <option value="interna">🔍 Observación interna</option>
+              <option value="externa">📡 Reporte externo</option>
+              <option value="meteorologica">🌧️ Servicio meteorológico</option>
+              <option value="gerencia">🏢 Gerencia / Administración</option>
+            </select>
+          </div>
+          <div>
+            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Urgencia</label>
+            <select style={S.input} value={alertaForm.urgencia} onChange={e=>setAlertaForm(p=>({...p,urgencia:e.target.value}))}>
+              <option value="inmediata">🔴 Inmediata</option>
+              <option value="alta">🟠 Alta</option>
+              <option value="media">🟡 Media</option>
+            </select>
+          </div>
+          <div style={{gridColumn:"1/-1"}}>
+            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Descripción</label>
+            <input style={S.input} value={alertaForm.descripcion} onChange={e=>setAlertaForm(p=>({...p,descripcion:e.target.value}))} placeholder="Describe la situación..."/>
+          </div>
+          <div>
+            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Fecha</label>
+            <input type="date" style={S.input} value={alertaForm.fecha} onChange={e=>setAlertaForm(p=>({...p,fecha:e.target.value}))}/>
+          </div>
+          <div>
+            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Responsable</label>
+            <select style={S.input} value={alertaForm.responsable} onChange={e=>setAlertaForm(p=>({...p,responsable:e.target.value}))}>
+              <option value="">Sin asignar</option>
+              {personalArr.map(mnaP=><option key={mnaP.id} value={mnaP.nombre}>{mnaP.nombre}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* Tareas editables */}
+        <div style={{marginBottom:14}}>
+          <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.5px"}}>Tareas a generar (edita antes de confirmar)</label>
+          {tareasEditables.map((t,i)=>(
+            <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,padding:"6px 10px",background:"rgba(255,255,255,0.03)",borderRadius:8,border:"1px solid rgba(255,255,255,0.06)"}}>
+              <input type="checkbox" checked={t.incluir} onChange={()=>setTareasEditables(p=>p.map((x,j)=>j===i?{...x,incluir:!x.incluir}:x))} style={{cursor:"pointer"}}/>
+              <input style={{...S.input,flex:2,fontSize:12,padding:"3px 8px"}} value={t.texto} onChange={e=>setTareasEditables(p=>p.map((x,j)=>j===i?{...x,texto:e.target.value}:x))}/>
+              <select style={{...S.input,flex:1,fontSize:11,padding:"3px 6px"}} value={t.responsable} onChange={e=>setTareasEditables(p=>p.map((x,j)=>j===i?{...x,responsable:e.target.value}:x))}>
+                <option value="">Sin asignar</option>
+                {personalArr.map(mnaP=><option key={mnaP.id} value={mnaP.nombre}>{mnaP.nombre.split(" ")[0]}</option>)}
+              </select>
+              <button onClick={()=>setTareasEditables(p=>p.filter((_,j)=>j!==i))} style={{background:"transparent",border:"none",color:"#5a9a7a",cursor:"pointer",fontSize:14}}>✕</button>
+            </div>
+          ))}
+          <button onClick={()=>setTareasEditables(p=>[...p,{id:Date.now(),texto:"",incluir:true,responsable:""}])}
+            style={{...S.btn,fontSize:11,color:"#34d399",background:"rgba(52,211,153,0.06)",border:"1px solid rgba(52,211,153,0.2)"}}>
+            + Agregar tarea
+          </button>
+        </div>
+
+        <div style={{display:"flex",gap:8}}>
+          <button className="btn-p" style={{...S.btn,flex:1,background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}}
+            disabled={!alertaForm.zonas.length||!alertaForm.descripcion.trim()}
+            onClick={onGuardar}>🚨 Registrar alerta y generar cierre</button>
+          <button className="btn-g" style={S.btn} onClick={onClose}>Cancelar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotificaciones, marcarTodasLeidas, notifNoLeidas, MACROZONAS_BASE, personal, tareasProg, setTareasProg, limpiarUndef, fechaLocal, crearNotificacion, esJefa }) {
   const [tabAlerta, setTabAlerta] = React.useState("incidencias");
   const [showNuevaAlerta, setShowNuevaAlerta] = React.useState(false);
@@ -13256,6 +13366,22 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
         {esJefa&&<button className="btn-p" style={{...S.btn,background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}} onClick={()=>setShowNuevaAlerta(true)}>+ Nueva alerta</button>}
       </div>
 
+      {/* MODAL NUEVA ALERTA — fuera del flujo para no mover contenido */}
+      {showNuevaAlerta&&(
+        <ModalNuevaAlerta
+          S={S}
+          alertaForm={alertaForm}
+          setAlertaForm={setAlertaForm}
+          TIPOS_ALERTA={TIPOS_ALERTA}
+          MACROZONAS_BASE={MACROZONAS_BASE}
+          personal={personal}
+          tareasEditables={tareasEditables}
+          setTareasEditables={setTareasEditables}
+          onGuardar={guardarAlerta}
+          onClose={()=>setShowNuevaAlerta(false)}
+        />
+      )}
+
       {/* Tabs */}
       <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>
         {[["incidencias","🚨 Activas",""],["viento","🌬️ Viento",""],["resueltas","✅ Resueltas",""],["notifs","🔔 Registros",""]].map(([t,l,badge])=>(
@@ -13267,113 +13393,7 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
         ))}
       </div>
 
-      {/* FORMULARIO NUEVA ALERTA */}
-      {showNuevaAlerta&&(
-        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.75)",zIndex:1000,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,overflowY:"auto"}} onClick={()=>setShowNuevaAlerta(false)}>
-          <div style={{background:"#0f2417",border:"1px solid rgba(239,68,68,0.3)",borderRadius:14,padding:24,width:"100%",maxWidth:560,marginTop:20,marginBottom:20}} onClick={e=>e.stopPropagation()}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-              <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#fca5a5"}}>+ Nueva alerta / incidencia</div>
-              <button onClick={()=>setShowNuevaAlerta(false)} style={{background:"transparent",border:"none",color:"#5a9a7a",fontSize:20,cursor:"pointer"}}>✕</button>
-            </div>
-          {/* Tipo */}
-          <div style={{marginBottom:12}}>
-            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.5px"}}>Tipo de alerta</label>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
-              {TIPOS_ALERTA.map(t=>(
-                <button key={t.id} onClick={()=>setAlertaForm(p=>({...p,tipo:t.id}))}
-                  style={{...S.btn,padding:"7px 10px",textAlign:"left",fontSize:12,
-                    background:alertaForm.tipo===t.id?"rgba(239,68,68,0.12)":"rgba(255,255,255,0.03)",
-                    border:`1px solid ${alertaForm.tipo===t.id?"rgba(239,68,68,0.4)":"rgba(255,255,255,0.08)"}`,
-                    color:alertaForm.tipo===t.id?"#fca5a5":"#7aaa80"}}>
-                  {t.icon} {t.label}
-                </button>
-              ))}
-            </div>
-          </div>
 
-          {/* Zonas */}
-          <div style={{marginBottom:12}}>
-            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.5px"}}>Zona(s) afectada(s)</label>
-            <div style={{display:"flex",flexWrap:"wrap",gap:4,maxHeight:110,overflowY:"auto"}}>
-              {[...MACROZONAS_BASE].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(z=>(
-                <button key={z.id} onClick={()=>setAlertaForm(p=>({...p,zonas:p.zonas.includes(z.nombre)?p.zonas.filter(x=>x!==z.nombre):[...p.zonas,z.nombre]}))}
-                  style={{...S.btn,fontSize:10,padding:"2px 8px",
-                    background:alertaForm.zonas.includes(z.nombre)?"rgba(239,68,68,0.15)":"rgba(255,255,255,0.03)",
-                    color:alertaForm.zonas.includes(z.nombre)?"#fca5a5":"#7aaa80",
-                    border:`1px solid ${alertaForm.zonas.includes(z.nombre)?"rgba(239,68,68,0.3)":"rgba(255,255,255,0.08)"}`}}>
-                  {z.icono} {z.nombre}
-                </button>
-              ))}
-            </div>
-            {alertaForm.zonas.length>0&&<div style={{fontSize:11,color:"#fca5a5",marginTop:4}}>{alertaForm.zonas.join(", ")}</div>}
-          </div>
-
-          {/* Datos básicos */}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
-            <div>
-              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Origen</label>
-              <select style={S.input} value={alertaForm.origen} onChange={e=>setAlertaForm(p=>({...p,origen:e.target.value}))}>
-                <option value="interna">🔍 Observación interna</option>
-                <option value="externa">📡 Reporte externo</option>
-                <option value="meteorologica">🌧️ Servicio meteorológico</option>
-                <option value="gerencia">🏢 Gerencia / Administración</option>
-              </select>
-            </div>
-            <div>
-              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Urgencia</label>
-              <select style={S.input} value={alertaForm.urgencia} onChange={e=>setAlertaForm(p=>({...p,urgencia:e.target.value}))}>
-                <option value="inmediata">🔴 Inmediata</option>
-                <option value="alta">🟠 Alta</option>
-                <option value="media">🟡 Media</option>
-              </select>
-            </div>
-            <div style={{gridColumn:"1/-1"}}>
-              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Descripción</label>
-              <input style={S.input} value={alertaForm.descripcion} onChange={e=>setAlertaForm(p=>({...p,descripcion:e.target.value}))} placeholder="Describe la situación..."/>
-            </div>
-            <div>
-              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Fecha</label>
-              <input type="date" style={S.input} value={alertaForm.fecha} onChange={e=>setAlertaForm(p=>({...p,fecha:e.target.value}))}/>
-            </div>
-            <div>
-              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Responsable</label>
-              <select style={S.input} value={alertaForm.responsable} onChange={e=>setAlertaForm(p=>({...p,responsable:e.target.value}))}>
-                <option value="">Sin asignar</option>
-                {personalArr.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
-              </select>
-            </div>
-          </div>
-
-          {/* Tareas editables */}
-          <div style={{marginBottom:14}}>
-            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.5px"}}>Tareas a generar (edita antes de confirmar)</label>
-            {tareasEditables.map((t,i)=>(
-              <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,padding:"6px 10px",background:"rgba(255,255,255,0.03)",borderRadius:8,border:"1px solid rgba(255,255,255,0.06)"}}>
-                <input type="checkbox" checked={t.incluir} onChange={()=>setTareasEditables(p=>p.map((x,j)=>j===i?{...x,incluir:!x.incluir}:x))} style={{cursor:"pointer"}}/>
-                <input style={{...S.input,flex:2,fontSize:12,padding:"3px 8px"}} value={t.texto} onChange={e=>setTareasEditables(p=>p.map((x,j)=>j===i?{...x,texto:e.target.value}:x))}/>
-                <select style={{...S.input,flex:1,fontSize:11,padding:"3px 6px"}} value={t.responsable} onChange={e=>setTareasEditables(p=>p.map((x,j)=>j===i?{...x,responsable:e.target.value}:x))}>
-                  <option value="">Sin asignar</option>
-                  {personalArr.map(p=><option key={p.id} value={p.nombre}>{p.nombre.split(" ")[0]}</option>)}
-                </select>
-                <button onClick={()=>setTareasEditables(p=>p.filter((_,j)=>j!==i))} style={{background:"transparent",border:"none",color:"#5a9a7a",cursor:"pointer",fontSize:14}}>✕</button>
-              </div>
-            ))}
-            <button onClick={()=>setTareasEditables(p=>[...p,{id:Date.now(),texto:"",incluir:true,responsable:""}])}
-              style={{...S.btn,fontSize:11,color:"#34d399",background:"rgba(52,211,153,0.06)",border:"1px solid rgba(52,211,153,0.2)"}}>
-              + Agregar tarea
-            </button>
-          </div>
-
-          <div style={{display:"flex",gap:8}}>
-            <button className="btn-p" style={{...S.btn,flex:1,background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}}
-              disabled={!alertaForm.zonas.length||!alertaForm.descripcion.trim()}
-              onClick={guardarAlerta}>🚨 Registrar alerta y generar cierre</button>
-            <button className="btn-g" style={S.btn} onClick={()=>setShowNuevaAlerta(false)}>Cancelar</button>
-          </div>
-
-          </div>
-        </div>
-      )}
 
       {/* PANEL VIENTO */}
       {tabAlerta==="viento"&&(
