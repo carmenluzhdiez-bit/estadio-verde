@@ -1094,9 +1094,9 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
   const dias = modoReporte==="semana" ? getDiasSemana(semanaBase) : getDiasRango(fechaDesde,fechaHasta);
 
   const normDia = (d) => {
-    const tvProg=tareasProg[tvD]; if(!tvProg) return [];
-    if(Array.isArray(v)) return v;
-    if(typeof v==="object") return Object.values(v).filter(Boolean);
+    const tvProg=tareasProg[d]; if(!tvProg) return [];
+    if(Array.isArray(tvProg)) return tvProg;
+    if(typeof tvProg==="object") return Object.values(tvProg).filter(Boolean);
     return [];
   };
   const todasTareas = dias.flatMap(d=>normDia(d).map(t=>({...t,fechaDia:d})));
