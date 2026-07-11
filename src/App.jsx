@@ -7928,6 +7928,142 @@ const PLANTILLA_PRE_TORNEO = {
 };
 
 // ─── ANÁLISIS MEDICIONES GOLF ────────────────────────────────────────────────
+function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisisTasas, colorCategoria, S }) {
+  const hoyProjStr = fechaLocal();
+  const diasSemana = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
+  const diasProx = Array.from({length:7},(_,i)=>{
+    const d = new Date(hoyProjStr+"T12:00:00"); d.setDate(d.getDate()+i);
+    const ds = d.toISOString().slice(0,10);
+    return {fecha:ds, label:i===0?"Hoy":i===1?"Mañana":diasSemana[(d.getDay()+6)%7]+" "+d.getDate()};
+  });
+
+  const todosLosCortes = Object.entries(tareasProg||{}).flatMap(([fecha,ts])=>{
+    const tsArr = Array.isArray(ts)?ts:(ts&&typeof ts==="object"?Object.values(ts):[]);
+    return tsArr.filter(t=>t&&
+      (t.estado==="hecha"||t.estado==="completada") &&
+      (t.tarea||"").toLowerCase().includes("corte") &&
+      (t.zona==="Golf"||(t.zona||"").includes("Golf"))
+    ).map(t=>({fecha, alturaCorte:t.alturaCorteReal?Number(t.alturaCorteReal):(t.alturaCorte?Number(t.alturaCorte):null), tarea:t.tarea||"", elemento:t.elemento||""}));
+  }).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+
+  const zonasDatos = ZONAS.map(z=>{
+    const anal = analisisTasas(z.id);
+    const ultMed = [...medOrdenadas].reverse().find(m=>m.alturas?.[z.id]);
+    const zonaNum = z.id.replace(/[^0-9]/g,"");
+    const corteRecZ = todosLosCortes.find(c=>{
+      const elem = c.elemento.toLowerCase();
+      const tar = c.tarea.toLowerCase();
+      if(z.id.includes("vivero")) return elem.includes("vivero")||tar.includes("vivero");
+      return (zonaNum && elem.includes(`green ${zonaNum.padStart(2,"0")}`)) ||
+             (zonaNum && elem.includes(`green ${Number(zonaNum)}`)) ||
+             (zonaNum && tar.includes(`green ${zonaNum.padStart(2,"0")}`)) ||
+             tar.includes("todos") || elem.includes("todos");
+    });
+
+    let altBase, fechaBase, baseOrigen;
+    if(ultMed && (!corteRecZ || ultMed.fecha >= corteRecZ.fecha)) {
+      altBase = Number(ultMed.alturas[z.id]);
+      fechaBase = ultMed.fecha;
+      baseOrigen = "medicion";
+    } else if(corteRecZ && corteRecZ.alturaCorte) {
+      altBase = corteRecZ.alturaCorte;
+      fechaBase = corteRecZ.fecha;
+      baseOrigen = "corte";
+    } else if(ultMed) {
+      const diasDesdeUltMed = Math.round((new Date(hoyProjStr+"T12:00:00")-new Date(ultMed.fecha+"T12:00:00"))/(1000*60*60*24));
+      if(diasDesdeUltMed > 7) return null;
+      altBase = Number(ultMed.alturas[z.id]);
+      fechaBase = ultMed.fecha;
+      baseOrigen = "medicion_antigua";
+    } else return null;
+
+    const tasaGlobal = anal ? anal.tasaGlobal : null;
+    const tasasCalc = calcTasa(z.id);
+    const ultimaTasaReal = tasasCalc && tasasCalc.length > 0 ? tasasCalc[tasasCalc.length-1] : null;
+    const tasaReal = ultimaTasaReal ? ultimaTasaReal.tasa : null;
+    const diasUltimoIntervalo = ultimaTasaReal ? ultimaTasaReal.dias : null;
+    const deltaUltimo = ultimaTasaReal ? ultimaTasaReal.delta : null;
+    const tasaUsar = tasaReal !== null ? tasaReal : (tasaGlobal || 0.4);
+    const categoria = anal ? anal.categoria : "Sin datos";
+
+    const proj = diasProx.map(d=>{
+      const diasDesde = Math.round((new Date(d.fecha+"T12:00:00")-new Date(fechaBase+"T12:00:00"))/(1000*60*60*24));
+      const altProj = Math.round((altBase + tasaUsar*Math.max(0,diasDesde))*10)/10;
+      return {...d, altProj, diasDesde};
+    });
+    return {zona:z, tasaGlobal, tasaReal, diasUltimoIntervalo, deltaUltimo, altBase, fechaBase, baseOrigen, proj, categoria};
+  }).filter(Boolean);
+
+  if(!zonasDatos.length) return null;
+
+  const altCorte = 4.5;
+  return (
+    <div style={{...S.card,padding:16,marginBottom:14}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <div style={{fontSize:13,fontWeight:700,color:"#60a5fa"}}>📅 Proyección semanal de altura (mm)</div>
+        <div style={{fontSize:10,color:"#5a9a7a"}}>⬛ desde medición · ✂️ desde corte · Umbral: {altCorte}mm</div>
+      </div>
+      <div style={{overflowX:"auto"}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:500}}>
+          <thead>
+            <tr style={{background:"rgba(96,165,250,0.08)"}}>
+              <th style={{padding:"6px 10px",textAlign:"left",color:"#60a5fa",fontWeight:700,fontSize:10,textTransform:"uppercase"}}>Green</th>
+              <th style={{padding:"6px 8px",textAlign:"center",color:"#fbbf24",fontSize:10,fontWeight:700}}>Tasa real</th>
+              <th style={{padding:"6px 8px",textAlign:"center",color:"#5a9a7a",fontSize:10}}>Histórica</th>
+              {diasProx.map(prD=>(
+                <th key={prD.fecha} style={{padding:"6px 8px",textAlign:"center",color:"#60a5fa",fontSize:10,fontWeight:700}}>{prD.label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {zonasDatos.map(({zona,tasaGlobal,tasaReal,diasUltimoIntervalo,deltaUltimo,altBase,fechaBase,baseOrigen,proj,categoria})=>(
+              <tr key={zona.id} style={{borderTop:"1px solid rgba(255,255,255,0.05)"}}>
+                <td style={{padding:"7px 10px",fontWeight:600,fontSize:12}}>
+                  {zona.nombre}
+                  <span style={{fontSize:9,marginLeft:4,color:baseOrigen==="corte"?"#60a5fa":"#34d399",background:"rgba(255,255,255,0.05)",padding:"1px 5px",borderRadius:4}}>
+                    {baseOrigen==="corte"?"✂️":baseOrigen==="medicion"?"📏":"📏?"}
+                  </span>
+                  <span style={{fontSize:9,display:"block",color:"#4a7a5a"}}>{altBase}mm · {fechaBase}</span>
+                </td>
+                <td style={{padding:"7px 8px",textAlign:"center",fontSize:12,fontWeight:700}}>
+                  {tasaReal!==null
+                    ? <span style={{color:"#fbbf24"}}>
+                        {tasaReal>0?"+":""}{tasaReal}
+                        {diasUltimoIntervalo&&<span style={{fontSize:9,color:"#5a9a7a",display:"block"}}>{diasUltimoIntervalo}d·+{deltaUltimo}mm</span>}
+                      </span>
+                    : <span style={{color:"#4a7a5a"}}>—</span>
+                  }
+                </td>
+                <td style={{padding:"7px 8px",textAlign:"center",color:colorCategoria(categoria),fontSize:11}}>{tasaGlobal?`${tasaGlobal>0?"+":""}${tasaGlobal}`:"—"}</td>
+                {proj.map((prD2,i)=>{
+                  const sobreCorte = prD2.altProj > altCorte;
+                  const muyAlto = prD2.altProj > altCorte * 1.3;
+                  return (
+                    <td key={prD2.fecha} style={{
+                      padding:"7px 8px",textAlign:"center",fontSize:12,fontWeight:600,
+                      color:muyAlto?"#ef4444":sobreCorte?"#f59e0b":"#22c55e",
+                      background:i===0?"rgba(96,165,250,0.06)":"transparent",
+                      borderLeft:i===0?"1px solid rgba(96,165,250,0.2)":"none",
+                    }}>
+                      {prD2.altProj.toFixed(1)}
+                      {muyAlto&&<span style={{fontSize:8,marginLeft:2}}>⚠️</span>}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div style={{display:"flex",gap:12,marginTop:8,fontSize:10,color:"#5a9a7a",flexWrap:"wrap"}}>
+        <span>🟢 Bajo umbral ({altCorte}mm)</span>
+        <span>🟡 Sobre umbral — considerar corte</span>
+        <span>🔴 Muy sobre umbral — corte urgente</span>
+      </div>
+    </div>
+  );
+}
+
 function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJefa, onBorrar, onBorrarTodo, tareasProg }) {
   const ZONAS = [...GREENS_DEF,{id:"vivero",nombre:"Vivero",hoyos:"Vivero"}].map((g,gi)=>({id:g.id,nombre:g.nombre,hoyos:g.hoyos,color:["#34d399","#60a5fa","#f59e0b","#a78bfa","#f472b6","#22d3ee","#fb923c","#86efac","#fcd34d","#4ade80"][gi]||"#34d399"}));
   const COLORES_ZONA = {
@@ -8455,157 +8591,7 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
         )}
 
         {/* ── PROYECCIÓN SEMANAL ── */}
-        {vistaGrafico==="tasas"&&(()=>{
-          // Fecha local Chile (evitar desfase UTC)
-          const hoyProjStr = fechaLocal();
-          const diasSemana = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
-          const diasProx = Array.from({length:7},(_,i)=>{
-            const d = new Date(hoyProjStr+"T12:00:00"); d.setDate(d.getDate()+i);
-            const ds = d.toISOString().slice(0,10);
-            return {fecha:ds, label:i===0?"Hoy":i===1?"Mañana":diasSemana[(d.getDay()+6)%7]+" "+d.getDate()};
-          });
-
-          // Corte más reciente de TODOS los greens (ayer o antes)
-          // Para greens sin medición reciente, usar la altura del último corte como base
-          const todosLosCortes = Object.entries(tareasProg||{}).flatMap(([fecha,ts])=>
-            (Array.isArray(ts)?ts:Object.values(ts||{})).filter(t=>
-              (t.estado==="hecha"||t.estado==="completada") &&
-              (t.tarea||"").toLowerCase().includes("corte") &&
-              (t.zona==="Golf"||(t.zona||"").includes("Golf"))
-            ).map(t=>({fecha, alturaCorte:t.alturaCorteReal?Number(t.alturaCorteReal):(t.alturaCorte?Number(t.alturaCorte):null), tarea:t.tarea||"", elemento:t.elemento||""}))
-          ).sort((a,b)=>b.fecha.localeCompare(a.fecha)); // más reciente primero
-
-          const zonasDatos = ZONAS.map(z=>{
-            const anal = analisisTasas(z.id);
-            // Última medición real
-            const ultMed = [...medOrdenadas].reverse().find(m=>m.alturas?.[z.id]);
-            
-            // Buscar el corte más reciente para esta zona
-            const zonaNum = z.id.replace(/\D/g,"");
-            const corteRecZ = todosLosCortes.find(c=>{
-              const elem = c.elemento.toLowerCase();
-              const tar = c.tarea.toLowerCase();
-              if(z.id.includes("vivero")) return elem.includes("vivero")||tar.includes("vivero");
-              return elem.includes(`green ${zonaNum.padStart(2,"0")}`) ||
-                     elem.includes(`green ${Number(zonaNum)}`) ||
-                     tar.includes(`green ${zonaNum.padStart(2,"0")}`) ||
-                     tar.includes("todos") || elem.includes("todos");
-            });
-
-            // Determinar base de proyección:
-            // Si hay medición MÁS RECIENTE que el corte → usar medición
-            // Si hay corte MÁS RECIENTE que la medición → usar altura del corte
-            // Si no hay medición ni corte → saltar
-            let altBase, fechaBase, baseOrigen;
-            if(ultMed && (!corteRecZ || ultMed.fecha >= corteRecZ.fecha)) {
-              // Medición más reciente (o no hay corte)
-              altBase = Number(ultMed.alturas[z.id]);
-              fechaBase = ultMed.fecha;
-              baseOrigen = "medicion";
-            } else if(corteRecZ && corteRecZ.alturaCorte) {
-              // Corte más reciente y tiene altura registrada
-              altBase = corteRecZ.alturaCorte;
-              fechaBase = corteRecZ.fecha;
-              baseOrigen = "corte";
-            } else if(ultMed) {
-              // Solo hay medición histórica — solo proyectar si es reciente (≤7 días)
-              const diasDesdeUltMed = Math.round((new Date(hoyProjStr+"T12:00:00")-new Date(ultMed.fecha+"T12:00:00"))/(1000*60*60*24));
-              if(diasDesdeUltMed > 7) return null; // muy antigua, no proyectar
-              altBase = Number(ultMed.alturas[z.id]);
-              fechaBase = ultMed.fecha;
-              baseOrigen = "medicion_antigua";
-            } else {
-              return null; // sin datos
-            }
-
-            const tasaGlobal = anal ? anal.tasaGlobal : null;
-            const tasasCalc = calcTasa(z.id);
-            const ultimaTasaReal = tasasCalc && tasasCalc.length > 0 ? tasasCalc[tasasCalc.length-1] : null;
-            const tasaReal = ultimaTasaReal ? ultimaTasaReal.tasa : null;
-            const diasUltimoIntervalo = ultimaTasaReal ? ultimaTasaReal.dias : null;
-            const deltaUltimo = ultimaTasaReal ? ultimaTasaReal.delta : null;
-            const tasaUsar = tasaReal !== null ? tasaReal : (tasaGlobal || 0.4); // fallback 0.4mm/d
-            const categoria = anal ? anal.categoria : "Sin datos";
-
-            const proj = diasProx.map(d=>{
-              const diasDesde = Math.round((new Date(d.fecha+"T12:00:00")-new Date(fechaBase+"T12:00:00"))/(1000*60*60*24));
-              const altProj = Math.round((altBase + tasaUsar*Math.max(0,diasDesde))*10)/10;
-              return {...d, altProj, diasDesde};
-            });
-            return {zona:z, tasaGlobal, tasaReal, diasUltimoIntervalo, deltaUltimo, altBase, fechaBase, baseOrigen, proj, categoria};
-          }).filter(Boolean);
-
-          if(!zonasDatos.length) return null;
-
-          // Altura de corte estándar (la más reciente registrada)
-          const altCorte = 4.5; // valor por defecto visible
-
-          return (
-            <div style={{...S.card,padding:16,marginBottom:14}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-                <div style={{fontSize:13,fontWeight:700,color:"#60a5fa"}}>📅 Proyección semanal de altura (mm)</div>
-                <div style={{fontSize:10,color:"#5a9a7a"}}>Basado en tasa histórica · Línea punteada = altura de corte ({altCorte}mm)</div>
-              </div>
-              <div style={{overflowX:"auto"}}>
-                <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:500}}>
-                  <thead>
-                    <tr style={{background:"rgba(96,165,250,0.08)"}}>
-                      <th style={{padding:"6px 10px",textAlign:"left",color:"#60a5fa",fontWeight:700,fontSize:10,textTransform:"uppercase"}}>Green</th>
-                      <th style={{padding:"6px 8px",textAlign:"center",color:"#fbbf24",fontSize:10,fontWeight:700}}>Tasa real</th>
-                      <th style={{padding:"6px 8px",textAlign:"center",color:"#5a9a7a",fontSize:10}}>Histórica</th>
-                      {diasProx.map(d=>(
-                        <th key={d.fecha} style={{padding:"6px 8px",textAlign:"center",color:"#60a5fa",fontSize:10,fontWeight:700}}>{d.label}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {zonasDatos.map(({zona,tasaGlobal,tasaReal,diasUltimoIntervalo,deltaUltimo,altBase,proj,categoria})=>(
-                      <tr key={zona.id} style={{borderTop:"1px solid rgba(255,255,255,0.05)"}}>
-                        <td style={{padding:"7px 10px",fontWeight:600,fontSize:12}}>
-                          {zona.nombre}
-                          <span style={{fontSize:9,marginLeft:4,color:baseOrigen==="corte"?"#60a5fa":baseOrigen==="medicion"?"#34d399":"#f59e0b",background:"rgba(255,255,255,0.05)",padding:"1px 5px",borderRadius:4}}>
-                            {baseOrigen==="corte"?"✂️ desde corte":baseOrigen==="medicion"?"📏 desde medición":"📏 med. antigua"}
-                          </span>
-                          <span style={{fontSize:9,display:"block",color:"#4a7a5a"}}>{altBase}mm · {fechaBase}</span>
-                        </td>
-                        <td style={{padding:"7px 8px",textAlign:"center",fontSize:12,fontWeight:700}}>
-                          {tasaReal!==null
-                            ? <span style={{color:"#fbbf24"}}>
-                                {tasaReal>0?"+":""}{tasaReal}
-                                {diasUltimoIntervalo&&<span style={{fontSize:9,color:"#5a9a7a",display:"block"}}>{diasUltimoIntervalo}d · +{deltaUltimo}mm</span>}
-                              </span>
-                            : <span style={{color:"#4a7a5a"}}>—</span>
-                          }
-                        </td>
-                        <td style={{padding:"7px 8px",textAlign:"center",color:colorCategoria(categoria),fontSize:11}}>{tasaGlobal>0?"+":""}{tasaGlobal}</td>
-                        {proj.map((d,i)=>{
-                          const sobreCorte = d.altProj > altCorte;
-                          const muyAlto = d.altProj > altCorte * 1.3;
-                          return (
-                            <td key={d.fecha} style={{
-                              padding:"7px 8px",textAlign:"center",fontSize:12,fontWeight:600,
-                              color:muyAlto?"#ef4444":sobreCorte?"#f59e0b":"#22c55e",
-                              background:i===0?"rgba(96,165,250,0.06)":"transparent",
-                              borderLeft:i===0?"1px solid rgba(96,165,250,0.2)":"none",
-                            }}>
-                              {d.altProj.toFixed(1)}
-                              {muyAlto&&<span style={{fontSize:8,marginLeft:2}}>⚠️</span>}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div style={{display:"flex",gap:12,marginTop:8,fontSize:10,color:"#5a9a7a",flexWrap:"wrap"}}>
-                <span>🟢 Por debajo del umbral de corte ({altCorte}mm)</span>
-                <span>🟡 Sobre umbral — considerar corte</span>
-                <span>🔴 Muy sobre umbral — corte urgente</span>
-              </div>
-            </div>
-          );
-        })()}
+        {vistaGrafico==="tasas"&&<ProyeccionSemanal ZONAS={ZONAS} medOrdenadas={medOrdenadas} tareasProg={tareasProg} calcTasa={calcTasa} analisisTasas={analisisTasas} colorCategoria={colorCategoria} S={S}/>}
       </>)}
 
       {/* Historial individual con borrar */}
