@@ -13168,7 +13168,7 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
   );
 }
 
-function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotificaciones, marcarTodasLeidas, notifNoLeidas, MACROZONAS_BASE, personal, tareasProg, setTareasProg, limpiarUndef, fechaLocal, crearNotificacion, esJefa }) {
+function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotificaciones, marcarTodasLeidas, notifNoLeidas, MACROZONAS_BASE, personal, tareasProg, setTareasProg, crearNotificacion, esJefa }) {
   const [tabAlerta, setTabAlerta] = React.useState("incidencias");
   const [showNuevaAlerta, setShowNuevaAlerta] = React.useState(false);
   const [alertaSelId, setAlertaSelId] = React.useState(null);
@@ -13751,7 +13751,7 @@ export default function App() {
       if(arr.length>0){
         const fbP = arr.find(x=>x.email?.toLowerCase()===fbUser.email?.toLowerCase());
         if(p){
-          setWorkerLogueado(p.id);
+          setWorkerLogueado(fbP.id);
           setVistaWorker(true);
           setVista("miturno");
         }
@@ -14418,7 +14418,7 @@ export default function App() {
                 const dzd=getZD(z.id); const est=ESTADOS_ZONA[dzd.estadoGeneral||"bueno"];
                 const allElems=getAllElems(z.id);
                 const criticos=allElems.filter(e=>e.edData.estado==="critico").length;
-                const pendTareas=(d.tareas||[]).filter(t=>!t.completada).length;
+                const pendTareas=(dzd.tareas||[]).filter(t=>!t.completada).length;
                 return (
                   <div key={z.id}
                     style={{
@@ -14874,23 +14874,23 @@ export default function App() {
                     const dzd2=getZD(z.id);
                     const allE=getAllElems(z.id);
                     const crit=allE.filter(e=>e.edData.estado==="critico").length;
-                    const pend=(d.tareas||[]).filter(t=>!t.completada).length;
+                    const pend=(dzd2.tareas||[]).filter(t=>!t.completada).length;
                     const COLORES={bueno:"#166534",regular:"#92400e",critico:"#991b1b",mantenimiento:"#1e40af"};
                     const LABELS={bueno:"Bueno",regular:"Regular",critico:"Crítico",mantenimiento:"En Mantenimiento"};
                     return "<tr>"
                       +"<td>"+z.icono+" "+z.nombre+"</td>"
                       +"<td>"+z.categoria+"</td>"
-                      +"<td style='color:"+COLORES[d.estadoGeneral||"bueno"]+";font-weight:600'>"+LABELS[d.estadoGeneral||"bueno"]+"</td>"
+                      +"<td style='color:"+COLORES[dzd2.estadoGeneral||"bueno"]+";font-weight:600'>"+LABELS[dzd2.estadoGeneral||"bueno"]+"</td>"
                       +"<td style='text-align:center'>"+allE.length+"</td>"
                       +"<td style='text-align:center;color:"+(crit>0?"#991b1b":"#166534")+"'>"+(crit>0?"🔴 "+crit:"—")+"</td>"
-                      +"<td>"+(d.ultimoMant||"—")+"</td>"
-                      +"<td>"+(d.proximoMant||"—")+"</td>"
+                      +"<td>"+(dzd2.ultimoMant||"—")+"</td>"
+                      +"<td>"+(dzd2.proximoMant||"—")+"</td>"
                       +"<td style='text-align:center;color:"+(pend>0?"#92400e":"#166534")+"'>"+(pend>0?"⚠️ "+pend:"✅ 0")+"</td>"
                       +"</tr>";
                   }).join("");
                   const estadoStats = Object.entries({bueno:{label:"Bueno",color:"#166534"},regular:{label:"Regular",color:"#92400e"},critico:{label:"Crítico",color:"#991b1b"},mantenimiento:{label:"En Mant.",color:"#1e40af"}}).map(([k,v])=>{
                     const statC=MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral===k).length;
-                    return "<span style='color:"+v.color+";font-weight:700'>"+v.label+": "+c+"</span>";
+                    return "<span style='color:"+v.color+";font-weight:700'>"+v.label+": "+statC+"</span>";
                   }).join(" &nbsp;·&nbsp; ");
                   const html = "<!DOCTYPE html><html lang='es'><head><meta charset='UTF-8'>"
                     +"<title>Reporte Áreas Verdes — Estadio Español</title>"
@@ -15384,7 +15384,7 @@ export default function App() {
 
         {/* ── ALERTAS / NOTIFICACIONES ── */}
         {vista==="notificaciones"&&(
-          <PanelAlertas S={S} incidencias={incidencias} setIncidencias={setIncidencias} notificaciones={notificaciones} setNotificaciones={setNotificaciones} marcarTodasLeidas={marcarTodasLeidas} notifNoLeidas={notifNoLeidas} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} tareasProg={tareasProg} setTareasProg={setTareasProg} limpiarUndef={limpiarUndef} fechaLocal={fechaLocal} crearNotificacion={crearNotificacion} esJefa={esJefa}/>
+          <PanelAlertas S={S} incidencias={incidencias} setIncidencias={setIncidencias} notificaciones={notificaciones} setNotificaciones={setNotificaciones} marcarTodasLeidas={marcarTodasLeidas} notifNoLeidas={notifNoLeidas} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} tareasProg={tareasProg} setTareasProg={setTareasProg} crearNotificacion={crearNotificacion} esJefa={esJefa}/>
         )}
 
         {showCierreSectorial&&<ModalCierreSectorial S={S} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} onClose={()=>setShowCierreSectorial(false)}/>}
