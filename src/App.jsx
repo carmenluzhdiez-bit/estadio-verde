@@ -13479,8 +13479,1916 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
           })}
         </div>
       )}
+      {showCierreSectorial&&<ModalCierreSectorial S={S} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} onClose={()=>setShowCierreSectorial(false)}/>}
+      {showCierreSectorial&&<ModalCierreSectorial S={S} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} onClose={()=>setShowCierreSectorial(false)}/>}
     </div>
   );
 }
 
+export default function App() {
+  const [zonas, setZonas] = useState(()=>MACROZONAS_BASE);
+  const [vista, setVista] = useState("dashboard");
+  const [zonaId, setZonaId] = useState(null);
+  const [tab, setTab] = useState("elementos");
+  const [filtroCat, setFiltroCat] = useState("Todas");
+  const [macrozonasCust, setMacrozonasCust] = useState([]);
+  // Combinar zonas base con personalizadas — debe ir después de ambos estados
+  const zonasConCust = React.useMemo(()=>[...zonas,...macrozonasCust],[zonas,macrozonasCust]);
+  const [showNuevaMacrozona, setShowNuevaMacrozona] = useState(false);
+  const [nuevaMacrozona, setNuevaMacrozona] = useState(()=>({nombre:"",categoria:"Calles y Accesos",icono:"🌿",descripcion:""}));
+  const [filtroEst, setFiltroEst] = useState("Todos");
+  const [busq, setBusq] = useState("");
+  const [showAddElem, setShowAddElem] = useState(false);
+  const [newElem, setNewElem] = useState(()=>({ nombre:"", tipo:"arboles" }));
+  const [nuevaTarea, setNuevaTarea] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiText, setAiText] = useState("");
+  const [editElem, setEditElem] = useState(null);
+  const [showPlantacionForm, setShowPlantacionForm] = useState(null);
 
+  const ejecutarDescuentoStock = (descuentos) => {
+    if(!descuentos||!descuentos.length) return;
+    const nuevoBodegasData = {...bodegasData};
+    descuentos.forEach(({bodegaId, itemId, cantidad, nombre, unidad, fecha})=>{
+      const bd = nuevoBodegasData[bodegaId]||{items:[],movimientos:[]};
+      const items = (bd.items||[]).map(i=>String(i.id)===String(itemId)?{...i,stockActual:Math.max(0,(Number(i.stockActual)||0)-Number(cantidad))}:i);
+      const movimientos = [{id:Date.now()+Math.random(),fecha:fecha||new Date().toISOString().slice(0,10),tipo:"salida",cantidad:Number(cantidad),unidad:unidad||"unidad",motivo:"Tarea completada — uso en macrozona",itemId:String(itemId),itemNombre:nombre},...(bd.movimientos||[])].slice(0,200);
+      nuevoBodegasData[bodegaId] = {...bd,items,movimientos};
+    });
+    setBodegasData(nuevoBodegasData);
+  };
+  const [fechaReporte, setFechaReporte] = useState(new Date().toISOString().slice(0,10));
+  const [tabReporte, setTabReporte] = useState("general");
+  const [semanaBase, setSemanaBase] = useState(()=>{
+    const dSem = new Date(); const day = dSem.getDay(); const diff = (day===0?-6:1-day);
+    dSem.setDate(dSem.getDate()+diff); return dSem.toISOString().slice(0,10);
+  });
+
+  // ─── AUTENTICACIÓN FIREBASE ──────────────────────────────────────────────────
+  const [fbUser,    setFbUser]    = useState(null);
+  // Worker states — deben declararse antes de los useEffects que los usan
+  const [vistaWorker,    setVistaWorker]    = useState(false);
+  const [workerARevisar, setWorkerARevisar] = useState(null);
+  const [showCierreSectorial, setShowCierreSectorial] = useState(false);
+  const [workerLogueado, setWorkerLogueado] = useState(null);
+  const [workerPinError, setWorkerPinError] = useState(false);
+  const [workerPinInput, setWorkerPinInput] = useState("");
+  const [rolSeleccionado, setRolSeleccionado] = useState("trabajador");
+  const [fbRol,     setFbRol]     = useState(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPass,  setLoginPass]  = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      setFbUser(user);
+      const rol = user ? getRolByEmail(user.email) : null;
+      setFbRol(rol);
+      setAuthReady(true);
+      // Si es trabajador, auto-activar vistaWorker con su id de personal
+      if(user && rol==="trabajador") {
+        // Buscar en personalArr por email (se carga después, usar setTimeout)
+        setTimeout(()=>{
+          setVistaWorker(true);
+        }, 500);
+      } else {
+        setVistaWorker(false);
+        setWorkerLogueado(null);
+      }
+    });
+    return () => unsub();
+  }, []);
+
+
+
+  const handleLogin = async (e) => {
+    e && e.preventDefault();
+    setLoginError(""); setLoginLoading(true);
+    try {
+      await signInWithEmailAndPassword(auth, loginEmail.trim(), loginPass);
+    } catch(err) {
+      setLoginError("Email o contraseña incorrectos.");
+    } finally { setLoginLoading(false); }
+  };
+
+  const handleLogout = () => signOut(auth);
+  const CUENTAS_DEFAULT = ["Rama Golf","Mantenimiento Jardines","Obras","Insumos Generales","Maquinaria y Equipos","Fitosanitarios","Semillas y Plantas","Uniformes y EPP"];
+  const [data,           setData,           dataReady]     = useFirebaseState("data",           initData());
+  const [personal, setPersonal, personalReady] = useFirebaseState("personal", PERSONAL_INICIAL);
+  const [tareasProg,     setTareasProg,     progReady]     = useFirebaseState("prog",           {});
+  const [aplicaciones,   setAplicaciones,   aplReady]      = useFirebaseState("fungicidas",     []);
+  const [incidenciasFito,setIncidenciasFito,incidReady]    = useFirebaseState("fung-incid",     []);
+  const [comprasData,    setComprasData,    comprasReady]  = useFirebaseState("compras",  {compras:[],cuentas:CUENTAS_DEFAULT});
+  const [bodegasData,    setBodegasData,    bodegasReady]  = useFirebaseState("bodegas",  {});
+  const [golfData,       setGolfData,       golfReady]     = useFirebaseState("golf", {greens:{},tees:{},arboles:[],eventos:[],mediciones:[]});
+  const [bonosConfig,    setBonosConfig,    bonosReady]    = useFirebaseState("bonos-config", {
+    pctFondo:50, pctEjecutor:50, pctAyudante:30, pctApoyo:20, año:new Date().getFullYear()
+  });
+  const [bonosMasivos,   setBonosMasivos,   bonosMasReady] = useFirebaseState("bonos-masivos", []);
+  const [rendicionesRRHH, setRendicionesRRHH] = useFirebaseState("rendiciones-rrhh", []);
+  const [notificaciones, setNotificaciones]   = useFirebaseState("notificaciones", []);
+  const [incidencias, setIncidencias]         = useFirebaseState("incidencias", []);
+  const [cierresTurno,  setCierresTurno]     = useFirebaseState("cierresTurno",   {});
+
+  const appReady = dataReady && personalReady && progReady;
+  const [golfInitTab, setGolfInitTab] = React.useState(null);
+  const [bonoPrefill, setBonoPrefill] = React.useState(null);
+
+  // ── Helper: registrar notificación en Firebase ───────────────────────
+  const crearNotificacion = React.useCallback((tipo, datos) => {
+    const nueva = {
+      id: Date.now() + Math.random(),
+      tipo,
+      fecha: new Date().toISOString().slice(0,10),
+      hora:  new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"}),
+      leida: false,
+      ...datos,
+    };
+    setNotificaciones(prev => {
+      const arr = Array.isArray(prev) ? prev : Object.values(prev||{});
+      return [nueva, ...arr].slice(0, 100);
+    });
+  }, [setNotificaciones]);
+
+  // Notificaciones no leídas para la jefa
+  const notifNoLeidas = React.useMemo(() => {
+    const arr = Array.isArray(notificaciones) ? notificaciones : Object.values(notificaciones||{});
+    return arr.filter(n => !n.leida);
+  }, [notificaciones]);
+
+  // Detección automática y centralizada: bono especializado por limpieza de Cancha de Fútbol Sintética.
+  // Vigila tareasProg completo (sin importar desde qué pantalla se haya cambiado el estado).
+  // Marca la tarea con bonoCanchaNotificado:true en Firebase para que la marca persista entre recargas.
+  React.useEffect(()=>{
+    if(!progReady) return;
+    const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+    Object.entries(tareasProg).forEach(([fecha, tareasDelDia])=>{
+      const lista = normArr(tareasDelDia);
+      let huboCambios = false;
+      const listaActualizada = lista.map(t=>{
+        if(!t || !t.id) return t;
+        const yaCompletada = t.estado==="hecha"||t.estado==="completada";
+        if(!yaCompletada) return t;
+        if(t.bonoCanchaNotificado) return t; // ya procesado anteriormente (persistido en Firebase)
+        const tNom=(t.tarea||"").toLowerCase();
+        const tZona=(t.zona||"").toLowerCase();
+        const tElem=(t.elemento||"").toLowerCase();
+        const esCanchaSint = tZona.includes("fútbol sintétic")||tZona.includes("futbol sintetic")||(tZona.includes("cancha")&&tZona.includes("sintétic"))||tElem.includes("césped sintético")||tElem.includes("cesped sintetico")||tElem.includes("alfombra");
+        const esLimpieza = tNom.includes("limpie")||tNom.includes("sopla")||tNom.includes("barrid")||tNom.includes("cepill")||tNom.includes("aspirad")||tNom.includes("escobill");
+        if(esCanchaSint && esLimpieza){
+          crearNotificacion("bono_cancha",{
+            titulo:"🎖️ Bono especializado disponible",
+            mensaje:`${t.responsable||"Trabajador"} completó limpieza de la Cancha de Fútbol Sintética (alfombra) — generar bono especializado`,
+            trabajadorNombre:t.responsable||"",
+            tareaFecha:fecha,
+            descripcionBono:`Limpieza profunda césped sintético — Cancha de Fútbol — ${fecha}`,
+          });
+        }
+        huboCambios = true;
+        return {...t, bonoCanchaNotificado:true};
+      });
+      if(huboCambios){
+        fbUpdate(ref(db, `${ROOT}/prog`), {[fecha]: listaActualizada}).catch(e=>console.error("Error marcando bonoCanchaNotificado:", e));
+      }
+    });
+  }, [tareasProg, progReady, crearNotificacion]);
+
+  const marcarTodasLeidas = () => {
+    const arr = Array.isArray(notificaciones) ? notificaciones : Object.values(notificaciones||{});
+    setNotificaciones(arr.map(n => ({...n, leida:true})));
+  };
+
+  // Migración: cargar frecuencias de Golf en elementos de MACROZONAS_BASE (greens individuales etc.)
+  useEffect(()=>{
+    if(!dataReady) return;
+    const zid = "31"; // Golf
+    const zdat = data[zid];
+    if(!zdat) return;
+    // Frecuencias base de Golf extraídas de ProgramacionGolf — modo "diasSemana" con días mínimos
+    const FRECS_GOLF_BASE = {
+      // Greens individuales — comparten las mismas frecuencias globales de greens
+      "green_g1": [
+        {id:"green_g1_corte",     modo:"diasSemana", tarea:"Corte de green",           diasMinimos:"3", diasSemana:[], diasProhibidos:[0,6], ultimaVez:"2026-06-17", obs:"Cambiar dirección de corte. Registrar altura de corte."},
+        {id:"green_g1_fertil",    modo:"diasSemana", tarea:"Fertilización",             diasMinimos:"14",diasSemana:[], diasProhibidos:[0,6], ultimaVez:"2026-06-17", obs:"Alternar Novatec Premium / Salitre K según etapa"},
+        {id:"green_g1_plagas",    modo:"estacion",   tarea:"Revisión plagas y enfermedades", verano:"semanal", otono:"semanal", invierno:"semanal", primavera:"semanal", ultimaVez:"2026-06-19", obs:"Si se detecta: generar tarea de control inmediata"},
+        {id:"green_g1_desmaz",    modo:"estacion",   tarea:"Desmalezado bordes",        verano:"semanal", otono:"semanal", invierno:"semanal", primavera:"semanal", ultimaVez:"2026-06-19", obs:"Límites del borde con placa larga"},
+        {id:"green_g1_vert",      modo:"diasSemana", tarea:"Verticorte / Groomer fuerte",diasMinimos:"25",diasSemana:[], diasProhibidos:[0,6], ultimaVez:"2026-05-28", obs:"Pasar groomer fuerte con corte"},
+        {id:"green_g1_aire_ch",   modo:"estacion",   tarea:"Aireación púas chicas",     verano:"noaplica",otono:"unavez",invierno:"noaplica",primavera:"unavez", ultimaVez:"2026-03-16", obs:"2 veces/año: marzo y ago-sep. Con riego y fertilización."},
+        {id:"green_g1_aire_gr",   modo:"estacion",   tarea:"Aireación sacabocados grandes",verano:"noaplica",otono:"unavez",invierno:"noaplica",primavera:"noaplica",ultimaVez:"2026-04-13",obs:"1 vez/año: abril. Con fertilización y riego."},
+      ],
+      "green_vivero": [
+        {id:"vivero_corte",  modo:"diasSemana", tarea:"Corte de Vivero",    diasMinimos:"3", diasSemana:[], diasProhibidos:[0,6], ultimaVez:"2026-06-17", obs:"Mismo ciclo que greens"},
+        {id:"vivero_fertil", modo:"diasSemana", tarea:"Fertilización",      diasMinimos:"14",diasSemana:[], diasProhibidos:[0,6], ultimaVez:"2026-06-17", obs:"Alternar Novatec Premium / Salitre K"},
+        {id:"vivero_riego",  modo:"estacion",   tarea:"Riego",             verano:"diario",otono:"cada3dias",invierno:"semanal",primavera:"cada3dias",ultimaVez:"", obs:""},
+      ],
+      "e1": [ // Fairways
+        {id:"e1_corte",    modo:"diasSemana", tarea:"Corte de Fairways",      diasMinimos:"10",diasSemana:[], diasProhibidos:[0,6], ultimaVez:"2026-06-12", obs:"1,75cm"},
+        {id:"e1_fertil",   modo:"diasSemana", tarea:"Fertilización Fairways", diasMinimos:"45",diasSemana:[], diasProhibidos:[0,6], ultimaVez:"2026-04-14", obs:"Salitre Potásico después del corte"},
+        {id:"e1_plagas",   modo:"estacion",   tarea:"Revisión plagas y enfermedades",verano:"quincenal",otono:"quincenal",invierno:"quincenal",primavera:"quincenal",ultimaVez:"2026-06-10",obs:"Si se detecta: generar tarea de control inmediata"},
+        {id:"e1_aireacion",modo:"diasSemana", tarea:"Aireación sacabocados grandes",diasMinimos:"180",diasSemana:[],diasProhibidos:[0,6],ultimaVez:"2026-03-16",obs:"2 veces/año: marzo y septiembre. Con riego."},
+      ],
+      "antegreen_golf": [
+        {id:"ag_corte",  modo:"diasSemana", tarea:"Corte de Antegreens",     diasMinimos:"16",diasSemana:[], diasProhibidos:[0,6], ultimaVez:"2026-06-12", obs:"a 1cm, usar helicoidal"},
+        {id:"ag_orill",  modo:"diasSemana", tarea:"Orillado Antegreens",     diasMinimos:"17",diasSemana:[], diasProhibidos:[0,6], ultimaVez:"2026-05-27", obs:"1,5-2,5cm con orilladora"},
+        {id:"ag_desmaz", modo:"diasSemana", tarea:"Desmalezado bordes Antegreens",diasMinimos:"21",diasSemana:[],diasProhibidos:[0,6],ultimaVez:"2026-05-28",obs:"Manualmente"},
+      ],
+      "lomas_golf": [
+        {id:"lomas_corte",modo:"diasSemana",tarea:"Corte de Lomas",diasMinimos:"20",diasSemana:[],diasProhibidos:[0,6],ultimaVez:"2026-06-12",obs:"Con flotante, nivel más bajo"},
+      ],
+      "macizos_golf": [
+        {id:"mac_orill", modo:"diasSemana",tarea:"Orillado / perfilado macizos",diasMinimos:"21",diasSemana:[],diasProhibidos:[0,6],ultimaVez:"2026-06-12",obs:"Proteger troncos. Solo antes 12:00hrs"},
+      ],
+      "e8": [ // Sistema de riego
+        {id:"e8_riego_g",modo:"estacion",tarea:"Revisión sistema riego Greens",verano:"quincenal",otono:"quincenal",invierno:"quincenal",primavera:"quincenal",ultimaVez:"2026-06-06",obs:"Controlador C09 — verificar señal, programas, porcentajes"},
+        {id:"e8_riego_c",modo:"estacion",tarea:"Revisión sistema riego Cancha",verano:"quincenal",otono:"quincenal",invierno:"quincenal",primavera:"quincenal",ultimaVez:"2026-06-05",obs:"Controlador C10 — verificar señal, alcances, boquillas"},
+      ],
+    };
+    // Copiar las mismas frecuencias de green_g1 a los greens g2-g9
+    ["green_g2","green_g3","green_g4","green_g5","green_g6","green_g7","green_g8","green_g9"].forEach((gid,i)=>{
+      FRECS_GOLF_BASE[gid] = FRECS_GOLF_BASE["green_g1"].map(f=>({...f, id:f.id.replace("green_g1", gid)}));
+    });
+    // Verificar cuáles elementos ya tienen frecuencias cargadas para no sobreescribir
+    let necesitaActualizar = false;
+    const nuevosElem = {...(zdat.elementos||{})};
+    Object.entries(FRECS_GOLF_BASE).forEach(([eid, frecs])=>{
+      if(!nuevosElem[eid]?.frecuencias || nuevosElem[eid].frecuencias.length===0){
+        nuevosElem[eid] = {estado:"bueno", notas:"", ...(nuevosElem[eid]||{}), frecuencias: frecs};
+        necesitaActualizar = true;
+      }
+    });
+    if(necesitaActualizar){
+      fbUpdate(ref(db, `${ROOT}/data`), {[zid]: {...zdat, elementos: nuevosElem}})
+        .catch(e=>console.error("Error migrando frecuencias Golf:", e));
+    }
+  // eslint-disable-next-line
+  },[dataReady]);
+
+  // Migración: corregir tareas con responsable asignado pero estado "por_designar"
+  useEffect(()=>{
+    if(!progReady) return;
+    let hayCorreccion = false;
+    const nuevoProg = {};
+    Object.entries(tareasProg).forEach(([fecha, tareas])=>{
+      if(!Array.isArray(tareas)) { nuevoProg[fecha] = tareas; return; }
+      nuevoProg[fecha] = tareas.map(t=>{
+        if(!t || t.zona==="Golf") return t; // Golf no participa en migración
+        if(t.estado==="por_designar" && t.responsable && t.responsable.trim()!=="") {
+          hayCorreccion = true;
+          return {...t, estado:"pendiente"};
+        }
+        return t;
+      });
+    });
+    if(hayCorreccion) setTareasProg(nuevoProg);
+  }, [progReady]);
+
+  // Cuando personal carga y el rol es trabajador, setear workerLogueado por email
+  useEffect(()=>{
+    if(fbRol==="trabajador" && fbUser) {
+      const arr = Array.isArray(personal)?personal:Object.values(personal||{});
+      if(arr.length>0){
+        const fbP = arr.find(x=>x.email?.toLowerCase()===fbUser.email?.toLowerCase());
+        if(p){
+          setWorkerLogueado(p.id);
+          setVistaWorker(true);
+          setVista("miturno");
+        }
+      }
+    }
+  }, [fbRol, fbUser, personal]);
+
+  // PINes siguen en localStorage (son locales por dispositivo)
+  const getPines    = () => { try { return JSON.parse(localStorage.getItem("ev2-pines")||"{}"); } catch { return {}; } };
+  const setPinRol   = (rol, pin) => { const p=getPines(); p[rol]=pin; localStorage.setItem("ev2-pines", JSON.stringify(p)); };
+  const [personalVista, setPersonalVista] = useState("lista");
+  const [personalId, setPersonalId] = useState(null);
+  const [personalTab, setPersonalTab] = useState("ficha");
+  const [showNuevoEvento, setShowNuevoEvento] = useState(false);
+  const [nuevoEvento, setNuevoEvento] = useState({ tipo:"permiso", fecha:"", fechaFin:"", horas:"", descripcion:"", estado:"pendiente" });
+  const [nuevoTrabajador, setNuevoTrabajador] = useState({ nombre:"", rut:"", cargo:"", zona:"", telefono:"", email:"", fechaIngreso:"", contrato:"indefinido", foto:"", pin:"" });
+  // [worker states moved up]
+  const rolLogueado = fbRol;
+  const esJefa = fbRol === "jefa";
+  const esSupervisor = fbRol === "supervisor";
+  const esTrabajador = fbRol === "trabajador";
+
+  // Trabajador siempre va a Mi Turno
+  useEffect(()=>{
+    if(esTrabajador && vista!=="miturno") setVista("miturno");
+  },[esTrabajador]);
+
+  // ─── FUNGICIDAS ──────────────────────────────────────────────────────────────
+  const checkPin = (rol, pin) => { const p=getPines(); return p[rol] && String(p[rol])===String(pin); };
+
+  // updateZona — actualiza una zona en el estado data
+
+  const updateZona = (id, patch) => setData(p => ({ ...p, [String(id)]: { ...p[String(id)], ...patch } }));
+  const addHistorial = (id, txt) => setData(p => ({
+    ...p, [String(id)]: { ...p[String(id)], historial: [{ txt, fecha: new Date().toLocaleDateString("es-CL"), hora: new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"}) }, ...(p[id]?.historial||[])].slice(0,30) }
+  }));
+
+  const getZD = (zid) => data[String(zid)] ?? { estadoGeneral:"bueno", ultimoMant:"", proximoMant:"", notas:"", elementos:{}, elementosCustom:[], tareas:[], historial:[] };
+  const getElemFrecs = (zid, eid, tipo, isCustom) => {
+    const zdat = getZD(zid);
+    if (isCustom) { const ce=(zdat.elementosCustom||[]).find(e=>e.id===eid); if(ce?.frecuencias) return ce.frecuencias; }
+    else { if(zdat.elementos?.[eid]?.frecuencias) return zdat.elementos[eid].frecuencias; }
+    return TAREAS_DEFAULT[tipo] ? TAREAS_DEFAULT[tipo].map(t=>({...t,id:eid+"_"+t.tarea})) : [];
+  };
+  const setElemFrecs = (zid, eid, isCustom, frecuencias) => {
+    if(isCustom){const arr=[...(data[zid]?.elementosCustom||[])];const i=arr.findIndex(e=>e.id===eid);if(i>=0){arr[i]={...arr[i],frecuencias};setData(p=>({...p,[zid]:{...p[zid],elementosCustom:arr}}));}}
+    else{setData(p=>({...p,[zid]:{...p[zid],elementos:{...p[zid]?.elementos,[eid]:{...(p[zid]?.elementos?.[eid]||{}),frecuencias}}}}));}
+  };
+
+  const zona = zonasConCust.find(z=>String(z.id)===String(zonaId));
+  const zd = zonaId ? getZD(zonaId) : null;
+
+  const getAllElems = (zid) => {
+    const zidS = String(zid);
+    const zonaZ = zonas.find(x=>String(x.id)===zidS);
+    const zdat = getZD(zidS);
+    const base = (zonaZ?.elementos||[]).map(e=>({...e,isCustom:false,edData:zdat.elementos?.[e.id]||{estado:"bueno",notas:""}}));
+    const custom = (zdat.elementosCustom||[]).map(e=>({...e,isCustom:true,edData:{estado:e.estado||"bueno",notas:e.notas||""}}));
+    return [...base,...custom].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+  };
+
+  const todasLasZonas = [...MACROZONAS_BASE, ...macrozonasCust];
+  const filteredZonas = todasLasZonas.filter(z=>{
+    const matchC=filtroCat==="Todas"||z.categoria===filtroCat;
+    const matchE=filtroEst==="Todos"||getZD(z.id).estadoGeneral===filtroEst;
+    const filtQ=(busq||"").trim().toLowerCase();
+    const matchB=!filtQ||
+      z.nombre.toLowerCase().includes(filtQ)||
+      z.categoria.toLowerCase().includes(filtQ)||
+      (z.descripcion||"").toLowerCase().includes(filtQ);
+    return matchC&&matchE&&matchB;
+  }).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+
+  const stats = {
+    total: MACROZONAS_BASE.length,
+    bueno: MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral==="bueno").length,
+    regular: MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral==="regular").length,
+    critico: MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral==="critico").length,
+    mantenimiento: MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral==="mantenimiento").length,
+  };
+  const totalElems = MACROZONAS_BASE.reduce((a,z)=>a+getAllElems(z.id).length,0);
+  const elemsOk = MACROZONAS_BASE.reduce((a,z)=>a+getAllElems(z.id).filter(e=>e.edData.estado==="bueno").length,0);
+
+  const addTareaZona = (zid, texto, tareaObj) => {
+    if(!texto.trim()) return;
+    const nuevaTareaZona = tareaObj || { id:Date.now(), texto, completada:false, fecha:new Date().toLocaleDateString("es-CL"), enviadaProg:true };
+    updateZona(zid, { tareas: [...(getZD(zid).tareas||[]), nuevaTareaZona] });
+    addHistorial(zid, `Tarea añadida: ${texto}`);
+    // 2. Agregar a programación diaria como tarea pendiente (hoy)
+    const hoy = fechaLocal();
+    const zona = zonasConCust.find(z=>String(z.id)===String(zid));
+    const nuevaProg = {
+      id: Date.now() + Math.random(),
+      fecha: hoy,
+      zona: zona?.nombre || "",
+      elemento: "",
+      tarea: texto,
+      responsable: "",
+      estado: "por_designar",
+      notas: "",
+      auto: false,
+      origenZona: true,
+    };
+    setTareasProg(prev => ({ ...prev, [hoy]: [...(prev[hoy]||[]), nuevaProg] }));
+  };
+  const toggleTareaZona = (zid, tid) => { const arr=(getZD(zid).tareas||[]).map(t=>t.id===tid?{...t,completada:!t.completada}:t); updateZona(zid,{tareas:arr}); };
+
+  const setElemEstado = (zid,eid,isCustom,estado) => {
+    if(isCustom){const arr=[...(data[zid].elementosCustom||[])];const i=arr.findIndex(e=>e.id===eid);if(i>=0){arr[i]={...arr[i],estado};updateZona(zid,{elementosCustom:arr});}}
+    else{updateZona(zid,{elementos:{...data[zid]?.elementos,[eid]:{...data[zid]?.elementos?.[eid],estado}}});}
+    addHistorial(zid,`Estado "${getElemNombre(zid,eid,isCustom)}" → ${ESTADOS_ELEM[estado]?.label}`);
+  };
+  const setElemNotas = (zid,eid,isCustom,notas) => {
+    if(isCustom){const arr=[...(data[zid].elementosCustom||[])];const i=arr.findIndex(e=>e.id===eid);if(i>=0){arr[i]={...arr[i],notas};updateZona(zid,{elementosCustom:arr});}}
+    else{updateZona(zid,{elementos:{...data[zid]?.elementos,[eid]:{...data[zid]?.elementos?.[eid],notas}}});}
+  };
+  const getElemNombre = (zid,eid,isCustom) => {
+    if(isCustom) return (data[zid]?.elementosCustom||[]).find(e=>e.id===eid)?.nombre||"";
+    return zonasConCust.find(z=>String(z.id)===String(zid))?.elementos.find(e=>e.id===eid)?.nombre||"";
+  };
+  const addCustomElem = (zid,elem) => { const id="c"+Date.now(); const arr=[...(data[String(zid)]?.elementosCustom||[]),{...elem,id,estado:"bueno",notas:""}]; updateZona(zid,{elementosCustom:arr}); addHistorial(zid,`Elemento agregado: ${elem.nombre}`); };
+  const removeCustomElem = (zid,eid) => { const arr=(data[zid]?.elementosCustom||[]).filter(e=>e.id!==eid); updateZona(zid,{elementosCustom:arr}); };
+  const removeBaseElem = (zid,eid) => { setZonas(prev=>prev.map(z=>String(z.id)===String(zid)?{...z,elementos:z.elementos.filter(e=>e.id!==eid)}:z)); const elems={...data[String(zid)]?.elementos}; delete elems[eid]; updateZona(zid,{elementos:elems}); addHistorial(zid,`Elemento eliminado`); };
+
+  const addTrabajador = (t) => { const id=Date.now(); setPersonal(p=>[...(Array.isArray(p)?p:Object.values(p||{})),{...t,id,eventos:[]}]); };
+  const updateTrabajador = (id,patch) => setPersonal(p=>(Array.isArray(p)?p:Object.values(p||{})).map(t=>t.id===id?{...t,...patch}:t));
+  const deleteTrabajador = (id) => setPersonal(p=>(Array.isArray(p)?p:Object.values(p||{})).filter(t=>t.id!==id));
+  const addEvento = (tid,ev) => setPersonal(p=>(Array.isArray(p)?p:Object.values(p||{})).map(t=>t.id===tid?{...t,eventos:[...(t.eventos||[]),{...ev,id:Date.now()}]}:t));
+  const deleteEvento = (tid,eid) => setPersonal(p=>(Array.isArray(p)?p:Object.values(p||{})).map(t=>t.id===tid?{...t,eventos:(t.eventos||[]).filter(e=>e.id!==eid)}:t));
+  const getTrabajador = (id) => personal.find(t=>t.id===id);
+
+  const getSugerenciaAI = async () => {
+    if(!zona) return;
+    setAiLoading(true); setAiText("");
+    const elems=getAllElems(zona.id).map(e=>`${e.nombre} (${ESTADOS_ELEM[e.edData.estado]?.label||"Bueno"})`).join(", ");
+    const prompt=`Eres experto en mantenimiento de parques y jardines de un club español en Chile. Analiza la macrozona "${zona.nombre}" con estos elementos: ${elems}. Estado general: ${ESTADOS_ZONA[zd?.estadoGeneral]?.label}. Notas: ${zd?.notas||"Ninguna"}. Da recomendaciones específicas de mantenimiento para cada elemento en estado regular o crítico, y un plan de acción priorizado. Responde en español con viñetas y secciones claras.`;
+    try {
+      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":"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","anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:prompt}]})});
+      const json=await res.json();
+      setAiText(json.content?.[0]?.text||"Sin respuesta.");
+    } catch { setAiText("Error al conectar con el asistente IA."); }
+    setAiLoading(false);
+  };
+
+  const S = {
+    app: { fontFamily:"'Georgia',serif", minHeight:"100vh", background:"linear-gradient(150deg,#0a1f10 0%,#122d1a 50%,#0d2414 100%)", color:"#ede9e0" },
+    header: { background:"rgba(0,0,0,0.45)", borderBottom:"1px solid rgba(160,200,140,0.15)" },
+    headerTop: { maxWidth:1600, margin:"0 auto", display:"flex", alignItems:"center", padding:"10px 20px", gap:10 },
+    headerNav: { background:"rgba(0,0,0,0.3)", borderTop:"1px solid rgba(160,200,140,0.08)", display:"flex", overflowX:"auto", padding:"0 8px", gap:2, scrollbarWidth:"none" },
+    logo: { display:"flex", alignItems:"center", gap:10, flex:1 },
+    logoCircle: { width:34, height:34, borderRadius:"50%", background:"linear-gradient(135deg,#3d7a52,#1e4d30)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, flexShrink:0 },
+    logoTitle: { fontFamily:"'Playfair Display',serif", fontSize:16, fontWeight:700 },
+    logoSub: { fontSize:9, color:"#6aaa7a", letterSpacing:"1.5px", textTransform:"uppercase" },
+    nav: { display:"flex", gap:2 },
+    main: { maxWidth:1600, margin:"0 auto", padding:"20px 20px" },
+    card: { background:"rgba(255,255,255,0.055)", border:"1px solid rgba(255,255,255,0.10)", borderRadius:14 },
+    btn: { cursor:"pointer", border:"none", borderRadius:8, padding:"8px 18px", fontFamily:"'Georgia',serif", fontSize:14, transition:"all .15s" },
+    chip: { display:"inline-flex", alignItems:"center", gap:4, padding:"3px 10px", borderRadius:20, fontSize:12, fontFamily:"'Georgia',serif" },
+    input: { background:"rgba(255,255,255,0.07)", border:"1px solid rgba(255,255,255,0.14)", borderRadius:8, color:"#ede9e0", padding:"8px 12px", fontFamily:"'Georgia',serif", fontSize:14, width:"100%", outline:"none" },
+  };
+
+  const ESTADOS_ZONA = {
+    bueno: { label:"Bueno", color:"#22c55e", bg:"rgba(34,197,94,0.12)" },
+    regular: { label:"Regular", color:"#f59e0b", bg:"rgba(245,158,11,0.12)" },
+    critico: { label:"Crítico", color:"#ef4444", bg:"rgba(239,68,68,0.12)" },
+    mantenimiento: { label:"En Mantenimiento", color:"#3b82f6", bg:"rgba(59,130,246,0.12)" },
+  };
+
+  const renderElemCard = (e) => {
+    const est = ESTADOS_ELEM[e.edData.estado||"bueno"];
+    const abierto = editElem?.eid===e.id;
+    const frecs = getElemFrecs(zonaId,e.id,e.tipo,e.isCustom);
+    const mesAct = new Date().getMonth()+1;
+    const estacion = [12,1,2].includes(mesAct)?"verano":[3,4,5].includes(mesAct)?"otono":[6,7,8].includes(mesAct)?"invierno":"primavera";
+    const tareasActivas = frecs.filter(f=>f[estacion]&&f[estacion]!=="noaplica");
+    const catMeta = CATEGORIAS_ELEM[e.tipo]||{icon:"🌿",label:e.tipo};
+
+    return (
+      <div key={e.id} style={{
+        background: abierto?"rgba(61,122,82,0.08)":"rgba(255,255,255,0.025)",
+        border:`1px solid ${abierto?"rgba(61,122,82,0.35)":"rgba(255,255,255,0.08)"}`,
+        borderRadius:12,
+        overflow:"hidden",
+        transition:"all .2s",
+        marginBottom:8,
+      }}>
+        {/* Cabecera del elemento — siempre visible */}
+        <div style={{
+          display:"flex",alignItems:"center",gap:10,padding:"10px 14px",
+          cursor:"pointer",userSelect:"none",
+        }} onClick={()=>setEditElem(abierto?null:{zid:zonaId,eid:e.id,isCustom:e.isCustom})}>
+          <span style={{fontSize:20,flexShrink:0}}>{catMeta.icon}</span>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+              <span style={{fontSize:14,fontWeight:600,color:"#ede9e0"}}>{e.nombre}</span>
+              <span style={{fontSize:10,color:"#5a9a7a",background:"rgba(255,255,255,0.05)",padding:"1px 7px",borderRadius:10,border:"1px solid rgba(255,255,255,0.08)"}}>{catMeta.label}</span>
+            </div>
+            {e.edData.notas&&!abierto&&(
+              <div style={{fontSize:11,color:"#5a8a6a",fontStyle:"italic",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:300}}>{e.edData.notas}</div>
+            )}
+            {tareasActivas.length>0&&!abierto&&(
+              <div style={{display:"flex",gap:4,marginTop:4,flexWrap:"wrap"}}>
+                {tareasActivas.slice(0,3).map(f=>(
+                  <span key={f.tarea||f.id} style={{fontSize:10,color:"#4a8a6a",background:"rgba(61,122,82,0.1)",padding:"1px 6px",borderRadius:6,border:"1px solid rgba(61,122,82,0.18)"}}>
+                    {f.tarea}: {f[estacion]}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+            <span style={{
+              fontSize:11,fontWeight:600,color:est.color,
+              background:est.bg,border:`1px solid ${est.color}35`,
+              padding:"2px 8px",borderRadius:8,
+            }}>{est.label}</span>
+            <span style={{color:"#4a7a5a",fontSize:12,transition:"transform .2s",
+              transform:abierto?"rotate(180deg)":"none"}}>▼</span>
+          </div>
+        </div>
+
+        {/* Panel expandido de edición */}
+        {abierto&&(
+          <div style={{padding:"0 14px 14px",borderTop:"1px solid rgba(255,255,255,0.07)"}}
+            onClick={ev=>ev.stopPropagation()}>
+
+            {/* Nombre + Categoría en fila */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:12,marginBottom:10}}>
+              <div>
+                <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.6px",textTransform:"uppercase"}}>Nombre</label>
+                <input style={{...S.input,fontSize:13}}
+                  value={editElem.nombreEdit!==undefined?editElem.nombreEdit:e.nombre}
+                  onChange={ev=>setEditElem(p=>({...p,nombreEdit:ev.target.value}))}/>
+              </div>
+              <div>
+                <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.6px",textTransform:"uppercase"}}>Categoría</label>
+                <select style={{...S.input,fontSize:13}}
+                  value={editElem.tipoEdit!==undefined?editElem.tipoEdit:e.tipo}
+                  onChange={ev=>setEditElem(p=>({...p,tipoEdit:ev.target.value}))}>
+                  {(()=>{
+                    const vk=["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
+                    const ok=["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","bodegas"];
+                    return(<>
+                      <optgroup label="🌿 Vegetación">{vk.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup>
+                      <optgroup label="🏗️ Infraestructura / Pavimentos">{ok.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup>
+                    </>);
+                  })()}
+                </select>
+              </div>
+            </div>
+
+            {/* Guardar si cambió nombre/tipo */}
+            {((editElem.nombreEdit!==undefined&&editElem.nombreEdit!==e.nombre)||(editElem.tipoEdit!==undefined&&editElem.tipoEdit!==e.tipo))&&(
+              <button className="btn-p" style={{...S.btn,fontSize:12,padding:"5px 14px",marginBottom:10}} onClick={()=>{
+                const nn=editElem.nombreEdit!==undefined?editElem.nombreEdit:e.nombre;
+                const nt=editElem.tipoEdit!==undefined?editElem.tipoEdit:e.tipo;
+                if(e.isCustom){const arr=[...(data[zonaId].elementosCustom||[])];const i=arr.findIndex(x=>x.id===e.id);if(i>=0){arr[i]={...arr[i],nombre:nn,tipo:nt};updateZona(zonaId,{elementosCustom:arr});}}
+                else{setZonas(prev=>prev.map(z=>String(z.id)===String(zonaId)?{...z,elementos:z.elementos.map(x=>x.id===e.id?{...x,nombre:nn,tipo:nt}:x)}:z));}
+                addHistorial(zonaId,`Elemento: "${e.nombre}" → "${nn}"`);
+                setEditElem(p=>({...p,nombreEdit:undefined,tipoEdit:undefined}));
+              }}>✓ Guardar nombre/categoría</button>
+            )}
+
+            {/* Estado con botones visuales */}
+            <div style={{marginBottom:12}}>
+              <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:6,letterSpacing:"0.6px",textTransform:"uppercase"}}>Estado actual</label>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                {Object.entries(ESTADOS_ELEM).map(([k,v])=>(
+                  <button key={k} style={{
+                    ...S.btn,padding:"6px 14px",fontSize:12,
+                    background:e.edData.estado===k?v.bg:"transparent",
+                    color:e.edData.estado===k?v.color:"#6aaa7a",
+                    border:`1px solid ${e.edData.estado===k?v.color+"60":"rgba(255,255,255,0.12)"}`,
+                    fontWeight:e.edData.estado===k?600:400,
+                  }} onClick={()=>setElemEstado(zonaId,e.id,e.isCustom,k)}>
+                    {e.edData.estado===k?"● ":""}{v.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Notas */}
+            <div style={{marginBottom:12}}>
+              <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.6px",textTransform:"uppercase"}}>Observaciones</label>
+              <textarea rows={2} style={{...S.input,resize:"vertical",fontSize:13}}
+                placeholder="Observaciones del elemento..."
+                value={e.edData.notas||""}
+                onChange={ev=>setElemNotas(zonaId,e.id,e.isCustom,ev.target.value)}/>
+            </div>
+
+            {/* Frecuencias de mantención */}
+            <FrecuenciasPanel zid={zonaId} eid={e.id} tipo={e.tipo} isCustom={e.isCustom} S={S} getFrecs={getElemFrecs} setFrecs={setElemFrecs}/>
+
+            {/* Eliminar */}
+            {(e.isCustom||(zona?.elementos.find(x=>x.id===e.id)))&&(
+              <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+                <button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 12px"}}
+                  onClick={()=>{e.isCustom?removeCustomElem(zonaId,e.id):removeBaseElem(zonaId,e.id);setEditElem(null);}}>
+                  🗑 Eliminar elemento
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ── Esperando Firebase Auth ───────────────────────────────────────────────
+  if (!authReady) return (
+    <div style={{minHeight:"100vh",background:"#0d1f13",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
+      <div style={{fontSize:48}}>🌿</div>
+      <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,color:"#a0d8b0",fontWeight:700}}>Estadio Español</div>
+      <div style={{width:40,height:40,border:"3px solid #1a3a22",borderTop:"3px solid #4a9a64",borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  );
+
+  // ── Login ─────────────────────────────────────────────────────────────────
+  if (!fbUser) return (
+    <div style={{minHeight:"100vh",background:"#0d1f13",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&display=swap');*{box-sizing:border-box;margin:0;padding:0}`}</style>
+      <div style={{background:"#0f2517",border:"1px solid #1e3a22",borderRadius:20,padding:40,width:"100%",maxWidth:380,boxShadow:"0 20px 60px rgba(0,0,0,0.5)"}}>
+        <div style={{textAlign:"center",marginBottom:32}}>
+          <div style={{fontSize:52,marginBottom:12}}>🌿</div>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:26,fontWeight:900,color:"#ede9e0",marginBottom:4}}>Estadio Español</div>
+          <div style={{fontSize:12,color:"#4a8a5a",letterSpacing:"2px",textTransform:"uppercase"}}>Gestión · Áreas Verdes</div>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:14}}>
+          <div>
+            <label style={{fontSize:11,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:6,textTransform:"uppercase"}}>Correo electrónico</label>
+            <input type="email" autoComplete="email" style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"12px 14px",color:"#ede9e0",fontSize:14,outline:"none"}}
+              value={loginEmail} onChange={e=>setLoginEmail(e.target.value)}
+              onKeyDown={e=>e.key==="Enter"&&handleLogin()}
+              placeholder="tu@email.com"/>
+          </div>
+          <div>
+            <label style={{fontSize:11,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:6,textTransform:"uppercase"}}>Contraseña</label>
+            <input type="password" autoComplete="current-password" style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"12px 14px",color:"#ede9e0",fontSize:14,outline:"none"}}
+              value={loginPass} onChange={e=>setLoginPass(e.target.value)}
+              onKeyDown={e=>e.key==="Enter"&&handleLogin()}
+              placeholder="••••••••"/>
+          </div>
+          {loginError&&<div style={{fontSize:13,color:"#fca5a5",background:"rgba(239,68,68,0.1)",borderRadius:8,padding:"8px 12px",textAlign:"center"}}>{loginError}</div>}
+          <button onClick={handleLogin} disabled={loginLoading}
+            style={{background:"#2d6a3f",color:"#fff",border:"none",borderRadius:10,padding:"14px",fontSize:15,fontWeight:700,cursor:"pointer",marginTop:6,opacity:loginLoading?0.7:1}}>
+            {loginLoading?"Ingresando...":"Ingresar →"}
+          </button>
+        </div>
+        <div style={{textAlign:"center",marginTop:20,fontSize:11,color:"#2a5a35"}}>Acceso restringido · Personal autorizado</div>
+      </div>
+    </div>
+  );
+
+  // ── Pantalla de carga Firebase ────────────────────────────────────────────
+  if (!appReady) return (
+    <div style={{minHeight:"100vh",background:"#0d1f13",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
+      <div style={{fontSize:48}}>🌿</div>
+      <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,color:"#a0d8b0",fontWeight:700}}>Estadio Español</div>
+      <div style={{fontSize:13,color:"#4a8a5a",marginBottom:8}}>Conectando con Firebase...</div>
+      <div style={{width:40,height:40,border:"3px solid #1a3a22",borderTop:"3px solid #4a9a64",borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  );
+
+  return (
+    <div style={S.app}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&display=swap');
+        *{box-sizing:border-box;margin:0;padding:0}
+        ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:#0a1f10}::-webkit-scrollbar-thumb{background:#3d7a52;border-radius:3px}
+        .hov:hover{background:rgba(255,255,255,0.09)!important;border-color:rgba(150,210,140,0.3)!important;transform:translateY(-1px)}
+        .btn-p{background:#3d7a52;color:#fff}.btn-p:hover{background:#4c9464}
+        .btn-g{background:transparent;color:#a0c8a0;border:1px solid rgba(160,200,140,0.25)}.btn-g:hover{background:rgba(160,200,140,0.1)}
+        .btn-d{background:rgba(239,68,68,0.22);color:#fca5a5;border:1px solid rgba(239,68,68,0.45);font-weight:600}.btn-d:hover{background:rgba(239,68,68,0.4);color:#fff;border-color:rgba(239,68,68,0.7)}
+        .tab{cursor:pointer;padding:7px 16px;border-radius:8px;font-family:'Georgia',serif;font-size:14px;transition:all .15s}
+        .tab.on{background:#3d7a52;color:#fff}.tab:not(.on){color:#7aaa80}.tab:not(.on):hover{background:rgba(61,122,82,0.2);color:#a0c8a0}
+        input:focus,select:focus,textarea:focus{border-color:#3d7a52!important;background:rgba(255,255,255,0.12)!important}
+        select option{background:#122d1a;color:#ede9e0}
+        .ein{animation:ein .25s ease}@keyframes ein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+        .spin{width:18px;height:18px;border:2px solid rgba(255,255,255,0.15);border-top-color:#3d7a52;border-radius:50%;animation:rot .7s linear infinite;display:inline-block}@keyframes rot{to{transform:rotate(360deg)}}
+        .ecard{transition:all .2s;cursor:pointer}.ecard:hover{background:rgba(255,255,255,0.09)!important}
+        .headerNav::-webkit-scrollbar{display:none}
+      `}</style>
+
+      {/* HEADER */}
+      <div style={S.header}>
+        <div style={S.headerTop}>
+          <div style={S.logo}>
+            <div style={S.logoCircle}>🌿</div>
+            <div>
+              <div style={S.logoTitle}>Estadio Español</div>
+              <div style={S.logoSub}>Gestión · Áreas Verdes</div>
+            </div>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+            <span style={{fontSize:11,color:fbRol==="jefa"?"#86efac":fbRol==="supervisor"?"#93c5fd":"#fcd34d",background:fbRol==="jefa"?"rgba(34,197,94,0.1)":fbRol==="supervisor"?"rgba(59,130,246,0.1)":"rgba(252,211,77,0.1)",padding:"4px 10px",borderRadius:20,border:`1px solid ${fbRol==="jefa"?"rgba(34,197,94,0.25)":fbRol==="supervisor"?"rgba(59,130,246,0.25)":"rgba(252,211,77,0.25)"}`}}>
+              {fbRol==="jefa"?"🌿 Jefa AV":fbRol==="supervisor"?"👷 Supervisor":(()=>{
+                const arr=Array.isArray(personal)?personal:Object.values(personal||{});
+                const fbU=fbUser?arr.find(x=>x.email?.toLowerCase()===fbUser.email?.toLowerCase()):null;
+                return u?`🌱 ${u.nombre.split(" ")[0]}`:"🌱 Jardinero";
+              })()}
+            </span>
+            <button onClick={handleLogout}
+              style={{background:"transparent",border:"1px solid rgba(255,255,255,0.1)",borderRadius:7,color:"#7aaa80",padding:"4px 10px",fontFamily:"'Georgia',serif",fontSize:11,cursor:"pointer"}}>
+              Salir
+            </button>
+          </div>
+        </div>
+        <div style={S.headerNav} className="headerNav">
+          {(fbRol==="jefa"
+            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["fungicidas","🧪","Fungicidas"],["compras","🛒","Compras"],["bodegas","🏪","Bodegas"],["golf","🏌️","Golf"],["personal","👷","Personal"],["notificaciones","🔔","Alertas"]]
+            : fbRol==="supervisor"
+            ? [["dashboard","📊","Panel"],["programacion","📆","Programa"],["reporte","📋","Reporte"],["golf","🏌️","Golf"],["miturno","🌿","Mi Turno"]]
+            : [["miturno","🌿","Mi Turno"]]
+          ).map(([v,ico,lbl])=>(
+            <button key={v} onClick={()=>{setVista(v);setZonaId(null);setAiText("");if(v==="notificaciones")marcarTodasLeidas();}} style={{cursor:"pointer",border:"none",background:"transparent",color:vista===v?"#fff":"#7aaa80",fontFamily:"'Georgia',serif",fontSize:12,padding:"10px 14px",borderBottom:vista===v?"2px solid #4a9a64":"2px solid transparent",transition:"all .15s",whiteSpace:"nowrap",display:"flex",flexDirection:"column",alignItems:"center",gap:2,flexShrink:0,position:"relative"}}>
+              <span style={{fontSize:16,position:"relative"}}>
+                {ico}
+                {v==="notificaciones"&&notifNoLeidas.length>0&&(
+                  <span style={{position:"absolute",top:-6,right:-8,background:"#ef4444",color:"#fff",
+                    borderRadius:"50%",width:15,height:15,fontSize:9,fontWeight:700,
+                    display:"flex",alignItems:"center",justifyContent:"center"}}>
+                    {notifNoLeidas.length>9?"9+":notifNoLeidas.length}
+                  </span>
+                )}
+              </span>
+              <span>{lbl}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={S.main}>
+        {/* DASHBOARD */}
+        {/* ── JEFA REVISA TURNO DE UN TRABAJADOR ── */}
+        {workerARevisar&&rolLogueado==="jefa"&&(()=>{
+          const arr=Array.isArray(personal)?personal:Object.values(personal||{});
+          const trab=arr.find(x=>String(x.id)===String(workerARevisar));
+          if(!trab) return null;
+          return (
+            <div className="ein">
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+                <button className="btn-g" style={S.btn} onClick={()=>setWorkerARevisar(null)}>← Volver al Panel</button>
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700}}>
+                  📋 Turno de {trab.nombre} — revisión de jefa
+                </div>
+                <span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.1)",border:"1px solid rgba(251,191,36,0.2)",borderRadius:8,padding:"2px 10px"}}>
+                  Modo supervisión — puedes editar aunque el turno esté cerrado
+                </span>
+              </div>
+              <VistaWorker
+                trabajador={trab}
+                fecha={new Date().toISOString().slice(0,10)}
+                tareas={tareasProg}
+                S={S}
+                esJefaApp={true}
+                cierresTurno={cierresTurno}
+                onUpdateTarea={(fecha,tid,patch)=>{
+                  const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+                  setTareasProg(prev=>{
+                    const lista=normArr(prev[fecha]);
+                    const actualizadas=lista.map(t=>String(t.id)===String(tid)?{...t,...patch}:t);
+                    fbUpdate(ref(db,`${ROOT}/prog`),{[fecha]:actualizadas.map(limpiarUndef)}).catch(e=>console.error(e));
+                    return {...prev,[fecha]:actualizadas};
+                  });
+                }}
+                onAddTarea={(t)=>{
+                  setTareasProg(prev=>{
+                    const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+                    const lista=[...normArr(prev[t.fecha]||[]),t];
+                    fbUpdate(ref(db,`${ROOT}/prog`),{[t.fecha]:lista}).catch(e=>console.error(e));
+                    return {...prev,[t.fecha]:lista};
+                  });
+                }}
+                onSetFrecs={setElemFrecs}
+                getFrecs={(zid,eid,tipo,isCustom,nombreElem)=>{
+                  const zdat=getZD(zid);const zona=zonasConCust.find(z=>String(z.id)===String(zid));if(!zona)return null;
+                  const elem=zona.elementos.find(e=>e.nombre===nombreElem);if(!elem)return null;
+                  const frecs=zdat.elementos?.[elem.id]?.frecuencias||(TAREAS_DEFAULT[elem.tipo]||[]).map(t=>({...t}));
+                  return {frecs,eid:elem.id,isCustom:false};
+                }}
+                MACROZONAS_BASE={MACROZONAS_BASE}
+                onAccesoRapido={(vista,subTab)=>{setVista(vista);if(subTab)setGolfInitTab(subTab);setWorkerARevisar(null);}}
+                onCambiarMetodo={()=>{}}
+                onCerrarTurno={()=>{}}
+                onReabrirTurno={(fecha,nombre)=>{
+                  const key=`${fecha}_${nombre.split(" ")[0].toLowerCase()}`;
+                  setCierresTurno(prev=>{const n={...prev};delete n[key];return n;});
+                }}
+              />
+            </div>
+          );
+        })()}
+
+        {!workerARevisar&&vista==="dashboard"&&!zonaId&&(
+          <div className="ein">
+            <div style={{marginBottom:26}}>
+              <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:26,fontWeight:900,marginBottom:3}}>Panel General</h1>
+              <p style={{color:"#6aaa7a",fontSize:15}}>Estado global de las {stats.total} macrozonas</p>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:14,marginBottom:28}}>
+              {[{label:"Total Zonas",val:stats.total,color:"#c0dab0",icon:"🗺️"},{label:"Buen estado",val:stats.bueno,color:"#22c55e",icon:"✅"},{label:"Estado regular",val:stats.regular,color:"#f59e0b",icon:"⚠️"},{label:"Estado crítico",val:stats.critico,color:"#ef4444",icon:"🔴"},{label:"Total elementos",val:totalElems,color:"#a0c8e0",icon:"📋"},{label:"Elementos OK",val:elemsOk,color:"#22c55e",icon:"🌿"}].map(s=>(
+                <div key={s.label} style={{...S.card,padding:"18px 14px",textAlign:"center"}}>
+                  <div style={{fontSize:24,marginBottom:4}}>{s.icon}</div>
+                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:28,fontWeight:700,color:s.color}}>{s.val}</div>
+                  <div style={{fontSize:12,color:"#7aaa80"}}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+            {stats.critico>0&&(
+              <div style={{background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:12,padding:16,marginBottom:22}}>
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:10,color:"#fca5a5"}}>🚨 Zonas en Estado Crítico</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+                  {MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral==="critico").map(z=>(
+                    <span key={z.id} onClick={()=>{setZonaId(String(z.id));setVista("zonas");setTab("elementos");}} style={{...S.chip,background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)",cursor:"pointer"}}>{z.icono} {z.nombre}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* ── Turnos de trabajadores hoy ── */}
+            {(()=>{
+              const tdHoy=new Date().toISOString().slice(0,10);
+              const tdNorm=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+              const tdTareas=tdNorm(tareasProg[tdHoy]);
+              const tdPersonal=Array.isArray(personal)?personal:Object.values(personal||{});
+              const tdTrabs=tdPersonal.filter(w=>tdTareas.some(x=>x.responsable===w.nombre));
+              if(tdTrabs.length===0) return null;
+              return (
+                <div style={{marginBottom:22}}>
+                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:19,fontWeight:700,marginBottom:10}}>👷 Turnos de hoy</div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+                    {tdTrabs.map(w=>{
+                      const tdKey=`${tdHoy}_${w.nombre.split(" ")[0].toLowerCase()}`;
+                      const tdCerrado=cierresTurno?.[tdKey];
+                      const tdTT=tdTareas.filter(x=>x.responsable===w.nombre);
+                      const tdHechas=tdTT.filter(t=>["hecha","completada"].includes(t.estado)).length;
+                      const tdPct=tdTT.length?Math.round((tdHechas/tdTT.length)*100):0;
+                      return (
+                        <button key={w.id} onClick={()=>setWorkerARevisar(w.id)}
+                          style={{cursor:"pointer",border:`1px solid ${tdCerrado?"rgba(34,197,94,0.3)":"rgba(255,255,255,0.12)"}`,borderRadius:10,padding:"10px 14px",background:tdCerrado?"rgba(34,197,94,0.06)":"rgba(255,255,255,0.04)",textAlign:"left",minWidth:160}}>
+                          <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:5}}>
+                            <div style={{width:24,height:24,borderRadius:"50%",background:"linear-gradient(135deg,#1a5c35,#2d7a4f)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",flexShrink:0}}>
+                              {w.nombre[0]?.toUpperCase()}
+                            </div>
+                            <div style={{fontSize:12,fontWeight:700}}>{w.nombre.split(" ")[0]}</div>
+                            {tdCerrado
+                              ? <span style={{fontSize:9,color:"#22c55e",background:"rgba(34,197,94,0.1)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:6,padding:"1px 6px",marginLeft:"auto"}}>✅ Cerrado</span>
+                              : <span style={{fontSize:9,color:"#f59e0b",background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.2)",borderRadius:6,padding:"1px 6px",marginLeft:"auto"}}>⏳ Activo</span>
+                            }
+                          </div>
+                          <div style={{background:"rgba(255,255,255,0.06)",borderRadius:4,height:4,marginBottom:4,overflow:"hidden"}}>
+                            <div style={{width:`${tdPct}%`,height:"100%",background:tdPct===100?"#22c55e":"#4ade80",borderRadius:4}}/>
+                          </div>
+                          <div style={{fontSize:10,color:"#5a9a7a"}}>{tdHechas}/{tdTT.length} tareas · {tdPct}%</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+            <div style={{marginBottom:12,fontFamily:"'Playfair Display',serif",fontSize:19,fontWeight:700}}>Por Categoría</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(210px,1fr))",gap:12}}>
+              {[...new Set(MACROZONAS_BASE.map(z=>z.categoria))].map(cat=>{
+                const zc=[...MACROZONAS_BASE].filter(z=>z.categoria===cat).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+                const ok=zc.filter(z=>getZD(z.id).estadoGeneral==="bueno").length;
+                const pct=Math.round((ok/zc.length)*100);
+                return (
+                  <div key={cat} style={{...S.card,padding:16,cursor:"pointer"}} className="hov" onClick={()=>{setFiltroCat(cat);setVista("zonas");}}>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
+                      <div style={{fontSize:14,fontWeight:600}}>{cat}</div>
+                      <span style={{fontSize:11,color:"#6aaa7a"}}>{zc.length} zonas</span>
+                    </div>
+                    <div style={{background:"rgba(255,255,255,0.07)",borderRadius:4,height:7,overflow:"hidden",marginBottom:5}}>
+                      <div style={{width:`${pct}%`,height:"100%",background:pct>70?"#22c55e":pct>40?"#f59e0b":"#ef4444",borderRadius:4,transition:"width .5s"}}/>
+                    </div>
+                    <div style={{fontSize:12,color:"#6aaa7a"}}>{pct}% en buen estado</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ZONAS LIST */}
+        {vista==="zonas"&&!zonaId&&(
+          <div className="ein">
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",marginBottom:20,flexWrap:"wrap",gap:12}}>
+              <div>
+                <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:24,fontWeight:900}}>Macrozonas</h1>
+                <p style={{color:"#6aaa7a",fontSize:14}}>{filteredZonas.length} de {MACROZONAS_BASE.length+macrozonasCust.length} zonas</p>
+              </div>
+              {esJefa&&(
+                <button onClick={()=>setShowNuevaMacrozona(true)}
+                  style={{...S.btn,background:"rgba(52,211,153,0.15)",color:"#34d399",border:"1px solid rgba(52,211,153,0.3)",fontSize:13}}>
+                  ＋ Nueva macrozona
+                </button>
+              )}
+            </div>
+
+            {/* Modal nueva macrozona */}
+            {showNuevaMacrozona&&(
+              <div style={{...S.card,padding:20,marginBottom:16,border:"1px solid rgba(52,211,153,0.3)"}} className="ein">
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#34d399",marginBottom:14}}>＋ Nueva macrozona personalizada</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                  <div style={{gridColumn:"1/-1"}}>
+                    <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Nombre</label>
+                    <input style={S.input} value={nuevaMacrozona.nombre} onChange={e=>setNuevaMacrozona(p=>({...p,nombre:e.target.value}))} placeholder="Ej: Av. Vizcaya"/>
+                  </div>
+                  <div>
+                    <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Categoría</label>
+                    <select style={S.input} value={nuevaMacrozona.categoria} onChange={e=>setNuevaMacrozona(p=>({...p,categoria:e.target.value}))}>
+                      {[...new Set(MACROZONAS_BASE.map(z=>z.categoria))].map(c=><option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Ícono</label>
+                    <input style={S.input} value={nuevaMacrozona.icono} onChange={e=>setNuevaMacrozona(p=>({...p,icono:e.target.value}))} placeholder="🌿"/>
+                  </div>
+                  <div style={{gridColumn:"1/-1"}}>
+                    <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Descripción (opcional)</label>
+                    <input style={S.input} value={nuevaMacrozona.descripcion} onChange={e=>setNuevaMacrozona(p=>({...p,descripcion:e.target.value}))} placeholder="Descripción breve"/>
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:8}}>
+                  <button className="btn-p" style={S.btn} disabled={!nuevaMacrozona.nombre.trim()} onClick={()=>{
+                    const newId="cust_"+Date.now();
+                    const nueva={
+                      id:newId, nombre:nuevaMacrozona.nombre.trim(), categoria:nuevaMacrozona.categoria,
+                      icono:nuevaMacrozona.icono||"🌿", descripcion:nuevaMacrozona.descripcion,
+                      elementos:[
+                        {id:"e1",nombre:"Árboles",tipo:"arboles"},
+                        {id:"e2",nombre:"Arbustos",tipo:"arbustos"},
+                        {id:"e3",nombre:"Césped",tipo:"cesped"},
+                        {id:"e4",nombre:"Luminarias",tipo:"infraestructura"},
+                        {id:"e5",nombre:"Pavimento",tipo:"pavimentos"},
+                      ],
+                      esPersonalizada:true,
+                    };
+                    setMacrozonasCust(p=>[...p,nueva]);
+                    // Inicializar en Firebase
+                    fbUpdate(ref(db,`${ROOT}/data`),{[newId]:{estadoGeneral:"bueno",notas:"",ultimoMant:"",proximoMant:"",elementos:{},elementosCustom:[],tareas:[],historial:[]}}).catch(e=>console.error(e));
+                    setNuevaMacrozona({nombre:"",categoria:"Calles y Accesos",icono:"🌿",descripcion:""});
+                    setShowNuevaMacrozona(false);
+                  }}>✓ Crear macrozona</button>
+                  <button className="btn-g" style={S.btn} onClick={()=>setShowNuevaMacrozona(false)}>Cancelar</button>
+                </div>
+              </div>
+            )}
+            <div style={{display:"flex",gap:10,marginBottom:18,flexWrap:"wrap"}}>
+              <input placeholder="🔍 Buscar zona..." value={busq||""} onChange={e=>setBusq(e.target.value)} style={{...S.input,flex:"1 1 180px",maxWidth:260}}/>
+              <select value={filtroCat} onChange={e=>setFiltroCat(e.target.value)} style={{...S.input,flex:"1 1 150px",maxWidth:200}}>
+                <option value="Todas">Todas las categorías</option>
+                {[...new Set(MACROZONAS_BASE.map(z=>z.categoria))].map(c=><option key={c} value={c}>{c}</option>)}
+              </select>
+              <select value={filtroEst} onChange={e=>setFiltroEst(e.target.value)} style={{...S.input,flex:"1 1 130px",maxWidth:180}}>
+                <option value="Todos">Todos los estados</option>
+                {Object.entries(ESTADOS_ZONA).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
+              </select>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(230px,1fr))",gap:14}}>
+              {filteredZonas.map(z=>{
+                const dzd=getZD(z.id); const est=ESTADOS_ZONA[dzd.estadoGeneral||"bueno"];
+                const allElems=getAllElems(z.id);
+                const criticos=allElems.filter(e=>e.edData.estado==="critico").length;
+                const pendTareas=(d.tareas||[]).filter(t=>!t.completada).length;
+                return (
+                  <div key={z.id}
+                    style={{
+                      background:"rgba(255,255,255,0.025)",
+                      border:`1px solid ${criticos>0?"rgba(239,68,68,0.25)":pendTareas>0?"rgba(245,158,11,0.2)":"rgba(255,255,255,0.08)"}`,
+                      borderRadius:12,padding:14,cursor:"pointer",
+                      transition:"all .15s",overflow:"hidden",position:"relative",
+                    }}
+                    className="hov"
+                    onClick={()=>{setZonaId(String(z.id));setTab("elementos");setAiText("");}}>
+                    {/* Banda lateral de estado */}
+                    <div style={{position:"absolute",left:0,top:0,bottom:0,width:4,background:est.color,borderRadius:"12px 0 0 12px",opacity:0.8}}/>
+                    <div style={{paddingLeft:6}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8}}>
+                          <span style={{fontSize:22}}>{z.icono}</span>
+                          <div>
+                            <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,lineHeight:1.2}}>{z.nombre}</div>
+                            <div style={{fontSize:10,color:"#5a8a6a",marginTop:1}}>{z.categoria}</div>
+                          </div>
+                        </div>
+                        <span style={{fontSize:10,fontWeight:600,color:est.color,background:est.bg,padding:"2px 7px",borderRadius:8,border:`1px solid ${est.color}35`,flexShrink:0}}>{est.label}</span>
+                      </div>
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+                        <span style={{fontSize:10,color:"#5a8a70"}}>📋 {allElems.length}</span>
+                        {criticos>0&&<span style={{fontSize:10,color:"#fca5a5",fontWeight:600}}>🔴 {criticos}</span>}
+                        {pendTareas>0&&<span style={{fontSize:10,color:"#fcd34d"}}>⚠️ {pendTareas}</span>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* DETALLE ZONA */}
+        {zonaId&&zona&&zd&&(
+          <div className="ein">
+            <button style={{...S.btn,background:"transparent",color:"#a0c8a0",border:"1px solid rgba(160,200,140,0.22)",marginBottom:20}} onClick={()=>{setZonaId(null);setAiText("");}}>← Volver</button>
+            {(()=>{
+              const estZona = ESTADOS_ZONA[zd.estadoGeneral||"bueno"]||{color:"#22c55e",bg:"rgba(34,197,94,0.1)",label:"Bueno"};
+              const elemsZona = getAllElems(zonaId);
+              const criticosZona = elemsZona.filter(e=>e.estado==="critico").length;
+              const regularesZona = elemsZona.filter(e=>e.estado==="regular").length;
+              return (
+                <div style={{...S.card,padding:0,marginBottom:18,overflow:"hidden"}}>
+                  {/* Banda de color superior según estado */}
+                  <div style={{height:5,background:estZona.color,opacity:0.7}}/>
+                  <div style={{padding:"18px 20px"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12}}>
+                      {/* Izquierda: icono + nombre + chips */}
+                      <div style={{display:"flex",alignItems:"center",gap:14,flex:1,minWidth:200}}>
+                        <span style={{fontSize:44,lineHeight:1}}>{zona.icono}</span>
+                        <div>
+                          <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:21,fontWeight:900,marginBottom:6,lineHeight:1.2}}>{zona.nombre}</h2>
+                          <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+                            <span style={{fontSize:11,color:"#6aaa7a",background:"rgba(255,255,255,0.06)",padding:"2px 8px",borderRadius:6,border:"1px solid rgba(255,255,255,0.1)"}}>
+                              📂 {zona.categoria}
+                            </span>
+                            <span style={{fontSize:11,color:"#6ab0c0",background:"rgba(96,176,192,0.08)",padding:"2px 8px",borderRadius:6,border:"1px solid rgba(96,176,192,0.15)"}}>
+                              📋 {elemsZona.length} elementos
+                            </span>
+                            {criticosZona>0&&(
+                              <span style={{fontSize:11,color:"#fca5a5",background:"rgba(239,68,68,0.1)",padding:"2px 8px",borderRadius:6,border:"1px solid rgba(239,68,68,0.25)"}}>
+                                🔴 {criticosZona} crítico{criticosZona>1?"s":""}
+                              </span>
+                            )}
+                            {regularesZona>0&&(
+                              <span style={{fontSize:11,color:"#fcd34d",background:"rgba(245,158,11,0.1)",padding:"2px 8px",borderRadius:6,border:"1px solid rgba(245,158,11,0.2)"}}>
+                                ⚠️ {regularesZona} regular{regularesZona>1?"es":""}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      {/* Derecha: estado + IA */}
+                      <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:6,background:estZona.bg,border:`1px solid ${estZona.color}40`,borderRadius:8,padding:"4px 6px 4px 10px"}}>
+                          <span style={{fontSize:12,color:estZona.color,fontWeight:600}}>{estZona.label}</span>
+                          <select value={zd.estadoGeneral||"bueno"}
+                            onChange={e=>{updateZona(zonaId,{estadoGeneral:e.target.value});addHistorial(zonaId,`Estado zona → ${ESTADOS_ZONA[e.target.value].label}`);}}
+                            style={{background:"transparent",border:"none",color:estZona.color,fontSize:11,cursor:"pointer",padding:"2px 0"}}>
+                            {Object.entries(ESTADOS_ZONA).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
+                          </select>
+                        </div>
+                        <button style={{...S.btn,background:"rgba(61,122,82,0.2)",color:"#a0d8b0",border:"1px solid rgba(61,122,82,0.35)",fontSize:12}}
+                          onClick={getSugerenciaAI} disabled={aiLoading}>
+                          {aiLoading?<><span className="spin"/> Analizando...</>:"🤖 Sugerencia IA"}
+                        </button>
+                      </div>
+                    </div>
+                    {/* Fechas de mantenimiento si existen */}
+                    {(zd.ultimoMant||zd.proximoMant)&&(
+                      <div style={{display:"flex",gap:16,marginTop:12,paddingTop:10,borderTop:"1px solid rgba(255,255,255,0.06)",flexWrap:"wrap"}}>
+                        {zd.ultimoMant&&<span style={{fontSize:11,color:"#5a8a6a"}}>✅ Último mant.: <strong style={{color:"#7aaa80"}}>{new Date(zd.ultimoMant+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"short",year:"numeric"})}</strong></span>}
+                        {zd.proximoMant&&<span style={{fontSize:11,color:"#5a8a6a"}}>📅 Próximo: <strong style={{color:"#fbbf24"}}>{new Date(zd.proximoMant+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"short",year:"numeric"})}</strong></span>}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+            {(aiLoading||aiText)&&(
+              <div style={{background:"rgba(40,100,60,0.15)",border:"1px solid rgba(61,122,82,0.35)",borderRadius:12,padding:18,marginBottom:18}}>
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:10,color:"#90d4a0"}}>🤖 Recomendaciones del Asistente</div>
+                {aiLoading?<div style={{color:"#6aaa7a",display:"flex",gap:8,alignItems:"center"}}><span className="spin"/> Generando...</div>
+                  :<div style={{fontSize:14,lineHeight:1.7,color:"#c8e0c8",whiteSpace:"pre-wrap"}}>{aiText}</div>}
+              </div>
+            )}
+            <div style={{display:"flex",gap:4,marginBottom:16,borderBottom:"1px solid rgba(255,255,255,0.08)",paddingBottom:0,overflowX:"auto"}}>
+              {[["elementos","🌿","Elementos"],["info","📝","Info"],["tareas","✅","Tareas"],["historial","📜","Historial"],...(zona?.categoria==="Bodegas"?[["recursos","🏗️","Recursos"]]:[])].map(([t,ico,lbl])=>(
+                <button key={t} onClick={()=>setTab(t)} style={{
+                  cursor:"pointer",border:"none",background:"transparent",
+                  color:tab===t?"#34d399":"#6aaa7a",
+                  padding:"10px 16px",
+                  fontSize:13,fontFamily:"'Georgia',serif",
+                  borderBottom:tab===t?"2px solid #34d399":"2px solid transparent",
+                  marginBottom:-1,
+                  whiteSpace:"nowrap",
+                  display:"flex",alignItems:"center",gap:5,
+                  fontWeight:tab===t?600:400,
+                  transition:"all .15s",
+                }}>
+                  <span>{ico}</span><span>{lbl}</span>
+                </button>
+              ))}
+            </div>
+
+            {tab==="elementos"&&(
+              <div className="ein">
+                {(()=>{
+                  const todosElems = getAllElems(zonaId);
+                  const VEGE_KEYS  = ["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
+                  const INFRA_KEYS = ["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","bodegas"];
+                  const vegeElems  = todosElems.filter(e=>VEGE_KEYS.includes(e.tipo));
+                  const infraElems = todosElems.filter(e=>INFRA_KEYS.includes(e.tipo));
+                  const otrosElems = todosElems.filter(e=>!VEGE_KEYS.includes(e.tipo)&&!INFRA_KEYS.includes(e.tipo));
+
+                  return (<>
+                    {/* ── VEGETACIÓN ── */}
+                    {vegeElems.length>0&&(
+                      <div style={{marginBottom:20}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12,paddingBottom:8,borderBottom:"1px solid rgba(34,197,94,0.2)"}}>
+                          <span style={{fontSize:18}}>🌿</span>
+                          <span style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#86efac"}}>Vegetación</span>
+                          <span style={{fontSize:11,color:"#4ade80",background:"rgba(34,197,94,0.1)",padding:"1px 8px",borderRadius:10}}>{vegeElems.length} elementos</span>
+                        </div>
+                        {VEGE_KEYS.map(subKey=>{
+                          const subElems=vegeElems.filter(e=>e.tipo===subKey);
+                          if(subElems.length===0) return null;
+                          const subMeta=CATEGORIAS_ELEM[subKey];
+                          return (
+                            <div key={subKey} style={{marginBottom:12,paddingLeft:10,borderLeft:`2px solid ${subMeta.color}30`}}>
+                              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                                <span style={{fontSize:13}}>{subMeta.icon}</span>
+                                <span style={{fontSize:12,fontWeight:600,color:subMeta.color}}>{subMeta.label}</span>
+                                <span style={{fontSize:11,color:"#5aaa70"}}>({subElems.length})</span>
+                              </div>
+                              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                                {subElems.map(e=>renderElemCard(e))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* ── INFRAESTRUCTURA — colapsable ── */}
+                    {infraElems.length>0&&(
+                      <div style={{marginBottom:20}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:0,paddingBottom:8,borderBottom:"1px solid rgba(245,158,11,0.2)",cursor:"pointer",userSelect:"none"}}
+                          onClick={()=>{
+                            const el=document.getElementById(`infra-${zonaId}`);
+                            if(el) el.style.display=el.style.display==="none"?"block":"none";
+                            const arr=document.getElementById(`infra-arr-${zonaId}`);
+                            if(arr) arr.style.transform=arr.style.transform==="rotate(0deg)"?"rotate(-90deg)":"rotate(0deg)";
+                          }}>
+                          <span style={{fontSize:18}}>🏗️</span>
+                          <span style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#fcd34d"}}>Infraestructura</span>
+                          <span style={{fontSize:11,color:"#f59e0b",background:"rgba(245,158,11,0.1)",padding:"1px 8px",borderRadius:10}}>{infraElems.length} elementos</span>
+                          <span id={`infra-arr-${zonaId}`} style={{marginLeft:"auto",fontSize:12,color:"#6aaa7a",transition:"transform .2s",display:"inline-block",transform:"rotate(0deg)"}}>▼</span>
+                        </div>
+                        <div id={`infra-${zonaId}`} style={{display:"none",marginTop:8}}>
+                          {INFRA_KEYS.map(subKey=>{
+                            const subElems=infraElems.filter(e=>e.tipo===subKey);
+                            if(subElems.length===0) return null;
+                            const subMeta=CATEGORIAS_ELEM[subKey];
+                            const subId=`infra-sub-${zonaId}-${subKey}`;
+                            return (
+                              <div key={subKey} style={{marginBottom:8,borderLeft:`2px solid ${subMeta.color}30`,borderRadius:6,overflow:"hidden"}}>
+                                <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 8px",cursor:"pointer",userSelect:"none",background:`${subMeta.color}08`}}
+                                  onClick={()=>{
+                                    const el=document.getElementById(subId);
+                                    if(el) el.style.display=el.style.display==="none"?"flex":"none";
+                                    const arr=document.getElementById(subId+"-arr");
+                                    if(arr) arr.style.transform=arr.style.transform==="rotate(-90deg)"?"rotate(0deg)":"rotate(-90deg)";
+                                  }}>
+                                  <span style={{fontSize:13}}>{subMeta.icon}</span>
+                                  <span style={{fontSize:12,fontWeight:600,color:subMeta.color}}>{subMeta.label}</span>
+                                  <span style={{fontSize:11,color:"#5aaa70"}}>({subElems.length})</span>
+                                  <span id={subId+"-arr"} style={{marginLeft:"auto",fontSize:10,color:"#6aaa7a",transition:"transform .2s",display:"inline-block",transform:"rotate(-90deg)"}}>▼</span>
+                                </div>
+                                <div id={subId} style={{display:"none",flexDirection:"column",gap:6,padding:"8px 8px 4px 10px"}}>
+                                  {subElems.map(e=>renderElemCard(e))}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ── OTROS ── */}
+                    {otrosElems.length>0&&(
+                      <div style={{marginBottom:16}}>
+                        <div style={{fontSize:13,fontWeight:600,color:"#6aaa7a",marginBottom:8}}>🔹 Otros</div>
+                        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                          {otrosElems.map(e=>renderElemCard(e))}
+                        </div>
+                      </div>
+                    )}
+                  </>);
+                })()}
+
+                {/* ── AGREGAR ELEMENTO ── */}
+                <div style={{...S.card,padding:14,marginTop:8}}>
+                  {!showAddElem?(
+                    <button style={{...S.btn,background:"rgba(61,122,82,0.2)",color:"#90d0a0",border:"1px solid rgba(61,122,82,0.3)",width:"100%",justifyContent:"center"}} onClick={()=>setShowAddElem(true)}>
+                      ➕ Agregar elemento a esta zona
+                    </button>
+                  ):(
+                    <div style={{background:"rgba(61,122,82,0.06)",border:"1px solid rgba(61,122,82,0.2)",borderRadius:10,padding:"14px 16px"}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                        <span style={{fontSize:13,fontWeight:600,color:"#90d0a0"}}>➕ Agregar elementos</span>
+                        <span style={{fontSize:11,color:"#5a8a6a"}}>Enter para agregar seguidos</span>
+                      </div>
+                      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
+                        <input
+                          placeholder="Nombre del elemento..."
+                          value={newElem.nombre}
+                          onChange={e=>setNewElem(p=>({...p,nombre:e.target.value}))}
+                          onKeyDown={e=>{
+                            if(e.key==="Enter"&&newElem.nombre.trim()){
+                              addCustomElem(zonaId,newElem);
+                              setNewElem(p=>({...p,nombre:""}));
+                            }
+                          }}
+                          style={{...S.input,flex:"2 1 200px"}}/>
+                        <div style={{flex:"1 1 150px",maxWidth:220}}>
+                          {(()=>{
+                            const vk=["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
+                            const ok=["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","bodegas"];
+                            const esVege = vk.includes(newElem.tipo);
+                            return (<>
+                              {/* Selector de grupo */}
+                              <div style={{display:"flex",gap:4,marginBottom:4}}>
+                                <button onClick={()=>setNewElem(p=>({...p,tipo:"arboles"}))}
+                                  style={{flex:1,cursor:"pointer",border:`1px solid ${esVege?"rgba(34,197,94,0.5)":"rgba(255,255,255,0.1)"}`,borderRadius:6,padding:"4px 6px",fontSize:11,background:esVege?"rgba(34,197,94,0.1)":"transparent",color:esVege?"#4ade80":"#6aaa7a",fontFamily:"'Georgia',serif"}}>
+                                  🌿 Vegetación
+                                </button>
+                                <button onClick={()=>setNewElem(p=>({...p,tipo:"infraestructura"}))}
+                                  style={{flex:1,cursor:"pointer",border:`1px solid ${!esVege?"rgba(245,158,11,0.5)":"rgba(255,255,255,0.1)"}`,borderRadius:6,padding:"4px 6px",fontSize:11,background:!esVege?"rgba(245,158,11,0.1)":"transparent",color:!esVege?"#fbbf24":"#6aaa7a",fontFamily:"'Georgia',serif"}}>
+                                  🏗️ Infraestructura
+                                </button>
+                              </div>
+                              {/* Selector de tipo específico */}
+                              <select value={newElem.tipo} onChange={e=>setNewElem(p=>({...p,tipo:e.target.value}))}
+                                style={{...S.input,width:"100%",fontSize:12}}>
+                                {(esVege?vk:ok).map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}
+                              </select>
+                            </>);
+                          })()}
+                        </div>
+                      </div>
+                      <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                        <button className="btn-p" style={S.btn} onClick={()=>{
+                          if(newElem.nombre.trim()){
+                            addCustomElem(zonaId,newElem);
+                            setNewElem(p=>({...p,nombre:""}));
+                          }
+                        }}>✓ Agregar</button>
+                        <span style={{fontSize:11,color:"#4a7a5a"}}>o presiona Enter</span>
+                        <button className="btn-g" style={{...S.btn,marginLeft:"auto"}} onClick={()=>{setShowAddElem(false);setNewElem({nombre:"",tipo:"arboles"});}}>Listo ✓</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {tab==="info"&&(
+              <div className="ein" style={{...S.card,padding:22}}>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
+                  <div>
+                    <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:5,letterSpacing:"0.5px"}}>ÚLTIMO MANTENIMIENTO</label>
+                    <input type="date" value={zd.ultimoMant||""} onChange={e=>updateZona(zonaId,{ultimoMant:e.target.value})} style={S.input}/>
+                  </div>
+                  <div>
+                    <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:5,letterSpacing:"0.5px"}}>PRÓXIMO MANTENIMIENTO</label>
+                    <input type="date" value={zd.proximoMant||""} onChange={e=>updateZona(zonaId,{proximoMant:e.target.value})} style={S.input}/>
+                  </div>
+                </div>
+                <div style={{marginBottom:16}}>
+                  <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:5,letterSpacing:"0.5px"}}>NOTAS Y OBSERVACIONES</label>
+                  <textarea rows={4} style={{...S.input,resize:"vertical"}} value={zd.notas||""} onChange={e=>updateZona(zonaId,{notas:e.target.value})}/>
+                </div>
+                <button className="btn-p" style={S.btn} onClick={()=>addHistorial(zonaId,"Información general actualizada")}>💾 Guardar</button>
+              </div>
+            )}
+
+            {tab==="tareas"&&(
+              <div className="ein">
+                <div style={{...S.card,padding:16,marginBottom:14}}>
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
+                    <input placeholder="Escribir tarea..." value={nuevaTarea} onChange={e=>setNuevaTarea(e.target.value)} style={{...S.input,flex:"2 1 180px"}} onKeyDown={e=>{if(e.key==="Enter"){addTareaZona(zonaId,nuevaTarea);setNuevaTarea("");}}}/>
+                    <button className="btn-p" style={S.btn} onClick={()=>{addTareaZona(zonaId,nuevaTarea);setNuevaTarea("");}}>➕ Agregar</button>
+                  </div>
+                  {/* Botones especiales */}
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                    <button style={{...S.btn,background:"rgba(74,222,128,0.12)",color:"#4ade80",border:"1px solid rgba(74,222,128,0.3)",fontSize:12}}
+                      onClick={()=>setShowPlantacionForm(p=>p==="plantar"?null:"plantar")}>
+                      🌱 Plantar desde Vivero
+                    </button>
+                    <button style={{...S.btn,background:"rgba(251,191,36,0.12)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.3)",fontSize:12}}
+                      onClick={()=>setShowPlantacionForm(p=>p==="trasplantar"?null:"trasplantar")}>
+                      🔄 Trasplantar a Vivero
+                    </button>
+                  </div>
+                  <div style={{fontSize:11,color:"#5a8a6a",marginTop:8}}>💡 Las tareas aparecen en 📆 Programación como Por designar — listas para asignar responsable y fecha.</div>
+                </div>
+
+                {/* Formulario Plantación desde Vivero */}
+                {showPlantacionForm==="plantar"&&(
+                  <TareaPlantacion
+                    modo="plantar" zona={zona} zonaId={zonaId}
+                    bodegasData={bodegasData} setBodegasData={setBodegasData}
+                    tareasProg={tareasProg} setTareasProg={setTareasProg}
+                    personal={personal} S={S}
+                    addTareaZona={addTareaZona} addHistorial={addHistorial}
+                    onClose={()=>setShowPlantacionForm(null)}
+                  />
+                )}
+
+                {/* Formulario Trasplante a Vivero */}
+                {showPlantacionForm==="trasplantar"&&(
+                  <TareaPlantacion
+                    modo="trasplantar" zona={zona} zonaId={zonaId}
+                    bodegasData={bodegasData} setBodegasData={setBodegasData}
+                    tareasProg={tareasProg} setTareasProg={setTareasProg}
+                    personal={personal} S={S}
+                    addTareaZona={addTareaZona} addHistorial={addHistorial}
+                    onClose={()=>setShowPlantacionForm(null)}
+                  />
+                )}
+
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {(zd.tareas||[]).length===0&&<div style={{textAlign:"center",color:"#4a8a5a",padding:32,fontSize:15}}>Sin tareas registradas.</div>}
+                  {(zd.tareas||[]).map(t=>(
+                    <div key={t.id} style={{...S.card,padding:"11px 16px",display:"flex",alignItems:"center",gap:12,opacity:t.completada?0.55:1}}>
+                      <input type="checkbox" checked={t.completada} onChange={()=>{
+                        toggleTareaZona(zonaId,t.id);
+                        addHistorial(zonaId,`Tarea ${t.completada?"reabierta":"completada"}: ${t.texto}`);
+                        // Si la tarea tiene descuento de stock pendiente, ejecutarlo al completar
+                        if(!t.completada && t.descuentoStock) {
+                          ejecutarDescuentoStock(t.descuentoStock);
+                        }
+                      }} style={{width:17,height:17,accentColor:"#3d7a52",cursor:"pointer",flexShrink:0}}/>
+                      <div style={{flex:1}}>
+                        <span style={{fontSize:14,textDecoration:t.completada?"line-through":"none"}}>{t.texto}</span>
+                        {t.insumos&&t.insumos.length>0&&(
+                          <div style={{fontSize:11,color:"#6aaa7a",marginTop:3}}>
+                            📦 Insumos: {t.insumos.map(i=>`${i.nombre} (${i.cantidad} ${i.unidad})`).join(", ")}
+                            {!t.completada&&<span style={{color:"#fbbf24"}}> — se descontarán al confirmar</span>}
+                            {t.completada&&<span style={{color:"#4ade80"}}> ✅ descontados</span>}
+                          </div>
+                        )}
+                      </div>
+                      <span style={{fontSize:11,color:"#4a8a5a"}}>{t.fecha}</span>
+                      {t.enviadaProg&&<span style={{fontSize:10,color:"#c084fc",background:"rgba(192,132,252,0.1)",padding:"1px 6px",borderRadius:8,border:"1px solid rgba(192,132,252,0.2)",flexShrink:0}}>📆 En prog.</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {tab==="historial"&&(
+              <div className="ein">
+                {(zd.historial||[]).length===0?<div style={{textAlign:"center",color:"#4a8a5a",padding:40,fontSize:15}}>Sin registros aún.</div>:(
+                  <div style={{display:"flex",flexDirection:"column",gap:7}}>
+                    {rolLogueado==="jefa"&&(
+                      <div style={{display:"flex",justifyContent:"flex-end",marginBottom:8}}>
+                        <button onClick={()=>{if(window.confirm("¿Borrar todo el historial de esta zona?"))updateZona(zonaId,{historial:[]});}}
+                          style={{...S.btn,background:"rgba(239,68,68,0.12)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.25)",fontSize:12,padding:"5px 12px"}}>
+                          🗑 Borrar todo el historial
+                        </button>
+                      </div>
+                    )}
+                    {(zd.historial||[]).map((h,i)=>(
+                      <div key={i} style={{...S.card,padding:"11px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
+                        <div style={{display:"flex",alignItems:"center",gap:10}}>
+                          <span style={{fontSize:16,flexShrink:0}}>📌</span>
+                          <span style={{fontSize:14}}>{h.txt}</span>
+                        </div>
+                        <div style={{display:"flex",alignItems:"center",gap:8}}>
+                          <div style={{fontSize:11,color:"#4a8a5a",whiteSpace:"nowrap"}}>{h.fecha} {h.hora}</div>
+                          {rolLogueado==="jefa"&&(
+                            <button onClick={()=>updateZona(zonaId,{historial:(zd.historial||[]).filter((_,j)=>j!==i)})}
+                              style={{background:"transparent",border:"none",color:"#7a5a5a",cursor:"pointer",fontSize:13,padding:"2px 4px",flexShrink:0}}>🗑</button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* REPORTE */}
+        {vista==="reporte"&&(
+          <div className="ein">
+            <div style={{marginBottom:24,display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:12}}>
+              <div>
+                <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:24,fontWeight:900,marginBottom:4}}>Reporte General</h1>
+                <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap"}}>
+                  {[["general","📋 Estado Actual"],["semanal","📅 Reporte Semanal"]].map(([t,l])=>(
+                    <button key={t} className={`tab${tabReporte===t?" on":""}`} onClick={()=>setTabReporte(t)} style={{fontSize:13}}>{l}</button>
+                  ))}
+                </div>
+                <p style={{color:"#6aaa7a",fontSize:15}}>
+                  Estado completo de macrozonas y elementos
+                </p>
+                {tabReporte==="general" && <div style={{display:"flex",alignItems:"center",gap:8,marginTop:6,flexWrap:"wrap"}}>
+                  <label style={{fontSize:12,color:"#6aaa7a"}}>📅 Fecha del reporte:</label>
+                  <input type="date" value={fechaReporte} onChange={e=>setFechaReporte(e.target.value)}
+                    style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.14)",borderRadius:8,color:"#ede9e0",padding:"5px 10px",fontFamily:"'Georgia',serif",fontSize:13,outline:"none"}}/>
+                  <span style={{fontSize:13,color:"#4a8a6a"}}>
+                    {new Date(fechaReporte+"T12:00:00").toLocaleDateString("es-CL",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}
+                  </span>
+                  {fechaReporte!==new Date().toISOString().slice(0,10)&&(
+                    <button onClick={()=>setFechaReporte(new Date().toISOString().slice(0,10))}
+                      style={{background:"transparent",border:"1px solid rgba(255,255,255,0.1)",borderRadius:6,color:"#6aaa7a",padding:"3px 8px",fontFamily:"'Georgia',serif",fontSize:11,cursor:"pointer"}}>
+                      Hoy
+                    </button>
+                  )}
+                </div>}
+              </div>
+              <button
+                onClick={()=>{
+                  const zonaRows = [...MACROZONAS_BASE].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(z=>{
+                    const dzd2=getZD(z.id);
+                    const allE=getAllElems(z.id);
+                    const crit=allE.filter(e=>e.edData.estado==="critico").length;
+                    const pend=(d.tareas||[]).filter(t=>!t.completada).length;
+                    const COLORES={bueno:"#166534",regular:"#92400e",critico:"#991b1b",mantenimiento:"#1e40af"};
+                    const LABELS={bueno:"Bueno",regular:"Regular",critico:"Crítico",mantenimiento:"En Mantenimiento"};
+                    return "<tr>"
+                      +"<td>"+z.icono+" "+z.nombre+"</td>"
+                      +"<td>"+z.categoria+"</td>"
+                      +"<td style='color:"+COLORES[d.estadoGeneral||"bueno"]+";font-weight:600'>"+LABELS[d.estadoGeneral||"bueno"]+"</td>"
+                      +"<td style='text-align:center'>"+allE.length+"</td>"
+                      +"<td style='text-align:center;color:"+(crit>0?"#991b1b":"#166534")+"'>"+(crit>0?"🔴 "+crit:"—")+"</td>"
+                      +"<td>"+(d.ultimoMant||"—")+"</td>"
+                      +"<td>"+(d.proximoMant||"—")+"</td>"
+                      +"<td style='text-align:center;color:"+(pend>0?"#92400e":"#166534")+"'>"+(pend>0?"⚠️ "+pend:"✅ 0")+"</td>"
+                      +"</tr>";
+                  }).join("");
+                  const estadoStats = Object.entries({bueno:{label:"Bueno",color:"#166534"},regular:{label:"Regular",color:"#92400e"},critico:{label:"Crítico",color:"#991b1b"},mantenimiento:{label:"En Mant.",color:"#1e40af"}}).map(([k,v])=>{
+                    const statC=MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral===k).length;
+                    return "<span style='color:"+v.color+";font-weight:700'>"+v.label+": "+c+"</span>";
+                  }).join(" &nbsp;·&nbsp; ");
+                  const html = "<!DOCTYPE html><html lang='es'><head><meta charset='UTF-8'>"
+                    +"<title>Reporte Áreas Verdes — Estadio Español</title>"
+                    +"<style>"
+                    +"body{font-family:Georgia,serif;color:#1a2e1a;padding:32px;max-width:900px;margin:0 auto}"
+                    +"h1{font-size:22px;color:#0d3320;margin-bottom:4px}"
+                    +".sub{font-size:13px;color:#4a7a4a;margin-bottom:6px}"
+                    +".stats{font-size:13px;margin-bottom:20px;padding:10px 14px;background:#f0f7f0;border-radius:8px}"
+                    +"table{width:100%;border-collapse:collapse;font-size:12px}"
+                    +"th{text-align:left;padding:8px 10px;background:#1a4a2e;color:#fff;font-size:10px;letter-spacing:0.8px;text-transform:uppercase;white-space:nowrap}"
+                    +"tr:nth-child(even){background:#f5fbf5}"
+                    +"td{padding:7px 10px;border-bottom:1px solid #dce8dc;vertical-align:top}"
+                    +".pie{margin-top:24px;font-size:11px;color:#6b7280;border-top:1px solid #dce8dc;padding-top:12px;display:flex;justify-content:space-between}"
+                    +"@media print{body{padding:16px}}"
+                    +"</style></head><body>"
+                    +"<h1>📋 Reporte General de Áreas Verdes — Estadio Español</h1>"
+                    +"<div class='sub'>Fecha del reporte: "+new Date(fechaReporte+"T12:00:00").toLocaleDateString("es-CL",{weekday:"long",year:"numeric",month:"long",day:"numeric"})+" · Generado: "+new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"})+"</div>"
+                    +"<div class='stats'>"+estadoStats+" &nbsp;·&nbsp; <b>Total zonas: "+MACROZONAS_BASE.length+"</b></div>"
+                    +"<table><thead><tr><th>Zona</th><th>Categoría</th><th>Estado</th><th>Elementos</th><th>Críticos</th><th>Últ. Mant.</th><th>Próx. Mant.</th><th>Tareas Pend.</th></tr></thead><tbody>"+zonaRows+"</tbody></table>"
+                    +"<div class='pie'><span>Estadio Español de Las Condes · Departamento de Áreas Verdes</span><span>"+new Date().getFullYear()+"</span></div>"
+                    +"</body></html>";
+                  const blob = new Blob([html], {type:"text/html;charset=utf-8"});
+                  const url = URL.createObjectURL(blob);
+                  const dlA = document.createElement("a");
+                  a.href = url; a.target = "_blank"; a.click();
+                  setTimeout(()=>URL.revokeObjectURL(url), 10000);
+                }}
+                style={{...S.btn,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)",fontSize:13,flexShrink:0}}
+              >🖨️ Imprimir Reporte</button>
+            </div>
+            {tabReporte==="semanal" && (
+              <ReporteSemanal S={S} tareasProg={tareasProg} semanaBase={semanaBase} setSemanaBase={setSemanaBase} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} incidenciasFito={incidenciasFito} esJefa={rolLogueado==="jefa"}/>
+            )}
+            {tabReporte==="general" && <>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(270px,1fr))",gap:18,marginBottom:26}}>
+              <div style={{...S.card,padding:20}}>
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,marginBottom:14}}>📊 Zonas por Estado</div>
+                {Object.entries(ESTADOS_ZONA).map(([k,v])=>{
+                  const statC2=MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral===k).length;
+                  const pct=Math.round((c/MACROZONAS_BASE.length)*100);
+                  return (
+                    <div key={k} style={{marginBottom:10}}>
+                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:3,fontSize:13}}>
+                        <span style={{color:v.color}}>{v.label}</span>
+                        <span style={{color:"#6aaa7a"}}>{c} ({pct}%)</span>
+                      </div>
+                      <div style={{background:"rgba(255,255,255,0.07)",borderRadius:4,height:7,overflow:"hidden"}}>
+                        <div style={{width:`${pct}%`,height:"100%",background:v.color,borderRadius:4}}/>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{...S.card,padding:20}}>
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,marginBottom:14}}>📅 Próximos Mantenimientos</div>
+                {MACROZONAS_BASE.filter(z=>getZD(z.id).proximoMant).sort((a,b)=>new Date(getZD(a.id).proximoMant)-new Date(getZD(b.id).proximoMant)).slice(0,8).map(z=>(
+                  <div key={z.id} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                    <span style={{fontSize:14}}>{z.icono} {z.nombre}</span>
+                    <span style={{fontSize:12,color:"#5a8a6a"}}>{getZD(z.id).proximoMant}</span>
+                  </div>
+                ))}
+                {MACROZONAS_BASE.filter(z=>getZD(z.id).proximoMant).length===0&&<div style={{color:"#4a7a5a",fontSize:13,textAlign:"center",padding:16}}>Sin fechas programadas</div>}
+              </div>
+            </div>
+            {/* Detalle actividad del día del reporte */}
+            {(()=>{
+              const tareasDelDia = tareasProg[fechaReporte]||[];
+              // Agrupar por zona, solo zonas con actividad
+              const zonaMap = {};
+              tareasDelDia.forEach(t=>{
+                if(!t.zona) return;
+                if(!zonaMap[t.zona]) zonaMap[t.zona]=[];
+                zonaMap[t.zona].push(t);
+              });
+              const zonasConActividad = Object.entries(zonaMap).sort(([a],[b])=>a.localeCompare(b,"es",{sensitivity:"base"}));
+
+              const EC={hecha:{color:"#22c55e",icon:"✅",label:"Hecha"},completada:{color:"#22c55e",icon:"✅",label:"Hecha"},no_pudo:{color:"#ef4444",icon:"🔴",label:"No se pudo"},haciendose:{color:"#3b82f6",icon:"🔵",label:"Haciéndose"},en_curso:{color:"#3b82f6",icon:"🔵",label:"En curso"},pendiente:{color:"#f59e0b",icon:"🟡",label:"Pendiente"},por_designar:{color:"#94a3b8",icon:"⬜",label:"Por designar"},cancelada:{color:"#ef4444",icon:"❌",label:"Cancelada"}};
+
+              return (
+                <>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:8}}>
+                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700}}>
+                      Actividad del {new Date(fechaReporte+"T12:00:00").toLocaleDateString("es-CL",{weekday:"long",day:"numeric",month:"long"})}
+                    </div>
+                    {zonasConActividad.length>0 && (
+                      <span style={{...S.chip,background:"rgba(255,255,255,0.07)",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)"}}>
+                        {zonasConActividad.length} zona{zonasConActividad.length!==1?"s":""} · {tareasDelDia.length} tarea{tareasDelDia.length!==1?"s":""}
+                      </span>
+                    )}
+                  </div>
+
+                  {zonasConActividad.length===0 ? (
+                    <div style={{...S.card,padding:32,textAlign:"center",color:"#4a8a5a"}}>
+                      <div style={{fontSize:32,marginBottom:8}}>📋</div>
+                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:6}}>Sin actividad registrada para esta fecha</div>
+                      <div style={{fontSize:13}}>Las tareas programadas en 📆 Programación aparecerán aquí.</div>
+                    </div>
+                  ) : (
+                    <ActividadDelDia zonas={zonasConActividad} MACROZONAS_BASE={MACROZONAS_BASE} S={S} EC={EC} tareasDelDia={tareasDelDia} />
+                  )}
+                </>
+              );
+            })()}
+            </>}
+          </div>
+        )}
+
+        {/* PROGRAMACIÓN */}
+        {vista==="programacion"&&(
+          <ProgramacionDiaria key="prog" S={S} zonas={zonas} data={data} personal={personal} getZD={getZD} getAllElems={getAllElems} MACROZONAS_BASE={MACROZONAS_BASE} tareas={tareasProg} setTareas={setTareasProg}
+            getElemFrecs={getElemFrecs} setElemFrecs={setElemFrecs}
+            tareasZonaHoy={(tareasProg[new Date().toISOString().slice(0,10)]||[]).filter(t=>t.origenZona&&t.estado==="por_designar").length}
+            esJefa={rolLogueado==="jefa"}
+            puedeCrear={rolLogueado==="jefa"||rolLogueado==="supervisor"}
+            cierresTurno={cierresTurno}
+            onReabrirTurno={(fecha,nombre)=>{
+              const key=`${fecha}_${nombre.split(" ")[0].toLowerCase()}`;
+              setCierresTurno(prev=>{ const n={...prev}; delete n[key]; return n; });
+            }}
+          />
+        )}
+
+        {/* MI TURNO */}
+        {vista==="miturno"&&(
+          <div className="ein">
+            {/* ── Logged in as supervisor ── */}
+            {rolLogueado==="supervisor"&&(
+              <VistaDesignacion
+                S={S}
+                tareasProg={tareasProg}
+                setTareasProg={setTareasProg}
+                personal={personal}
+                MACROZONAS_BASE={MACROZONAS_BASE}
+                onSalir={()=>{setWorkerPinInput("");setWorkerLogueado(null);setVistaWorker(false);}}
+              />
+            )}
+
+            {/* ── Logged in as worker ── */}
+            {rolLogueado==="trabajador"&&(vistaWorker||fbUser)&&(
+              <div>
+                <button className="btn-g" style={{...S.btn,marginBottom:16}} onClick={()=>{setVistaWorker(false);setWorkerPinInput("");setWorkerLogueado(null);}}>← Salir</button>
+                <VistaWorker
+                  trabajador={(()=>{
+                    const arr=Array.isArray(personal)?personal:Object.values(personal||{});
+                    return workerLogueado
+                      ? arr.find(x=>String(x.id)===String(workerLogueado))
+                      : fbUser ? arr.find(x=>x.email?.toLowerCase()===fbUser.email?.toLowerCase()) : null;
+                  })()}
+                  fecha={fechaLocal()}
+                  tareas={tareasProg}
+                  S={S}
+                  MACROZONAS_BASE={MACROZONAS_BASE}
+                  onUpdateTarea={(fecha,tid,patch)=>{
+                    const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+                    setTareasProg(prev=>{
+                      const tareasDelDia = normArr(prev[fecha]);
+                      const actualizadas = tareasDelDia.map(t=>String(t.id)===String(tid)?{...t,...patch}:t);
+                      // Escribir solo la ruta de esa fecha en Firebase
+                      fbUpdate(ref(db, `${ROOT}/prog`), {[fecha]: actualizadas.map(limpiarUndef)})
+                        .catch(e=>console.error("Error:", e));
+                      if(patch.estado==="no_pudo"||patch.estado==="hecha"||patch.estado==="completada"||patch.estado==="haciendose"){
+                        const tarea=tareasDelDia.find(t=>String(t.id)===String(tid));
+                        if(tarea){
+                          const onUpdZ=MACROZONAS_BASE.find(zz=>zz.nombre===tarea.zona);
+                          if(z){
+                            const ico=patch.estado==="no_pudo"?"🔴":patch.estado==="hecha"?"✅":"🔵";
+                            addHistorial(String(z.id),`${ico} [${tarea.responsable||"?"}] ${tarea.tarea}${patch.estado==="no_pudo"&&patch.notaWorker?" ("+patch.notaWorker+")":""}`);
+                          }
+                          // Bono especializado: la detección ahora es centralizada en un useEffect que vigila tareasProg
+                        }
+                      }
+                      return {...prev,[fecha]:actualizadas};
+                    });
+                  }}
+                  getFrecs={(zid,_eid,_tipo,_isCustom,nombreElem)=>{
+                    const zdat=getZD(zid); const zona=zonasConCust.find(z=>String(z.id)===String(zid)); if(!zona) return null;
+                    const elem=zona.elementos.find(e=>e.nombre===nombreElem); if(!elem) return null;
+                    const frecs=zdat.elementos?.[elem.id]?.frecuencias||(TAREAS_DEFAULT[elem.tipo]||[]).map(t=>({...t}));
+                    return {frecs,eid:elem.id,isCustom:false};
+                  }}
+                  onCambiarMetodo={(fecha,tid,metodo)=>{
+                    setTareasProg(prev=>({...prev,
+                      [fecha]:(prev[fecha]||[]).map(t=>t.id===tid?{...t,metodoLimpieza:metodo}:t)
+                    }));
+                  }}
+                  onAccesoRapido={(tipo)=>{
+                    const tab = tipo==="medicion"?"mediciones":tipo==="humedad"?"humedad":"greens";
+                    setGolfInitTab(tab);
+                    setVista("golf");
+                  }}
+                  onSetFrecs={setElemFrecs}
+                  onAddTarea={(nuevaTarea)=>{
+                    const hoyKey=nuevaTarea.fecha||fechaLocal(); // siempre hora local Chile
+                    setTareasProg(prev=>{
+                      const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+                      const lista=[...normArr(prev[hoyKey]),{...nuevaTarea,fecha:hoyKey}];
+                      fbUpdate(ref(db,`${ROOT}/prog`),{[hoyKey]:lista}).catch(e=>console.error(e));
+                      return {...prev,[hoyKey]:lista};
+                    });
+                    const propZ=MACROZONAS_BASE.find(zz=>zz.nombre===nuevaTarea.zona);
+                    if(z) addHistorial(z.id,`🆕 [${nuevaTarea.responsable}] Tarea emergente: ${nuevaTarea.tarea}`);
+                  }}
+                  esJefaApp={rolLogueado==="jefa"}
+                  cierresTurno={cierresTurno}
+                  onCerrarTurno={(fecha,nombre)=>{
+                    const fechaCierre=fechaLocal(); // siempre usar hora local Chile
+                    const key=`${fechaCierre}_${nombre.split(" ")[0].toLowerCase()}`;
+                    setCierresTurno(prev=>({...prev,[key]:{
+                      fecha:fechaCierre,nombre,
+                      hora:new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"}),
+                      cerradoEn:new Date().toISOString(),
+                    }}));
+                  }}
+                  onReabrirTurno={(fecha,nombre)=>{
+                    const key=`${fecha}_${nombre.split(" ")[0].toLowerCase()}`;
+                    setCierresTurno(prev=>{ const n={...prev}; delete n[key]; return n; });
+                  }}
+                />
+              </div>
+            )}
+
+            {/* ── Login screen ── */}
+            {!rolLogueado&&(
+              <div style={{maxWidth:380,margin:"50px auto 0"}}>
+                <div style={{textAlign:"center",marginBottom:28}}>
+                  <div style={{fontSize:48,marginBottom:12}}>🌿</div>
+                  <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:900,marginBottom:6}}>Acceso por Rol</h2>
+                  <p style={{color:"#6aaa7a",fontSize:14}}>Selecciona tu rol e ingresa tu PIN</p>
+                </div>
+
+                {/* Role selector */}
+                <div style={{display:"flex",gap:8,marginBottom:20,justifyContent:"center"}}>
+                  {[
+                    {key:"trabajador",label:"👷 Trabajador",color:"#3d7a52"},
+                    {key:"supervisor",label:"🎯 Supervisor",color:"#2563eb"},
+                    {key:"jefa",     label:"🌿 Jefa AV",   color:"#7c3aed"},
+                  ].map(r=>(
+                    <button key={r.key} onClick={()=>{setRolSeleccionado(r.key);setWorkerPinInput("");setWorkerPinError(false);setWorkerLogueado(null);}}
+                      style={{flex:1,cursor:"pointer",border:`2px solid ${rolSeleccionado===r.key?r.color:"rgba(255,255,255,0.1)"}`,borderRadius:10,padding:"10px 6px",background:rolSeleccionado===r.key?`${r.color}22`:"rgba(255,255,255,0.04)",color:rolSeleccionado===r.key?"#fff":"#7aaa80",fontFamily:"'Georgia',serif",fontSize:12,transition:"all .15s"}}>
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div style={{background:"rgba(255,255,255,0.055)",border:"1px solid rgba(255,255,255,0.10)",borderRadius:14,padding:24}}>
+                  {/* Worker: select from list */}
+                  {rolSeleccionado==="trabajador"&&(
+                    <div style={{marginBottom:14}}>
+                      <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:5,letterSpacing:"0.5px"}}>TRABAJADOR</label>
+                      <select style={S.input} value={workerLogueado||""} onChange={e=>{setWorkerLogueado(e.target.value);setWorkerPinError(false);setWorkerPinInput("");}}>
+                        <option value="">Seleccionar...</option>
+                        {personal.filter(p=>p.cargo!=="Jefa de Áreas Verdes"&&p.cargo!=="Supervisor de Áreas Verdes")
+                          .sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}))
+                          .map(t=><option key={t.id} value={t.id}>{t.nombre} {t.cargo?" · "+t.cargo:""}</option>)}
+                      </select>
+                    </div>
+                  )}
+
+                  <div style={{marginBottom:18}}>
+                    <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:5,letterSpacing:"0.5px"}}>PIN (4 DÍGITOS)</label>
+                    <input type="password" maxLength={4} placeholder="••••"
+                      style={{...S.input,fontSize:22,letterSpacing:"0.6em",textAlign:"center"}}
+                      value={workerPinInput}
+                      onChange={e=>{setWorkerPinInput(e.target.value);setWorkerPinError(false);}}
+                      onKeyDown={e=>{
+                        if(e.key!=="Enter") return;
+                        if(rolSeleccionado==="trabajador"){
+                          const wrkT=personal.find(x=>String(x.id)===String(workerLogueado));
+                          if(t&&String(t.pin)===String(workerPinInput)){setVistaWorker(true);setWorkerPinError(false);}
+                          else setWorkerPinError(true);
+                        } else {
+                          if(checkPin(rolSeleccionado,workerPinInput)){setWorkerPinError(false);}
+                          else setWorkerPinError(true);
+                        }
+                      }}
+                    />
+                    {workerPinError&&<div style={{color:"#fca5a5",fontSize:12,marginTop:6,textAlign:"center"}}>PIN incorrecto. Intenta nuevamente.</div>}
+                    {rolSeleccionado==="trabajador"&&workerLogueado&&!personal.find(x=>String(x.id)===String(workerLogueado))?.pin&&(
+                      <div style={{color:"#f59e0b",fontSize:11,marginTop:6,textAlign:"center"}}>⚠️ Sin PIN configurado. Configúralo en la ficha.</div>
+                    )}
+                    {(rolSeleccionado==="supervisor"||rolSeleccionado==="jefa")&&!getPines()[rolSeleccionado]&&(
+                      <div style={{color:"#f59e0b",fontSize:11,marginTop:6,textAlign:"center"}}>⚠️ PIN no configurado aún.</div>
+                    )}
+                  </div>
+
+                  <button style={{...S.btn,width:"100%",padding:"12px",fontSize:15,background:"#3d7a52",color:"#fff",cursor:"pointer"}}
+                    onClick={()=>{
+                      if(rolSeleccionado==="trabajador"){
+                        const wrkT2=personal.find(x=>String(x.id)===String(workerLogueado));
+                        if(t&&String(t.pin)===String(workerPinInput)){setVistaWorker(true);setWorkerPinError(false);}
+                        else setWorkerPinError(true);
+                      } else {
+                        if(checkPin(rolSeleccionado,workerPinInput)){setWorkerPinError(false);}
+                        else setWorkerPinError(true);
+                      }
+                    }}>
+                    Ingresar →
+                  </button>
+                </div>
+
+                {/* PIN config for jefa/supervisor roles */}
+                {/* Configuración de PINs — siempre disponible en modo setup */}
+                <PinConfig getPines={getPines} setPinRol={setPinRol} S={S}/>
+              </div>
+            )}
+
+            {/* ── Jefa logged in → redirect to main app ── */}
+            {rolLogueado==="jefa"&&(
+              <div className="ein" style={{textAlign:"center",paddingTop:40}}>
+                <div style={{fontSize:48,marginBottom:16}}>🌿</div>
+                <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:900,marginBottom:8}}>Bienvenida, Jefa de Áreas Verdes</h2>
+                <p style={{color:"#6aaa7a",fontSize:14,marginBottom:24}}>Usa el menú de navegación para acceder a todas las secciones.</p>
+                <button onClick={()=>setVista("programacion")} style={{...S.btn,background:"#3d7a52",color:"#fff",fontSize:15,padding:"12px 28px"}}>📆 Ir a Programación →</button>
+                <button onClick={()=>setVista("fungicidas")} style={{...S.btn,background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)",fontSize:13,padding:"10px 20px"}}>🚫 Registrar cierre sectorial</button>
+                <div style={{marginTop:12}}>
+                  <button onClick={()=>{setWorkerPinInput("");}} style={{...S.btn,background:"transparent",color:"#6aaa7a",border:"1px solid rgba(255,255,255,0.1)",fontSize:13}}>← Cerrar sesión</button>
+
+                <div style={{maxWidth:380,margin:"24px auto 0"}}>
+                  <PinConfig getPines={getPines} setPinRol={setPinRol} S={S}/>
+                </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+
+        {/* FUNGICIDAS */}
+        {vista==="fungicidas"&&(
+          <PanelFungicidas S={S} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} />
+        )}
+
+        {/* COMPRAS */}
+        {vista==="compras"&&(
+          <PanelCompras S={S} comprasData={comprasData} setComprasData={setComprasData} personal={personal} esJefa={esJefa} data={data} updateZona={updateZona} MACROZONAS_BASE={MACROZONAS_BASE} bodegasData={bodegasData} setBodegasData={setBodegasData} />
+        )}
+
+        {/* GOLF */}
+        {vista==="golf"&&(
+          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial} setVista={setVista}
+            crearNotificacion={crearNotificacion}
+            initialSubTab={golfInitTab}
+            onRegistroGuardado={(tipo)=>{
+              if(rolLogueado==="trabajador"){ setVista("miturno"); setGolfInitTab(null); }
+            }}
+          />
+        )}
+
+        {/* BODEGAS */}
+        {vista==="bodegas"&&(
+          <PanelBodegas S={S} bodegasData={bodegasData} setBodegasData={setBodegasData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} compras={comprasData?.compras||[]} />
+        )}
+
+        
+
+        {/* PERSONAL */}
+        {vista==="personal"&&personalVista==="lista"&&(
+          <div className="ein">
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",marginBottom:22,flexWrap:"wrap",gap:12}}>
+              <div>
+                <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:24,fontWeight:900,marginBottom:3}}>Personal</h1>
+                <p style={{color:"#6aaa7a",fontSize:14}}>{personal.length} trabajador{personal.length!==1?"es":""} registrado{personal.length!==1?"s":""}</p>
+              </div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                <button style={{...S.btn,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}} onClick={()=>setPersonalVista("informe-rrhh")}>📄 Informe RRHH</button>
+                <button style={{...S.btn,background:"rgba(196,181,253,0.15)",color:"#c4b5fd",border:"1px solid rgba(196,181,253,0.3)"}} onClick={()=>setPersonalVista("bono-masivo")}>💰 Bono por Tarea</button>
+                <button className="btn-p" style={S.btn} onClick={()=>setPersonalVista("nuevo")}>➕ Nuevo Trabajador</button>
+              </div>
+            </div>
+            {personal.length===0&&(
+              <div style={{...S.card,padding:48,textAlign:"center",color:"#4a8a5a"}}>
+                <div style={{fontSize:48,marginBottom:12}}>👷</div>
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,marginBottom:8}}>Sin personal registrado</div>
+              </div>
+            )}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:14}}>
+              {personal.sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(t=>{
+                const eventosAbiertos=(t.eventos||[]).filter(e=>e.estado==="pendiente").length;
+                const vacDias=(t.eventos||[]).filter(e=>e.tipo==="vacaciones"&&e.estado==="aprobado").reduce((a,e)=>{if(!e.fecha||!e.fechaFin) return a;return a+Math.round((new Date(e.fechaFin)-new Date(e.fecha))/(1000*60*60*24))+1;},0);
+                const heHoras=(t.eventos||[]).filter(e=>e.tipo==="horaExtra"&&e.estado==="aprobado").reduce((a,e)=>a+Number(e.horas||0),0);
+                return (
+                  <div key={t.id} className="hov" style={{...S.card,padding:18,cursor:"pointer"}} onClick={()=>{setPersonalId(t.id);setPersonalVista("ficha");setPersonalTab("ficha");}}>
+                    <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
+                      <div style={{width:44,height:44,borderRadius:"50%",background:"linear-gradient(135deg,#3d7a52,#1a4a2e)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{t.nombre?t.nombre[0].toUpperCase():"?"}</div>
+                      <div>
+                        <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700}}>{t.nombre}</div>
+                        <div style={{fontSize:12,color:"#6aaa7a"}}>{t.cargo||"Sin cargo"}</div>
+                      </div>
+                    </div>
+                    <div style={{fontSize:12,color:"#5a8a6a",marginBottom:10}}>{t.zona||"Sin zona asignada"}</div>
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                      <span style={{...S.chip,background:"rgba(255,255,255,0.07)",color:"#8ab0c0",border:"1px solid rgba(255,255,255,0.1)",fontSize:11}}>📄 {t.contrato||"—"}</span>
+                      {eventosAbiertos>0&&<span style={{...S.chip,background:"rgba(245,158,11,0.12)",color:"#fcd34d",border:"1px solid rgba(245,158,11,0.25)",fontSize:11}}>⏳ {eventosAbiertos} pend.</span>}
+                      {vacDias>0&&<span style={{...S.chip,background:"rgba(59,130,246,0.12)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.25)",fontSize:11}}>🏖️ {vacDias}d</span>}
+                      {heHoras>0&&<span style={{...S.chip,background:"rgba(34,197,94,0.12)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)",fontSize:11}}>⏰ {heHoras}h</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {vista==="personal"&&personalVista==="informe-rrhh"&&(
+          <InformeRRHH S={S} personal={personal} bonosMasivos={bonosMasivos} setBonosMasivos={setBonosMasivos} setPersonal={setPersonal} rendicionesRRHH={rendicionesRRHH} setRendicionesRRHH={setRendicionesRRHH} onVolver={()=>setPersonalVista("lista")}/>
+        )}
+
+        {vista==="personal"&&personalVista==="bono-masivo"&&(
+          <BonoMasivo
+            S={S} personal={personal} bonosConfig={bonosConfig} setBonosConfig={setBonosConfig}
+            bonosMasivos={bonosMasivos} setBonosMasivos={setBonosMasivos}
+            setPersonal={setPersonal}
+            onVolver={()=>{setPersonalVista("lista");setBonoPrefill(null);}}
+            esJefa={rolLogueado==="jefa"}
+            prefill={bonoPrefill}
+          />
+        )}
+
+        {vista==="personal"&&personalVista==="nuevo"&&(
+          <div className="ein">
+            <button className="btn-g" style={S.btn} onClick={()=>setPersonalVista("lista")}>← Volver</button>
+            <div style={{...S.card,padding:24,marginTop:16}}>
+              <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:900,marginBottom:20}}>Nuevo Trabajador</h2>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
+                {[["Nombre completo","nombre","text"],["RUT","rut","text"],["Teléfono","telefono","tel"],["Email","email","email"],["Fecha de ingreso","fechaIngreso","date"]].map(([lbl,key,type])=>(
+                  <div key={key}>
+                    <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>{lbl.toUpperCase()}</label>
+                    <input type={type} style={S.input} value={nuevoTrabajador[key]||""} onChange={e=>setNuevoTrabajador(p=>({...p,[key]:e.target.value}))}/>
+                  </div>
+                ))}
+                {/* PIN en fila propia */}
+                <div style={{gridColumn:"1/-1",background:"rgba(61,122,82,0.08)",border:"1px solid rgba(61,122,82,0.2)",borderRadius:10,padding:"12px 14px"}}>
+                  <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:6,letterSpacing:"0.5px"}}>🔐 PIN DE ACCESO (4 DÍGITOS)</label>
+                  <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+                    <input type="password" maxLength={4} placeholder="••••"
+                      style={{...S.input,maxWidth:140,fontSize:20,letterSpacing:"0.5em",textAlign:"center"}}
+                      value={nuevoTrabajador.pin||""} onChange={e=>setNuevoTrabajador(p=>({...p,pin:e.target.value}))}/>
+                    <div style={{fontSize:12,color:"#5a8a6a"}}>El trabajador usa este PIN para acceder a sus tareas en 🌿 Mi Turno</div>
+                  </div>
+                </div>
+                <div>
+                  <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>CARGO</label>
+                  <select style={S.input} value={nuevoTrabajador.cargo} onChange={e=>setNuevoTrabajador(p=>({...p,cargo:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    {["Jefa de Áreas Verdes","Supervisor de Áreas Verdes","Jardinero","Jardinero Senior","Técnico en Riego","Operador Maquinaria","Capataz","Administrativo","Otro"].map(c=><option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>MACROZONA ASIGNADA</label>
+                  <select style={S.input} value={nuevoTrabajador.zona} onChange={e=>setNuevoTrabajador(p=>({...p,zona:e.target.value}))}>
+                    <option value="">Sin zona</option>
+                    {[...MACROZONAS_BASE].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(z=><option key={z.id} value={z.nombre}>{z.icono} {z.nombre}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>TIPO DE CONTRATO</label>
+                  <select style={S.input} value={nuevoTrabajador.contrato} onChange={e=>setNuevoTrabajador(p=>({...p,contrato:e.target.value}))}>
+                    {["indefinido","plazo fijo","honorarios","part-time"].map(c=><option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div style={{marginBottom:16}}>
+                <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>OBSERVACIONES</label>
+                <textarea rows={3} style={{...S.input,resize:"vertical"}} value={nuevoTrabajador.notas||""} onChange={e=>setNuevoTrabajador(p=>({...p,notas:e.target.value}))}/>
+              </div>
+              <div style={{display:"flex",gap:10}}>
+                <button className="btn-p" style={S.btn} onClick={()=>{
+                  if(!nuevoTrabajador.nombre.trim()) return;
+                  addTrabajador(nuevoTrabajador);
+                  setNuevoTrabajador({nombre:"",rut:"",cargo:"",zona:"",telefono:"",email:"",fechaIngreso:"",contrato:"indefinido",notas:"",pin:""});
+                  setPersonalVista("lista");
+                }}>✓ Guardar Trabajador</button>
+                <button className="btn-g" style={S.btn} onClick={()=>setPersonalVista("lista")}>Cancelar</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {vista==="personal"&&personalVista==="ficha"&&personalId&&getTrabajador(personalId)&&(
+          <FichaTrabajador
+            t={getTrabajador(personalId)}
+            S={S}
+            onVolver={()=>{setPersonalVista("lista");setPersonalId(null);}}
+            onDelete={()=>{deleteTrabajador(personalId);setPersonalVista("lista");setPersonalId(null);}}
+            onUpdate={(patch)=>updateTrabajador(personalId,patch)}
+            onAddEvento={(ev)=>addEvento(personalId,ev)}
+            onDeleteEvento={(eid)=>deleteEvento(personalId,eid)}
+            onUpdateEvento={(eid,patch)=>setPersonal(p=>(Array.isArray(p)?p:Object.values(p||{})).map(t=>t.id===personalId?{...t,eventos:(t.eventos||[]).map(e=>e.id===eid?{...e,...patch}:e)}:t))}
+          />
+        )}
+
+        {/* ── ALERTAS / NOTIFICACIONES ── */}
+        {vista==="notificaciones"&&(
+          <PanelAlertas S={S} incidencias={incidencias} setIncidencias={setIncidencias} notificaciones={notificaciones} setNotificaciones={setNotificaciones} marcarTodasLeidas={marcarTodasLeidas} notifNoLeidas={notifNoLeidas} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} tareasProg={tareasProg} setTareasProg={setTareasProg} limpiarUndef={limpiarUndef} fechaLocal={fechaLocal} crearNotificacion={crearNotificacion} esJefa={esJefa}/>
+        )}
+
+        {showCierreSectorial&&<ModalCierreSectorial S={S} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} onClose={()=>setShowCierreSectorial(false)}/>}
+      </div>
+    </div>
+  );
+}
