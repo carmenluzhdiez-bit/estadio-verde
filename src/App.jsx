@@ -13480,8 +13480,6 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
           })}
         </div>
       )}
-      {showCierreSectorial&&<ModalCierreSectorial S={S} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} onClose={()=>setShowCierreSectorial(false)}/>}
-      {showCierreSectorial&&<ModalCierreSectorial S={S} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} onClose={()=>setShowCierreSectorial(false)}/>}
     </div>
   );
 }
