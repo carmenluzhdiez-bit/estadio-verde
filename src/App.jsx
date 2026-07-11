@@ -7994,9 +7994,9 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
     const tasaGlobal = anal ? anal.tasaGlobal : null;
     const tasasCalc = calcTasa(z.id);
     const ultimaTasaReal = tasasCalc && tasasCalc.length > 0 ? tasasCalc[tasasCalc.length-1] : null;
-    const tasaReal = ultimaTasaReal ? ultimaTasaReal.tasa : null;
-    const diasUltimoIntervalo = ultimaTasaReal ? ultimaTasaReal.dias : null;
-    const deltaUltimo = ultimaTasaReal ? ultimaTasaReal.delta : null;
+    const tasaReal = (ultimaTasaReal && (!corteRecZ || ultimaTasaReal.fecha > corteRecZ.fecha)) ? ultimaTasaReal.tasa : null;
+    const diasUltimoIntervalo = tasaReal !== null ? ultimaTasaReal.dias : null;
+    const deltaUltimo = tasaReal !== null ? ultimaTasaReal.delta : null;
     const tasaUsar = tasaReal !== null ? tasaReal : (tasaGlobal || 0.4);
     const categoria = anal ? anal.categoria : "Sin datos";
 
