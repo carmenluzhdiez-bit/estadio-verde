@@ -8070,9 +8070,9 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
         </table>
       </div>
       <div style={{display:"flex",gap:12,marginTop:8,fontSize:10,color:"#5a9a7a",flexWrap:"wrap"}}>
-        <span>🟢 Bajo umbral ({altCorte}mm)</span>
-        <span>🟡 Sobre umbral — considerar corte</span>
-        <span>🔴 Muy sobre umbral — corte urgente</span>
+        <span><span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:"#22c55e",marginRight:4}}/>Bajo umbral ({altCorte}mm)</span>
+        <span><span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:"#f59e0b",marginRight:4}}/>Sobre umbral — considerar corte</span>
+        <span><span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:"#ef4444",marginRight:4}}/>Muy sobre umbral — corte urgente</span>
       </div>
     </div>
   );
@@ -8097,6 +8097,7 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
   const [zonasComparativas, setZonasComparativas] = React.useState(["g1","g3","vivero"]);
   const [confirmarBorrarTodo, setConfirmarBorrarTodo] = React.useState(false);
   const [verInforme, setVerInforme] = React.useState(false);
+  const [unidadTasa, setUnidadTasa] = React.useState("dia");
   const [informePeriodo, setInformePeriodo] = React.useState("global");
   const [informeAnio, setInformeAnio] = React.useState(String(new Date().getFullYear()));
   const [informeMes, setInformeMes] = React.useState(String(new Date().getMonth()+1).padStart(2,"0"));
@@ -8572,38 +8573,57 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
         {/* Vista Tasas resumen */}
         {vistaGrafico==="tasas"&&(
           <div style={{...S.card,padding:16,marginBottom:14}}>
-            <div style={{fontSize:13,fontWeight:700,color:"#34d399",marginBottom:10}}>⚡ Clasificación por tasa de crecimiento (mm/día)</div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#34d399"}}>⚡ Clasificación por tasa de crecimiento</div>
+              <div style={{display:"flex",gap:4}}>
+                {[["dia","mm/día"],["semana","mm/sem"]].map(([v,l])=>(
+                  <button key={v} onClick={()=>setUnidadTasa&&setUnidadTasa(v)}
+                    style={{...S.btn,fontSize:10,padding:"2px 8px",
+                      background:(unidadTasa||"dia")===v?"rgba(52,211,153,0.2)":"rgba(255,255,255,0.04)",
+                      color:(unidadTasa||"dia")===v?"#34d399":"#5a9a7a",
+                      border:`1px solid ${(unidadTasa||"dia")===v?"rgba(52,211,153,0.4)":"rgba(255,255,255,0.1)"}`}}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               {ZONAS.map(z=>{
-                const medA3=analisisTasas(z.id);
-                if(!medA3) return null;
-                const medW = Math.min(Math.abs(medA3.tasaGlobal)/1.5*100,100);
+                // Tasa de la última semana: promedio de intervalos en los últimos 7 días
+                const hace7 = new Date(fechaLocal()+"T12:00:00");
+                hace7.setDate(hace7.getDate()-7);
+                const hace7str = hace7.toISOString().slice(0,10);
+                const tasasZ = calcTasa(z.id);
+                if(!tasasZ||!tasasZ.length) return null;
+                // Intervalos de la última semana
+                const tasasUltSem = tasasZ.filter(t=>t.fecha >= hace7str);
+                // Si no hay datos de la última semana, usar el más reciente disponible
+                const tasasUsar = tasasUltSem.length > 0 ? tasasUltSem : [tasasZ[tasasZ.length-1]];
+                const tasaDia = Math.round((tasasUsar.reduce((s,t)=>s+t.tasa,0)/tasasUsar.length)*100)/100;
+                const factor = (unidadTasa||"dia")==="semana" ? 7 : 1;
+                const tasaMostrar = Math.round(tasaDia*factor*100)/100;
+                const unidad = (unidadTasa||"dia")==="semana"?"mm/sem":"mm/d";
+                const medW = Math.min(Math.abs(tasaMostrar)/((unidadTasa||"dia")==="semana"?10:1.5)*100,100);
+                const catColor = tasaDia<0.3?"#22c55e":tasaDia<0.6?"#f59e0b":"#ef4444";
+                const catLabel = tasaDia<0.3?"Lento":tasaDia<0.6?"Medio":"Rápido";
+                const esSemReciente = tasasUltSem.length > 0;
                 return (
                   <div key={z.id} style={{display:"flex",alignItems:"center",gap:10}}>
                     <div style={{width:100,fontSize:11,color:"#7aaa80",flexShrink:0,textAlign:"right"}}>{z.nombre}</div>
                     <div style={{flex:1,background:"rgba(255,255,255,0.06)",borderRadius:4,height:20,overflow:"hidden",position:"relative"}}>
-                      <div style={{width:`${medW}%`,height:"100%",background:colorCategoria(medA3.categoria),borderRadius:4,transition:"width 0.3s",opacity:0.8}}/>
+                      <div style={{width:`${medW}%`,height:"100%",background:catColor,borderRadius:4,transition:"width 0.3s",opacity:0.8}}/>
                     </div>
-                    <div style={{width:90,fontSize:11,fontWeight:700,flexShrink:0}}>
-                      {(()=>{
-                        const tRec = calcTasa(z.id);
-                        const ultT = tRec&&tRec.length>0?tRec[tRec.length-1]:null;
-                        return ultT
-                          ? <span style={{color:"#fbbf24"}} title={`Último intervalo: ${ultT.dias}d, +${ultT.delta}mm`}>
-                              ⚡ {ultT.tasa>0?"+":""}{Math.round(ultT.tasa*100)/100} mm/d
-                            </span>
-                          : <span style={{color:colorCategoria(medA3.categoria)}}>
-                              {medA3.tasaGlobal>0?"+":""}{medA3.tasaGlobal} mm/d
-                            </span>;
-                      })()}
+                    <div style={{width:90,fontSize:11,fontWeight:700,flexShrink:0,color:esSemReciente?"#fbbf24":catColor}}>
+                      {tasaMostrar>0?"+":""}{tasaMostrar} {unidad}
+                      {!esSemReciente&&<span style={{fontSize:8,color:"#5a9a7a",display:"block"}}>último dato</span>}
                     </div>
-                    <div style={{fontSize:10,color:"#5a9a7a",flexShrink:0}}>{medA3.categoria}</div>
+                    <div style={{fontSize:10,color:catColor,flexShrink:0}}>{catLabel}</div>
                   </div>
                 );
               }).filter(Boolean)}
             </div>
             <div style={{fontSize:10,color:"#5a9a7a",marginTop:10}}>
-              🟢 Lento: &lt;0.3mm/d · 🟡 Medio: 0.3-0.6mm/d · 🔴 Rápido: &gt;0.6mm/d
+              <span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:"#22c55e",marginRight:4,verticalAlign:"middle"}}/> Lento: &lt;0.3 mm/d · <span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:"#f59e0b",marginRight:4,verticalAlign:"middle"}}/> Medio: 0.3–0.6 mm/d · <span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:"#ef4444",marginRight:4,verticalAlign:"middle"}}/> Rápido: &gt;0.6 mm/d
             </div>
           </div>
         )}
