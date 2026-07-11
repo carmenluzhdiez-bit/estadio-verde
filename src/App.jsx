@@ -7961,15 +7961,29 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
     });
 
     let altBase, fechaBase, baseOrigen;
-    if(ultMed && (!corteRecZ || ultMed.fecha >= corteRecZ.fecha)) {
+    // REGLA: si el corte es más reciente QUE la medición, o es el mismo día
+    // → el corte tiene prioridad (se mide primero, luego se corta)
+    // Si la última medición es POSTERIOR al último corte → usar medición
+    const corteEsPosteriorOIgual = corteRecZ && ultMed && corteRecZ.fecha >= ultMed.fecha;
+    const corteEsPosterior       = corteRecZ && ultMed && corteRecZ.fecha > ultMed.fecha;
+    
+    if(corteRecZ && corteRecZ.alturaCorte && corteEsPosteriorOIgual) {
+      // Corte más reciente o mismo día que medición → partir desde altura de corte
+      altBase = corteRecZ.alturaCorte;
+      fechaBase = corteRecZ.fecha;
+      baseOrigen = "corte";
+    } else if(ultMed && (!corteRecZ || ultMed.fecha > corteRecZ.fecha)) {
+      // Medición posterior al corte → partir desde medición
       altBase = Number(ultMed.alturas[z.id]);
       fechaBase = ultMed.fecha;
       baseOrigen = "medicion";
     } else if(corteRecZ && corteRecZ.alturaCorte) {
+      // Solo hay corte (sin medición posterior)
       altBase = corteRecZ.alturaCorte;
       fechaBase = corteRecZ.fecha;
       baseOrigen = "corte";
     } else if(ultMed) {
+      // Solo hay medición histórica
       const diasDesdeUltMed = Math.round((new Date(hoyProjStr+"T12:00:00")-new Date(ultMed.fecha+"T12:00:00"))/(1000*60*60*24));
       if(diasDesdeUltMed > 7) return null;
       altBase = Number(ultMed.alturas[z.id]);
@@ -8028,8 +8042,8 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
                 <td style={{padding:"7px 8px",textAlign:"center",fontSize:12,fontWeight:700}}>
                   {tasaReal!==null
                     ? <span style={{color:"#fbbf24"}}>
-                        {tasaReal>0?"+":""}{tasaReal}
-                        {diasUltimoIntervalo&&<span style={{fontSize:9,color:"#5a9a7a",display:"block"}}>{diasUltimoIntervalo}d·+{deltaUltimo}mm</span>}
+                        {tasaReal>0?"+":""}{Math.round(tasaReal*100)/100}
+                        {diasUltimoIntervalo&&<span style={{fontSize:9,color:"#5a9a7a",display:"block"}}>{diasUltimoIntervalo}d · +{Math.round(Number(deltaUltimo)*100)/100}mm</span>}
                       </span>
                     : <span style={{color:"#4a7a5a"}}>—</span>
                   }
@@ -8158,15 +8172,19 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
         }
       } else {
         // Sin días desde corte: buscar si hubo corte entre las dos mediciones
-        const corteEntremedias = todosCortes.find(c=>c.fecha>pPrev.fecha && c.fecha<=svgP.fecha);
+        // IMPORTANTE: corte en la misma fecha que la medición anterior también cuenta
+        // (se mide primero, luego se corta el mismo día)
+        const corteEntremedias = todosCortes.find(c=>c.fecha>=pPrev.fecha && c.fecha<=svgP.fecha);
         if(corteEntremedias) {
-          // Hubo corte: calcular solo desde el corte hasta la medición actual
-          const diasDesdeCorte = Math.round((new Date(svgP.fecha)-new Date(corteEntremedias.fecha))/(1000*60*60*24));
-          // Usar alturaCorteReal primero, luego alturaCorte, luego pPrev.alt como estimación
-          const altBase = corteEntremedias.alturaCorte || (diasDesdeCorte > 0 ? pPrev.alt : null);
-          if(altBase && svgP.alt > altBase && diasDesdeCorte > 0) {
+          // Hubo corte: calcular desde el corte hasta la medición actual
+          // Si el corte y la medición anterior son el mismo día, diasDesdeCorte = días entre corte y medición actual
+          const diasDesdeCorte = Math.round((new Date(svgP.fecha+"T12:00:00")-new Date(corteEntremedias.fecha+"T12:00:00"))/(1000*60*60*24));
+          // Si el corte es el mismo día que svgP → tasa intra-día, usar días=1 mínimo
+          const diasEfectivos = diasDesdeCorte > 0 ? diasDesdeCorte : 1;
+          const altBase = corteEntremedias.alturaCorte || null;
+          if(altBase && svgP.alt > altBase) {
             delta = svgP.alt - altBase;
-            diasRef = diasDesdeCorte;
+            diasRef = diasEfectivos;
             metodo = "corte_detectado";
           } else if(diasDesdeCorte > 0) {
             // Corte sin altura registrada: omitir este intervalo (dato no confiable)
@@ -8572,7 +8590,7 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
                         const ultT = tRec&&tRec.length>0?tRec[tRec.length-1]:null;
                         return ultT
                           ? <span style={{color:"#fbbf24"}} title={`Último intervalo: ${ultT.dias}d, +${ultT.delta}mm`}>
-                              ⚡ {ultT.tasa>0?"+":""}{ultT.tasa} mm/d
+                              ⚡ {ultT.tasa>0?"+":""}{Math.round(ultT.tasa*100)/100} mm/d
                             </span>
                           : <span style={{color:colorCategoria(medA3.categoria)}}>
                               {medA3.tasaGlobal>0?"+":""}{medA3.tasaGlobal} mm/d
