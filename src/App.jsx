@@ -8456,41 +8456,83 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
 
         {/* ── PROYECCIÓN SEMANAL ── */}
         {vistaGrafico==="tasas"&&(()=>{
-          const hoyProj = new Date();
+          // Fecha local Chile (evitar desfase UTC)
+          const hoyProjStr = fechaLocal();
           const diasSemana = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
-          // Calcular los próximos 7 días desde hoy
           const diasProx = Array.from({length:7},(_,i)=>{
-            const d = new Date(hoyProj); d.setDate(d.getDate()+i);
-            return {fecha:d.toISOString().slice(0,10), label:i===0?"Hoy":i===1?"Mañana":diasSemana[(d.getDay()+6)%7]+" "+d.getDate()};
+            const d = new Date(hoyProjStr+"T12:00:00"); d.setDate(d.getDate()+i);
+            const ds = d.toISOString().slice(0,10);
+            return {fecha:ds, label:i===0?"Hoy":i===1?"Mañana":diasSemana[(d.getDay()+6)%7]+" "+d.getDate()};
           });
-          // Para cada zona con tasa, proyectar altura
+
+          // Corte más reciente de TODOS los greens (ayer o antes)
+          // Para greens sin medición reciente, usar la altura del último corte como base
+          const todosLosCortes = Object.entries(tareasProg||{}).flatMap(([fecha,ts])=>
+            (Array.isArray(ts)?ts:Object.values(ts||{})).filter(t=>
+              (t.estado==="hecha"||t.estado==="completada") &&
+              (t.tarea||"").toLowerCase().includes("corte") &&
+              (t.zona==="Golf"||(t.zona||"").includes("Golf"))
+            ).map(t=>({fecha, alturaCorte:t.alturaCorteReal?Number(t.alturaCorteReal):(t.alturaCorte?Number(t.alturaCorte):null), tarea:t.tarea||"", elemento:t.elemento||""}))
+          ).sort((a,b)=>b.fecha.localeCompare(a.fecha)); // más reciente primero
+
           const zonasDatos = ZONAS.map(z=>{
             const anal = analisisTasas(z.id);
-            if(!anal) return null;
-            // Última medición
+            // Última medición real
             const ultMed = [...medOrdenadas].reverse().find(m=>m.alturas?.[z.id]);
-            if(!ultMed) return null;
-            const altBase = Number(ultMed.alturas[z.id]);
-            const fechaBase = ultMed.fecha;
-            const tasaGlobal = anal.tasaGlobal; // mm/día promedio histórico
+            
+            // Buscar el corte más reciente para esta zona
+            const zonaNum = z.id.replace(/\D/g,"");
+            const corteRecZ = todosLosCortes.find(c=>{
+              const elem = c.elemento.toLowerCase();
+              const tar = c.tarea.toLowerCase();
+              if(z.id.includes("vivero")) return elem.includes("vivero")||tar.includes("vivero");
+              return elem.includes(`green ${zonaNum.padStart(2,"0")}`) ||
+                     elem.includes(`green ${Number(zonaNum)}`) ||
+                     tar.includes(`green ${zonaNum.padStart(2,"0")}`) ||
+                     tar.includes("todos") || elem.includes("todos");
+            });
 
-            // Tasa REAL del último intervalo: última medición vs corte anterior
+            // Determinar base de proyección:
+            // Si hay medición MÁS RECIENTE que el corte → usar medición
+            // Si hay corte MÁS RECIENTE que la medición → usar altura del corte
+            // Si no hay medición ni corte → saltar
+            let altBase, fechaBase, baseOrigen;
+            if(ultMed && (!corteRecZ || ultMed.fecha >= corteRecZ.fecha)) {
+              // Medición más reciente (o no hay corte)
+              altBase = Number(ultMed.alturas[z.id]);
+              fechaBase = ultMed.fecha;
+              baseOrigen = "medicion";
+            } else if(corteRecZ && corteRecZ.alturaCorte) {
+              // Corte más reciente y tiene altura registrada
+              altBase = corteRecZ.alturaCorte;
+              fechaBase = corteRecZ.fecha;
+              baseOrigen = "corte";
+            } else if(ultMed) {
+              // Solo hay medición histórica — solo proyectar si es reciente (≤7 días)
+              const diasDesdeUltMed = Math.round((new Date(hoyProjStr+"T12:00:00")-new Date(ultMed.fecha+"T12:00:00"))/(1000*60*60*24));
+              if(diasDesdeUltMed > 7) return null; // muy antigua, no proyectar
+              altBase = Number(ultMed.alturas[z.id]);
+              fechaBase = ultMed.fecha;
+              baseOrigen = "medicion_antigua";
+            } else {
+              return null; // sin datos
+            }
+
+            const tasaGlobal = anal ? anal.tasaGlobal : null;
             const tasasCalc = calcTasa(z.id);
-            const ultimaTasaReal = tasasCalc && tasasCalc.length > 0
-              ? tasasCalc[tasasCalc.length-1]
-              : null;
+            const ultimaTasaReal = tasasCalc && tasasCalc.length > 0 ? tasasCalc[tasasCalc.length-1] : null;
             const tasaReal = ultimaTasaReal ? ultimaTasaReal.tasa : null;
             const diasUltimoIntervalo = ultimaTasaReal ? ultimaTasaReal.dias : null;
             const deltaUltimo = ultimaTasaReal ? ultimaTasaReal.delta : null;
+            const tasaUsar = tasaReal !== null ? tasaReal : (tasaGlobal || 0.4); // fallback 0.4mm/d
+            const categoria = anal ? anal.categoria : "Sin datos";
 
-            // Proyección usando tasa real si existe, si no la histórica
-            const tasaUsar = tasaReal !== null ? tasaReal : tasaGlobal;
             const proj = diasProx.map(d=>{
-              const diasDesde = Math.round((new Date(d.fecha)-new Date(fechaBase+"T12:00:00"))/(1000*60*60*24));
-              const altProj = Math.round((altBase + tasaUsar*diasDesde)*10)/10;
+              const diasDesde = Math.round((new Date(d.fecha+"T12:00:00")-new Date(fechaBase+"T12:00:00"))/(1000*60*60*24));
+              const altProj = Math.round((altBase + tasaUsar*Math.max(0,diasDesde))*10)/10;
               return {...d, altProj, diasDesde};
             });
-            return {zona:z, tasaGlobal, tasaReal, diasUltimoIntervalo, deltaUltimo, altBase, fechaBase, proj, categoria:anal.categoria};
+            return {zona:z, tasaGlobal, tasaReal, diasUltimoIntervalo, deltaUltimo, altBase, fechaBase, baseOrigen, proj, categoria};
           }).filter(Boolean);
 
           if(!zonasDatos.length) return null;
@@ -8519,7 +8561,13 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
                   <tbody>
                     {zonasDatos.map(({zona,tasaGlobal,tasaReal,diasUltimoIntervalo,deltaUltimo,altBase,proj,categoria})=>(
                       <tr key={zona.id} style={{borderTop:"1px solid rgba(255,255,255,0.05)"}}>
-                        <td style={{padding:"7px 10px",fontWeight:600,fontSize:12}}>{zona.nombre}</td>
+                        <td style={{padding:"7px 10px",fontWeight:600,fontSize:12}}>
+                          {zona.nombre}
+                          <span style={{fontSize:9,marginLeft:4,color:baseOrigen==="corte"?"#60a5fa":baseOrigen==="medicion"?"#34d399":"#f59e0b",background:"rgba(255,255,255,0.05)",padding:"1px 5px",borderRadius:4}}>
+                            {baseOrigen==="corte"?"✂️ desde corte":baseOrigen==="medicion"?"📏 desde medición":"📏 med. antigua"}
+                          </span>
+                          <span style={{fontSize:9,display:"block",color:"#4a7a5a"}}>{altBase}mm · {fechaBase}</span>
+                        </td>
                         <td style={{padding:"7px 8px",textAlign:"center",fontSize:12,fontWeight:700}}>
                           {tasaReal!==null
                             ? <span style={{color:"#fbbf24"}}>
