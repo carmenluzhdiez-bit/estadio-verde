@@ -13233,6 +13233,7 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
 
   const guardarAlerta = () => {
     if(!alertaForm.zonas.length||!alertaForm.descripcion.trim()) return;
+    if(typeof crearNotificacion !== "function") { console.error("crearNotificacion no es función"); }
     const tipoObj = TIPOS_ALERTA.find(t=>t.id===alertaForm.tipo)||TIPOS_ALERTA[0];
     const nuevaId = Date.now()+Math.random();
     const nuevaAlerta = limpiarUndef({id:nuevaId,estado:"activa",tipo:alertaForm.tipo,tipoLabel:tipoObj.label,tipoIcon:tipoObj.icon,zonas:alertaForm.zonas,origen:alertaForm.origen,urgencia:alertaForm.urgencia,descripcion:alertaForm.descripcion,responsable:alertaForm.responsable,fecha:alertaForm.fecha,hora:alertaForm.hora,fechaCreacion:new Date().toISOString(),tareas:tareasEditables.filter(t=>t.incluir).map(t=>({texto:t.texto,responsable:t.responsable,estado:"pendiente"})),historial:[{accion:"Alerta creada",fecha:alertaForm.fecha,hora:alertaForm.hora,responsable:alertaForm.responsable}]});
@@ -13483,6 +13484,21 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
       {showCierreSectorial&&<ModalCierreSectorial S={S} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} onClose={()=>setShowCierreSectorial(false)}/>}
     </div>
   );
+}
+
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(e) { return { error: e }; }
+  componentDidCatch(e, info) { console.error("🔴 Error en:", info.componentStack, e); }
+  render() {
+    if(this.state.error) return (
+      <div style={{padding:20,color:"#fca5a5",background:"rgba(239,68,68,0.1)",borderRadius:8,margin:10}}>
+        <strong>Error:</strong> {this.state.error.message}
+        <pre style={{fontSize:10,marginTop:8,whiteSpace:"pre-wrap"}}>{this.state.error.stack?.slice(0,300)}</pre>
+      </div>
+    );
+    return this.props.children;
+  }
 }
 
 export default function App() {
@@ -14840,7 +14856,7 @@ export default function App() {
         )}
 
         {/* REPORTE */}
-        {vista==="reporte"&&(
+        {vista==="reporte"&&(<ErrorBoundary>
           <div className="ein">
             <div style={{marginBottom:24,display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:12}}>
               <div>
@@ -14935,7 +14951,7 @@ export default function App() {
                     <div key={k} style={{marginBottom:10}}>
                       <div style={{display:"flex",justifyContent:"space-between",marginBottom:3,fontSize:13}}>
                         <span style={{color:v.color}}>{v.label}</span>
-                        <span style={{color:"#6aaa7a"}}>{c} ({pct}%)</span>
+                        <span style={{color:"#6aaa7a"}}>{statC2} ({pct}%)</span>
                       </div>
                       <div style={{background:"rgba(255,255,255,0.07)",borderRadius:4,height:7,overflow:"hidden"}}>
                         <div style={{width:`${pct}%`,height:"100%",background:v.color,borderRadius:4}}/>
@@ -14996,9 +15012,9 @@ export default function App() {
             })()}
             </>}
           </div>
-        )}
+        </ErrorBoundary>)}
 
-        {/* PROGRAMACIÓN */}
+        {/* PROGRAMACIÓN */}}
         {vista==="programacion"&&(
           <ProgramacionDiaria key="prog" S={S} zonas={zonas} data={data} personal={personal} getZD={getZD} getAllElems={getAllElems} MACROZONAS_BASE={MACROZONAS_BASE} tareas={tareasProg} setTareas={setTareasProg}
             getElemFrecs={getElemFrecs} setElemFrecs={setElemFrecs}
@@ -15383,9 +15399,9 @@ export default function App() {
         )}
 
         {/* ── ALERTAS / NOTIFICACIONES ── */}
-        {vista==="notificaciones"&&(
+        {vista==="notificaciones"&&(<ErrorBoundary>
           <PanelAlertas S={S} incidencias={incidencias} setIncidencias={setIncidencias} notificaciones={notificaciones} setNotificaciones={setNotificaciones} marcarTodasLeidas={marcarTodasLeidas} notifNoLeidas={notifNoLeidas} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} tareasProg={tareasProg} setTareasProg={setTareasProg} crearNotificacion={crearNotificacion} esJefa={esJefa}/>
-        )}
+        </ErrorBoundary>)}
 
         {showCierreSectorial&&<ModalCierreSectorial S={S} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} onClose={()=>setShowCierreSectorial(false)}/>}
       </div>
