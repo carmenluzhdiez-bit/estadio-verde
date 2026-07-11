@@ -14152,7 +14152,7 @@ export default function App() {
               {fbRol==="jefa"?"🌿 Jefa AV":fbRol==="supervisor"?"👷 Supervisor":(()=>{
                 const arr=Array.isArray(personal)?personal:Object.values(personal||{});
                 const fbU=fbUser?arr.find(x=>x.email?.toLowerCase()===fbUser.email?.toLowerCase()):null;
-                return u?`🌱 ${u.nombre.split(" ")[0]}`:"🌱 Jardinero";
+                return fbU?`🌱 ${fbU.nombre.split(" ")[0]}`:"🌱 Jardinero";
               })()}
             </span>
             <button onClick={handleLogout}
@@ -14915,7 +14915,7 @@ export default function App() {
                   const blob = new Blob([html], {type:"text/html;charset=utf-8"});
                   const url = URL.createObjectURL(blob);
                   const dlA = document.createElement("a");
-                  a.href = url; a.target = "_blank"; a.click();
+                  dlA.href = url; dlA.target = "_blank"; dlA.click();
                   setTimeout(()=>URL.revokeObjectURL(url), 10000);
                 }}
                 style={{...S.btn,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)",fontSize:13,flexShrink:0}}
@@ -14930,7 +14930,7 @@ export default function App() {
                 <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,marginBottom:14}}>📊 Zonas por Estado</div>
                 {Object.entries(ESTADOS_ZONA).map(([k,v])=>{
                   const statC2=MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral===k).length;
-                  const pct=Math.round((c/MACROZONAS_BASE.length)*100);
+                  const pct=Math.round((statC2/MACROZONAS_BASE.length)*100);
                   return (
                     <div key={k} style={{marginBottom:10}}>
                       <div style={{display:"flex",justifyContent:"space-between",marginBottom:3,fontSize:13}}>
@@ -15055,9 +15055,9 @@ export default function App() {
                         const tarea=tareasDelDia.find(t=>String(t.id)===String(tid));
                         if(tarea){
                           const onUpdZ=MACROZONAS_BASE.find(zz=>zz.nombre===tarea.zona);
-                          if(z){
+                          if(onUpdZ){
                             const ico=patch.estado==="no_pudo"?"🔴":patch.estado==="hecha"?"✅":"🔵";
-                            addHistorial(String(z.id),`${ico} [${tarea.responsable||"?"}] ${tarea.tarea}${patch.estado==="no_pudo"&&patch.notaWorker?" ("+patch.notaWorker+")":""}`);
+                            addHistorial(String(onUpdZ.id),`${ico} [${tarea.responsable||"?"}] ${tarea.tarea}${patch.estado==="no_pudo"&&patch.notaWorker?" ("+patch.notaWorker+")":""}`);
                           }
                           // Bono especializado: la detección ahora es centralizada en un useEffect que vigila tareasProg
                         }
@@ -15091,7 +15091,7 @@ export default function App() {
                       return {...prev,[hoyKey]:lista};
                     });
                     const propZ=MACROZONAS_BASE.find(zz=>zz.nombre===nuevaTarea.zona);
-                    if(z) addHistorial(z.id,`🆕 [${nuevaTarea.responsable}] Tarea emergente: ${nuevaTarea.tarea}`);
+                    if(propZ) addHistorial(propZ.id,`🆕 [${nuevaTarea.responsable}] Tarea emergente: ${nuevaTarea.tarea}`);
                   }}
                   esJefaApp={rolLogueado==="jefa"}
                   cierresTurno={cierresTurno}
@@ -15159,7 +15159,7 @@ export default function App() {
                         if(e.key!=="Enter") return;
                         if(rolSeleccionado==="trabajador"){
                           const wrkT=personal.find(x=>String(x.id)===String(workerLogueado));
-                          if(t&&String(t.pin)===String(workerPinInput)){setVistaWorker(true);setWorkerPinError(false);}
+                          if(wrkT&&String(wrkT.pin)===String(workerPinInput)){setVistaWorker(true);setWorkerPinError(false);}
                           else setWorkerPinError(true);
                         } else {
                           if(checkPin(rolSeleccionado,workerPinInput)){setWorkerPinError(false);}
@@ -15180,7 +15180,7 @@ export default function App() {
                     onClick={()=>{
                       if(rolSeleccionado==="trabajador"){
                         const wrkT2=personal.find(x=>String(x.id)===String(workerLogueado));
-                        if(t&&String(t.pin)===String(workerPinInput)){setVistaWorker(true);setWorkerPinError(false);}
+                        if(wrkT2&&String(wrkT2.pin)===String(workerPinInput)){setVistaWorker(true);setWorkerPinError(false);}
                         else setWorkerPinError(true);
                       } else {
                         if(checkPin(rolSeleccionado,workerPinInput)){setWorkerPinError(false);}
