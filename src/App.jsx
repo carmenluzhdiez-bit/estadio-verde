@@ -2121,11 +2121,14 @@ function ConfiguradorSemanal({ S, personal, configSemanal, setConfigSemanal, esJ
 
   const semana = (() => {
     const hoy = new Date();
+    const dow = hoy.getDay(); // 0=dom, 1=lun ... 6=sab
+    // Días hasta el próximo lunes
+    const diasAlLunes = dow === 1 ? 7 : dow === 0 ? 1 : (8 - dow);
     const lun = new Date(hoy);
-    lun.setDate(hoy.getDate() - ((hoy.getDay()+6)%7));
-    const vie = new Date(lun); vie.setDate(lun.getDate()+4);
+    lun.setDate(hoy.getDate() + diasAlLunes);
+    const sab = new Date(lun); sab.setDate(lun.getDate()+5);
     const fmt = d => d.toLocaleDateString("es-CL",{day:"2-digit",month:"short"});
-    return `${fmt(lun)} – ${fmt(vie)}`;
+    return `Semana ${fmt(lun)} – ${fmt(sab)}`;
   })();
 
   if(!esJefa) return null;
@@ -2172,6 +2175,9 @@ function ConfiguradorSemanal({ S, personal, configSemanal, setConfigSemanal, esJ
           </div>
           <div style={{marginTop:12,fontSize:11,color:"#5a9a7a",padding:"8px 12px",background:"rgba(52,211,153,0.05)",borderRadius:6,border:"1px solid rgba(52,211,153,0.1)"}}>
             💡 Riego: si hay muchas tareas, asigna a Esteban. El sistema no impone restricciones — tú decides.
+          </div>
+          <div style={{marginTop:8,fontSize:11,color:"#fbbf24",padding:"8px 12px",background:"rgba(251,191,36,0.05)",borderRadius:6,border:"1px solid rgba(251,191,36,0.1)"}}>
+            📅 Para días especiales fuera de semana (torneos, feriados trabajados), usa <strong>Programación</strong> directamente seleccionando la fecha específica.
           </div>
         </div>
       )}
