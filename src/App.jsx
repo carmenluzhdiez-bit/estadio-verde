@@ -5286,7 +5286,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
 
       {/* Sub-tabs */}
       <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
-        {[["alerta","📅 Programa"],["incidencias","🚨 Incidencias y Cierres"],["stock","📦 Stock"],["proveedor","🏪 Proveedor"],["registro","📝 Registrar"],["historial","🗂️ Historial"]].map(([t,l])=>{
+        {[["alerta","📅 Programa"],["incidencias","🦠 Incidencias Fitosanitarias"],["stock","📦 Stock"],["proveedor","🏪 Proveedor"],["registro","📝 Registrar"],["historial","🗂️ Historial"]].map(([t,l])=>{
           const hayAlerta = t==="incidencias" && incidencias.some(i=>i.estado==="cerrada"||i.estado==="observacion");
           return (
             <button key={t} className={`tab${subTab===t?" on":""}`} onClick={()=>{setSubTab(t);setShowForm(false);}} style={{position:"relative"}}>
@@ -5331,8 +5331,6 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                   <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                     {[
                       ["fitosanitario","🦠 Fitosanitario","Plagas, enfermedades, aplicación pesticidas","#ef4444"],
-                      ["recuperacion","🌱 Recuperación","Resiembra, aireación, fertilización, recuperación césped","#22c55e"],
-                      ["evento","🎉 Evento / Montaje","Torneo, evento, montaje que restringe el uso de un área","#60a5fa"],
                     ].map(([flujo,titulo,desc,color])=>(
                       <div key={flujo} onClick={()=>setIncidForm(p=>({...p,flujo,tipoCierre:flujo==="fitosanitario"?"fitosanitario":flujo==="recuperacion"?"recuperacion":"evento"}))}
                         style={{flex:"1 1 200px",cursor:"pointer",border:`2px solid ${incidForm.flujo===flujo?color:"rgba(255,255,255,0.1)"}`,
@@ -6313,6 +6311,23 @@ function ActividadDelDia({ zonas, MACROZONAS_BASE, S, EC, tareasDelDia }) {
             );
           })}
         </div>
+      )}
+
+      {/* ── TAB FITOSANITARIO ── */}
+      {subTab==="fitosanitario"&&rolLogueado!=="trabajador"&&(
+        <PanelFungicidas
+          S={S}
+          aplicaciones={aplicaciones}
+          setAplicaciones={setAplicaciones}
+          personal={personal}
+          esJefa={esJefa}
+          tareasProg={tareasProg}
+          setTareasProg={setTareasProg}
+          incidenciasFito={incidenciasFito}
+          setIncidenciasFito={setIncidenciasFito}
+          crearNotificacion={crearNotificacion}
+          zonasFito={["Golf/Greens","Golf/Tees","Golf/Fairways","Golf/Búnkers","Golf/Vivero"]}
+        />
       )}
     </div>
   );
@@ -9701,7 +9716,7 @@ function TareasGolfPanel({ tareasGolfHoy, hoy, esJefa, setTareasProg, tareasProg
 }
 
 
-function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista }) {
+function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito }) {
   const GOLF_ZONA_ID = 31; // ID macrozona Golf
   const sincronizarMacrozona = (tipo, detalle) => {
     if(!updateZona) return;
@@ -10125,7 +10140,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
         {(()=>{
           // Tabs según rol: trabajador solo ve lo que le corresponde
-          const todosTabs = [["panel","📊 Panel"],["greens","⛳ Greens"],["tees","🎯 Tees"],["bunkers","🏖️ Búnkers"],["fairways","🌾 Fairways"],["zonas","🌿 Zonas"],["arboles","🌳 Árboles"],["mediciones","📏 Alturas"],["humedad","💧 Humedad"],["eventos","🏆 Eventos"]];
+          const todosTabs = [["panel","📊 Panel"],["greens","⛳ Greens"],["tees","🎯 Tees"],["bunkers","🏖️ Búnkers"],["fairways","🌾 Fairways"],["zonas","🌿 Zonas"],["arboles","🌳 Árboles"],["mediciones","📏 Alturas"],["humedad","💧 Humedad"],["eventos","🏆 Eventos"],["fitosanitario","🧪 Fitosanitario"]];
           const tabsWorker = [["mediciones","📏 Alturas"],["humedad","💧 Humedad"]];
           // Agregar Programación solo para jefa/supervisor
           const todosTabs2 = [...todosTabs, ["programacion_golf","📅 Programación"]];
@@ -13384,12 +13399,14 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
   const [tareasEditables, setTareasEditables] = React.useState([]);
 
   const TIPOS_ALERTA = [
-    {id:"meteorologica",icon:"🌧️",label:"Meteorológica",    tareas:["🚧 Encintar zona afectada","Revisar drenaje y canales","Retirar obstáculos en caminos","Inspección post-evento"]},
-    {id:"enfermedad",   icon:"🦠",label:"Enfermedad/Plaga", tareas:["🚧 Encintar zona afectada","Aplicar tratamiento fitosanitario","Registrar agente causal","Monitoreo diario"]},
-    {id:"dano",         icon:"🔧",label:"Daño/Reparación",  tareas:["🚧 Encintar zona afectada","Evaluar magnitud del daño","Fotografiar y documentar","Solicitar reparación"]},
-    {id:"evento",       icon:"🏆",label:"Evento/Actividad", tareas:["🚧 Encintar zona afectada","Instalar señalética","Coordinación con organizadores","Revisión post-evento"]},
-    {id:"riego",        icon:"💧",label:"Riego emergencia", tareas:["🚧 Encintar zona afectada","Riego de emergencia","Revisión sistema de drenaje"]},
-    {id:"riesgo",       icon:"⚠️",label:"Riesgo general",   tareas:["🚧 Encintar zona afectada","Inspección de seguridad","Notificar a administración"]},
+    {id:"meteorologica",icon:"🌧️",label:"Meteorológica",       tareas:["🚧 Encintar zona afectada","Revisar drenaje y canales","Retirar obstáculos en caminos","Inspección post-evento"]},
+    {id:"enfermedad",   icon:"🦠",label:"Enfermedad/Plaga",    tareas:["🚧 Encintar zona afectada","Aplicar tratamiento fitosanitario","Registrar agente causal","Monitoreo diario"]},
+    {id:"dano",         icon:"🔧",label:"Daño/Reparación",     tareas:["🚧 Encintar zona afectada","Evaluar magnitud del daño","Fotografiar y documentar","Solicitar reparación"]},
+    {id:"evento",       icon:"🏆",label:"Evento/Montaje",      tareas:["🚧 Encintar zona afectada","Instalar señalética","Coordinación con organizadores","Revisión post-evento","Inspección post-evento"]},
+    {id:"recuperacion", icon:"🌱",label:"Recuperación césped", tareas:["🚧 Encintar zona afectada","Evaluar estado del césped","Definir tipo de trabajo (resiembra/aireación/fertilización)","Programar inicio de faenas","Estimación días de recuperación"]},
+    {id:"golf_incid",   icon:"⛳",label:"Incidencia Golf",     tareas:["🚧 Encintar green o zona afectada","Suspender uso del green","Evaluar causa (pitch mark, desgaste, plaga)","Fotografiar y documentar","Notificar al encargado de golf"]},
+    {id:"riego",        icon:"💧",label:"Riego emergencia",    tareas:["🚧 Encintar zona afectada","Riego de emergencia","Revisión sistema de drenaje"]},
+    {id:"riesgo",       icon:"⚠️",label:"Riesgo general",      tareas:["🚧 Encintar zona afectada","Inspección de seguridad","Notificar a administración"]},
   ];
 
   React.useEffect(()=>{
@@ -14464,7 +14481,7 @@ export default function App() {
         </div>
         <div style={S.headerNav} className="headerNav">
           {(fbRol==="jefa"
-            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["fungicidas","🧪","Fungicidas"],["compras","🛒","Compras"],["bodegas","🏪","Bodegas"],["golf","🏌️","Golf"],["personal","👷","Personal"],["notificaciones","🔔","Alertas"]]
+            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["compras","🛒","Compras"],["bodegas","🏪","Bodegas"],["golf","🏌️","Golf"],["personal","👷","Personal"],["notificaciones","🔔","Alertas"]]
             : fbRol==="supervisor"
             ? [["dashboard","📊","Panel"],["programacion","📆","Programa"],["reporte","📋","Reporte"],["golf","🏌️","Golf"],["miturno","🌿","Mi Turno"]]
             : [["miturno","🌿","Mi Turno"]]
@@ -15537,7 +15554,7 @@ export default function App() {
 
         {/* GOLF */}
         {vista==="golf"&&(
-          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial} setVista={setVista}
+          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial} setVista={setVista} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito}
             crearNotificacion={crearNotificacion}
             initialSubTab={golfInitTab}
             onRegistroGuardado={(tipo)=>{
