@@ -2210,6 +2210,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   const turnoCerradoKey = `${fechaVer}_${(trabajador?.nombre||"").split(" ")[0].toLowerCase()}`;
   const turnoCerrado = (cierresTurno||{})[turnoCerradoKey] || null;
   const puedeEditar = !turnoCerrado || esJefaApp;
+  const puedeCambiarEstado = true; // siempre puede marcar estado de sus propias tareas
   const [showNuevaTareaEmerg, setShowNuevaTareaEmerg] = React.useState(false);
   const [nuevaTareaEmerg, setNuevaTareaEmerg] = React.useState({ zona:"", tarea:"", notas:"" });
   // Estado de grupos colapsables — objeto {key: bool}
@@ -2418,7 +2419,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                           </div>
                           <span style={{fontSize:11,fontWeight:600,color:est.color,background:`${est.color}15`,padding:"2px 8px",borderRadius:8,border:`1px solid ${est.color}30`,whiteSpace:"nowrap",flexShrink:0}}>{est.icon} {est.label}</span>
                         </div>
-                        {puedeEditar ? (
+                        {puedeCambiarEstado ? (
                           <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                             {Object.entries(ESTADOS_TAREA).map(([k,v])=>(
                               <button key={k} onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:k,notaWorker:k!=="no_pudo"?(t.notaWorker||""):""})}
@@ -2571,7 +2572,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                                 </div>
                                 <span style={{fontSize:10,fontWeight:600,color:est.color,background:`${est.color}12`,padding:"2px 7px",borderRadius:8,border:`1px solid ${est.color}25`,whiteSpace:"nowrap",flexShrink:0}}>{est.icon} {est.label}</span>
                               </div>
-                              {puedeEditar ? (
+                              {puedeCambiarEstado ? (
                                 <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                                   {Object.entries(ESTADOS_TAREA).map(([k,v])=>(
                                     <button key={k} onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:k,notaWorker:k!=="no_pudo"?(t.notaWorker||""):""})}
