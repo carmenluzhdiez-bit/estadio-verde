@@ -1,6 +1,5 @@
-// firebase-messaging-sw.js
-// Service Worker para notificaciones push — Estadio Verde
-// Subir a: /public/firebase-messaging-sw.js en el repositorio
+// firebase-messaging-sw.js — Estadio Verde
+// Ubicación en el repo: raíz (junto a index.html) o public/
 
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
@@ -17,7 +16,23 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// Notificaciones en background (cuando la app está cerrada)
+// Responder al GET_TOKEN desde la app
+self.addEventListener("message", async (evt) => {
+  if(evt.data?.type === "GET_TOKEN") {
+    try {
+      const token = await messaging.getToken({
+        vapidKey: evt.data.vapidKey
+      });
+      // Devolver token a la app
+      const clients = await self.clients.matchAll({ type: "window" });
+      clients.forEach(c => c.postMessage({ type: "TOKEN", token }));
+    } catch(e) {
+      console.warn("SW getToken error:", e);
+    }
+  }
+});
+
+// Notificaciones en background (app cerrada)
 messaging.onBackgroundMessage((payload) => {
   const { title, body, icon } = payload.notification || {};
   self.registration.showNotification(title || '🔔 Estadio Verde', {
@@ -33,10 +48,10 @@ messaging.onBackgroundMessage((payload) => {
   });
 });
 
-// Clic en la notificación → abrir la app
+// Clic en notificación → abrir app
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  if (event.action === 'abrir' || !event.action) {
+  if(event.action !== 'cerrar') {
     event.waitUntil(
       clients.openWindow('https://carmenluzhdiez-bit.github.io/estadio-verde/')
     );
