@@ -6313,24 +6313,6 @@ function ActividadDelDia({ zonas, MACROZONAS_BASE, S, EC, tareasDelDia }) {
         </div>
       )}
 
-      {/* ── TAB FITOSANITARIO ── */}
-      {subTab==="fitosanitario"&&rolLogueado!=="trabajador"&&(
-        <ErrorBoundary>
-        <PanelFungicidas
-          S={S}
-          aplicaciones={aplicaciones}
-          setAplicaciones={setAplicaciones}
-          personal={personal}
-          esJefa={esJefa}
-          tareasProg={tareasProg}
-          setTareasProg={setTareasProg}
-          incidenciasFito={incidenciasFito}
-          setIncidenciasFito={setIncidenciasFito}
-          crearNotificacion={crearNotificacion}
-          zonasFito={["Golf/Greens","Golf/Tees","Golf/Fairways","Golf/Búnkers","Golf/Vivero"]}
-        />
-        </ErrorBoundary>
-      )}
     </div>
   );
 }
@@ -11466,6 +11448,23 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             );
           })}
         </div>
+      )}
+
+      {/* ── TAB FITOSANITARIO ── */}
+      {subTab==="fitosanitario"&&rolLogueado!=="trabajador"&&(
+        <PanelFungicidas
+          S={S}
+          aplicaciones={aplicaciones}
+          setAplicaciones={setAplicaciones}
+          personal={personal}
+          esJefa={esJefa}
+          tareasProg={tareasProg}
+          setTareasProg={setTareasProg}
+          incidenciasFito={incidenciasFito}
+          setIncidenciasFito={setIncidenciasFito}
+          crearNotificacion={crearNotificacion}
+          zonasFito={["Golf/Greens","Golf/Tees","Golf/Fairways","Golf/Búnkers","Golf/Vivero"]}
+        />
       )}
     </div>
   );
