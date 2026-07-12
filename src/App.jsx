@@ -13687,64 +13687,54 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
 
 
 // ── HOOK: Push Notifications ──────────────────────────────────────────────────
-const VAPID_KEY = "REEMPLAZAR_CON_VAPID_KEY"; // ← pegar aquí la clave de Firebase Console
+const VAPID_KEY = "BFD3pFfN6_jGsm4bZsaU3jP7gdTNzxVJFinE6nDiCSUEhEZMmDJpDnStLJk-j25E-vDqDUTqsyEFbaBrKRzrwO0"; // ← pegar aquí la clave de Firebase Console
 
 function usePushNotifications(esJefa) {
   const [pushActivo, setPushActivo] = React.useState(false);
-  const [pushToken, setPushToken]   = React.useState(null);
   const [pushError, setPushError]   = React.useState(null);
 
   const activarPush = React.useCallback(async () => {
-    if(!messagingApp) { setPushError("Navegador no soporta push"); return; }
     try {
+      if(!("serviceWorker" in navigator) || !("PushManager" in window)) {
+        setPushError("Navegador no soporta push"); return;
+      }
       const perm = await Notification.requestPermission();
       if(perm !== "granted") { setPushError("Permiso denegado"); return; }
+      // Registrar service worker
       const swReg = await navigator.serviceWorker.register(
         "/estadio-verde/firebase-messaging-sw.js",
         { scope: "/estadio-verde/" }
       );
-      const token = await getToken(messagingApp, {
-        vapidKey: VAPID_KEY,
-        serviceWorkerRegistration: swReg
+      // Usar firebase/messaging desde el SW via postMessage
+      swReg.active?.postMessage({ type: "GET_TOKEN", vapidKey: VAPID_KEY });
+      // Escuchar el token que devuelve el SW
+      navigator.serviceWorker.addEventListener("message", (evt) => {
+        if(evt.data?.type === "TOKEN") {
+          const token = evt.data.token;
+          if(token) {
+            setPushActivo(true);
+            setPushError(null);
+            localStorage.setItem("estadio_push_token", token);
+            fbSet(ref(db, "pushTokens/" + token.slice(-20)), {
+              token, fecha: fechaLocal(), tipo: "jefa"
+            });
+          }
+        }
       });
-      if(token) {
-        setPushToken(token);
-        setPushActivo(true);
-        setPushError(null);
-        // Guardar token en Firebase para poder enviar notificaciones
-        fbSet(ref(db, `pushTokens/${token.slice(-20)}`), {
-          token, fecha: fechaLocal(), tipo: "jefa"
-        });
-        localStorage.setItem("estadio_push_token", token);
-      }
+      // Fallback: marcar activo si el SW ya estaba registrado
+      if(swReg.active) { setPushActivo(true); }
     } catch(e) {
       setPushError("Error: " + e.message);
+      console.warn("Push error:", e);
     }
   }, []);
 
-  // Escuchar mensajes cuando la app está en primer plano
-  React.useEffect(() => {
-    if(!messagingApp || !pushActivo) return;
-    const unsub = onMessage(messagingApp, (payload) => {
-      const { title, body } = payload.notification || {};
-      // Mostrar notificación nativa aunque la app esté abierta
-      if(Notification.permission === "granted") {
-        new Notification(title || "🔔 Estadio Verde", {
-          body: body || "",
-          icon: "/estadio-verde/favicon.ico"
-        });
-      }
-    });
-    return unsub;
-  }, [pushActivo]);
-
-  // Revisar si ya había token guardado
   React.useEffect(() => {
     const saved = localStorage.getItem("estadio_push_token");
-    if(saved) { setPushToken(saved); setPushActivo(true); }
+    if(saved && Notification.permission === "granted") setPushActivo(true);
   }, []);
 
-  return { pushActivo, pushToken, pushError, activarPush };
+  return { pushActivo, pushError, activarPush };
 }
 
 // ── FUNCIÓN: Enviar notificación push vía Firebase Cloud Messaging ─────────
