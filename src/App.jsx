@@ -8573,54 +8573,41 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
         {/* Vista Tasas resumen */}
         {vistaGrafico==="tasas"&&(
           <div style={{...S.card,padding:16,marginBottom:14}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-              <div style={{fontSize:13,fontWeight:700,color:"#34d399"}}>⚡ Clasificación por tasa de crecimiento</div>
-              <div style={{display:"flex",gap:4}}>
-                {[["dia","mm/día"],["semana","mm/sem"]].map(([v,l])=>(
-                  <button key={v} onClick={()=>setUnidadTasa&&setUnidadTasa(v)}
-                    style={{...S.btn,fontSize:10,padding:"2px 8px",
-                      background:(unidadTasa||"dia")===v?"rgba(52,211,153,0.2)":"rgba(255,255,255,0.04)",
-                      color:(unidadTasa||"dia")===v?"#34d399":"#5a9a7a",
-                      border:`1px solid ${(unidadTasa||"dia")===v?"rgba(52,211,153,0.4)":"rgba(255,255,255,0.1)"}`}}>
-                    {l}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              {ZONAS.map(z=>{
-                // Tasa de la última semana: promedio de intervalos en los últimos 7 días
-                const hace7 = new Date(fechaLocal()+"T12:00:00");
-                hace7.setDate(hace7.getDate()-7);
-                const hace7str = hace7.toISOString().slice(0,10);
-                const tasasZ = calcTasa(z.id);
-                if(!tasasZ||!tasasZ.length) return null;
-                // Intervalos de la última semana
-                const tasasUltSem = tasasZ.filter(t=>t.fecha >= hace7str);
-                // Si no hay datos de la última semana, usar el más reciente disponible
-                const tasasUsar = tasasUltSem.length > 0 ? tasasUltSem : [tasasZ[tasasZ.length-1]];
-                const tasaDia = Math.round((tasasUsar.reduce((s,t)=>s+t.tasa,0)/tasasUsar.length)*100)/100;
-                const factor = (unidadTasa||"dia")==="semana" ? 7 : 1;
-                const tasaMostrar = Math.round(tasaDia*factor*100)/100;
-                const unidad = (unidadTasa||"dia")==="semana"?"mm/sem":"mm/d";
-                const medW = Math.min(Math.abs(tasaMostrar)/((unidadTasa||"dia")==="semana"?10:1.5)*100,100);
-                const catColor = tasaDia<0.3?"#22c55e":tasaDia<0.6?"#f59e0b":"#ef4444";
-                const catLabel = tasaDia<0.3?"Lento":tasaDia<0.6?"Medio":"Rápido";
-                const esSemReciente = tasasUltSem.length > 0;
-                return (
-                  <div key={z.id} style={{display:"flex",alignItems:"center",gap:10}}>
-                    <div style={{width:100,fontSize:11,color:"#7aaa80",flexShrink:0,textAlign:"right"}}>{z.nombre}</div>
-                    <div style={{flex:1,background:"rgba(255,255,255,0.06)",borderRadius:4,height:20,overflow:"hidden",position:"relative"}}>
-                      <div style={{width:`${medW}%`,height:"100%",background:catColor,borderRadius:4,transition:"width 0.3s",opacity:0.8}}/>
-                    </div>
-                    <div style={{width:90,fontSize:11,fontWeight:700,flexShrink:0,color:esSemReciente?"#fbbf24":catColor}}>
-                      {tasaMostrar>0?"+":""}{tasaMostrar} {unidad}
-                      {!esSemReciente&&<span style={{fontSize:8,color:"#5a9a7a",display:"block"}}>último dato</span>}
-                    </div>
-                    <div style={{fontSize:10,color:catColor,flexShrink:0}}>{catLabel}</div>
+            <div style={{fontSize:13,fontWeight:700,color:"#34d399",marginBottom:12}}>⚡ Clasificación por tasa de crecimiento</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+              {[{factor:1,unidad:"mm/día",label:"📅 Últimos datos (mm/día)",maxW:1.5},{factor:7,unidad:"mm/sem",label:"📆 Proyección semanal (mm/sem)",maxW:10}].map(({factor,unidad,label,maxW})=>(
+                <div key={unidad}>
+                  <div style={{fontSize:11,color:"#5a9a7a",marginBottom:8,fontWeight:600,letterSpacing:"0.5px",textTransform:"uppercase"}}>{label}</div>
+                  <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                    {ZONAS.map(z=>{
+                      const hace7 = new Date(fechaLocal()+"T12:00:00");
+                      hace7.setDate(hace7.getDate()-7);
+                      const hace7str = hace7.toISOString().slice(0,10);
+                      const tasasZ = calcTasa(z.id);
+                      if(!tasasZ||!tasasZ.length) return null;
+                      const tasasUltSem = tasasZ.filter(t=>t.fecha >= hace7str);
+                      const tasasUsar = tasasUltSem.length > 0 ? tasasUltSem : [tasasZ[tasasZ.length-1]];
+                      const tasaDia = Math.round((tasasUsar.reduce((s,t)=>s+t.tasa,0)/tasasUsar.length)*100)/100;
+                      const tasaMostrar = Math.round(tasaDia*factor*100)/100;
+                      const barW = Math.min(Math.abs(tasaMostrar)/maxW*100,100);
+                      const catColor = tasaDia<0.3?"#22c55e":tasaDia<0.6?"#f59e0b":"#ef4444";
+                      const esSemReciente = tasasUltSem.length > 0;
+                      return (
+                        <div key={z.id} style={{display:"flex",alignItems:"center",gap:6}}>
+                          <div style={{width:70,fontSize:10,color:"#7aaa80",flexShrink:0,textAlign:"right"}}>{z.nombre}</div>
+                          <div style={{flex:1,background:"rgba(255,255,255,0.06)",borderRadius:3,height:16,overflow:"hidden"}}>
+                            <div style={{width:`${barW}%`,height:"100%",background:catColor,borderRadius:3,opacity:0.85}}/>
+                          </div>
+                          <div style={{width:70,fontSize:11,fontWeight:700,color:esSemReciente?"#fbbf24":catColor,flexShrink:0}}>
+                            {tasaMostrar>0?"+":""}{tasaMostrar}
+                            {!esSemReciente&&<span style={{fontSize:8,color:"#5a9a7a",marginLeft:2}}>↩</span>}
+                          </div>
+                        </div>
+                      );
+                    }).filter(Boolean)}
                   </div>
-                );
-              }).filter(Boolean)}
+                </div>
+              ))}
             </div>
             <div style={{fontSize:10,color:"#5a9a7a",marginTop:10}}>
               <span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:"#22c55e",marginRight:4,verticalAlign:"middle"}}/> Lento: &lt;0.3 mm/d · <span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:"#f59e0b",marginRight:4,verticalAlign:"middle"}}/> Medio: 0.3–0.6 mm/d · <span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:"#ef4444",marginRight:4,verticalAlign:"middle"}}/> Rápido: &gt;0.6 mm/d
@@ -13698,6 +13685,84 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
   );
 }
 
+
+// ── HOOK: Push Notifications ──────────────────────────────────────────────────
+const VAPID_KEY = "REEMPLAZAR_CON_VAPID_KEY"; // ← pegar aquí la clave de Firebase Console
+
+function usePushNotifications(esJefa) {
+  const [pushActivo, setPushActivo] = React.useState(false);
+  const [pushToken, setPushToken]   = React.useState(null);
+  const [pushError, setPushError]   = React.useState(null);
+
+  const activarPush = React.useCallback(async () => {
+    if(!messagingApp) { setPushError("Navegador no soporta push"); return; }
+    try {
+      const perm = await Notification.requestPermission();
+      if(perm !== "granted") { setPushError("Permiso denegado"); return; }
+      const swReg = await navigator.serviceWorker.register(
+        "/estadio-verde/firebase-messaging-sw.js",
+        { scope: "/estadio-verde/" }
+      );
+      const token = await getToken(messagingApp, {
+        vapidKey: VAPID_KEY,
+        serviceWorkerRegistration: swReg
+      });
+      if(token) {
+        setPushToken(token);
+        setPushActivo(true);
+        setPushError(null);
+        // Guardar token en Firebase para poder enviar notificaciones
+        fbSet(ref(db, `pushTokens/${token.slice(-20)}`), {
+          token, fecha: fechaLocal(), tipo: "jefa"
+        });
+        localStorage.setItem("estadio_push_token", token);
+      }
+    } catch(e) {
+      setPushError("Error: " + e.message);
+    }
+  }, []);
+
+  // Escuchar mensajes cuando la app está en primer plano
+  React.useEffect(() => {
+    if(!messagingApp || !pushActivo) return;
+    const unsub = onMessage(messagingApp, (payload) => {
+      const { title, body } = payload.notification || {};
+      // Mostrar notificación nativa aunque la app esté abierta
+      if(Notification.permission === "granted") {
+        new Notification(title || "🔔 Estadio Verde", {
+          body: body || "",
+          icon: "/estadio-verde/favicon.ico"
+        });
+      }
+    });
+    return unsub;
+  }, [pushActivo]);
+
+  // Revisar si ya había token guardado
+  React.useEffect(() => {
+    const saved = localStorage.getItem("estadio_push_token");
+    if(saved) { setPushToken(saved); setPushActivo(true); }
+  }, []);
+
+  return { pushActivo, pushToken, pushError, activarPush };
+}
+
+// ── FUNCIÓN: Enviar notificación push vía Firebase Cloud Messaging ─────────
+async function enviarPushATodos(titulo, cuerpo, tipo = "alerta") {
+  // Obtener todos los tokens guardados en Firebase
+  const tokensSnap = await new Promise(resolve => {
+    onValue(ref(db, "pushTokens"), resolve, { onlyOnce: true });
+  });
+  const tokens = tokensSnap.val();
+  if(!tokens) return;
+  // Guardar la notificación en la cola de Firebase para que el SW la procese
+  await fbPush(ref(db, "notificacionesPush"), {
+    titulo, cuerpo, tipo,
+    fecha: new Date().toISOString(),
+    tokens: Object.values(tokens).map(t => t.token)
+  });
+}
+
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { error: null }; }
   static getDerivedStateFromError(e) { return { error: e }; }
@@ -13999,6 +14064,7 @@ export default function App() {
   // [worker states moved up]
   const rolLogueado = fbRol;
   const esJefa = fbRol === "jefa";
+  const { pushActivo, activarPush } = usePushNotifications(esJefa);
   const esSupervisor = fbRol === "supervisor";
   const esTrabajador = fbRol === "trabajador";
 
@@ -14411,6 +14477,12 @@ export default function App() {
             </button>
           ))}
         </div>
+        {/* Botón activar push */}
+        {esJefa&&<div style={{padding:"4px 8px",flexShrink:0}}>
+          <button onClick={pushActivo?null:activarPush} title={pushActivo?"Notificaciones push activas en este dispositivo":"Activar notificaciones push"} style={{background:pushActivo?"rgba(52,211,153,0.15)":"rgba(251,191,36,0.1)",color:pushActivo?"#34d399":"#fbbf24",border:`1px solid ${pushActivo?"rgba(52,211,153,0.3)":"rgba(251,191,36,0.3)"}`,borderRadius:6,padding:"6px 10px",fontSize:10,cursor:pushActivo?"default":"pointer",whiteSpace:"nowrap"}}>
+            {pushActivo?"🔔 Push ✓":"🔕 Push"}
+          </button>
+        </div>}
       </div>
 
       <div style={S.main}>
