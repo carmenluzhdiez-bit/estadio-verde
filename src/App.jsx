@@ -13693,6 +13693,45 @@ function usePushNotifications(esJefa) {
   const [pushActivo, setPushActivo] = React.useState(false);
   const [pushError, setPushError]   = React.useState(null);
 
+  // Al cargar: verificar si el SW ya está registrado y el permiso concedido
+  React.useEffect(() => {
+    const verificar = async () => {
+      try {
+        if(!("serviceWorker" in navigator)) return;
+        const perm = Notification.permission;
+        if(perm !== "granted") return;
+        const regs = await navigator.serviceWorker.getRegistrations();
+        const swActivo = regs.find(r => r.active?.scriptURL?.includes("firebase-messaging-sw"));
+        if(swActivo) {
+          setPushActivo(true);
+          // Re-registrar token en Firebase silenciosamente
+          swActivo.active.postMessage({ type: "GET_TOKEN", vapidKey: VAPID_KEY });
+        }
+      } catch(e) {}
+    };
+    verificar();
+  }, []);
+
+  // Escuchar token que devuelve el SW
+  React.useEffect(() => {
+    if(!("serviceWorker" in navigator)) return;
+    const handler = (evt) => {
+      if(evt.data?.type === "TOKEN" && evt.data.token) {
+        const token = evt.data.token;
+        setPushActivo(true);
+        // Guardar en Firebase con ID del dispositivo como clave
+        const devId = token.slice(-20);
+        fbSet(ref(db, "pushTokens/" + devId), {
+          token,
+          fecha: fechaLocal(),
+          agente: navigator.userAgent.slice(0,80)
+        });
+      }
+    };
+    navigator.serviceWorker.addEventListener("message", handler);
+    return () => navigator.serviceWorker.removeEventListener("message", handler);
+  }, []);
+
   const activarPush = React.useCallback(async () => {
     try {
       if(!("serviceWorker" in navigator) || !("PushManager" in window)) {
@@ -13700,38 +13739,16 @@ function usePushNotifications(esJefa) {
       }
       const perm = await Notification.requestPermission();
       if(perm !== "granted") { setPushError("Permiso denegado"); return; }
-      // Registrar service worker
       const swReg = await navigator.serviceWorker.register(
         "/estadio-verde/firebase-messaging-sw.js",
         { scope: "/estadio-verde/" }
       );
-      // Usar firebase/messaging desde el SW via postMessage
+      await navigator.serviceWorker.ready;
       swReg.active?.postMessage({ type: "GET_TOKEN", vapidKey: VAPID_KEY });
-      // Escuchar el token que devuelve el SW
-      navigator.serviceWorker.addEventListener("message", (evt) => {
-        if(evt.data?.type === "TOKEN") {
-          const token = evt.data.token;
-          if(token) {
-            setPushActivo(true);
-            setPushError(null);
-            localStorage.setItem("estadio_push_token", token);
-            fbSet(ref(db, "pushTokens/" + token.slice(-20)), {
-              token, fecha: fechaLocal(), tipo: "jefa"
-            });
-          }
-        }
-      });
-      // Fallback: marcar activo si el SW ya estaba registrado
-      if(swReg.active) { setPushActivo(true); }
+      setPushActivo(true);
     } catch(e) {
       setPushError("Error: " + e.message);
-      console.warn("Push error:", e);
     }
-  }, []);
-
-  React.useEffect(() => {
-    const saved = localStorage.getItem("estadio_push_token");
-    if(saved && Notification.permission === "granted") setPushActivo(true);
   }, []);
 
   return { pushActivo, pushError, activarPush };
