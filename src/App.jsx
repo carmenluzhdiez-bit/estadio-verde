@@ -5124,6 +5124,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
   // (estado manejado desde App vía props incidenciasFito / setIncidenciasFito)
   const [showIncidForm, setShowIncidForm] = React.useState(false);
   const [incidPaso, setIncidPaso] = React.useState(1);
+  const [incidError, setIncidError] = React.useState("");
   const [expandIncid, setExpandIncid] = React.useState(null);
 
   const emptyIncid = {
@@ -5164,26 +5165,27 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
 
   const guardarIncidencia = () => {
     if(!incidForm.observacion.trim()) return;
+    try {
     const reap = calcReapertura(incidForm.productoAplicar, incidForm.fechaAplicacion, incidForm.horaAplicacion);
-    const nueva = { ...incidForm, id:Date.now(), fechaReaperturaISO:reap.fechaISO, notaReingreso:reap.nota, estado: incidForm.sectoresCerrados.length>0?"cerrada":"observacion" };
-    setIncidencias(prev=>[nueva,...prev].slice(0,100));
+    const nueva = { ...incidForm, id:Date.now(), fechaReaperturaISO:reap?.fechaISO||"", notaReingreso:reap?.nota||"", estado: (incidForm.sectoresCerrados||[]).length>0?"cerrada":"observacion" };
+    setIncidencias(prev=>{const arr=Array.isArray(prev)?prev:Object.values(prev||{});return [nueva,...arr].slice(0,100);});
 
     // Tareas al programa del día
     const fp = incidForm.fechaAplicacion;
     if(fp && incidForm.productoAplicar) {
-      const sectLabel = incidForm.sectoresCerrados.join(", ") || "Sector no especificado";
-      setTareasProg(prev=>({ ...prev, [fp]: [...(prev[fp]||[]), {
+      const sectLabel = (incidForm.sectoresCerrados||[]).join(", ") || "Sector no especificado";
+      setTareasProg(prev=>{const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);return{ ...prev, [fp]: [...normArr(prev[fp]||[]), {
         id:Date.now()+Math.random(), fecha:fp,
         zona: sectLabel, elemento:"",
         tarea:`🧪 Fumigación: ${incidForm.productoAplicar} — ${incidForm.agenteCausal||incidForm.diagnostico}`,
         responsable: incidForm.diagnosticadoPor||"", estado:incidForm.diagnosticadoPor?"pendiente":"por_designar",
-        notas:`Reingreso estimado: ${reap.label}. ${reap.nota}`, auto:false, origenFungicida:true,
-      }]}));
+        notas:`Reingreso estimado: ${reap?.label||""}. ${reap?.nota||""}`, auto:false, origenFungicida:true,
+      }]};});
     }
     // Cierre de cancha al programa
     if(incidForm.sectoresCerrados.length>0) {
       const fc = incidForm.fechaObservacion;
-      setTareasProg(prev=>({ ...prev, [fc]: [...(prev[fc]||[]), {
+      setTareasProg(prev=>{const normArr2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);return{ ...prev, [fc]: [...normArr2(prev[fc]||[]), {
         id:Date.now()+Math.random()+1, fecha:fc,
         zona: incidForm.sectoresCerrados.join(", "), elemento:"",
         tarea:`🚫 CIERRE: ${incidForm.sectoresCerrados.join(", ")} — ${
@@ -5195,9 +5197,10 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
         estado:"por_designar",
         notas:`${incidForm.flujo==="fitosanitario"?`Reapertura: ${reap.label||"por determinar"}`:incidForm.flujo==="recuperacion"?`Cierre estimado: ${incidForm.diasRecuperacion} días`:incidForm.flujo==="evento"?`Evento: ${incidForm.fechaInicioEvento} al ${incidForm.fechaFinEvento}. Org: ${incidForm.organizador}`:""}`,
         auto:false, origenCierre:true, flujo:incidForm.flujo,
-      }]}));
+      }]};});
     }
     setIncidForm(emptyIncid); setShowIncidForm(false); setIncidPaso(1);
+    } catch(e) { console.error("guardarIncidencia error:", e); }
   };
 
   const progMes = PROGRAMA_FUNGICIDAS.filter(p => p.mes === mesActual);
@@ -5384,8 +5387,8 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                       <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>
                         {incidForm.flujo==="fitosanitario"?"Descripción de la observación":incidForm.flujo==="recuperacion"?"Descripción del trabajo a realizar":"Descripción del evento / montaje"}
                       </label>
-                      <textarea rows={3} style={{...S.input,resize:"vertical"}}
-                        placeholder={incidForm.flujo==="fitosanitario"?"Ej: Se observan manchas irregulares amarillo-pardas en Green 02...":incidForm.flujo==="recuperacion"?"Ej: Resiembra área oriente green 03 por desgaste excesivo. Se cortará, escarificará y sembrará...":"Ej: Torneo de golf institucional, requiere cancha completa sin acceso público..."}
+                      <textarea rows={3} style={{...S.input,resize:"vertical",border:!incidForm.observacion.trim()&&incidPaso===1?"1px solid rgba(239,68,68,0.5)":"inherit"}}
+                        placeholder={incidForm.flujo==="fitosanitario"?"Ej: Se observan manchas irregulares amarillo-pardas en Green 02...":incidForm.flujo==="recuperacion"?"Ej: Resiembra área oriente green 03 por desgaste excesivo...":"Ej: Torneo de golf institucional..."}
                         value={incidForm.observacion} onChange={e=>setIncidForm(p=>({...p,observacion:e.target.value}))}/>
                     </div>
                     {/* Campos adicionales según flujo */}
@@ -5452,9 +5455,13 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                     </div>
                   </div>
                   <div style={{display:"flex",gap:10}}>
+                    {incidError&&<div style={{color:"#fca5a5",fontSize:12,marginBottom:6,padding:"6px 10px",background:"rgba(239,68,68,0.1)",borderRadius:6}}>{incidError}</div>}
                     <button className="btn-p" style={S.btn} onClick={()=>{
-                        if(!incidForm.observacion.trim()&&incidForm.flujo==="fitosanitario") return;
-                        // Recuperación y evento van directo al paso de cierre
+                        if(!incidForm.observacion.trim()&&incidForm.flujo==="fitosanitario"){
+                          setIncidError("⚠️ Describe la observación antes de continuar");
+                          return;
+                        }
+                        setIncidError("");
                         setIncidPaso(incidForm.flujo==="fitosanitario"?2:4);
                       }}>
                         {incidForm.flujo==="fitosanitario"?"Siguiente → Diagnóstico":"Siguiente → Definir cierre"}
