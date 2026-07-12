@@ -2112,7 +2112,7 @@ function ConfiguradorSemanal({ S, personal, configSemanal, setConfigSemanal, esJ
   const personalArr = Array.isArray(personal)
     ? personal
     : Object.values(personal||{});
-  const jardineros = personalArr.filter(p=>p.cargo==="Jardinero"||p.cargo==="Supervisor")
+  const jardineros = personalArr.filter(p=>p.cargo==="Jardinero"||p.cargo==="Supervisor"||(p.cargo||"").toLowerCase().includes("supervisor"))
     .sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
 
   const setResp = (tipoId, nombre) => {
