@@ -2093,6 +2093,108 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
   );
 }
 
+// ─── CONFIGURADOR SEMANAL DE RESPONSABLES ─────────────────────────────────────
+function ConfiguradorSemanal({ S, personal, configSemanal, setConfigSemanal, esJefa }) {
+  const [open, setOpen] = React.useState(false);
+
+  const TIPOS_TAREA = [
+    { id:"corte_tractor",  label:"🚜 Corte con tractor",      restriccion:"capacitación tractor",  fijo:null },
+    { id:"corte_golf",     label:"⛳ Corte Golf / Greens",     restriccion:"Por defecto: Bhalú",    fijo:null },
+    { id:"orillado",       label:"✂️ Orillado",                restriccion:null,                    fijo:null },
+    { id:"riego",          label:"💧 Riego general",           restriccion:null,                    fijo:null },
+    { id:"pesticidas",     label:"🧪 Aplicación pesticidas",   restriccion:"capacitación RILES",    fijo:null },
+    { id:"poda",           label:"🌿 Poda y arbusto",          restriccion:null,                    fijo:null },
+    { id:"siembra",        label:"🌱 Siembra / trasplante",    restriccion:null,                    fijo:null },
+    { id:"limpieza",       label:"🧹 Limpieza general",        restriccion:null,                    fijo:null },
+    { id:"arboles",        label:"🌳 Faenas en árboles",       restriccion:"capacitación arborista",fijo:null },
+  ];
+
+  const personalArr = Array.isArray(personal)
+    ? personal
+    : Object.values(personal||{});
+  const jardineros = personalArr.filter(p=>p.cargo==="Jardinero"||p.cargo==="Supervisor")
+    .sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+
+  const setResp = (tipoId, nombre) => {
+    setConfigSemanal(prev=>({...prev, [tipoId]: nombre}));
+  };
+
+  const semana = (() => {
+    const hoy = new Date();
+    const lun = new Date(hoy);
+    lun.setDate(hoy.getDate() - ((hoy.getDay()+6)%7));
+    const vie = new Date(lun); vie.setDate(lun.getDate()+4);
+    const fmt = d => d.toLocaleDateString("es-CL",{day:"2-digit",month:"short"});
+    return `${fmt(lun)} – ${fmt(vie)}`;
+  })();
+
+  if(!esJefa) return null;
+
+  return (
+    <div style={{...S.card,marginBottom:14,padding:0,overflow:"hidden"}}>
+      <div
+        onClick={()=>setOpen(o=>!o)}
+        style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+          padding:"12px 16px",cursor:"pointer",
+          background:"rgba(96,165,250,0.06)",borderBottom:open?"1px solid rgba(255,255,255,0.06)":"none"}}>
+        <div>
+          <span style={{fontSize:13,fontWeight:700,color:"#60a5fa"}}>👷 Responsables de la semana</span>
+          <span style={{fontSize:11,color:"#5a9a7a",marginLeft:10}}>{semana}</span>
+        </div>
+        <span style={{color:"#5a9a7a",fontSize:12}}>{open?"▲ Cerrar":"▼ Configurar"}</span>
+      </div>
+      {open&&(
+        <div style={{padding:"14px 16px"}}>
+          <div style={{fontSize:11,color:"#5a9a7a",marginBottom:12}}>
+            Define quién realiza cada tipo de tarea esta semana. Se aplica automáticamente al crear tareas — puedes sobreescribir tarea por tarea.
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+            {TIPOS_TAREA.map(t=>(
+              <div key={t.id} style={{padding:"8px 10px",background:"rgba(255,255,255,0.03)",borderRadius:7,border:"1px solid rgba(255,255,255,0.06)"}}>
+                <div style={{fontSize:11,fontWeight:600,marginBottom:5}}>{t.label}</div>
+                {t.fijo
+                  ? <div style={{fontSize:11,color:"#fbbf24",padding:"4px 8px",background:"rgba(251,191,36,0.08)",borderRadius:5}}>
+                      🔒 {t.fijo}
+                    </div>
+                  : <select
+                      style={{...S.input,fontSize:11,padding:"4px 8px"}}
+                      value={configSemanal[t.id]||(t.id==="corte_golf"?"Osmar Bhalú Armijo Zúñiga":"")}
+                      onChange={e=>setResp(t.id, e.target.value)}>
+                      <option value="">— Sin asignar —</option>
+                      {jardineros.map(p=>(
+                        <option key={p.id} value={p.nombre}>{p.nombre.split(" ")[0]} {p.nombre.split(" ")[1]||""}</option>
+                      ))}
+                    </select>
+                }
+                {t.restriccion&&<div style={{fontSize:9,color:"#f59e0b",marginTop:3}}>⚠️ {t.restriccion}</div>}
+              </div>
+            ))}
+          </div>
+          <div style={{marginTop:12,fontSize:11,color:"#5a9a7a",padding:"8px 12px",background:"rgba(52,211,153,0.05)",borderRadius:6,border:"1px solid rgba(52,211,153,0.1)"}}>
+            💡 Riego: si hay muchas tareas, asigna a Esteban. El sistema no impone restricciones — tú decides.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Función global para obtener el responsable por defecto según tipo de tarea
+const getResponsablePorTipo = (tarea, configSemanal) => {
+  const t = (tarea||"").toLowerCase();
+  if(t.includes("corte")&&(t.includes("golf")||t.includes("green"))) return configSemanal?.corte_golf||"Osmar Bhalú Armijo Zúñiga";
+  if(t.includes("corte")&&t.includes("tractor")) return configSemanal?.corte_tractor||"";
+  if(t.includes("orill")) return configSemanal?.orillado||"";
+  if(t.includes("riego")) return configSemanal?.riego||"";
+  if(t.includes("pesticida")||t.includes("fungicida")||t.includes("fumigac")) return configSemanal?.pesticidas||"";
+  if(t.includes("poda")||t.includes("arbust")) return configSemanal?.poda||"";
+  if(t.includes("siembra")||t.includes("trasplante")) return configSemanal?.siembra||"";
+  if(t.includes("limpieza")) return configSemanal?.limpieza||"";
+  if(t.includes("árbol")||t.includes("arbol")||t.includes("poda árbol")) return configSemanal?.arboles||"";
+  return "";
+};
+
+
 // ─── PROGRAMACIÓN DIARIA ─────────────────────────────────────────────────────
 // ─── VISTA TRABAJADOR ────────────────────────────────────────────────────────
 function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE, onAccesoRapido, onCambiarMetodo, cierresTurno={}, onCerrarTurno, onReabrirTurno, esJefaApp=false }) {
@@ -2627,7 +2729,7 @@ Una vez cerrado no podrás modificar las tareas. Solo la jefa puede reabrir el t
   );
 }
 
-function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACROZONAS_BASE, tareas, setTareas, tareasZonaHoy=0, esJefa=false, puedeCrear=false, cierresTurno={}, onReabrirTurno, getElemFrecs, setElemFrecs }) {
+function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACROZONAS_BASE, tareas, setTareas, tareasZonaHoy=0, esJefa=false, configSemanal={}, setConfigSemanal, puedeCrear=false, cierresTurno={}, onReabrirTurno, getElemFrecs, setElemFrecs }) {
   const hoy = fechaLocal();
   const [fecha, setFecha] = React.useState(hoy);
   const [tabProg, setTabProg] = React.useState("programa");
@@ -2741,6 +2843,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           }} style={{...S.btn,background:"rgba(61,122,82,0.25)",color:"#90d0a0",border:"1px solid rgba(61,122,82,0.35)",fontSize:13}}>➕ Agregar tarea</button>
         </div>
       </div>
+      <ConfiguradorSemanal S={S} personal={personal} configSemanal={configSemanal||{}} setConfigSemanal={setConfigSemanal} esJefa={esJefa}/>
 
       {/* Tabs */}
       <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
@@ -2868,7 +2971,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                 <div style={{gridColumn:"1/-1"}}>
                   <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>TAREA</label>
                   <select style={{...S.input,fontSize:13}} value={nuevaTarea.tarea}
-                    onChange={e=>setNuevaTarea(p=>({...p,tarea:e.target.value==="__otro__"?"":e.target.value}))}>
+                    onChange={e=>setNuevaTarea(p=>({...p,tarea:e.target.value==="__otro__"?"":e.target.value,responsable:p.responsable||(getResponsablePorTipo(e.target.value==="__otro__"?"":e.target.value,configSemanal)||"")}))}>
                     <option value="">Seleccionar tarea...</option>
                     {tareasDisp.map(t=><option key={t} value={t}>{t}</option>)}
                     <option value="__otro__">✏️ Escribir otra...</option>
@@ -2876,7 +2979,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                   {nuevaTarea.tarea===""&&(
                     <input style={{...S.input,fontSize:13,marginTop:6}} autoFocus
                       placeholder="Describir tarea..."
-                      onChange={e=>setNuevaTarea(p=>({...p,tarea:e.target.value}))}/>
+                      onChange={e=>setNuevaTarea(p=>({...p,tarea:e.target.value,responsable:p.responsable||(getResponsablePorTipo(e.target.value,configSemanal)||"")}))}/>
                   )}
                   {nuevaTarea.tarea==="Plantar desde Vivero"&&(
                     <div style={{marginTop:8,padding:"10px 12px",background:"rgba(74,222,128,0.08)",border:"1px solid rgba(74,222,128,0.25)",borderRadius:8,fontSize:12,color:"#4ade80"}}>
@@ -5127,10 +5230,12 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
   const [incidError, setIncidError] = React.useState("");
   const [expandIncid, setExpandIncid] = React.useState(null);
 
+  const RESPONSABLE_GOLF_DEFAULT = "Osmar Bhalú Armijo Zúñiga";
   const emptyIncid = {
     flujo:"fitosanitario", // "fitosanitario" | "recuperacion" | "evento"
     fechaObservacion: hoy.toISOString().slice(0,10), horaObservacion: hoy.toTimeString().slice(0,5),
-    observador:"Osmar Bhalú Armijo Zúñiga", observacion:"", sectoresObservados:[],
+    observador: RESPONSABLE_GOLF_DEFAULT, observacion:"", sectoresObservados:[],
+    responsableGolf: RESPONSABLE_GOLF_DEFAULT,
     tipoCierre:"fitosanitario", diagnostico:"", agenteCausal:"", severidad:"media",
     diagnosticadoPor:"", otrosDiagnosticos:"",
     tratamiento:"completo", productoAplicar:"", fechaAplicacion: hoy.toISOString().slice(0,10), horaAplicacion:"14:00",
@@ -5178,7 +5283,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
         id:Date.now()+Math.random(), fecha:fp,
         zona: sectLabel, elemento:"",
         tarea:`🧪 Fumigación: ${incidForm.productoAplicar} — ${incidForm.agenteCausal||incidForm.diagnostico}`,
-        responsable: incidForm.diagnosticadoPor||"", estado:incidForm.diagnosticadoPor?"pendiente":"por_designar",
+        responsable: incidForm.responsableGolf||incidForm.diagnosticadoPor||RESPONSABLE_GOLF_DEFAULT, estado:"pendiente",
         notas:`Reingreso estimado: ${reap?.label||""}. ${reap?.nota||""}`, auto:false, origenFungicida:true,
       }]};});
     }
@@ -5198,6 +5303,45 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
         notas:`${incidForm.flujo==="fitosanitario"?`Reapertura: ${reap.label||"por determinar"}`:incidForm.flujo==="recuperacion"?`Cierre estimado: ${incidForm.diasRecuperacion} días`:incidForm.flujo==="evento"?`Evento: ${incidForm.fechaInicioEvento} al ${incidForm.fechaFinEvento}. Org: ${incidForm.organizador}`:""}`,
         auto:false, origenCierre:true, flujo:incidForm.flujo,
       }]};});
+    }
+    // ── Registro automático en Alertas + tareas institucionales ──
+    if(incidForm.flujo==="fitosanitario") {
+      const hoyStr = incidForm.fechaObservacion;
+      const respGolf = incidForm.responsableGolf || RESPONSABLE_GOLF_DEFAULT;
+      // Crear registro en incidencias generales (solo lectura)
+      if(typeof setIncidencias !== "undefined") {
+        // ya se guardó arriba en incidenciasFito — aquí podemos agregar un aviso
+      }
+      // Tareas institucionales para la Jefa
+      const tareasInst = [
+        {texto:"🏌️ Avisar a socios Rama Golf", resp:"jefa"},
+        {texto:"⚽ Informar a Gerencia Deportes", resp:"jefa"},
+        {texto:"⚙️ Informar a Gerencia Operaciones (Marco Romero)", resp:"jefa"},
+        {texto:"🏢 Informar a Gerencia General (Javier Viñales)", resp:"jefa"},
+      ].map((t,i)=>({
+        id: Date.now()+Math.random()+i+10,
+        fecha: hoyStr,
+        zona: "Administración",
+        elemento: "",
+        tarea: t.texto + ` — Incidencia fitosanitaria golf: ${incidForm.agenteCausal||incidForm.diagnostico||"ver registro"}`,
+        responsable: "",
+        estado: "pendiente",
+        obs: `Ref. incidencia Golf ${hoyStr}: ${incidForm.observacion?.slice(0,80)}`,
+        auto: true,
+        origenFitoGolf: true,
+      }));
+      setTareasProg(prev=>{
+        const normA=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+        return {...prev, [hoyStr]: [...normA(prev[hoyStr]||[]), ...tareasInst]};
+      });
+      // Notificación en Alertas
+      if(typeof crearNotificacion === "function") {
+        crearNotificacion("alerta_fito_golf", {
+          titulo: `🦠 Incidencia fitosanitaria Golf — ${incidForm.agenteCausal||"diagnóstico pendiente"}`,
+          mensaje: `${incidForm.sectoresCerrados?.join(", ")||"Sector no especificado"} · Resp: ${respGolf} · ${incidForm.observacion?.slice(0,60)}`,
+          fecha: hoyStr,
+        });
+      }
     }
     setIncidForm(emptyIncid); setShowIncidForm(false); setIncidPaso(1);
     } catch(e) { console.error("guardarIncidencia error:", e); }
@@ -5382,6 +5526,16 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                       <select style={S.input} value={incidForm.observador} onChange={e=>setIncidForm(p=>({...p,observador:e.target.value}))}>
                         {listaPersonal.map(t=><option key={t.id} value={t.nombre}>{t.nombre}</option>)}
                       </select>
+                    </div>
+                    {/* Selector responsable Golf */}
+                    <div style={{gridColumn:"1/-1",marginBottom:10,padding:"10px 14px",background:"rgba(251,191,36,0.06)",borderRadius:8,border:"1px solid rgba(251,191,36,0.2)"}}>
+                      <div style={{fontSize:10,color:"#fbbf24",letterSpacing:"0.6px",marginBottom:8,textTransform:"uppercase",fontWeight:700}}>👷 Responsable de terreno</div>
+                      <select style={S.input} value={incidForm.responsableGolf||RESPONSABLE_GOLF_DEFAULT} onChange={e=>setIncidForm(p=>({...p,responsableGolf:e.target.value,diagnosticadoPor:e.target.value}))}>
+                        {[...personal].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(p=>(
+                          <option key={p.id} value={p.nombre}>{p.nombre}</option>
+                        ))}
+                      </select>
+                      <div style={{fontSize:10,color:"#5a9a7a",marginTop:4}}>Por defecto Bhalú — cambia solo si es necesario</div>
                     </div>
                     <div style={{gridColumn:"1/-1"}}>
                       <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>
@@ -13925,6 +14079,7 @@ export default function App() {
   const [autoOpenAlerta, setAutoOpenAlerta]   = React.useState(false);
   const [cierresTurno,  setCierresTurno]     = useFirebaseState("cierresTurno",   {});
 
+  const [configSemanal, setConfigSemanal] = useFirebaseState("config-semanal", {});
   const appReady = dataReady && personalReady && progReady;
   const [golfInitTab, setGolfInitTab] = React.useState(null);
   const [bonoPrefill, setBonoPrefill] = React.useState(null);
@@ -15340,7 +15495,7 @@ export default function App() {
 
         {/* PROGRAMACIÓN */}
         {vista==="programacion"&&(
-          <ProgramacionDiaria key="prog" S={S} zonas={zonas} data={data} personal={personal} getZD={getZD} getAllElems={getAllElems} MACROZONAS_BASE={MACROZONAS_BASE} tareas={tareasProg} setTareas={setTareasProg}
+          <ProgramacionDiaria key="prog" S={S} zonas={zonas} data={data} personal={personal} getZD={getZD} getAllElems={getAllElems} MACROZONAS_BASE={MACROZONAS_BASE} tareas={tareasProg} setTareas={setTareasProg} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal}
             getElemFrecs={getElemFrecs} setElemFrecs={setElemFrecs}
             tareasZonaHoy={(tareasProg[new Date().toISOString().slice(0,10)]||[]).filter(t=>t.origenZona&&t.estado==="por_designar").length}
             esJefa={rolLogueado==="jefa"}
