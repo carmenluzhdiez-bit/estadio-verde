@@ -1567,7 +1567,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
     no_pudo:     {color:"#ef4444", icon:"🔴", label:"No se pudo"},
     haciendose:  {color:"#3b82f6", icon:"🔵", label:"Haciéndose"},
     en_curso:    {color:"#3b82f6", icon:"🔵", label:"En curso"},
-    pendiente:   {color:"#f59e0b", icon:"🟡", label:"Pendiente"},
+    pendiente:   {color:"#f59e0b", icon:"N1", label:"Pendiente"},
     por_designar:{color:"#94a3b8", icon:"⬜", label:"Por designar"},
     cancelada:   {color:"#ef4444", icon:"❌", label:"Cancelada"},
   };
@@ -2113,9 +2113,9 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   const [registroDiarioForm, setRegistroDiarioForm] = React.useState({tareas:{}, obsFito:"", obs:""});
 
   const ESTADOS_TAREA = {
-    pendiente:    { label:"Pendiente",      color:"#f59e0b", bg:"rgba(245,158,11,0.15)",  icon:"🟡" },
+    pendiente:    { label:"Pendiente",      color:"#f59e0b", bg:"rgba(245,158,11,0.15)",  icon:"N1" },
     haciendose:   { label:"Haciéndose",     color:"#3b82f6", bg:"rgba(59,130,246,0.15)",  icon:"🔵" },
-    hecha:        { label:"Hecha ✓",        color:"#22c55e", bg:"rgba(34,197,94,0.15)",   icon:"🟢" },
+    hecha:        { label:"Hecha ✓",        color:"#22c55e", bg:"rgba(34,197,94,0.15)",   icon:"N0" },
     no_pudo:      { label:"No se pudo",     color:"#ef4444", bg:"rgba(239,68,68,0.15)",   icon:"🔴" },
   };
 
@@ -2692,9 +2692,9 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
 
   const ESTADOS_TAREA = {
     por_designar: { label:"Por designar", color:"#94a3b8", bg:"rgba(148,163,184,0.12)", icon:"⬜" },
-    pendiente:    { label:"Pendiente",    color:"#f59e0b", bg:"rgba(245,158,11,0.12)",  icon:"🟡" },
+    pendiente:    { label:"Pendiente",    color:"#f59e0b", bg:"rgba(245,158,11,0.12)",  icon:"N1" },
     en_curso:     { label:"En curso",     color:"#3b82f6", bg:"rgba(59,130,246,0.12)",  icon:"🔵" },
-    completada:   { label:"Completada",   color:"#22c55e", bg:"rgba(34,197,94,0.12)",   icon:"🟢" },
+    completada:   { label:"Completada",   color:"#22c55e", bg:"rgba(34,197,94,0.12)",   icon:"N0" },
     cancelada:    { label:"Cancelada",    color:"#ef4444", bg:"rgba(239,68,68,0.12)",   icon:"🔴" },
   };
 
@@ -13392,6 +13392,7 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
 function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotificaciones, marcarTodasLeidas, notifNoLeidas, MACROZONAS_BASE, personal, tareasProg, setTareasProg, crearNotificacion, esJefa, autoOpen, onAutoOpenDone }) {
   const [tabAlerta, setTabAlerta] = React.useState("incidencias");
   const [showNuevaAlerta, setShowNuevaAlerta] = React.useState(false);
+  React.useEffect(()=>{ if(autoOpen){ setShowNuevaAlerta(true); setTabAlerta("incidencias"); onAutoOpenDone&&onAutoOpenDone(); } },[autoOpen]);
   React.useEffect(()=>{
     if(autoOpen){ setShowNuevaAlerta(true); setTabAlerta("incidencias"); onAutoOpenDone&&onAutoOpenDone(); }
   },[autoOpen]);
@@ -15300,7 +15301,7 @@ export default function App() {
               });
               const zonasConActividad = Object.entries(zonaMap).sort(([a],[b])=>a.localeCompare(b,"es",{sensitivity:"base"}));
 
-              const EC={hecha:{color:"#22c55e",icon:"✅",label:"Hecha"},completada:{color:"#22c55e",icon:"✅",label:"Hecha"},no_pudo:{color:"#ef4444",icon:"🔴",label:"No se pudo"},haciendose:{color:"#3b82f6",icon:"🔵",label:"Haciéndose"},en_curso:{color:"#3b82f6",icon:"🔵",label:"En curso"},pendiente:{color:"#f59e0b",icon:"🟡",label:"Pendiente"},por_designar:{color:"#94a3b8",icon:"⬜",label:"Por designar"},cancelada:{color:"#ef4444",icon:"❌",label:"Cancelada"}};
+              const EC={hecha:{color:"#22c55e",icon:"✅",label:"Hecha"},completada:{color:"#22c55e",icon:"✅",label:"Hecha"},no_pudo:{color:"#ef4444",icon:"🔴",label:"No se pudo"},haciendose:{color:"#3b82f6",icon:"🔵",label:"Haciéndose"},en_curso:{color:"#3b82f6",icon:"🔵",label:"En curso"},pendiente:{color:"#f59e0b",icon:"N1",label:"Pendiente"},por_designar:{color:"#94a3b8",icon:"⬜",label:"Por designar"},cancelada:{color:"#ef4444",icon:"❌",label:"Cancelada"}};
 
               return (
                 <>
