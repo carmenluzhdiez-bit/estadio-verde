@@ -5090,7 +5090,7 @@ const REINGRESO_DIAS = {
 // Estado inicial vacío — se inicializa desde localStorage
 const INCIDENCIAS_INICIAL = [];
 
-function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, tareasProg, setTareasProg, incidenciasFito, setIncidenciasFito }) {
+function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, tareasProg, setTareasProg, incidenciasFito, setIncidenciasFito, crearNotificacion, zonasFito }) {
   const hoy = new Date();
   const mesActual = hoy.getMonth() + 1;
   const [subTab, setSubTab] = React.useState("alerta");
@@ -9638,7 +9638,7 @@ function TareasGolfPanel({ tareasGolfHoy, hoy, esJefa, setTareasProg, tareasProg
   });
 
   const colorEstado = {pendiente:"#f59e0b",haciendose:"#60a5fa",hecha:"#22c55e",no_pudo:"#ef4444",por_designar:"#6b7280"};
-  const iconoEstado = {pendiente:"⬜",haciendose:"🔵",hecha:"✅",no_pudo:"🔴",por_designar:"⬜"};
+  const iconoEstado = {pendiente:"○",haciendose:"◑",hecha:"✅",no_pudo:"✗",por_designar:"–"};
 
   const toggle = (key) => setAbiertos(p => ({...p,[key]:!p[key]}));
 
@@ -9716,7 +9716,7 @@ function TareasGolfPanel({ tareasGolfHoy, hoy, esJefa, setTareasProg, tareasProg
 }
 
 
-function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito }) {
+function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito, onCierreSectorial, onNuevaAlerta }) {
   const GOLF_ZONA_ID = 31; // ID macrozona Golf
   const sincronizarMacrozona = (tipo, detalle) => {
     if(!updateZona) return;
@@ -10174,8 +10174,9 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           <div style={{...S.card,padding:16,marginBottom:14}}>
             <div style={{fontSize:13,fontWeight:700,color:"#34d399",marginBottom:10}}>⚡ Acciones rápidas</div>
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              <button style={{...S.btn,background:"rgba(239,68,68,0.12)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}} onClick={()=>onNuevaAlerta&&onNuevaAlerta()}>🚫 Cierre temporal</button>
               <button style={{...S.btn,background:"rgba(52,211,153,0.15)",color:"#34d399",border:"1px solid rgba(52,211,153,0.3)"}} onClick={()=>{setSubTab("mediciones");setShowMedForm(true);}}>📏 Nueva medición</button>
-              <button style={{...S.btn,background:"rgba(239,68,68,0.12)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}} onClick={()=>setShowCierreSectorial(true)}>🚫 Registrar cierre sectorial</button>
+              
               <button style={{...S.btn,background:"rgba(52,211,153,0.12)",color:"#6ee7b7",border:"1px solid rgba(52,211,153,0.2)"}} onClick={()=>{setSubTab("greens");setShowDiariaForm(true);}}>✅ Registro diario jefa</button>
               <button style={{...S.btn,background:"rgba(52,211,153,0.12)",color:"#6ee7b7",border:"1px solid rgba(52,211,153,0.2)"}} onClick={()=>{setSubTab("greens");setShowTareaForm("green");}}>📋 Nueva tarea greens</button>
               {esJefa&&<button style={{...S.btn,background:"rgba(251,191,36,0.12)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.25)"}} onClick={()=>{setSubTab("eventos");setShowEventoForm(true);}}>🏆 Cargar evento</button>}
@@ -10336,6 +10337,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
         </div>
       )}
 
+      {subTab==="panel"&&(<>
           {/* Estado greens hoy */}
           <div style={{...S.card,padding:16}}>
             <div style={{fontSize:13,fontWeight:700,color:"#34d399",marginBottom:10}}>⛳ Estado Greens — última medición{ultimaMed?` (${ultimaMed.fecha})`:""}</div>
@@ -10360,6 +10362,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             hoy={hoy} esJefa={esJefa}
             setTareasProg={setTareasProg} tareasProg={tareasProg} S={S}
           />
+      </>)}
       {subTab==="greens"&&rolLogueado!=="trabajador"&&(
         <div className="ein">
           <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
@@ -13384,9 +13387,12 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
   );
 }
 
-function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotificaciones, marcarTodasLeidas, notifNoLeidas, MACROZONAS_BASE, personal, tareasProg, setTareasProg, crearNotificacion, esJefa }) {
+function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotificaciones, marcarTodasLeidas, notifNoLeidas, MACROZONAS_BASE, personal, tareasProg, setTareasProg, crearNotificacion, esJefa, autoOpen, onAutoOpenDone }) {
   const [tabAlerta, setTabAlerta] = React.useState("incidencias");
   const [showNuevaAlerta, setShowNuevaAlerta] = React.useState(false);
+  React.useEffect(()=>{
+    if(autoOpen){ setShowNuevaAlerta(true); setTabAlerta("incidencias"); onAutoOpenDone&&onAutoOpenDone(); }
+  },[autoOpen]);
   const [alertaSelId, setAlertaSelId] = React.useState(null);
   // Viento
   const [vientoData, setVientoData] = React.useState(null);
@@ -13417,10 +13423,10 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
   React.useEffect(()=>{ if(tabAlerta==="viento") fetchViento(); },[tabAlerta]);
 
   const NIVELES_VIENTO = [
-    {nivel:0,label:"Normal",         rango:"< 40 km/h",  color:"#22c55e",bg:"rgba(34,197,94,0.08)",   min:0, max:39, icon:"🟢",acciones:[]},
-    {nivel:1,label:"Alerta temprana",rango:"40–59 km/h", color:"#f59e0b",bg:"rgba(245,158,11,0.08)", min:40,max:59, icon:"🟡",acciones:["Asegurar macetas y elementos móviles","Revisar y asegurar señalética","Alertar al equipo","Suspender trabajos en altura"]},
-    {nivel:2,label:"Alerta media",   rango:"60–81 km/h", color:"#f97316",bg:"rgba(249,115,22,0.08)", min:60,max:81, icon:"🟠",acciones:["Suspender labores de jardinería en exterior","Retirar herramientas y equipos livianos","Encintar zonas de riesgo por caída de ramas","Revisar árboles con riesgo de volcamiento","Notificar a administración del estadio","Cierre sectorial de zonas arboladas"]},
-    {nivel:3,label:"Alerta alta",    rango:"> 82 km/h",  color:"#ef4444",bg:"rgba(239,68,68,0.08)",  min:82,max:999,icon:"🔴",acciones:["EVACUACIÓN INMEDIATA de todas las zonas verdes","Cerrar acceso al estadio y zonas deportivas","Activar protocolo de emergencia con administración","Contactar Defensa Civil si corresponde","Documentar fotográficamente post-evento","Inspección completa antes de reabrir"]},
+    {nivel:0,label:"Normal",         rango:"< 40 km/h",  color:"#22c55e",bg:"rgba(34,197,94,0.08)",   min:0, max:39, icon:"N0",acciones:[]},
+    {nivel:1,label:"Alerta temprana",rango:"40–59 km/h", color:"#f59e0b",bg:"rgba(245,158,11,0.08)", min:40,max:59, icon:"N1",acciones:["Asegurar macetas y elementos móviles","Revisar y asegurar señalética","Alertar al equipo","Suspender trabajos en altura"]},
+    {nivel:2,label:"Alerta media",   rango:"60–81 km/h", color:"#f97316",bg:"rgba(249,115,22,0.08)", min:60,max:81, icon:"N2",acciones:["Suspender labores de jardinería en exterior","Retirar herramientas y equipos livianos","Encintar zonas de riesgo por caída de ramas","Revisar árboles con riesgo de volcamiento","Notificar a administración del estadio","Cierre sectorial de zonas arboladas"]},
+    {nivel:3,label:"Alerta alta",    rango:"> 82 km/h",  color:"#ef4444",bg:"rgba(239,68,68,0.08)",  min:82,max:999,icon:"N3",acciones:["EVACUACIÓN INMEDIATA de todas las zonas verdes","Cerrar acceso al estadio y zonas deportivas","Activar protocolo de emergencia con administración","Contactar Defensa Civil si corresponde","Documentar fotográficamente post-evento","Inspección completa antes de reabrir"]},
   ];
 
   const getNivelViento = (kmh) => [...NIVELES_VIENTO].reverse().find(n=>kmh>=n.min)||NIVELES_VIENTO[0];
@@ -13606,7 +13612,7 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
                   </div>
                   <div style={{background:nvMax.bg,border:`2px solid ${nvMax.color}`,borderRadius:10,padding:"12px 16px",marginBottom:nvMax.acciones.length>0?10:0}}>
                     <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:nvMax.acciones.length>0?8:0}}>
-                      <span style={{fontSize:22}}>{nvMax.icon}</span>
+                      <span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:28,height:28,borderRadius:"50%",background:nvMax.color,color:"#fff",fontWeight:900,fontSize:11}}>{nvMax.nivel}</span>
                       <div>
                         <div style={{fontWeight:700,fontSize:14,color:nvMax.color}}>Nivel {nvMax.nivel} — {nvMax.label}</div>
                         <div style={{fontSize:12,color:"#5a9a7a"}}>{nvMax.rango}</div>
@@ -13620,7 +13626,7 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
                 <div style={{...S.card,padding:14,marginBottom:12}}>
                   <div style={{fontSize:12,fontWeight:700,color:"#5a9a7a",marginBottom:8}}>📋 Tabla de niveles</div>
                   {NIVELES_VIENTO.map(n=><div key={n.nivel} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",marginBottom:3,borderRadius:6,background:nvMax.nivel===n.nivel?n.bg:"rgba(255,255,255,0.02)",border:`1px solid ${nvMax.nivel===n.nivel?n.color+"50":"rgba(255,255,255,0.05)"}`}}>
-                    <span>{n.icon}</span>
+                    <span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:20,height:20,borderRadius:"50%",background:n.color,color:"#fff",fontWeight:900,fontSize:10,flexShrink:0}}>{n.nivel}</span>
                     <div style={{flex:1}}>
                       <span style={{fontSize:12,fontWeight:700,color:n.color}}>Nivel {n.nivel} — {n.label}</span>
                       <span style={{fontSize:11,color:"#5a9a7a",marginLeft:8}}>{n.rango}</span>
@@ -13637,7 +13643,7 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
                           <div style={{fontSize:10,color:"#5a9a7a"}}>{h.hora}</div>
                           <div style={{fontWeight:700,fontSize:13,color:nv2.color}}>{h.velocidad}</div>
                           <div style={{fontSize:9,color:"#5a9a7a"}}>↑{h.rafaga}</div>
-                          <div style={{fontSize:10}}>{nv2.icon}</div>
+                          <div style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:16,height:16,borderRadius:"50%",background:nv2.color,color:"#fff",fontWeight:900,fontSize:9,margin:"0 auto"}}>{nv2.nivel}</div>
                         </div>
                       );})}
                     </div>
@@ -13907,6 +13913,7 @@ export default function App() {
   const [rendicionesRRHH, setRendicionesRRHH] = useFirebaseState("rendiciones-rrhh", []);
   const [notificaciones, setNotificaciones]   = useFirebaseState("notificaciones", []);
   const [incidencias, setIncidencias]         = useFirebaseState("incidencias", []);
+  const [autoOpenAlerta, setAutoOpenAlerta]   = React.useState(false);
   const [cierresTurno,  setCierresTurno]     = useFirebaseState("cierresTurno",   {});
 
   const appReady = dataReady && personalReady && progReady;
@@ -15322,7 +15329,7 @@ export default function App() {
           </div>
         </ErrorBoundary>)}
 
-        {/* PROGRAMACIÓN */}}
+        {/* PROGRAMACIÓN */}
         {vista==="programacion"&&(
           <ProgramacionDiaria key="prog" S={S} zonas={zonas} data={data} personal={personal} getZD={getZD} getAllElems={getAllElems} MACROZONAS_BASE={MACROZONAS_BASE} tareas={tareasProg} setTareas={setTareasProg}
             getElemFrecs={getElemFrecs} setElemFrecs={setElemFrecs}
@@ -15554,7 +15561,7 @@ export default function App() {
 
         {/* GOLF */}
         {vista==="golf"&&(
-          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial} setVista={setVista} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito}
+          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial} setVista={setVista} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} onCierreSectorial={()=>setShowCierreSectorial(true)} onNuevaAlerta={()=>{setAutoOpenAlerta(true);setVista("notificaciones");}}
             crearNotificacion={crearNotificacion}
             initialSubTab={golfInitTab}
             onRegistroGuardado={(tipo)=>{
@@ -15708,7 +15715,7 @@ export default function App() {
 
         {/* ── ALERTAS / NOTIFICACIONES ── */}
         {vista==="notificaciones"&&(<ErrorBoundary>
-          <PanelAlertas S={S} incidencias={incidencias} setIncidencias={setIncidencias} notificaciones={notificaciones} setNotificaciones={setNotificaciones} marcarTodasLeidas={marcarTodasLeidas} notifNoLeidas={notifNoLeidas} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} tareasProg={tareasProg} setTareasProg={setTareasProg} crearNotificacion={crearNotificacion} esJefa={esJefa}/>
+          <PanelAlertas S={S} incidencias={incidencias} setIncidencias={setIncidencias} autoOpen={autoOpenAlerta} onAutoOpenDone={()=>setAutoOpenAlerta(false)} notificaciones={notificaciones} setNotificaciones={setNotificaciones} marcarTodasLeidas={marcarTodasLeidas} notifNoLeidas={notifNoLeidas} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} tareasProg={tareasProg} setTareasProg={setTareasProg} crearNotificacion={crearNotificacion} esJefa={esJefa}/>
         </ErrorBoundary>)}
 
         {showCierreSectorial&&<ModalCierreSectorial S={S} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} onClose={()=>setShowCierreSectorial(false)}/>}
