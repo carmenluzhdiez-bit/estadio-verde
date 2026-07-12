@@ -2201,6 +2201,171 @@ const getResponsablePorTipo = (tarea, configSemanal) => {
 };
 
 
+// ─── FRECUENCIAS INICIALES GOLF (se cargan si el elemento no tiene frecuencias en Firebase) ──
+const GOLF_FRECS_INIT = {
+  "green_g1": [
+    { id:"green_g1_corte",    tarea:"Corte",              modo:"estacion", verano:"diario",    otono:"cada5dias", invierno:"diario",    primavera:"cada2dias", ultimaVez:"2026-06-17", obs:"Cambiar dirección. Registrar HOC real." },
+    { id:"green_g1_fertil",   tarea:"Fertilización",      modo:"estacion", verano:"quincenal", otono:"mensual",   invierno:"noaplica",  primavera:"quincenal", ultimaVez:"2026-06-17", obs:"Alternar Novatec / Salitre K" },
+    { id:"green_g1_vertcort", tarea:"Verticorte/Groomer", modo:"estacion", verano:"noaplica",  otono:"mensual",   invierno:"noaplica",  primavera:"mensual",   ultimaVez:"2026-05-28", obs:"Pasar groomer fuerte con corte" },
+    { id:"green_g1_desmal",   tarea:"Desmalezado bordes", modo:"estacion", verano:"semanal",   otono:"semanal",   invierno:"quincenal", primavera:"semanal",   ultimaVez:"2026-06-19", obs:"Límites del borde con placa larga" },
+    { id:"green_g1_revplaga", tarea:"Revisión plagas",    modo:"estacion", verano:"semanal",   otono:"semanal",   invierno:"semanal",   primavera:"semanal",   ultimaVez:"2026-06-19", obs:"Si se detecta: generar alerta fitosanitaria" },
+    { id:"green_g1_revhum",   tarea:"Revisión humedad",   modo:"estacion", verano:"semanal",   otono:"semanal",   invierno:"semanal",   primavera:"semanal",   ultimaVez:"2026-06-10", obs:"Medir en lado más seco. Después del almuerzo" },
+    { id:"green_g1_aireach",  tarea:"Aireación púas chicas", modo:"estacion", verano:"noaplica", otono:"segunecesidad", invierno:"noaplica", primavera:"segunecesidad", ultimaVez:"2026-03-16", obs:"2 veces/año: marzo y ago-sep" },
+    { id:"green_g1_airegr",   tarea:"Aireación sacabocados", modo:"estacion", verano:"noaplica", otono:"unavez",    invierno:"noaplica",  primavera:"noaplica",  ultimaVez:"2026-04-13", obs:"1 vez/año: abril" },
+  ],
+  "green_g2": [
+    { id:"green_g2_corte",    tarea:"Corte",              modo:"estacion", verano:"diario",    otono:"cada5dias", invierno:"diario",    primavera:"cada2dias", ultimaVez:"2026-06-17", obs:"Cambiar dirección. Registrar HOC real." },
+    { id:"green_g2_fertil",   tarea:"Fertilización",      modo:"estacion", verano:"quincenal", otono:"mensual",   invierno:"noaplica",  primavera:"quincenal", ultimaVez:"2026-06-17", obs:"Alternar Novatec / Salitre K" },
+    { id:"green_g2_vertcort", tarea:"Verticorte/Groomer", modo:"estacion", verano:"noaplica",  otono:"mensual",   invierno:"noaplica",  primavera:"mensual",   ultimaVez:"2026-05-28", obs:"Pasar groomer fuerte con corte" },
+    { id:"green_g2_desmal",   tarea:"Desmalezado bordes", modo:"estacion", verano:"semanal",   otono:"semanal",   invierno:"quincenal", primavera:"semanal",   ultimaVez:"2026-06-19", obs:"Límites del borde con placa larga" },
+    { id:"green_g2_revplaga", tarea:"Revisión plagas",    modo:"estacion", verano:"semanal",   otono:"semanal",   invierno:"semanal",   primavera:"semanal",   ultimaVez:"2026-06-19", obs:"Si se detecta: generar alerta fitosanitaria" },
+    { id:"green_g2_revhum",   tarea:"Revisión humedad",   modo:"estacion", verano:"semanal",   otono:"semanal",   invierno:"semanal",   primavera:"semanal",   ultimaVez:"2026-06-10", obs:"Medir en lado más seco. Después del almuerzo" },
+    { id:"green_g2_aireach",  tarea:"Aireación púas chicas", modo:"estacion", verano:"noaplica", otono:"segunecesidad", invierno:"noaplica", primavera:"segunecesidad", ultimaVez:"2026-03-16", obs:"2 veces/año: marzo y ago-sep" },
+    { id:"green_g2_airegr",   tarea:"Aireación sacabocados", modo:"estacion", verano:"noaplica", otono:"unavez",    invierno:"noaplica",  primavera:"noaplica",  ultimaVez:"2026-04-13", obs:"1 vez/año: abril" },
+  ],
+  "green_g3": [
+    { id:"green_g3_corte",    tarea:"Corte",              modo:"estacion", verano:"diario",    otono:"cada5dias", invierno:"diario",    primavera:"cada2dias", ultimaVez:"2026-06-17", obs:"Cambiar dirección. Registrar HOC real." },
+    { id:"green_g3_fertil",   tarea:"Fertilización",      modo:"estacion", verano:"quincenal", otono:"mensual",   invierno:"noaplica",  primavera:"quincenal", ultimaVez:"2026-06-17", obs:"Alternar Novatec / Salitre K" },
+    { id:"green_g3_vertcort", tarea:"Verticorte/Groomer", modo:"estacion", verano:"noaplica",  otono:"mensual",   invierno:"noaplica",  primavera:"mensual",   ultimaVez:"2026-05-28", obs:"Pasar groomer fuerte con corte" },
+    { id:"green_g3_desmal",   tarea:"Desmalezado bordes", modo:"estacion", verano:"semanal",   otono:"semanal",   invierno:"quincenal", primavera:"semanal",   ultimaVez:"2026-06-19", obs:"Límites del borde con placa larga" },
+    { id:"green_g3_revplaga", tarea:"Revisión plagas",    modo:"estacion", verano:"semanal",   otono:"semanal",   invierno:"semanal",   primavera:"semanal",   ultimaVez:"2026-06-19", obs:"Si se detecta: generar alerta fitosanitaria" },
+    { id:"green_g3_revhum",   tarea:"Revisión humedad",   modo:"estacion", verano:"semanal",   otono:"semanal",   invierno:"semanal",   primavera:"semanal",   ultimaVez:"2026-06-10", obs:"Medir en lado más seco. Después del almuerzo" },
+    { id:"green_g3_aireach",  tarea:"Aireación púas chicas", modo:"estacion", verano:"noaplica", otono:"segunecesidad", invierno:"noaplica", primavera:"segunecesidad", ultimaVez:"2026-03-16", obs:"2 veces/año: marzo y ago-sep" },
+    { id:"green_g3_airegr",   tarea:"Aireación sacabocados", modo:"estacion", verano:"noaplica", otono:"unavez",    invierno:"noaplica",  primavera:"noaplica",  ultimaVez:"2026-04-13", obs:"1 vez/año: abril" },
+  ],
+  "green_g4": [
+    { id:"green_g4_corte",    tarea:"Corte",              modo:"estacion", verano:"diario",    otono:"cada5dias", invierno:"diario",    primavera:"cada2dias", ultimaVez:"2026-06-17", obs:"Cambiar dirección. Registrar HOC real." },
+    { id:"green_g4_fertil",   tarea:"Fertilización",      modo:"estacion", verano:"quincenal", otono:"mensual",   invierno:"noaplica",  primavera:"quincenal", ultimaVez:"2026-06-17", obs:"Alternar Novatec / Salitre K" },
+    { id:"green_g4_vertcort", tarea:"Verticorte/Groomer", modo:"estacion", verano:"noaplica",  otono:"mensual",   invierno:"noaplica",  primavera:"mensual",   ultimaVez:"2026-05-28", obs:"Pasar groomer fuerte con corte" },
+    { id:"green_g4_desmal",   tarea:"Desmalezado bordes", modo:"estacion", verano:"semanal",   otono:"semanal",   invierno:"quincenal", primavera:"semanal",   ultimaVez:"2026-06-19", obs:"Límites del borde con placa larga" },
+    { id:"green_g4_revplaga", tarea:"Revisión plagas",    modo:"estacion", verano:"semanal",   otono:"semanal",   invierno:"semanal",   primavera:"semanal",   ultimaVez:"2026-06-19", obs:"Si se detecta: generar alerta fitosanitaria" },
+    { id:"green_g4_revhum",   tarea:"Revisión humedad",   modo:"estacion", verano:"semanal",   otono:"semanal",   invierno:"semanal",   primavera:"semanal",   ultimaVez:"2026-06-10", obs:"Medir en lado más seco. Después del almuerzo" },
+    { id:"green_g4_aireach",  tarea:"Aireación púas chicas", modo:"estacion", verano:"noaplica", otono:"segunecesidad", invierno:"noaplica", primavera:"segunecesidad", ultimaVez:"2026-03-16", obs:"2 veces/año: marzo y ago-sep" },
+    { id:"green_g4_airegr",   tarea:"Aireación sacabocados", modo:"estacion", verano:"noaplica", otono:"unavez",    invierno:"noaplica",  primavera:"noaplica",  ultimaVez:"2026-04-13", obs:"1 vez/año: abril" },
+  ],
+  "green_g5": [
+    { id:"green_g5_corte",    tarea:"Corte",              modo:"estacion", verano:"diario",    otono:"cada5dias", invierno:"diario",    primavera:"cada2dias", ultimaVez:"2026-06-17", obs:"Cambiar dirección. Registrar HOC real." },
+    { id:"green_g5_fertil",   tarea:"Fertilización",      modo:"estacion", verano:"quincenal", otono:"mensual",   invierno:"noaplica",  primavera:"quincenal", ultimaVez:"2026-06-17", obs:"Alternar Novatec / Salitre K" },
+    { id:"green_g5_vertcort", tarea:"Verticorte/Groomer", modo:"estacion", verano:"noaplica",  otono:"mensual",   invierno:"noaplica",  primavera:"mensual",   ultimaVez:"2026-05-28", obs:"Pasar groomer fuerte con corte" },
+    { id:"green_g5_desmal",   tarea:"Desmalezado bordes", modo:"estacion", verano:"semanal",   otono:"semanal",   invierno:"quincenal", primavera:"semanal",   ultimaVez:"2026-06-19", obs:"Límites del borde con placa larga" },
+    { id:"green_g5_revplaga", tarea:"Revisión plagas",    modo:"estacion", verano:"semanal",   otono:"semanal",   invierno:"semanal",   primavera:"semanal",   ultimaVez:"2026-06-19", obs:"Si se detecta: generar alerta fitosanitaria" },
+    { id:"green_g5_revhum",   tarea:"Revisión humedad",   modo:"estacion", verano:"semanal",   otono:"semanal",   invierno:"semanal",   primavera:"semanal",   ultimaVez:"2026-06-10", obs:"Medir en lado más seco. Después del almuerzo" },
+    { id:"green_g5_aireach",  tarea:"Aireación púas chicas", modo:"estacion", verano:"noaplica", otono:"segunecesidad", invierno:"noaplica", primavera:"segunecesidad", ultimaVez:"2026-03-16", obs:"2 veces/año: marzo y ago-sep" },
+    { id:"green_g5_airegr",   tarea:"Aireación sacabocados", modo:"estacion", verano:"noaplica", otono:"unavez",    invierno:"noaplica",  primavera:"noaplica",  ultimaVez:"2026-04-13", obs:"1 vez/año: abril" },
+  ],
+  "green_g6": [
+    { id:"green_g6_corte",    tarea:"Corte",              modo:"estacion", verano:"diario",    otono:"cada5dias", invierno:"diario",    primavera:"cada2dias", ultimaVez:"2026-06-17", obs:"Cambiar dirección. Registrar HOC real." },
+    { id:"green_g6_fertil",   tarea:"Fertilización",      modo:"estacion", verano:"quincenal", otono:"mensual",   invierno:"noaplica",  primavera:"quincenal", ultimaVez:"2026-06-17", obs:"Alternar Novatec / Salitre K" },
+    { id:"green_g6_vertcort", tarea:"Verticorte/Groomer", modo:"estacion", verano:"noaplica",  otono:"mensual",   invierno:"noaplica",  primavera:"mensual",   ultimaVez:"2026-05-28", obs:"Pasar groomer fuerte con corte" },
+    { id:"green_g6_desmal",   tarea:"Desmalezado bordes", modo:"estacion", verano:"semanal",   otono:"semanal",   invierno:"quincenal", primavera:"semanal",   ultimaVez:"2026-06-19", obs:"Límites del borde con placa larga" },
+    { id:"green_g6_revplaga", tarea:"Revisión plagas",    modo:"estacion", verano:"semanal",   otono:"semanal",   invierno:"semanal",   primavera:"semanal",   ultimaVez:"2026-06-19", obs:"Si se detecta: generar alerta fitosanitaria" },
+    { id:"green_g6_revhum",   tarea:"Revisión humedad",   modo:"estacion", verano:"semanal",   otono:"semanal",   invierno:"semanal",   primavera:"semanal",   ultimaVez:"2026-06-10", obs:"Medir en lado más seco. Después del almuerzo" },
+    { id:"green_g6_aireach",  tarea:"Aireación púas chicas", modo:"estacion", verano:"noaplica", otono:"segunecesidad", invierno:"noaplica", primavera:"segunecesidad", ultimaVez:"2026-03-16", obs:"2 veces/año: marzo y ago-sep" },
+    { id:"green_g6_airegr",   tarea:"Aireación sacabocados", modo:"estacion", verano:"noaplica", otono:"unavez",    invierno:"noaplica",  primavera:"noaplica",  ultimaVez:"2026-04-13", obs:"1 vez/año: abril" },
+  ],
+  "green_g7": [
+    { id:"green_g7_corte",    tarea:"Corte",              modo:"estacion", verano:"diario",    otono:"cada5dias", invierno:"diario",    primavera:"cada2dias", ultimaVez:"2026-06-17", obs:"Cambiar dirección. Registrar HOC real." },
+    { id:"green_g7_fertil",   tarea:"Fertilización",      modo:"estacion", verano:"quincenal", otono:"mensual",   invierno:"noaplica",  primavera:"quincenal", ultimaVez:"2026-06-17", obs:"Alternar Novatec / Salitre K" },
+    { id:"green_g7_vertcort", tarea:"Verticorte/Groomer", modo:"estacion", verano:"noaplica",  otono:"mensual",   invierno:"noaplica",  primavera:"mensual",   ultimaVez:"2026-05-28", obs:"Pasar groomer fuerte con corte" },
+    { id:"green_g7_desmal",   tarea:"Desmalezado bordes", modo:"estacion", verano:"semanal",   otono:"semanal",   invierno:"quincenal", primavera:"semanal",   ultimaVez:"2026-06-19", obs:"Límites del borde con placa larga" },
+    { id:"green_g7_revplaga", tarea:"Revisión plagas",    modo:"estacion", verano:"semanal",   otono:"semanal",   invierno:"semanal",   primavera:"semanal",   ultimaVez:"2026-06-19", obs:"Si se detecta: generar alerta fitosanitaria" },
+    { id:"green_g7_revhum",   tarea:"Revisión humedad",   modo:"estacion", verano:"semanal",   otono:"semanal",   invierno:"semanal",   primavera:"semanal",   ultimaVez:"2026-06-10", obs:"Medir en lado más seco. Después del almuerzo" },
+    { id:"green_g7_aireach",  tarea:"Aireación púas chicas", modo:"estacion", verano:"noaplica", otono:"segunecesidad", invierno:"noaplica", primavera:"segunecesidad", ultimaVez:"2026-03-16", obs:"2 veces/año: marzo y ago-sep" },
+    { id:"green_g7_airegr",   tarea:"Aireación sacabocados", modo:"estacion", verano:"noaplica", otono:"unavez",    invierno:"noaplica",  primavera:"noaplica",  ultimaVez:"2026-04-13", obs:"1 vez/año: abril" },
+  ],
+  "green_g8": [
+    { id:"green_g8_corte",    tarea:"Corte",              modo:"estacion", verano:"diario",    otono:"cada5dias", invierno:"diario",    primavera:"cada2dias", ultimaVez:"2026-06-17", obs:"Cambiar dirección. Registrar HOC real." },
+    { id:"green_g8_fertil",   tarea:"Fertilización",      modo:"estacion", verano:"quincenal", otono:"mensual",   invierno:"noaplica",  primavera:"quincenal", ultimaVez:"2026-06-17", obs:"Alternar Novatec / Salitre K" },
+    { id:"green_g8_vertcort", tarea:"Verticorte/Groomer", modo:"estacion", verano:"noaplica",  otono:"mensual",   invierno:"noaplica",  primavera:"mensual",   ultimaVez:"2026-05-28", obs:"Pasar groomer fuerte con corte" },
+    { id:"green_g8_desmal",   tarea:"Desmalezado bordes", modo:"estacion", verano:"semanal",   otono:"semanal",   invierno:"quincenal", primavera:"semanal",   ultimaVez:"2026-06-19", obs:"Límites del borde con placa larga" },
+    { id:"green_g8_revplaga", tarea:"Revisión plagas",    modo:"estacion", verano:"semanal",   otono:"semanal",   invierno:"semanal",   primavera:"semanal",   ultimaVez:"2026-06-19", obs:"Si se detecta: generar alerta fitosanitaria" },
+    { id:"green_g8_revhum",   tarea:"Revisión humedad",   modo:"estacion", verano:"semanal",   otono:"semanal",   invierno:"semanal",   primavera:"semanal",   ultimaVez:"2026-06-10", obs:"Medir en lado más seco. Después del almuerzo" },
+    { id:"green_g8_aireach",  tarea:"Aireación púas chicas", modo:"estacion", verano:"noaplica", otono:"segunecesidad", invierno:"noaplica", primavera:"segunecesidad", ultimaVez:"2026-03-16", obs:"2 veces/año: marzo y ago-sep" },
+    { id:"green_g8_airegr",   tarea:"Aireación sacabocados", modo:"estacion", verano:"noaplica", otono:"unavez",    invierno:"noaplica",  primavera:"noaplica",  ultimaVez:"2026-04-13", obs:"1 vez/año: abril" },
+  ],
+  "green_g9": [
+    { id:"green_g9_corte",    tarea:"Corte",              modo:"estacion", verano:"diario",    otono:"cada5dias", invierno:"diario",    primavera:"cada2dias", ultimaVez:"2026-06-17", obs:"Cambiar dirección. Registrar HOC real." },
+    { id:"green_g9_fertil",   tarea:"Fertilización",      modo:"estacion", verano:"quincenal", otono:"mensual",   invierno:"noaplica",  primavera:"quincenal", ultimaVez:"2026-06-17", obs:"Alternar Novatec / Salitre K" },
+    { id:"green_g9_vertcort", tarea:"Verticorte/Groomer", modo:"estacion", verano:"noaplica",  otono:"mensual",   invierno:"noaplica",  primavera:"mensual",   ultimaVez:"2026-05-28", obs:"Pasar groomer fuerte con corte" },
+    { id:"green_g9_desmal",   tarea:"Desmalezado bordes", modo:"estacion", verano:"semanal",   otono:"semanal",   invierno:"quincenal", primavera:"semanal",   ultimaVez:"2026-06-19", obs:"Límites del borde con placa larga" },
+    { id:"green_g9_revplaga", tarea:"Revisión plagas",    modo:"estacion", verano:"semanal",   otono:"semanal",   invierno:"semanal",   primavera:"semanal",   ultimaVez:"2026-06-19", obs:"Si se detecta: generar alerta fitosanitaria" },
+    { id:"green_g9_revhum",   tarea:"Revisión humedad",   modo:"estacion", verano:"semanal",   otono:"semanal",   invierno:"semanal",   primavera:"semanal",   ultimaVez:"2026-06-10", obs:"Medir en lado más seco. Después del almuerzo" },
+    { id:"green_g9_aireach",  tarea:"Aireación púas chicas", modo:"estacion", verano:"noaplica", otono:"segunecesidad", invierno:"noaplica", primavera:"segunecesidad", ultimaVez:"2026-03-16", obs:"2 veces/año: marzo y ago-sep" },
+    { id:"green_g9_airegr",   tarea:"Aireación sacabocados", modo:"estacion", verano:"noaplica", otono:"unavez",    invierno:"noaplica",  primavera:"noaplica",  ultimaVez:"2026-04-13", obs:"1 vez/año: abril" },
+  ],
+  "green_vivero": [
+    { id:"green_vivero_corte",    tarea:"Corte",              modo:"estacion", verano:"diario",    otono:"cada5dias", invierno:"diario",    primavera:"cada2dias", ultimaVez:"2026-06-17", obs:"Cambiar dirección. Registrar HOC real." },
+    { id:"green_vivero_fertil",   tarea:"Fertilización",      modo:"estacion", verano:"quincenal", otono:"mensual",   invierno:"noaplica",  primavera:"quincenal", ultimaVez:"2026-06-17", obs:"Alternar Novatec / Salitre K" },
+    { id:"green_vivero_vertcort", tarea:"Verticorte/Groomer", modo:"estacion", verano:"noaplica",  otono:"mensual",   invierno:"noaplica",  primavera:"mensual",   ultimaVez:"2026-05-28", obs:"Pasar groomer fuerte con corte" },
+    { id:"green_vivero_desmal",   tarea:"Desmalezado bordes", modo:"estacion", verano:"semanal",   otono:"semanal",   invierno:"quincenal", primavera:"semanal",   ultimaVez:"2026-06-19", obs:"Límites del borde con placa larga" },
+    { id:"green_vivero_revplaga", tarea:"Revisión plagas",    modo:"estacion", verano:"semanal",   otono:"semanal",   invierno:"semanal",   primavera:"semanal",   ultimaVez:"2026-06-19", obs:"Si se detecta: generar alerta fitosanitaria" },
+    { id:"green_vivero_revhum",   tarea:"Revisión humedad",   modo:"estacion", verano:"semanal",   otono:"semanal",   invierno:"semanal",   primavera:"semanal",   ultimaVez:"2026-06-10", obs:"Medir en lado más seco. Después del almuerzo" },
+    { id:"green_vivero_aireach",  tarea:"Aireación púas chicas", modo:"estacion", verano:"noaplica", otono:"segunecesidad", invierno:"noaplica", primavera:"segunecesidad", ultimaVez:"2026-03-16", obs:"2 veces/año: marzo y ago-sep" },
+    { id:"green_vivero_airegr",   tarea:"Aireación sacabocados", modo:"estacion", verano:"noaplica", otono:"unavez",    invierno:"noaplica",  primavera:"noaplica",  ultimaVez:"2026-04-13", obs:"1 vez/año: abril" },
+  ],
+
+  // Fairways
+  e1: [
+    { id:"e1_corte",    tarea:"Corte de Fairways",          modo:"estacion", verano:"cada5dias", otono:"cada5dias", invierno:"cada5dias",   primavera:"cada5dias", ultimaVez:"2026-06-12", obs:"1.75cm" },
+    { id:"e1_fertil",   tarea:"Fertilización",              modo:"estacion", verano:"mensual",   otono:"mensual",   invierno:"noaplica",    primavera:"mensual",   ultimaVez:"2026-04-14", obs:"Salitre Potásico después del corte" },
+    { id:"e1_aireag",   tarea:"Aireación sacabocados",      modo:"estacion", verano:"noaplica",  otono:"segunecesidad", invierno:"noaplica", primavera:"segunecesidad", ultimaVez:"2026-03-16", obs:"2 veces/año: marzo y sept" },
+    { id:"e1_revplaga", tarea:"Revisión plagas",            modo:"estacion", verano:"quincenal", otono:"quincenal", invierno:"quincenal",   primavera:"quincenal", ultimaVez:"2026-06-10", obs:"Si se detecta: generar alerta" },
+    { id:"e1_riego",    tarea:"Revisión riego",             modo:"estacion", verano:"quincenal", otono:"quincenal", invierno:"quincenal",   primavera:"quincenal", ultimaVez:"2026-06-05", obs:"Verificar alcances y boquillas" },
+  ],
+  // Tees
+  tees_golf: [
+    { id:"tees_corte",  tarea:"Corte de Tees",              modo:"estacion", verano:"cada5dias", otono:"cada5dias", invierno:"cada5dias",   primavera:"cada5dias", ultimaVez:"2026-06-12", obs:"Nivel uniforme" },
+    { id:"tees_desmal", tarea:"Desmalezado bordes",         modo:"estacion", verano:"semanal",   otono:"semanal",   invierno:"quincenal",   primavera:"semanal",   ultimaVez:"2026-06-12", obs:"" },
+  ],
+  // Antegreens
+  antegreen_golf: [
+    { id:"anteg_corte", tarea:"Corte de Antegreens",        modo:"estacion", verano:"quincenal", otono:"quincenal", invierno:"quincenal",   primavera:"quincenal", ultimaVez:"2026-06-12", obs:"a 1cm, usar helicoidal" },
+    { id:"anteg_orill", tarea:"Orillado",                   modo:"estacion", verano:"quincenal", otono:"quincenal", invierno:"quincenal",   primavera:"quincenal", ultimaVez:"2026-05-27", obs:"1.5-2.5cm con orilladora" },
+    { id:"anteg_desm",  tarea:"Desmalezado bordes",         modo:"estacion", verano:"mensual",   otono:"mensual",   invierno:"mensual",     primavera:"mensual",   ultimaVez:"2026-05-28", obs:"Manualmente" },
+  ],
+  // Lomas
+  lomas_golf: [
+    { id:"lomas_corte", tarea:"Corte de Lomas",             modo:"estacion", verano:"mensual",   otono:"mensual",   invierno:"mensual",     primavera:"mensual",   ultimaVez:"2026-06-12", obs:"Con flotante, nivel más bajo" },
+  ],
+  // Cancha general
+  e3: [
+    { id:"e3_corte",    tarea:"Corte de Cancha (césped)",   modo:"estacion", verano:"quincenal", otono:"quincenal", invierno:"quincenal",   primavera:"quincenal", ultimaVez:"2026-06-13", obs:"3 y 2.75 pulgadas" },
+    { id:"e3_orill",    tarea:"Orillado/perfilado macizos", modo:"estacion", verano:"mensual",   otono:"mensual",   invierno:"mensual",     primavera:"mensual",   ultimaVez:"2026-06-12", obs:"Solo antes 12:00hrs" },
+    { id:"e3_riego",    tarea:"Revisión riego",             modo:"estacion", verano:"quincenal", otono:"quincenal", invierno:"quincenal",   primavera:"quincenal", ultimaVez:"2026-06-06", obs:"Verificar señal, programas" },
+  ],
+  // Sistema de riego
+  e8: [
+    { id:"e8_rev",      tarea:"Revisión sistema riego",     modo:"estacion", verano:"quincenal", otono:"quincenal", invierno:"quincenal",   primavera:"quincenal", ultimaVez:"2026-06-06", obs:"Verificar señal, alcances" },
+  ],
+};
+
+// Hook para inicializar frecuencias Golf si no existen en Firebase
+function useInitGolfFrecs(data, setData) {
+  React.useEffect(() => {
+    if(!data) return;
+    const golfData = data[31];
+    if(!golfData) return;
+    const elems = golfData.elementos || {};
+    const updates = {};
+    Object.entries(GOLF_FRECS_INIT).forEach(([eid, frecs]) => {
+      if(!elems[eid]?.frecuencias?.length) {
+        updates[eid] = { ...(elems[eid]||{}), frecuencias: frecs };
+      }
+    });
+    if(Object.keys(updates).length > 0) {
+      setData(prev => ({
+        ...prev,
+        31: {
+          ...(prev[31]||{}),
+          elementos: { ...(prev[31]?.elementos||{}), ...updates }
+        }
+      }));
+      console.log("✅ Frecuencias Golf inicializadas:", Object.keys(updates));
+    }
+  }, [!!data]);
+}
+
+
 // ─── PROGRAMACIÓN DIARIA ─────────────────────────────────────────────────────
 // ─── VISTA TRABAJADOR ────────────────────────────────────────────────────────
 function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE, onAccesoRapido, onCambiarMetodo, cierresTurno={}, onCerrarTurno, onReabrirTurno, esJefaApp=false }) {
@@ -2210,8 +2375,6 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   const turnoCerradoKey = `${fechaVer}_${(trabajador?.nombre||"").split(" ")[0].toLowerCase()}`;
   const turnoCerrado = (cierresTurno||{})[turnoCerradoKey] || null;
   const puedeEditar = !turnoCerrado || esJefaApp;
-  const puedeCambiarEstado = true; // siempre puede marcar estado de sus propias tareas
-  const [showNuevaTareaEmerg, setShowNuevaTareaEmerg] = React.useState(false);
   const [nuevaTareaEmerg, setNuevaTareaEmerg] = React.useState({ zona:"", tarea:"", notas:"" });
   // Estado de grupos colapsables — objeto {key: bool}
   const [gruposAbiertos, setGruposAbiertos] = React.useState({diarias:true,corte:true,medicion:true,riego:true,fitosan:true,limpieza:true,otros:true});
@@ -2221,12 +2384,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   const [emergenteForm, setEmergenteForm] = React.useState({zona:"",tarea:"",obs:""}); // abierto por defecto
   const [registroDiarioForm, setRegistroDiarioForm] = React.useState({tareas:{}, obsFito:"", obs:""});
 
-  const ESTADOS_TAREA = {
-    pendiente:    { label:"Pendiente",      color:"#f59e0b", bg:"rgba(245,158,11,0.15)",  icon:"N1" },
-    haciendose:   { label:"Haciéndose",     color:"#3b82f6", bg:"rgba(59,130,246,0.15)",  icon:"🔵" },
-    hecha:        { label:"Hecha ✓",        color:"#22c55e", bg:"rgba(34,197,94,0.15)",   icon:"N0" },
-    no_pudo:      { label:"No se pudo",     color:"#ef4444", bg:"rgba(239,68,68,0.15)",   icon:"🔴" },
-  };
+    const ESTADOS_TAREA = ESTADOS_TAREA_GLOBAL;
 
   const getTareasDeZona = (nombreZona) => {
     const zona = MACROZONAS_BASE.find(z=>z.nombre===nombreZona);
@@ -2240,15 +2398,16 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   };
 
   const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
-  const ORDEN_ESTADO = {pendiente:0, haciendose:1, no_pudo:2, hecha:3, por_designar:4};
+  const ORDEN_ESTADO = {por_designar:0, pendiente:1, en_curso:2, haciendose:2, no_pudo:3, cancelada:3, hecha:4, completada:4};
   function esDiariaVW(tareaObj) {
     if(tareaObj.diaria === true) return true;
     const nombreED = (tareaObj.tarea||"").toLowerCase();
     const keywordsED = [
-      "limpieza tee","limpieza —","revisión estado general","revisión humedad greens",
-      "revisión estado fitosanitario","soplado","barrido","pediluvios",
+      "limpieza tee","limpieza —","revisión estado general",
+      "soplado","barrido","pediluvios",
       "limpieza general","riego manual","orden y limpieza","registro diario"
     ];
+    // NOTA: "revisión humedad greens" NO es diaria — tiene frecuencia semanal
     for(let edI=0;edI<keywordsED.length;edI++){
       if(nombreED.includes(keywordsED[edI])) return true;
     }
@@ -2396,11 +2555,51 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                   <span style={{color:"#4a7a5a",fontSize:12,transform:openDiarias?"rotate(90deg)":"rotate(0deg)",transition:"transform .2s",display:"inline-block"}}>▶</span>
                 </div>
               </div>
-              {/* Lista de tareas */}
+              {/* Botón marcar todas hechas */}
+              {puedeEditar&&!todasHechas&&(
+                <div style={{padding:"6px 14px",borderBottom:"1px solid rgba(255,255,255,0.04)",display:"flex",justifyContent:"flex-end"}}>
+                  <button
+                    onClick={()=>misTareasDiarias.forEach(t=>normalizarEstado(t.estado)!=="hecha"&&onUpdateTarea(fechaVer,t.id,{estado:"hecha"}))}
+                    style={{...S.btn,fontSize:11,padding:"3px 12px",background:"rgba(34,197,94,0.12)",color:"#22c55e",border:"1px solid rgba(34,197,94,0.3)"}}>
+                    ✅ Marcar todas hechas
+                  </button>
+                </div>
+              )}
+              {/* Lista de tareas diarias agrupadas por tipo */}
               {openDiarias&&(
                 <div>
-                  {misTareasDiarias.map((t,i)=>{
-                    const est=ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente;
+                  {(()=>{
+                    const GRUPOS_D=[
+                      {key:"corte",   icon:"✂️",label:"Cortes",      match:t=>(t.tarea||"").toLowerCase().includes("corte")},
+                      {key:"limpieza",icon:"🧹",label:"Limpieza",    match:t=>(t.tarea||"").toLowerCase().includes("limpieza")||(t.tarea||"").toLowerCase().includes("barrido")||(t.tarea||"").toLowerCase().includes("soplado")},
+                      {key:"riego",   icon:"💧",label:"Riego",       match:t=>(t.tarea||"").toLowerCase().includes("riego")},
+                      {key:"revision",icon:"🔍",label:"Revisiones",  match:t=>(t.tarea||"").toLowerCase().includes("revisión")||(t.tarea||"").toLowerCase().includes("revision")},
+                      {key:"otros_d", icon:"🌿",label:"Otras",       match:t=>true},
+                    ];
+                    const asignadas=new Set();
+                    const gruposDiarias=[];
+                    GRUPOS_D.forEach(g=>{
+                      const ts=misTareasDiarias.filter(t=>!asignadas.has(t.id)&&g.match(t));
+                      ts.forEach(t=>asignadas.add(t.id));
+                      if(ts.length>0) gruposDiarias.push({...g,tareas:ts});
+                    });
+                    return gruposDiarias.map(gD=>(
+                      <div key={gD.key}>
+                        {gruposDiarias.length>1&&(
+                          <div style={{padding:"4px 14px",fontSize:10,color:"#4a7a5a",background:"rgba(255,255,255,0.02)",textTransform:"uppercase",letterSpacing:"0.5px"}}>
+                            {gD.icon} {gD.label}
+                            {/* Botón marcar grupo completo */}
+                            {puedeEditar&&gD.tareas.some(t=>normalizarEstado(t.estado)!=="hecha")&&(
+                              <button
+                                onClick={()=>gD.tareas.forEach(t=>normalizarEstado(t.estado)!=="hecha"&&onUpdateTarea(fechaVer,t.id,{estado:"hecha"}))}
+                                style={{marginLeft:8,fontSize:9,padding:"1px 6px",border:"1px solid rgba(34,197,94,0.3)",borderRadius:4,background:"rgba(34,197,94,0.08)",color:"#22c55e",cursor:"pointer"}}>
+                                ✅ todas
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        {gD.tareas.map((t,i)=>{
+                    const est=ESTADOS_TAREA[normalizarEstado(t.estado)]||ESTADOS_TAREA.pendiente;
                     return (
                       <div key={t.id} style={{padding:"10px 14px",background:i%2===0?"rgba(255,255,255,0.02)":"rgba(255,255,255,0.04)",borderBottom:i<misTareasDiarias.length-1?"1px solid rgba(255,255,255,0.05)":"none"}}>
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:t.metodoLimpieza||t.notas?4:0}}>
@@ -2419,10 +2618,10 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                           </div>
                           <span style={{fontSize:11,fontWeight:600,color:est.color,background:`${est.color}15`,padding:"2px 8px",borderRadius:8,border:`1px solid ${est.color}30`,whiteSpace:"nowrap",flexShrink:0}}>{est.icon} {est.label}</span>
                         </div>
-                        {puedeCambiarEstado ? (
+                        {puedeEditar ? (
                           <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                             {Object.entries(ESTADOS_TAREA).map(([k,v])=>(
-                              <button key={k} onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:k,notaWorker:k!=="no_pudo"?(t.notaWorker||""):""})}
+                              <button key={k} onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:normalizarEstado(k),notaWorker:k!=="no_pudo"?(t.notaWorker||""):""})}
                                 style={{cursor:"pointer",border:`1px solid ${t.estado===k?v.color+"60":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"4px 10px",fontSize:11,background:t.estado===k?`${v.color}15`:"transparent",color:t.estado===k?v.color:"#6aaa7a",fontFamily:"'Georgia',serif"}}>
                                 {v.icon} {v.label}
                               </button>
@@ -2430,19 +2629,32 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                           </div>
                         ) : (
                           <div style={{display:"flex",alignItems:"center",gap:6}}>
-                            <span style={{fontSize:11,fontWeight:600,color:(ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente).color}}>
-                              {(ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente).icon} {(ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente).label}
+                            <span style={{fontSize:11,fontWeight:600,color:(ESTADOS_TAREA[normalizarEstado(t.estado)]||ESTADOS_TAREA.pendiente).color}}>
+                              {(ESTADOS_TAREA[normalizarEstado(t.estado)]||ESTADOS_TAREA.pendiente).icon} {(ESTADOS_TAREA[normalizarEstado(t.estado)]||ESTADOS_TAREA.pendiente).label}
                             </span>
                             <span style={{fontSize:10,color:"#4a7a5a"}}>· Turno cerrado</span>
                           </div>
                         )}
                         {/* Campo altura real de corte — aparece al marcar como hecha si la tarea es de corte */}
-                        {t.estado==="hecha"&&(t.tarea||"").toLowerCase().includes("corte")&&t.zona==="Golf"&&(
+                        {(t.tarea||"").toLowerCase().includes("corte")&&(t.zona==="Golf"||(t.zona||"").includes("Golf"))&&(
                           <div style={{marginTop:6,display:"flex",alignItems:"center",gap:8}}>
-                            <label style={{fontSize:11,color:"#fbbf24",whiteSpace:"nowrap"}}>✂️ Altura de corte real (mm):</label>
+                            <div style={{fontSize:11,color:"#fbbf24",fontWeight:600,marginBottom:4}}>✂️ Ratificar altura de corte (mm)</div>
+                              <div style={{fontSize:10,color:"#5a9a7a",marginBottom:4}}>HOC objetivo: <b style={{color:"#fbbf24"}}>{t.alturaCorteObj||t.alturaCorte||"—"}mm</b> — confirma o corrige el valor real</div>
                             <input type="number" step="0.1" min="2" max="20"
-                              value={t.alturaCorteReal||""}
-                              onChange={e=>onUpdateTarea(fechaVer,t.id,{alturaCorteReal:e.target.value})}
+                              value={alturaInputs[t.id]??t.alturaCorteReal??""}
+                              onChange={e=>setAlturaInputs(p=>({...p,[t.id]:e.target.value}))}
+                              onBlur={e=>{
+                                const val = e.target.value;
+                                if(val && val !== (t.alturaCorteReal||"")) {
+                                  onUpdateTarea(fechaVer,t.id,{alturaCorteReal:val});
+                                }
+                              }}
+                              onKeyDown={e=>{
+                                if(e.key==="Enter"||e.key==="Tab") {
+                                  const val = e.target.value;
+                                  if(val) onUpdateTarea(fechaVer,t.id,{alturaCorteReal:val});
+                                }
+                              }}
                               placeholder={t.alturaCorteObj||t.alturaCorte||"mm"}
                               style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(251,191,36,0.3)",borderRadius:6,color:"#fbbf24",padding:"4px 8px",fontSize:13,fontFamily:"'Georgia',serif",width:80,outline:"none"}}/>
                             {t.alturaCorteReal&&<span style={{fontSize:10,color:"#5a9a7a"}}>✓ {t.alturaCorteReal}mm registrado</span>}
@@ -2458,6 +2670,9 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                       </div>
                     );
                   })}
+                      </div>
+                    ));
+                  })()}
                   {/* ── Observaciones del turno integradas ── */}
                   <div style={{padding:"12px 14px",background:"rgba(52,211,153,0.03)",borderTop:"1px solid rgba(52,211,153,0.1)"}}>
                     <div style={{fontSize:11,fontWeight:600,color:"#34d399",marginBottom:10}}>📝 Observaciones del turno</div>
@@ -2556,11 +2771,21 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                         <span style={{fontSize:10,color:"#5a9a7a",background:"rgba(255,255,255,0.05)",padding:"1px 6px",borderRadius:10}}>{hechas}/{g.tareas.length}</span>
                       </div>
                       <span style={{color:"#4a7a5a",fontSize:11,transform:open?"rotate(90deg)":"rotate(0deg)",transition:"transform .2s",display:"inline-block"}}>▶</span>
+                    {/* Botón marcar grupo completo */}
+                    {puedeEditar&&g.tareas.some(t=>normalizarEstado(t.estado)!=="hecha")&&(
+                      <div style={{padding:"4px 12px",borderBottom:"1px solid rgba(255,255,255,0.04)",display:"flex",justifyContent:"flex-end"}}>
+                        <button
+                          onClick={()=>g.tareas.forEach(t=>normalizarEstado(t.estado)!=="hecha"&&onUpdateTarea(fechaVer,t.id,{estado:"hecha"}))}
+                          style={{fontSize:10,padding:"2px 10px",border:"1px solid rgba(34,197,94,0.3)",borderRadius:4,background:"rgba(34,197,94,0.08)",color:"#22c55e",cursor:"pointer"}}>
+                          ✅ Marcar todas hechas
+                        </button>
+                      </div>
+                    )}
                     </div>
                     {open&&(
                       <div>
                         {g.tareas.map((t,i)=>{
-                          const est=ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente;
+                          const est=ESTADOS_TAREA[normalizarEstado(t.estado)]||ESTADOS_TAREA.pendiente;
                           return (
                             <div key={t.id} style={{padding:"9px 12px",background:i%2===0?"transparent":"rgba(255,255,255,0.02)",borderTop:"1px solid rgba(255,255,255,0.04)"}}>
                               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:5}}>
@@ -2572,18 +2797,18 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                                 </div>
                                 <span style={{fontSize:10,fontWeight:600,color:est.color,background:`${est.color}12`,padding:"2px 7px",borderRadius:8,border:`1px solid ${est.color}25`,whiteSpace:"nowrap",flexShrink:0}}>{est.icon} {est.label}</span>
                               </div>
-                              {puedeCambiarEstado ? (
+                              {puedeEditar ? (
                                 <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                                   {Object.entries(ESTADOS_TAREA).map(([k,v])=>(
-                                    <button key={k} onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:k,notaWorker:k!=="no_pudo"?(t.notaWorker||""):""})}
+                                    <button key={k} onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:normalizarEstado(k),notaWorker:k!=="no_pudo"?(t.notaWorker||""):""})}
                                       style={{cursor:"pointer",border:`1px solid ${t.estado===k?v.color+"50":"rgba(255,255,255,0.08)"}`,borderRadius:8,padding:"3px 9px",fontSize:11,background:t.estado===k?`${v.color}12`:"transparent",color:t.estado===k?v.color:"#6aaa7a",fontFamily:"'Georgia',serif"}}>
                                       {v.icon} {v.label}
                                     </button>
                                   ))}
                                 </div>
                               ) : (
-                                <span style={{fontSize:11,fontWeight:600,color:(ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente).color}}>
-                                  {(ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente).icon} {(ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente).label}
+                                <span style={{fontSize:11,fontWeight:600,color:(ESTADOS_TAREA[normalizarEstado(t.estado)]||ESTADOS_TAREA.pendiente).color}}>
+                                  {(ESTADOS_TAREA[normalizarEstado(t.estado)]||ESTADOS_TAREA.pendiente).icon} {(ESTADOS_TAREA[normalizarEstado(t.estado)]||ESTADOS_TAREA.pendiente).label}
                                 </span>
                               )}
                               {t.estado==="no_pudo"&&(
@@ -2744,6 +2969,8 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
   const [nuevaTarea, setNuevaTarea] = React.useState({ zona:"", elemento:"", tarea:"", responsable:"", estado:"por_designar", notas:"" });
   const [filtroEstado, setFiltroEstado] = React.useState("todos");
   const [filtroZona, setFiltroZona] = React.useState("todas");
+  const [vistaSemanal, setVistaSemanal] = React.useState(false);
+  const [filtroTrabajador, setFiltroTrabajador] = React.useState("todos");
   const [aviso, setAviso] = React.useState(null);
 
   const esDomingo = (f) => new Date(f + "T12:00:00").getDay() === 0;
@@ -2778,7 +3005,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
       elems.forEach(e => {
         const zdatElem = zdat.elementos?.[e.id] || (zdat.elementosCustom||[]).find(x=>x.id===e.id);
         const frecs = zdatElem?.frecuencias || [];
-        if(frecs.length===0) return; // solo proponer si hay frecuencias definidas manualmente
+        if(frecs.length===0) return; // solo proponer si hay frecuencias — incluye Golf
         frecs.forEach(f => {
           const key = z.nombre+"_"+e.nombre+"_"+f.tarea;
           if(existentes.includes(key)) return;
@@ -2799,13 +3026,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     else if(vencidas.length>0) setAviso(`⚠️ ${vencidas.length} tarea(s) están vencidas según su frecuencia: ${vencidas.slice(0,3).join(" · ")}${vencidas.length>3?"...":""}`);
   };
 
-  const ESTADOS_TAREA = {
-    por_designar: { label:"Por designar", color:"#94a3b8", bg:"rgba(148,163,184,0.12)", icon:"⬜" },
-    pendiente:    { label:"Pendiente",    color:"#f59e0b", bg:"rgba(245,158,11,0.12)",  icon:"N1" },
-    en_curso:     { label:"En curso",     color:"#3b82f6", bg:"rgba(59,130,246,0.12)",  icon:"🔵" },
-    completada:   { label:"Completada",   color:"#22c55e", bg:"rgba(34,197,94,0.12)",   icon:"N0" },
-    cancelada:    { label:"Cancelada",    color:"#ef4444", bg:"rgba(239,68,68,0.12)",   icon:"🔴" },
-  };
+    const ESTADOS_TAREA = ESTADOS_TAREA_GLOBAL;
 
   const tareasHoy = getTareasDelDia(fecha);
   const filtradas = tareasHoy.filter(pdTask => {
@@ -2927,16 +3148,111 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
               </select>
               <select value={filtroZona} onChange={e=>setFiltroZona(e.target.value)} style={{...S.input,flex:"1 1 160px",maxWidth:220,fontSize:13}}>
                 <option value="todas">🔍 Filtrar: todas las zonas con tareas</option>
-                {zonasEnProg.filter(z=>z!=="Golf").map(z=><option key={z} value={z}>{z}</option>)}
-                {zonasEnProg.includes("Golf")&&<option value="Golf" disabled>⛳ Golf → programar en sección Golf</option>}
-              </select>
-              {(filtroEstado!=="todos"||filtroZona!=="todas")&&(
-                <button onClick={()=>{setFiltroEstado("todos");setFiltroZona("todas");}} style={{...S.btn,background:"transparent",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)",fontSize:12}}>✕ Limpiar</button>
+                {zonasEnProg.map(z=><option key={z} value={z}>{z==="Golf"?"⛳ "+z:z}</option>)}</select>
+              {(filtroEstado!=="todos"||filtroZona!=="todas"||filtroTrabajador!=="todos")&&(
+                <button onClick={()=>{setFiltroEstado("todos");setFiltroZona("todas");setFiltroTrabajador("todos");}} style={{...S.btn,background:"transparent",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)",fontSize:12}}>✕ Limpiar</button>
               )}
+              {/* Filtro por trabajador */}
+              <select value={filtroTrabajador} onChange={e=>setFiltroTrabajador(e.target.value)} style={{...S.input,fontSize:11,maxWidth:180}}>
+                <option value="todos">👷 Todos los trabajadores</option>
+                {[...new Set(Object.values(tareas||{}).flat().map(t=>t.responsable).filter(Boolean))].sort().map(r=>(
+                  <option key={r} value={r}>{r.split(" ")[0]} {r.split(" ")[1]||""}</option>
+                ))}
+              </select>
+              {/* Toggle vista semanal */}
+              <button
+                onClick={()=>setVistaSemanal(v=>!v)}
+                style={{...S.btn,fontSize:11,padding:"4px 12px",
+                  background:vistaSemanal?"rgba(96,165,250,0.2)":"rgba(255,255,255,0.04)",
+                  color:vistaSemanal?"#60a5fa":"#5a9a7a",
+                  border:`1px solid ${vistaSemanal?"rgba(96,165,250,0.4)":"rgba(255,255,255,0.1)"}`}}>
+                {vistaSemanal?"📅 Semana":"📆 Día"}
+              </button>
             </div>
           )}
 
-          {showAgregar && (
+          {/* ── VISTA SEMANAL ── */}
+          {vistaSemanal&&(()=>{
+            const hoyD = new Date(hoy+"T12:00:00");
+            const lunes = new Date(hoyD); lunes.setDate(hoyD.getDate()-((hoyD.getDay()+6)%7));
+            const dias7 = Array.from({length:7},(_,i)=>{
+              const d = new Date(lunes); d.setDate(lunes.getDate()+i);
+              return d.toISOString().slice(0,10);
+            });
+            const diasLabels = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
+            const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
+            // Obtener todos los trabajadores con tareas esta semana
+            const todosResp = [...new Set(dias7.flatMap(d=>(tareas[d]||[]).map(t=>t.responsable).filter(Boolean)))].sort();
+            // Filtrar trabajadores a mostrar
+            const respMostrar = filtroTrabajador==="todos" ? todosResp : [filtroTrabajador];
+            
+            return (
+              <div style={{overflowX:"auto",marginBottom:16}}>
+                <table style={{width:"100%",borderCollapse:"collapse",minWidth:700,fontSize:11}}>
+                  <thead>
+                    <tr style={{background:"rgba(96,165,250,0.08)"}}>
+                      <th style={{padding:"8px 10px",textAlign:"left",color:"#60a5fa",fontSize:10,textTransform:"uppercase",minWidth:120,borderRight:"1px solid rgba(255,255,255,0.06)"}}>Tarea</th>
+                      {dias7.map((d,i)=>{
+                        const esHoy = d===hoy;
+                        const fecha_d = new Date(d+"T12:00:00");
+                        const esDom = fecha_d.getDay()===0;
+                        return (
+                          <th key={d} style={{padding:"6px 8px",textAlign:"center",color:esHoy?"#fbbf24":esDom?"#5a7a5a":"#60a5fa",fontSize:10,fontWeight:esHoy?700:400,background:esHoy?"rgba(251,191,36,0.06)":"transparent",minWidth:80}}>
+                            {diasLabels[i]}<br/>
+                            <span style={{fontSize:9}}>{fecha_d.getDate()}/{fecha_d.getMonth()+1}</span>
+                          </th>
+                        );
+                      })}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {respMostrar.length===0?(
+                      <tr><td colSpan={8} style={{padding:20,textAlign:"center",color:"#4a7a5a"}}>Sin tareas esta semana</td></tr>
+                    ):respMostrar.map(resp=>{
+                      // Tareas únicas de este trabajador esta semana
+                      const tareasResp = dias7.flatMap(d=>(tareas[d]||[]).filter(t=>(t.responsable||"")===(resp||"")));
+                      const tareasUnicas = [...new Set(tareasResp.map(t=>t.tarea))];
+                      return tareasUnicas.map((nombreTarea,ti)=>{
+                        const isFirst = ti===0;
+                        return (
+                          <tr key={resp+nombreTarea} style={{borderTop:"1px solid rgba(255,255,255,0.04)",background:isFirst?"rgba(255,255,255,0.01)":"transparent"}}>
+                            <td style={{padding:"6px 10px",borderRight:"1px solid rgba(255,255,255,0.06)"}}>
+                              {isFirst&&<div style={{fontSize:10,color:"#fbbf24",fontWeight:700,marginBottom:2}}>{resp.split(" ")[0]} {resp.split(" ")[1]||""}</div>}
+                              <div style={{color:"#c0dac0",fontSize:11}}>{nombreTarea}</div>
+                            </td>
+                            {dias7.map(d=>{
+                              const tDia = (tareas[d]||[]).find(t=>t.responsable===resp&&t.tarea===nombreTarea);
+                              const est = tDia ? (ESTADOS_TAREA[normalizarEstado(tDia.estado)]||ESTADOS_TAREA.pendiente) : null;
+                              return (
+                                <td key={d} style={{padding:"4px 6px",textAlign:"center",background:d===hoy?"rgba(251,191,36,0.04)":"transparent"}}>
+                                  {tDia ? (
+                                    <span
+                                      title={`${est.label} · ${tDia.zona||""}`}
+                                      style={{display:"inline-block",padding:"2px 8px",borderRadius:10,fontSize:10,fontWeight:600,
+                                        background:est.bg,color:est.color,border:`1px solid ${est.color}30`,cursor:"pointer"}}
+                                      onClick={()=>{setFecha(d);setVistaSemanal(false);}}>
+                                      {est.icon}
+                                    </span>
+                                  ):(
+                                    <span style={{color:"rgba(255,255,255,0.1)",fontSize:14}}>·</span>
+                                  )}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      });
+                    })}
+                  </tbody>
+                </table>
+                <div style={{fontSize:10,color:"#4a7a5a",marginTop:8}}>
+                  Clic en el estado para ir al día · Semana {new Date(lunes+"T12:00:00").toLocaleDateString("es-CL",{day:"2-digit",month:"short"})} – {new Date(dias7[6]+"T12:00:00").toLocaleDateString("es-CL",{day:"2-digit",month:"short"})}
+                </div>
+              </div>
+            );
+          })()}
+
+          {!vistaSemanal&&showAgregar && (
             <div style={{...S.card,padding:18,marginBottom:16}} className="ein">
               <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:14}}>Nueva Tarea — {fecha}</div>
               {(()=>{
@@ -3046,7 +3362,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
                 {tz.map(t=>{
-                  const est=ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.por_designar;
+                  const est=ESTADOS_TAREA[normalizarEstado(t.estado)]||ESTADOS_TAREA.por_designar;
                   return (
                     <div key={t.id} style={{...S.card,padding:"12px 14px",borderLeft:`3px solid ${est.color}`,opacity:t.estado==="cancelada"?0.5:1}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",gap:10,flexWrap:"wrap"}}>
@@ -4192,6 +4508,17 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
                   <input style={{...inputSt,fontSize:14,fontWeight:600}} value={f.tarea} onChange={e=>updateFila(idx,"tarea",e.target.value)} placeholder="Ej: Poda de limpieza, Riego, Corte de césped..."/>
                 </div>
                 <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,flexShrink:0}}>
+                  {/* Última vez + días transcurridos */}
+                  {f.ultimaVez&&(()=>{
+                    const hoyUlt=new Date();hoyUlt.setHours(12,0,0,0);
+                    const diasDesde=Math.round((hoyUlt-new Date(f.ultimaVez+"T12:00:00"))/(24*60*60*1000));
+                    const colD=diasDesde===0?"#22c55e":diasDesde<=7?"#f59e0b":"#94a3b8";
+                    return(<div style={{textAlign:"center",marginBottom:4}}>
+                      <div style={{fontSize:9,color:"#5a9a7a"}}>Última vez</div>
+                      <div style={{fontSize:11,fontWeight:700,color:colD}}>{diasDesde===0?"Hoy":`hace ${diasDesde}d`}</div>
+                      <div style={{fontSize:9,color:"#4a7a5a"}}>{new Date(f.ultimaVez+"T12:00:00").toLocaleDateString("es-CL",{day:"2-digit",month:"short",year:"2-digit"})}</div>
+                    </div>);
+                  })()}
                   {esSinFrecuencia(f) ? (
                     <span style={{fontSize:11,color:"#c084fc",background:"rgba(192,132,252,0.12)",padding:"4px 10px",borderRadius:8,border:"1px solid rgba(192,132,252,0.25)",whiteSpace:"nowrap"}}>
                       {f[estActual]==="unavez"?"1 sola vez":"Según necesidad"}
@@ -9281,7 +9608,7 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
 }
 
 
-function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJefa }) {
+function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJefa, configSemanal={} }) {
 
   // ── Definición de tareas periódicas con última fecha y frecuencia ──
   // Frecuencias dinámicas: invierno (jun-ago) vs verano (dic-feb) vs transición
@@ -9397,8 +9724,8 @@ function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJe
       Object.entries(tareasProg||{}).forEach(([fecha, tareas]) => {
         if(!Array.isArray(tareas)) return;
         const coincide = tareas.some(tr =>
-          tr.estado === "hecha" &&
-          tr.zona === "Golf" &&
+          normalizarEstado(tr.estado) === "hecha" &&
+          (tr.zona === "Golf" || (tr.zona||"").includes("Golf")) &&
           (tr.tarea||"").toLowerCase().includes(
             t.nombre.toLowerCase().split(" ").slice(0,3).join(" ").toLowerCase()
           )
@@ -9497,17 +9824,14 @@ function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJe
       subZona: tarea.zona.replace("Golf/",""),
       elemento: tarea.subzona,
       tarea: `⛳ ${tarea.nombre}${alturaCorteConfirm?` — HOC ${alturaCorteConfirm}mm`:""}`,
-      responsable: tarea.resp,
+      responsable: (tarea.nombre&&getResponsablePorTipo(tarea.nombre,configSemanal)) || tarea.resp || bhaluNombre,
       estado: "pendiente",
       notas: notasOverride[tarea.id] ?? tarea.notas ?? "",
       auto: false,
       origen: "programacion_golf",
       ...(esCorte && alturaCorteConfirm ? {alturaCorte: alturaCorteConfirm} : {}),
     };
-    setTareasProg(p => ({
-      ...p,
-      [fechaStr]: [...(p[fechaStr]||[]), nuevaTarea]
-    }));
+    setTareasProg(p => {const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);return{...p,[fechaStr]:[...normArr(p[fechaStr]||[]),nuevaTarea]};});
     // Actualizar la última fecha en el estado local
     setUltimasFechas(p => ({...p, [tarea.id]: fechaStr}));
     setConfirmando(null);
@@ -9639,9 +9963,9 @@ function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJe
                     style={{...S.input,fontSize:11,padding:"2px 6px",width:130}}/>
                   <button onClick={()=>{
                     const golfFechaV = document.getElementById(`fecha_${t.id}`)?.value;
-                    if(v) {
+                    if(golfFechaV) {
                       // Guardar como override manual (persiste sobre la detección automática)
-                      setFechasOverride(p=>({...p,[t.id]:v}));
+                      setFechasOverride(p=>({...p,[t.id]:golfFechaV}));
                     }
                     setEditandoFecha(null);
                   }} style={{cursor:"pointer",border:"none",borderRadius:6,padding:"2px 8px",background:"#3d7a52",color:"#fff",fontSize:11}}>✓</button>
@@ -9672,7 +9996,7 @@ function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJe
                 <div style={{display:"flex",flexDirection:"column",gap:4}}>
                   <button onClick={()=>{
                     const golfNotaV=document.getElementById(`nota_${t.id}`)?.value;
-                    setNotasOverride(p=>({...p,[t.id]:v}));
+                    setNotasOverride(p=>({...p,[t.id]:golfNotaV}));
                     setEditandoNota(null);
                   }} style={{cursor:"pointer",border:"none",borderRadius:6,padding:"4px 8px",background:"#3d7a52",color:"#fff",fontSize:11}}>✓</button>
                   <button onClick={()=>setEditandoNota(null)}
@@ -9705,7 +10029,7 @@ function ProgramacionGolf({ S, tareasProg, setTareasProg, hoy, bhaluNombre, esJe
               {confirmando.tarea.nombre}
             </div>
             <div style={{fontSize:12,color:"#5a9a7a",marginBottom:16}}>
-              {confirmando.tarea.zona} · Resp: {confirmando.tarea.resp}
+              {confirmando.tarea.zona} · Resp: {(confirmando.tarea.nombre&&getResponsablePorTipo(confirmando.tarea.nombre,configSemanal))||confirmando.tarea.resp}
             </div>
             <label style={{fontSize:12,color:"#6aaa7a",display:"block",marginBottom:6}}>
               Fecha de programación:
@@ -9790,7 +10114,7 @@ function TareasGolfPanel({ tareasGolfHoy, hoy, esJefa, setTareasProg, tareasProg
   });
 
   const colorEstado = {pendiente:"#f59e0b",haciendose:"#60a5fa",hecha:"#22c55e",no_pudo:"#ef4444",por_designar:"#6b7280"};
-  const iconoEstado = {pendiente:"○",haciendose:"◑",hecha:"✅",no_pudo:"✗",por_designar:"–"};
+  const iconoEstado = Object.fromEntries(Object.entries(ESTADOS_TAREA_GLOBAL).map(([k,v])=>[k,v.icon]));
 
   const toggle = (key) => setAbiertos(p => ({...p,[key]:!p[key]}));
 
@@ -9800,7 +10124,7 @@ function TareasGolfPanel({ tareasGolfHoy, hoy, esJefa, setTareasProg, tareasProg
         <div style={{fontSize:11,fontWeight:600,color:"#34d399"}}>
           Tareas Golf hoy
           <span style={{marginLeft:8,fontSize:10,color:"#5a9a7a",fontWeight:400}}>
-            {tareasGolfHoy.filter(t=>t.estado==="hecha").length}/{tareasGolfHoy.length} hechas
+            {tareasGolfHoy.filter(t=>normalizarEstado(t.estado)==="hecha").length}/{tareasGolfHoy.length} hechas
           </span>
         </div>
         {esJefa&&tareasGolfHoy.some(t=>t.metodoLimpieza)&&(
@@ -9822,7 +10146,7 @@ function TareasGolfPanel({ tareasGolfHoy, hoy, esJefa, setTareasProg, tareasProg
       </div>
       <div style={{display:"flex",flexDirection:"column",gap:3}}>
         {gruposOrdenados.map(([tipo, tareas]) => {
-          const hechas = tareas.filter(t=>t.estado==="hecha").length;
+          const hechas = tareas.filter(t=>normalizarEstado(t.estado)==="hecha").length;
           const total = tareas.length;
           const pct = Math.round(hechas/total*100);
           const col = pct===100?"#22c55e":pct>0?"#60a5fa":"#f59e0b";
@@ -9868,7 +10192,7 @@ function TareasGolfPanel({ tareasGolfHoy, hoy, esJefa, setTareasProg, tareasProg
 }
 
 
-function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito, onCierreSectorial, onNuevaAlerta }) {
+function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito, onCierreSectorial, onNuevaAlerta, configSemanal={} }) {
   const GOLF_ZONA_ID = 31; // ID macrozona Golf
   const sincronizarMacrozona = (tipo, detalle) => {
     if(!updateZona) return;
@@ -10292,7 +10616,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
         {(()=>{
           // Tabs según rol: trabajador solo ve lo que le corresponde
-          const todosTabs = [["panel","📊 Panel"],["greens","⛳ Greens"],["tees","🎯 Tees"],["bunkers","🏖️ Búnkers"],["fairways","🌾 Fairways"],["zonas","🌿 Zonas"],["arboles","🌳 Árboles"],["mediciones","📏 Alturas"],["humedad","💧 Humedad"],["eventos","🏆 Eventos"],["fitosanitario","⚗ Fitosanitario"]];
+          const todosTabs = [["panel","📊 Panel"],["greens","⛳ Greens"],["tees","🎯 Tees"],["bunkers","🏖️ Búnkers"],["fairways","🌾 Fairways"],["zonas","🌿 Zonas"],["arboles","🌳 Árboles"],["mediciones","📏 Alturas"],["humedad","💧 Humedad"],["eventos","🏆 Eventos"],["fitosanitario","⚗ Fitosanitario"],["programacion_golf","📅 Semana Golf"]];
           const tabsWorker = [["mediciones","📏 Alturas"],["humedad","💧 Humedad"]];
           // Agregar Programación solo para jefa/supervisor
           const todosTabs2 = [...todosTabs, ["programacion_golf","📅 Programación"]];
@@ -11465,27 +11789,104 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       )}
 
             {/* ── EVENTOS / TORNEOS ── */}
-      {subTab==="programacion_golf"&&rolLogueado!=="trabajador"&&hoy&&(
-        <div>
-          {/* Banner de migración */}
-          <div style={{background:"rgba(96,165,250,0.08)",border:"1px solid rgba(96,165,250,0.25)",borderRadius:12,padding:"14px 18px",marginBottom:16,display:"flex",gap:12,alignItems:"flex-start"}}>
-            <span style={{fontSize:22}}>ℹ️</span>
-            <div>
-              <div style={{fontSize:14,fontWeight:700,color:"#60a5fa",marginBottom:4}}>Las frecuencias de Golf se gestionan desde Programación</div>
-              <div style={{fontSize:12,color:"#5a9a9a",lineHeight:1.6}}>
-                Ve a <strong>Programa → 🔄 Frecuencias → Golf</strong> para ver y editar las frecuencias de cada Green, Fairway, Antegreen y demás zonas.<br/>
-                El botón <strong>✨ Proponer del día</strong> en Programación genera automáticamente las tareas vencidas según esas frecuencias.
-              </div>
-            </div>
+            {subTab==="programacion_golf"&&rolLogueado!=="trabajador"&&hoy&&(
+        <div className="ein">
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,color:"#fbbf24",marginBottom:14}}>
+            📅 Semana Golf — {new Date(hoy+"T12:00:00").toLocaleDateString("es-CL",{weekday:"long",day:"numeric",month:"long"})}
           </div>
-          <ProgramacionGolf
-            S={S}
-            tareasProg={tareasProg}
-            setTareasProg={setTareasProg}
-            hoy={hoy}
-            bhaluNombre={BHALÚ}
-            esJefa={esJefa}
-        />
+          {(()=>{
+            // Semana actual
+            const hoyD = new Date(hoy+"T12:00:00");
+            const lunes = new Date(hoyD); lunes.setDate(hoyD.getDate()-((hoyD.getDay()+6)%7));
+            const dias7 = Array.from({length:7},(_,i)=>{ const d=new Date(lunes); d.setDate(lunes.getDate()+i); return d.toISOString().slice(0,10); });
+            const diasLabels = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
+            // Tareas Golf de la semana
+            const tareasGolfSem = dias7.flatMap(d=>(Array.isArray(tareasProg[d])?tareasProg[d]:Object.values(tareasProg[d]||{})).filter(t=>t&&(t.zona==="Golf"||(t.zona||"").includes("Golf"))).map(t=>({...t,fechaDia:d})));
+            // Agrupar por responsable
+            const porResp = {};
+            tareasGolfSem.forEach(t=>{ const r=t.responsable||"Sin asignar"; if(!porResp[r]) porResp[r]=[]; porResp[r].push(t); });
+            
+            if(tareasGolfSem.length===0) return (
+              <div style={{...S.card,padding:32,textAlign:"center",color:"#4a7a5a"}}>
+                <div style={{fontSize:32,marginBottom:8}}>📅</div>
+                <div style={{fontSize:14}}>Sin tareas Golf programadas esta semana</div>
+                <div style={{fontSize:12,color:"#3a6a4a",marginTop:6}}>Ve a <b>Programa → 📆 Programar</b> para agregar tareas</div>
+              </div>
+            );
+
+            return (
+              <div>
+                {/* KPIs semana */}
+                <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+                  {[
+                    {label:"Total",val:tareasGolfSem.length,color:"#60a5fa"},
+                    {label:"Hechas",val:tareasGolfSem.filter(t=>normalizarEstado(t.estado)==="hecha").length,color:"#22c55e"},
+                    {label:"Pendientes",val:tareasGolfSem.filter(t=>["pendiente","por_designar"].includes(normalizarEstado(t.estado))).length,color:"#f59e0b"},
+                    {label:"Sin asignar",val:tareasGolfSem.filter(t=>!t.responsable).length,color:"#94a3b8"},
+                  ].map(k=>(
+                    <div key={k.label} style={{flex:"1 1 80px",background:`${k.color}10`,border:`1px solid ${k.color}30`,borderRadius:10,padding:"10px 14px",textAlign:"center"}}>
+                      <div style={{fontSize:22,fontWeight:700,color:k.color}}>{k.val}</div>
+                      <div style={{fontSize:10,color:"#5a9a7a"}}>{k.label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Tabla semanal por responsable */}
+                <div style={{overflowX:"auto"}}>
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:600}}>
+                    <thead>
+                      <tr style={{background:"rgba(251,191,36,0.08)"}}>
+                        <th style={{padding:"7px 10px",textAlign:"left",color:"#fbbf24",fontSize:10,textTransform:"uppercase",minWidth:160,borderRight:"1px solid rgba(255,255,255,0.06)"}}>Tarea</th>
+                        {dias7.map((d,i)=>{
+                          const esH=d===hoy;
+                          const fd=new Date(d+"T12:00:00");
+                          return (
+                            <th key={d} style={{padding:"5px 6px",textAlign:"center",color:esH?"#fbbf24":"#5a9a7a",fontSize:10,fontWeight:esH?700:400,background:esH?"rgba(251,191,36,0.06)":"transparent",minWidth:60}}>
+                              {diasLabels[i]}<br/><span style={{fontSize:9}}>{fd.getDate()}/{fd.getMonth()+1}</span>
+                            </th>
+                          );
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(porResp).map(([resp,tareas])=>{
+                        const tareasUnicas=[...new Set(tareas.map(t=>t.tarea))];
+                        return tareasUnicas.map((nombre,ti)=>{
+                          const isFirst=ti===0;
+                          return (
+                            <tr key={resp+nombre} style={{borderTop:"1px solid rgba(255,255,255,0.04)"}}>
+                              <td style={{padding:"5px 10px",borderRight:"1px solid rgba(255,255,255,0.06)"}}>
+                                {isFirst&&<div style={{fontSize:10,color:"#fbbf24",fontWeight:700,marginBottom:1}}>👷 {resp.split(" ")[0]} {resp.split(" ")[1]||""}</div>}
+                                <div style={{color:"#c0dac0",fontSize:11}}>{nombre}</div>
+                              </td>
+                              {dias7.map(d=>{
+                                const tDia=tareas.find(t=>t.fechaDia===d&&t.tarea===nombre);
+                                const est=tDia?(ESTADOS_TAREA_GLOBAL[normalizarEstado(tDia.estado)]||ESTADOS_TAREA_GLOBAL.pendiente):null;
+                                return (
+                                  <td key={d} style={{padding:"4px 5px",textAlign:"center",background:d===hoy?"rgba(251,191,36,0.04)":"transparent"}}>
+                                    {tDia?(
+                                      <span title={est.label} style={{display:"inline-block",padding:"2px 7px",borderRadius:8,fontSize:10,fontWeight:600,background:est.bg,color:est.color,border:`1px solid ${est.color}30`}}>
+                                        {est.icon}
+                                      </span>
+                                    ):(
+                                      <span style={{color:"rgba(255,255,255,0.08)"}}>·</span>
+                                    )}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          );
+                        });
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{fontSize:10,color:"#4a7a5a",marginTop:8}}>
+                  Edita en <b>Programa → 📆 Programar</b> · Para cortar greens usa <b>Golf → 📏 Alturas</b>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -13486,7 +13887,16 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
               </button>
             ))}
           </div>
-          {alertaForm.zonas.length>0&&<div style={{fontSize:11,color:"#fca5a5",marginTop:4}}>{alertaForm.zonas.join(", ")}</div>}
+          {alertaForm.zonas.length>0&&(
+            <div style={{fontSize:11,marginTop:4}}>
+              <span style={{color:"#fca5a5"}}>{alertaForm.zonas.join(", ")}</span>
+              {alertaForm.zonas.some(z=>z==="Golf"||(z||"").toLowerCase().includes("golf"))&&(
+                <span style={{marginLeft:8,fontSize:10,color:"#fbbf24",background:"rgba(251,191,36,0.1)",padding:"2px 8px",borderRadius:8,border:"1px solid rgba(251,191,36,0.2)"}}>
+                  ⛳ Alerta Golf — se generarán avisos institucionales automáticamente
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Datos básicos */}
@@ -13559,9 +13969,8 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
 function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotificaciones, marcarTodasLeidas, notifNoLeidas, MACROZONAS_BASE, personal, tareasProg, setTareasProg, crearNotificacion, esJefa, autoOpen, onAutoOpenDone }) {
   const [tabAlerta, setTabAlerta] = React.useState("incidencias");
   const [showNuevaAlerta, setShowNuevaAlerta] = React.useState(false);
-  React.useEffect(()=>{ if(autoOpen){ setShowNuevaAlerta(true); setTabAlerta("incidencias"); onAutoOpenDone&&onAutoOpenDone(); } },[autoOpen]);
   React.useEffect(()=>{
-    if(autoOpen){ setShowNuevaAlerta(true); setTabAlerta("incidencias"); onAutoOpenDone&&onAutoOpenDone(); }
+    if(autoOpen){ setShowNuevaAlerta(true); setTabAlerta("incidencias"); onAutoOpenDone?.(); }
   },[autoOpen]);
   const [alertaSelId, setAlertaSelId] = React.useState(null);
   // Viento
@@ -13632,9 +14041,48 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
     const nuevaId = Date.now()+Math.random();
     const nuevaAlerta = limpiarUndef({id:nuevaId,estado:"activa",tipo:alertaForm.tipo,tipoLabel:tipoObj.label,tipoIcon:tipoObj.icon,zonas:alertaForm.zonas,origen:alertaForm.origen,urgencia:alertaForm.urgencia,descripcion:alertaForm.descripcion,responsable:alertaForm.responsable,fecha:alertaForm.fecha,hora:alertaForm.hora,fechaCreacion:new Date().toISOString(),tareas:tareasEditables.filter(t=>t.incluir).map(t=>({texto:t.texto,responsable:t.responsable,estado:"pendiente"})),historial:[{accion:"Alerta creada",fecha:alertaForm.fecha,hora:alertaForm.hora,responsable:alertaForm.responsable}]});
     setIncidencias([nuevaAlerta,...incArr]);
-    const tareaCierre = limpiarUndef({id:Date.now()+Math.random(),fecha:alertaForm.fecha,zona:alertaForm.zonas.join(", "),elemento:"",tarea:`🚫 CIERRE: ${alertaForm.zonas.join(", ")} — ${tipoObj.icon} ${tipoObj.label}`,responsable:alertaForm.responsable||"",estado:"pendiente",obs:alertaForm.descripcion,tipoEvento:"cierre_sectorial"});
-    const tareasGen = tareasEditables.filter(t=>t.incluir).map(t=>limpiarUndef({id:Date.now()+Math.random(),fecha:alertaForm.fecha,zona:alertaForm.zonas.join(", "),elemento:"",tarea:t.texto,responsable:t.responsable||alertaForm.responsable||"",estado:t.responsable?"pendiente":"por_designar",obs:`Generada por alerta: ${alertaForm.descripcion}`}));
-    setTareasProg(prev=>{const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);return {...prev,[alertaForm.fecha]:[tareaCierre,...tareasGen,...normArr(prev[alertaForm.fecha]||[])].map(limpiarUndef)};});
+    // Determinar si la alerta es de Golf
+    const esGolf = alertaForm.zonas.some(z=>z==="Golf"||(z||"").toLowerCase().includes("golf")) ||
+                   alertaForm.tipo==="golf_incid";
+    const zonaLabel = alertaForm.zonas.join(", ");
+
+    const tareaCierre = limpiarUndef({
+      id:Date.now()+Math.random(), fecha:alertaForm.fecha,
+      zona: esGolf ? "Golf" : zonaLabel, elemento:"",
+      tarea:`🚫 CIERRE: ${zonaLabel} — ${tipoObj.icon} ${tipoObj.label}`,
+      responsable:alertaForm.responsable||"", estado:"pendiente",
+      obs:alertaForm.descripcion, tipoEvento:"cierre_sectorial",
+      origenAlerta: nuevaId,
+    });
+
+    const tareasGen = tareasEditables.filter(t=>t.incluir).map(t=>limpiarUndef({
+      id:Date.now()+Math.random(), fecha:alertaForm.fecha,
+      zona: esGolf ? "Golf" : zonaLabel, elemento:"",
+      tarea:t.texto, responsable:t.responsable||alertaForm.responsable||"",
+      estado:t.responsable?"pendiente":"por_designar",
+      obs:`Generada por alerta: ${alertaForm.descripcion}`,
+      origenAlerta: nuevaId,
+    }));
+
+    // Si es Golf: agregar tareas institucionales de notificación
+    const tareasInst = esGolf ? [
+      {texto:"🏌️ Avisar a socios Rama Golf", resp:""},
+      {texto:"⚽ Informar a Gerencia Deportes", resp:""},
+      {texto:"⚙️ Informar a GO Marco Romero", resp:""},
+      {texto:"🏢 Informar a GG Javier Viñales", resp:""},
+    ].map((t,i)=>limpiarUndef({
+      id:Date.now()+Math.random()+i+100, fecha:alertaForm.fecha,
+      zona:"Administración", elemento:"",
+      tarea:t.texto+` — ${tipoObj.icon} ${alertaForm.descripcion.slice(0,60)}`,
+      responsable:"", estado:"pendiente",
+      obs:`Notificación institucional — Alerta Golf ${alertaForm.fecha}`,
+      origenAlerta: nuevaId,
+    })) : [];
+
+    setTareasProg(prev=>{
+      const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+      return {...prev,[alertaForm.fecha]:[tareaCierre,...tareasGen,...tareasInst,...normArr(prev[alertaForm.fecha]||[])].map(limpiarUndef)};
+    });
     crearNotificacion?.("alerta",{titulo:`${tipoObj.icon} Nueva alerta: ${alertaForm.zonas.join(", ")}`,mensaje:alertaForm.descripcion,fecha:alertaForm.fecha});
     setAlertaForm(emptyAlerta);
     setShowNuevaAlerta(false);
@@ -13880,6 +14328,24 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
 
 
 // ── HOOK: Push Notifications ──────────────────────────────────────────────────
+// ─── ESTADOS DE TAREA (global, usado en todos los componentes) ────────────────
+const ESTADOS_TAREA_GLOBAL = {
+  por_designar: { label:"Por designar", labelWorker:"Por designar", color:"#94a3b8", bg:"rgba(148,163,184,0.12)", icon:"–" },
+  pendiente:    { label:"Pendiente",    labelWorker:"Pendiente",    color:"#f59e0b", bg:"rgba(245,158,11,0.12)",  icon:"○" },
+  en_curso:     { label:"En curso",     labelWorker:"Haciéndose",   color:"#3b82f6", bg:"rgba(59,130,246,0.12)", icon:"◑" },
+  hecha:        { label:"Hecha ✓",      labelWorker:"Hecha ✓",      color:"#22c55e", bg:"rgba(34,197,94,0.12)",  icon:"✅" },
+  no_pudo:      { label:"No se pudo",   labelWorker:"No se pudo",   color:"#ef4444", bg:"rgba(239,68,68,0.12)",  icon:"✗" },
+};
+
+// Aliases para compatibilidad con datos existentes
+const ALIAS_ESTADO = {
+  completada: "hecha",
+  haciendose: "en_curso",
+  cancelada: "no_pudo",
+};
+const normalizarEstado = (e) => ALIAS_ESTADO[e] || e || "pendiente";
+
+
 const VAPID_KEY = "BFD3pFfN6_jGsm4bZsaU3jP7gdTNzxVJFinE6nDiCSUEhEZMmDJpDnStLJk-j25E-vDqDUTqsyEFbaBrKRzrwO0"; // ← pegar aquí la clave de Firebase Console
 
 function usePushNotifications(esJefa) {
@@ -14267,6 +14733,7 @@ export default function App() {
   const rolLogueado = fbRol;
   const esJefa = fbRol === "jefa";
   const { pushActivo, activarPush } = usePushNotifications(esJefa);
+  useInitGolfFrecs(data, setData); // inicializa frecuencias Golf en Firebase
   const esSupervisor = fbRol === "supervisor";
   const esTrabajador = fbRol === "trabajador";
 
@@ -14716,7 +15183,64 @@ export default function App() {
                   const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
                   setTareasProg(prev=>{
                     const lista=normArr(prev[fecha]);
-                    const actualizadas=lista.map(t=>String(t.id)===String(tid)?{...t,...patch}:t);
+                    const actualizadas=lista.map(t=>{
+                      if(String(t.id)!==String(tid)) return t;
+                      const tActualizada = {...t,...patch};
+
+                      // ── AUTO: si el corte Golf queda hecho con alturaCorteReal ──
+                      // Se dispara cuando: (a) se marca hecha y ya tenía altura, o
+                      //                   (b) se guarda altura y ya estaba hecha
+                      const esCorteGolf = (tActualizada.zona==="Golf"||(tActualizada.zona||"").includes("Golf")) &&
+                                          (tActualizada.tarea||"").toLowerCase().includes("corte");
+                      const estadoHecho = normalizarEstado(tActualizada.estado)==="hecha";
+                      const altReal = tActualizada.alturaCorteReal ? Number(tActualizada.alturaCorteReal) : null;
+                      // Solo crear medición si este patch es el que completa el par hecha+altura
+                      const esPatchEstado = patch.estado && normalizarEstado(patch.estado)==="hecha";
+                      const esPatchAltura = patch.alturaCorteReal && !!patch.alturaCorteReal;
+                      const debeCrearMedicion = esCorteGolf && estadoHecho && altReal &&
+                        (esPatchEstado || esPatchAltura); // solo cuando cambia algo relevante
+
+                      if(debeCrearMedicion) {
+                        // 1. Registrar medición de altura en golfData
+                        const medId = Date.now()+Math.random();
+                        // Determinar qué greens afecta — revisar elemento, subZona y nombre de tarea
+                        const zonaGolf = (tActualizada.elemento||tActualizada.subZona||"").toLowerCase();
+                        const tareaGolfNombre = (tActualizada.tarea||"").toLowerCase();
+                        const alturas = {};
+                        const esCorteGeneral = zonaGolf.includes("todos")||tareaGolfNombre.includes("todos")||
+                                               tareaGolfNombre.includes("greens + vivero")||zonaGolf==="";
+                        if(esCorteGeneral) {
+                          // Corte de todos los greens y vivero
+                          ["g1","g2","g3","g4","g5","g6","g7","g8","g9","vivero"].forEach(z=>{ alturas[z]=altReal; });
+                        } else if(zonaGolf.includes("green")||tareaGolfNombre.includes("green")) {
+                          // Buscar número de green en elemento o tarea
+                          const numStr = (zonaGolf+tareaGolfNombre).match(/green\s*(?:0?(\d+))/)?.[1];
+                          if(numStr) alturas[`g${Number(numStr)}`] = altReal;
+                        } else if(zonaGolf.includes("vivero")||tareaGolfNombre.includes("vivero")) {
+                          alturas.vivero = altReal;
+                        }
+
+                        if(Object.keys(alturas).length > 0) {
+                          setGolfData(prev=>{
+                            const mediciones = Array.isArray(prev?.mediciones)?prev.mediciones:
+                              (prev?.mediciones&&typeof prev.mediciones==="object"?Object.values(prev.mediciones):[]);
+                            const nueva = limpiarUndef({
+                              id: medId, fecha, tipo:"corte",
+                              responsable: tActualizada.responsable||"",
+                              alturas, alturaCorte: altReal,
+                              obs:`Corte registrado — HOC real: ${altReal}mm`,
+                            });
+                            return {...prev, mediciones:[...mediciones, nueva]};
+                          });
+                          crearNotificacion("medicion",{
+                            titulo:`✂️ Corte Golf registrado — ${altReal}mm`,
+                            mensaje:`${fecha} · ${tActualizada.responsable||""}`,
+                            fecha,
+                          });
+                        }
+                      }
+                      return tActualizada;
+                    });
                     fbUpdate(ref(db,`${ROOT}/prog`),{[fecha]:actualizadas.map(limpiarUndef)}).catch(e=>console.error(e));
                     return {...prev,[fecha]:actualizadas};
                   });
@@ -15732,7 +16256,7 @@ export default function App() {
 
         {/* GOLF */}
         {vista==="golf"&&(
-          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial} setVista={setVista} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} onCierreSectorial={()=>setShowCierreSectorial(true)} onNuevaAlerta={()=>{setAutoOpenAlerta(true);setVista("notificaciones");}}
+          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial} setVista={setVista} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} onCierreSectorial={()=>setShowCierreSectorial(true)} onNuevaAlerta={()=>{setAutoOpenAlerta(true);setVista("notificaciones");}} configSemanal={configSemanal}
             crearNotificacion={crearNotificacion}
             initialSubTab={golfInitTab}
             onRegistroGuardado={(tipo)=>{
