@@ -5093,7 +5093,7 @@ const INCIDENCIAS_INICIAL = [];
 function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, tareasProg, setTareasProg, incidenciasFito, setIncidenciasFito, crearNotificacion, zonasFito }) {
   const hoy = new Date();
   const mesActual = hoy.getMonth() + 1;
-  const [subTab, setSubTab] = React.useState("alerta");
+  const [subTab, setSubTab] = React.useState("historial");
   const [showForm, setShowForm] = React.useState(false);
   const [form, setForm] = React.useState({
     fecha: hoy.toISOString().slice(0,10),
@@ -5240,7 +5240,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
   return (
     <div className="ein">
       <div style={{marginBottom:22}}>
-        <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:24,fontWeight:900,marginBottom:4}}>🧪 Programa de Fungicidas</h1>
+        <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:24,fontWeight:900,marginBottom:4}}>⚗ Programa Fitosanitario — Golf</h1>
         <p style={{color:"#6aaa7a",fontSize:14}}>Temporada 2026–2027 · Áreas Verdes Estadio Español</p>
       </div>
 
@@ -6315,6 +6315,7 @@ function ActividadDelDia({ zonas, MACROZONAS_BASE, S, EC, tareasDelDia }) {
 
       {/* ── TAB FITOSANITARIO ── */}
       {subTab==="fitosanitario"&&rolLogueado!=="trabajador"&&(
+        <ErrorBoundary>
         <PanelFungicidas
           S={S}
           aplicaciones={aplicaciones}
@@ -6328,6 +6329,7 @@ function ActividadDelDia({ zonas, MACROZONAS_BASE, S, EC, tareasDelDia }) {
           crearNotificacion={crearNotificacion}
           zonasFito={["Golf/Greens","Golf/Tees","Golf/Fairways","Golf/Búnkers","Golf/Vivero"]}
         />
+        </ErrorBoundary>
       )}
     </div>
   );
@@ -10140,7 +10142,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
         {(()=>{
           // Tabs según rol: trabajador solo ve lo que le corresponde
-          const todosTabs = [["panel","📊 Panel"],["greens","⛳ Greens"],["tees","🎯 Tees"],["bunkers","🏖️ Búnkers"],["fairways","🌾 Fairways"],["zonas","🌿 Zonas"],["arboles","🌳 Árboles"],["mediciones","📏 Alturas"],["humedad","💧 Humedad"],["eventos","🏆 Eventos"],["fitosanitario","🧪 Fitosanitario"]];
+          const todosTabs = [["panel","📊 Panel"],["greens","⛳ Greens"],["tees","🎯 Tees"],["bunkers","🏖️ Búnkers"],["fairways","🌾 Fairways"],["zonas","🌿 Zonas"],["arboles","🌳 Árboles"],["mediciones","📏 Alturas"],["humedad","💧 Humedad"],["eventos","🏆 Eventos"],["fitosanitario","⚗ Fitosanitario"]];
           const tabsWorker = [["mediciones","📏 Alturas"],["humedad","💧 Humedad"]];
           // Agregar Programación solo para jefa/supervisor
           const todosTabs2 = [...todosTabs, ["programacion_golf","📅 Programación"]];
