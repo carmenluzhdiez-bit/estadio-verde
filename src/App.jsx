@@ -2320,45 +2320,12 @@ const getResponsablePorTipo = (tarea, configSemanal) => {
 
 // ─── TAREAS DIARIAS GOLF (rutinas que Bhalú hace todos los días) ──────────────
 const TAREAS_DIARIAS_GOLF = [
-  {
-    id: "tdg_limpieza_greens",
-    tarea: "Limpieza de rines/hojas",
-    categoria: "limpieza",
-    icon: "🧹",
-    subzonas: [
-      "Green 01","Green 02","Green 03","Green 04","Green 05",
-      "Green 06","Green 07","Green 08","Green 09","Vivero"
-    ],
-    responsable: "Osmar Bhalú Armijo Zúñiga",
-    obs: "Barrer hojas, ramas, restos de corte. Revisar estado general del green."
-  },
-  {
-    id: "tdg_limpieza_tees",
-    tarea: "Limpieza de tees",
-    categoria: "limpieza",
-    icon: "🧹",
-    subzonas: ["Tee 01","Tee 02","Tee 03","Tee 04","Tee 05","Tee 06","Tee 07","Tee 08","Tee 09"],
-    responsable: "Osmar Bhalú Armijo Zúñiga",
-    obs: "Limpiar superficies, retirar residuos, revisar divisores."
-  },
-  {
-    id: "tdg_bandera_hoyo",
-    tarea: "Rotación de banderas y hoyos",
-    categoria: "revision",
-    icon: "🚩",
-    subzonas: ["Todos los greens"],
-    responsable: "Osmar Bhalú Armijo Zúñiga",
-    obs: "Rotar posición del hoyo según pauta semanal."
-  },
-  {
-    id: "tdg_revision_general",
-    tarea: "Revisión estado general cancha",
-    categoria: "revision",
-    icon: "🔍",
-    subzonas: ["Cancha Golf completa"],
-    responsable: "Osmar Bhalú Armijo Zúñiga",
-    obs: "Recorrido general: daños, plagas visibles, riego irregular."
-  },
+  { id:"tdg_1", tarea:"Limpieza Tee 01",                          icon:"🧹", obs:"" },
+  { id:"tdg_2", tarea:"Revisión estado general greens (visual)",   icon:"🔍", obs:"Recorrido visual de los greens" },
+  { id:"tdg_3", tarea:"Revisión humedad greens",                   icon:"💧", obs:"Medir en lado más seco, después del almuerzo" },
+  { id:"tdg_4", tarea:"Revisión estado fitosanitario",             icon:"🦠", obs:"Buscar signos de plagas o enfermedades" },
+  { id:"tdg_5", tarea:"Soplado/Barrido",                           icon:"💨", obs:"Limpiar hojas y residuos de greens" },
+  { id:"tdg_6", tarea:"Pediluvios — llenado y revisión",           icon:"🪣", obs:"Verificar nivel y cambiar si corresponde" },
 ];
 
 
@@ -2678,91 +2645,64 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
              SECCIÓN 1 — TAREAS DIARIAS (con observaciones integradas)
              ══════════════════════════════════════════════════════════ */}
         {/* ── RUTINAS DIARIAS GOLF (solo para Bhalú) ── */}
-        {(trabajador?.nombre||"").toLowerCase().includes("bhalú")||(trabajador?.nombre||"").toLowerCase().includes("bhalu")||trabajador?.id===1004?(<>
-          {TAREAS_DIARIAS_GOLF.map(tarea=>{
-            const estado = rutinasGolfState[tarea.id] || {};
-            const todasHechas = tarea.subzonas.every(sz=>estado[sz]==="hecha");
-            const alguna_nopudo = tarea.subzonas.some(sz=>estado[sz]==="no_pudo");
-            const open = gruposAbiertos["rg_"+tarea.id]!==false;
-
-            const marcarSubzona = (sz, est) => {
-              setRutinasGolfState(prev=>({
-                ...prev,
-                [tarea.id]: {...(prev[tarea.id]||{}), [sz]: est}
-              }));
-            };
-            const marcarTodas = (est) => {
-              const nuevo = {};
-              tarea.subzonas.forEach(sz=>{ nuevo[sz]=est; });
-              setRutinasGolfState(prev=>({...prev, [tarea.id]: nuevo}));
-            };
-
-            return (
-              <div key={tarea.id} style={{marginBottom:10,border:`1px solid ${todasHechas?"rgba(34,197,94,0.3)":alguna_nopudo?"rgba(239,68,68,0.2)":"rgba(52,211,153,0.15)"}`,borderRadius:12,overflow:"hidden"}}>
-                {/* Header */}
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 14px",background:todasHechas?"rgba(34,197,94,0.08)":"rgba(52,211,153,0.05)",cursor:"pointer"}}
-                  onClick={()=>setGruposAbiertos(p=>({...p,["rg_"+tarea.id]:!open}))}>
-                  <div style={{display:"flex",alignItems:"center",gap:8}}>
-                    <span style={{fontSize:16}}>{tarea.icon}</span>
-                    <div>
-                      <div style={{fontSize:13,fontWeight:700,color:todasHechas?"#22c55e":"#34d399"}}>{tarea.tarea}</div>
-                      <div style={{fontSize:10,color:"#5a9a7a"}}>
-                        {todasHechas?"✅ Completado":tarea.subzonas.filter(sz=>estado[sz]==="hecha").length+" / "+tarea.subzonas.length+" hechos"}
-                      </div>
+        {((trabajador?.nombre||"").toLowerCase().includes("bhal")||trabajador?.id===1004)&&(
+          <div style={{marginBottom:14,border:"1px solid rgba(251,191,36,0.2)",borderRadius:12,overflow:"hidden"}}>
+            <div style={{padding:"10px 14px",background:"rgba(251,191,36,0.06)",borderBottom:"1px solid rgba(251,191,36,0.1)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#fbbf24"}}>⛳ Rutinas diarias Golf</div>
+              {puedeEditar&&TAREAS_DIARIAS_GOLF.some(t=>rutinasGolfState[t.id]!=="hecha")&&(
+                <button onClick={()=>{
+                  const nuevo={};
+                  TAREAS_DIARIAS_GOLF.forEach(t=>{nuevo[t.id]="hecha";});
+                  setRutinasGolfState(nuevo);
+                }} style={{fontSize:11,padding:"3px 12px",border:"1px solid rgba(34,197,94,0.4)",borderRadius:6,background:"rgba(34,197,94,0.1)",color:"#22c55e",cursor:"pointer"}}>
+                  ✅ Marcar todas hechas
+                </button>
+              )}
+            </div>
+            <div style={{padding:"8px 14px",display:"flex",flexDirection:"column",gap:6}}>
+              {TAREAS_DIARIAS_GOLF.map(tarea=>{
+                const est = rutinasGolfState[tarea.id];
+                const hecha = est==="hecha";
+                const noPudo = est==="no_pudo";
+                return (
+                  <div key={tarea.id} style={{padding:"8px 10px",borderRadius:8,
+                    background:hecha?"rgba(34,197,94,0.06)":noPudo?"rgba(239,68,68,0.06)":"rgba(255,255,255,0.02)",
+                    border:`1px solid ${hecha?"rgba(34,197,94,0.2)":noPudo?"rgba(239,68,68,0.2)":"rgba(255,255,255,0.06)"}`}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{fontSize:14}}>{tarea.icon}</span>
+                      <span style={{flex:1,fontSize:13,color:hecha?"#22c55e":noPudo?"#ef4444":"#c0dac0"}}>{tarea.tarea}</span>
+                      {puedeEditar&&(<>
+                        <button onClick={()=>setRutinasGolfState(p=>({...p,[tarea.id]:hecha?null:"hecha"}))}
+                          style={{fontSize:11,padding:"2px 10px",borderRadius:5,
+                            border:`1px solid ${hecha?"rgba(34,197,94,0.5)":"rgba(255,255,255,0.1)"}`,
+                            background:hecha?"rgba(34,197,94,0.15)":"transparent",
+                            color:hecha?"#22c55e":"#5a9a7a",cursor:"pointer"}}>
+                          {hecha?"✅ Hecha":"○ Hecha"}
+                        </button>
+                        <button onClick={()=>setRutinasGolfState(p=>({...p,[tarea.id]:noPudo?null:"no_pudo"}))}
+                          style={{fontSize:11,padding:"2px 8px",borderRadius:5,
+                            border:`1px solid ${noPudo?"rgba(239,68,68,0.5)":"rgba(255,255,255,0.1)"}`,
+                            background:noPudo?"rgba(239,68,68,0.1)":"transparent",
+                            color:noPudo?"#ef4444":"#5a9a7a",cursor:"pointer"}}>
+                          ✗
+                        </button>
+                      </>)}
                     </div>
-                  </div>
-                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                    {puedeEditar&&!todasHechas&&(
-                      <button onClick={e=>{e.stopPropagation();marcarTodas("hecha");}}
-                        style={{fontSize:10,padding:"3px 10px",border:"1px solid rgba(34,197,94,0.4)",borderRadius:6,background:"rgba(34,197,94,0.1)",color:"#22c55e",cursor:"pointer"}}>
-                        ✅ Todos
-                      </button>
+                    {tarea.obs&&!hecha&&<div style={{fontSize:10,color:"#4a7a5a",marginTop:3,marginLeft:22}}>{tarea.obs}</div>}
+                    {noPudo&&(
+                      <input placeholder="¿Por qué no se pudo?"
+                        value={rutinasGolfState[tarea.id+"_obs"]||""}
+                        onChange={e=>setRutinasGolfState(p=>({...p,[tarea.id+"_obs"]:e.target.value}))}
+                        style={{marginTop:4,marginLeft:22,fontSize:11,padding:"3px 8px",borderRadius:5,
+                          border:"1px solid rgba(239,68,68,0.3)",background:"rgba(239,68,68,0.05)",
+                          color:"#fca5a5",width:"calc(100% - 22px)"}}/>
                     )}
-                    <span style={{color:"#4a7a5a",fontSize:12}}>{open?"▲":"▼"}</span>
                   </div>
-                </div>
-                {/* Lista de subzonas */}
-                {open&&(
-                  <div style={{padding:"10px 14px",display:"flex",flexDirection:"column",gap:6}}>
-                    {tarea.obs&&<div style={{fontSize:10,color:"#5a9a7a",marginBottom:4,fontStyle:"italic"}}>{tarea.obs}</div>}
-                    {tarea.subzonas.map(sz=>{
-                      const est = estado[sz];
-                      const obsKey = sz+"_obs";
-                      return (
-                        <div key={sz} style={{display:"flex",flexDirection:"column",gap:4,padding:"6px 10px",borderRadius:8,background:est==="hecha"?"rgba(34,197,94,0.06)":est==="no_pudo"?"rgba(239,68,68,0.06)":"rgba(255,255,255,0.02)",border:`1px solid ${est==="hecha"?"rgba(34,197,94,0.2)":est==="no_pudo"?"rgba(239,68,68,0.2)":"rgba(255,255,255,0.06)"}`}}>
-                          <div style={{display:"flex",alignItems:"center",gap:8}}>
-                            <span style={{fontSize:12,flex:1,color:est==="hecha"?"#22c55e":est==="no_pudo"?"#ef4444":"#c0dac0"}}>{sz}</span>
-                            {puedeEditar&&(<>
-                              <button onClick={()=>marcarSubzona(sz, est==="hecha"?null:"hecha")}
-                                style={{fontSize:11,padding:"2px 8px",borderRadius:5,border:`1px solid ${est==="hecha"?"rgba(34,197,94,0.5)":"rgba(255,255,255,0.1)"}`,background:est==="hecha"?"rgba(34,197,94,0.15)":"transparent",color:est==="hecha"?"#22c55e":"#5a9a7a",cursor:"pointer"}}>
-                                {est==="hecha"?"✅ Hecha":"○ Marcar hecha"}
-                              </button>
-                              <button onClick={()=>marcarSubzona(sz, est==="no_pudo"?null:"no_pudo")}
-                                style={{fontSize:11,padding:"2px 8px",borderRadius:5,border:`1px solid ${est==="no_pudo"?"rgba(239,68,68,0.5)":"rgba(255,255,255,0.1)"}`,background:est==="no_pudo"?"rgba(239,68,68,0.1)":"transparent",color:est==="no_pudo"?"#ef4444":"#5a9a7a",cursor:"pointer"}}>
-                                {est==="no_pudo"?"✗ No pudo":"✗"}
-                              </button>
-                            </>)}
-                          </div>
-                          {est==="no_pudo"&&(
-                            <input
-                              placeholder="¿Por qué no se pudo? (obligatorio)"
-                              value={estado[obsKey]||""}
-                              onChange={e=>setRutinasGolfState(prev=>({
-                                ...prev,
-                                [tarea.id]:{...(prev[tarea.id]||{}),[obsKey]:e.target.value}
-                              }))}
-                              style={{fontSize:11,padding:"4px 8px",borderRadius:5,border:"1px solid rgba(239,68,68,0.3)",background:"rgba(239,68,68,0.05)",color:"#fca5a5",width:"100%"}}
-                            />
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </>):null}
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {misTareasDiarias.length>0&&(()=>{
           const hechasDiarias=misTareasDiarias.filter(t=>t.estado==="hecha").length;
