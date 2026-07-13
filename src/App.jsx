@@ -1138,10 +1138,10 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
       else if(t.estado==="no_pudo") porTrab[n].noPudo++;
       else porTrab[n].pend++;
       const hpZona=t.zona||"Sin zona";
-      if(!porZona[z]) porZona[z]={total:0,hechas:0,noPudo:0,tareas:[]};
-      porZona[z].total++; if(esHecha(t)) porZona[z].hechas++;
-      else if(t.estado==="no_pudo") porZona[z].noPudo++;
-      porZona[z].tareas.push(t);
+      if(!porZona[hpZona]) porZona[hpZona]={total:0,hechas:0,noPudo:0,tareas:[]};
+      porZona[hpZona].total++; if(esHecha(t)) porZona[hpZona].hechas++;
+      else if(t.estado==="no_pudo") porZona[hpZona].noPudo++;
+      porZona[hpZona].tareas.push(t);
       const zonaObj=MACROZONAS_BASE.find(z2=>z2.nombre===t.zona);
       const cat=zonaObj?.categoria||t.zona||"Sin categoría";
       if(!porCategoria[cat]) porCategoria[cat]={total:0,hechas:0,noPudo:0,tareas:[]};
@@ -1166,11 +1166,11 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
 
   const tareasDeportes = todasTareas.filter(t=>{
     const hpZ=MACROZONAS_BASE.find(z2=>z2.nombre===t.zona);
-    return z&&IDS_DEPORTES.includes(z.id);
+    return hpZ&&IDS_DEPORTES.includes(hpZ.id);
   });
   const tareasGeneral = todasTareas.filter(t=>{
     const hpZ=MACROZONAS_BASE.find(z2=>z2.nombre===t.zona);
-    return !z||IDS_GENERAL.includes(z.id);
+    return !hpZ||IDS_GENERAL.includes(hpZ.id);
   });
   const statsDeportes=calcStats(tareasDeportes), statsGeneral=calcStats(tareasGeneral), statsTotal=calcStats(todasTareas);
   const incFitoPeriodo=incidenciasFito.filter(i=>i.fecha>=(dias[0]||"")&&i.fecha<=(dias[dias.length-1]||""));
