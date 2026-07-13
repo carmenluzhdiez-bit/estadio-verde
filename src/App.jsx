@@ -15071,11 +15071,30 @@ export default function App() {
 
   // ── Pantalla de carga Firebase ────────────────────────────────────────────
   if (!appReady) return (
-    <div style={{minHeight:"100vh",background:"#0d1f13",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
+    <div style={{minHeight:"100vh",background:"#0d1f13",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,padding:20}}>
       <div style={{fontSize:48}}>🌿</div>
       <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,color:"#a0d8b0",fontWeight:700}}>Estadio Español</div>
-      <div style={{fontSize:13,color:"#4a8a5a",marginBottom:8}}>Conectando con Firebase...</div>
-      <div style={{width:40,height:40,border:"3px solid #1a3a22",borderTop:"3px solid #4a9a64",borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
+      {!connTimeout ? (<>
+        <div style={{fontSize:13,color:"#4a8a5a",marginBottom:8}}>Conectando con Firebase...</div>
+        <div style={{width:40,height:40,border:"3px solid #1a3a22",borderTop:"3px solid #4a9a64",borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
+        <div style={{fontSize:11,color:"#3a6a4a",marginTop:8}}>
+          {!dataReady&&"• Datos principales... "}
+          {!personalReady&&"• Personal... "}
+          {!progReady&&"• Programación... "}
+        </div>
+      </>) : (<>
+        <div style={{fontSize:13,color:"#fca5a5",marginBottom:4}}>No se pudo conectar con Firebase</div>
+        <div style={{fontSize:11,color:"#5a7a5a",textAlign:"center",maxWidth:280}}>
+          Verifica tu conexión a internet e intenta recargar la página.
+        </div>
+        <div style={{fontSize:11,color:"#3a5a3a",marginTop:4}}>
+          {!dataReady&&"• Datos pendientes "}{!personalReady&&"• Personal pendiente "}{!progReady&&"• Programación pendiente "}
+        </div>
+        <button onClick={()=>window.location.reload()}
+          style={{marginTop:12,padding:"8px 20px",borderRadius:8,border:"1px solid rgba(74,154,100,0.4)",background:"rgba(74,154,100,0.1)",color:"#4a9a64",cursor:"pointer",fontSize:13}}>
+          🔄 Reintentar
+        </button>
+      </>)}
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   );
