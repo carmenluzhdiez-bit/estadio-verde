@@ -3289,6 +3289,22 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
             }}
             style={{...S.input,width:"auto",fontSize:13}}/>
           <button onClick={proponerTareas} style={{...S.btn,background:"rgba(59,130,246,0.2)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)",fontSize:13}}>✨ Proponer del día</button>
+          {esJefa&&(
+            <button onClick={()=>{
+              if(!window.confirm("¿Eliminar TODAS las tareas auto-generadas de Golf (auto:true) de todos los días? Esto limpia los duplicados.")) return;
+              setTareas(prev=>{
+                const limpio={};
+                Object.entries(prev||{}).forEach(([d,arr])=>{
+                  const a=Array.isArray(arr)?arr:Object.values(arr||{});
+                  const filtrada=a.filter(t=>!(t.auto===true&&(t.zona==="Golf"||(t.zona||"").includes("Golf"))&&!t.origenAlerta));
+                  if(filtrada.length>0) limpio[d]=filtrada;
+                });
+                return limpio;
+              });
+            }} style={{...S.btn,background:"rgba(239,68,68,0.1)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.2)",fontSize:11}}>
+              🧹 Limpiar tareas auto Golf
+            </button>
+          )}
           <button onClick={()=>{
             setNuevaTarea(p=>({...p,
               zona:filtroZona!=="todas"&&filtroZona!=="Golf"?filtroZona:p.zona,
@@ -10519,51 +10535,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   const BHALÚ = personalArr.find(p=>p.nombre?.includes("Armijo")||p.nombre?.toLowerCase().includes("bhalu"))?.nombre || "Osmar Bhalú Armijo Zúñiga";
 
   // ── Generación automática de tareas diarias ───────────────────────────────
-  React.useEffect(()=>{
-    if(!hoy||!setTareasProg) return;
-    const diaSemana = new Date(hoy+"T12:00:00").getDay(); // 0=domingo
-    const esDomingo = diaSemana===0;
-    const hayTorneo = eventos.some(e=>e.fecha<=hoy&&(e.fechaFin||e.fecha)>=hoy);
-    // Verificar si ya se generaron las tareas de hoy para Golf
-    const tareasHoy = tareasProg[hoy]||[];
-    // Verificar si las tareas DIARIAS ya están generadas (no solo cualquier tarea auto)
-    const yaGeneradasDiarias = tareasHoy.some(t=>t.zona==="Golf"&&t.diaria===true);
-    const yaGeneradasOtras = tareasHoy.some(t=>t.zona==="Golf"&&t.auto===true&&t.autoGolfFecha===hoy&&!t.diaria);
-    if(yaGeneradasDiarias && yaGeneradasOtras) return;
-
-    const nuevas = [];
-    const mkTarea = (tarea,elemento,resp) => ({
-      id:Date.now()+Math.random(), fecha:hoy, zona:"Golf", elemento,
-      tarea:`⛳ ${tarea}`, responsable:resp||BHALÚ,
-      estado:resp||BHALÚ?"pendiente":"por_designar",
-      notas:"Tarea recurrente automática", auto:true, autoGolfFecha:hoy,
-    });
-    const mkDiaria = (tarea) => ({...mkTarea(tarea,"Greens"),diaria:true});
-
-    // 1. Medición Green 03, 07 y Vivero — Lunes a Sábado
-    if(!esDomingo && !yaGeneradasOtras) {
-      nuevas.push(mkTarea("Medición de altura — Green 03","Green 03 (Hoyo 03-12)"));
-      nuevas.push(mkTarea("Medición de altura — Green 07","Green 07 (Hoyo 07-16)"));
-      nuevas.push(mkTarea("Medición de altura — Vivero","Vivero"));
-    }
-
-    // 2. Tareas diarias — solo si no existen aún
-    if(!yaGeneradasDiarias && (!esDomingo || hayTorneo)) {
-      TAREAS_GREENS_DIARIAS.forEach(t => nuevas.push(mkDiaria(t)));
-    }
-
-    // 3. Limpieza por green — diaria, con método variable (sopladora/barrido)
-    if(!yaGeneradasOtras && (!esDomingo || hayTorneo)) {
-      GREENS_DEF.forEach(g=>{
-        nuevas.push({...mkDiaria(`Limpieza — ${g.nombre}`), elemento:`${g.nombre} (${g.hoyos})`, metodoLimpieza:"sopladora"});
-      });
-      nuevas.push({...mkDiaria("Limpieza — Vivero"), elemento:"Vivero", metodoLimpieza:"sopladora"});
-    }
-
-    if(nuevas.length>0) {
-      setTareasProg(p=>({...p,[hoy]:[...(p[hoy]||[]),...nuevas]}));
-    }
-  },[hoy, eventos.length]);
+  // Tareas diarias Golf: se gestionan desde TAREAS_DIARIAS_GOLF en VistaWorker
 
 
   // ── Formularios ──────────────────────────────────────────────────────────
