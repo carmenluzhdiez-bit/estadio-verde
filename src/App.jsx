@@ -3374,7 +3374,8 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                 {Object.entries(ESTADOS_TAREA).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
               </select>
               <select value={filtroZona} onChange={e=>setFiltroZona(e.target.value)} style={{...S.input,flex:"1 1 160px",maxWidth:220,fontSize:13}}>
-                <option value="todas">🔍 Filtrar: todas las zonas con tareas</option>
+                <option value="todas">📋 Todas las tareas del día</option>
+                {zonasEnProg.length>0&&<option disabled>── Filtrar por zona ──</option>}
                 {zonasEnProg.map(z=><option key={z} value={z}>{z==="Golf"?"⛳ "+z:z}</option>)}</select>
               {(filtroEstado!=="todos"||filtroZona!=="todas"||filtroTrabajador!=="todos")&&(
                 <button onClick={()=>{setFiltroEstado("todos");setFiltroZona("todas");setFiltroTrabajador("todos");}} style={{...S.btn,background:"transparent",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)",fontSize:12}}>✕ Limpiar</button>
@@ -3382,9 +3383,12 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
               {/* Filtro por trabajador */}
               <select value={filtroTrabajador} onChange={e=>setFiltroTrabajador(e.target.value)} style={{...S.input,fontSize:11,maxWidth:180}}>
                 <option value="todos">👷 Todos los trabajadores</option>
-                {[...new Set(Object.values(tareas||{}).flat().map(t=>t.responsable).filter(Boolean))].sort().map(r=>(
-                  <option key={r} value={r}>{r.split(" ")[0]} {r.split(" ")[1]||""}</option>
-                ))}
+                {(Array.isArray(personal)?personal:Object.values(personal||{}))
+                  .sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}))
+                  .map(p=>(
+                    <option key={p.id} value={p.nombre}>{p.nombre.split(" ")[0]} {p.nombre.split(" ")[1]||""}</option>
+                  ))
+                }
               </select>
               {/* Toggle vista semanal */}
               <button
