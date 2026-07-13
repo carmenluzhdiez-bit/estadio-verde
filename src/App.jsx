@@ -4602,7 +4602,20 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
     return null;
   };
 
-  const calcProxima = (f) => f.modo==="diasSemana" ? calcProximaDiaSemana(f) : calcProximaEstacion(f);
+  const calcProximaIntervalo = (f) => {
+    if(!f.ultimaVez||!f.intervaloDias) return null;
+    const dias = Number(f.intervaloDias);
+    if(!dias||dias<=0) return null;
+    const ultima = new Date(f.ultimaVez+"T12:00:00");
+    const proxima = new Date(ultima.getTime() + dias*24*60*60*1000);
+    const hoyD = new Date(); hoyD.setHours(12,0,0,0);
+    const diff = Math.round((proxima-hoyD)/(24*60*60*1000));
+    return { fecha: proxima.toISOString().slice(0,10), diff };
+  };
+  const calcProxima = (f) =>
+    f.modo==="diasSemana" ? calcProximaDiaSemana(f) :
+    f.modo==="intervalo"  ? calcProximaIntervalo(f)  :
+    calcProximaEstacion(f);
   const esSinFrecuencia = (f) => f.modo!=="diasSemana" && f.modo!=="intervalo" && ["unavez","segunecesidad"].includes(f[estActual]);
 
   const inputSt = {background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:7,color:"#ede9e0",padding:"7px 10px",fontFamily:"'Georgia',serif",fontSize:13,width:"100%",outline:"none"};
@@ -13955,9 +13968,9 @@ function PanelFrecuenciasZona({ S, zonas, getAllElems, getZD, setElemFrecs, esJe
           eid={elemActFrec.id}
           tipo={elemActFrec.tipo||"arboles"}
           isCustom={elemActFrec.isCustom||false}
-          getFrecs={()=> zdActFrec.elementos?.[elemActFrec.id]?.frecuencias||[]}
+          getFrecs={(zidA,eidA,tipoA,isCustomA)=> zdActFrec.elementos?.[elemActFrec.id]?.frecuencias||[]}
           setFrecs={(zidArg, eidArg, isCustomArg, nuevasFrecs)=>{
-            setElemFrecs(String(zonaActFrec.id), elemActFrec.id, nuevasFrecs, elemActFrec.isCustom||false);
+            setElemFrecs(String(zonaActFrec.id), elemActFrec.id, elemActFrec.isCustom||false, nuevasFrecs);
           }}
         />
       )}
