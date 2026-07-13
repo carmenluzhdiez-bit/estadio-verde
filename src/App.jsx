@@ -2485,13 +2485,14 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   const [gruposAbiertos, setGruposAbiertos] = React.useState({rutinas_golf:true,diarias:true,corte:true,medicion:true,riego:true,fitosan:true,limpieza:true,otros:true});
   // Estado de subzonas por tarea diaria Golf: {tdg_id: {subzona: "hecha"|"no_pudo"|null, obs: string}}
   const [rutinasGolfState, setRutinasGolfState] = React.useState({});
+  const [alturaInputs, setAlturaInputs] = React.useState({});
   const toggleGrupo = (key) => setGruposAbiertos(p=>({...p,[key]:!p[key]}));
   const [showRegistroDiarioWorker, setShowRegistroDiarioWorker] = React.useState(true);
   const [showEmergente, setShowEmergente] = React.useState(false);
   const [emergenteForm, setEmergenteForm] = React.useState({zona:"",tarea:"",obs:""}); // abierto por defecto
   const [registroDiarioForm, setRegistroDiarioForm] = React.useState({tareas:{}, obsFito:"", obs:""});
 
-    const ESTADOS_TAREA = ESTADOS_TAREA_GLOBAL;
+  const ESTADOS_TAREA = ESTADOS_TAREA_GLOBAL;
 
   const getTareasDeZona = (nombreZona) => {
     const zona = MACROZONAS_BASE.find(z=>z.nombre===nombreZona);
