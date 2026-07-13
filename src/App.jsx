@@ -2322,11 +2322,11 @@ const getResponsablePorTipo = (tarea, configSemanal) => {
 const TAREAS_DIARIAS_GOLF = [
   { id:"tdg_1", tarea:"Limpieza Tee 01",                          icon:"🧹", obs:"" },
   { id:"tdg_2", tarea:"Revisión estado general greens (visual)",   icon:"🔍", obs:"Recorrido visual de los greens" },
-  { id:"tdg_3", tarea:"Revisión humedad greens",                   icon:"💧", obs:"Medir en lado más seco, después del almuerzo" },
   { id:"tdg_4", tarea:"Revisión estado fitosanitario",             icon:"🦠", obs:"Buscar signos de plagas o enfermedades" },
   { id:"tdg_5", tarea:"Soplado/Barrido",                           icon:"💨", obs:"Limpiar hojas y residuos de greens" },
   { id:"tdg_6", tarea:"Pediluvios — llenado y revisión",           icon:"🪣", obs:"Verificar nivel y cambiar si corresponde" },
 ];
+// Nota: "Revisión humedad greens" tiene frecuencia semanal — aparece en Programación, no en rutinas diarias
 
 
 // ─── FRECUENCIAS INICIALES GOLF (se cargan si el elemento no tiene frecuencias en Firebase) ──
@@ -3024,11 +3024,14 @@ Una vez cerrado no podrás modificar las tareas. Solo la jefa puede reabrir el t
         {misTargets.length===0&&(
           <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:"32px 20px",textAlign:"center",marginBottom:14}}>
             <div style={{fontSize:36,marginBottom:10}}>🌿</div>
-            <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,marginBottom:6}}>Sin tareas asignadas</div>
-            <div style={{fontSize:13,marginBottom:12,color:"#5a8a6a"}}>No hay tareas para este día o aún no están designadas.</div>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,marginBottom:6}}>Sin tareas asignadas para hoy</div>
+            <div style={{fontSize:13,marginBottom:12,color:"#5a8a6a"}}>
+              No hay tareas programadas para <b style={{color:"#34d399"}}>{trabajador?.nombre?.split(" ")[0]}</b> hoy.
+              Consulta con la jefa para que las programe desde Programa → ✨ Proponer del día.
+            </div>
             {(tareas[fechaVer]||[]).length>0&&(
               <div style={{background:"rgba(255,255,255,0.05)",borderRadius:10,padding:"10px 14px",textAlign:"left",fontSize:12}}>
-                <div style={{marginBottom:6,fontWeight:600,color:"#6aaa7a"}}>Tareas del día ({(tareas[fechaVer]||[]).length}):</div>
+                <div style={{marginBottom:6,fontWeight:600,color:"#6aaa7a"}}>Tareas del día ({(tareas[fechaVer]||[]).length}) — ninguna asignada a ti:</div>
                 {(tareas[fechaVer]||[]).slice(0,5).map((t,i)=>(
                   <div key={i} style={{padding:"3px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
                     <span style={{color:normalizar(t.responsable)===normalizar(trabajador.nombre)?"#4ade80":"#ef4444"}}>{normalizar(t.responsable)===normalizar(trabajador.nombre)?"✓":"✗"}</span>
