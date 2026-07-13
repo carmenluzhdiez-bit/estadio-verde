@@ -15014,14 +15014,16 @@ export default function App() {
     return zonasConCust.find(z=>String(z.id)===String(zid))?.elementos.find(e=>e.id===eid)?.nombre||"";
   };
   const addCustomElem = (zid,elem) => {
+    if(!zid||!elem?.nombre?.trim()) { console.warn("addCustomElem: zonaId o nombre vacío", zid, elem); return; }
     const id = "c"+Date.now();
     const zidStr = String(zid);
-    const currentElems = Array.isArray(data[zidStr]?.elementosCustom)
-      ? data[zidStr].elementosCustom
-      : Object.values(data[zidStr]?.elementosCustom||{});
-    const arr = [...currentElems, {...elem, id, estado:"bueno", notas:""}];
-    updateZona(zid, {elementosCustom: arr});
-    addHistorial(zid, `Elemento agregado: ${elem.nombre}`);
+    const existing = data[zidStr]?.elementosCustom;
+    const currentElems = Array.isArray(existing) ? existing : Object.values(existing||{});
+    const newElemObj = {...elem, id, estado:"bueno", notas:""};
+    const arr = [...currentElems, newElemObj];
+    console.log("addCustomElem:", zidStr, newElemObj, "total:", arr.length);
+    updateZona(zidStr, {elementosCustom: arr});
+    addHistorial(zidStr, `Elemento agregado: ${elem.nombre}`);
   };
   const removeCustomElem = (zid,eid) => { const arr=(data[zid]?.elementosCustom||[]).filter(e=>e.id!==eid); updateZona(zid,{elementosCustom:arr}); };
   const removeBaseElem = (zid,eid) => { setZonas(prev=>prev.map(z=>String(z.id)===String(zid)?{...z,elementos:z.elementos.filter(e=>e.id!==eid)}:z)); const elems={...data[String(zid)]?.elementos}; delete elems[eid]; updateZona(zid,{elementos:elems}); addHistorial(zid,`Elemento eliminado`); };
