@@ -3366,7 +3366,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
             <div style={{...S.card,padding:18,marginBottom:16}} className="ein">
               <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:14}}>Nueva Tarea — {fecha}</div>
               {(()=>{
-                const zonasSinGolf=[...MACROZONAS_BASE].filter(z=>z.id!==31).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+                const zonasSinGolf=[...MACROZONAS_BASE].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
                 const zonaObj=zonasSinGolf.find(z=>z.nombre===nuevaTarea.zona);
                 const elemsZona=zonaObj?getAllElems(zonaObj.id):[];
                 const elemObj=elemsZona.find(e=>e.nombre===nuevaTarea.elemento);
@@ -14921,7 +14921,11 @@ export default function App() {
 
   // updateZona — actualiza una zona en el estado data
 
-  const updateZona = (id, patch) => setData(p => ({ ...p, [String(id)]: { ...p[String(id)], ...patch } }));
+  const updateZona = (id, patch) => setData(prev => {
+    const zidStr = String(id);
+    const existing = prev[zidStr] || {};
+    return { ...prev, [zidStr]: { ...existing, ...patch } };
+  });
   const addHistorial = (id, txt) => setData(p => ({
     ...p, [String(id)]: { ...p[String(id)], historial: [{ txt, fecha: new Date().toLocaleDateString("es-CL"), hora: new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"}) }, ...(p[id]?.historial||[])].slice(0,30) }
   }));
@@ -15009,7 +15013,16 @@ export default function App() {
     if(isCustom) return (data[zid]?.elementosCustom||[]).find(e=>e.id===eid)?.nombre||"";
     return zonasConCust.find(z=>String(z.id)===String(zid))?.elementos.find(e=>e.id===eid)?.nombre||"";
   };
-  const addCustomElem = (zid,elem) => { const id="c"+Date.now(); const arr=[...(data[String(zid)]?.elementosCustom||[]),{...elem,id,estado:"bueno",notas:""}]; updateZona(zid,{elementosCustom:arr}); addHistorial(zid,`Elemento agregado: ${elem.nombre}`); };
+  const addCustomElem = (zid,elem) => {
+    const id = "c"+Date.now();
+    const zidStr = String(zid);
+    const currentElems = Array.isArray(data[zidStr]?.elementosCustom)
+      ? data[zidStr].elementosCustom
+      : Object.values(data[zidStr]?.elementosCustom||{});
+    const arr = [...currentElems, {...elem, id, estado:"bueno", notas:""}];
+    updateZona(zid, {elementosCustom: arr});
+    addHistorial(zid, `Elemento agregado: ${elem.nombre}`);
+  };
   const removeCustomElem = (zid,eid) => { const arr=(data[zid]?.elementosCustom||[]).filter(e=>e.id!==eid); updateZona(zid,{elementosCustom:arr}); };
   const removeBaseElem = (zid,eid) => { setZonas(prev=>prev.map(z=>String(z.id)===String(zid)?{...z,elementos:z.elementos.filter(e=>e.id!==eid)}:z)); const elems={...data[String(zid)]?.elementos}; delete elems[eid]; updateZona(zid,{elementos:elems}); addHistorial(zid,`Elemento eliminado`); };
 
