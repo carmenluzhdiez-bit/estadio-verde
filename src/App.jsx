@@ -3192,7 +3192,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
 
       {/* ── FRECUENCIAS POR MACROZONA ── */}
       {tabProg==="frecuencias"&&(
-        <PanelFrecuenciasZona S={S} zonas={zonas} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} esJefa={esJefa}/>
+        <PanelFrecuenciasZona S={S} zonas={MACROZONAS_BASE} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} esJefa={esJefa}/>
       )}
 
       {/* ── HISTORIAL ── */}
@@ -13937,7 +13937,11 @@ function PanelFrecuenciasZona({ S, zonas, getAllElems, getZD, setElemFrecs, esJe
   const elemsActFrec = zonaActFrec ? getAllElems(String(zonaActFrec.id)) : [];
   const zdActFrec = zonaActFrec ? getZD(String(zonaActFrec.id)) : {};
   const elemActFrec = elemSelFrec ? elemsActFrec.find(e=>e.id===elemSelFrec) : null;
-  const frecsActuales = elemActFrec ? (zdActFrec.elementos?.[elemActFrec.id]?.frecuencias||[]) : [];
+  const frecsActuales = elemActFrec ? (
+    elemActFrec.isCustom
+      ? (zdActFrec.elementosCustom||[]).find(e=>e.id===elemActFrec.id)?.frecuencias||[]
+      : zdActFrec.elementos?.[elemActFrec.id]?.frecuencias||[]
+  ) : [];
 
   return (
     <div className="ein">
@@ -13974,7 +13978,11 @@ function PanelFrecuenciasZona({ S, zonas, getAllElems, getZD, setElemFrecs, esJe
           eid={elemActFrec.id}
           tipo={elemActFrec.tipo||"arboles"}
           isCustom={elemActFrec.isCustom||false}
-          getFrecs={(zidA,eidA,tipoA,isCustomA)=> zdActFrec.elementos?.[elemActFrec.id]?.frecuencias||[]}
+          getFrecs={(zidA,eidA,tipoA,isCustomA)=>
+            elemActFrec.isCustom
+              ? (zdActFrec.elementosCustom||[]).find(e=>e.id===elemActFrec.id)?.frecuencias||[]
+              : zdActFrec.elementos?.[elemActFrec.id]?.frecuencias||[]
+          }
           setFrecs={(zidArg, eidArg, isCustomArg, nuevasFrecs)=>{
             setElemFrecs(String(zonaActFrec.id), elemActFrec.id, elemActFrec.isCustom||false, nuevasFrecs);
           }}
