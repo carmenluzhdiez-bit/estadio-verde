@@ -14869,7 +14869,7 @@ export default function App() {
       const arr = Array.isArray(personal)?personal:Object.values(personal||{});
       if(arr.length>0){
         const fbP = arr.find(x=>x.email?.toLowerCase()===fbUser.email?.toLowerCase());
-        if(p){
+        if(fbP){
           setWorkerLogueado(fbP.id);
           setVistaWorker(true);
           setVista("miturno");
