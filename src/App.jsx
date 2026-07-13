@@ -8116,7 +8116,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
             <div style={{...S.card,padding:36,textAlign:"center",color:"#4a8a5a"}}><div style={{fontSize:32,marginBottom:8}}>🛒</div><div>Sin compras registradas</div></div>
           ):(
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
-              {comprasFilt.map(optC=>{
+              {comprasFilt.map(c=>{
                 const est=ESTADO_C[c.estado]||ESTADO_C.pendiente;
                 const sel=seleccionadas.includes(c.id);
                 const selectable=["pendiente","pagada","pagada_efectivo"].includes(c.estado);
