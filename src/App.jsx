@@ -43,24 +43,30 @@ function useFirebaseState(path, defaultValue) {
   const fullPath = `${ROOT}/${path}`;
   const [value, setValueLocal] = useState(defaultValue);
   const [ready,  setReady]     = useState(false);
-  const skipRef = useRef(false);
+  const valueRef = useRef(defaultValue); // referencia siempre actualizada
+  const pendingRef = useRef(false); // hay una escritura pendiente
 
   useEffect(() => {
     const fbRef = ref(db, fullPath);
     const unsub = onValue(fbRef, (snap) => {
-      if (skipRef.current) { skipRef.current = false; return; }
+      if (pendingRef.current) return; // ignorar actualizaciones mientras escribimos
       const snapV = snap.val();
-      setValueLocal(snapV !== null && snapV !== undefined ? snapV : defaultValue);
+      const newVal = snapV !== null && snapV !== undefined ? snapV : defaultValue;
+      valueRef.current = newVal;
+      setValueLocal(newVal);
       setReady(true);
     });
     return () => unsub();
   }, [fullPath]);
 
   const setValue = (newVal) => {
-    const resolved = typeof newVal === "function" ? newVal(value) : newVal;
-    setValueLocal(resolved); // actualiza local inmediatamente
-    skipRef.current = true;
-    fbSet(ref(db, fullPath), resolved).catch(() => { skipRef.current = false; });
+    const resolved = typeof newVal === "function" ? newVal(valueRef.current) : newVal;
+    valueRef.current = resolved;
+    setValueLocal(resolved);
+    pendingRef.current = true;
+    fbSet(ref(db, fullPath), resolved)
+      .then(() => { setTimeout(() => { pendingRef.current = false; }, 500); })
+      .catch(() => { pendingRef.current = false; });
   };
 
   return [value, setValue, ready];
@@ -14923,15 +14929,15 @@ export default function App() {
 
   const updateZona = (id, patch) => {
     const zidStr = String(id);
-    console.log("updateZona:", zidStr, Object.keys(patch));
+    // Actualizar estado local inmediatamente
     setData(prev => {
       const existing = prev[zidStr] || {};
-      const nuevo = { ...prev, [zidStr]: { ...existing, ...patch } };
-      // Forzar escritura directa en Firebase también
-      fbSet(ref(db, ROOT+"/data/"+zidStr), { ...existing, ...patch })
-        .then(()=>console.log("✅ Firebase guardado:", zidStr))
-        .catch(e=>console.error("❌ Firebase error:", e));
-      return nuevo;
+      return { ...prev, [zidStr]: { ...existing, ...patch } };
+    });
+    // Escribir en Firebase solo el campo modificado (no todo el objeto data)
+    Object.entries(patch).forEach(([key, val]) => {
+      fbUpdate(ref(db, ROOT+"/data/"+zidStr), { [key]: val })
+        .catch(e=>console.error("updateZona firebase error:", key, e));
     });
   };
   const addHistorial = (id, txt) => setData(p => ({
