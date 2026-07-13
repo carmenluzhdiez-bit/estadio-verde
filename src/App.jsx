@@ -4553,7 +4553,7 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
                 </button>
                 <button onClick={()=>updateFila(idx,"modo","diasSemana")}
                   style={{flex:1,cursor:"pointer",border:`1px solid ${modo==="diasSemana"?"rgba(96,165,250,0.5)":"rgba(255,255,255,0.1)"}`,borderRadius:7,padding:"6px 10px",fontSize:11,background:modo==="diasSemana"?"rgba(96,165,250,0.1)":"transparent",color:modo==="diasSemana"?"#60a5fa":"#7aaa80",fontFamily:"'Georgia',serif"}}>
-                  📆 Días semana
+                  📆 Por días/semana
                 </button>
               </div>
 
@@ -4604,6 +4604,9 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
               {/* Modo: Días específicos de la semana */}
               {modo==="diasSemana"&&(
                 <div style={{marginBottom:10}}>
+                  <div style={{fontSize:10,color:"#5a9a7a",padding:"6px 10px",background:"rgba(96,165,250,0.06)",borderRadius:6,marginBottom:8}}>
+                    <b style={{color:"#60a5fa"}}>Días preferidos</b>: días en que idealmente se realiza · <b style={{color:"#f87171"}}>Días prohibidos</b>: nunca se puede hacer · <b style={{color:"#fbbf24"}}>Mínimo</b>: días mínimos entre repeticiones
+                  </div>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
                     <div>
                       <label style={{...labelSt,color:"#60a5fa"}}>Días específicos (opcional — solo si DEBE ser justo ese día)</label>
