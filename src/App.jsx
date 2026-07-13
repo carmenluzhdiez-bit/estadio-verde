@@ -2491,13 +2491,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   const [showEmergente, setShowEmergente] = React.useState(false);
   const [emergenteForm, setEmergenteForm] = React.useState({zona:"",tarea:"",obs:""}); // abierto por defecto
   const [registroDiarioForm, setRegistroDiarioForm] = React.useState({tareas:{}, obsFito:"", obs:""});
-
-  const ESTADOS_TAREA = {
-    pendiente:    { label:"Pendiente",      color:"#f59e0b", bg:"rgba(245,158,11,0.15)",  icon:"🟡" },
-    haciendose:   { label:"Haciéndose",     color:"#3b82f6", bg:"rgba(59,130,246,0.15)",  icon:"🔵" },
-    hecha:        { label:"Hecha ✓",        color:"#22c55e", bg:"rgba(34,197,94,0.15)",   icon:"🟢" },
-    no_pudo:      { label:"No se pudo",     color:"#ef4444", bg:"rgba(239,68,68,0.15)",   icon:"🔴" },
-  };
+  const ESTADOS_TAREA = ESTADOS_TAREA_GLOBAL;
 
   const getTareasDeZona = (nombreZona) => {
     const zona = MACROZONAS_BASE.find(z=>z.nombre===nombreZona);
@@ -2714,7 +2708,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
               {openDiarias&&(
                 <div>
                   {misTareasDiarias.map((t,i)=>{
-                    const est=ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente;
+                    const est=ESTADOS_TAREA[normalizarEstado(t.estado)]||ESTADOS_TAREA.pendiente;
                     return (
                       <div key={t.id} style={{padding:"10px 14px",background:i%2===0?"rgba(255,255,255,0.02)":"rgba(255,255,255,0.04)",borderBottom:i<misTareasDiarias.length-1?"1px solid rgba(255,255,255,0.05)":"none"}}>
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:t.metodoLimpieza||t.notas?4:0}}>
@@ -2744,8 +2738,8 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                           </div>
                         ) : (
                           <div style={{display:"flex",alignItems:"center",gap:6}}>
-                            <span style={{fontSize:11,fontWeight:600,color:(ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente).color}}>
-                              {(ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente).icon} {(ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente).label}
+                            <span style={{fontSize:11,fontWeight:600,color:(ESTADOS_TAREA[normalizarEstado(t.estado)]||ESTADOS_TAREA.pendiente).color}}>
+                              {(ESTADOS_TAREA[normalizarEstado(t.estado)]||ESTADOS_TAREA.pendiente).icon} {(ESTADOS_TAREA[normalizarEstado(t.estado)]||ESTADOS_TAREA.pendiente).label}
                             </span>
                             <span style={{fontSize:10,color:"#4a7a5a"}}>· Turno cerrado</span>
                           </div>
@@ -2876,7 +2870,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                     {open&&(
                       <div>
                         {g.tareas.map((t,i)=>{
-                          const est=ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente;
+                          const est=ESTADOS_TAREA[normalizarEstado(t.estado)]||ESTADOS_TAREA.pendiente;
                           return (
                             <div key={t.id} style={{padding:"9px 12px",background:i%2===0?"transparent":"rgba(255,255,255,0.02)",borderTop:"1px solid rgba(255,255,255,0.04)"}}>
                               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:5}}>
@@ -2898,8 +2892,8 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                                   ))}
                                 </div>
                               ) : (
-                                <span style={{fontSize:11,fontWeight:600,color:(ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente).color}}>
-                                  {(ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente).icon} {(ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente).label}
+                                <span style={{fontSize:11,fontWeight:600,color:(ESTADOS_TAREA[normalizarEstado(t.estado)]||ESTADOS_TAREA.pendiente).color}}>
+                                  {(ESTADOS_TAREA[normalizarEstado(t.estado)]||ESTADOS_TAREA.pendiente).icon} {(ESTADOS_TAREA[normalizarEstado(t.estado)]||ESTADOS_TAREA.pendiente).label}
                                 </span>
                               )}
                               {t.estado==="no_pudo"&&(
