@@ -2341,7 +2341,9 @@ const GOLF_FRECS_INIT = {
 
 // Hook para inicializar frecuencias Golf si no existen en Firebase
 function useInitGolfFrecs(data, setData) {
+  const yaInicializado = React.useRef(false);
   React.useEffect(() => {
+    if(yaInicializado.current) return; // solo una vez
     if(!data) return;
     const golfData = data[31];
     if(!golfData) return;
@@ -2353,14 +2355,16 @@ function useInitGolfFrecs(data, setData) {
       }
     });
     if(Object.keys(updates).length > 0) {
-      setData(prev => ({
-        ...prev,
-        31: {
-          ...(prev[31]||{}),
-          elementos: { ...(prev[31]?.elementos||{}), ...updates }
-        }
-      }));
+      yaInicializado.current = true;
+      // Escribir directo en Firebase sin pasar por setData (evita loop)
+      const updatesFirebase = {};
+      Object.entries(updates).forEach(([eid, val]) => {
+        updatesFirebase[`${ROOT}/data/31/elementos/${eid}`] = val;
+      });
+      fbUpdate(ref(db), updatesFirebase).catch(e=>console.warn("InitGolfFrecs:", e));
       console.log("✅ Frecuencias Golf inicializadas:", Object.keys(updates));
+    } else {
+      yaInicializado.current = true; // ya tenía frecuencias
     }
   }, [!!data]);
 }
