@@ -1609,14 +1609,14 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
               </tr></thead>
               <tbody>
                 {Object.entries(statsTotal.porTrab).sort((a,b)=>b[1].hechas-a[1].hechas).map(([n,d],i)=>{
-                  const hpPct=hpD.total?Math.round(hpD.hechas/d.total*100):0;
+                  const hpPct=d.total?Math.round(d.hechas/d.total*100):0;
                   return (<tr key={n} style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
                     <td style={{padding:"4px 8px",fontWeight:600,color:"#ede9e0"}}>{n}</td>
                     <td style={{padding:"4px",textAlign:"center",color:"#5a9a7a"}}>{d.total}</td>
                     <td style={{padding:"4px",textAlign:"center",color:"#22c55e",fontWeight:600}}>{d.hechas}</td>
                     <td style={{padding:"4px",textAlign:"center",color:d.noPudo>0?"#ef4444":"#4a7a5a"}}>{d.noPudo||"—"}</td>
                     <td style={{padding:"4px",textAlign:"center",color:d.pend>0?"#f59e0b":"#4a7a5a"}}>{d.pend||"—"}</td>
-                    <td style={{padding:"4px",textAlign:"center",fontWeight:700,color:p>=80?"#22c55e":p>=50?"#f59e0b":"#ef4444"}}>{p}%</td>
+                    <td style={{padding:"4px",textAlign:"center",fontWeight:700,color:hpPct>=80?"#22c55e":hpPct>=50?"#f59e0b":"#ef4444"}}>{hpPct}%</td>
                   </tr>);
                 })}
               </tbody>
@@ -2480,19 +2480,24 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   const turnoCerradoKey = `${fechaVer}_${(trabajador?.nombre||"").split(" ")[0].toLowerCase()}`;
   const turnoCerrado = (cierresTurno||{})[turnoCerradoKey] || null;
   const puedeEditar = !turnoCerrado || esJefaApp;
+  const [showNuevaTareaEmerg, setShowNuevaTareaEmerg] = React.useState(false);
   const [nuevaTareaEmerg, setNuevaTareaEmerg] = React.useState({ zona:"", tarea:"", notas:"" });
   // Estado de grupos colapsables — objeto {key: bool}
-  const [gruposAbiertos, setGruposAbiertos] = React.useState({rutinas_golf:true,diarias:true,corte:true,medicion:true,riego:true,fitosan:true,limpieza:true,otros:true});
-  // Estado de subzonas por tarea diaria Golf: {tdg_id: {subzona: "hecha"|"no_pudo"|null, obs: string}}
-  const [rutinasGolfState, setRutinasGolfState] = React.useState({});
+  const [gruposAbiertos, setGruposAbiertos] = React.useState({diarias:true,corte:true,medicion:true,riego:true,fitosan:true,limpieza:true,otros:true});
   const [alturaInputs, setAlturaInputs] = React.useState({});
+  const [rutinasGolfState, setRutinasGolfState] = React.useState({});
   const toggleGrupo = (key) => setGruposAbiertos(p=>({...p,[key]:!p[key]}));
   const [showRegistroDiarioWorker, setShowRegistroDiarioWorker] = React.useState(true);
   const [showEmergente, setShowEmergente] = React.useState(false);
   const [emergenteForm, setEmergenteForm] = React.useState({zona:"",tarea:"",obs:""}); // abierto por defecto
   const [registroDiarioForm, setRegistroDiarioForm] = React.useState({tareas:{}, obsFito:"", obs:""});
 
-  const ESTADOS_TAREA = ESTADOS_TAREA_GLOBAL;
+  const ESTADOS_TAREA = {
+    pendiente:    { label:"Pendiente",      color:"#f59e0b", bg:"rgba(245,158,11,0.15)",  icon:"🟡" },
+    haciendose:   { label:"Haciéndose",     color:"#3b82f6", bg:"rgba(59,130,246,0.15)",  icon:"🔵" },
+    hecha:        { label:"Hecha ✓",        color:"#22c55e", bg:"rgba(34,197,94,0.15)",   icon:"🟢" },
+    no_pudo:      { label:"No se pudo",     color:"#ef4444", bg:"rgba(239,68,68,0.15)",   icon:"🔴" },
+  };
 
   const getTareasDeZona = (nombreZona) => {
     const zona = MACROZONAS_BASE.find(z=>z.nombre===nombreZona);
@@ -2506,16 +2511,15 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   };
 
   const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
-  const ORDEN_ESTADO = {por_designar:0, pendiente:1, en_curso:2, haciendose:2, no_pudo:3, cancelada:3, hecha:4, completada:4};
+  const ORDEN_ESTADO = {pendiente:0, haciendose:1, no_pudo:2, hecha:3, por_designar:4};
   function esDiariaVW(tareaObj) {
     if(tareaObj.diaria === true) return true;
     const nombreED = (tareaObj.tarea||"").toLowerCase();
     const keywordsED = [
-      "limpieza tee","limpieza —","revisión estado general",
-      "soplado","barrido","pediluvios",
+      "limpieza tee","limpieza —","revisión estado general","revisión humedad greens",
+      "revisión estado fitosanitario","soplado","barrido","pediluvios",
       "limpieza general","riego manual","orden y limpieza","registro diario"
     ];
-    // NOTA: "revisión humedad greens" NO es diaria — tiene frecuencia semanal
     for(let edI=0;edI<keywordsED.length;edI++){
       if(nombreED.includes(keywordsED[edI])) return true;
     }
@@ -2645,59 +2649,42 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
         {/* ══════════════════════════════════════════════════════════
              SECCIÓN 1 — TAREAS DIARIAS (con observaciones integradas)
              ══════════════════════════════════════════════════════════ */}
-        {/* ── RUTINAS DIARIAS GOLF (solo para Bhalú) ── */}
+        {/* ── RUTINAS DIARIAS GOLF ── */}
         {((trabajador?.nombre||"").toLowerCase().includes("bhal")||trabajador?.id===1004)&&(
           <div style={{marginBottom:14,border:"1px solid rgba(251,191,36,0.2)",borderRadius:12,overflow:"hidden"}}>
             <div style={{padding:"10px 14px",background:"rgba(251,191,36,0.06)",borderBottom:"1px solid rgba(251,191,36,0.1)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <div style={{fontSize:13,fontWeight:700,color:"#fbbf24"}}>⛳ Rutinas diarias Golf</div>
               {puedeEditar&&TAREAS_DIARIAS_GOLF.some(t=>rutinasGolfState[t.id]!=="hecha")&&(
-                <button onClick={()=>{
-                  const nuevo={};
-                  TAREAS_DIARIAS_GOLF.forEach(t=>{nuevo[t.id]="hecha";});
-                  setRutinasGolfState(nuevo);
-                }} style={{fontSize:11,padding:"3px 12px",border:"1px solid rgba(34,197,94,0.4)",borderRadius:6,background:"rgba(34,197,94,0.1)",color:"#22c55e",cursor:"pointer"}}>
+                <button onClick={()=>{const n={};TAREAS_DIARIAS_GOLF.forEach(t=>{n[t.id]="hecha";});setRutinasGolfState(n);}}
+                  style={{fontSize:11,padding:"3px 12px",border:"1px solid rgba(34,197,94,0.4)",borderRadius:6,background:"rgba(34,197,94,0.1)",color:"#22c55e",cursor:"pointer"}}>
                   ✅ Marcar todas hechas
                 </button>
               )}
             </div>
             <div style={{padding:"8px 14px",display:"flex",flexDirection:"column",gap:6}}>
               {TAREAS_DIARIAS_GOLF.map(tarea=>{
-                const est = rutinasGolfState[tarea.id];
-                const hecha = est==="hecha";
-                const noPudo = est==="no_pudo";
+                const est=rutinasGolfState[tarea.id];
+                const hecha=est==="hecha", noPudo=est==="no_pudo";
                 return (
                   <div key={tarea.id} style={{padding:"8px 10px",borderRadius:8,
                     background:hecha?"rgba(34,197,94,0.06)":noPudo?"rgba(239,68,68,0.06)":"rgba(255,255,255,0.02)",
                     border:`1px solid ${hecha?"rgba(34,197,94,0.2)":noPudo?"rgba(239,68,68,0.2)":"rgba(255,255,255,0.06)"}`}}>
                     <div style={{display:"flex",alignItems:"center",gap:8}}>
-                      <span style={{fontSize:14}}>{tarea.icon}</span>
+                      <span>{tarea.icon}</span>
                       <span style={{flex:1,fontSize:13,color:hecha?"#22c55e":noPudo?"#ef4444":"#c0dac0"}}>{tarea.tarea}</span>
-                      {puedeEditar&&(<>
+                      {puedeEditar&&<>
                         <button onClick={()=>setRutinasGolfState(p=>({...p,[tarea.id]:hecha?null:"hecha"}))}
-                          style={{fontSize:11,padding:"2px 10px",borderRadius:5,
-                            border:`1px solid ${hecha?"rgba(34,197,94,0.5)":"rgba(255,255,255,0.1)"}`,
-                            background:hecha?"rgba(34,197,94,0.15)":"transparent",
-                            color:hecha?"#22c55e":"#5a9a7a",cursor:"pointer"}}>
-                          {hecha?"✅ Hecha":"○ Hecha"}
+                          style={{fontSize:11,padding:"2px 10px",borderRadius:5,border:`1px solid ${hecha?"rgba(34,197,94,0.5)":"rgba(255,255,255,0.1)"}`,background:hecha?"rgba(34,197,94,0.15)":"transparent",color:hecha?"#22c55e":"#5a9a7a",cursor:"pointer"}}>
+                          {hecha?"✅":"○"}
                         </button>
                         <button onClick={()=>setRutinasGolfState(p=>({...p,[tarea.id]:noPudo?null:"no_pudo"}))}
-                          style={{fontSize:11,padding:"2px 8px",borderRadius:5,
-                            border:`1px solid ${noPudo?"rgba(239,68,68,0.5)":"rgba(255,255,255,0.1)"}`,
-                            background:noPudo?"rgba(239,68,68,0.1)":"transparent",
-                            color:noPudo?"#ef4444":"#5a9a7a",cursor:"pointer"}}>
-                          ✗
-                        </button>
-                      </>)}
+                          style={{fontSize:11,padding:"2px 8px",borderRadius:5,border:`1px solid ${noPudo?"rgba(239,68,68,0.5)":"rgba(255,255,255,0.1)"}`,background:noPudo?"rgba(239,68,68,0.1)":"transparent",color:noPudo?"#ef4444":"#5a9a7a",cursor:"pointer"}}>✗</button>
+                      </>}
                     </div>
-                    {tarea.obs&&!hecha&&<div style={{fontSize:10,color:"#4a7a5a",marginTop:3,marginLeft:22}}>{tarea.obs}</div>}
-                    {noPudo&&(
-                      <input placeholder="¿Por qué no se pudo?"
-                        value={rutinasGolfState[tarea.id+"_obs"]||""}
-                        onChange={e=>setRutinasGolfState(p=>({...p,[tarea.id+"_obs"]:e.target.value}))}
-                        style={{marginTop:4,marginLeft:22,fontSize:11,padding:"3px 8px",borderRadius:5,
-                          border:"1px solid rgba(239,68,68,0.3)",background:"rgba(239,68,68,0.05)",
-                          color:"#fca5a5",width:"calc(100% - 22px)"}}/>
-                    )}
+                    {noPudo&&<input placeholder="¿Por qué no se pudo?"
+                      value={rutinasGolfState[tarea.id+"_obs"]||""}
+                      onChange={e=>setRutinasGolfState(p=>({...p,[tarea.id+"_obs"]:e.target.value}))}
+                      style={{marginTop:4,marginLeft:22,fontSize:11,padding:"3px 8px",borderRadius:5,border:"1px solid rgba(239,68,68,0.3)",background:"rgba(239,68,68,0.05)",color:"#fca5a5",width:"calc(100% - 22px)"}}/>}
                   </div>
                 );
               })}
@@ -2723,51 +2710,11 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                   <span style={{color:"#4a7a5a",fontSize:12,transform:openDiarias?"rotate(90deg)":"rotate(0deg)",transition:"transform .2s",display:"inline-block"}}>▶</span>
                 </div>
               </div>
-              {/* Botón marcar todas hechas */}
-              {puedeEditar&&!todasHechas&&(
-                <div style={{padding:"6px 14px",borderBottom:"1px solid rgba(255,255,255,0.04)",display:"flex",justifyContent:"flex-end"}}>
-                  <button
-                    onClick={()=>misTareasDiarias.forEach(t=>normalizarEstado(t.estado)!=="hecha"&&onUpdateTarea(fechaVer,t.id,{estado:"hecha"}))}
-                    style={{...S.btn,fontSize:11,padding:"3px 12px",background:"rgba(34,197,94,0.12)",color:"#22c55e",border:"1px solid rgba(34,197,94,0.3)"}}>
-                    ✅ Marcar todas hechas
-                  </button>
-                </div>
-              )}
-              {/* Lista de tareas diarias agrupadas por tipo */}
+              {/* Lista de tareas */}
               {openDiarias&&(
                 <div>
-                  {(()=>{
-                    const GRUPOS_D=[
-                      {key:"corte",   icon:"✂️",label:"Cortes",      match:t=>(t.tarea||"").toLowerCase().includes("corte")},
-                      {key:"limpieza",icon:"🧹",label:"Limpieza",    match:t=>(t.tarea||"").toLowerCase().includes("limpieza")||(t.tarea||"").toLowerCase().includes("barrido")||(t.tarea||"").toLowerCase().includes("soplado")},
-                      {key:"riego",   icon:"💧",label:"Riego",       match:t=>(t.tarea||"").toLowerCase().includes("riego")},
-                      {key:"revision",icon:"🔍",label:"Revisiones",  match:t=>(t.tarea||"").toLowerCase().includes("revisión")||(t.tarea||"").toLowerCase().includes("revision")},
-                      {key:"otros_d", icon:"🌿",label:"Otras",       match:t=>true},
-                    ];
-                    const asignadas=new Set();
-                    const gruposDiarias=[];
-                    GRUPOS_D.forEach(g=>{
-                      const ts=misTareasDiarias.filter(t=>!asignadas.has(t.id)&&g.match(t));
-                      ts.forEach(t=>asignadas.add(t.id));
-                      if(ts.length>0) gruposDiarias.push({...g,tareas:ts});
-                    });
-                    return gruposDiarias.map(gD=>(
-                      <div key={gD.key}>
-                        {gruposDiarias.length>1&&(
-                          <div style={{padding:"4px 14px",fontSize:10,color:"#4a7a5a",background:"rgba(255,255,255,0.02)",textTransform:"uppercase",letterSpacing:"0.5px"}}>
-                            {gD.icon} {gD.label}
-                            {/* Botón marcar grupo completo */}
-                            {puedeEditar&&gD.tareas.some(t=>normalizarEstado(t.estado)!=="hecha")&&(
-                              <button
-                                onClick={()=>gD.tareas.forEach(t=>normalizarEstado(t.estado)!=="hecha"&&onUpdateTarea(fechaVer,t.id,{estado:"hecha"}))}
-                                style={{marginLeft:8,fontSize:9,padding:"1px 6px",border:"1px solid rgba(34,197,94,0.3)",borderRadius:4,background:"rgba(34,197,94,0.08)",color:"#22c55e",cursor:"pointer"}}>
-                                ✅ todas
-                              </button>
-                            )}
-                          </div>
-                        )}
-                        {gD.tareas.map((t,i)=>{
-                    const est=ESTADOS_TAREA[normalizarEstado(t.estado)]||ESTADOS_TAREA.pendiente;
+                  {misTareasDiarias.map((t,i)=>{
+                    const est=ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente;
                     return (
                       <div key={t.id} style={{padding:"10px 14px",background:i%2===0?"rgba(255,255,255,0.02)":"rgba(255,255,255,0.04)",borderBottom:i<misTareasDiarias.length-1?"1px solid rgba(255,255,255,0.05)":"none"}}>
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:t.metodoLimpieza||t.notas?4:0}}>
@@ -2797,8 +2744,8 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                           </div>
                         ) : (
                           <div style={{display:"flex",alignItems:"center",gap:6}}>
-                            <span style={{fontSize:11,fontWeight:600,color:(ESTADOS_TAREA[normalizarEstado(t.estado)]||ESTADOS_TAREA.pendiente).color}}>
-                              {(ESTADOS_TAREA[normalizarEstado(t.estado)]||ESTADOS_TAREA.pendiente).icon} {(ESTADOS_TAREA[normalizarEstado(t.estado)]||ESTADOS_TAREA.pendiente).label}
+                            <span style={{fontSize:11,fontWeight:600,color:(ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente).color}}>
+                              {(ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente).icon} {(ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente).label}
                             </span>
                             <span style={{fontSize:10,color:"#4a7a5a"}}>· Turno cerrado</span>
                           </div>
@@ -2806,23 +2753,12 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                         {/* Campo altura real de corte — aparece al marcar como hecha si la tarea es de corte */}
                         {(t.tarea||"").toLowerCase().includes("corte")&&(t.zona==="Golf"||(t.zona||"").includes("Golf"))&&(
                           <div style={{marginTop:6,display:"flex",alignItems:"center",gap:8}}>
-                            <div style={{fontSize:11,color:"#fbbf24",fontWeight:600,marginBottom:4}}>✂️ Ratificar altura de corte (mm)</div>
-                              <div style={{fontSize:10,color:"#5a9a7a",marginBottom:4}}>HOC objetivo: <b style={{color:"#fbbf24"}}>{t.alturaCorteObj||t.alturaCorte||"—"}mm</b> — confirma o corrige el valor real</div>
+                            <label style={{fontSize:11,color:"#fbbf24",whiteSpace:"nowrap"}}>✂️ Altura de corte real (mm):</label>
                             <input type="number" step="0.1" min="2" max="20"
                               value={alturaInputs[t.id]??t.alturaCorteReal??""}
                               onChange={e=>setAlturaInputs(p=>({...p,[t.id]:e.target.value}))}
-                              onBlur={e=>{
-                                const val = e.target.value;
-                                if(val && val !== (t.alturaCorteReal||"")) {
-                                  onUpdateTarea(fechaVer,t.id,{alturaCorteReal:val});
-                                }
-                              }}
-                              onKeyDown={e=>{
-                                if(e.key==="Enter"||e.key==="Tab") {
-                                  const val = e.target.value;
-                                  if(val) onUpdateTarea(fechaVer,t.id,{alturaCorteReal:val});
-                                }
-                              }}
+                              onBlur={e=>{const val=e.target.value;if(val&&val!==(t.alturaCorteReal||""))onUpdateTarea(fechaVer,t.id,{alturaCorteReal:val});}}
+                              onKeyDown={e=>{if(e.key==="Enter"||e.key==="Tab"){const val=e.target.value;if(val)onUpdateTarea(fechaVer,t.id,{alturaCorteReal:val});}}}
                               placeholder={t.alturaCorteObj||t.alturaCorte||"mm"}
                               style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(251,191,36,0.3)",borderRadius:6,color:"#fbbf24",padding:"4px 8px",fontSize:13,fontFamily:"'Georgia',serif",width:80,outline:"none"}}/>
                             {t.alturaCorteReal&&<span style={{fontSize:10,color:"#5a9a7a"}}>✓ {t.alturaCorteReal}mm registrado</span>}
@@ -2838,9 +2774,6 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                       </div>
                     );
                   })}
-                      </div>
-                    ));
-                  })()}
                   {/* ── Observaciones del turno integradas ── */}
                   <div style={{padding:"12px 14px",background:"rgba(52,211,153,0.03)",borderTop:"1px solid rgba(52,211,153,0.1)"}}>
                     <div style={{fontSize:11,fontWeight:600,color:"#34d399",marginBottom:10}}>📝 Observaciones del turno</div>
@@ -2939,21 +2872,11 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                         <span style={{fontSize:10,color:"#5a9a7a",background:"rgba(255,255,255,0.05)",padding:"1px 6px",borderRadius:10}}>{hechas}/{g.tareas.length}</span>
                       </div>
                       <span style={{color:"#4a7a5a",fontSize:11,transform:open?"rotate(90deg)":"rotate(0deg)",transition:"transform .2s",display:"inline-block"}}>▶</span>
-                    {/* Botón marcar grupo completo */}
-                    {puedeEditar&&g.tareas.some(t=>normalizarEstado(t.estado)!=="hecha")&&(
-                      <div style={{padding:"4px 12px",borderBottom:"1px solid rgba(255,255,255,0.04)",display:"flex",justifyContent:"flex-end"}}>
-                        <button
-                          onClick={()=>g.tareas.forEach(t=>normalizarEstado(t.estado)!=="hecha"&&onUpdateTarea(fechaVer,t.id,{estado:"hecha"}))}
-                          style={{fontSize:10,padding:"2px 10px",border:"1px solid rgba(34,197,94,0.3)",borderRadius:4,background:"rgba(34,197,94,0.08)",color:"#22c55e",cursor:"pointer"}}>
-                          ✅ Marcar todas hechas
-                        </button>
-                      </div>
-                    )}
                     </div>
                     {open&&(
                       <div>
                         {g.tareas.map((t,i)=>{
-                          const est=ESTADOS_TAREA[normalizarEstado(t.estado)]||ESTADOS_TAREA.pendiente;
+                          const est=ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente;
                           return (
                             <div key={t.id} style={{padding:"9px 12px",background:i%2===0?"transparent":"rgba(255,255,255,0.02)",borderTop:"1px solid rgba(255,255,255,0.04)"}}>
                               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:5}}>
@@ -2975,8 +2898,8 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                                   ))}
                                 </div>
                               ) : (
-                                <span style={{fontSize:11,fontWeight:600,color:(ESTADOS_TAREA[normalizarEstado(t.estado)]||ESTADOS_TAREA.pendiente).color}}>
-                                  {(ESTADOS_TAREA[normalizarEstado(t.estado)]||ESTADOS_TAREA.pendiente).icon} {(ESTADOS_TAREA[normalizarEstado(t.estado)]||ESTADOS_TAREA.pendiente).label}
+                                <span style={{fontSize:11,fontWeight:600,color:(ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente).color}}>
+                                  {(ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente).icon} {(ESTADOS_TAREA[t.estado]||ESTADOS_TAREA.pendiente).label}
                                 </span>
                               )}
                               {t.estado==="no_pudo"&&(
