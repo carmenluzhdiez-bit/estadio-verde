@@ -3340,7 +3340,27 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                 <span style={{fontSize:11,color:"#22c55e"}}>{tz.filter(t=>["hecha","completada"].includes(t.estado)).length} ✓</span>
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                {tz.map(t=>{
+                {(()=>{
+                  const TIPOS_PD=[
+                    {key:"corte",   icon:"✂️", label:"Cortes",        match:t=>(t.tarea||"").toLowerCase().includes("corte")},
+                    {key:"riego",   icon:"💧", label:"Riego",          match:t=>(t.tarea||"").toLowerCase().includes("riego")||(t.tarea||"").toLowerCase().includes("regar")},
+                    {key:"poda",    icon:"🌿", label:"Poda / Arbusto", match:t=>(t.tarea||"").toLowerCase().includes("poda")||(t.tarea||"").toLowerCase().includes("arbusto")},
+                    {key:"limpieza",icon:"🧹", label:"Limpieza",       match:t=>(t.tarea||"").toLowerCase().includes("limpieza")||(t.tarea||"").toLowerCase().includes("barrido")},
+                    {key:"fertil",  icon:"🌱", label:"Fertilización",  match:t=>(t.tarea||"").toLowerCase().includes("fertil")||(t.tarea||"").toLowerCase().includes("abono")},
+                    {key:"otros",   icon:"📋", label:"Otras",          match:t=>true},
+                  ];
+                  const usados=new Set();
+                  const grupos=[];
+                  TIPOS_PD.forEach(g=>{
+                    const ts=tz.filter(t=>!usados.has(t.id)&&g.match(t));
+                    ts.forEach(t=>usados.add(t.id));
+                    if(ts.length>0) grupos.push({...g,tareas:ts});
+                  });
+                  return grupos.map(gp=>(
+                    <div key={gp.key}>
+                      {grupos.length>1&&<div style={{fontSize:10,color:"#4a7a5a",padding:"3px 0 5px",textTransform:"uppercase",letterSpacing:"0.5px",fontWeight:600}}>{gp.icon} {gp.label} <span style={{color:"#3a5a3a"}}>({gp.tareas.length})</span></div>}
+                      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                      {gp.tareas.map(t=>{
                   const est=ESTADOS_TAREA[normalizarEstado(t.estado)]||ESTADOS_TAREA.por_designar;
                   return (
                     <div key={t.id} style={{...S.card,padding:"12px 14px",borderLeft:`3px solid ${est.color}`,opacity:t.estado==="cancelada"?0.5:1}}>
@@ -3376,6 +3396,10 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                     </div>
                   );
                 })}
+                      </div>
+                    </div>
+                  ));
+                })()}
               </div>
             </div>
           ))}
@@ -4448,7 +4472,7 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
   };
 
   const calcProxima = (f) => f.modo==="diasSemana" ? calcProximaDiaSemana(f) : calcProximaEstacion(f);
-  const esSinFrecuencia = (f) => f.modo!=="diasSemana" && ["unavez","segunecesidad"].includes(f[estActual]);
+  const esSinFrecuencia = (f) => f.modo!=="diasSemana" && f.modo!=="intervalo" && ["unavez","segunecesidad"].includes(f[estActual]);
 
   const inputSt = {background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:7,color:"#ede9e0",padding:"7px 10px",fontFamily:"'Georgia',serif",fontSize:13,width:"100%",outline:"none"};
   const labelSt = {fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
@@ -4520,12 +4544,16 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
               {/* Selector de modo */}
               <div style={{display:"flex",gap:6,marginBottom:10}}>
                 <button onClick={()=>updateFila(idx,"modo","estacion")}
-                  style={{flex:1,cursor:"pointer",border:`1px solid ${modo==="estacion"?"rgba(52,211,153,0.5)":"rgba(255,255,255,0.1)"}`,borderRadius:7,padding:"6px 10px",fontSize:12,background:modo==="estacion"?"rgba(52,211,153,0.1)":"transparent",color:modo==="estacion"?"#34d399":"#7aaa80",fontFamily:"'Georgia',serif"}}>
+                  style={{flex:1,cursor:"pointer",border:`1px solid ${modo==="estacion"?"rgba(52,211,153,0.5)":"rgba(255,255,255,0.1)"}`,borderRadius:7,padding:"6px 10px",fontSize:11,background:modo==="estacion"?"rgba(52,211,153,0.1)":"transparent",color:modo==="estacion"?"#34d399":"#7aaa80",fontFamily:"'Georgia',serif"}}>
                   🌦️ Por estación
                 </button>
+                <button onClick={()=>updateFila(idx,"modo","intervalo")}
+                  style={{flex:1,cursor:"pointer",border:`1px solid ${modo==="intervalo"?"rgba(251,191,36,0.5)":"rgba(255,255,255,0.1)"}`,borderRadius:7,padding:"6px 10px",fontSize:11,background:modo==="intervalo"?"rgba(251,191,36,0.1)":"transparent",color:modo==="intervalo"?"#fbbf24":"#7aaa80",fontFamily:"'Georgia',serif"}}>
+                  📏 Cada X días
+                </button>
                 <button onClick={()=>updateFila(idx,"modo","diasSemana")}
-                  style={{flex:1,cursor:"pointer",border:`1px solid ${modo==="diasSemana"?"rgba(96,165,250,0.5)":"rgba(255,255,255,0.1)"}`,borderRadius:7,padding:"6px 10px",fontSize:12,background:modo==="diasSemana"?"rgba(96,165,250,0.1)":"transparent",color:modo==="diasSemana"?"#60a5fa":"#7aaa80",fontFamily:"'Georgia',serif"}}>
-                  📆 Días específicos
+                  style={{flex:1,cursor:"pointer",border:`1px solid ${modo==="diasSemana"?"rgba(96,165,250,0.5)":"rgba(255,255,255,0.1)"}`,borderRadius:7,padding:"6px 10px",fontSize:11,background:modo==="diasSemana"?"rgba(96,165,250,0.1)":"transparent",color:modo==="diasSemana"?"#60a5fa":"#7aaa80",fontFamily:"'Georgia',serif"}}>
+                  📆 Días semana
                 </button>
               </div>
 
@@ -4544,6 +4572,32 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
                       </div>
                     );
                   })}
+                </div>
+              )}
+
+              {/* Modo: Cada X días (intervalo fijo) */}
+              {modo==="intervalo"&&(
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                  <div>
+                    <label style={{...labelSt,color:"#fbbf24"}}>Cada cuántos días</label>
+                    <input type="number" min="1" max="365" style={{...inputSt,fontSize:16,fontWeight:700}}
+                      value={f.intervaloDias||""}
+                      onChange={e=>updateFila(idx,"intervaloDias",e.target.value)}
+                      placeholder="ej: 7"/>
+                    <div style={{fontSize:10,color:"#5a9a7a",marginTop:3}}>
+                      {f.intervaloDias?`Cada ${f.intervaloDias} días — ${Math.round(365/Number(f.intervaloDias))} veces al año`:""}
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{...labelSt,color:"#fbbf24"}}>Última vez</label>
+                    <input type="date" style={inputSt}
+                      value={f.ultimaVez||""}
+                      onChange={e=>updateFila(idx,"ultimaVez",e.target.value)}/>
+                  </div>
+                  <div style={{gridColumn:"1/-1"}}>
+                    <label style={labelSt}>Observaciones</label>
+                    <input style={inputSt} value={f.obs||""} onChange={e=>updateFila(idx,"obs",e.target.value)} placeholder="Notas sobre esta tarea..."/>
+                  </div>
                 </div>
               )}
 
