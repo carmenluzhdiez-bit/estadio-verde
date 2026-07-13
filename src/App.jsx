@@ -2340,34 +2340,7 @@ const GOLF_FRECS_INIT = {
 };
 
 // Hook para inicializar frecuencias Golf si no existen en Firebase
-function useInitGolfFrecs(data, setData) {
-  const yaInicializado = React.useRef(false);
-  React.useEffect(() => {
-    if(yaInicializado.current) return; // solo una vez
-    if(!data) return;
-    const golfData = data[31];
-    if(!golfData) return;
-    const elems = golfData.elementos || {};
-    const updates = {};
-    Object.entries(GOLF_FRECS_INIT).forEach(([eid, frecs]) => {
-      if(!elems[eid]?.frecuencias?.length) {
-        updates[eid] = { ...(elems[eid]||{}), frecuencias: frecs };
-      }
-    });
-    if(Object.keys(updates).length > 0) {
-      yaInicializado.current = true;
-      // Escribir directo en Firebase sin pasar por setData (evita loop)
-      const updatesFirebase = {};
-      Object.entries(updates).forEach(([eid, val]) => {
-        updatesFirebase[`${ROOT}/data/31/elementos/${eid}`] = val;
-      });
-      fbUpdate(ref(db), updatesFirebase).catch(e=>console.warn("InitGolfFrecs:", e));
-      console.log("✅ Frecuencias Golf inicializadas:", Object.keys(updates));
-    } else {
-      yaInicializado.current = true; // ya tenía frecuencias
-    }
-  }, [!!data]);
-}
+// useInitGolfFrecs movido a App
 
 
 // ─── PROGRAMACIÓN DIARIA ─────────────────────────────────────────────────────
@@ -14574,6 +14547,30 @@ export default function App() {
   const appReady = dataReady && personalReady && progReady;
   const [golfInitTab, setGolfInitTab] = React.useState(null);
   const [bonoPrefill, setBonoPrefill] = React.useState(null);
+  const [connTimeout, setConnTimeout] = React.useState(false);
+  React.useEffect(()=>{
+    const t = setTimeout(()=>{ if(!appReady) setConnTimeout(true); }, 12000);
+    return ()=>clearTimeout(t);
+  },[appReady]);
+
+  // Inicializar frecuencias Golf en Firebase (una sola vez cuando data está lista)
+  const golfFrecsInited = React.useRef(false);
+  React.useEffect(()=>{
+    if(!dataReady || golfFrecsInited.current) return;
+    const golfZona = data?.[31];
+    if(!golfZona) return;
+    const elems = golfZona.elementos || {};
+    const fbUpdates = {};
+    Object.entries(GOLF_FRECS_INIT).forEach(([eid, frecs]) => {
+      if(!elems[eid]?.frecuencias?.length) {
+        fbUpdates[ROOT+"/data/31/elementos/"+eid+"/frecuencias"] = frecs;
+      }
+    });
+    golfFrecsInited.current = true;
+    if(Object.keys(fbUpdates).length > 0) {
+      fbUpdate(ref(db), fbUpdates).catch(e=>console.warn("InitGolfFrecs:", e));
+    }
+  },[dataReady]);
 
   // ── Helper: registrar notificación en Firebase ───────────────────────
   const crearNotificacion = React.useCallback((tipo, datos) => {
@@ -14751,7 +14748,7 @@ export default function App() {
   const rolLogueado = fbRol;
   const esJefa = fbRol === "jefa";
   const { pushActivo, activarPush } = usePushNotifications(esJefa);
-  useInitGolfFrecs(data, setData); // inicializa frecuencias Golf en Firebase
+
   const esSupervisor = fbRol === "supervisor";
   const esTrabajador = fbRol === "trabajador";
 
