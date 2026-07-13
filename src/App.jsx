@@ -3151,7 +3151,9 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           {/* ── VISTA SEMANAL ── */}
           {vistaSemanal&&(()=>{
             const hoyD = new Date(hoy+"T12:00:00");
-            const lunes = new Date(hoyD); lunes.setDate(hoyD.getDate()-((hoyD.getDay()+6)%7));
+            // Semana próxima: lunes siguiente
+            const diasHastaLunes = ((8 - hoyD.getDay()) % 7) || 7; // días hasta próximo lunes
+            const lunes = new Date(hoyD); lunes.setDate(hoyD.getDate()+diasHastaLunes);
             const dias7 = Array.from({length:7},(_,i)=>{
               const d = new Date(lunes); d.setDate(lunes.getDate()+i);
               return d.toISOString().slice(0,10);
@@ -15020,8 +15022,10 @@ export default function App() {
                 onChange={ev=>setElemNotas(zonaId,e.id,e.isCustom,ev.target.value)}/>
             </div>
 
-            {/* Frecuencias de mantención */}
-            <FrecuenciasPanel zid={zonaId} eid={e.id} tipo={e.tipo} isCustom={e.isCustom} S={S} getFrecs={getElemFrecs} setFrecs={setElemFrecs}/>
+            {/* Frecuencias de mantención → ver en Programa */}
+            <div style={{marginTop:10,padding:"10px 14px",background:"rgba(96,165,250,0.06)",borderRadius:8,border:"1px solid rgba(96,165,250,0.15)",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div style={{fontSize:11,color:"#5a9a7a"}}>📅 Las frecuencias de mantención se gestionan en <b style={{color:"#60a5fa"}}>Programa → 🔄 Frecuencias</b></div>
+            </div>
 
             {/* Eliminar */}
             {(e.isCustom||(zona?.elementos.find(x=>x.id===e.id)))&&(
