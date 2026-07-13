@@ -7064,7 +7064,7 @@ function CuentaSelector({ value, onChange, S, CUENTAS_INTERNAS, CUENTAS_EXTERNAS
             <div style={{padding:"8px 14px 4px",fontSize:10,color:"#4ade80",fontWeight:700,letterSpacing:"1px",textTransform:"uppercase",background:"rgba(74,222,128,0.05)"}}>
               🏛️ Internas — Beneficio general socios
             </div>
-            {CUENTAS_INTERNAS.map(cuentaGrp=>(
+            {CUENTAS_INTERNAS.map(c=>(
               <div key={c} style={{padding:"9px 14px 9px 22px",cursor:"pointer",fontSize:13,color:value===c?"#86efac":"#ede9e0",background:value===c?"rgba(34,197,94,0.1)":"transparent",borderLeft:value===c?"2px solid #86efac":"2px solid transparent"}}
                 onClick={()=>{onChange(c);setOpen(false);}}>
                 {c}
@@ -7074,7 +7074,7 @@ function CuentaSelector({ value, onChange, S, CUENTAS_INTERNAS, CUENTAS_EXTERNAS
             <div style={{padding:"8px 14px 4px",fontSize:10,color:"#60a5fa",fontWeight:700,letterSpacing:"1px",textTransform:"uppercase",background:"rgba(96,165,250,0.05)",borderTop:"1px solid rgba(255,255,255,0.06)",marginTop:4}}>
               🏢 Externas — Beneficio área específica
             </div>
-            {CUENTAS_EXTERNAS.map(cuentaGrp=>(
+            {CUENTAS_EXTERNAS.map(c=>(
               <div key={c} style={{padding:"9px 14px 9px 22px",cursor:"pointer",fontSize:13,color:value===c?"#93c5fd":"#ede9e0",background:value===c?"rgba(59,130,246,0.1)":"transparent",borderLeft:value===c?"2px solid #93c5fd":"2px solid transparent"}}
                 onClick={()=>{onChange(c);setOpen(false);}}>
                 {c}
@@ -8399,7 +8399,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                       </div>
                     </div>
                     <div style={{borderTop:"1px solid rgba(255,255,255,0.07)",paddingTop:10,marginBottom:10}}>
-                      {itemsRend.map(optC=>{
+                      {itemsRend.map(c=>{
                         const items=c.items||[{descripcion:c.descripcion}];
                         return <div key={c.id} style={{fontSize:12,color:"#7aaa80",padding:"3px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
                           <div style={{display:"flex",justifyContent:"space-between"}}>
