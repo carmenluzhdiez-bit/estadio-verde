@@ -14921,11 +14921,19 @@ export default function App() {
 
   // updateZona — actualiza una zona en el estado data
 
-  const updateZona = (id, patch) => setData(prev => {
+  const updateZona = (id, patch) => {
     const zidStr = String(id);
-    const existing = prev[zidStr] || {};
-    return { ...prev, [zidStr]: { ...existing, ...patch } };
-  });
+    console.log("updateZona:", zidStr, Object.keys(patch));
+    setData(prev => {
+      const existing = prev[zidStr] || {};
+      const nuevo = { ...prev, [zidStr]: { ...existing, ...patch } };
+      // Forzar escritura directa en Firebase también
+      fbSet(ref(db, ROOT+"/data/"+zidStr), { ...existing, ...patch })
+        .then(()=>console.log("✅ Firebase guardado:", zidStr))
+        .catch(e=>console.error("❌ Firebase error:", e));
+      return nuevo;
+    });
+  };
   const addHistorial = (id, txt) => setData(p => ({
     ...p, [String(id)]: { ...p[String(id)], historial: [{ txt, fecha: new Date().toLocaleDateString("es-CL"), hora: new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"}) }, ...(p[id]?.historial||[])].slice(0,30) }
   }));
