@@ -14002,10 +14002,10 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
   React.useEffect(()=>{ if(tabAlerta==="viento") fetchViento(); },[tabAlerta]);
 
   const NIVELES_VIENTO = [
-    {nivel:0,label:"Normal",         rango:"< 40 km/h",  color:"#22c55e",bg:"rgba(34,197,94,0.08)",   min:0, max:39, icon:"N0",acciones:[]},
-    {nivel:1,label:"Alerta temprana",rango:"40–59 km/h", color:"#f59e0b",bg:"rgba(245,158,11,0.08)", min:40,max:59, icon:"N1",acciones:["Asegurar macetas y elementos móviles","Revisar y asegurar señalética","Alertar al equipo","Suspender trabajos en altura"]},
-    {nivel:2,label:"Alerta media",   rango:"60–81 km/h", color:"#f97316",bg:"rgba(249,115,22,0.08)", min:60,max:81, icon:"N2",acciones:["Suspender labores de jardinería en exterior","Retirar herramientas y equipos livianos","Encintar zonas de riesgo por caída de ramas","Revisar árboles con riesgo de volcamiento","Notificar a administración del estadio","Cierre sectorial de zonas arboladas"]},
-    {nivel:3,label:"Alerta alta",    rango:"> 82 km/h",  color:"#ef4444",bg:"rgba(239,68,68,0.08)",  min:82,max:999,icon:"N3",acciones:["EVACUACIÓN INMEDIATA de todas las zonas verdes","Cerrar acceso al estadio y zonas deportivas","Activar protocolo de emergencia con administración","Contactar Defensa Civil si corresponde","Documentar fotográficamente post-evento","Inspección completa antes de reabrir"]},
+    {nivel:0,label:"Normal",         rango:"< 40 km/h (vel. y ráfagas)",  color:"#22c55e",bg:"rgba(34,197,94,0.08)",   min:0, max:39, icon:"N0",acciones:[]},
+    {nivel:1,label:"Alerta temprana",rango:"40–59 km/h (vel. o ráfagas)", color:"#f59e0b",bg:"rgba(245,158,11,0.08)", min:40,max:59, icon:"N1",acciones:["Asegurar macetas y elementos móviles","Revisar y asegurar señalética","Alertar al equipo","Suspender trabajos en altura"]},
+    {nivel:2,label:"Alerta media",   rango:"60–81 km/h (vel. o ráfagas)", color:"#f97316",bg:"rgba(249,115,22,0.08)", min:60,max:81, icon:"N2",acciones:["Suspender labores de jardinería en exterior","Retirar herramientas y equipos livianos","Encintar zonas de riesgo por caída de ramas","Revisar árboles con riesgo de volcamiento","Notificar a administración del estadio","Cierre sectorial de zonas arboladas"]},
+    {nivel:3,label:"Alerta alta",    rango:"> 82 km/h (vel. o ráfagas)",  color:"#ef4444",bg:"rgba(239,68,68,0.08)",  min:82,max:999,icon:"N3",acciones:["EVACUACIÓN INMEDIATA de todas las zonas verdes","Cerrar acceso al estadio y zonas deportivas","Activar protocolo de emergencia con administración","Contactar Defensa Civil si corresponde","Documentar fotográficamente post-evento","Inspección completa antes de reabrir"]},
   ];
 
   const getNivelViento = (kmh) => [...NIVELES_VIENTO].reverse().find(n=>kmh>=n.min)||NIVELES_VIENTO[0];
@@ -14229,6 +14229,20 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
                     ))}
                   </div>
                   <div style={{background:nvMax.bg,border:`2px solid ${nvMax.color}`,borderRadius:10,padding:"12px 16px",marginBottom:nvMax.acciones.length>0?10:0}}>
+                    {/* Indicador de qué determinó el nivel */}
+                    {nvRaf.nivel!==nvVel.nivel&&(
+                      <div style={{fontSize:10,color:nvMax.color,marginBottom:6,fontWeight:600}}>
+                        {nvRaf.nivel>nvVel.nivel
+                          ? `⚠️ Nivel determinado por RÁFAGAS (${vientoData.rafaga} km/h) — viento sostenido: ${vientoData.velocidad} km/h`
+                          : `ℹ️ Nivel por viento sostenido (${vientoData.velocidad} km/h) — ráfagas: ${vientoData.rafaga} km/h`
+                        }
+                      </div>
+                    )}
+                    {nvRaf.nivel===nvVel.nivel&&nvMax.nivel>0&&(
+                      <div style={{fontSize:10,color:nvMax.color,marginBottom:6}}>
+                        Viento {vientoData.velocidad} km/h · Ráfagas {vientoData.rafaga} km/h — ambos en nivel {nvMax.label}
+                      </div>
+                    )}
                     <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:nvMax.acciones.length>0?8:0}}>
                       <span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:28,height:28,borderRadius:"50%",background:nvMax.color,color:"#fff",fontWeight:900,fontSize:11}}>{nvMax.nivel}</span>
                       <div>
@@ -14256,7 +14270,7 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
                   <div style={{...S.card,padding:14}}>
                     <div style={{fontSize:12,fontWeight:700,color:"#5a9a7a",marginBottom:8}}>⏱️ Próximas horas</div>
                     <div style={{display:"flex",gap:6,overflowX:"auto"}}>
-                      {vientoPronostico.map((h,i)=>{const nv2=getNivelViento(Math.max(h.velocidad,h.rafaga));return(
+                      {vientoPronostico.map((h,i)=>{const nv2=getNivelViento(Math.max(h.velocidad,h.rafaga));const esRaf=h.rafaga>h.velocidad&&getNivelViento(h.rafaga).nivel>getNivelViento(h.velocidad).nivel;return(
                         <div key={i} style={{textAlign:"center",minWidth:54,padding:"7px 5px",borderRadius:7,background:nv2.bg,border:`1px solid ${nv2.color}30`,flexShrink:0}}>
                           <div style={{fontSize:10,color:"#5a9a7a"}}>{h.hora}</div>
                           <div style={{fontWeight:700,fontSize:13,color:nv2.color}}>{h.velocidad}</div>
