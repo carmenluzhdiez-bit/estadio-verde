@@ -6,7 +6,7 @@ import * as React from "react";
 
 // ─── FIREBASE ────────────────────────────────────────────────────────────────
 import { initializeApp } from "firebase/app";
-import { getDatabase, ref, onValue, set as fbSet, update as fbUpdate } from "firebase/database";
+import { getDatabase, ref, onValue, set as fbSet, update as fbUpdate, get } from "firebase/database";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
 
 const firebaseConfig = {
@@ -2243,9 +2243,8 @@ function ConfiguradorSemanal({ S, personal, configSemanal, setConfigSemanal, esJ
   };
 
   const semana = (() => {
-    const base = new Date(fecha+"T12:00:00");
+    const base = new Date(fechaLocal()+"T12:00:00");
     const dow = base.getDay();
-    // Lunes de la semana del día seleccionado
     const lun = new Date(base);
     lun.setDate(base.getDate() - ((dow+6)%7));
     const sab = new Date(lun); sab.setDate(lun.getDate()+5);
@@ -4562,10 +4561,15 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
     {v:1,l:"Lun",full:"Lunes"},{v:2,l:"Mar",full:"Martes"},{v:3,l:"Mié",full:"Miércoles"},
     {v:4,l:"Jue",full:"Jueves"},{v:5,l:"Vie",full:"Viernes"},{v:6,l:"Sáb",full:"Sábado"},{v:0,l:"Dom",full:"Domingo"},
   ];
-  const frecuencias = getFrecs(zid, eid, tipo, isCustom);
-  const updateFila = (idx, campo, valor) => { const arr = frecuencias.map((f,i)=>i===idx?{...f,[campo]:valor}:f); setFrecs(zid,eid,isCustom,arr); };
-  const addFila = () => { setFrecs(zid,eid,isCustom,[...frecuencias,{id:eid+"_"+Date.now(),modo:"estacion",tarea:"",verano:"semanal",otono:"semanal",invierno:"noaplica",primavera:"semanal",ultimaVez:"",diasSemana:[],diasProhibidos:[0,6],diasMinimos:""}]); };
-  const removeFila = (idx) => { setFrecs(zid,eid,isCustom,frecuencias.filter((_,i)=>i!==idx)); };
+  const frecuenciasBase = getFrecs(zid, eid, tipo, isCustom);
+  const [frecLocal, setFrecLocal] = React.useState(frecuenciasBase);
+  const [guardado, setGuardado] = React.useState(false);
+  React.useEffect(()=>{ setFrecLocal(getFrecs(zid,eid,tipo,isCustom)); setGuardado(false); },[zid,eid]);
+  const frecuencias = frecLocal;
+  const updateFila = (idx, campo, valor) => { setFrecLocal(arr=>arr.map((f,i)=>i===idx?{...f,[campo]:valor}:f)); setGuardado(false); };
+  const addFila = () => { setFrecLocal(arr=>[...arr,{id:eid+"_"+Date.now(),modo:"estacion",tarea:"",verano:"semanal",otono:"semanal",invierno:"noaplica",primavera:"semanal",ultimaVez:"",diasSemana:[],diasProhibidos:[0,6],diasMinimos:""}]); setGuardado(false); };
+  const removeFila = (idx) => { setFrecLocal(arr=>arr.filter((_,i)=>i!==idx)); setGuardado(false); };
+  const guardarFrecuencias = () => { setFrecs(zid,eid,isCustom,frecLocal); setGuardado(true); setTimeout(()=>setGuardado(false),2000); };
 
   // Convierte frecuencia a días
   const frecToDias = (frec) => {
@@ -4842,6 +4846,9 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
 
       <button onClick={addFila} style={{background:"rgba(61,122,82,0.2)",border:"1px solid rgba(61,122,82,0.3)",borderRadius:8,color:"#80c890",padding:"8px 16px",fontFamily:"'Georgia',serif",fontSize:13,cursor:"pointer",width:"100%"}}>
         ＋ Agregar tarea de mantención
+      </button>
+      <button onClick={guardarFrecuencias} style={{marginTop:8,width:"100%",padding:"8px 16px",borderRadius:8,cursor:"pointer",fontFamily:"'Georgia',serif",fontSize:13,background:guardado?"rgba(34,197,94,0.15)":"rgba(59,130,246,0.1)",color:guardado?"#22c55e":"#60a5fa",border:`1px solid ${guardado?"rgba(34,197,94,0.4)":"rgba(59,130,246,0.3)"}`}}>
+        {guardado?"✅ Frecuencias guardadas":"💾 Guardar frecuencias"}
       </button>
     </div>
   );
@@ -15032,12 +15039,28 @@ export default function App() {
   const toggleTareaZona = (zid, tid) => { const arr=(getZD(zid).tareas||[]).map(t=>t.id===tid?{...t,completada:!t.completada}:t); updateZona(zid,{tareas:arr}); };
 
   const setElemEstado = (zid,eid,isCustom,estado) => {
-    if(isCustom){const arr=[...(data[zid].elementosCustom||[])];const i=arr.findIndex(e=>e.id===eid);if(i>=0){arr[i]={...arr[i],estado};updateZona(zid,{elementosCustom:arr});}}
+    if(isCustom){ updateCustomElemField(zid,eid,{estado}); return; }
     else{updateZona(zid,{elementos:{...data[zid]?.elementos,[eid]:{...data[zid]?.elementos?.[eid],estado}}});}
     addHistorial(zid,`Estado "${getElemNombre(zid,eid,isCustom)}" → ${ESTADOS_ELEM[estado]?.label}`);
   };
+  // Helper: actualizar campo de elemento custom leyendo desde Firebase
+  const updateCustomElemField = (zid, eid, fieldPatch) => {
+    const zidStr = String(zid);
+    get(ref(db, ROOT+"/data/"+zidStr+"/elementosCustom")).then(snap=>{
+      const snapVal = snap.val();
+      const elems = Array.isArray(snapVal) ? snapVal
+        : snapVal && typeof snapVal==="object" ? Object.values(snapVal) : [];
+      const arr = elems.map(e=>e.id===eid?{...e,...fieldPatch}:e);
+      fbUpdate(ref(db, ROOT+"/data/"+zidStr), {elementosCustom:arr})
+        .then(()=>setData(prev=>({...prev,[zidStr]:{...(prev[zidStr]||{}),elementosCustom:arr}})));
+    }).catch(()=>{
+      const arr=[...(data[zidStr]?.elementosCustom||[])];
+      const i=arr.findIndex(e=>e.id===eid);
+      if(i>=0){arr[i]={...arr[i],...fieldPatch};updateZona(zidStr,{elementosCustom:arr});}
+    });
+  };
   const setElemNotas = (zid,eid,isCustom,notas) => {
-    if(isCustom){const arr=[...(data[zid].elementosCustom||[])];const i=arr.findIndex(e=>e.id===eid);if(i>=0){arr[i]={...arr[i],notas};updateZona(zid,{elementosCustom:arr});}}
+    if(isCustom){ updateCustomElemField(zid,eid,{notas}); return; }
     else{updateZona(zid,{elementos:{...data[zid]?.elementos,[eid]:{...data[zid]?.elementos?.[eid],notas}}});}
   };
   const getElemNombre = (zid,eid,isCustom) => {
@@ -15045,18 +15068,51 @@ export default function App() {
     return zonasConCust.find(z=>String(z.id)===String(zid))?.elementos.find(e=>e.id===eid)?.nombre||"";
   };
   const addCustomElem = (zid,elem) => {
-    if(!zid||!elem?.nombre?.trim()) { console.warn("addCustomElem: zonaId o nombre vacío", zid, elem); return; }
+    if(!zid||!elem?.nombre?.trim()) return;
     const id = "c"+Date.now();
     const zidStr = String(zid);
-    const existing = data[zidStr]?.elementosCustom;
-    const currentElems = Array.isArray(existing) ? existing : Object.values(existing||{});
     const newElemObj = {...elem, id, estado:"bueno", notas:""};
-    const arr = [...currentElems, newElemObj];
-    console.log("addCustomElem:", zidStr, newElemObj, "total:", arr.length);
-    updateZona(zidStr, {elementosCustom: arr});
+    // Leer desde Firebase para no perder elementos agregados en otras sesiones
+    const fbRef = ref(db, ROOT+"/data/"+zidStr+"/elementosCustom");
+    get(fbRef).then(snap=>{
+      const snapVal = snap.val();
+      const currentElems = Array.isArray(snapVal) ? snapVal
+        : snapVal && typeof snapVal==="object" ? Object.values(snapVal)
+        : [];
+      const arr = [...currentElems, newElemObj];
+      fbUpdate(ref(db, ROOT+"/data/"+zidStr), {elementosCustom: arr})
+        .then(()=>{
+          setData(prev=>{
+            const ex = prev[zidStr]||{};
+            return {...prev, [zidStr]:{...ex, elementosCustom:arr}};
+          });
+        })
+        .catch(e=>console.error("addCustomElem error:", e));
+    }).catch(()=>{
+      // Si falla la lectura, usar estado local
+      const existing = data[zidStr]?.elementosCustom;
+      const currentElems = Array.isArray(existing)?existing:Object.values(existing||{});
+      const arr = [...currentElems, newElemObj];
+      fbUpdate(ref(db, ROOT+"/data/"+zidStr), {elementosCustom: arr});
+      setData(prev=>({...prev,[zidStr]:{...(prev[zidStr]||{}),elementosCustom:arr}}));
+    });
     addHistorial(zidStr, `Elemento agregado: ${elem.nombre}`);
   };
-  const removeCustomElem = (zid,eid) => { const arr=(data[zid]?.elementosCustom||[]).filter(e=>e.id!==eid); updateZona(zid,{elementosCustom:arr}); };
+  const removeCustomElem = (zid,eid) => {
+    const zidStr = String(zid);
+    get(ref(db, ROOT+"/data/"+zidStr+"/elementosCustom")).then(snap=>{
+      const snapVal = snap.val();
+      const currentElems = Array.isArray(snapVal) ? snapVal
+        : snapVal && typeof snapVal==="object" ? Object.values(snapVal) : [];
+      const arr = currentElems.filter(e=>e.id!==eid);
+      fbUpdate(ref(db, ROOT+"/data/"+zidStr), {elementosCustom: arr})
+        .then(()=>setData(prev=>({...prev,[zidStr]:{...(prev[zidStr]||{}),elementosCustom:arr}})))
+        .catch(e=>console.error("removeCustomElem error:", e));
+    }).catch(()=>{
+      const arr=(data[zidStr]?.elementosCustom||[]).filter(e=>e.id!==eid);
+      updateZona(zidStr,{elementosCustom:arr});
+    });
+  };
   const removeBaseElem = (zid,eid) => { setZonas(prev=>prev.map(z=>String(z.id)===String(zid)?{...z,elementos:z.elementos.filter(e=>e.id!==eid)}:z)); const elems={...data[String(zid)]?.elementos}; delete elems[eid]; updateZona(zid,{elementos:elems}); addHistorial(zid,`Elemento eliminado`); };
 
   const addTrabajador = (t) => { const id=Date.now(); setPersonal(p=>[...(Array.isArray(p)?p:Object.values(p||{})),{...t,id,eventos:[]}]); };
@@ -15221,8 +15277,19 @@ export default function App() {
               <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.6px",textTransform:"uppercase"}}>Observaciones</label>
               <textarea rows={2} style={{...S.input,resize:"vertical",fontSize:13}}
                 placeholder="Observaciones del elemento..."
-                value={e.edData.notas||""}
-                onChange={ev=>setElemNotas(zonaId,e.id,e.isCustom,ev.target.value)}/>
+                defaultValue={e.edData.notas||""}
+                onBlur={ev=>{ if(ev.target.value!==(e.edData.notas||"")) setElemNotas(zonaId,e.id,e.isCustom,ev.target.value); }}
+                key={e.id+"_notas"}/>
+              <button onClick={ev=>{
+                const ta = ev.target.previousSibling;
+                setElemNotas(zonaId,e.id,e.isCustom,ta.value);
+                ta.style.border="1px solid rgba(34,197,94,0.5)";
+                setTimeout(()=>{ ta.style.border=""; },1200);
+              }} style={{marginTop:4,fontSize:11,padding:"3px 12px",borderRadius:6,
+                border:"1px solid rgba(34,197,94,0.3)",background:"rgba(34,197,94,0.08)",
+                color:"#22c55e",cursor:"pointer"}}>
+                💾 Guardar observaciones
+              </button>
             </div>
 
             {/* Frecuencias de mantención → ver en Programa */}
