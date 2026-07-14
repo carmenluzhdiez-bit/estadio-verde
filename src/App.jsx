@@ -3185,10 +3185,13 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
               // Obtener TODAS las tareas del día normalizando el array
               const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
               const todasHoy = normArr(tareasProg[fecha]||[]);
+              console.log("Reprogramar: fecha="+fecha+" total="+todasHoy.length, todasHoy.map(t=>t.tarea+"→"+t.estado));
               const pendientes = todasHoy.filter(t=>{
                 const est = normalizarEstado(t.estado);
+                console.log("  tarea:", t.tarea, "estado:", t.estado, "→", est);
                 return est!=="hecha" && est!=="no_pudo";
               });
+              console.log("Pendientes:", pendientes.length);
               if(pendientes.length===0) return alert("No hay tareas pendientes para reprogramar.");
               const tareasManana = normArr(tareasProg[mananaStr]||[]);
               const yaExisten = tareasManana.map(t=>t.zona+"_"+t.tarea);
