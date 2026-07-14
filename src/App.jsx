@@ -3218,6 +3218,25 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           )}
           {esJefa&&(
             <button onClick={()=>{
+              const hoy = fecha;
+              setTareas(prev=>{
+                const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+                const arr = normArr(prev[hoy]||[]);
+                const count = arr.filter(t=>(t.zona==="Golf"||(t.zona||"").toLowerCase().includes("golf"))&&!t.responsable).length;
+                if(count===0){alert("No hay tareas de Golf sin asignar hoy.");return prev;}
+                const updated = arr.map(t=>{
+                  const esGolf=(t.zona==="Golf"||(t.zona||"").toLowerCase().includes("golf"));
+                  return esGolf&&!t.responsable?{...t,responsable:"Osmar Bhalú Armijo Zúñiga",estado:"pendiente"}:t;
+                });
+                alert(count+" tarea(s) de Golf asignadas a Bhalú.");
+                return {...prev,[hoy]:updated};
+              });
+            }} style={{...S.btn,background:"rgba(251,191,36,0.1)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.2)",fontSize:11}}>
+              ⛳ Asignar Golf → Bhalú
+            </button>
+          )}
+          {esJefa&&(
+            <button onClick={()=>{
               const manana = new Date(fecha+"T12:00:00");
               manana.setDate(manana.getDate()+1);
               // Saltar domingo
@@ -16066,9 +16085,12 @@ export default function App() {
                 onAddTarea={(t)=>{
                   setTareasProg(prev=>{
                     const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-                    const lista=[...normArr(prev[t.fecha]||[]),t];
-                    fbUpdate(ref(db,`${ROOT}/prog`),{[t.fecha]:lista}).catch(e=>console.error(e));
-                    return {...prev,[t.fecha]:lista};
+                    // Auto-asignar Bhalú si zona Golf y sin responsable
+                    const esGolfT = (t.zona||"")==="Golf"||(t.zona||"").toLowerCase().includes("golf");
+                    const tFinal = esGolfT&&!t.responsable ? {...t, responsable:"Osmar Bhalú Armijo Zúñiga", estado:"pendiente"} : t;
+                    const lista=[...normArr(prev[tFinal.fecha]||[]),tFinal];
+                    fbUpdate(ref(db,`${ROOT}/prog`),{[tFinal.fecha]:lista}).catch(e=>console.error(e));
+                    return {...prev,[tFinal.fecha]:lista};
                   });
                 }}
                 onSetFrecs={setElemFrecs}
