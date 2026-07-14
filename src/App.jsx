@@ -65,11 +65,16 @@ function useFirebaseState(path, defaultValue) {
     setValueLocal(resolved);
     pendingRef.current = true;
     fbSet(ref(db, fullPath), resolved)
-      .then(() => { setTimeout(() => { pendingRef.current = false; }, 500); })
+      .then(() => { setTimeout(() => { pendingRef.current = false; }, 3000); })
       .catch(() => { pendingRef.current = false; });
   };
 
-  return [value, setValue, ready];
+  const setValueLocalOnly = (newVal) => {
+    const resolved = typeof newVal === "function" ? newVal(valueRef.current) : newVal;
+    valueRef.current = resolved;
+    setValueLocal(resolved);
+  };
+  return [value, setValue, ready, setValueLocalOnly];
 }
 
 // ─── CATEGORÍAS DE ELEMENTOS ────────────────────────────────────────────────
@@ -646,36 +651,68 @@ const MACROZONAS_BASE = [
   {
     id: 31, nombre: "Golf", categoria: "Deportivo", icono: "⛳",
     elementos: [
-      // Greens individuales — cada uno con su propio panel de frecuencias
-      { id: "green_g1", nombre: "Green 01 (Hoyo 01-10)", tipo: "cesped" },
-      { id: "green_g2", nombre: "Green 02 (Hoyo 02-11)", tipo: "cesped" },
-      { id: "green_g3", nombre: "Green 03 (Hoyo 03-12)", tipo: "cesped" },
-      { id: "green_g4", nombre: "Green 04 (Hoyo 04-13)", tipo: "cesped" },
-      { id: "green_g5", nombre: "Green 05 (Hoyo 05-14)", tipo: "cesped" },
-      { id: "green_g6", nombre: "Green 06 (Hoyo 06-15)", tipo: "cesped" },
-      { id: "green_g7", nombre: "Green 07 (Hoyo 07-16)", tipo: "cesped" },
-      { id: "green_g8", nombre: "Green 08 (Hoyo 08-17)", tipo: "cesped" },
-      { id: "green_g9", nombre: "Green 09 (Hoyo 09-18)", tipo: "cesped" },
+      // ── GREENS (9 + Vivero) ──────────────────────────────────────
+      { id: "green_g1", nombre: "Green 01", tipo: "cesped", hoyo: "Hoyo 01-10" },
+      { id: "green_g2", nombre: "Green 02", tipo: "cesped", hoyo: "Hoyo 02-11" },
+      { id: "green_g3", nombre: "Green 03", tipo: "cesped", hoyo: "Hoyo 03-12" },
+      { id: "green_g4", nombre: "Green 04", tipo: "cesped", hoyo: "Hoyo 04-13" },
+      { id: "green_g5", nombre: "Green 05", tipo: "cesped", hoyo: "Hoyo 05-14" },
+      { id: "green_g6", nombre: "Green 06", tipo: "cesped", hoyo: "Hoyo 06-15" },
+      { id: "green_g7", nombre: "Green 07", tipo: "cesped", hoyo: "Hoyo 07-16" },
+      { id: "green_g8", nombre: "Green 08", tipo: "cesped", hoyo: "Hoyo 08-17" },
+      { id: "green_g9", nombre: "Green 09", tipo: "cesped", hoyo: "Hoyo 09-18" },
       { id: "green_vivero", nombre: "Vivero de greens", tipo: "cesped" },
-      // Otras superficies del campo
-      { id: "e1", nombre: "Fairways (calles de golf)", tipo: "cesped" },
-      { id: "e3", nombre: "Rough (zona alta)", tipo: "cesped" },
-      { id: "e4", nombre: "Bunkers (arena)", tipo: "pavimentos" },
-      { id: "tees_golf", nombre: "Tees de salida", tipo: "cesped" },
-      // Zonas especiales
+      // ── TEES (18 posiciones → 9 hoyos) ──────────────────────────
+      { id: "tee_01a", nombre: "Tee 01A", tipo: "cesped", hoyo: "Hoyo 01", posicion: "A" },
+      { id: "tee_01b", nombre: "Tee 01B", tipo: "cesped", hoyo: "Hoyo 01", posicion: "B" },
+      { id: "tee_02a", nombre: "Tee 02A", tipo: "cesped", hoyo: "Hoyo 02", posicion: "A" },
+      { id: "tee_02b", nombre: "Tee 02B", tipo: "cesped", hoyo: "Hoyo 02", posicion: "B" },
+      { id: "tee_03a", nombre: "Tee 03A", tipo: "cesped", hoyo: "Hoyo 03", posicion: "A" },
+      { id: "tee_03b", nombre: "Tee 03B", tipo: "cesped", hoyo: "Hoyo 03", posicion: "B" },
+      { id: "tee_04a", nombre: "Tee 04A", tipo: "cesped", hoyo: "Hoyo 04", posicion: "A" },
+      { id: "tee_04b", nombre: "Tee 04B", tipo: "cesped", hoyo: "Hoyo 04", posicion: "B" },
+      { id: "tee_05a", nombre: "Tee 05A", tipo: "cesped", hoyo: "Hoyo 05", posicion: "A" },
+      { id: "tee_05b", nombre: "Tee 05B", tipo: "cesped", hoyo: "Hoyo 05", posicion: "B" },
+      { id: "tee_06a", nombre: "Tee 06A", tipo: "cesped", hoyo: "Hoyo 06", posicion: "A" },
+      { id: "tee_06b", nombre: "Tee 06B", tipo: "cesped", hoyo: "Hoyo 06", posicion: "B" },
+      { id: "tee_07a", nombre: "Tee 07A", tipo: "cesped", hoyo: "Hoyo 07", posicion: "A" },
+      { id: "tee_07b", nombre: "Tee 07B", tipo: "cesped", hoyo: "Hoyo 07", posicion: "B" },
+      { id: "tee_08a", nombre: "Tee 08A", tipo: "cesped", hoyo: "Hoyo 08", posicion: "A" },
+      { id: "tee_08b", nombre: "Tee 08B", tipo: "cesped", hoyo: "Hoyo 08", posicion: "B" },
+      { id: "tee_09a", nombre: "Tee 09A", tipo: "cesped", hoyo: "Hoyo 09", posicion: "A" },
+      { id: "tee_09b", nombre: "Tee 09B", tipo: "cesped", hoyo: "Hoyo 09", posicion: "B" },
+      // ── FAIRWAYS (9) ─────────────────────────────────────────────
+      { id: "fw_01", nombre: "Fairway 01", tipo: "cesped", hoyo: "Hoyo 01" },
+      { id: "fw_02", nombre: "Fairway 02", tipo: "cesped", hoyo: "Hoyo 02" },
+      { id: "fw_03", nombre: "Fairway 03", tipo: "cesped", hoyo: "Hoyo 03" },
+      { id: "fw_04", nombre: "Fairway 04", tipo: "cesped", hoyo: "Hoyo 04" },
+      { id: "fw_05", nombre: "Fairway 05", tipo: "cesped", hoyo: "Hoyo 05" },
+      { id: "fw_06", nombre: "Fairway 06", tipo: "cesped", hoyo: "Hoyo 06" },
+      { id: "fw_07", nombre: "Fairway 07", tipo: "cesped", hoyo: "Hoyo 07" },
+      { id: "fw_08", nombre: "Fairway 08", tipo: "cesped", hoyo: "Hoyo 08" },
+      { id: "fw_09", nombre: "Fairway 09", tipo: "cesped", hoyo: "Hoyo 09" },
+      // ── BUNKERS (5) ──────────────────────────────────────────────
+      { id: "bk_01", nombre: "Búnker 01", tipo: "pavimentos" },
+      { id: "bk_02", nombre: "Búnker 02", tipo: "pavimentos" },
+      { id: "bk_03", nombre: "Búnker 03", tipo: "pavimentos" },
+      { id: "bk_04", nombre: "Búnker 04", tipo: "pavimentos" },
+      { id: "bk_05", nombre: "Búnker 05", tipo: "pavimentos" },
+      // ── OTRAS SUPERFICIES ────────────────────────────────────────
       { id: "antegreen_golf", nombre: "Ante-greens", tipo: "cesped" },
       { id: "lomas_golf", nombre: "Lomas", tipo: "cesped" },
+      { id: "rough_golf", nombre: "Rough", tipo: "cesped" },
+      { id: "e1", nombre: "Fairways (zona general)", tipo: "cesped" },
+      // ── VEGETACIÓN ───────────────────────────────────────────────
+      { id: "arboles_golf", nombre: "Árboles y arboledas", tipo: "arboles" },
+      { id: "arbustos_golf", nombre: "Arbustos decorativos", tipo: "arbustos" },
       { id: "macizos_golf", nombre: "Macizos (acceso/interior/exterior)", tipo: "arbustos" },
+      // ── INFRAESTRUCTURA ──────────────────────────────────────────
+      { id: "caminos_golf", nombre: "Caminos carros golf", tipo: "pavimentos" },
       { id: "isla_golf", nombre: "Isla de Arena", tipo: "pavimentos" },
       { id: "jaula_golf", nombre: "Jaula de práctica", tipo: "infraestructura" },
-      // Vegetación y otros
-      { id: "e5", nombre: "Árboles y arboledas", tipo: "arboles" },
-      { id: "e6", nombre: "Arbustos decorativos", tipo: "arbustos" },
       { id: "e7", nombre: "Banderines y hoyos", tipo: "infraestructura" },
-      { id: "e8", nombre: "Sistema de riego", tipo: "sistemas" },
-      { id: "e9", nombre: "Caminos carros golf", tipo: "pavimentos" },
       { id: "e10", nombre: "Luminarias perimetrales", tipo: "infraestructura" },
-      // Infraestructura Golf
+      { id: "e8", nombre: "Sistema de riego", tipo: "sistemas" },
       { id: "estanque_golf", nombre: "Estanque de agua", tipo: "sistemas" },
       { id: "caseta_bomba", nombre: "Caseta de bombas", tipo: "infraestructura" },
       { id: "sala_maquinas", nombre: "Sala de máquinas Golf", tipo: "infraestructura" },
@@ -2474,7 +2511,146 @@ const GOLF_FRECS_INIT = {
   e8: [
     { id:"e8_rev",      tarea:"Revisión sistema riego",     modo:"estacion", verano:"quincenal", otono:"quincenal", invierno:"quincenal",   primavera:"quincenal", ultimaVez:"2026-06-06", obs:"Verificar señal, alcances" },
   ],
+  "tee_01a": [
+    { id:"tee_01a_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_01a_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_01b": [
+    { id:"tee_01b_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_01b_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_02a": [
+    { id:"tee_02a_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_02a_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_02b": [
+    { id:"tee_02b_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_02b_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_03a": [
+    { id:"tee_03a_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_03a_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_03b": [
+    { id:"tee_03b_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_03b_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_04a": [
+    { id:"tee_04a_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_04a_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_04b": [
+    { id:"tee_04b_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_04b_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_05a": [
+    { id:"tee_05a_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_05a_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_05b": [
+    { id:"tee_05b_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_05b_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_06a": [
+    { id:"tee_06a_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_06a_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_06b": [
+    { id:"tee_06b_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_06b_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_07a": [
+    { id:"tee_07a_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_07a_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_07b": [
+    { id:"tee_07b_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_07b_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_08a": [
+    { id:"tee_08a_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_08a_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_08b": [
+    { id:"tee_08b_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_08b_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_09a": [
+    { id:"tee_09a_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_09a_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_09b": [
+    { id:"tee_09b_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_09b_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "fw_01": [
+    { id:"fw_01_corte",   tarea:"Corte",        modo:"estacion", verano:"semanal",   otono:"quincenal", invierno:"mensual",  primavera:"semanal",   ultimaVez:"2026-07-07" },
+    { id:"fw_01_riego",   tarea:"Riego",         modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"noaplica", primavera:"cada3dias", ultimaVez:"2026-07-14" },
+    { id:"fw_01_fertil",  tarea:"Fertilización", modo:"estacion", verano:"mensual",   otono:"bimestral", invierno:"noaplica", primavera:"mensual",   ultimaVez:"2026-06-01" },
+  ],
+  "fw_02": [
+    { id:"fw_02_corte",   tarea:"Corte",        modo:"estacion", verano:"semanal",   otono:"quincenal", invierno:"mensual",  primavera:"semanal",   ultimaVez:"2026-07-07" },
+    { id:"fw_02_riego",   tarea:"Riego",         modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"noaplica", primavera:"cada3dias", ultimaVez:"2026-07-14" },
+    { id:"fw_02_fertil",  tarea:"Fertilización", modo:"estacion", verano:"mensual",   otono:"bimestral", invierno:"noaplica", primavera:"mensual",   ultimaVez:"2026-06-01" },
+  ],
+  "fw_03": [
+    { id:"fw_03_corte",   tarea:"Corte",        modo:"estacion", verano:"semanal",   otono:"quincenal", invierno:"mensual",  primavera:"semanal",   ultimaVez:"2026-07-07" },
+    { id:"fw_03_riego",   tarea:"Riego",         modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"noaplica", primavera:"cada3dias", ultimaVez:"2026-07-14" },
+    { id:"fw_03_fertil",  tarea:"Fertilización", modo:"estacion", verano:"mensual",   otono:"bimestral", invierno:"noaplica", primavera:"mensual",   ultimaVez:"2026-06-01" },
+  ],
+  "fw_04": [
+    { id:"fw_04_corte",   tarea:"Corte",        modo:"estacion", verano:"semanal",   otono:"quincenal", invierno:"mensual",  primavera:"semanal",   ultimaVez:"2026-07-07" },
+    { id:"fw_04_riego",   tarea:"Riego",         modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"noaplica", primavera:"cada3dias", ultimaVez:"2026-07-14" },
+    { id:"fw_04_fertil",  tarea:"Fertilización", modo:"estacion", verano:"mensual",   otono:"bimestral", invierno:"noaplica", primavera:"mensual",   ultimaVez:"2026-06-01" },
+  ],
+  "fw_05": [
+    { id:"fw_05_corte",   tarea:"Corte",        modo:"estacion", verano:"semanal",   otono:"quincenal", invierno:"mensual",  primavera:"semanal",   ultimaVez:"2026-07-07" },
+    { id:"fw_05_riego",   tarea:"Riego",         modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"noaplica", primavera:"cada3dias", ultimaVez:"2026-07-14" },
+    { id:"fw_05_fertil",  tarea:"Fertilización", modo:"estacion", verano:"mensual",   otono:"bimestral", invierno:"noaplica", primavera:"mensual",   ultimaVez:"2026-06-01" },
+  ],
+  "fw_06": [
+    { id:"fw_06_corte",   tarea:"Corte",        modo:"estacion", verano:"semanal",   otono:"quincenal", invierno:"mensual",  primavera:"semanal",   ultimaVez:"2026-07-07" },
+    { id:"fw_06_riego",   tarea:"Riego",         modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"noaplica", primavera:"cada3dias", ultimaVez:"2026-07-14" },
+    { id:"fw_06_fertil",  tarea:"Fertilización", modo:"estacion", verano:"mensual",   otono:"bimestral", invierno:"noaplica", primavera:"mensual",   ultimaVez:"2026-06-01" },
+  ],
+  "fw_07": [
+    { id:"fw_07_corte",   tarea:"Corte",        modo:"estacion", verano:"semanal",   otono:"quincenal", invierno:"mensual",  primavera:"semanal",   ultimaVez:"2026-07-07" },
+    { id:"fw_07_riego",   tarea:"Riego",         modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"noaplica", primavera:"cada3dias", ultimaVez:"2026-07-14" },
+    { id:"fw_07_fertil",  tarea:"Fertilización", modo:"estacion", verano:"mensual",   otono:"bimestral", invierno:"noaplica", primavera:"mensual",   ultimaVez:"2026-06-01" },
+  ],
+  "fw_08": [
+    { id:"fw_08_corte",   tarea:"Corte",        modo:"estacion", verano:"semanal",   otono:"quincenal", invierno:"mensual",  primavera:"semanal",   ultimaVez:"2026-07-07" },
+    { id:"fw_08_riego",   tarea:"Riego",         modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"noaplica", primavera:"cada3dias", ultimaVez:"2026-07-14" },
+    { id:"fw_08_fertil",  tarea:"Fertilización", modo:"estacion", verano:"mensual",   otono:"bimestral", invierno:"noaplica", primavera:"mensual",   ultimaVez:"2026-06-01" },
+  ],
+  "fw_09": [
+    { id:"fw_09_corte",   tarea:"Corte",        modo:"estacion", verano:"semanal",   otono:"quincenal", invierno:"mensual",  primavera:"semanal",   ultimaVez:"2026-07-07" },
+    { id:"fw_09_riego",   tarea:"Riego",         modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"noaplica", primavera:"cada3dias", ultimaVez:"2026-07-14" },
+    { id:"fw_09_fertil",  tarea:"Fertilización", modo:"estacion", verano:"mensual",   otono:"bimestral", invierno:"noaplica", primavera:"mensual",   ultimaVez:"2026-06-01" },
+  ],
+  "bk_01": [
+    { id:"bk_01_rastrillado", tarea:"Rastrillado de arena", modo:"estacion", verano:"diario", otono:"cada2dias", invierno:"cada3dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+    { id:"bk_01_limpieza",   tarea:"Limpieza bordes",      modo:"estacion", verano:"semanal", otono:"quincenal", invierno:"mensual",   primavera:"semanal",  ultimaVez:"2026-07-07" },
+  ],
+  "bk_02": [
+    { id:"bk_02_rastrillado", tarea:"Rastrillado de arena", modo:"estacion", verano:"diario", otono:"cada2dias", invierno:"cada3dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+    { id:"bk_02_limpieza",   tarea:"Limpieza bordes",      modo:"estacion", verano:"semanal", otono:"quincenal", invierno:"mensual",   primavera:"semanal",  ultimaVez:"2026-07-07" },
+  ],
+  "bk_03": [
+    { id:"bk_03_rastrillado", tarea:"Rastrillado de arena", modo:"estacion", verano:"diario", otono:"cada2dias", invierno:"cada3dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+    { id:"bk_03_limpieza",   tarea:"Limpieza bordes",      modo:"estacion", verano:"semanal", otono:"quincenal", invierno:"mensual",   primavera:"semanal",  ultimaVez:"2026-07-07" },
+  ],
+  "bk_04": [
+    { id:"bk_04_rastrillado", tarea:"Rastrillado de arena", modo:"estacion", verano:"diario", otono:"cada2dias", invierno:"cada3dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+    { id:"bk_04_limpieza",   tarea:"Limpieza bordes",      modo:"estacion", verano:"semanal", otono:"quincenal", invierno:"mensual",   primavera:"semanal",  ultimaVez:"2026-07-07" },
+  ],
+  "bk_05": [
+    { id:"bk_05_rastrillado", tarea:"Rastrillado de arena", modo:"estacion", verano:"diario", otono:"cada2dias", invierno:"cada3dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+    { id:"bk_05_limpieza",   tarea:"Limpieza bordes",      modo:"estacion", verano:"semanal", otono:"quincenal", invierno:"mensual",   primavera:"semanal",  ultimaVez:"2026-07-07" },
+  ],
+
 };
+
 
 // Hook para inicializar frecuencias Golf si no existen en Firebase
 // useInitGolfFrecs movido a App
@@ -2482,7 +2658,7 @@ const GOLF_FRECS_INIT = {
 
 // ─── PROGRAMACIÓN DIARIA ─────────────────────────────────────────────────────
 // ─── VISTA TRABAJADOR ────────────────────────────────────────────────────────
-function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE, onAccesoRapido, onCambiarMetodo, cierresTurno={}, onCerrarTurno, onReabrirTurno, esJefaApp=false }) {
+function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE, onAccesoRapido, onCambiarMetodo, cierresTurno={}, onCerrarTurno, onReabrirTurno, crearNotificacion, esJefaApp=false }) {
   const hoy = fechaLocal();
   const [fechaVer, setFechaVer] = React.useState(fecha || hoy);
   // Cierre de turno
@@ -2806,6 +2982,45 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                           <div style={{marginTop:6}}>
                             <textarea rows={2} placeholder="¿Por qué no se pudo? (obligatorio)" value={t.notaWorker||""} onChange={e=>onUpdateTarea(fechaVer,t.id,{notaWorker:e.target.value})} style={{width:"100%",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:8,color:"#ede9e0",padding:"6px 10px",fontFamily:"'Georgia',serif",fontSize:12,resize:"vertical"}}/>
                             {!t.notaWorker&&<div style={{fontSize:10,color:"#ef4444",marginTop:2}}>⚠️ Explica el motivo para poder guardar</div>}
+                          </div>
+                        )}
+                        {/* Campo fitosanitario — aparece cuando se marca hecha la revisión */}
+                        {(t.tarea||"NADA").toLowerCase().includes("fitosanit")&&normalizarEstado(t.estado)==="hecha"&&(
+                          <div style={{marginTop:8,padding:"10px 12px",background:"rgba(167,139,250,0.06)",border:"1px solid rgba(167,139,250,0.2)",borderRadius:8}}>
+                            <div style={{fontSize:11,color:"#c4b5fd",fontWeight:600,marginBottom:6}}>🦠 Observación fitosanitaria</div>
+                            <input
+                              placeholder="Sin novedad · Mancha sospechosa en Green 03 · Presencia de hongos..."
+                              value={t.notaFito||""}
+                              onChange={e=>onUpdateTarea(fechaVer,t.id,{notaFito:e.target.value})}
+                              style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(167,139,250,0.3)",borderRadius:6,color:"#ede9e0",padding:"6px 10px",fontSize:12,fontFamily:"'Georgia',serif",boxSizing:"border-box"}}/>
+                            <div style={{fontSize:10,color:"#7a6a9a",marginTop:3}}>Si hay novedad, se generará una alerta fitosanitaria automáticamente.</div>
+                            {t.notaFito?.trim()&&t.notaFito.toLowerCase()!=="sin novedad"&&(
+                              <button onClick={()=>{
+                                // Crear alerta fitosanitaria real en el sistema
+                                onAddTarea&&onAddTarea({
+                                  id:Date.now()+Math.random(),
+                                  fecha:fechaVer,
+                                  tarea:"🚨 ALERTA FITOSANITARIA: "+t.notaFito.slice(0,80),
+                                  responsable:"",
+                                  zona:"Golf",
+                                  elemento:t.elemento||"",
+                                  estado:"por_designar",
+                                  notas:"Reportado por "+trabajador?.nombre+" · "+fechaVer+" · Tarea: "+t.tarea,
+                                  tipoEvento:"alerta_fito",
+                                  urgente:true,
+                                });
+                                alert("⚠️ Alerta fitosanitaria generada. La jefa será notificada.");
+                                crearNotificacion&&crearNotificacion("alerta",{
+                                  titulo:"🦠 Alerta fitosanitaria Golf",
+                                  mensaje:t.notaFito+" · "+trabajador?.nombre+" · "+fechaVer,
+                                  fecha:fechaVer,
+                                  tipo:"golf_fito",
+                                  urgente:true,
+                                });
+                              }} style={{marginTop:6,fontSize:11,padding:"4px 12px",borderRadius:6,border:"1px solid rgba(239,68,68,0.4)",background:"rgba(239,68,68,0.1)",color:"#fca5a5",cursor:"pointer"}}>
+                                🚨 Generar alerta fitosanitaria
+                              </button>
+                            )}
                           </div>
                         )}
                         {t.notaWorker&&t.estado!=="no_pudo"&&<div style={{fontSize:11,color:"#f59e0b",marginTop:4,fontStyle:"italic"}}>💬 {t.notaWorker}</div>}
@@ -15243,7 +15458,7 @@ export default function App() {
 
   const handleLogout = () => signOut(auth);
   const CUENTAS_DEFAULT = ["Rama Golf","Mantenimiento Jardines","Obras","Insumos Generales","Maquinaria y Equipos","Fitosanitarios","Semillas y Plantas","Uniformes y EPP"];
-  const [data,           setData,           dataReady]     = useFirebaseState("data",           initData());
+  const [data,           setData,           dataReady, setDataLocal]     = useFirebaseState("data",           initData());
   const [personal, setPersonal, personalReady] = useFirebaseState("personal", PERSONAL_INICIAL);
   const [tareasProg,     setTareasProg,     progReady]     = useFirebaseState("prog",           {});
   const [aplicaciones,   setAplicaciones,   aplReady]      = useFirebaseState("fungicidas",     []);
@@ -16015,6 +16230,7 @@ export default function App() {
                 tareas={tareasProg}
                 S={S}
                 esJefaApp={true}
+                crearNotificacion={crearNotificacion}
                 cierresTurno={cierresTurno}
                 onUpdateTarea={(fecha,tid,patch)=>{
                   const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
