@@ -10931,7 +10931,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               if(!tasa&&histG.length>=2){
                 const a1=Number(histG[0].alturas[g.id]),a2=Number(histG[1].alturas[g.id]);
                 const dHist3=Math.round((new Date(histG[0].fecha+"T12:00:00")-new Date(histG[1].fecha+"T12:00:00"))/(1000*60*60*24));
-                if(dHist1>0&&a1>a2) tasa=(a1-a2)/dHist1;
+                if(dHist3>0&&a1>a2) tasa=(a1-a2)/dHist3;
               }
               const altN=Number(alt);
               if(altN>=altObjetivo) return {g,diasRestantes:0,urgencia:"cortar",alt:altN,tasa,altObjetivo,infoCorte};
