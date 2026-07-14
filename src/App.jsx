@@ -3429,7 +3429,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
             );
           })()}
 
-          {!vistaSemanal&&showAgregar && (
+          {showAgregar && (
             <div style={{...S.card,padding:18,marginBottom:16}} className="ein">
               <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:14}}>Nueva Tarea — {fecha}</div>
               {(()=>{
