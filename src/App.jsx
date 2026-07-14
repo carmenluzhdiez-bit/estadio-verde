@@ -3415,6 +3415,22 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
             }}
             style={{...S.input,width:"auto",fontSize:13}}/>
           <button onClick={proponerTareas} style={{...S.btn,background:"rgba(59,130,246,0.2)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)",fontSize:13}}>✨ Proponer del día</button>
+          {esJefa&&zonaId==="31"&&(
+            <button onClick={()=>{
+              if(!window.confirm("Esto actualizará Golf en Firebase con la nueva estructura (Tees 01A-09B, Fairways 01-09, Búnkers 01-05). Los elementos custom se mantendrán. ¿Continuar?")) return;
+              const golfBase = MACROZONAS_BASE.find(z=>z.id===31);
+              if(!golfBase) return;
+              const nuevosElems = {};
+              golfBase.elementos.forEach(e=>{
+                nuevosElems[e.id] = { estado:"bueno", notas:"", frecuencias:[] };
+              });
+              fbUpdate(ref(db, ROOT+"/data/31"), { elementos: nuevosElems })
+                .then(()=>alert("✅ Golf actualizado en Firebase con la nueva estructura"))
+                .catch(e=>alert("Error: "+e));
+            }} style={{...S.btn,background:"rgba(96,165,250,0.1)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.2)",fontSize:11,marginBottom:8,width:"100%"}}>
+              🔄 Actualizar estructura Golf en Firebase
+            </button>
+          )}
           {esJefa&&(
             <button onClick={()=>{
               if(!window.confirm("¿Eliminar TODAS las tareas auto-generadas de Golf (auto:true) de todos los días? Esto limpia los duplicados.")) return;
