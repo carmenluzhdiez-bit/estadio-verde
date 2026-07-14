@@ -2796,8 +2796,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                         )}
                         {t.notaWorker&&t.estado!=="no_pudo"&&<div style={{fontSize:11,color:"#f59e0b",marginTop:4,fontStyle:"italic"}}>💬 {t.notaWorker}</div>}
                       </div>
-                    );
-                  })}
+                    })}
                   {/* ── Observaciones del turno integradas ── */}
                   <div style={{padding:"12px 14px",background:"rgba(52,211,153,0.03)",borderTop:"1px solid rgba(52,211,153,0.1)"}}>
                     <div style={{fontSize:11,fontWeight:600,color:"#34d399",marginBottom:10}}>📝 Observaciones del turno</div>
