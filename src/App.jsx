@@ -2551,7 +2551,19 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
     if(utcStr!==fechaVer){
       normDia(tareas[utcStr]||[]).forEach(t=>{if(!combinadas.find(x=>String(x.id)===String(t.id)))combinadas.push(t);});
     }
-    return combinadas.filter(t => t.responsable && normalizar(t.responsable) === normalizar(trabajador?.nombre||""));
+    const nombreTrab = normalizar(trabajador?.nombre||"");
+    const resultado = combinadas.filter(t => {
+      if(!t.responsable) return false;
+      const normResp = normalizar(t.responsable);
+      if(normResp===nombreTrab) return true;
+      // Compatibilidad: Bhalu puede estar guardado con acento o sin él
+      if(nombreTrab.includes("bhalu")&&normResp.includes("bhalu")) return true;
+      if(nombreTrab.includes("bhalu")&&normResp.includes("osmar")) return true;
+      if(normResp.includes("bhalu")&&nombreTrab.includes("osmar")) return true;
+      return false;
+    });
+    console.log("VistaWorker filtro:", trabajador?.nombre, "tareas total:", combinadas.length, "mis tareas:", resultado.length, combinadas.map(t=>t.responsable+"|"+t.tarea).join(", "));
+    return resultado;
   }, [tareas, fechaVer, trabajador]
   );
   const misTareasDiarias  = React.useMemo(()=>sortTareas(todasMisTareas.filter(t=>esDiaria(t))),[todasMisTareas]);
@@ -10894,7 +10906,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               const extraerAlturaCorte = (t) => {
                 if(t?.alturaCorte) return Number(t.alturaCorte);
                 const pgM=(t?.tarea||t?.descripcion||"").match(/(?:HOC|a)\s*([0-9]+(?:\.[0-9]+))\s*mm/i);
-                return m?Number(pgM[1]):null;
+                return pgM?Number(pgM[1]):null;
               };
               const altCorteReal = extraerAlturaCorte(infoCorte);
               const altObjetivo=infoCorte?.alturaObjetivo?Number(infoCorte.alturaObjetivo):(rango.min*1.5);
