@@ -2243,12 +2243,11 @@ function ConfiguradorSemanal({ S, personal, configSemanal, setConfigSemanal, esJ
   };
 
   const semana = (() => {
-    const hoy = new Date();
-    const dow = hoy.getDay(); // 0=dom, 1=lun ... 6=sab
-    // Días hasta el próximo lunes
-    const diasAlLunes = dow === 1 ? 7 : dow === 0 ? 1 : (8 - dow);
-    const lun = new Date(hoy);
-    lun.setDate(hoy.getDate() + diasAlLunes);
+    const base = new Date(fecha+"T12:00:00");
+    const dow = base.getDay();
+    // Lunes de la semana del día seleccionado
+    const lun = new Date(base);
+    lun.setDate(base.getDate() - ((dow+6)%7));
     const sab = new Date(lun); sab.setDate(lun.getDate()+5);
     const fmt = d => d.toLocaleDateString("es-CL",{day:"2-digit",month:"short"});
     return `Semana ${fmt(lun)} – ${fmt(sab)}`;
@@ -3292,10 +3291,10 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
 
           {/* ── VISTA SEMANAL ── */}
           {vistaSemanal&&(()=>{
-            const hoyD = new Date(hoy+"T12:00:00");
-            // Semana próxima: lunes siguiente
-            const diasHastaLunes = ((8 - hoyD.getDay()) % 7) || 7; // días hasta próximo lunes
-            const lunes = new Date(hoyD); lunes.setDate(hoyD.getDate()+diasHastaLunes);
+            const fechaD = new Date(fecha+"T12:00:00");
+            // Semana del día seleccionado (lunes de esa semana)
+            const lunes = new Date(fechaD);
+            lunes.setDate(fechaD.getDate()-((fechaD.getDay()+6)%7));
             const dias7 = Array.from({length:7},(_,i)=>{
               const d = new Date(lunes); d.setDate(lunes.getDate()+i);
               return d.toISOString().slice(0,10);
@@ -3367,7 +3366,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                   </tbody>
                 </table>
                 <div style={{fontSize:10,color:"#4a7a5a",marginTop:8}}>
-                  Clic en el estado para ir al día · Semana {new Date(lunes+"T12:00:00").toLocaleDateString("es-CL",{day:"2-digit",month:"short"})} – {new Date(dias7[6]+"T12:00:00").toLocaleDateString("es-CL",{day:"2-digit",month:"short"})}
+                  Clic en el estado para ir al día · Semana {new Date(dias7[0]+"T12:00:00").toLocaleDateString("es-CL",{day:"2-digit",month:"short"})} – {new Date(dias7[6]+"T12:00:00").toLocaleDateString("es-CL",{day:"2-digit",month:"short"})}
                 </div>
               </div>
             );
