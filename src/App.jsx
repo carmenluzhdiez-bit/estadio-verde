@@ -2519,10 +2519,13 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
     if(tareaObj.diaria === true) return true;
     const nombreED = (tareaObj.tarea||"").toLowerCase();
     const keywordsED = [
-      "limpieza tee","limpieza —","revisión estado general","revisión humedad greens",
-      "revisión estado fitosanitario","soplado","barrido","pediluvios",
-      "limpieza general","riego manual","orden y limpieza","registro diario"
+      "limpieza tee","limpieza —","revisión estado general",
+      "revisión estado fitosanitario","soplado/barrido","pediluvios",
+      "orden y limpieza","registro diario"
     ];
+    // EXCLUIDOS intencionalmente: "riego manual" (no es diaria), "revisión humedad greens" (frecuencia semanal)
+    // Las rutinas de Golf (TAREAS_DIARIAS_GOLF) se muestran en sección separada — no duplicar
+    if(TAREAS_DIARIAS_GOLF.some(tg=>tg.tarea.toLowerCase()===(tareaObj.tarea||"").toLowerCase())) return false;
     for(let edI=0;edI<keywordsED.length;edI++){
       if(nombreED.includes(keywordsED[edI])) return true;
     }
