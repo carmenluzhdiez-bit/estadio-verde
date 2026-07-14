@@ -3108,16 +3108,21 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           // Solo proponer si la fecha calculada ya llegó (vencida o es hoy) — no proponer tareas futuras todavía lejanas
           if(prox.diff > 0) return;
           const esVencida = prox.diff < 0;
-          const item = { id: Date.now()+Math.random(), fecha, zona:z.nombre, elemento:e.nombre, tarea:f.tarea, responsable:"", estado:"por_designar", notas:f.obs||"", frecuencia:f.modo==="diasSemana"?`cada ${f.diasMinimos||"?"} días`:f[estProp], estacion:estProp, auto:true, fechaCorrespondiente:prox.fecha, origenZid:String(z.id), origenEid:e.id, origenFrecId:f.id, origenEsCustom:!!e.isCustom };
+          // Asignar responsable por defecto según zona y tipo de tarea
+          const esZonaGolf = z.id===31||(z.nombre||"").toLowerCase().includes("golf");
+          const respDefault = esZonaGolf
+            ? "Osmar Bhalú Armijo Zúñiga"  // Golf → Bhalú por defecto
+            : getResponsablePorTipo(f.tarea, configSemanal)||"";
+          const item = { id: Date.now()+Math.random(), fecha, zona:z.nombre, elemento:e.nombre, tarea:f.tarea, responsable:respDefault, estado:respDefault?"pendiente":"por_designar", notas:f.obs||"", frecuencia:f.modo==="diasSemana"?`cada ${f.diasMinimos||"?"} días`:f[estProp], estacion:estProp, auto:true, fechaCorrespondiente:prox.fecha, origenZid:String(z.id), origenEid:e.id, origenFrecId:f.id, origenEsCustom:!!e.isCustom };
           propuestas.push(item);
-          if(esVencida) vencidas.push(`${z.nombre} — ${f.tarea} (vencida desde ${prox.fecha})`);
+          if(esVencida) { const vKey=`${z.nombre} — ${f.tarea}`; if(!vencidas.includes(vKey)) vencidas.push(vKey); }
         });
       });
     });
     if(propuestas.length===0) return alert("No hay tareas pendientes según las frecuencias definidas para esta fecha.\n\nRevisa que las macrozonas tengan 'Última realización' registrada en sus frecuencias.");
     setTareasDelDia(fecha, [...getTareasDelDia(fecha), ...propuestas]);
     if(esDomingo(fecha)) setAviso("⚠️ El día seleccionado es domingo. Las tareas fueron cargadas igual, pero considera mover la programación a otro día.");
-    else if(vencidas.length>0) setAviso(`⚠️ ${vencidas.length} tarea(s) están vencidas según su frecuencia: ${vencidas.slice(0,3).join(" · ")}${vencidas.length>3?"...":""}`);
+    else if(vencidas.length>0) setAviso(`✅ ${propuestas.length} tarea(s) propuestas. ${vencidas.length} estaban vencidas y se programaron para hoy: ${vencidas.slice(0,3).join(" · ")}${vencidas.length>3?" y más...":""}`);
   };
 
     const ESTADOS_TAREA = ESTADOS_TAREA_GLOBAL;
@@ -3386,7 +3391,12 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                 <div>
                   <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>MACROZONA</label>
                   <select style={{...S.input,fontSize:13}} value={nuevaTarea.zona}
-                    onChange={e=>setNuevaTarea(p=>({...p,zona:e.target.value,elemento:"",tarea:""}))}>
+                    onChange={e=>setNuevaTarea(p=>{
+                        const esGolf = (e.target.value||"").toLowerCase().includes("golf");
+                        return {...p, zona:e.target.value, elemento:"", tarea:"",
+                          responsable: esGolf ? "Osmar Bhalú Armijo Zúñiga" : (p.responsable||"")
+                        };
+                      })}>
                     <option value="">Seleccionar zona...</option>
                     {zonasSinGolf.map(z=>(
                       <option key={z.id} value={z.nombre}>{z.icono} {z.nombre}</option>
