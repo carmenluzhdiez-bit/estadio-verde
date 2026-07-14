@@ -3175,6 +3175,28 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
               🧹 Limpiar tareas auto Golf
             </button>
           )}
+          {esJefa&&(
+            <button onClick={()=>{
+              const manana = new Date(fecha+"T12:00:00");
+              manana.setDate(manana.getDate()+1);
+              // Saltar domingo
+              if(manana.getDay()===0) manana.setDate(manana.getDate()+1);
+              const mananaStr = manana.toISOString().slice(0,10);
+              const pendientes = getTareasDelDia(fecha).filter(t=>
+                normalizarEstado(t.estado)!=="hecha" && normalizarEstado(t.estado)!=="no_pudo"
+              );
+              if(pendientes.length===0) return alert("No hay tareas pendientes para reprogramar.");
+              const yaExisten = getTareasDelDia(mananaStr).map(t=>t.zona+"_"+t.tarea);
+              const nuevas = pendientes
+                .filter(t=>!yaExisten.includes(t.zona+"_"+t.tarea))
+                .map(t=>({...t, id:Date.now()+Math.random(), fecha:mananaStr, estado:"pendiente"}));
+              if(nuevas.length===0) return alert("Todas las tareas pendientes ya existen para mañana.");
+              setTareasDelDia(mananaStr, [...getTareasDelDia(mananaStr), ...nuevas]);
+              alert(`✅ ${nuevas.length} tarea(s) pendientes reprogramadas para ${mananaStr}`);
+            }} style={{...S.btn,background:"rgba(251,191,36,0.1)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.2)",fontSize:11}}>
+              📅 Reprogramar pendientes para mañana
+            </button>
+          )}
           <button onClick={()=>{
             setNuevaTarea(p=>({...p,
               zona:filtroZona!=="todas"&&filtroZona!=="Golf"?filtroZona:p.zona,
@@ -3423,10 +3445,10 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                     {tareasDisp.map(t=><option key={t} value={t}>{t}</option>)}
                     <option value="__otro__">✏️ Escribir otra...</option>
                   </select>
-                  {nuevaTarea.tarea===""&&(
+                  {(nuevaTarea.tarea===""||nuevaTarea.tarea==="__otro__")&&(
                     <input style={{...S.input,fontSize:13,marginTop:6}} autoFocus
                       placeholder="Describir tarea..."
-                      onChange={e=>setNuevaTarea(p=>({...p,tarea:e.target.value,responsable:p.responsable||(getResponsablePorTipo(e.target.value,configSemanal)||"")}))}/>
+                      onChange={e=>setNuevaTarea(p=>({...p,tarea:e.target.value||"__otro__",responsable:p.responsable||(getResponsablePorTipo(e.target.value,configSemanal)||"")}))}/>  
                   )}
                   {nuevaTarea.tarea==="Plantar desde Vivero"&&(
                     <div style={{marginTop:8,padding:"10px 12px",background:"rgba(74,222,128,0.08)",border:"1px solid rgba(74,222,128,0.25)",borderRadius:8,fontSize:12,color:"#4ade80"}}>
@@ -3459,7 +3481,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
               </>);})()}
               <div style={{display:"flex",gap:8}}>
                 <button className="btn-p" style={S.btn} onClick={()=>{
-                  if(!nuevaTarea.zona||!nuevaTarea.tarea) return;
+                  if(!nuevaTarea.zona||!nuevaTarea.tarea||nuevaTarea.tarea==="__otro__") return;
                   addTarea(nuevaTarea);
                   setNuevaTarea({zona:"",elemento:"",tarea:"",responsable:"",estado:"por_designar",notas:""});
                   setShowAgregar(false);
