@@ -2774,7 +2774,6 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                               {(t.alturaCorteObj||t.alturaCorte)&&<span style={{color:"#5a9a7a",fontWeight:400,marginLeft:6}}>· HOC indicada: {t.alturaCorteObj||t.alturaCorte}mm</span>}
                             </div>
                             <div style={{display:"flex",alignItems:"center",gap:8}}>
-                            <div style={{display:"flex",alignItems:"center",gap:8}}>
                               <input type="number" step="0.1" min="2" max="20"
                                 style={{width:80,textAlign:"center",fontWeight:700,fontSize:15,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(251,191,36,0.3)",borderRadius:6,color:"#fbbf24",padding:"4px 8px"}}
                                 value={alturaInputs[t.id]??t.alturaCorteReal??""}
@@ -2784,7 +2783,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                                 onKeyDown={e=>{if(e.key==="Enter"||e.key==="Tab"){const val=e.target.value;if(val)onUpdateTarea(fechaVer,t.id,{alturaCorteReal:val});}}}/>
                               <span style={{fontSize:11,color:"#5a9a7a"}}>mm</span>
                               <button onClick={()=>{const val=alturaInputs[t.id]??t.alturaCorteReal??"";if(val)onUpdateTarea(fechaVer,t.id,{alturaCorteReal:String(val)});}} style={{fontSize:11,padding:"3px 10px",borderRadius:5,border:"1px solid rgba(251,191,36,0.4)",background:"rgba(251,191,36,0.1)",color:"#fbbf24",cursor:"pointer"}}>💾 Guardar</button>
-                              {t.alturaCorteReal&&<span style={{fontSize:11,color:"#22c55e"}}>✅ {t.alturaCorteReal}mm</span>}
+              {t.alturaCorteReal&&<span style={{fontSize:11,color:"#22c55e",marginLeft:4}}>✅ {t.alturaCorteReal}mm</span>}
                             </div>
                           </div>
                         )}
@@ -2796,7 +2795,8 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                         )}
                         {t.notaWorker&&t.estado!=="no_pudo"&&<div style={{fontSize:11,color:"#f59e0b",marginTop:4,fontStyle:"italic"}}>💬 {t.notaWorker}</div>}
                       </div>
-                    })}
+                    );
+                  })}
                   {/* ── Observaciones del turno integradas ── */}
                   <div style={{padding:"12px 14px",background:"rgba(52,211,153,0.03)",borderTop:"1px solid rgba(52,211,153,0.1)"}}>
                     <div style={{fontSize:11,fontWeight:600,color:"#34d399",marginBottom:10}}>📝 Observaciones del turno</div>
