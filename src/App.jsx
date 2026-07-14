@@ -14683,6 +14683,417 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+// ─── PANEL PROTOCOLOS ─────────────────────────────────────────────────────────
+function PanelProtocolos({ S, personal, esJefa, crearNotificacion }) {
+  const [tabProt, setTabProt] = React.useState("poda");
+
+  return (
+    <div className="ein">
+      <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:700,marginBottom:4}}>📋 Protocolos de Seguridad</div>
+      <div style={{fontSize:12,color:"#5a9a7a",marginBottom:16}}>Registros de autorización para trabajos de riesgo</div>
+      <div style={{display:"flex",gap:6,marginBottom:16}}>
+        {[["poda","🌿 Poda en altura"]].map(([t,l])=>(
+          <button key={t} className={`tab${tabProt===t?" on":""}`} onClick={()=>setTabProt(t)}
+            style={{cursor:"pointer",border:`1px solid ${tabProt===t?"#34d399":"rgba(255,255,255,0.12)"}`,borderRadius:8,padding:"5px 14px",fontSize:12,background:tabProt===t?"rgba(52,211,153,0.12)":"transparent",color:tabProt===t?"#34d399":"#6aaa7a"}}>
+            {l}
+          </button>
+        ))}
+      </div>
+      {tabProt==="poda"&&<ProtocoloPodaAltura S={S} personal={personal} esJefa={esJefa} crearNotificacion={crearNotificacion}/>}
+    </div>
+  );
+}
+
+// ─── PROTOCOLO PODA EN ALTURA ─────────────────────────────────────────────────
+const PROT_PATH = "estadio-verde-data/protocolos/poda_altura";
+const PROT_TRABAJADORES = ["Andrés Astorga","Osmar Bhalú Armijo Zúñiga","Sergio Esteban Peña","Saúl Molina"];
+const PROT_SUPERVISOR = "Juber Leopoldo Juárez Burgos";
+const PROT_STEPS = [
+  {id:1,label:"Trabajadores"},
+  {id:2,label:"Árbol / sitio"},
+  {id:3,label:"Equipo"},
+  {id:4,label:"Briefing"},
+  {id:5,label:"Autorización"},
+];
+const protEmptyForm = () => ({
+  fecha: new Date().toISOString().slice(0,10),
+  operadores:[], sitio:"", especie:"",
+  historialFalla:null, grietasCavidades:null, viento:"", humedad:null, interferencias:null,
+  arnes:null, cuerdas:null, casco:null, certificacionVigente:null, comunicacion:null,
+  rolesClaros:null, senalesAcordadas:null, perimetroDelimitado:null, planEmergencia:null,
+  supervisorNombre:"", justificacion:"",
+});
+const protEmptyOp = (nombre) => ({nombre, descanso:null, preocupacion:null, confianzaExcesiva:null, nota:""});
+
+function ProtToggle({ value, onChange, labelYes="Sí", labelNo="No" }) {
+  return (
+    <div style={{display:"flex",gap:6}}>
+      <button type="button" onClick={()=>onChange(true)}
+        style={{flex:1,padding:"7px 0",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",
+          border:`1px solid ${value===true?"rgba(34,197,94,0.6)":"rgba(255,255,255,0.1)"}`,
+          background:value===true?"rgba(34,197,94,0.15)":"transparent",
+          color:value===true?"#22c55e":"#7aaa80"}}>
+        {labelYes}
+      </button>
+      <button type="button" onClick={()=>onChange(false)}
+        style={{flex:1,padding:"7px 0",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",
+          border:`1px solid ${value===false?"rgba(245,158,11,0.6)":"rgba(255,255,255,0.1)"}`,
+          background:value===false?"rgba(245,158,11,0.12)":"transparent",
+          color:value===false?"#f59e0b":"#7aaa80"}}>
+        {labelNo}
+      </button>
+    </div>
+  );
+}
+
+function ProtItem({ children, value, onChange, invert }) {
+  const flagged = invert ? value===true : value===false;
+  return (
+    <div style={{padding:"10px 12px",borderRadius:10,border:`1px solid ${flagged?"rgba(245,158,11,0.4)":"rgba(255,255,255,0.08)"}`,
+      background:flagged?"rgba(245,158,11,0.06)":"rgba(255,255,255,0.02)",marginBottom:6}}>
+      <div style={{fontSize:12,color:"#c0dac0",marginBottom:6}}>{children}</div>
+      <ProtToggle value={value} onChange={onChange}/>
+    </div>
+  );
+}
+
+function ProtocoloPodaAltura({ S, personal, esJefa, crearNotificacion }) {
+  const [form, setForm] = React.useState(protEmptyForm());
+  const [step, setStep] = React.useState(1);
+  const [history, setHistory] = React.useState([]);
+  const [showHistory, setShowHistory] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const [saved, setSaved] = React.useState(false);
+
+  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+  const agregarOp = (nombre) => { if(!nombre) return; setForm(f=>f.operadores.some(o=>o.nombre===nombre)?f:{...f,operadores:[...f.operadores,protEmptyOp(nombre)]}); };
+  const quitarOp = (nombre) => setForm(f=>({...f,operadores:f.operadores.filter(o=>o.nombre!==nombre)}));
+  const setOpCampo = (nombre,campo,valor) => setForm(f=>({...f,operadores:f.operadores.map(o=>o.nombre===nombre?{...o,[campo]:valor}:o)}));
+
+  React.useEffect(()=>{
+    // Escuchar historial en tiempo real
+    const fbRef = ref(db, PROT_PATH);
+    const unsub = onValue(fbRef, snap=>{
+      if(snap.val()) {
+        const arr = Object.entries(snap.val()).map(([k,v])=>({id:k,...v}))
+          .sort((a,b)=>(b.creadoEn||"").localeCompare(a.creadoEn||""));
+        setHistory(arr);
+      } else {
+        setHistory([]);
+      }
+    });
+    return ()=>unsub();
+  },[]);
+
+  const flags = [];
+  form.operadores.forEach(o=>{
+    if(o.descanso===false) flags.push(`${o.nombre}: descanso insuficiente`);
+    if(o.preocupacion===true) flags.push(`${o.nombre}: reporta preocupación / distracción`);
+    if(o.confianzaExcesiva===true) flags.push(`${o.nombre}: riesgo de exceso de confianza`);
+  });
+  if(form.historialFalla===true) flags.push("Árbol con historial previo de falla de rama");
+  if(form.grietasCavidades===true) flags.push("Grietas, cavidades u hongos visibles");
+  if(form.viento&&Number(form.viento)>30) flags.push(`Viento registrado (${form.viento} km/h) supera umbral de 30 km/h`);
+  if(form.humedad===true) flags.push("Madera húmeda por lluvia reciente");
+  if(form.interferencias===true) flags.push("Cableado, estructuras o tránsito bajo la zona de trabajo");
+  if(form.arnes===false) flags.push("Arnés no aprobado");
+  if(form.cuerdas===false) flags.push("Cuerdas / mosquetones no aprobados");
+  if(form.casco===false) flags.push("Casco no aprobado");
+  if(form.certificacionVigente===false) flags.push("Certificación de equipo no vigente");
+  if(form.comunicacion===false) flags.push("Sin kit de comunicación operativo");
+  if(form.rolesClaros===false) flags.push("Roles del equipo no definidos");
+  if(form.senalesAcordadas===false) flags.push("Señales de comunicación no acordadas");
+  if(form.perimetroDelimitado===false) flags.push("Perímetro de seguridad no delimitado");
+  if(form.planEmergencia===false) flags.push("Sin plan de emergencia claro");
+
+  const stepOk = (n) => {
+    if(n===1) return form.operadores.length>0&&form.sitio&&form.operadores.every(o=>o.descanso!==null&&o.preocupacion!==null&&o.confianzaExcesiva!==null);
+    if(n===2) return form.historialFalla!==null&&form.grietasCavidades!==null&&form.viento!==""&&form.humedad!==null&&form.interferencias!==null;
+    if(n===3) return [form.arnes,form.cuerdas,form.casco,form.certificacionVigente,form.comunicacion].every(v=>v!==null);
+    if(n===4) return [form.rolesClaros,form.senalesAcordadas,form.perimetroDelimitado,form.planEmergencia].every(v=>v!==null);
+    return true;
+  };
+  const allDone = [1,2,3,4].every(stepOk);
+  const canAuth = allDone&&form.operadores.length>0&&form.sitio&&form.supervisorNombre&&(flags.length===0||form.justificacion.trim().length>0);
+
+  async function guardar() {
+    setSaving(true);
+    const id = "prot_"+Date.now();
+    const record = {...form, flags, autorizado:flags.length===0?"sin observaciones":"autorizado con justificación escrita", creadoEn:new Date().toISOString()};
+    try {
+      await fbUpdate(ref(db, PROT_PATH+"/"+id), record);
+      setSaved(true);
+      crearNotificacion&&crearNotificacion("protocolo",{titulo:"✅ Protocolo de subida registrado",mensaje:`${form.sitio} · ${form.fecha} · ${form.supervisorNombre}`,fecha:form.fecha});
+      setTimeout(()=>{ setForm(protEmptyForm()); setStep(1); setSaved(false); }, 2000);
+    } catch(e) { console.error("Error al guardar protocolo",e); }
+    finally { setSaving(false); }
+  }
+
+  const nodeColor = (n) => {
+    if(n<step) return stepOk(n)?"#22c55e":"#f59e0b";
+    if(n===step) return "#34d399";
+    return "#3a5a3a";
+  };
+
+  const imprimirProtocolo = (r) => {
+    const win = window.open("","_blank");
+    const flags = r.flags||[];
+    const ops = (r.operadores||[]).map(o=>`
+      <tr style="border-bottom:1px solid #e5e7eb">
+        <td style="padding:6px 10px;font-weight:600">${o.nombre}</td>
+        <td style="padding:6px 10px;text-align:center">${o.descanso===true?"✅ Sí":o.descanso===false?"⚠️ No":"—"}</td>
+        <td style="padding:6px 10px;text-align:center">${o.preocupacion===true?"⚠️ Sí":o.preocupacion===false?"✅ No":"—"}</td>
+        <td style="padding:6px 10px;text-align:center">${o.confianzaExcesiva===true?"⚠️ Sí":o.confianzaExcesiva===false?"✅ No":"—"}</td>
+        ${o.nota?`<td style="padding:6px 10px;font-style:italic;color:#6b7280">${o.nota}</td>`:"<td></td>"}
+      </tr>`).join("");
+    win.document.write(`<!DOCTYPE html><html lang="es"><head>
+      <meta charset="UTF-8"/>
+      <title>Protocolo de Subida — ${r.fecha}</title>
+      <style>
+        body{font-family:'Segoe UI',sans-serif;color:#1a1a2e;padding:32px;max-width:800px;margin:0 auto}
+        h1{font-size:22px;color:#065f46;margin:0 0 4px}
+        h2{font-size:14px;color:#374151;border-bottom:2px solid #d1fae5;padding-bottom:4px;margin:20px 0 10px}
+        .meta{font-size:12px;color:#6b7280;margin-bottom:20px}
+        table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:12px}
+        th{background:#f0fdf4;padding:6px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#065f46}
+        .ok{color:#065f46;font-weight:600} .warn{color:#b45309;font-weight:600}
+        .flag-box{background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:12px;margin:12px 0}
+        .flag-box ul{margin:4px 0;padding-left:18px;font-size:12px;color:#92400e}
+        .auth-box{background:#f0fdf4;border:1px solid #6ee7b7;border-radius:8px;padding:14px;margin-top:16px}
+        .just-box{background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px;margin:8px 0;font-style:italic;font-size:12px;color:#92400e}
+        .footer{margin-top:32px;font-size:10px;color:#9ca3af;text-align:center;border-top:1px solid #e5e7eb;padding-top:12px}
+        @media print{body{padding:16px}.no-print{display:none}}
+      </style>
+    </head><body>
+      <button onclick="window.print()" class="no-print" style="float:right;padding:8px 16px;background:#065f46;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">🖨️ Imprimir / Guardar PDF</button>
+      <h1>Estadio Español · DAV</h1>
+      <div style="font-size:13px;color:#065f46;font-weight:600;margin-bottom:2px">Protocolo de Subida — Poda en Altura</div>
+      <div class="meta">
+        <b>Fecha:</b> ${r.fecha} &nbsp;·&nbsp;
+        <b>Sitio:</b> ${r.sitio||"—"} &nbsp;·&nbsp;
+        <b>Especie:</b> ${r.especie||"—"} &nbsp;·&nbsp;
+        <b>Registrado:</b> ${new Date(r.creadoEn||"").toLocaleString("es-CL")}
+      </div>
+
+      <h2>1. Trabajadores</h2>
+      <table>
+        <thead><tr>
+          <th>Nombre</th><th>Descanso</th><th>Preocupación</th><th>Exceso confianza</th><th>Notas</th>
+        </tr></thead>
+        <tbody>${ops}</tbody>
+      </table>
+
+      <h2>2. Árbol / Sitio</h2>
+      <table><tbody>
+        <tr><td style="padding:5px 10px;width:220px">Historial previo de falla</td><td style="padding:5px 10px" class="${r.historialFalla?"warn":"ok"}">${r.historialFalla?"⚠️ Sí":"✅ No"}</td></tr>
+        <tr><td style="padding:5px 10px">Grietas, cavidades u hongos</td><td style="padding:5px 10px" class="${r.grietasCavidades?"warn":"ok"}">${r.grietasCavidades?"⚠️ Sí":"✅ No"}</td></tr>
+        <tr><td style="padding:5px 10px">Viento registrado</td><td style="padding:5px 10px" class="${r.viento&&Number(r.viento)>30?"warn":"ok"}">${r.viento||"—"} km/h${r.viento&&Number(r.viento)>30?" ⚠️ Sobre umbral":""}</td></tr>
+        <tr><td style="padding:5px 10px">Madera húmeda</td><td style="padding:5px 10px" class="${r.humedad?"warn":"ok"}">${r.humedad?"⚠️ Sí":"✅ No"}</td></tr>
+        <tr><td style="padding:5px 10px">Interferencias bajo zona de trabajo</td><td style="padding:5px 10px" class="${r.interferencias?"warn":"ok"}">${r.interferencias?"⚠️ Sí":"✅ No"}</td></tr>
+      </tbody></table>
+
+      <h2>3. Equipo</h2>
+      <table><tbody>
+        <tr><td style="padding:5px 10px;width:220px">Arnés</td><td style="padding:5px 10px" class="${r.arnes===false?"warn":"ok"}">${r.arnes?"✅ Aprobado":"⚠️ No aprobado"}</td></tr>
+        <tr><td style="padding:5px 10px">Cuerdas y mosquetones</td><td style="padding:5px 10px" class="${r.cuerdas===false?"warn":"ok"}">${r.cuerdas?"✅ Aprobado":"⚠️ No aprobado"}</td></tr>
+        <tr><td style="padding:5px 10px">Casco</td><td style="padding:5px 10px" class="${r.casco===false?"warn":"ok"}">${r.casco?"✅ Aprobado":"⚠️ No aprobado"}</td></tr>
+        <tr><td style="padding:5px 10px">Certificación vigente</td><td style="padding:5px 10px" class="${r.certificacionVigente===false?"warn":"ok"}">${r.certificacionVigente?"✅ Vigente":"⚠️ No vigente"}</td></tr>
+        <tr><td style="padding:5px 10px">Kit de comunicación</td><td style="padding:5px 10px" class="${r.comunicacion===false?"warn":"ok"}">${r.comunicacion?"✅ Operativo":"⚠️ No operativo"}</td></tr>
+      </tbody></table>
+
+      <h2>4. Briefing</h2>
+      <table><tbody>
+        <tr><td style="padding:5px 10px;width:220px">Roles definidos</td><td style="padding:5px 10px" class="${r.rolesClaros===false?"warn":"ok"}">${r.rolesClaros?"✅ Sí":"⚠️ No"}</td></tr>
+        <tr><td style="padding:5px 10px">Señales acordadas</td><td style="padding:5px 10px" class="${r.senalesAcordadas===false?"warn":"ok"}">${r.senalesAcordadas?"✅ Sí":"⚠️ No"}</td></tr>
+        <tr><td style="padding:5px 10px">Perímetro delimitado</td><td style="padding:5px 10px" class="${r.perimetroDelimitado===false?"warn":"ok"}">${r.perimetroDelimitado?"✅ Sí":"⚠️ No"}</td></tr>
+        <tr><td style="padding:5px 10px">Plan de emergencia</td><td style="padding:5px 10px" class="${r.planEmergencia===false?"warn":"ok"}">${r.planEmergencia?"✅ Sí":"⚠️ No"}</td></tr>
+      </tbody></table>
+
+      ${flags.length>0?`
+        <div class="flag-box">
+          <b style="color:#92400e">⚠️ ${flags.length} alerta(s) detectada(s):</b>
+          <ul>${flags.map(f=>`<li>${f}</li>`).join("")}</ul>
+        </div>
+        ${r.justificacion?`<div class="just-box"><b>Justificación:</b> "${r.justificacion}"</div>`:""}
+      `:""}
+
+      <div class="auth-box">
+        <div style="font-size:13px;font-weight:600;color:#065f46;margin-bottom:6px">
+          ${flags.length===0?"✅ Autorizado sin observaciones":"✅ Autorizado con justificación escrita"}
+        </div>
+        <div style="font-size:12px"><b>Supervisor:</b> ${r.supervisorNombre||"—"}</div>
+      </div>
+
+      <div class="footer">Estadio Español de Las Condes · Departamento de Áreas Verdes · Generado desde Estadio Verde</div>
+    </body></html>`);
+    win.document.close();
+    win.focus();
+  };
+
+  if(showHistory) return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <div style={{fontWeight:700,fontSize:14}}>📂 Registros guardados ({history.length})</div>
+        <button onClick={()=>setShowHistory(false)} style={{...S.btn,fontSize:11}}>← Nuevo checklist</button>
+      </div>
+      {history.length===0&&<div style={{textAlign:"center",color:"#5a9a7a",padding:30}}>Aún no hay registros guardados.</div>}
+      {history.map((r,i)=>(
+        <div key={i} style={{...S.card,padding:12,marginBottom:8}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",marginBottom:4}}>
+            <div>
+              <div style={{fontSize:13,fontWeight:600,color:"#c0dac0"}}>{r.operadores?.map(o=>o.nombre).join(", ")}</div>
+              <div style={{fontSize:11,color:"#5a9a7a"}}>{r.sitio} · {r.fecha}</div>
+            </div>
+            <div style={{display:"flex",gap:6,alignItems:"center"}}>
+              <span style={{fontSize:10,padding:"2px 8px",borderRadius:8,
+                background:r.flags?.length?"rgba(245,158,11,0.12)":"rgba(34,197,94,0.1)",
+                color:r.flags?.length?"#f59e0b":"#22c55e",border:`1px solid ${r.flags?.length?"rgba(245,158,11,0.3)":"rgba(34,197,94,0.3)"}`}}>
+                {r.flags?.length?`${r.flags.length} alerta(s)`:"sin observaciones"}
+              </span>
+              <button onClick={()=>imprimirProtocolo(r)}
+                style={{fontSize:10,padding:"2px 8px",borderRadius:6,border:"1px solid rgba(96,165,250,0.3)",background:"rgba(96,165,250,0.08)",color:"#60a5fa",cursor:"pointer"}}>
+                🖨️ PDF
+              </button>
+            </div>
+          </div>
+          {r.flags?.length>0&&<ul style={{fontSize:11,color:"#f59e0b",marginTop:4,paddingLeft:16}}>{r.flags.map((f,j)=><li key={j}>{f}</li>)}</ul>}
+          {r.justificacion&&<div style={{fontSize:11,color:"#7aaa80",marginTop:4,fontStyle:"italic"}}>"{r.justificacion}"</div>}
+          <div style={{fontSize:10,color:"#4a7a5a",marginTop:4}}>Autorizó: {r.supervisorNombre}</div>
+        </div>
+      ))}
+    </div>
+  );
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        <div>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700}}>🌿 Protocolo de subida</div>
+          <div style={{fontSize:11,color:"#5a9a7a"}}>Revisión previa a poda en altura — completar antes de anclar</div>
+        </div>
+        <button onClick={()=>setShowHistory(true)} style={{...S.btn,fontSize:11,color:"#60a5fa"}}>
+          📂 Ver registros ({history.length})
+        </button>
+      </div>
+
+      {/* Stepper */}
+      <div style={{...S.card,padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+        {PROT_STEPS.map((s,idx)=>(
+          <React.Fragment key={s.id}>
+            <button onClick={()=>setStep(s.id)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,background:"none",border:"none",cursor:"pointer"}}>
+              <div style={{width:26,height:26,borderRadius:"50%",background:nodeColor(s.id)+"22",border:`2px solid ${nodeColor(s.id)}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:nodeColor(s.id)}}>
+                {step>s.id&&stepOk(s.id)?"✓":s.id}
+              </div>
+              <span style={{fontSize:9,color:step===s.id?"#34d399":"#4a7a5a",textTransform:"uppercase",letterSpacing:"0.3px"}}>{s.label}</span>
+            </button>
+            {idx<PROT_STEPS.length-1&&<div style={{flex:1,height:1,background:"rgba(255,255,255,0.08)",margin:"0 4px"}}/>}
+          </React.Fragment>
+        ))}
+      </div>
+
+      {/* Contenido por step */}
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {step===1&&(<>
+          <select value="" onChange={e=>agregarOp(e.target.value)} style={S.input}>
+            <option value="">+ Agregar trabajador a la faena</option>
+            {PROT_TRABAJADORES.filter(t=>!form.operadores.some(o=>o.nombre===t)).map(t=>(
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+          <input value={form.sitio} onChange={e=>set("sitio",e.target.value)} placeholder="Sitio / árbol (ej. Alameda Central, Q3)" style={S.input}/>
+          {form.operadores.length===0&&<div style={{textAlign:"center",color:"#5a9a7a",fontSize:12,padding:"16px 0"}}>Agrega al menos un trabajador para evaluar su estado antes de subir.</div>}
+          {form.operadores.map(o=>(
+            <div key={o.nombre} style={{...S.card,padding:12}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+                <div style={{fontWeight:700,color:"#34d399"}}>{o.nombre.split(" ")[0]} {o.nombre.split(" ")[1]||""}</div>
+                <button onClick={()=>quitarOp(o.nombre)} style={{fontSize:11,color:"#5a9a7a",background:"none",border:"none",cursor:"pointer"}}>✕ quitar</button>
+              </div>
+              <ProtItem value={o.descanso} onChange={v=>setOpCampo(o.nombre,"descanso",v)}>¿Descansó bien anoche?</ProtItem>
+              <ProtItem value={o.preocupacion} onChange={v=>setOpCampo(o.nombre,"preocupacion",v)} invert>¿Reporta preocupación personal o laboral que lo distraiga hoy?</ProtItem>
+              <ProtItem value={o.confianzaExcesiva} onChange={v=>setOpCampo(o.nombre,"confianzaExcesiva",v)} invert>¿Se detecta exceso de confianza?</ProtItem>
+              <textarea value={o.nota} onChange={e=>setOpCampo(o.nombre,"nota",e.target.value)} placeholder="Observaciones adicionales (opcional)" style={{...S.input,resize:"vertical",marginTop:6}} rows={2}/>
+            </div>
+          ))}
+        </>)}
+
+        {step===2&&(<>
+          <input value={form.especie} onChange={e=>set("especie",e.target.value)} placeholder="Especie (ej. Quercus, Ciprés)" style={S.input}/>
+          <ProtItem value={form.historialFalla} onChange={v=>set("historialFalla",v)} invert>¿Este árbol tiene historial previo de falla de rama?</ProtItem>
+          <ProtItem value={form.grietasCavidades} onChange={v=>set("grietasCavidades",v)} invert>¿Se observan grietas, cavidades u hongos?</ProtItem>
+          <div style={{...S.card,padding:10}}>
+            <div style={{fontSize:12,color:"#c0dac0",marginBottom:6}}>Viento registrado (km/h)</div>
+            <input type="number" value={form.viento} onChange={e=>set("viento",e.target.value)} placeholder="ej. 18" style={{...S.input,width:120}}/>
+            {form.viento&&Number(form.viento)>30&&<div style={{fontSize:11,color:"#f59e0b",marginTop:4}}>⚠️ Sobre el umbral de 30 km/h — suspender faena</div>}
+          </div>
+          <ProtItem value={form.humedad} onChange={v=>set("humedad",v)} invert>¿Madera húmeda por lluvia reciente?</ProtItem>
+          <ProtItem value={form.interferencias} onChange={v=>set("interferencias",v)} invert>¿Hay cableado, estructuras o tránsito bajo la zona de trabajo?</ProtItem>
+        </>)}
+
+        {step===3&&(<>
+          <ProtItem value={form.arnes} onChange={v=>set("arnes",v)}>Arnés inspeccionado y aprobado</ProtItem>
+          <ProtItem value={form.cuerdas} onChange={v=>set("cuerdas",v)}>Cuerdas y mosquetones inspeccionados y aprobados</ProtItem>
+          <ProtItem value={form.casco} onChange={v=>set("casco",v)}>Casco en buen estado</ProtItem>
+          <ProtItem value={form.certificacionVigente} onChange={v=>set("certificacionVigente",v)}>Certificación del equipo vigente</ProtItem>
+          <ProtItem value={form.comunicacion} onChange={v=>set("comunicacion",v)}>Kit de comunicación (radio/celular) operativo</ProtItem>
+        </>)}
+
+        {step===4&&(<>
+          <ProtItem value={form.rolesClaros} onChange={v=>set("rolesClaros",v)}>Roles definidos (quién sube, quién asegura, quién delimita)</ProtItem>
+          <ProtItem value={form.senalesAcordadas} onChange={v=>set("senalesAcordadas",v)}>Señales de comunicación acordadas</ProtItem>
+          <ProtItem value={form.perimetroDelimitado} onChange={v=>set("perimetroDelimitado",v)}>Perímetro de seguridad delimitado</ProtItem>
+          <ProtItem value={form.planEmergencia} onChange={v=>set("planEmergencia",v)}>Plan de emergencia y botiquín identificados</ProtItem>
+        </>)}
+
+        {step===5&&(
+          <div style={{...S.card,padding:14}}>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:8}}>Resumen</div>
+            <div style={{fontSize:12,color:"#7aaa80",marginBottom:8}}>{form.operadores.map(o=>o.nombre).join(", ")||"—"} · {form.sitio||"—"} · {form.fecha}</div>
+            {flags.length===0
+              ? <div style={{fontSize:12,color:"#22c55e",padding:"8px 10px",background:"rgba(34,197,94,0.06)",borderRadius:8}}>✅ Sin observaciones. Condiciones aptas para iniciar la faena.</div>
+              : <>
+                  <div style={{fontSize:12,color:"#f59e0b",fontWeight:600,marginBottom:4}}>⚠️ {flags.length} alerta(s) detectada(s):</div>
+                  <ul style={{fontSize:11,color:"#f59e0b",paddingLeft:16,marginBottom:8}}>{flags.map((f,i)=><li key={i}>{f}</li>)}</ul>
+                </>
+            }
+            {flags.length>0&&(
+              <textarea value={form.justificacion} onChange={e=>set("justificacion",e.target.value)}
+                placeholder="Justificación escrita para autorizar pese a las alertas (obligatoria)"
+                style={{...S.input,border:"1px solid rgba(245,158,11,0.4)",resize:"vertical",marginBottom:8}} rows={3}/>
+            )}
+            <select value={form.supervisorNombre} onChange={e=>set("supervisorNombre",e.target.value)} style={{...S.input,marginBottom:0}}>
+              <option value="">Supervisor que autoriza...</option>
+              <option value={PROT_SUPERVISOR}>{PROT_SUPERVISOR}</option>
+            </select>
+          </div>
+        )}
+      </div>
+
+      {/* Navegación */}
+      <div style={{display:"flex",gap:8,marginTop:16}}>
+        {step>1&&<button onClick={()=>setStep(s=>s-1)} style={{...S.btn,flex:1,padding:"10px 0",background:"transparent",border:"1px solid rgba(255,255,255,0.1)",color:"#7aaa80"}}>← Atrás</button>}
+        {step<5
+          ? <button onClick={()=>setStep(s=>s+1)} disabled={!stepOk(step)}
+              style={{...S.btn,flex:1,padding:"10px 0",background:stepOk(step)?"rgba(52,211,153,0.15)":"rgba(255,255,255,0.04)",
+                color:stepOk(step)?"#34d399":"#4a7a5a",border:`1px solid ${stepOk(step)?"rgba(52,211,153,0.3)":"rgba(255,255,255,0.06)"}`,
+                cursor:stepOk(step)?"pointer":"not-allowed"}}>
+              Siguiente →
+            </button>
+          : <button onClick={guardar} disabled={!canAuth||saving}
+              style={{...S.btn,flex:1,padding:"10px 0",fontWeight:700,
+                background:canAuth?"rgba(34,197,94,0.15)":"rgba(255,255,255,0.04)",
+                color:canAuth?"#22c55e":"#4a7a5a",border:`1px solid ${canAuth?"rgba(34,197,94,0.4)":"rgba(255,255,255,0.06)"}`,
+                cursor:canAuth?"pointer":"not-allowed"}}>
+              {saved?"✅ Guardado":saving?"Guardando...":"Autorizar e iniciar faena"}
+            </button>
+        }
+      </div>
+      <div style={{fontSize:10,color:"#3a5a3a",textAlign:"center",marginTop:8}}>Los registros quedan guardados en Firebase para auditoría.</div>
+    </div>
+  );
+}
+
+
 export default function App() {
   const [zonas, setZonas] = useState(()=>MACROZONAS_BASE);
   const [vista, setVista] = useState("dashboard");
@@ -15493,9 +15904,9 @@ export default function App() {
         </div>
         <div style={S.headerNav} className="headerNav">
           {(fbRol==="jefa"
-            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["compras","🛒","Compras"],["bodegas","🏪","Bodegas"],["golf","🏌️","Golf"],["personal","👷","Personal"],["notificaciones","🔔","Alertas"]]
+            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["compras","🛒","Compras"],["bodegas","🏪","Bodegas"],["golf","🏌️","Golf"],["personal","👷","Personal"],["protocolos","📋","Protocolos"],["notificaciones","🔔","Alertas"]]
             : fbRol==="supervisor"
-            ? [["dashboard","📊","Panel"],["programacion","📆","Programa"],["reporte","📋","Reporte"],["golf","🏌️","Golf"],["miturno","🌿","Mi Turno"]]
+            ? [["dashboard","📊","Panel"],["programacion","📆","Programa"],["reporte","📋","Reporte"],["golf","🏌️","Golf"],["protocolos","📋","Protocolos"],["miturno","🌿","Mi Turno"]]
             : [["miturno","🌿","Mi Turno"]]
           ).map(([v,ico,lbl])=>(
             <button key={v} onClick={()=>{setVista(v);setZonaId(null);setAiText("");if(v==="notificaciones")marcarTodasLeidas();}} style={{cursor:"pointer",border:"none",background:"transparent",color:vista===v?"#fff":"#7aaa80",fontFamily:"'Georgia',serif",fontSize:12,padding:"10px 14px",borderBottom:vista===v?"2px solid #4a9a64":"2px solid transparent",transition:"all .15s",whiteSpace:"nowrap",display:"flex",flexDirection:"column",alignItems:"center",gap:2,flexShrink:0,position:"relative"}}>
@@ -16776,6 +17187,9 @@ export default function App() {
         )}
 
         {/* ── ALERTAS / NOTIFICACIONES ── */}
+          {vista==="protocolos"&&(
+            <PanelProtocolos S={S} personal={personal} esJefa={esJefa} crearNotificacion={crearNotificacion}/>
+          )}
         {vista==="notificaciones"&&(<ErrorBoundary>
           <PanelAlertas S={S} incidencias={incidencias} setIncidencias={setIncidencias} autoOpen={autoOpenAlerta} onAutoOpenDone={()=>setAutoOpenAlerta(false)} notificaciones={notificaciones} setNotificaciones={setNotificaciones} marcarTodasLeidas={marcarTodasLeidas} notifNoLeidas={notifNoLeidas} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} tareasProg={tareasProg} setTareasProg={setTareasProg} crearNotificacion={crearNotificacion} esJefa={esJefa}/>
         </ErrorBoundary>)}
