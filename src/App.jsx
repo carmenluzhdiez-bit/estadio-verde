@@ -14757,7 +14757,7 @@ function ProtItem({ children, value, onChange, invert }) {
   );
 }
 
-function ProtocoloPodaAltura({ S, personal, esJefa, crearNotificacion }) {
+function ProtocoloPodaAltura({ S, personal, esJefa, crearNotificacion, rolLogueado }) {
   const [form, setForm] = React.useState(protEmptyForm());
   const [step, setStep] = React.useState(1);
   const [history, setHistory] = React.useState([]);
@@ -14995,12 +14995,37 @@ function ProtocoloPodaAltura({ S, personal, esJefa, crearNotificacion }) {
       {/* Contenido por step */}
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
         {step===1&&(<>
-          <select value="" onChange={e=>agregarOp(e.target.value)} style={S.input}>
-            <option value="">+ Agregar trabajador a la faena</option>
-            {PROT_TRABAJADORES.filter(t=>!form.operadores.some(o=>o.nombre===t)).map(t=>(
-              <option key={t} value={t}>{t}</option>
-            ))}
-          </select>
+          {/* Selector de personal desde Firebase */}
+          {(()=>{
+            const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
+            const disponibles = personalArr
+              .filter(p=>!form.operadores.some(o=>o.nombre===p.nombre))
+              .sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+            return (
+              <select value="" onChange={e=>agregarOp(e.target.value)} style={S.input}>
+                <option value="">+ Agregar miembro del equipo a la faena</option>
+                {disponibles.map(p=>(
+                  <option key={p.id} value={p.nombre}>{p.nombre} — {p.cargo}</option>
+                ))}
+              </select>
+            );
+          })()}
+          {/* Agregar trabajador externo */}
+          <div style={{display:"flex",gap:6}}>
+            <input
+              value={form._externoNombre||""} 
+              onChange={e=>set("_externoNombre",e.target.value)}
+              placeholder="Externo: nombre completo..."
+              style={{...S.input,flex:1}}/>
+            <button onClick={()=>{
+              const n=(form._externoNombre||"EXTERNO").trim();
+              if(!n) return;
+              agregarOp(n+" (externo)");
+              set("_externoNombre","");
+            }} style={{...S.btn,whiteSpace:"nowrap",background:"rgba(96,165,250,0.1)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.3)"}}>
+              + Agregar externo
+            </button>
+          </div>
           <input value={form.sitio} onChange={e=>set("sitio",e.target.value)} placeholder="Sitio / árbol (ej. Alameda Central, Q3)" style={S.input}/>
           {form.operadores.length===0&&<div style={{textAlign:"center",color:"#5a9a7a",fontSize:12,padding:"16px 0"}}>Agrega al menos un trabajador para evaluar su estado antes de subir.</div>}
           {form.operadores.map(o=>(
@@ -15061,10 +15086,13 @@ function ProtocoloPodaAltura({ S, personal, esJefa, crearNotificacion }) {
                 placeholder="Justificación escrita para autorizar pese a las alertas (obligatoria)"
                 style={{...S.input,border:"1px solid rgba(245,158,11,0.4)",resize:"vertical",marginBottom:8}} rows={3}/>
             )}
-            <select value={form.supervisorNombre} onChange={e=>set("supervisorNombre",e.target.value)} style={{...S.input,marginBottom:0}}>
-              <option value="">Supervisor que autoriza...</option>
-              <option value={PROT_SUPERVISOR}>{PROT_SUPERVISOR}</option>
-            </select>
+            <div style={{padding:"10px 12px",background:"rgba(34,197,94,0.05)",borderRadius:8,border:"1px solid rgba(34,197,94,0.2)"}}>
+              <div style={{fontSize:11,color:"#5a9a7a",marginBottom:6}}>La autorización recae en la <b style={{color:"#34d399"}}>Jefa de Áreas Verdes</b></div>
+              <select value={form.supervisorNombre} onChange={e=>set("supervisorNombre",e.target.value)} style={{...S.input,marginBottom:0}}>
+                <option value="">Seleccionar quien autoriza...</option>
+                <option value="Carmen Luz Hermosilla Diez">Carmen Luz Hermosilla Diez — Jefa DAV</option>
+              </select>
+            </div>
           </div>
         )}
       </div>
@@ -17188,7 +17216,7 @@ export default function App() {
 
         {/* ── ALERTAS / NOTIFICACIONES ── */}
           {vista==="protocolos"&&(
-            <PanelProtocolos S={S} personal={personal} esJefa={esJefa} crearNotificacion={crearNotificacion}/>
+            <PanelProtocolos S={S} personal={personal} esJefa={esJefa} crearNotificacion={crearNotificacion} rolLogueado={rolLogueado}/>
           )}
         {vista==="notificaciones"&&(<ErrorBoundary>
           <PanelAlertas S={S} incidencias={incidencias} setIncidencias={setIncidencias} autoOpen={autoOpenAlerta} onAutoOpenDone={()=>setAutoOpenAlerta(false)} notificaciones={notificaciones} setNotificaciones={setNotificaciones} marcarTodasLeidas={marcarTodasLeidas} notifNoLeidas={notifNoLeidas} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} tareasProg={tareasProg} setTareasProg={setTareasProg} crearNotificacion={crearNotificacion} esJefa={esJefa}/>
