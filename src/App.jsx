@@ -2307,17 +2307,22 @@ function ConfiguradorSemanal({ S, personal, configSemanal, setConfigSemanal, esJ
 }
 
 // Función global para obtener el responsable por defecto según tipo de tarea
-const getResponsablePorTipo = (tarea, configSemanal) => {
+const getResponsablePorTipo = (tarea, configSemanal, zona) => {
   const t = (tarea||"").toLowerCase();
+  const z = (zona||"").toLowerCase();
+  // Golf → siempre Bhalú
+  if(z.includes("golf")||t.includes("golf")||t.includes("green")||t.includes("green")||t.includes("tee")||t.includes("fairway")||t.includes("bunker"))
+    return configSemanal?.corte_golf||"Osmar Bhalú Armijo Zúñiga";
   if(t.includes("corte")&&(t.includes("golf")||t.includes("green"))) return configSemanal?.corte_golf||"Osmar Bhalú Armijo Zúñiga";
-  if(t.includes("corte")&&t.includes("tractor")) return configSemanal?.corte_tractor||"";
+  if(t.includes("corte")&&(t.includes("tractor")||t.includes("mz")||t.includes("ts"))) return configSemanal?.corte_tractor||"";
+  if(t.includes("corte")) return configSemanal?.corte_tractor||"";
   if(t.includes("orill")) return configSemanal?.orillado||"";
-  if(t.includes("riego")) return configSemanal?.riego||"";
-  if(t.includes("pesticida")||t.includes("fungicida")||t.includes("fumigac")) return configSemanal?.pesticidas||"";
-  if(t.includes("poda")||t.includes("arbust")) return configSemanal?.poda||"";
-  if(t.includes("siembra")||t.includes("trasplante")) return configSemanal?.siembra||"";
-  if(t.includes("limpieza")) return configSemanal?.limpieza||"";
-  if(t.includes("árbol")||t.includes("arbol")||t.includes("poda árbol")) return configSemanal?.arboles||"";
+  if(t.includes("riego")||t.includes("regar")||t.includes("syringing")||t.includes("fertirriego")) return configSemanal?.riego||"";
+  if(t.includes("pesticida")||t.includes("fungicida")||t.includes("fumigac")||t.includes("herbicida")||t.includes("fitosanit")) return configSemanal?.pesticidas||"";
+  if(t.includes("poda")||t.includes("arbust")||t.includes("árbol")||t.includes("arbol")) return configSemanal?.poda||"";
+  if(t.includes("siembra")||t.includes("trasplante")||t.includes("plantar")||t.includes("vivero")) return configSemanal?.siembra||"";
+  if(t.includes("limpieza")||t.includes("limpiar")||t.includes("barrido")||t.includes("soplad")) return configSemanal?.limpieza||"";
+  if(t.includes("fertil")||t.includes("abono")||t.includes("novatec")||t.includes("salitre")) return configSemanal?.pesticidas||"";
   return "";
 };
 
@@ -2749,17 +2754,38 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                           </div>
                         )}
                         {/* Campo altura real de corte — aparece al marcar como hecha si la tarea es de corte */}
-                        {(t.tarea||"").toLowerCase().includes("corte")&&(t.zona==="Golf"||(t.zona||"").includes("Golf"))&&(
-                          <div style={{marginTop:6,display:"flex",alignItems:"center",gap:8}}>
-                            <label style={{fontSize:11,color:"#fbbf24",whiteSpace:"nowrap"}}>✂️ Altura de corte real (mm):</label>
-                            <input type="number" step="0.1" min="2" max="20"
-                              value={alturaInputs[t.id]??t.alturaCorteReal??""}
-                              onChange={e=>setAlturaInputs(p=>({...p,[t.id]:e.target.value}))}
-                              onBlur={e=>{const val=e.target.value;if(val&&val!==(t.alturaCorteReal||""))onUpdateTarea(fechaVer,t.id,{alturaCorteReal:val});}}
-                              onKeyDown={e=>{if(e.key==="Enter"||e.key==="Tab"){const val=e.target.value;if(val)onUpdateTarea(fechaVer,t.id,{alturaCorteReal:val});}}}
-                              placeholder={t.alturaCorteObj||t.alturaCorte||"mm"}
-                              style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(251,191,36,0.3)",borderRadius:6,color:"#fbbf24",padding:"4px 8px",fontSize:13,fontFamily:"'Georgia',serif",width:80,outline:"none"}}/>
-                            {t.alturaCorteReal&&<span style={{fontSize:10,color:"#5a9a7a"}}>✓ {t.alturaCorteReal}mm registrado</span>}
+                        {(()=>{
+                          const esCorteGolf = (
+                            (t.tarea||"").toLowerCase().includes("corte") ||
+                            (t.tarea||"").toLowerCase().includes("cortar") ||
+                            (t.tarea||"").toLowerCase().includes("mow") ||
+                            (t.tarea||"").toLowerCase().includes("hoc")
+                          ) && (
+                            t.zona==="Golf" || (t.zona||"").includes("Golf") ||
+                            (t.elemento||"").toLowerCase().includes("green") ||
+                            (t.elemento||"").toLowerCase().includes("vivero") ||
+                            (t.tarea||"").toLowerCase().includes("green")
+                          );
+                          return esCorteGolf;
+                        })()&&(
+                          <div style={{marginTop:8,padding:"8px 12px",background:"rgba(251,191,36,0.06)",border:"1px solid rgba(251,191,36,0.2)",borderRadius:8}}>
+                            <div style={{fontSize:11,color:"#fbbf24",fontWeight:600,marginBottom:6}}>
+                              ✂️ Registrar altura de corte real
+                              {(t.alturaCorteObj||t.alturaCorte)&&<span style={{color:"#5a9a7a",fontWeight:400,marginLeft:6}}>· HOC indicada: {t.alturaCorteObj||t.alturaCorte}mm</span>}
+                            </div>
+                            <div style={{display:"flex",alignItems:"center",gap:8}}>
+                            <div style={{display:"flex",alignItems:"center",gap:8}}>
+                              <input type="number" step="0.1" min="2" max="20"
+                                style={{width:80,textAlign:"center",fontWeight:700,fontSize:15,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(251,191,36,0.3)",borderRadius:6,color:"#fbbf24",padding:"4px 8px"}}
+                                value={alturaInputs[t.id]??t.alturaCorteReal??""}
+                                placeholder={t.alturaCorteObj||t.alturaCorte||"mm"}
+                                onChange={e=>setAlturaInputs(p=>({...p,[t.id]:e.target.value}))}
+                                onBlur={e=>{const val=e.target.value;if(val&&val!==(t.alturaCorteReal||""))onUpdateTarea(fechaVer,t.id,{alturaCorteReal:val});}}
+                                onKeyDown={e=>{if(e.key==="Enter"||e.key==="Tab"){const val=e.target.value;if(val)onUpdateTarea(fechaVer,t.id,{alturaCorteReal:val});}}}/>
+                              <span style={{fontSize:11,color:"#5a9a7a"}}>mm</span>
+                              <button onClick={()=>{const val=alturaInputs[t.id]??t.alturaCorteReal??"";if(val)onUpdateTarea(fechaVer,t.id,{alturaCorteReal:String(val)});}} style={{fontSize:11,padding:"3px 10px",borderRadius:5,border:"1px solid rgba(251,191,36,0.4)",background:"rgba(251,191,36,0.1)",color:"#fbbf24",cursor:"pointer"}}>💾 Guardar</button>
+                              {t.alturaCorteReal&&<span style={{fontSize:11,color:"#22c55e"}}>✅ {t.alturaCorteReal}mm</span>}
+                            </div>
                           </div>
                         )}
                         {t.estado==="no_pudo"&&(
@@ -3110,7 +3136,8 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           const esZonaGolf = z.id===31||(z.nombre||"").toLowerCase().includes("golf");
           const respDefault = esZonaGolf
             ? "Osmar Bhalú Armijo Zúñiga"  // Golf → Bhalú por defecto
-            : getResponsablePorTipo(f.tarea, configSemanal)||"";
+            : getResponsablePorTipo(f.tarea, configSemanal, z.nombre)||"";
+          if(esZonaGolf) console.log("Golf tarea:", f.tarea, "→ resp:", respDefault);
           const item = { id: Date.now()+Math.random(), fecha, zona:z.nombre, elemento:e.nombre, tarea:f.tarea, responsable:respDefault, estado:respDefault?"pendiente":"por_designar", notas:f.obs||"", frecuencia:f.modo==="diasSemana"?`cada ${f.diasMinimos||"?"} días`:f[estProp], estacion:estProp, auto:true, fechaCorrespondiente:prox.fecha, origenZid:String(z.id), origenEid:e.id, origenFrecId:f.id, origenEsCustom:!!e.isCustom };
           propuestas.push(item);
           if(esVencida) { const vKey=`${z.nombre} — ${f.tarea}`; if(!vencidas.includes(vKey)) vencidas.push(vKey); }
