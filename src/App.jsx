@@ -2658,7 +2658,7 @@ const GOLF_FRECS_INIT = {
 
 // ─── PROGRAMACIÓN DIARIA ─────────────────────────────────────────────────────
 // ─── VISTA TRABAJADOR ────────────────────────────────────────────────────────
-function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE, onAccesoRapido, onCambiarMetodo, cierresTurno={}, onCerrarTurno, onReabrirTurno, crearNotificacion, esJefaApp=false }) {
+function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE, onAccesoRapido, onCambiarMetodo, cierresTurno={}, onCerrarTurno, onReabrirTurno, crearNotificacion, esJefaApp=false, onGuardarRutinas, onGuardarAlertaFito }) {
   const hoy = fechaLocal();
   const [fechaVer, setFechaVer] = React.useState(fecha || hoy);
   // Cierre de turno
@@ -2849,7 +2849,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
             <div style={{padding:"10px 14px",background:"rgba(251,191,36,0.06)",borderBottom:"1px solid rgba(251,191,36,0.1)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <div style={{fontSize:13,fontWeight:700,color:"#fbbf24"}}>⛳ Rutinas diarias Golf</div>
               {puedeEditar&&TAREAS_DIARIAS_GOLF.some(t=>rutinasGolfState[t.id]!=="hecha")&&(
-                <button onClick={()=>{const n={};TAREAS_DIARIAS_GOLF.forEach(t=>{n[t.id]="hecha";});setRutinasGolfState(n);}}
+                <button onClick={()=>{const n={};TAREAS_DIARIAS_GOLF.forEach(t=>{n[t.id]="hecha";});setRutinasGolfState(n);onGuardarRutinas&&onGuardarRutinas(n);}}
                   style={{fontSize:11,padding:"3px 12px",border:"1px solid rgba(34,197,94,0.4)",borderRadius:6,background:"rgba(34,197,94,0.1)",color:"#22c55e",cursor:"pointer"}}>
                   ✅ Marcar todas hechas
                 </button>
@@ -2867,11 +2867,21 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                       <span>{tarea.icon}</span>
                       <span style={{flex:1,fontSize:13,color:hecha?"#22c55e":noPudo?"#ef4444":"#c0dac0"}}>{tarea.tarea}</span>
                       {puedeEditar&&<>
-                        <button onClick={()=>setRutinasGolfState(p=>({...p,[tarea.id]:hecha?null:"hecha"}))}
+                        <button onClick={()=>{
+                          const nuevoEst = hecha?null:"hecha";
+                          const nuevo = {...rutinasGolfState,[tarea.id]:nuevoEst};
+                          setRutinasGolfState(nuevo);
+                          onGuardarRutinas&&onGuardarRutinas(nuevo);
+                        }}
                           style={{fontSize:11,padding:"2px 10px",borderRadius:5,border:`1px solid ${hecha?"rgba(34,197,94,0.5)":"rgba(255,255,255,0.1)"}`,background:hecha?"rgba(34,197,94,0.15)":"transparent",color:hecha?"#22c55e":"#5a9a7a",cursor:"pointer"}}>
                           {hecha?"✅":"○"}
                         </button>
-                        <button onClick={()=>setRutinasGolfState(p=>({...p,[tarea.id]:noPudo?null:"no_pudo"}))}
+                        <button onClick={()=>{
+                          const nuevoEst = noPudo?null:"no_pudo";
+                          const nuevo = {...rutinasGolfState,[tarea.id]:nuevoEst};
+                          setRutinasGolfState(nuevo);
+                          onGuardarRutinas&&onGuardarRutinas(nuevo);
+                        }}
                           style={{fontSize:11,padding:"2px 8px",borderRadius:5,border:`1px solid ${noPudo?"rgba(239,68,68,0.5)":"rgba(255,255,255,0.1)"}`,background:noPudo?"rgba(239,68,68,0.1)":"transparent",color:noPudo?"#ef4444":"#5a9a7a",cursor:"pointer"}}>✗</button>
                       </>}
                     </div>
@@ -2890,6 +2900,13 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                           style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(167,139,250,0.3)",borderRadius:6,color:"#ede9e0",padding:"5px 8px",fontSize:11,boxSizing:"border-box"}}/>
                         {rutinasGolfState.fito_obs?.trim()&&rutinasGolfState.fito_obs.toLowerCase()!=="sin novedad"&&(
                           <button onClick={()=>{
+                            // Guardar alerta en Firebase incidencias
+                            onGuardarAlertaFito&&onGuardarAlertaFito({
+                              obs: rutinasGolfState.fito_obs,
+                              trabajador: trabajador?.nombre,
+                              fecha: fechaVer,
+                            });
+                            // Crear tarea urgente en programación
                             onAddTarea&&onAddTarea({
                               id:Date.now()+Math.random(),
                               fecha:fechaVer,
@@ -2909,7 +2926,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                               tipo:"golf_fito",
                               urgente:true,
                             });
-                            alert("⚠️ Alerta fitosanitaria generada.");
+                            alert("⚠️ Alerta fitosanitaria generada y enviada a la jefa.");
                           }} style={{marginTop:6,fontSize:11,padding:"3px 10px",borderRadius:5,border:"1px solid rgba(239,68,68,0.4)",background:"rgba(239,68,68,0.1)",color:"#fca5a5",cursor:"pointer"}}>
                             🚨 Generar alerta fitosanitaria
                           </button>
@@ -14490,7 +14507,7 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
   );
 }
 
-function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotificaciones, marcarTodasLeidas, notifNoLeidas, MACROZONAS_BASE, personal, tareasProg, setTareasProg, crearNotificacion, esJefa, autoOpen, onAutoOpenDone }) {
+function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotificaciones, marcarTodasLeidas, notifNoLeidas, MACROZONAS_BASE, personal, tareasProg, setTareasProg, crearNotificacion, onGuardarDirecto, esJefa, autoOpen, onAutoOpenDone }) {
   const [tabAlerta, setTabAlerta] = React.useState("incidencias");
   const [showNuevaAlerta, setShowNuevaAlerta] = React.useState(false);
   React.useEffect(()=>{
@@ -14564,7 +14581,10 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
     const tipoObj = TIPOS_ALERTA.find(t=>t.id===alertaForm.tipo)||TIPOS_ALERTA[0];
     const nuevaId = Date.now()+Math.random();
     const nuevaAlerta = limpiarUndef({id:nuevaId,estado:"activa",tipo:alertaForm.tipo,tipoLabel:tipoObj.label,tipoIcon:tipoObj.icon,zonas:alertaForm.zonas,origen:alertaForm.origen,urgencia:alertaForm.urgencia,descripcion:alertaForm.descripcion,responsable:alertaForm.responsable,fecha:alertaForm.fecha,hora:alertaForm.hora,fechaCreacion:new Date().toISOString(),tareas:tareasEditables.filter(t=>t.incluir).map(t=>({texto:t.texto,responsable:t.responsable,estado:"pendiente"})),historial:[{accion:"Alerta creada",fecha:alertaForm.fecha,hora:alertaForm.hora,responsable:alertaForm.responsable}]});
-    setIncidencias([nuevaAlerta,...incArr]);
+    setIncidencias(prev=>{
+      const arr = Array.isArray(prev)?prev:Object.values(prev||{});
+      return [nuevaAlerta, ...arr];
+    });
     // Determinar si la alerta es de Golf
     const esGolf = alertaForm.zonas.some(z=>z==="Golf"||(z||"").toLowerCase().includes("golf")) ||
                    alertaForm.tipo==="golf_incid";
@@ -14608,6 +14628,8 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
       return {...prev,[alertaForm.fecha]:[tareaCierre,...tareasGen,...tareasInst,...normArr(prev[alertaForm.fecha]||[])].map(limpiarUndef)};
     });
     crearNotificacion?.("alerta",{titulo:`${tipoObj.icon} Nueva alerta: ${alertaForm.zonas.join(", ")}`,mensaje:alertaForm.descripcion,fecha:alertaForm.fecha});
+    // Guardar directamente en Firebase como respaldo
+    onGuardarDirecto&&onGuardarDirecto(nuevaAlerta);
     setAlertaForm(emptyAlerta);
     setShowNuevaAlerta(false);
     setTabAlerta("incidencias");
@@ -16284,6 +16306,29 @@ export default function App() {
                 S={S}
                 esJefaApp={true}
                 crearNotificacion={crearNotificacion}
+                onGuardarRutinas={(estado)=>{
+                  const tId = workerLogueado;
+                  if(!tId) return;
+                  fbUpdate(ref(db, ROOT+"/rutinas-golf/"+fechaLocal()+"/"+tId), estado)
+                    .catch(e=>console.error("rutinas firebase:",e));
+                }}
+                onGuardarAlertaFito={({obs, trabajador: trab, fecha: fec})=>{
+                  const nueva = {
+                    id:"fito_"+Date.now(),
+                    tipo:"enfermedad",
+                    descripcion:"🦠 Alerta fitosanitaria: "+obs,
+                    zonas:["Golf"],
+                    responsable:trab||"Bhalú",
+                    fecha:fec||fechaLocal(),
+                    estado:"activa",
+                    origen:"trabajador",
+                    creadoEn:new Date().toISOString(),
+                  };
+                  setIncidencias(prev=>{
+                    const arr=Array.isArray(prev)?prev:Object.values(prev||{});
+                    return [nueva,...arr];
+                  });
+                }}
                 cierresTurno={cierresTurno}
                 onUpdateTarea={(fecha,tid,patch)=>{
                   const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
@@ -17522,7 +17567,14 @@ export default function App() {
             <PanelProtocolos S={S} personal={personal} esJefa={esJefa} crearNotificacion={crearNotificacion} rolLogueado={rolLogueado}/>
           )}
         {vista==="notificaciones"&&(<ErrorBoundary>
-          <PanelAlertas S={S} incidencias={incidencias} setIncidencias={setIncidencias} autoOpen={autoOpenAlerta} onAutoOpenDone={()=>setAutoOpenAlerta(false)} notificaciones={notificaciones} setNotificaciones={setNotificaciones} marcarTodasLeidas={marcarTodasLeidas} notifNoLeidas={notifNoLeidas} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} tareasProg={tareasProg} setTareasProg={setTareasProg} crearNotificacion={crearNotificacion} esJefa={esJefa}/>
+          <PanelAlertas S={S} incidencias={incidencias} setIncidencias={setIncidencias}
+              onGuardarDirecto={(alerta)=>{
+                const id = "inc_"+Date.now();
+                fbUpdate(ref(db, ROOT+"/incidencias/"+id), alerta)
+                  .then(()=>console.log("✅ Alerta guardada en Firebase:",id))
+                  .catch(e=>console.error("❌ Error guardando alerta:",e));
+              }}
+              autoOpen={autoOpenAlerta} onAutoOpenDone={()=>setAutoOpenAlerta(false)} notificaciones={notificaciones} setNotificaciones={setNotificaciones} marcarTodasLeidas={marcarTodasLeidas} notifNoLeidas={notifNoLeidas} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} tareasProg={tareasProg} setTareasProg={setTareasProg} crearNotificacion={crearNotificacion} esJefa={esJefa}/>
         </ErrorBoundary>)}
 
         {showCierreSectorial&&<ModalCierreSectorial S={S} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} onClose={()=>setShowCierreSectorial(false)}/>}
