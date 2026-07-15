@@ -2985,7 +2985,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                           </div>
                         )}
                         {/* Campo fitosanitario — aparece cuando se marca hecha la revisión */}
-                        {(t.tarea||"NADA").toLowerCase().includes("fitosanit")&&normalizarEstado(t.estado)==="hecha"&&(
+                        {(t.tarea||"").toLowerCase().includes("fitosanit")&&(
                           <div style={{marginTop:8,padding:"10px 12px",background:"rgba(167,139,250,0.06)",border:"1px solid rgba(167,139,250,0.2)",borderRadius:8}}>
                             <div style={{fontSize:11,color:"#c4b5fd",fontWeight:600,marginBottom:6}}>🦠 Observación fitosanitaria</div>
                             <input
@@ -6585,12 +6585,12 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                       </div>
                       {incidForm.productoAplicar&&(()=>{
                         const reapert1 = calcReapertura(incidForm.productoAplicar, incidForm.fechaAplicacion, incidForm.horaAplicacion);
-                        if(!r.label) return null;
+                        if(!reapert1.label) return null;
                         return (
                           <div style={{gridColumn:"1/-1",background:"rgba(34,197,94,0.08)",border:"1px solid rgba(34,197,94,0.25)",borderRadius:10,padding:"10px 14px"}}>
                             <div style={{fontSize:12,color:"#86efac",fontWeight:600,marginBottom:4}}>📅 Reapertura estimada según ficha técnica</div>
-                            <div style={{fontSize:15,color:"#4ade80",fontWeight:700,marginBottom:4}}>{r.label}</div>
-                            <div style={{fontSize:11,color:"#5a9a7a",fontStyle:"italic"}}>{r.nota}</div>
+                            <div style={{fontSize:15,color:"#4ade80",fontWeight:700,marginBottom:4}}>{reapert1.label}</div>
+                            <div style={{fontSize:11,color:"#5a9a7a",fontStyle:"italic"}}>{reapert1.nota}</div>
                           </div>
                         );
                       })()}
@@ -6661,7 +6661,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                   </div>
                   {(()=>{
                     const reapert2 = calcReapertura(incidForm.productoAplicar, incidForm.fechaAplicacion, incidForm.horaAplicacion);
-                    if(!r.label) return null;
+                    if(!reapert1.label) return null;
                     return (
                       <div style={{...S.card,padding:14,marginBottom:12,background:"rgba(34,197,94,0.08)",borderColor:"rgba(34,197,94,0.25)"}}>
                         <div style={{fontSize:12,color:"#86efac",fontWeight:600,marginBottom:3}}>✅ Reapertura estimada</div>
