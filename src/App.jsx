@@ -3362,7 +3362,7 @@ Una vez cerrado no podrás modificar las tareas. Solo la jefa puede reabrir el t
   );
 }
 
-function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACROZONAS_BASE, tareas, setTareas, tareasZonaHoy=0, esJefa=false, configSemanal={}, setConfigSemanal, puedeCrear=false, cierresTurno={}, onReabrirTurno, getElemFrecs, setElemFrecs }) {
+function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACROZONAS_BASE, tareas, setTareas, tareasZonaHoy=0, esJefa=false, configSemanal={}, setConfigSemanal, puedeCrear=false, cierresTurno={}, onReabrirTurno, getElemFrecs, setElemFrecs, aplicaciones=[], setAplicaciones, stockFito, setStockFito, crearNotificacion }) {
   const hoy = fechaLocal();
   const [fecha, setFecha] = React.useState(hoy);
   const [tabProg, setTabProg] = React.useState("programa");
@@ -3562,7 +3562,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
 
       {/* Tabs */}
       <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
-        {[["programa","📆 Programar"],["frecuencias","🔄 Frecuencias"],["historial","📜 Historial"]].map(([t,l])=>(
+        {[["programa","📆 Programar"],["frecuencias","🔄 Frecuencias"],["fitosanitario","⚗ Fitosanitario"],["historial","📜 Historial"]].map(([t,l])=>(
           <button key={t} className={`tab${tabProg===t?" on":""}`} onClick={()=>setTabProg(t)}>{l}</button>
         ))}
       </div>
@@ -3573,6 +3573,15 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
       )}
 
       {/* ── HISTORIAL ── */}
+      {tabProg==="fitosanitario"&&(
+        <PanelFitosanitarioGlobal
+          S={S} MACROZONAS_BASE={MACROZONAS_BASE} getAllElems={getAllElems}
+          personal={personal} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones}
+          tareasProg={tareas} setTareasProg={setTareas}
+          stockFito={stockFito} setStockFito={setStockFito}
+          crearNotificacion={crearNotificacion} esJefa={esJefa}/>
+      )}
+
       {tabProg==="historial" && (
         <HistorialProg tareas={tareas} setTareas={setTareas} MACROZONAS_BASE={MACROZONAS_BASE} S={S} esJefa={esJefa} puedeCrear={puedeCrear} cierresTurno={cierresTurno} onReabrirTurno={onReabrirTurno}/>
       )}
@@ -6104,7 +6113,7 @@ const REINGRESO_DIAS = {
 // Estado inicial vacío — se inicializa desde localStorage
 const INCIDENCIAS_INICIAL = [];
 
-function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, tareasProg, setTareasProg, incidenciasFito, setIncidenciasFito, crearNotificacion, zonasFito }) {
+function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, tareasProg, setTareasProg, incidenciasFito, setIncidenciasFito, crearNotificacion, zonasFito, stockFito, setStockFito }) {
   const hoy = new Date();
   const mesActual = hoy.getMonth() + 1;
   const [subTab, setSubTab] = React.useState("historial");
@@ -6121,10 +6130,9 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
   const incidencias = incidenciasFito;
   const setIncidencias = setIncidenciasFito;
 
-  // ── Stock (inicializa desde localStorage o desde STOCK_INICIAL) ──────────────
-  const initStock = () => { try { const s=localStorage.getItem("ev2-fung-stock"); return s?JSON.parse(s):STOCK_INICIAL; } catch { return STOCK_INICIAL; } };
-  const [stock, setStock] = React.useState(initStock);
-  React.useEffect(() => { try { localStorage.setItem("ev2-fung-stock", JSON.stringify(stock)); } catch {} }, [stock]);
+  // ── Stock desde Firebase (compartido entre dispositivos) ──────────────
+  const stock = (stockFito && Object.keys(stockFito).length > 0) ? stockFito : STOCK_INICIAL;
+  const setStock = setStockFito || (() => {});
 
   // ── Pedidos (inicializa con el pedido 7609) ──────────────────────────────────
   const initPedidos = () => { try { const s=localStorage.getItem("ev2-fung-pedidos"); return s?JSON.parse(s):PEDIDO_INICIAL; } catch { return PEDIDO_INICIAL; } };
@@ -6268,6 +6276,24 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
     if(!form.producto.trim()||!form.fecha) return;
     const nueva = { ...form, id:Date.now(), mes:mesActual, sectorFinal };
     setAplicaciones(prev=>[nueva, ...prev].slice(0,200));
+    // Descontar stock si hay producto y cantidad usada
+    if(form.producto && form.cantidadUsada) {
+      const cant = Number(form.cantidadUsada);
+      if(cant > 0) {
+        setStock(prev => {
+          const key = form.producto.trim().toLowerCase();
+          // Buscar el producto en stock (match parcial)
+          const stockKey = Object.keys(prev).find(k => k.toLowerCase().includes(key) || key.includes(k.toLowerCase()));
+          if(!stockKey) return prev;
+          const actual = Number(prev[stockKey]?.cantidad || prev[stockKey] || 0);
+          const nuevo = Math.max(0, actual - cant);
+          if(typeof prev[stockKey] === "object") {
+            return {...prev, [stockKey]: {...prev[stockKey], cantidad: nuevo}};
+          }
+          return {...prev, [stockKey]: nuevo};
+        });
+      }
+    }
 
     // Enviar a programa del día si está marcado
     if(form.enviarProg && form.fecha) {
@@ -6277,8 +6303,8 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
         zona: sectorFinal || form.superficie || "Fungicidas",
         elemento: "",
         tarea: `🧪 Aplicación fungicida: ${form.producto}${form.dosis ? " · "+form.dosis : ""}${sectorFinal ? " → "+sectorFinal : ""}`,
-        responsable: form.responsable || "",
-        estado: "por_designar",
+        responsable: form.responsable || (sectorFinal==="Golf"||(sectorFinal||"").toLowerCase().includes("golf")?"Osmar Bhalú Armijo Zúñiga":""),
+        estado: form.responsable ? "pendiente" : "por_designar",
         notas: form.obs || "",
         auto: false,
         origenFungicida: true,
@@ -15443,6 +15469,268 @@ function ProtocoloPodaAltura({ S, personal, esJefa, crearNotificacion, rolLoguea
 }
 
 
+// ─── PANEL FITOSANITARIO GLOBAL ───────────────────────────────────────────────
+function PanelFitosanitarioGlobal({ S, MACROZONAS_BASE, getAllElems, personal, aplicaciones, setAplicaciones, tareasProg, setTareasProg, stockFito, setStockFito, crearNotificacion, esJefa }) {
+  const hoy = fechaLocal();
+  const [zonaSelId, setZonaSelId] = React.useState("");
+  const [subZonasSel, setSubZonasSel] = React.useState([]); // múltiples sub-zonas
+  const [form, setForm] = React.useState({
+    fecha: hoy, producto:"", dosis:"", cantidadUsada:"", unidadUsada:"L",
+    responsable:"", obs:"", clima:"", volAgua:"", enviarProg:true,
+  });
+  const [showForm, setShowForm] = React.useState(false);
+  const [saved, setSaved] = React.useState(false);
+
+  const zonaSel = MACROZONAS_BASE.find(z=>String(z.id)===zonaSelId);
+  const elemsZona = zonaSel ? getAllElems(zonaSel.id) : [];
+  const esGolfZona = zonaSelId==="31"||(zonaSel?.nombre||"").toLowerCase().includes("golf");
+
+  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+
+  const toggleSubZona = (nombre) => {
+    setSubZonasSel(prev => prev.includes(nombre) ? prev.filter(x=>x!==nombre) : [...prev,nombre]);
+  };
+
+  const guardar = () => {
+    if(!form.producto.trim()||!form.fecha||!zonaSelId) return;
+    const zonasAplicar = subZonasSel.length>0 ? subZonasSel : [zonaSel?.nombre||"General"];
+    const respDefault = esGolfZona ? "Osmar Bhalú Armijo Zúñiga" : (form.responsable||"");
+    const resp = form.responsable || respDefault;
+
+    // Crear una aplicación por zona
+    const nuevasAplic = zonasAplicar.map(zona => limpiarUndef({
+      id: Date.now()+Math.random(),
+      fecha: form.fecha,
+      producto: form.producto,
+      dosis: form.dosis,
+      cantidadUsada: form.cantidadUsada,
+      unidadUsada: form.unidadUsada,
+      superficie: zonaSel?.nombre,
+      sectorDetalle: zona,
+      responsable: resp,
+      obs: form.obs,
+      clima: form.clima,
+      volAgua: form.volAgua,
+      mes: new Date(form.fecha+"T12:00:00").getMonth()+1,
+    }));
+
+    setAplicaciones(prev => {
+      const arr = Array.isArray(prev)?prev:Object.values(prev||{});
+      return [...nuevasAplic, ...arr].slice(0,500);
+    });
+
+    // Descontar stock
+    if(form.cantidadUsada && Number(form.cantidadUsada)>0) {
+      const cant = Number(form.cantidadUsada) / zonasAplicar.length;
+      setStockFito&&setStockFito(prev=>{
+        const key = Object.keys(prev||{}).find(k=>k.toLowerCase().includes(form.producto.toLowerCase().split(" ")[0]));
+        if(!key) return prev;
+        const actual = Number(prev[key]?.cantidad||prev[key]||0);
+        return typeof prev[key]==="object"
+          ? {...prev,[key]:{...prev[key],cantidad:Math.max(0,actual-cant*zonasAplicar.length)}}
+          : {...prev,[key]:Math.max(0,actual-cant*zonasAplicar.length)};
+      });
+    }
+
+    // Enviar tareas a programación
+    if(form.enviarProg) {
+      const nuevasTareas = zonasAplicar.map(zona => limpiarUndef({
+        id: Date.now()+Math.random(),
+        fecha: form.fecha,
+        zona: esGolfZona ? "Golf" : (zonaSel?.nombre||zona),
+        elemento: zona,
+        tarea: "⚗ Aplicación fitosanitaria: "+form.producto+(form.dosis?" · "+form.dosis:""),
+        responsable: resp,
+        estado: resp ? "pendiente" : "por_designar",
+        notas: "Dosis: "+form.dosis+" · Cantidad: "+form.cantidadUsada+" "+form.unidadUsada+(form.obs?" · "+form.obs:""),
+        auto: false,
+        origenFungicida: true,
+      }));
+      setTareasProg(prev=>({
+        ...prev,
+        [form.fecha]: [...(Array.isArray(prev[form.fecha])?prev[form.fecha]:Object.values(prev[form.fecha]||{})), ...nuevasTareas],
+      }));
+    }
+
+    crearNotificacion&&crearNotificacion("fito",{
+      titulo:"⚗ Aplicación fitosanitaria registrada",
+      mensaje:form.producto+" · "+zonasAplicar.join(", ")+" · "+form.fecha,
+      fecha:form.fecha,
+    });
+
+    setSaved(true);
+    setTimeout(()=>{
+      setSaved(false);
+      setForm({fecha:hoy,producto:"",dosis:"",cantidadUsada:"",unidadUsada:"L",responsable:"",obs:"",clima:"",volAgua:"",enviarProg:true});
+      setSubZonasSel([]);
+      setShowForm(false);
+    },1500);
+  };
+
+  const listaPersonal = Array.isArray(personal)?personal:Object.values(personal||{});
+  const aplicFiltradas = (Array.isArray(aplicaciones)?aplicaciones:Object.values(aplicaciones||{}))
+    .filter(a=>!zonaSelId||(a.superficie===zonaSel?.nombre||(a.sectorDetalle||a.superficie||"")===(zonaSel?.nombre)))
+    .slice(0,20);
+
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        <div>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700}}>⚗ Fitosanitario</div>
+          <div style={{fontSize:11,color:"#5a9a7a"}}>Registro de aplicaciones por zona</div>
+        </div>
+        {esJefa&&<button onClick={()=>setShowForm(s=>!s)} style={{...S.btn,background:"rgba(167,139,250,0.12)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.3)"}}>
+          {showForm?"✕ Cancelar":"+ Nueva aplicación"}
+        </button>}
+      </div>
+
+      {/* Formulario */}
+      {showForm&&(
+        <div style={{...S.card,padding:16,marginBottom:16,border:"1px solid rgba(167,139,250,0.2)"}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+            <div>
+              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>FECHA</label>
+              <input type="date" value={form.fecha} onChange={e=>set("fecha",e.target.value)} style={S.input}/>
+            </div>
+            <div>
+              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>MACROZONA</label>
+              <select value={zonaSelId} onChange={e=>{setZonaSelId(e.target.value);setSubZonasSel([]);}} style={S.input}>
+                <option value="">Seleccionar zona...</option>
+                {[...MACROZONAS_BASE].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(z=>(
+                  <option key={z.id} value={String(z.id)}>{z.icono} {z.nombre}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Sub-zonas múltiples */}
+          {elemsZona.length>0&&(
+            <div style={{marginBottom:10}}>
+              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4}}>ELEMENTOS / SUB-ZONAS (selecciona uno o varios)</label>
+              <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                <button onClick={()=>setSubZonasSel(elemsZona.map(e=>e.nombre))}
+                  style={{fontSize:10,padding:"2px 8px",borderRadius:6,border:"1px solid rgba(167,139,250,0.3)",background:"rgba(167,139,250,0.08)",color:"#c4b5fd",cursor:"pointer"}}>
+                  ✓ Todos
+                </button>
+                <button onClick={()=>setSubZonasSel([])}
+                  style={{fontSize:10,padding:"2px 8px",borderRadius:6,border:"1px solid rgba(255,255,255,0.1)",background:"transparent",color:"#5a9a7a",cursor:"pointer"}}>
+                  ✕ Ninguno
+                </button>
+                {elemsZona.map(e=>(
+                  <button key={e.id} onClick={()=>toggleSubZona(e.nombre)}
+                    style={{fontSize:11,padding:"3px 10px",borderRadius:6,cursor:"pointer",
+                      border:`1px solid ${subZonasSel.includes(e.nombre)?"rgba(167,139,250,0.5)":"rgba(255,255,255,0.1)"}`,
+                      background:subZonasSel.includes(e.nombre)?"rgba(167,139,250,0.15)":"transparent",
+                      color:subZonasSel.includes(e.nombre)?"#c4b5fd":"#7aaa80"}}>
+                    {e.nombre}
+                  </button>
+                ))}
+              </div>
+              {subZonasSel.length>0&&<div style={{fontSize:10,color:"#c4b5fd",marginTop:4}}>
+                {subZonasSel.length} zona(s) seleccionada(s) — se creará una tarea por cada una
+              </div>}
+            </div>
+          )}
+
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+            <div>
+              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>PRODUCTO</label>
+              <input value={form.producto} onChange={e=>set("producto",e.target.value)} placeholder="ej: Roundup, Azufre..." style={S.input}/>
+            </div>
+            <div>
+              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>DOSIS</label>
+              <input value={form.dosis} onChange={e=>set("dosis",e.target.value)} placeholder="ej: 5cc/L" style={S.input}/>
+            </div>
+            <div>
+              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>CANTIDAD TOTAL USADA</label>
+              <div style={{display:"flex",gap:4}}>
+                <input type="number" value={form.cantidadUsada} onChange={e=>set("cantidadUsada",e.target.value)} placeholder="0" style={{...S.input,flex:1}}/>
+                <select value={form.unidadUsada} onChange={e=>set("unidadUsada",e.target.value)} style={{...S.input,width:70}}>
+                  <option>L</option><option>mL</option><option>kg</option><option>g</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>VOL. AGUA (L)</label>
+              <input type="number" value={form.volAgua} onChange={e=>set("volAgua",e.target.value)} placeholder="ej: 100" style={S.input}/>
+            </div>
+            <div>
+              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>RESPONSABLE</label>
+              <select value={form.responsable} onChange={e=>set("responsable",e.target.value)} style={S.input}>
+                <option value="">{esGolfZona?"Osmar Bhalú Armijo Zúñiga (por defecto)":"Seleccionar..."}</option>
+                {listaPersonal.sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(p=>(
+                  <option key={p.id} value={p.nombre}>{p.nombre}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>CLIMA</label>
+              <input value={form.clima} onChange={e=>set("clima",e.target.value)} placeholder="ej: Despejado, 18°C" style={S.input}/>
+            </div>
+          </div>
+
+          <div style={{marginBottom:10}}>
+            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>OBSERVACIONES</label>
+            <textarea rows={2} value={form.obs} onChange={e=>set("obs",e.target.value)} placeholder="Motivo, condiciones, notas..." style={{...S.input,resize:"vertical"}}/>
+          </div>
+
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+            <input type="checkbox" checked={form.enviarProg} onChange={e=>set("enviarProg",e.target.checked)} id="envProg"/>
+            <label htmlFor="envProg" style={{fontSize:12,color:"#c0dac0",cursor:"pointer"}}>
+              Generar tarea en Programación del día para el responsable
+            </label>
+          </div>
+
+          <button onClick={guardar} disabled={!form.producto||!form.fecha||!zonaSelId}
+            style={{...S.btn,width:"100%",padding:"10px 0",fontWeight:700,
+              background:saved?"rgba(34,197,94,0.15)":"rgba(167,139,250,0.12)",
+              color:saved?"#22c55e":"#c4b5fd",
+              border:`1px solid ${saved?"rgba(34,197,94,0.4)":"rgba(167,139,250,0.3)"}`,
+              cursor:form.producto&&form.fecha&&zonaSelId?"pointer":"not-allowed"}}>
+            {saved?"✅ Guardado":"💾 Guardar aplicación"}
+          </button>
+        </div>
+      )}
+
+      {/* Historial de aplicaciones */}
+      <div style={{...S.card,padding:14}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+          <div style={{fontSize:13,fontWeight:600,color:"#c0dac0"}}>Últimas aplicaciones</div>
+          <select value={zonaSelId} onChange={e=>{setZonaSelId(e.target.value);setSubZonasSel([]);}}
+            style={{...S.input,maxWidth:200,fontSize:12}}>
+            <option value="">Todas las zonas</option>
+            {[...MACROZONAS_BASE].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(z=>(
+              <option key={z.id} value={String(z.id)}>{z.icono} {z.nombre}</option>
+            ))}
+          </select>
+        </div>
+        {aplicFiltradas.length===0
+          ? <div style={{textAlign:"center",color:"#4a7a5a",padding:20,fontSize:12}}>Sin aplicaciones registradas</div>
+          : aplicFiltradas.map((a,i)=>(
+            <div key={i} style={{padding:"8px 0",borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"start"}}>
+                <div>
+                  <span style={{fontSize:13,fontWeight:600,color:"#c4b5fd"}}>{a.producto}</span>
+                  {a.dosis&&<span style={{fontSize:11,color:"#5a9a7a",marginLeft:8}}>· {a.dosis}</span>}
+                  {a.cantidadUsada&&<span style={{fontSize:11,color:"#5a9a7a",marginLeft:4}}>· {a.cantidadUsada}{a.unidadUsada}</span>}
+                </div>
+                <span style={{fontSize:10,color:"#5a9a7a"}}>{a.fecha}</span>
+              </div>
+              <div style={{fontSize:11,color:"#5a9a7a",marginTop:2}}>
+                {a.superficie&&<span>📍 {a.superficie}</span>}
+                {a.sectorDetalle&&a.sectorDetalle!==a.superficie&&<span> → {a.sectorDetalle}</span>}
+                {a.responsable&&<span style={{marginLeft:8}}>👤 {a.responsable.split(" ")[0]}</span>}
+              </div>
+              {a.obs&&<div style={{fontSize:11,color:"#4a7a5a",fontStyle:"italic",marginTop:2}}>{a.obs}</div>}
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  );
+}
+
+
 export default function App() {
   const [zonas, setZonas] = useState(()=>MACROZONAS_BASE);
   const [vista, setVista] = useState("dashboard");
@@ -15536,6 +15824,7 @@ export default function App() {
   const [data,           setData,           dataReady, setDataLocal]     = useFirebaseState("data",           initData());
   const [personal, setPersonal, personalReady] = useFirebaseState("personal", PERSONAL_INICIAL);
   const [tareasProg,     setTareasProg,     progReady]     = useFirebaseState("prog",           {});
+  const [stockFito, setStockFito]  = useFirebaseState("fung-stock", {});
   const [aplicaciones,   setAplicaciones,   aplReady]      = useFirebaseState("fungicidas",     []);
   const [incidenciasFito,setIncidenciasFito,incidReady]    = useFirebaseState("fung-incid",     []);
   const [comprasData,    setComprasData,    comprasReady]  = useFirebaseState("compras",  {compras:[],cuentas:CUENTAS_DEFAULT});
@@ -17181,7 +17470,7 @@ export default function App() {
         {/* PROGRAMACIÓN */}
         {vista==="programacion"&&(
           <ProgramacionDiaria key="prog" S={S} zonas={zonas} data={data} personal={personal} getZD={getZD} getAllElems={getAllElems} MACROZONAS_BASE={MACROZONAS_BASE} tareas={tareasProg} setTareas={setTareasProg} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal}
-            getElemFrecs={getElemFrecs} setElemFrecs={setElemFrecs}
+            getElemFrecs={getElemFrecs} setElemFrecs={setElemFrecs} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} stockFito={stockFito} setStockFito={setStockFito} crearNotificacion={crearNotificacion}
             tareasZonaHoy={(tareasProg[new Date().toISOString().slice(0,10)]||[]).filter(t=>t.origenZona&&t.estado==="por_designar").length}
             esJefa={rolLogueado==="jefa"}
             puedeCrear={rolLogueado==="jefa"||rolLogueado==="supervisor"}
@@ -17400,7 +17689,7 @@ export default function App() {
 
         {/* FUNGICIDAS */}
         {vista==="fungicidas"&&(
-          <PanelFungicidas S={S} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} />
+          <PanelFungicidas S={S} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} stockFito={stockFito} setStockFito={setStockFito} crearNotificacion={crearNotificacion}/>
         )}
 
         {/* COMPRAS */}
