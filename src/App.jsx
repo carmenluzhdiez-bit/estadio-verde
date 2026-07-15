@@ -13914,7 +13914,11 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
       valorMercado:Number(form.valorMercado), fondoTotal, obs:form.obs,
       estado:"generado", participantes,
     };
-    setBonosMasivos(p=>[nuevoBono,...(Array.isArray(p)?p:Object.values(p||{}))]);
+    setBonosMasivos(p=>{
+      const arr = Array.isArray(p)?p:Object.values(p||{});
+      const existe = arr.some(b=>b.id===nuevoBono.id);
+      return existe ? arr.map(b=>b.id===nuevoBono.id?nuevoBono:b) : [nuevoBono,...arr];
+    });
     // Agregar bono en ficha de cada trabajador
     setPersonal(p=>{
       const arr=Array.isArray(p)?p:Object.values(p||{});
@@ -13965,7 +13969,11 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
       modo: "jornada", valorJornada: valorJornadaNum, totalJornadas, fondoTotal: totalBonoJornada,
       obs: formJornada.obs, estado: "generado", participantes,
     };
-    setBonosMasivos(p=>[nuevoBono,...(Array.isArray(p)?p:Object.values(p||{}))]);
+    setBonosMasivos(p=>{
+      const arr = Array.isArray(p)?p:Object.values(p||{});
+      const existe = arr.some(b=>b.id===nuevoBono.id);
+      return existe ? arr.map(b=>b.id===nuevoBono.id?nuevoBono:b) : [nuevoBono,...arr];
+    });
     setPersonal(p=>{
       const arr=Array.isArray(p)?p:Object.values(p||{});
       return arr.map(t=>{
@@ -14255,6 +14263,7 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
                     </>)}
                   </div>
                   <button style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(255,255,255,0.06)",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)"}} onClick={()=>{setEditBonoId(bono.id);setEditBonoForm({...bono});}}>✏️ Editar</button>
+                  <button style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(239,68,68,0.08)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.2)"}} onClick={()=>{if(window.confirm("¿Eliminar este bono? Esta acción no se puede deshacer."))setBonosMasivos(p=>(Array.isArray(p)?p:Object.values(p||{})).filter(b=>b.id!==bono.id));}}>🗑 Eliminar</button>
                   <button style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}} onClick={()=>imprimirBono(bono)}>🖨️ Informe RRHH</button>
                 </div>
               </div>
