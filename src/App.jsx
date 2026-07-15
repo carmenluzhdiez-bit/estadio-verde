@@ -2879,6 +2879,43 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                       value={rutinasGolfState[tarea.id+"_obs"]||""}
                       onChange={e=>setRutinasGolfState(p=>({...p,[tarea.id+"_obs"]:e.target.value}))}
                       style={{marginTop:4,marginLeft:22,fontSize:11,padding:"3px 8px",borderRadius:5,border:"1px solid rgba(239,68,68,0.3)",background:"rgba(239,68,68,0.05)",color:"#fca5a5",width:"calc(100% - 22px)"}}/>}
+                    {/* Campo observación fitosanitaria */}
+                    {tarea.id==="tdg_4"&&(
+                      <div style={{marginTop:8,padding:"8px 10px",background:"rgba(167,139,250,0.06)",border:"1px solid rgba(167,139,250,0.2)",borderRadius:8}}>
+                        <div style={{fontSize:11,color:"#c4b5fd",fontWeight:600,marginBottom:4}}>🦠 Observación fitosanitaria</div>
+                        <input
+                          placeholder="Sin novedad · Mancha en Green 03 · Presencia de hongos..."
+                          value={rutinasGolfState["fito_obs"]||""}
+                          onChange={e=>setRutinasGolfState(p=>({...p,fito_obs:e.target.value}))}
+                          style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(167,139,250,0.3)",borderRadius:6,color:"#ede9e0",padding:"5px 8px",fontSize:11,boxSizing:"border-box"}}/>
+                        {rutinasGolfState.fito_obs?.trim()&&rutinasGolfState.fito_obs.toLowerCase()!=="sin novedad"&&(
+                          <button onClick={()=>{
+                            onAddTarea&&onAddTarea({
+                              id:Date.now()+Math.random(),
+                              fecha:fechaVer,
+                              tarea:"🚨 ALERTA FITOSANITARIA: "+rutinasGolfState.fito_obs.slice(0,80),
+                              responsable:"",
+                              zona:"Golf",
+                              elemento:"",
+                              estado:"por_designar",
+                              notas:"Reportado por "+trabajador?.nombre+" · "+fechaVer,
+                              tipoEvento:"alerta_fito",
+                              urgente:true,
+                            });
+                            crearNotificacion&&crearNotificacion("alerta",{
+                              titulo:"🦠 Alerta fitosanitaria Golf",
+                              mensaje:rutinasGolfState.fito_obs+" · "+trabajador?.nombre+" · "+fechaVer,
+                              fecha:fechaVer,
+                              tipo:"golf_fito",
+                              urgente:true,
+                            });
+                            alert("⚠️ Alerta fitosanitaria generada.");
+                          }} style={{marginTop:6,fontSize:11,padding:"3px 10px",borderRadius:5,border:"1px solid rgba(239,68,68,0.4)",background:"rgba(239,68,68,0.1)",color:"#fca5a5",cursor:"pointer"}}>
+                            🚨 Generar alerta fitosanitaria
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
