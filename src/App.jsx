@@ -3415,7 +3415,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
             }}
             style={{...S.input,width:"auto",fontSize:13}}/>
           <button onClick={proponerTareas} style={{...S.btn,background:"rgba(59,130,246,0.2)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)",fontSize:13}}>✨ Proponer del día</button>
-          {esJefa&&zonaId==="31"&&(
+          {esJefa&&(
             <button onClick={()=>{
               if(!window.confirm("Esto actualizará Golf en Firebase con la nueva estructura (Tees 01A-09B, Fairways 01-09, Búnkers 01-05). Los elementos custom se mantendrán. ¿Continuar?")) return;
               const golfBase = MACROZONAS_BASE.find(z=>z.id===31);
