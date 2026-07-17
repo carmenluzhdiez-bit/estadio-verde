@@ -3427,6 +3427,9 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
         });
       });
     });
+    // No proponer tareas en domingo
+    const diaSemana = new Date(fecha+"T12:00:00").getDay();
+    if(diaSemana===0) return alert("⚠️ Es domingo. Las tareas no se programan automáticamente en domingo. Agrégalas manualmente si hay turno especial.");
     if(propuestas.length===0) return alert("No hay tareas pendientes según las frecuencias definidas para esta fecha.\n\nRevisa que las macrozonas tengan 'Última realización' registrada en sus frecuencias.");
     setTareasDelDia(fecha, [...getTareasDelDia(fecha), ...propuestas]);
     if(esDomingo(fecha)) setAviso("⚠️ El día seleccionado es domingo. Las tareas fueron cargadas igual, pero considera mover la programación a otro día.");
@@ -3522,11 +3525,88 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           )}
           {esJefa&&(
             <button onClick={()=>{
-              const manana = new Date(fecha+"T12:00:00");
-              manana.setDate(manana.getDate()+1);
-              // Saltar domingo
-              if(manana.getDay()===0) manana.setDate(manana.getDate()+1);
-              const mananaStr = manana.toISOString().slice(0,10);
+              // MODO LLUVIA
+              const diaSemana = new Date(fecha+"T12:00:00").getDay();
+              const normArr = v=>Array.isArray(v)?v:Object.values(v||{});
+              const tareasHoy = normArr(tareas[fecha]||[]);
+              
+              // Palabras clave de tareas que NO se cancelan por lluvia
+              const BAJO_TECHO = ["bajo techo","invernadero","vivero","bodega","sala","interior","oficina","taller"];
+              const EXTERIOR_CANCELAR = ["corte","poda","fumiga","fungicida","pestici","herbicida","siembra","plantaci","trasplant","aireaci","vertic","fertiliz","abono","soplad","barrido"];
+              
+              const esBajoTecho = t => {
+                // 1. Verificar campo condicion en data del elemento
+                if(t.zona && t.elemento) {
+                  const zonaObj = MACROZONAS_BASE.find(z=>z.nombre===t.zona);
+                  if(zonaObj) {
+                    const zdat = getZD ? getZD(String(zonaObj.id)) : {};
+                    const elemBase = zdat.elementos?.[zonaObj.elementos?.find(e=>e.nombre===t.elemento)?.id];
+                    const elemCustom = (zdat.elementosCustom||[]).find(e=>e.nombre===t.elemento);
+                    const condicion = elemBase?.condicion || elemCustom?.condicion;
+                    if(condicion==="bajo_techo") return true;
+                    if(condicion==="exterior") return false;
+                    if(condicion==="mixto") return false; // mixto = revisar manual
+                  }
+                }
+                // 2. Fallback: keywords en texto
+                return BAJO_TECHO.some(k=>(t.tarea+" "+(t.notas||"")).toLowerCase().includes(k));
+              };
+              const esExterior = t => EXTERIOR_CANCELAR.some(k=>(t.tarea||t.elemento||"").toLowerCase().includes(k));
+              const esRiego = t => (t.tarea||t.elemento||"").toLowerCase().includes("riego")||(t.tarea||t.elemento||"").toLowerCase().includes("regar");
+              
+              const aPosponer = tareasHoy.filter(t=>
+                normalizarEstado(t.estado)!=="hecha" &&
+                !esBajoTecho(t) &&
+                (esExterior(t) || (!esRiego(t) && !esBajoTecho(t)))
+              );
+              
+              const aRevisar = tareasHoy.filter(t=>esRiego(t)&&normalizarEstado(t.estado)!=="hecha");
+              
+              if(aPosponer.length===0&&aRevisar.length===0){
+                alert("No hay tareas que posponer por lluvia."); return;
+              }
+              
+              const msg = [
+                aPosponer.length>0 ? aPosponer.length+" tarea(s) de exterior se marcarán como 'No se pudo (lluvia)' y se reprogramarán en 2 días hábiles." : "",
+                aRevisar.length>0 ? aRevisar.length+" tarea(s) de riego requieren revisión manual (algunas pueden estar bajo techo)." : "",
+              ].filter(Boolean).join("\n");
+              if(!window.confirm("🌧️ MODO LLUVIA\n\n"+msg+"\n\n¿Continuar?")) return;
+              if(!window.confirm("Modo Lluvia: "+msg+" Continuar?")) return;
+              
+              // Destino = +2 días hábiles (sin domingo)
+              const destino = diasHabiles(fecha, 2);
+              
+              // Marcar como no_pudo y reprogramar
+              const nuevasTareasDestino = [];
+              setTareas(prev=>{
+                const normA = v=>Array.isArray(v)?v:Object.values(v||{});
+                const hoy = normA(prev[fecha]||[]).map(t=>{
+                  if(aPosponer.some(p=>p.id===t.id)){
+                    return {...t, estado:"no_pudo", notaWorker:"No se pudo — Lluvia"};
+                  }
+                  return t;
+                });
+                // Crear copias para el día destino
+                aPosponer.forEach(t=>{
+                  nuevasTareasDestino.push({...t,
+                    id:Date.now()+Math.random(),
+                    fecha:destino,
+                    estado:"pendiente",
+                    notaWorker:"",
+                    notas:(t.notas?t.notas+" | ":"")+"Reprogramada por lluvia desde "+fecha,
+                  });
+                });
+                const destArr = [...normA(prev[destino]||[]),...nuevasTareasDestino];
+                return {...prev,[fecha]:hoy,[destino]:destArr};
+              });
+              
+              setTimeout(()=>alert("Modo lluvia aplicado. "+aPosponer.length+" tarea(s) reprogramadas para "+destino+". "+(aRevisar.length>0?aRevisar.length+" riego(s) a revisar manualmente.":"")),200);
+            }} style={{...S.btn,background:"rgba(96,165,250,0.1)",color:"#93c5fd",border:"1px solid rgba(96,165,250,0.2)",fontSize:11}}>
+          )}
+          {esJefa&&(
+            <button onClick={()=>{
+              // Próximo día hábil (salta domingo)
+              const mananaStr = diasHabiles(fecha, 1);
               // Obtener TODAS las tareas del día normalizando el array
               const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
               const todasHoy = normArr(tareas[fecha]||[]);
@@ -15740,6 +15820,17 @@ function PanelFitosanitarioGlobal({ S, MACROZONAS_BASE, getAllElems, personal, a
 }
 
 
+// ─── HELPER: próximo día hábil (salta domingos) ──────────────────────────────
+const diasHabiles = (fechaStr, n=1) => {
+  const d = new Date(fechaStr+"T12:00:00");
+  let sumados = 0;
+  while(sumados < n) {
+    d.setDate(d.getDate()+1);
+    if(d.getDay() !== 0) sumados++; // 0 = domingo
+  }
+  return d.toISOString().slice(0,10);
+};
+
 export default function App() {
   const [zonas, setZonas] = useState(()=>MACROZONAS_BASE);
   const [vista, setVista] = useState("dashboard");
@@ -16407,6 +16498,22 @@ export default function App() {
                 color:"#22c55e",cursor:"pointer"}}>
                 💾 Guardar observaciones
               </button>
+            </div>
+
+            {/* Condición: exterior / bajo techo */}
+            <div style={{marginTop:10}}>
+              <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",textTransform:"uppercase",display:"block",marginBottom:4}}>Condición</label>
+              <div style={{display:"flex",gap:6}}>
+                {[["exterior","🌿 Exterior","#34d399"],["bajo_techo","🏠 Bajo techo","#60a5fa"],["mixto","🔀 Mixto","#f59e0b"]].map(([k,lbl,color])=>(
+                  <button key={k} onClick={()=>updateCustomElemField(zonaId,e.id,{condicion:k})||setElemNotas(zonaId,e.id,e.isCustom,e.edData.notas||"")}
+                    style={{flex:1,fontSize:11,padding:"5px 0",borderRadius:7,cursor:"pointer",
+                      border:`1px solid ${(e.edData.condicion||"exterior")===k?color+"60":"rgba(255,255,255,0.1)"}`,
+                      background:(e.edData.condicion||"exterior")===k?"rgba(255,255,255,0.06)":"transparent",
+                      color:(e.edData.condicion||"exterior")===k?color:"#5a9a7a",fontWeight:(e.edData.condicion||"exterior")===k?600:400}}>
+                    {lbl}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Frecuencias de mantención → ver en Programa */}
