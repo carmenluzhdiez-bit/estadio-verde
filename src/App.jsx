@@ -94,10 +94,11 @@ const CATEGORIAS_ELEM = {
   cesped_sintetico:{ label: "Césped Sintético",      color: "#7c3aed", icon: "🟪" },
   canchas:         { label: "Canchas Deportivas",    color: "#0ea5e9", icon: "🏟️" },
   mobiliario:      { label: "Mobiliario Urbano",     color: "#fb923c", icon: "🪑" },
+  maceteros:       { label: "Maceteros",              color: "#e879f9", icon: "🪴" },
   bodegas:         { label: "Bodegas",               color: "#94a3b8", icon: "🏚️" },
 };
 const VEGETACION_SUBS = ["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
-const OTRAS_CATS      = ["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","bodegas"];
+const OTRAS_CATS      = ["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","maceteros","bodegas"];
 // ─── ESTACIONES ──────────────────────────────────────────────────────────────
 const limpiarUndef = (obj) => JSON.parse(JSON.stringify(obj, function(limpKey,limpVal){ return limpVal===undefined?null:limpVal; }));
 
@@ -16221,7 +16222,7 @@ export default function App() {
     const zidS = String(zid);
     const zonaZ = zonas.find(x=>String(x.id)===zidS);
     const zdat = getZD(zidS);
-    const base = (zonaZ?.elementos||[]).map(e=>({...e,isCustom:false,edData:zdat.elementos?.[e.id]||{estado:"bueno",notas:""}}));
+    const base = (zonaZ?.elementos||[]).map(e=>({...e,isCustom:false,edData:{estado:"bueno",notas:"",...(zdat.elementos?.[e.id]||{})}}));
     const custom = (zdat.elementosCustom||[]).map(e=>({...e,isCustom:true,edData:{estado:e.estado||"bueno",notas:e.notas||""}}));
     return [...base,...custom].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
   };
@@ -16271,6 +16272,11 @@ export default function App() {
     setTareasProg(prev => ({ ...prev, [hoy]: [...(prev[hoy]||[]), nuevaProg] }));
   };
   const toggleTareaZona = (zid, tid) => { const arr=(getZD(zid).tareas||[]).map(t=>t.id===tid?{...t,completada:!t.completada}:t); updateZona(zid,{tareas:arr}); };
+
+  const setElemCondicion = (zid,eid,isCustom,condicion) => {
+    if(isCustom){ updateCustomElemField(zid,eid,{condicion}); return; }
+    updateZona(zid,{elementos:{...data[zid]?.elementos,[eid]:{...data[zid]?.elementos?.[eid],condicion}}});
+  };
 
   const setElemEstado = (zid,eid,isCustom,estado) => {
     if(isCustom){ updateCustomElemField(zid,eid,{estado}); return; }
@@ -16531,7 +16537,7 @@ export default function App() {
               <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",textTransform:"uppercase",display:"block",marginBottom:4}}>Condición</label>
               <div style={{display:"flex",gap:6}}>
                 {[["exterior","🌿 Exterior","#34d399"],["bajo_techo","🏠 Bajo techo","#60a5fa"],["mixto","🔀 Mixto","#f59e0b"]].map(([k,lbl,color])=>(
-                  <button key={k} onClick={()=>updateCustomElemField(zonaId,e.id,{condicion:k})||setElemNotas(zonaId,e.id,e.isCustom,e.edData.notas||"")}
+                  <button key={k} onClick={()=>setElemCondicion(zonaId,e.id,e.isCustom,k)}
                     style={{flex:1,fontSize:11,padding:"5px 0",borderRadius:7,cursor:"pointer",
                       border:`1px solid ${(e.edData.condicion||"exterior")===k?color+"60":"rgba(255,255,255,0.1)"}`,
                       background:(e.edData.condicion||"exterior")===k?"rgba(255,255,255,0.06)":"transparent",
@@ -17291,7 +17297,7 @@ export default function App() {
                                   style={{flex:1,cursor:"pointer",border:`1px solid ${esVege?"rgba(34,197,94,0.5)":"rgba(255,255,255,0.1)"}`,borderRadius:6,padding:"4px 6px",fontSize:11,background:esVege?"rgba(34,197,94,0.1)":"transparent",color:esVege?"#4ade80":"#6aaa7a",fontFamily:"'Georgia',serif"}}>
                                   🌿 Vegetación
                                 </button>
-                                <button onClick={()=>setNewElem(p=>({...p,tipo:"infraestructura"}))}
+                                <button onClick={()=>setNewElem(p=>({...p,tipo:OTRAS_CATS[0]}))}
                                   style={{flex:1,cursor:"pointer",border:`1px solid ${!esVege?"rgba(245,158,11,0.5)":"rgba(255,255,255,0.1)"}`,borderRadius:6,padding:"4px 6px",fontSize:11,background:!esVege?"rgba(245,158,11,0.1)":"transparent",color:!esVege?"#fbbf24":"#6aaa7a",fontFamily:"'Georgia',serif"}}>
                                   🏗️ Infraestructura
                                 </button>
