@@ -8231,26 +8231,22 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                     // Informe de gastos por ítem con filtros de período
                     const mesActual = new Date().toISOString().slice(0,7);
                     const anioActual = new Date().getFullYear();
-                    // Recopilar todos los ítems de todas las compras del año
-                    const comprasAnio = compras.filter(c=>c.fecha?.startsWith(String(anioActual)) && c.tipoDoc!=="Nota de Crédito" && c.tipoDoc!=="Cotización" && c.tipoDoc!=="Nota de Pedido");
-                    // Construir tabla por ítem agrupado por descripcion+categoria
-                    const porItem = {};
+                    // Agrupar por CATEGORÍA
+                    const comprasAnio = compras.filter(c=>c.fecha?.startsWith(String(anioActual)) && c.tipoDoc!=="Cotización" && c.tipoDoc!=="Nota de Pedido");
+                    const porCatInf = {};
                     comprasAnio.forEach(comp=>{
+                      const signo = comp.tipoDoc==="Nota de Crédito"?-1:1;
                       (comp.items||[]).forEach(it=>{
-                        if(!it.descripcion?.trim()) return;
-                        const key = it.descripcion.trim().toLowerCase();
-                        if(!porItem[key]) porItem[key]={desc:it.descripcion.trim(),cat:it.categoria||"Sin categoría",meses:{},totalAnio:0,cantTotal:0};
+                        const cat = it.categoria||"Sin categoría";
                         const mes = comp.fecha?.slice(0,7)||"";
-                        const monto = Number(it.totalBruto||it.totalNeto||0) * (comp.tipoDoc==="Nota de Crédito"?-1:1);
-                        const cant = Number(it.cantidad||0);
-                        if(!porItem[key].meses[mes]) porItem[key].meses[mes]={monto:0,cant:0};
-                        porItem[key].meses[mes].monto += monto;
-                        porItem[key].meses[mes].cant += cant;
-                        porItem[key].totalAnio += monto;
-                        porItem[key].cantTotal += cant;
+                        const monto = signo*Number(it.totalBruto||it.totalNeto||0);
+                        if(!porCatInf[cat]) porCatInf[cat]={desc:cat,meses:{},totalAnio:0};
+                        if(!porCatInf[cat].meses[mes]) porCatInf[cat].meses[mes]={monto:0};
+                        porCatInf[cat].meses[mes].monto += monto;
+                        porCatInf[cat].totalAnio += monto;
                       });
                     });
-                    const items = Object.values(porItem).sort((a,b)=>b.totalAnio-a.totalAnio);
+                    const items = Object.values(porCatInf).sort((a,b)=>b.totalAnio-a.totalAnio);
                     // Generar meses del año actual
                     const MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
                     const mesesCols = Array.from({length:12},(_,i)=>`${anioActual}-${String(i+1).padStart(2,"0")}`);
@@ -8260,29 +8256,28 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                     const filas = items.map(it=>`
                       <tr>
                         <td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;font-weight:500">${it.desc}</td>
-                        <td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;font-size:11px;color:#888">${it.cat}</td>
                         ${mesesConDatos.map(m=>`<td style="padding:6px 8px;border-bottom:1px solid #f0f0f0;text-align:right;font-size:11px">${it.meses[m]?`$${it.meses[m].monto.toLocaleString("es-CL")}`:"—"}</td>`).join("")}
                         <td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;text-align:right;font-weight:700;color:#1a5c2a">$${it.totalAnio.toLocaleString("es-CL")}</td>
                       </tr>`).join("");
                     const totFila = `<tr style="background:#f0fdf4;font-weight:700">
-                      <td colspan="2" style="padding:7px 10px;border-top:2px solid #16a34a">TOTAL MES</td>
+                      <td style="padding:7px 10px;border-top:2px solid #16a34a">TOTAL MES</td>
                       ${mesesConDatos.map(m=>`<td style="padding:7px 8px;border-top:2px solid #16a34a;text-align:right;color:#1a5c2a">$${(totalPorMes[m]||0).toLocaleString("es-CL")}</td>`).join("")}
                       <td style="padding:7px 10px;border-top:2px solid #16a34a;text-align:right;color:#1a5c2a">$${items.reduce((s,it)=>s+it.totalAnio,0).toLocaleString("es-CL")}</td>
                     </tr>`;
                     const hoy = new Date().toLocaleDateString("es-CL",{day:"2-digit",month:"long",year:"numeric"});
                     const winG = window.open("","_blank","width=1100,height=700");
                     winG.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-                    <title>Informe de Gastos ${anioActual}</title>
+                    <title>Informe de Gastos por Categoría ${anioActual}</title>
                     <style>body{font-family:Calibri,Arial,sans-serif;color:#222;padding:28px;font-size:13px}
                     h1{font-size:19px;color:#1a5c2a;margin-bottom:2px}h2{font-size:12px;color:#888;font-weight:normal;margin-top:0}
                     table{width:100%;border-collapse:collapse}th{background:#1a5c2a;color:#fff;padding:8px 8px;font-size:11px;text-align:left}
                     th.num{text-align:right}tr:nth-child(even){background:#fafafa}
                     .noprint{display:block}@media print{.noprint{display:none}}</style></head><body>
-                    <h1>📊 Informe de Gastos por Ítem — ${anioActual}</h1>
+                    <h1>📊 Informe de Gastos por Categoría — ${anioActual}</h1>
                     <h2>Departamento de Áreas Verdes · Estadio Español de Las Condes · Generado el ${hoy}</h2>
                     <table>
                       <thead><tr>
-                        <th>Ítem / Producto</th><th>Categoría</th>
+                        <th>Categoría</th>
                         ${mesesConDatos.map(m=>`<th class="num">${MESES[Number(m.slice(5))-1]}</th>`).join("")}
                         <th class="num">Total ${anioActual}</th>
                       </tr></thead>
@@ -8294,7 +8289,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                     </div></body></html>`);
                     winG.document.close();
                   }}>
-                  📊 Informe gastos por ítem
+                  📊 Informe gastos por categoría
                 </button>
               </div>
               <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,marginBottom:10}}>💰 Gasto por cuenta</div>
@@ -16018,42 +16013,63 @@ export default function App() {
     return arr.filter(n => !n.leida);
   }, [notificaciones]);
 
-  // Detección automática y centralizada: bono especializado por limpieza de Cancha de Fútbol Sintética.
-  // Vigila tareasProg completo (sin importar desde qué pantalla se haya cambiado el estado).
-  // Marca la tarea con bonoCanchaNotificado:true en Firebase para que la marca persista entre recargas.
+  // Detección automática: bono especializado por limpieza de Cancha Sintética
+  // Solo procesa tareas nuevas (bonoCanchaNotificado===false/undefined)
   React.useEffect(()=>{
     if(!progReady) return;
     const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
     Object.entries(tareasProg).forEach(([fecha, tareasDelDia])=>{
       const lista = normArr(tareasDelDia);
-      let huboCambios = false;
-      const listaActualizada = lista.map(t=>{
-        if(!t || !t.id) return t;
-        const yaCompletada = t.estado==="hecha"||t.estado==="completada";
-        if(!yaCompletada) return t;
-        if(t.bonoCanchaNotificado) return t; // ya procesado anteriormente (persistido en Firebase)
+      const aMarcar = lista.filter(t=>{
+        if(!t?.id) return false;
+        if(t.bonoCanchaNotificado) return false; // ya procesado
+        if(t.estado!=="hecha"&&t.estado!=="completada") return false;
         const tNom=(t.tarea||"").toLowerCase();
         const tZona=(t.zona||"").toLowerCase();
         const tElem=(t.elemento||"").toLowerCase();
-        const esCanchaSint = tZona.includes("fútbol sintétic")||tZona.includes("futbol sintetic")||(tZona.includes("cancha")&&tZona.includes("sintétic"))||tElem.includes("césped sintético")||tElem.includes("cesped sintetico")||tElem.includes("alfombra");
-        const esLimpieza = tNom.includes("limpie")||tNom.includes("sopla")||tNom.includes("barrid")||tNom.includes("cepill")||tNom.includes("aspirad")||tNom.includes("escobill");
-        if(esCanchaSint && esLimpieza){
-          crearNotificacion("bono_cancha",{
-            titulo:"🎖️ Bono especializado disponible",
-            mensaje:`${t.responsable||"Trabajador"} completó limpieza de la Cancha de Fútbol Sintética (alfombra) — generar bono especializado`,
-            trabajadorNombre:t.responsable||"",
-            tareaFecha:fecha,
-            descripcionBono:`Limpieza profunda césped sintético — Cancha de Fútbol — ${fecha}`,
-          });
-        }
-        huboCambios = true;
-        return {...t, bonoCanchaNotificado:true};
+        const esCanchaSint = tZona.includes("fútbol sintétic")||tZona.includes("futbol sintetic")||(tZona.includes("cancha")&&(tZona.includes("sintétic")||tZona.includes("sintetic")))||tElem.includes("césped sintético")||tElem.includes("cesped sintetico")||tElem.includes("alfombra")||tNom.includes("alfombra")||tNom.includes("sintético");
+        const esLimpieza = tNom.includes("limpie")||tNom.includes("sopla")||tNom.includes("barrid")||tNom.includes("cepill")||tNom.includes("aspirad")||tNom.includes("escobill")||tNom.includes("mantenci")||tNom.includes("mantención");
+        return esCanchaSint && esLimpieza;
       });
-      if(huboCambios){
-        fbUpdate(ref(db, `${ROOT}/prog`), {[fecha]: listaActualizada}).catch(e=>console.error("Error marcando bonoCanchaNotificado:", e));
-      }
+      if(aMarcar.length===0) return;
+      // Generar bono directamente en personal — no como alerta
+      aMarcar.forEach(t=>{
+        const trabajadorNombre = t.responsable||"";
+        if(!trabajadorNombre) return;
+        // Buscar el trabajador en personal
+        const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
+        const trab = personalArr.find(p=>p.nombre===trabajadorNombre);
+        if(!trab) return;
+        const nuevoBono = {
+          id:"bc_"+Date.now()+Math.random(),
+          tipo:"bonoEspecializado",
+          fecha,
+          descripcion:`Limpieza/mantención césped sintético — Cancha de Fútbol — ${fecha}`,
+          estado:"pendiente",
+          monto:0, // la jefa define el monto
+          origen:"automatico",
+          tareaId:t.id,
+        };
+        // Agregar bono a la ficha del trabajador
+        setPersonal(prev=>{
+          const arr = Array.isArray(prev)?prev:Object.values(prev||{});
+          return arr.map(p=>{
+            if(p.nombre!==trabajadorNombre) return p;
+            const bonos = Array.isArray(p.bonos)?p.bonos:[];
+            // No duplicar
+            if(bonos.some(b=>b.tareaId===t.id)) return p;
+            return {...p, bonos:[...bonos, nuevoBono]};
+          });
+        });
+      });
+      // Marcar como notificado en Firebase
+      const listaActualizada = lista.map(t=>
+        aMarcar.some(a=>a.id===t.id) ? {...t, bonoCanchaNotificado:true} : t
+      );
+      fbUpdate(ref(db, `${ROOT}/prog`), {[fecha]: listaActualizada})
+        .catch(e=>console.error("Error marcando bonoCanchaNotificado:", e));
     });
-  }, [tareasProg, progReady, crearNotificacion]);
+  }, [progReady]); // ← Solo al cargar, no en cada cambio de tareasProg
 
   const marcarTodasLeidas = () => {
     const arr = Array.isArray(notificaciones) ? notificaciones : Object.values(notificaciones||{});
