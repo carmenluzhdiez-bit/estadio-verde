@@ -13548,7 +13548,14 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
           <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px;text-align:right;font-weight:700;color:#7b1fa2">$${Number(bonoP3?.monto||0).toLocaleString("es-CL")}</td>
         </tr>`;}).join("");
 
-      const filasBonosInd = eventosT.filter(e=>["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)).map(e=>`
+      // Excluir bonos individuales que correspondan a bonos masivos no seleccionados
+      const idsBonosMasivosNoSel = bonosPendientes.filter(b=>!selBonos[b.id]).map(b=>String(b.id));
+      const filasBonosInd = eventosT.filter(e=>{
+        if(!["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)) return false;
+        // Si tiene origenBonoId que coincide con un bono masivo no seleccionado, excluir
+        if(e.origenBonoId&&idsBonosMasivosNoSel.includes(String(e.origenBonoId))) return false;
+        return true;
+      }).map(e=>`
         <tr><td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${e.fecha}</td>
         <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${e.descripcion||"Bono"}</td>
         <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px;text-align:right;font-weight:700;color:#7b1fa2">${e.valor?`$${Number(e.valor).toLocaleString("es-CL")}`:"—"}</td></tr>`).join("");
@@ -13767,52 +13774,6 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
           </div>
 
           {/* Bonos masivos pendientes */}
-          {/* Botón para detectar bonos de cancha sintética de fechas pasadas */}
-          <div style={{marginBottom:12}}>
-            <button onClick={()=>{
-              const normArr = v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-              const personalArr3 = Array.isArray(personal)?personal:Object.values(personal||{});
-              let detectados = 0;
-              const nuevasProg = {...tareasProg};
-              Object.entries(tareasProg).forEach(([fecha, tareasDelDia])=>{
-                const lista = normArr(tareasDelDia);
-                const aMarcar = lista.filter(t=>{
-                  if(!t?.id||t.bonoCanchaNotificado) return false;
-                  if(t.estado!=="hecha"&&t.estado!=="completada") return false;
-                  const tNom=(t.tarea||"").toLowerCase();
-                  const tZona=(t.zona||"").toLowerCase();
-                  const tElem=(t.elemento||"").toLowerCase();
-                  const esCanchaSint = tZona.includes("fútbol sintétic")||tZona.includes("futbol sintetic")||(tZona.includes("cancha")&&(tZona.includes("sintétic")||tZona.includes("sintetic")))||tElem.includes("césped sintético")||tElem.includes("cesped sintetico")||tElem.includes("alfombra")||tNom.includes("alfombra")||tNom.includes("sintético");
-                  const esLimpieza = tNom.includes("limpie")||tNom.includes("sopla")||tNom.includes("barrid")||tNom.includes("cepill")||tNom.includes("aspirad")||tNom.includes("escobill")||tNom.includes("mantenci")||tNom.includes("mantención");
-                  return esCanchaSint && esLimpieza;
-                });
-                if(aMarcar.length===0) return;
-                aMarcar.forEach(t=>{
-                  const trab = personalArr3.find(p=>p.nombre===t.responsable);
-                  if(!trab) return;
-                  const bonos = Array.isArray(trab.bonos)?trab.bonos:[];
-                  if(bonos.some(b=>b.tareaId===t.id)) return;
-                  detectados++;
-                  const nuevoBono = {id:"bc_"+Date.now()+Math.random(),tipo:"bonoEspecializado",fecha,descripcion:"Limpieza/mantención césped sintético — Cancha de Fútbol — "+fecha,estado:"pendiente",monto:0,origen:"automatico_retroactivo",tareaId:t.id};
-                  setPersonal(prev=>{
-                    const arr=Array.isArray(prev)?prev:Object.values(prev||{});
-                    return arr.map(p=>{
-                      if(p.nombre!==t.responsable) return p;
-                      const bs=Array.isArray(p.bonos)?p.bonos:[];
-                      if(bs.some(b=>b.tareaId===t.id)) return p;
-                      return {...p,bonos:[...bs,nuevoBono]};
-                    });
-                  });
-                });
-                nuevasProg[fecha] = lista.map(t=>aMarcar.some(a=>a.id===t.id)?{...t,bonoCanchaNotificado:true}:t);
-              });
-              if(detectados>0) alert("✅ "+detectados+" bono(s) de cancha sintética detectados y asignados. Ve a Personal → ficha del trabajador para verlos.");
-              else alert("No se encontraron tareas de cancha sintética completadas sin bono asignado.");
-            }} style={{...S.btn,fontSize:12,background:"rgba(196,181,253,0.1)",color:"#c4b5fd",border:"1px solid rgba(196,181,253,0.3)"}}>
-              🔍 Detectar bonos cancha sintética históricos
-            </button>
-          </div>
-
           {bonosPendientes.length>0&&(
             <div style={{marginBottom:16}}>
               <div style={{fontSize:13,fontWeight:700,color:"#c4b5fd",marginBottom:8}}>💰 Bonos por Tarea pendientes</div>
@@ -14764,7 +14725,7 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
   const incActivas = incArr.filter(i=>i.estado==="activa"||i.estado==="en_gestion").sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
   const incResueltas = incArr.filter(i=>i.estado==="resuelta").sort((a,b)=>(b.fechaResolucion||b.fecha||"").localeCompare(a.fechaResolucion||a.fecha||""));
   const notifArr = Array.isArray(notificaciones)?notificaciones:Object.values(notificaciones||{});
-  const notifSorted = notifArr.filter(n=>n&&n.titulo).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
+  const notifSorted = notifArr.filter(n=>n&&n.titulo&&n.tipo!=="bono_cancha").sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
   const URGENCIA_COLORS = {inmediata:"#ef4444",alta:"#f59e0b",media:"#60a5fa"};
 
   const guardarAlerta = () => {
