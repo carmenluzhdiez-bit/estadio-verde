@@ -13511,7 +13511,16 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
     const ini={};
     bonosPendientes.forEach(b=>{ini[b.id]=true;});
     setSelBonos(ini);
-  },[bonosMasivos]);
+    // Inicializar selEventos con todos los eventos seleccionados
+    const iniEv={};
+    const personalArr2 = Array.isArray(personal)?personal:Object.values(personal||{});
+    personalArr2.forEach(t=>{
+      (t.eventos||[]).filter(e=>e.estado!=="rendido").forEach(e=>{
+        iniEv[`${t.id}_${e.id}`]=true;
+      });
+    });
+    setSelEventos(iniEv);
+  },[bonosMasivos, personal]);
 
   // Construir HTML del informe
   const construirHTML = (titulo) => {
@@ -13758,6 +13767,52 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
           </div>
 
           {/* Bonos masivos pendientes */}
+          {/* Botón para detectar bonos de cancha sintética de fechas pasadas */}
+          <div style={{marginBottom:12}}>
+            <button onClick={()=>{
+              const normArr = v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+              const personalArr3 = Array.isArray(personal)?personal:Object.values(personal||{});
+              let detectados = 0;
+              const nuevasProg = {...tareasProg};
+              Object.entries(tareasProg).forEach(([fecha, tareasDelDia])=>{
+                const lista = normArr(tareasDelDia);
+                const aMarcar = lista.filter(t=>{
+                  if(!t?.id||t.bonoCanchaNotificado) return false;
+                  if(t.estado!=="hecha"&&t.estado!=="completada") return false;
+                  const tNom=(t.tarea||"").toLowerCase();
+                  const tZona=(t.zona||"").toLowerCase();
+                  const tElem=(t.elemento||"").toLowerCase();
+                  const esCanchaSint = tZona.includes("fútbol sintétic")||tZona.includes("futbol sintetic")||(tZona.includes("cancha")&&(tZona.includes("sintétic")||tZona.includes("sintetic")))||tElem.includes("césped sintético")||tElem.includes("cesped sintetico")||tElem.includes("alfombra")||tNom.includes("alfombra")||tNom.includes("sintético");
+                  const esLimpieza = tNom.includes("limpie")||tNom.includes("sopla")||tNom.includes("barrid")||tNom.includes("cepill")||tNom.includes("aspirad")||tNom.includes("escobill")||tNom.includes("mantenci")||tNom.includes("mantención");
+                  return esCanchaSint && esLimpieza;
+                });
+                if(aMarcar.length===0) return;
+                aMarcar.forEach(t=>{
+                  const trab = personalArr3.find(p=>p.nombre===t.responsable);
+                  if(!trab) return;
+                  const bonos = Array.isArray(trab.bonos)?trab.bonos:[];
+                  if(bonos.some(b=>b.tareaId===t.id)) return;
+                  detectados++;
+                  const nuevoBono = {id:"bc_"+Date.now()+Math.random(),tipo:"bonoEspecializado",fecha,descripcion:"Limpieza/mantención césped sintético — Cancha de Fútbol — "+fecha,estado:"pendiente",monto:0,origen:"automatico_retroactivo",tareaId:t.id};
+                  setPersonal(prev=>{
+                    const arr=Array.isArray(prev)?prev:Object.values(prev||{});
+                    return arr.map(p=>{
+                      if(p.nombre!==t.responsable) return p;
+                      const bs=Array.isArray(p.bonos)?p.bonos:[];
+                      if(bs.some(b=>b.tareaId===t.id)) return p;
+                      return {...p,bonos:[...bs,nuevoBono]};
+                    });
+                  });
+                });
+                nuevasProg[fecha] = lista.map(t=>aMarcar.some(a=>a.id===t.id)?{...t,bonoCanchaNotificado:true}:t);
+              });
+              if(detectados>0) alert("✅ "+detectados+" bono(s) de cancha sintética detectados y asignados. Ve a Personal → ficha del trabajador para verlos.");
+              else alert("No se encontraron tareas de cancha sintética completadas sin bono asignado.");
+            }} style={{...S.btn,fontSize:12,background:"rgba(196,181,253,0.1)",color:"#c4b5fd",border:"1px solid rgba(196,181,253,0.3)"}}>
+              🔍 Detectar bonos cancha sintética históricos
+            </button>
+          </div>
+
           {bonosPendientes.length>0&&(
             <div style={{marginBottom:16}}>
               <div style={{fontSize:13,fontWeight:700,color:"#c4b5fd",marginBottom:8}}>💰 Bonos por Tarea pendientes</div>
@@ -13818,7 +13873,7 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
                     {selEventos[`${t.id}_${e.id}`]&&<span style={{color:"#000",fontSize:10,fontWeight:700}}>✓</span>}
                   </div>
                   <div style={{flex:1,fontSize:12}}>
-                    <span>{e.tipo==="horaExtra"?"⏰":e.tipo==="permiso"?"📋":e.tipo==="vacaciones"?"🏖️":e.tipo==="licencia"?"🏥":"💰"}</span>
+                    <span style={{fontWeight:["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)?700:400,color:["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)?"#c4b5fd":"inherit"}}>{e.tipo==="horaExtra"?"⏰":e.tipo==="bonoConstruccion"||e.tipo==="bonoPesado"||e.tipo==="bonoEspecializado"?"🎖️":e.tipo==="permiso"?"📋":e.tipo==="vacaciones"?"🏖️":e.tipo==="licencia"?"🏥":"💰"}</span>
                     {" "}{e.descripcion||e.tipo} · {e.fecha}{e.fechaFin?` → ${e.fechaFin}`:""}
                     {e.tipo==="horaExtra"&&e.estado!=="aprobado"&&<span style={{fontSize:10,color:"#f59e0b",marginLeft:6,background:"rgba(245,158,11,0.1)",padding:"1px 6px",borderRadius:8,border:"1px solid rgba(245,158,11,0.2)"}}>⚠️ Pendiente aprobación — no se sumará</span>}
                   </div>
