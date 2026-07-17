@@ -13549,11 +13549,19 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
         </tr>`;}).join("");
 
       // Excluir bonos individuales que correspondan a bonos masivos no seleccionados
-      const idsBonosMasivosNoSel = bonosPendientes.filter(b=>!selBonos[b.id]).map(b=>String(b.id));
+      const bonosNoSel = bonosPendientes.filter(b=>!selBonos[b.id]);
       const filasBonosInd = eventosT.filter(e=>{
         if(!["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)) return false;
-        // Si tiene origenBonoId que coincide con un bono masivo no seleccionado, excluir
-        if(e.origenBonoId&&idsBonosMasivosNoSel.includes(String(e.origenBonoId))) return false;
+        // Excluir si tiene origenBonoId explícito
+        if(e.origenBonoId&&bonosNoSel.some(b=>String(b.id)===String(e.origenBonoId))) return false;
+        // Excluir si la descripción coincide con un bono masivo no seleccionado
+        const descE = (e.descripcion||"").toLowerCase().trim();
+        if(bonosNoSel.some(b=>{
+          const descB = (b.descripcion||"").toLowerCase().trim();
+          // Match si descripción del evento contiene palabras clave del bono masivo
+          const palabras = descB.split(" ").filter(p=>p.length>4);
+          return palabras.length>0 && palabras.filter(p=>descE.includes(p)).length >= Math.ceil(palabras.length*0.5);
+        })) return false;
         return true;
       }).map(e=>`
         <tr><td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${e.fecha}</td>
@@ -15888,6 +15896,7 @@ export default function App() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiText, setAiText] = useState("");
   const [editElem, setEditElem] = useState(null);
+  const [condicionesLocales, setCondicionesLocales] = useState({}); // condicion UI inmediata por elemento
   const [showPlantacionForm, setShowPlantacionForm] = useState(null);
 
   const ejecutarDescuentoStock = (descuentos) => {
@@ -16581,26 +16590,27 @@ export default function App() {
               </button>
             </div>
 
-            {/* Condición: exterior / bajo techo — con estado local para UI inmediata */}
-            {(()=>{
-              const [condLocal, setCondLocal] = React.useState(e.edData.condicion||"exterior");
-              return (
-                <div style={{marginTop:10}}>
-                  <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",textTransform:"uppercase",display:"block",marginBottom:4}}>Condición</label>
-                  <div style={{display:"flex",gap:6}}>
-                    {[["exterior","🌿 Exterior","#34d399"],["bajo_techo","🏠 Bajo techo","#60a5fa"],["mixto","🔀 Mixto","#f59e0b"]].map(([k,lbl,color])=>(
-                      <button key={k} onClick={()=>{setCondLocal(k);setElemCondicion(zonaId,e.id,e.isCustom,k);}}
-                        style={{flex:1,fontSize:11,padding:"5px 0",borderRadius:7,cursor:"pointer",
-                          border:`1px solid ${condLocal===k?color+"60":"rgba(255,255,255,0.1)"}`,
-                          background:condLocal===k?"rgba(255,255,255,0.06)":"transparent",
-                          color:condLocal===k?color:"#5a9a7a",fontWeight:condLocal===k?600:400}}>
-                        {lbl}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              );
-            })()}
+            {/* Condición: exterior / bajo techo */}
+            <div style={{marginTop:10}}>
+              <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",textTransform:"uppercase",display:"block",marginBottom:4}}>Condición</label>
+              <div style={{display:"flex",gap:6}}>
+                {[["exterior","🌿 Exterior","#34d399"],["bajo_techo","🏠 Bajo techo","#60a5fa"],["mixto","🔀 Mixto","#f59e0b"]].map(([k,lbl,color])=>{
+                  const condActual = condicionesLocales[e.id] ?? (e.edData.condicion||"exterior");
+                  return (
+                    <button key={k} onClick={()=>{
+                      setCondicionesLocales(p=>({...p,[e.id]:k}));
+                      setElemCondicion(zonaId,e.id,e.isCustom,k);
+                    }}
+                      style={{flex:1,fontSize:11,padding:"5px 0",borderRadius:7,cursor:"pointer",
+                        border:`1px solid ${condActual===k?color+"60":"rgba(255,255,255,0.1)"}`,
+                        background:condActual===k?"rgba(255,255,255,0.06)":"transparent",
+                        color:condActual===k?color:"#5a9a7a",fontWeight:condActual===k?600:400}}>
+                      {lbl}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
             {/* Frecuencias de mantención → ver en Programa */}
             <div style={{marginTop:10,padding:"10px 14px",background:"rgba(96,165,250,0.06)",borderRadius:8,border:"1px solid rgba(96,165,250,0.15)",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
