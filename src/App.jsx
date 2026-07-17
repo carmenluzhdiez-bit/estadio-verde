@@ -16346,12 +16346,29 @@ export default function App() {
 
   const setElemCondicion = (zid,eid,isCustom,condicion) => {
     if(isCustom){ updateCustomElemField(zid,eid,{condicion}); return; }
-    updateZona(zid,{elementos:{...data[zid]?.elementos,[eid]:{...data[zid]?.elementos?.[eid],condicion}}});
+    // Actualizar estado local
+    setDataLocal(prev=>{
+      const zidStr=String(zid);
+      const ex=prev[zidStr]||{};
+      const exElems=ex.elementos||{};
+      return {...prev,[zidStr]:{...ex,elementos:{...exElems,[eid]:{...exElems[eid],condicion}}}};
+    });
+    // Escribir en Firebase con path notation para no sobreescribir otros campos
+    fbUpdate(ref(db, ROOT+"/data/"+String(zid)+"/elementos/"+eid), {condicion})
+      .catch(e=>console.error("setElemCondicion error:",e));
   };
 
   const setElemEstado = (zid,eid,isCustom,estado) => {
     if(isCustom){ updateCustomElemField(zid,eid,{estado}); return; }
-    else{updateZona(zid,{elementos:{...data[zid]?.elementos,[eid]:{...data[zid]?.elementos?.[eid],estado}}});}
+    // Actualizar local y Firebase con path específico
+    setDataLocal(prev=>{
+      const zidStr=String(zid);
+      const ex=prev[zidStr]||{};
+      const exElems=ex.elementos||{};
+      return {...prev,[zidStr]:{...ex,elementos:{...exElems,[eid]:{...exElems[eid],estado}}}};
+    });
+    fbUpdate(ref(db, ROOT+"/data/"+String(zid)+"/elementos/"+eid), {estado})
+      .catch(e=>console.error("setElemEstado error:",e));
     addHistorial(zid,`Estado "${getElemNombre(zid,eid,isCustom)}" → ${ESTADOS_ELEM[estado]?.label}`);
   };
   // Helper: actualizar campo de elemento custom leyendo desde Firebase
