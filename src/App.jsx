@@ -8098,7 +8098,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
 
       {/* Sub-tabs */}
       <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
-        {[["fondo","📊 Resumen"],["lista","📋 Compras"],["rendiciones","📤 Rendiciones"],["gastos","🔍 Gastos por ítem"]].map(([t,l])=>{
+        {[["fondo","📊 Resumen"],["lista","📋 Compras"],["rendiciones","📤 Rendiciones"],["gastos","📊 Gastos por categoría"]].map(([t,l])=>{
           const badge=t==="lista"?compras.filter(c=>c.estado==="pendiente").length:t==="rendiciones"?rendiciones.filter(r=>!r.reembolso).length:0;
           return <button key={t} className={`tab${subTab===t?" on":""}`} onClick={()=>{setSubTab(t);setShowForm(false);}} style={{position:"relative"}}>
             {l}{badge>0&&<span style={{position:"absolute",top:1,right:1,background:"#ef4444",color:"#fff",borderRadius:"50%",width:14,height:14,fontSize:9,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>{badge}</span>}
@@ -8693,172 +8693,196 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
 
       {/* ── RENDICIONES ── */}
       {subTab==="gastos"&&(()=>{
-        // Recopilar todos los ítems únicos de todas las compras
-        const todosItems = {};
+        // ── GASTOS POR CATEGORÍA ──────────────────────────────────────────
+        const MESES_NOM = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+        const todasCats = [...new Set([
+          ...CATEGORIAS,
+          ...compras.flatMap(c=>(c.items||[]).map(it=>it.categoria)).filter(Boolean)
+        ])].sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
+
+        // Calcular gasto total por categoría para el año/período seleccionado
+        const gastoPorCat = {};
+        const anioN = Number(gastoAnio);
         compras.forEach(comp=>{
+          if(gastoPeriodo!=="anual"&&!comp.fecha?.startsWith(String(anioN))) return;
+          const signo = comp.tipoDoc==="Nota de Crédito"?-1:1;
           (comp.items||[]).forEach(it=>{
-            if(!it.descripcion?.trim()) return;
-            const key = it.descripcion.trim().toLowerCase();
-            if(!todosItems[key]) todosItems[key] = {nombre:it.descripcion.trim(), cat:it.categoria||""};
+            const cat = it.categoria||"Sin categoría";
+            if(!gastoPorCat[cat]) gastoPorCat[cat]={total:0,cant:0,ndocs:0,meses:{}};
+            const monto = signo*Number(it.totalBruto||it.totalNeto||0);
+            gastoPorCat[cat].total += monto;
+            gastoPorCat[cat].cant  += Number(it.cantidad||0);
+            gastoPorCat[cat].ndocs++;
+            if(comp.fecha) {
+              const mes = comp.fecha.slice(5,7);
+              if(!gastoPorCat[cat].meses[mes]) gastoPorCat[cat].meses[mes]=0;
+              gastoPorCat[cat].meses[mes] += monto;
+            }
           });
         });
-        const listaItems = Object.values(todosItems).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
-        const itemsFiltrados = gastoItemBusq
-          ? listaItems.filter(i=>i.nombre.toLowerCase().includes(gastoItemBusq.toLowerCase()))
-          : listaItems;
 
-        // Calcular datos para el ítem seleccionado
+        const catsSorted = Object.entries(gastoPorCat)
+          .sort((a,b)=>b[1].total-a[1].total);
+        const totalGeneral = catsSorted.reduce((s,[,v])=>s+v.total,0);
+
+        // Detalle de la categoría seleccionada
         let filasDatos = [];
         let totalSel = 0;
         if(gastoItemSel) {
           const anio = Number(gastoAnio);
-          const comprasConItem = compras.filter(c=>
-            c.fecha?.startsWith(String(anio)) &&
-            (c.items||[]).some(it=>it.descripcion?.trim().toLowerCase()===gastoItemSel.toLowerCase())
+          const comprasCat = compras.filter(c=>
+            (gastoPeriodo==="anual"||c.fecha?.startsWith(String(anio)))&&
+            (c.items||[]).some(it=>(it.categoria||"Sin categoría")===gastoItemSel)
           );
           if(gastoPeriodo==="mensual") {
-            const meses = Array.from({length:12},(_,i)=>String(i+1).padStart(2,"0"));
-            const MESES_NOM = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-            filasDatos = meses.map((m,i)=>{
-              const cMes = comprasConItem.filter(c=>c.fecha?.slice(5,7)===m);
+            filasDatos = Array.from({length:12},(_,i)=>{
+              const m = String(i+1).padStart(2,"0");
+              const cMes = comprasCat.filter(c=>c.fecha?.slice(5,7)===m);
               const monto = cMes.reduce((s,c)=>{
                 const signo = c.tipoDoc==="Nota de Crédito"?-1:1;
-                return s+signo*(c.items||[]).filter(it=>it.descripcion?.trim().toLowerCase()===gastoItemSel.toLowerCase())
+                return s+signo*(c.items||[]).filter(it=>(it.categoria||"Sin categoría")===gastoItemSel)
                   .reduce((ss,it)=>ss+Number(it.totalBruto||it.totalNeto||0),0);
               },0);
-              const cant = cMes.reduce((s,c)=>(c.items||[]).filter(it=>it.descripcion?.trim().toLowerCase()===gastoItemSel.toLowerCase())
+              const cant = cMes.reduce((s,c)=>(c.items||[]).filter(it=>(it.categoria||"Sin categoría")===gastoItemSel)
                 .reduce((ss,it)=>ss+Number(it.cantidad||0),s),0);
               totalSel += monto;
-              return {periodo:MESES_NOM[i], monto, cant, ndocs:cMes.length};
+              return {periodo:MESES_NOM[i],monto,cant,ndocs:cMes.length};
             }).filter(f=>f.ndocs>0||f.monto!==0);
-          } else if(gastoPeriodo==="semanal") {
-            // Agrupar por semana del año
-            const porSemana = {};
-            comprasConItem.forEach(comp=>{
-              const fecha = new Date(comp.fecha+"T12:00:00");
-              const inicio = new Date(fecha); inicio.setDate(inicio.getDate()-(inicio.getDay()===0?6:inicio.getDay()-1));
-              const semKey = inicio.toISOString().slice(0,10);
-              if(!porSemana[semKey]) porSemana[semKey]={monto:0,cant:0,ndocs:0};
-              const signo = comp.tipoDoc==="Nota de Crédito"?-1:1;
-              (comp.items||[]).filter(it=>it.descripcion?.trim().toLowerCase()===gastoItemSel.toLowerCase()).forEach(it=>{
-                porSemana[semKey].monto += signo*Number(it.totalBruto||it.totalNeto||0);
-                porSemana[semKey].cant  += Number(it.cantidad||0);
-                porSemana[semKey].ndocs++;
-              });
-            });
-            filasDatos = Object.entries(porSemana).sort((a,b)=>a[0].localeCompare(b[0])).map(([sem,val])=>{
-              const fin = new Date(sem+"T12:00:00"); fin.setDate(fin.getDate()+6);
-              totalSel += val.monto;
-              return {periodo:`${new Date(sem+"T12:00:00").toLocaleDateString("es-CL",{day:"2-digit",month:"short"})} – ${fin.toLocaleDateString("es-CL",{day:"2-digit",month:"short"})}`, ...val};
-            });
-          } else { // anual — por año
-            const anios = [...new Set(compras.map(compraC=>compraC.fecha?.slice(0,4)).filter(Boolean))].sort();
+          } else if(gastoPeriodo==="anual") {
+            const anios = [...new Set(compras.map(c=>c.fecha?.slice(0,4)).filter(Boolean))].sort();
             filasDatos = anios.map(a=>{
-              const cAnio = compras.filter(c=>c.fecha?.startsWith(a)&&(c.items||[]).some(it=>it.descripcion?.trim().toLowerCase()===gastoItemSel.toLowerCase()));
+              const cAnio = compras.filter(c=>c.fecha?.startsWith(a)&&(c.items||[]).some(it=>(it.categoria||"Sin categoría")===gastoItemSel));
               const monto = cAnio.reduce((s,c)=>{
                 const signo = c.tipoDoc==="Nota de Crédito"?-1:1;
-                return s+signo*(c.items||[]).filter(it=>it.descripcion?.trim().toLowerCase()===gastoItemSel.toLowerCase()).reduce((ss,it)=>ss+Number(it.totalBruto||it.totalNeto||0),0);
+                return s+signo*(c.items||[]).filter(it=>(it.categoria||"Sin categoría")===gastoItemSel)
+                  .reduce((ss,it)=>ss+Number(it.totalBruto||it.totalNeto||0),0);
               },0);
-              const cant = cAnio.reduce((s,c)=>(c.items||[]).filter(it=>it.descripcion?.trim().toLowerCase()===gastoItemSel.toLowerCase()).reduce((ss,it)=>ss+Number(it.cantidad||0),s),0);
+              const cant = cAnio.reduce((s,c)=>(c.items||[]).filter(it=>(it.categoria||"Sin categoría")===gastoItemSel)
+                .reduce((ss,it)=>ss+Number(it.cantidad||0),s),0);
               totalSel += monto;
-              return {periodo:a, monto, cant, ndocs:cAnio.length};
+              return {periodo:a,monto,cant,ndocs:cAnio.length};
             }).filter(f=>f.ndocs>0);
           }
         }
 
+        const fmt = n => new Intl.NumberFormat("es-CL",{style:"currency",currency:"CLP",maximumFractionDigits:0}).format(n);
+        const pct = (v,t) => t?Math.round(v/t*100):0;
+
         return (
           <div className="ein">
-            <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,marginBottom:14}}>🔍 Gastos por ítem</div>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,marginBottom:4}}>📊 Gastos por categoría</div>
+            <div style={{fontSize:11,color:"#5a9a7a",marginBottom:14}}>Distribución del gasto por categoría de compra</div>
+
             {/* Controles */}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:10,marginBottom:16,alignItems:"end"}}>
               <div>
-                <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Buscar ítem</label>
-                <input style={S.input} value={gastoItemBusq} onChange={e=>{setGastoItemBusq(e.target.value);setGastoItemSel("");}} placeholder="ej: Bencina, Compost, Fungicida..."/>
-              </div>
-              <div>
                 <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Período</label>
-                <select style={S.input} value={gastoPeriodo} onChange={e=>setGastoPeriodo(e.target.value)}>
-                  <option value="mensual">Mensual (por mes)</option>
-                  <option value="semanal">Semanal (por semana)</option>
-                  <option value="anual">Anual (comparar años)</option>
+                <select style={S.input} value={gastoPeriodo} onChange={e=>{setGastoPeriodo(e.target.value);setGastoItemSel("");}}>
+                  <option value="mensual">Mensual</option>
+                  <option value="anual">Comparar años</option>
                 </select>
               </div>
               {gastoPeriodo!=="anual"&&(
                 <div>
                   <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Año</label>
-                  <select style={S.input} value={gastoAnio} onChange={e=>setGastoAnio(e.target.value)}>
-                    {[...new Set(compras.map(compraC=>compraC.fecha?.slice(0,4)).filter(Boolean))].sort().reverse().map(a=><option key={a} value={a}>{a}</option>)}
+                  <select style={S.input} value={gastoAnio} onChange={e=>{setGastoAnio(e.target.value);setGastoItemSel("");}}>
+                    {[...new Set(compras.map(c=>c.fecha?.slice(0,4)).filter(Boolean))].sort().reverse().map(a=><option key={a} value={a}>{a}</option>)}
                   </select>
                 </div>
               )}
+              <button onClick={()=>{
+                const anioActual = gastoPeriodo==="anual"?"todos los años":gastoAnio;
+                const win = window.open("","_blank");
+                win.document.write(`<!DOCTYPE html><html lang="es"><head>
+                  <meta charset="UTF-8"/><title>Gastos por Categoría ${anioActual}</title>
+                  <style>body{font-family:Calibri,Arial,sans-serif;padding:24px;color:#1a1a2e}
+                  h1{font-size:18px;color:#065f46}table{width:100%;border-collapse:collapse;font-size:12px}
+                  th{background:#f0fdf4;padding:6px 10px;text-align:left;font-size:11px;text-transform:uppercase;color:#065f46}
+                  td{padding:5px 10px;border-bottom:1px solid #e5e7eb}
+                  .bar{height:8px;background:#34d399;border-radius:4px;display:inline-block}
+                  .total{font-weight:700;color:#065f46}.footer{margin-top:24px;font-size:10px;color:#9ca3af;text-align:center}
+                  @media print{.no-print{display:none}}</style></head><body>
+                  <button onclick="window.print()" class="no-print" style="float:right;padding:6px 14px;background:#065f46;color:#fff;border:none;border-radius:5px;cursor:pointer">🖨️ Imprimir / PDF</button>
+                  <h1>📊 Informe de Gastos por Categoría — ${anioActual}</h1>
+                  <p style="font-size:12px;color:#6b7280">Estadio Español de Las Condes · Departamento de Áreas Verdes</p>
+                  <table><thead><tr><th>Categoría</th><th>N° docs</th><th>Monto total</th><th>% del total</th><th>Distribución</th></tr></thead><tbody>
+                  ${catsSorted.map(([cat,v])=>`
+                    <tr><td>${cat}</td><td>${v.ndocs}</td><td class="total">${new Intl.NumberFormat("es-CL",{style:"currency",currency:"CLP",maximumFractionDigits:0}).format(v.total)}</td>
+                    <td>${pct(v.total,totalGeneral)}%</td>
+                    <td><span class="bar" style="width:${pct(v.total,totalGeneral)*2}px"></span></td></tr>`).join("")}
+                  <tr style="background:#f0fdf4"><td><b>TOTAL</b></td><td></td><td class="total">${new Intl.NumberFormat("es-CL",{style:"currency",currency:"CLP",maximumFractionDigits:0}).format(totalGeneral)}</td><td>100%</td><td></td></tr>
+                  </tbody></table>
+                  <div class="footer">Estadio Verde · ${new Date().toLocaleDateString("es-CL")}</div>
+                </body></html>`);
+                win.document.close();win.focus();
+              }} style={{...S.btn,background:"rgba(52,211,153,0.12)",color:"#34d399",border:"1px solid rgba(52,211,153,0.3)",whiteSpace:"nowrap",fontSize:12}}>
+                🖨️ Informe PDF
+              </button>
             </div>
 
-            {/* Lista de ítems para seleccionar */}
+            {/* Tabla resumen por categoría */}
             {!gastoItemSel&&(
-              <div style={{...S.card,padding:12,marginBottom:16}}>
-                <div style={{fontSize:11,color:"#5a9a7a",marginBottom:8}}>
-                  {gastoItemBusq ? `${itemsFiltrados.length} resultado(s) — selecciona uno para ver su historial:` : `${listaItems.length} ítems en el historial de compras:`}
+              <div style={{...S.card,padding:0,overflow:"hidden"}}>
+                <div style={{padding:"10px 14px",borderBottom:"1px solid rgba(255,255,255,0.06)",fontSize:11,color:"#5a9a7a",display:"flex",justifyContent:"space-between"}}>
+                  <span>Total {gastoPeriodo==="anual"?"(todos los años)":gastoAnio}: <b style={{color:"#34d399"}}>{fmt(totalGeneral)}</b></span>
+                  <span>Clic en una categoría para ver detalle</span>
                 </div>
-                <div style={{display:"flex",flexWrap:"wrap",gap:6,maxHeight:220,overflowY:"auto"}}>
-                  {itemsFiltrados.map(it=>(
-                    <button key={it.nombre} onClick={()=>setGastoItemSel(it.nombre)}
-                      style={{...S.btn,fontSize:11,padding:"4px 12px",background:"rgba(255,255,255,0.05)",color:"#ede9e0",border:"1px solid rgba(255,255,255,0.1)",borderRadius:20}}>
-                      {it.nombre}{it.cat&&<span style={{color:"#5a9a7a",marginLeft:4,fontSize:10}}>· {it.cat}</span>}
-                    </button>
-                  ))}
-                  {itemsFiltrados.length===0&&<div style={{color:"#5a9a7a",fontSize:12}}>Sin resultados para "{gastoItemBusq}"</div>}
-                </div>
+                {catsSorted.map(([cat,v])=>(
+                  <div key={cat} onClick={()=>setGastoItemSel(cat)}
+                    style={{padding:"10px 14px",borderBottom:"1px solid rgba(255,255,255,0.05)",cursor:"pointer",
+                      display:"grid",gridTemplateColumns:"1fr auto auto",gap:10,alignItems:"center",
+                      background:"transparent",transition:"background 0.15s"}}
+                    onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.03)"}
+                    onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                    <div>
+                      <div style={{fontSize:13,color:"#c0dac0",fontWeight:500}}>{cat}</div>
+                      <div style={{marginTop:4,height:5,borderRadius:3,background:"rgba(52,211,153,0.1)",overflow:"hidden"}}>
+                        <div style={{width:pct(v.total,totalGeneral)+"%",height:"100%",background:"#34d399",borderRadius:3}}/>
+                      </div>
+                    </div>
+                    <div style={{textAlign:"right",fontSize:11,color:"#5a9a7a"}}>{v.ndocs} doc(s)</div>
+                    <div style={{textAlign:"right",fontSize:13,fontWeight:700,color:"#34d399",minWidth:100}}>{fmt(v.total)}</div>
+                  </div>
+                ))}
+                {catsSorted.length===0&&<div style={{padding:24,textAlign:"center",color:"#5a9a7a",fontSize:12}}>Sin datos para mostrar</div>}
               </div>
             )}
 
-            {/* Resultados del ítem seleccionado */}
+            {/* Detalle de categoría seleccionada */}
             {gastoItemSel&&(
               <div>
-                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
-                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,color:"#34d399"}}>{gastoItemSel}</div>
-                  <button onClick={()=>setGastoItemSel("")} style={{...S.btn,fontSize:10,padding:"2px 8px",background:"rgba(255,255,255,0.05)",color:"#5a9a7a"}}>✕ cambiar</button>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700}}>{gastoItemSel}</div>
+                  <button onClick={()=>setGastoItemSel("")} style={{...S.btn,fontSize:11,padding:"3px 10px"}}>← Volver</button>
                 </div>
-                {filasDatos.length===0?(
-                  <div style={{...S.card,padding:24,textAlign:"center",color:"#5a9a7a"}}>Sin compras de este ítem en {gastoPeriodo==="anual"?"ningún año":gastoAnio}</div>
-                ):(
-                  <>
+                {filasDatos.length===0
+                  ? <div style={{color:"#5a9a7a",fontSize:12,textAlign:"center",padding:20}}>Sin gastos en esta categoría para el período seleccionado</div>
+                  : <>
                     <div style={{...S.card,padding:0,overflow:"hidden",marginBottom:12}}>
-                      <table style={{width:"100%",borderCollapse:"collapse"}}>
-                        <thead>
-                          <tr style={{background:"rgba(52,211,153,0.08)"}}>
-                            <th style={{padding:"9px 14px",fontSize:11,fontWeight:700,color:"#34d399",textAlign:"left",textTransform:"uppercase",letterSpacing:"0.5px"}}>Período</th>
-                            <th style={{padding:"9px 14px",fontSize:11,fontWeight:700,color:"#34d399",textAlign:"right",textTransform:"uppercase",letterSpacing:"0.5px"}}>Cantidad</th>
-                            <th style={{padding:"9px 14px",fontSize:11,fontWeight:700,color:"#34d399",textAlign:"right",textTransform:"uppercase",letterSpacing:"0.5px"}}>Monto</th>
-                            <th style={{padding:"9px 14px",fontSize:11,fontWeight:700,color:"#34d399",textAlign:"center",textTransform:"uppercase",letterSpacing:"0.5px"}}>Docs</th>
-                          </tr>
-                        </thead>
+                      <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                        <thead><tr style={{borderBottom:"1px solid rgba(255,255,255,0.1)"}}>
+                          <th style={{padding:"8px 12px",textAlign:"left",fontSize:10,color:"#5a9a7a",textTransform:"uppercase"}}>Período</th>
+                          <th style={{padding:"8px 12px",textAlign:"right",fontSize:10,color:"#5a9a7a",textTransform:"uppercase"}}>N° docs</th>
+                          <th style={{padding:"8px 12px",textAlign:"right",fontSize:10,color:"#5a9a7a",textTransform:"uppercase"}}>Monto</th>
+                        </tr></thead>
                         <tbody>
                           {filasDatos.map((f,i)=>(
-                            <tr key={i} style={{borderTop:"1px solid rgba(255,255,255,0.05)",background:i%2===0?"transparent":"rgba(255,255,255,0.02)"}}>
-                              <td style={{padding:"8px 14px",fontSize:13}}>{f.periodo}</td>
-                              <td style={{padding:"8px 14px",fontSize:13,textAlign:"right",color:"#5a9a7a"}}>{f.cant>0?f.cant:"—"}</td>
-                              <td style={{padding:"8px 14px",fontSize:13,fontWeight:600,textAlign:"right",color:f.monto<0?"#ef4444":"#ede9e0"}}>{f.monto!==0?`${f.monto<0?"-":""}$${Math.abs(f.monto).toLocaleString("es-CL")}`:"—"}</td>
-                              <td style={{padding:"8px 14px",fontSize:12,textAlign:"center",color:"#5a9a7a"}}>{f.ndocs}</td>
+                            <tr key={i} style={{borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                              <td style={{padding:"7px 12px",color:"#c0dac0"}}>{f.periodo}</td>
+                              <td style={{padding:"7px 12px",textAlign:"right",color:"#5a9a7a"}}>{f.ndocs}</td>
+                              <td style={{padding:"7px 12px",textAlign:"right",fontWeight:700,color:"#34d399"}}>{fmt(f.monto)}</td>
                             </tr>
                           ))}
-                          <tr style={{borderTop:"2px solid rgba(52,211,153,0.3)",background:"rgba(52,211,153,0.05)"}}>
-                            <td colSpan={2} style={{padding:"9px 14px",fontSize:13,fontWeight:700,color:"#34d399"}}>TOTAL</td>
-                            <td style={{padding:"9px 14px",fontSize:14,fontWeight:900,textAlign:"right",color:totalSel<0?"#ef4444":"#34d399"}}>{totalSel<0?"-":""}${Math.abs(totalSel).toLocaleString("es-CL")}</td>
-                            <td style={{padding:"9px 14px",fontSize:12,textAlign:"center",color:"#5a9a7a"}}>{filasDatos.reduce((s,f)=>s+f.ndocs,0)}</td>
+                          <tr style={{borderTop:"2px solid rgba(52,211,153,0.3)"}}>
+                            <td style={{padding:"8px 12px",fontWeight:700,color:"#c0dac0"}}>TOTAL</td>
+                            <td></td>
+                            <td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,color:"#34d399",fontSize:14}}>{fmt(totalSel)}</td>
                           </tr>
                         </tbody>
                       </table>
                     </div>
-                    <button style={{...S.btn,fontSize:11,padding:"5px 14px",background:"rgba(52,211,153,0.1)",color:"#34d399",border:"1px solid rgba(52,211,153,0.3)"}}
-                      onClick={()=>{
-                        const hoy = new Date().toLocaleDateString("es-CL",{day:"2-digit",month:"long",year:"numeric"});
-                        const filas = filasDatos.map(f=>`<tr><td style="padding:7px 12px;border-bottom:1px solid #f0f0f0">${f.periodo}</td><td style="padding:7px 12px;border-bottom:1px solid #f0f0f0;text-align:right">${f.cant||"—"}</td><td style="padding:7px 12px;border-bottom:1px solid #f0f0f0;text-align:right;font-weight:600;color:${f.monto<0?"#dc2626":"#1a5c2a"}">${f.monto!==0?`${f.monto<0?"-":""}$${Math.abs(f.monto).toLocaleString("es-CL")}`:"—"}</td><td style="padding:7px 12px;border-bottom:1px solid #f0f0f0;text-align:center">${f.ndocs}</td></tr>`).join("");
-                        const winI = window.open("","_blank","width=700,height=600");
-                        winI.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Gasto ${gastoItemSel}</title><style>body{font-family:Calibri,Arial,sans-serif;padding:28px;color:#222;font-size:13px}h1{font-size:18px;color:#1a5c2a;margin-bottom:2px}h2{font-size:12px;color:#888;font-weight:normal;margin-top:0}table{width:100%;border-collapse:collapse}th{background:#1a5c2a;color:#fff;padding:8px 12px;font-size:11px;text-align:left}th.r{text-align:right}tr:nth-child(even){background:#f9fafb}.tot{background:#f0fdf4;font-weight:700}@media print{button{display:none}}</style></head><body><h1>📊 Historial de Gasto — ${gastoItemSel}</h1><h2>Período: ${gastoPeriodo==="mensual"?`Mensual ${gastoAnio}`:gastoPeriodo==="semanal"?`Semanal ${gastoAnio}`:"Comparativo anual"} · Generado el ${hoy}</h2><table><thead><tr><th>Período</th><th class="r">Cantidad</th><th class="r">Monto</th><th class="r">Docs</th></tr></thead><tbody>${filas}<tr class="tot"><td colspan="2">TOTAL</td><td style="text-align:right;color:${totalSel<0?"#dc2626":"#1a5c2a"}">${totalSel<0?"-":""}$${Math.abs(totalSel).toLocaleString("es-CL")}</td><td style="text-align:right">${filasDatos.reduce((s,f)=>s+f.ndocs,0)}</td></tr></tbody></table><div style="margin-top:14px;text-align:center"><button onclick="window.print()" style="background:#1a5c2a;color:#fff;border:none;padding:9px 22px;border-radius:6px;cursor:pointer">🖨️ Imprimir / PDF</button></div></body></html>`);
-                        winI.document.close();
-                      }}>🖨️ Imprimir / exportar PDF</button>
                   </>
-                )}
+                }
               </div>
             )}
           </div>
