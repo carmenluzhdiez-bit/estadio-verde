@@ -16521,7 +16521,7 @@ export default function App() {
                   onChange={ev=>setEditElem(p=>({...p,tipoEdit:ev.target.value}))}>
                   {(()=>{
                     const vk=["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
-                    const ok=["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","bodegas"];
+                    const ok=["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","maceteros","bodegas"];
                     return(<>
                       <optgroup label="🌿 Vegetación">{vk.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup>
                       <optgroup label="🏗️ Infraestructura / Pavimentos">{ok.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup>
@@ -16581,21 +16581,26 @@ export default function App() {
               </button>
             </div>
 
-            {/* Condición: exterior / bajo techo */}
-            <div style={{marginTop:10}}>
-              <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",textTransform:"uppercase",display:"block",marginBottom:4}}>Condición</label>
-              <div style={{display:"flex",gap:6}}>
-                {[["exterior","🌿 Exterior","#34d399"],["bajo_techo","🏠 Bajo techo","#60a5fa"],["mixto","🔀 Mixto","#f59e0b"]].map(([k,lbl,color])=>(
-                  <button key={k} onClick={()=>setElemCondicion(zonaId,e.id,e.isCustom,k)}
-                    style={{flex:1,fontSize:11,padding:"5px 0",borderRadius:7,cursor:"pointer",
-                      border:`1px solid ${(e.edData.condicion||"exterior")===k?color+"60":"rgba(255,255,255,0.1)"}`,
-                      background:(e.edData.condicion||"exterior")===k?"rgba(255,255,255,0.06)":"transparent",
-                      color:(e.edData.condicion||"exterior")===k?color:"#5a9a7a",fontWeight:(e.edData.condicion||"exterior")===k?600:400}}>
-                    {lbl}
-                  </button>
-                ))}
-              </div>
-            </div>
+            {/* Condición: exterior / bajo techo — con estado local para UI inmediata */}
+            {(()=>{
+              const [condLocal, setCondLocal] = React.useState(e.edData.condicion||"exterior");
+              return (
+                <div style={{marginTop:10}}>
+                  <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",textTransform:"uppercase",display:"block",marginBottom:4}}>Condición</label>
+                  <div style={{display:"flex",gap:6}}>
+                    {[["exterior","🌿 Exterior","#34d399"],["bajo_techo","🏠 Bajo techo","#60a5fa"],["mixto","🔀 Mixto","#f59e0b"]].map(([k,lbl,color])=>(
+                      <button key={k} onClick={()=>{setCondLocal(k);setElemCondicion(zonaId,e.id,e.isCustom,k);}}
+                        style={{flex:1,fontSize:11,padding:"5px 0",borderRadius:7,cursor:"pointer",
+                          border:`1px solid ${condLocal===k?color+"60":"rgba(255,255,255,0.1)"}`,
+                          background:condLocal===k?"rgba(255,255,255,0.06)":"transparent",
+                          color:condLocal===k?color:"#5a9a7a",fontWeight:condLocal===k?600:400}}>
+                        {lbl}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Frecuencias de mantención → ver en Programa */}
             <div style={{marginTop:10,padding:"10px 14px",background:"rgba(96,165,250,0.06)",borderRadius:8,border:"1px solid rgba(96,165,250,0.15)",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
@@ -17337,7 +17342,7 @@ export default function App() {
                         <div style={{flex:"1 1 150px",maxWidth:220}}>
                           {(()=>{
                             const vk=["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
-                            const ok=["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","bodegas"];
+                            const ok=["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","maceteros","bodegas"];
                             const esVege = vk.includes(newElem.tipo);
                             return (<>
                               {/* Selector de grupo */}
@@ -17362,7 +17367,7 @@ export default function App() {
                       </div>
                       <div style={{display:"flex",gap:8,alignItems:"center"}}>
                         <button className="btn-p" style={S.btn} onClick={()=>{
-                          if(newElem.nombre.trim()){
+                          console.log("Agregar elem: zonaId=",zonaId,"newElem=",newElem); if(newElem.nombre.trim()){
                             addCustomElem(zonaId,newElem);
                             setNewElem(p=>({...p,nombre:""}));
                           }
