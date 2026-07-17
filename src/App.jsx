@@ -3602,6 +3602,8 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
               
               setTimeout(()=>alert("Modo lluvia aplicado. "+aPosponer.length+" tarea(s) reprogramadas para "+destino+". "+(aRevisar.length>0?aRevisar.length+" riego(s) a revisar manualmente.":"")),200);
             }} style={{...S.btn,background:"rgba(96,165,250,0.1)",color:"#93c5fd",border:"1px solid rgba(96,165,250,0.2)",fontSize:11}}>
+              🌧️ Modo lluvia
+            </button>
           )}
           {esJefa&&(
             <button onClick={()=>{
