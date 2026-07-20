@@ -16150,12 +16150,12 @@ function PlanificadorSemanal({ S, MACROZONAS_BASE, getAllElems, getZD, getElemFr
                     ))}
                   </tr>
                 ))}
+                ))}
                   </>);
                 })()}
-            ))}
+            )}
           </tbody>
         </table>
-        {grupos.length===0&&(
           <div style={{textAlign:"center",color:"#4a7a5a",padding:32,fontSize:12}}>
             No hay tareas pendientes según las frecuencias configuradas para esta semana.
           </div>
