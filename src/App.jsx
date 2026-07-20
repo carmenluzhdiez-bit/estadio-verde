@@ -2669,7 +2669,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   const [showNuevaTareaEmerg, setShowNuevaTareaEmerg] = React.useState(false);
   const [nuevaTareaEmerg, setNuevaTareaEmerg] = React.useState({ zona:"", tarea:"", notas:"" });
   // Estado de grupos colapsables — objeto {key: bool}
-  const [gruposAbiertos, setGruposAbiertos] = React.useState({diarias:true}); // resto cerrados por defecto
+  const [gruposAbiertos, setGruposAbiertos] = React.useState({diarias:true});
   const [alturaInputs, setAlturaInputs] = React.useState({});
   const [rutinasGolfState, setRutinasGolfState] = React.useState({});
   const toggleGrupo = (key) => setGruposAbiertos(p=>({...p,[key]:!p[key]}));
@@ -3362,6 +3362,237 @@ Una vez cerrado no podrás modificar las tareas. Solo la jefa puede reabrir el t
     </div>
   );
 }
+
+// ─── PLANIFICADOR SEMANAL ─────────────────────────────────────────────────────
+function PlanificadorSemanal({ S, MACROZONAS_BASE, getAllElems, getZD, getElemFrecs,
+  tareas, setTareas, personal, configSemanal, esJefa }) {
+
+  const hoy = fechaLocal();
+  const lunesHoy = (() => {
+    const d = new Date(hoy+"T12:00:00");
+    d.setDate(d.getDate()-((d.getDay()+6)%7));
+    return d.toISOString().slice(0,10);
+  })();
+
+  const [semanaBase, setSemanaBase] = React.useState(lunesHoy);
+  const [asignaciones, setAsignaciones] = React.useState({});
+  const [guardado, setGuardado] = React.useState(false);
+  const [grupoAbierto, setGrupoAbierto] = React.useState(null);
+
+  const diasSemana = Array.from({length:6},(_,i)=>{
+    const d = new Date(semanaBase+"T12:00:00");
+    d.setDate(d.getDate()+i);
+    return d.toISOString().slice(0,10);
+  });
+
+  const fmtDia = (f) => {
+    const d = new Date(f+"T12:00:00");
+    return d.toLocaleDateString("es-CL",{weekday:"short",day:"numeric",month:"short"});
+  };
+
+  const tareasSemanales = React.useMemo(()=>{
+    const estacion = (()=>{
+      const m = new Date().getMonth()+1;
+      if([12,1,2].includes(m)) return "verano";
+      if([3,4,5].includes(m)) return "otono";
+      if([6,7,8].includes(m)) return "invierno";
+      return "primavera";
+    })();
+    const lista = [];
+    MACROZONAS_BASE.forEach(z=>{
+      const elems = getAllElems(z.id);
+      elems.forEach(e=>{
+        const frecs = getElemFrecs(String(z.id), e.id, e.tipo, e.isCustom);
+        frecs.forEach(f=>{
+          if(!f.tarea) return;
+          const freq = f.modo==="diasSemana"?f.diasMinimos:f[estacion];
+          if(!freq||freq==="noaplica") return;
+          const ultima = f.ultimaVez||"2025-01-01";
+          const diasDesde = Math.round((new Date(semanaBase+"T12:00:00")-new Date(ultima+"T12:00:00"))/(1000*60*60*24));
+          const intervalo = freq==="diario"?1:freq==="cada2dias"?2:freq==="cada3dias"?3:
+            freq==="cada4dias"?4:freq==="cada5dias"?5:freq==="semanal"?7:
+            freq==="quincenal"?15:freq==="mensual"?30:freq==="bimestral"?60:
+            freq==="trimestral"?90:Number(f.diasMinimos)||7;
+          if(diasDesde < intervalo*0.7) return;
+          const esGolf = z.id===31||(z.nombre||"").toLowerCase().includes("golf");
+          const resp = esGolf?"Osmar Bhalú Armijo Zúñiga":getResponsablePorTipo(f.tarea,configSemanal,z.nombre)||"";
+          lista.push({
+            key:`${z.id}_${e.id}_${f.id}`,
+            zona:z.nombre, zonaIcono:z.icono, elemento:e.nombre,
+            tarea:f.tarea, frecuencia:freq, intervalo, diasDesde,
+            urgente:diasDesde>=intervalo*1.5, responsable:resp,
+            origenZid:String(z.id), origenEid:e.id, origenFrecId:f.id, origenEsCustom:!!e.isCustom,
+          });
+        });
+      });
+    });
+    lista.sort((a,b)=>a.tarea.localeCompare(b.tarea,"es",{sensitivity:"base"}));
+    return lista;
+  }, [semanaBase, MACROZONAS_BASE]);
+
+  const grupos = React.useMemo(()=>{
+    const g = {};
+    tareasSemanales.forEach(t=>{
+      const key = t.tarea.toLowerCase().trim();
+      if(!g[key]) g[key]={tarea:t.tarea, items:[]};
+      g[key].items.push(t);
+    });
+    return Object.values(g).sort((a,b)=>a.tarea.localeCompare(b.tarea,"es",{sensitivity:"base"}));
+  }, [tareasSemanales]);
+
+  const setAsig = (taskKey, fecha) =>
+    setAsignaciones(p=>({...p,[taskKey]:fecha===p[taskKey]?null:fecha}));
+
+  const confirmarSemana = () => {
+    const normArr = v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+    const nuevasTareas = {};
+    diasSemana.forEach(d=>{ nuevasTareas[d]=[...normArr(tareas[d]||[])]; });
+    tareasSemanales.forEach(t=>{
+      const fecha = asignaciones[t.key];
+      if(!fecha) return;
+      if(normArr(tareas[fecha]||[]).some(x=>x.zona===t.zona&&x.elemento===t.elemento&&x.tarea===t.tarea)) return;
+      if(!nuevasTareas[fecha]) nuevasTareas[fecha]=[];
+      nuevasTareas[fecha].push({
+        id:Date.now()+Math.random(), fecha, zona:t.zona, elemento:t.elemento,
+        tarea:t.tarea, responsable:t.responsable,
+        estado:t.responsable?"pendiente":"por_designar",
+        notas:"", auto:true,
+        origenZid:t.origenZid, origenEid:t.origenEid,
+        origenFrecId:t.origenFrecId, origenEsCustom:t.origenEsCustom,
+      });
+    });
+    setTareas(prev=>({...prev,...nuevasTareas}));
+    setGuardado(true);
+    setTimeout(()=>setGuardado(false),2000);
+  };
+
+  const sinAsignar = tareasSemanales.filter(t=>!asignaciones[t.key]).length;
+  const asignadas = tareasSemanales.filter(t=>asignaciones[t.key]).length;
+  const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
+
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
+        <div>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700}}>🗓 Planificación semanal</div>
+          <div style={{fontSize:11,color:"#5a9a7a"}}>Distribuye las tareas de la semana por tipo</div>
+        </div>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <button onClick={()=>{const d=new Date(semanaBase+"T12:00:00");d.setDate(d.getDate()-7);setSemanaBase(d.toISOString().slice(0,10));setAsignaciones({});setGrupoAbierto(null);}}
+            style={{...S.btn,fontSize:12,padding:"4px 10px"}}>◀</button>
+          <span style={{fontSize:12,color:"#c0dac0",fontWeight:600}}>{fmtDia(diasSemana[0])} – {fmtDia(diasSemana[5])}</span>
+          <button onClick={()=>{const d=new Date(semanaBase+"T12:00:00");d.setDate(d.getDate()+7);setSemanaBase(d.toISOString().slice(0,10));setAsignaciones({});setGrupoAbierto(null);}}
+            style={{...S.btn,fontSize:12,padding:"4px 10px"}}>▶</button>
+        </div>
+      </div>
+
+      <div style={{...S.card,padding:"10px 14px",marginBottom:14,display:"flex",gap:16,flexWrap:"wrap"}}>
+        <span style={{fontSize:12,color:"#c0dac0"}}><b style={{color:"#34d399"}}>{tareasSemanales.length}</b> tareas según frecuencias</span>
+        <span style={{fontSize:12,color:"#c0dac0"}}><b style={{color:"#60a5fa"}}>{asignadas}</b> asignadas</span>
+        <span style={{fontSize:12,color:"#c0dac0"}}><b style={{color:"#f59e0b"}}>{sinAsignar}</b> sin día</span>
+        <span style={{fontSize:12,color:"#c0dac0"}}><b style={{color:"#f87171"}}>{tareasSemanales.filter(t=>t.urgente).length}</b> urgentes</span>
+      </div>
+
+      {/* Días header */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr repeat(6,56px)",gap:4,padding:"0 14px 8px",fontSize:10,color:"#5a9a7a"}}>
+        <div></div>
+        {diasSemana.map(d=>(
+          <div key={d} style={{textAlign:"center",fontWeight:d===hoy?700:400,color:d===hoy?"#34d399":"#5a9a7a"}}>
+            {fmtDia(d).split(" ").slice(0,2).join(" ")}
+          </div>
+        ))}
+      </div>
+
+      {/* Grupos colapsables */}
+      <div style={{marginBottom:16}}>
+        {grupos.map(g=>{
+          const abierto = grupoAbierto===g.tarea;
+          const asignadasGrupo = g.items.filter(t=>asignaciones[t.key]).length;
+          return (
+            <div key={g.tarea} style={{marginBottom:4,borderRadius:8,overflow:"hidden",
+              border:`1px solid ${abierto?"rgba(52,211,153,0.2)":"rgba(255,255,255,0.06)"}`}}>
+              <div onClick={()=>setGrupoAbierto(abierto?null:g.tarea)}
+                style={{padding:"10px 14px",cursor:"pointer",userSelect:"none",
+                  background:abierto?"rgba(52,211,153,0.06)":"rgba(255,255,255,0.02)",
+                  borderLeft:`3px solid ${abierto?"rgba(52,211,153,0.5)":"transparent"}`,
+                  display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:11,color:abierto?"#34d399":"#6aaa7a",
+                  transform:abierto?"rotate(90deg)":"rotate(0deg)",
+                  transition:"transform 0.15s",display:"inline-block"}}>▶</span>
+                <span style={{fontSize:13,fontWeight:700,color:abierto?"#c0dac0":"#7aaa80",flex:1}}>{g.tarea}</span>
+                <span style={{fontSize:10,color:"#5a9a7a"}}>
+                  {g.items.length} zona(s)
+                  {g.items.some(t=>t.urgente)&&<span style={{color:"#f87171",marginLeft:6}}>⚠️</span>}
+                  {asignadasGrupo>0&&<span style={{color:"#34d399",marginLeft:6}}>✓ {asignadasGrupo}/{g.items.length}</span>}
+                </span>
+              </div>
+              {abierto&&(
+                <div style={{padding:"6px 0"}}>
+                  <div style={{padding:"4px 14px 8px",display:"flex",gap:4,alignItems:"center",borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
+                    <span style={{fontSize:10,color:"#5a9a7a",flex:1}}>Asignar todos →</span>
+                    {diasSemana.map(d=>(
+                      <button key={d} onClick={()=>g.items.forEach(t=>setAsig(t.key,d))}
+                        style={{fontSize:10,padding:"2px 8px",borderRadius:4,cursor:"pointer",
+                          border:"1px solid rgba(52,211,153,0.3)",background:"rgba(52,211,153,0.08)",color:"#34d399",width:52}}>
+                        {fmtDia(d).split(" ")[0]}
+                      </button>
+                    ))}
+                  </div>
+                  {g.items.map(t=>(
+                    <div key={t.key} style={{padding:"6px 14px",borderBottom:"1px solid rgba(255,255,255,0.04)",
+                      display:"grid",gridTemplateColumns:"1fr 72px repeat(6,52px)",gap:4,alignItems:"center",
+                      background:t.urgente?"rgba(248,113,113,0.04)":"transparent"}}>
+                      <div style={{fontSize:11}}>
+                        <span style={{color:"#5a9a7a"}}>{t.zonaIcono} {t.zona}</span>
+                        {t.elemento&&<span style={{color:"#4a7a5a",marginLeft:4,fontSize:10}}>· {t.elemento}</span>}
+                        {t.urgente&&<span style={{color:"#f87171",marginLeft:4,fontSize:9}}>⚠️ {t.diasDesde}d</span>}
+                      </div>
+                      <select value={t.responsable} onChange={e=>{t.responsable=e.target.value;}}
+                        style={{fontSize:10,padding:"1px 3px",background:"rgba(255,255,255,0.05)",
+                          border:"1px solid rgba(255,255,255,0.1)",borderRadius:4,color:"#c0dac0",width:"100%"}}>
+                        <option value="">—</option>
+                        {personalArr.map(p=>(
+                          <option key={p.id} value={p.nombre}>{p.nombre.split(" ")[0]}</option>
+                        ))}
+                      </select>
+                      {diasSemana.map(d=>(
+                        <button key={d} onClick={()=>setAsig(t.key,d)}
+                          style={{width:"100%",height:28,borderRadius:5,cursor:"pointer",fontSize:10,
+                            border:`1px solid ${asignaciones[t.key]===d?"rgba(52,211,153,0.6)":"rgba(255,255,255,0.08)"}`,
+                            background:asignaciones[t.key]===d?"rgba(52,211,153,0.2)":"transparent",
+                            color:asignaciones[t.key]===d?"#34d399":"#4a7a5a"}}>
+                          {asignaciones[t.key]===d?"✓":fmtDia(d).split(" ")[0].slice(0,2)}
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {grupos.length===0&&(
+          <div style={{textAlign:"center",color:"#4a7a5a",padding:32,fontSize:12}}>
+            No hay tareas pendientes según las frecuencias para esta semana.
+          </div>
+        )}
+      </div>
+
+      {asignadas>0&&(
+        <div style={{position:"sticky",bottom:16}}>
+          <button onClick={confirmarSemana}
+            style={{...S.btn,width:"100%",padding:"12px 0",fontWeight:700,fontSize:14,
+              background:guardado?"rgba(34,197,94,0.15)":"rgba(52,211,153,0.15)",
+              color:guardado?"#22c55e":"#34d399",
+              border:`1px solid ${guardado?"rgba(34,197,94,0.4)":"rgba(52,211,153,0.3)"}`}}>
+            {guardado?"✅ Semana programada":"📅 Confirmar ("+asignadas+" tareas)"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACROZONAS_BASE, tareas, setTareas, tareasZonaHoy=0, esJefa=false, configSemanal={}, setConfigSemanal, puedeCrear=false, cierresTurno={}, onReabrirTurno, getElemFrecs, setElemFrecs, aplicaciones=[], setAplicaciones, stockFito, setStockFito, crearNotificacion }) {
   const hoy = fechaLocal();
@@ -13558,19 +13789,19 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
 
       // Excluir bonos individuales que correspondan a bonos masivos no seleccionados
       const bonosNoSel = bonosPendientes.filter(b=>!selBonos[b.id]);
-      // filasBonosInd: solo bonos individuales que NO correspondan a ningún bono masivo
-      // Los masivos ya aparecen en filasBonosMasivos — evitar duplicación
-      const todosBonosMasivos = [...bonosPendientes, ...bonosRendidos];
       const filasBonosInd = eventosT.filter(e=>{
         if(!["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)) return false;
-        // Excluir si corresponde a CUALQUIER bono masivo (seleccionado o no)
+        // Excluir si tiene origenBonoId explícito
+        if(e.origenBonoId&&bonosNoSel.some(b=>String(b.id)===String(e.origenBonoId))) return false;
+        // Excluir si la descripción coincide con un bono masivo no seleccionado
         const descE = (e.descripcion||"").toLowerCase().trim();
-        return !todosBonosMasivos.some(b=>{
-          if(e.origenBonoId&&String(e.origenBonoId)===String(b.id)) return true;
+        if(bonosNoSel.some(b=>{
           const descB = (b.descripcion||"").toLowerCase().trim();
+          // Match si descripción del evento contiene palabras clave del bono masivo
           const palabras = descB.split(" ").filter(p=>p.length>4);
-          return palabras.length>0 && palabras.filter(p=>descE.includes(p)).length >= Math.ceil(palabras.length*0.6);
-        });
+          return palabras.length>0 && palabras.filter(p=>descE.includes(p)).length >= Math.ceil(palabras.length*0.5);
+        })) return false;
+        return true;
       }).map(e=>`
         <tr><td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${e.fecha}</td>
         <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${e.descripcion||"Bono"}</td>
@@ -15885,300 +16116,6 @@ const diasHabiles = (fechaStr, n=1) => {
   return d.toISOString().slice(0,10);
 };
 
-// ─── PLANIFICADOR SEMANAL ─────────────────────────────────────────────────────
-// Permite distribuir todas las tareas de la semana por tipo de tarea
-function PlanificadorSemanal({ S, MACROZONAS_BASE, getAllElems, getZD, getElemFrecs,
-  tareas, setTareas, personal, configSemanal, esJefa }) {
-
-  const hoy = fechaLocal();
-  // Semana por defecto: lunes de la semana actual
-  const lunesHoy = (() => {
-    const d = new Date(hoy+"T12:00:00");
-    d.setDate(d.getDate()-((d.getDay()+6)%7));
-    return d.toISOString().slice(0,10);
-  })();
-
-  const [semanaBase, setSemanaBase] = React.useState(lunesHoy);
-  const [asignaciones, setAsignaciones] = React.useState({}); // {taskKey: fecha}
-  const [guardado, setGuardado] = React.useState(false);
-  const [grupoAbierto, setGrupoAbierto] = React.useState(null); // clave del grupo desplegado
-
-  // Días de la semana (lunes a sábado, sin domingo)
-  const diasSemana = Array.from({length:6},(_,i)=>{
-    const d = new Date(semanaBase+"T12:00:00");
-    d.setDate(d.getDate()+i);
-    return d.toISOString().slice(0,10);
-  });
-
-  const fmtDia = (f) => {
-    const d = new Date(f+"T12:00:00");
-    return d.toLocaleDateString("es-CL",{weekday:"short",day:"numeric",month:"short"});
-  };
-
-  // Calcular tareas pendientes según frecuencias — agrupadas por tipo
-  const tareasSemanales = React.useMemo(()=>{
-    const estacion = (()=>{
-      const m = new Date().getMonth()+1;
-      if([12,1,2].includes(m)) return "verano";
-      if([3,4,5].includes(m)) return "otono";
-      if([6,7,8].includes(m)) return "invierno";
-      return "primavera";
-    })();
-
-    const lista = [];
-    const normArr = v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-
-    MACROZONAS_BASE.forEach(z=>{
-      const elems = getAllElems(z.id);
-      elems.forEach(e=>{
-        const frecs = getElemFrecs(String(z.id), e.id, e.tipo, e.isCustom);
-        frecs.forEach(f=>{
-          if(!f.tarea) return;
-          const freq = f.modo==="diasSemana"?f.diasMinimos:f[estacion];
-          if(!freq||freq==="noaplica") return;
-
-          // Calcular si corresponde esta semana
-          const ultima = f.ultimaVez||"2025-01-01";
-          const diasDesde = Math.round((new Date(semanaBase+"T12:00:00")-new Date(ultima+"T12:00:00"))/(1000*60*60*24));
-          const intervalo = freq==="diario"?1:freq==="cada2dias"?2:freq==="cada3dias"?3:
-            freq==="cada4dias"?4:freq==="cada5dias"?5:freq==="semanal"?7:
-            freq==="quincenal"?15:freq==="mensual"?30:freq==="bimestral"?60:
-            freq==="trimestral"?90:Number(f.diasMinimos)||7;
-
-          if(diasDesde < intervalo*0.7) return; // no corresponde esta semana
-
-          // Determinar responsable por defecto
-          const esGolf = z.id===31||(z.nombre||"").toLowerCase().includes("golf");
-          const resp = esGolf?"Osmar Bhalú Armijo Zúñiga":getResponsablePorTipo(f.tarea,configSemanal,z.nombre)||"";
-
-          lista.push({
-            key: `${z.id}_${e.id}_${f.id}`,
-            zona: z.nombre,
-            zonaIcono: z.icono,
-            elemento: e.nombre,
-            tarea: f.tarea,
-            frecuencia: freq,
-            intervalo,
-            diasDesde,
-            urgente: diasDesde >= intervalo*1.5,
-            responsable: resp,
-            origenZid: String(z.id),
-            origenEid: e.id,
-            origenFrecId: f.id,
-            origenEsCustom: !!e.isCustom,
-          });
-        });
-      });
-    });
-
-    // Ordenar por tipo de tarea
-    lista.sort((a,b)=>a.tarea.localeCompare(b.tarea,"es",{sensitivity:"base"}));
-    return lista;
-  }, [semanaBase, MACROZONAS_BASE]);
-
-  // Agrupar por tipo de tarea
-  const grupos = React.useMemo(()=>{
-    const g = {};
-    tareasSemanales.forEach(t=>{
-      const key = t.tarea.toLowerCase().trim();
-      if(!g[key]) g[key]={tarea:t.tarea, items:[]};
-      g[key].items.push(t);
-    });
-    return Object.values(g).sort((a,b)=>a.tarea.localeCompare(b.tarea,"es",{sensitivity:"base"}));
-  }, [tareasSemanales]);
-
-  const setAsig = (taskKey, fecha) => {
-    setAsignaciones(p=>({...p,[taskKey]:fecha===p[taskKey]?null:fecha}));
-  };
-
-  const confirmarSemana = () => {
-    const nuevasTareas = {};
-    const normArr = v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-
-    // Inicializar con tareas existentes
-    diasSemana.forEach(d=>{ nuevasTareas[d]=[...normArr(tareas[d]||[])]; });
-
-    // Agregar las asignadas
-    tareasSemanales.forEach(t=>{
-      const fecha = asignaciones[t.key];
-      if(!fecha) return;
-      // No duplicar
-      const yaExiste = normArr(tareas[fecha]||[]).some(x=>
-        x.zona===t.zona && x.elemento===t.elemento && x.tarea===t.tarea
-      );
-      if(yaExiste) return;
-      if(!nuevasTareas[fecha]) nuevasTareas[fecha]=[];
-      nuevasTareas[fecha].push({
-        id: Date.now()+Math.random(),
-        fecha, zona:t.zona, elemento:t.elemento,
-        tarea:t.tarea, responsable:t.responsable,
-        estado:t.responsable?"pendiente":"por_designar",
-        notas:"", auto:true,
-        origenZid:t.origenZid, origenEid:t.origenEid,
-        origenFrecId:t.origenFrecId, origenEsCustom:t.origenEsCustom,
-      });
-    });
-
-    setTareas(prev=>({...prev,...nuevasTareas}));
-    setGuardado(true);
-    setTimeout(()=>setGuardado(false),2000);
-  };
-
-  const sinAsignar = tareasSemanales.filter(t=>!asignaciones[t.key]).length;
-  const asignadas = tareasSemanales.filter(t=>asignaciones[t.key]).length;
-
-  const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
-
-  return (
-    <div>
-      {/* Header */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
-        <div>
-          <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700}}>📅 Planificación semanal</div>
-          <div style={{fontSize:11,color:"#5a9a7a"}}>Distribuye las tareas de la semana por tipo</div>
-        </div>
-        <div style={{display:"flex",gap:8,alignItems:"center"}}>
-          <button onClick={()=>{const d=new Date(semanaBase+"T12:00:00");d.setDate(d.getDate()-7);setSemanaBase(d.toISOString().slice(0,10));setAsignaciones({});}}
-            style={{...S.btn,fontSize:12,padding:"4px 10px"}}>◀</button>
-          <span style={{fontSize:12,color:"#c0dac0",fontWeight:600}}>
-            {fmtDia(diasSemana[0])} – {fmtDia(diasSemana[5])}
-          </span>
-          <button onClick={()=>{const d=new Date(semanaBase+"T12:00:00");d.setDate(d.getDate()+7);setSemanaBase(d.toISOString().slice(0,10));setAsignaciones({});}}
-            style={{...S.btn,fontSize:12,padding:"4px 10px"}}>▶</button>
-        </div>
-      </div>
-
-      {/* Resumen */}
-      <div style={{...S.card,padding:"10px 14px",marginBottom:14,display:"flex",gap:16,flexWrap:"wrap"}}>
-        <span style={{fontSize:12,color:"#c0dac0"}}><b style={{color:"#34d399"}}>{tareasSemanales.length}</b> tareas según frecuencias</span>
-        <span style={{fontSize:12,color:"#c0dac0"}}><b style={{color:"#60a5fa"}}>{asignadas}</b> asignadas a días</span>
-        <span style={{fontSize:12,color:"#c0dac0"}}><b style={{color:"#f59e0b"}}>{sinAsignar}</b> sin día asignado</span>
-        <span style={{fontSize:12,color:"#c0dac0"}}><b style={{color:"#f87171"}}>{tareasSemanales.filter(t=>t.urgente).length}</b> urgentes</span>
-      </div>
-
-      {/* Tabla de días (header) */}
-      <div style={{overflowX:"auto",marginBottom:16}}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-          <thead>
-            <tr>
-              <th style={{padding:"8px 12px",textAlign:"left",color:"#5a9a7a",fontWeight:600,minWidth:200,borderBottom:"1px solid rgba(255,255,255,0.1)"}}>Tarea / Elemento</th>
-              <th style={{padding:"8px 6px",textAlign:"left",color:"#5a9a7a",minWidth:80,borderBottom:"1px solid rgba(255,255,255,0.1)"}}>Resp.</th>
-              {diasSemana.map(d=>(
-                <th key={d} style={{padding:"6px 8px",textAlign:"center",minWidth:60,borderBottom:"1px solid rgba(255,255,255,0.1)",
-                  color:d===hoy?"#34d399":"#5a9a7a",fontWeight:d===hoy?700:400}}>
-                  {fmtDia(d)}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {grupos.map(g=>(
-              <React.Fragment key={g.tarea}>
-                {/* Header de grupo — clickeable para desplegar/colapsar */}
-                {(()=>{
-                  const gKey = g.tarea;
-                  const abierto = grupoAbierto===gKey;
-                  const asignadasGrupo = g.items.filter(t=>asignaciones[t.key]).length;
-                  return (<>
-                    <tr onClick={()=>setGrupoAbierto(abierto?null:gKey)}
-                      style={{cursor:"pointer",userSelect:"none"}}>
-                      <td colSpan={8} style={{padding:"10px 12px",
-                        background:abierto?"rgba(52,211,153,0.06)":"rgba(255,255,255,0.02)",
-                        borderTop:"1px solid rgba(255,255,255,0.08)",
-                        borderLeft:abierto?"3px solid rgba(52,211,153,0.4)":"3px solid transparent"}}>
-                        <div style={{display:"flex",alignItems:"center",gap:8}}>
-                          <span style={{fontSize:13,color:abierto?"#34d399":"#9ca3af",transition:"transform 0.15s",
-                            display:"inline-block",transform:abierto?"rotate(90deg)":"rotate(0deg)"}}>▶</span>
-                          <span style={{fontSize:13,fontWeight:700,color:abierto?"#c0dac0":"#7aaa80",flex:1}}>
-                            {g.tarea}
-                          </span>
-                          <span style={{fontSize:10,color:"#5a9a7a"}}>
-                            {g.items.length} zona(s)
-                            {g.items.some(t=>t.urgente)&&<span style={{color:"#f87171",marginLeft:6}}>⚠️</span>}
-                            {asignadasGrupo>0&&<span style={{color:"#34d399",marginLeft:6}}>✓ {asignadasGrupo}/{g.items.length}</span>}
-                          </span>
-                          {/* Botones asignar todos — solo cuando está abierto */}
-                          {abierto&&(
-                            <span style={{display:"flex",gap:4}} onClick={e=>e.stopPropagation()}>
-                              {diasSemana.map(d=>(
-                                <button key={d} onClick={()=>g.items.forEach(t=>setAsig(t.key,d))}
-                                  style={{fontSize:9,padding:"2px 6px",borderRadius:4,cursor:"pointer",
-                                    border:"1px solid rgba(52,211,153,0.3)",background:"rgba(52,211,153,0.08)",
-                                    color:"#34d399"}}>
-                                  {fmtDia(d).split(" ")[0]}
-                                </button>
-                              ))}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                    {/* Filas — solo si está abierto */}
-                    {abierto&&g.items.map(t=>(
-                  <tr key={t.key} style={{borderBottom:"1px solid rgba(255,255,255,0.04)",
-                    background:t.urgente?"rgba(248,113,113,0.04)":"transparent"}}>
-                    <td style={{padding:"5px 12px",fontSize:11}}>
-                      <span style={{color:"#5a9a7a"}}>{t.zonaIcono} {t.zona}</span>
-                      {t.elemento&&<span style={{color:"#4a7a5a",marginLeft:4}}>· {t.elemento}</span>}
-                      {t.urgente&&<span style={{color:"#f87171",marginLeft:4,fontSize:9}}>⚠️ {t.diasDesde}d</span>}
-                    </td>
-                    <td style={{padding:"5px 6px"}}>
-                      <select value={t.responsable}
-                        onChange={e=>{
-                          const idx = tareasSemanales.findIndex(x=>x.key===t.key);
-                          // No podemos mutarla directamente — la asignación de resp se guarda al confirmar
-                          t.responsable = e.target.value; // mutación local temporal
-                        }}
-                        style={{fontSize:10,padding:"1px 3px",background:"rgba(255,255,255,0.05)",
-                          border:"1px solid rgba(255,255,255,0.1)",borderRadius:4,color:"#c0dac0",maxWidth:80}}>
-                        <option value="">—</option>
-                        {personalArr.map(p=>(
-                          <option key={p.id} value={p.nombre}>{p.nombre.split(" ")[0]}</option>
-                        ))}
-                      </select>
-                    </td>
-                    {diasSemana.map(d=>(
-                      <td key={d} style={{padding:"4px 6px",textAlign:"center"}}>
-                        <button onClick={()=>setAsig(t.key,d)}
-                          style={{width:28,height:28,borderRadius:6,cursor:"pointer",fontSize:11,
-                            border:`1px solid ${asignaciones[t.key]===d?"rgba(52,211,153,0.6)":"rgba(255,255,255,0.1)"}`,
-                            background:asignaciones[t.key]===d?"rgba(52,211,153,0.2)":"transparent",
-                            color:asignaciones[t.key]===d?"#34d399":"#4a7a5a"}}>
-                          {asignaciones[t.key]===d?"✓":"·"}
-                        </button>
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-                ))}
-                  </>);
-                })()}
-            )}
-          </tbody>
-        </table>
-          <div style={{textAlign:"center",color:"#4a7a5a",padding:32,fontSize:12}}>
-            No hay tareas pendientes según las frecuencias configuradas para esta semana.
-          </div>
-        )}
-      </div>
-
-      {/* Botón confirmar */}
-      {asignadas>0&&(
-        <div style={{position:"sticky",bottom:16}}>
-          <button onClick={confirmarSemana}
-            style={{...S.btn,width:"100%",padding:"12px 0",fontWeight:700,fontSize:14,
-              background:guardado?"rgba(34,197,94,0.15)":"rgba(52,211,153,0.15)",
-              color:guardado?"#22c55e":"#34d399",
-              border:`1px solid ${guardado?"rgba(34,197,94,0.4)":"rgba(52,211,153,0.3)"}`}}>
-            {guardado?"✅ Semana programada":"📅 Confirmar programación ("+ asignadas+" tareas)"}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-
 export default function App() {
   const [zonas, setZonas] = useState(()=>MACROZONAS_BASE);
   const [vista, setVista] = useState("dashboard");
@@ -16198,7 +16135,7 @@ export default function App() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiText, setAiText] = useState("");
   const [editElem, setEditElem] = useState(null);
-  const [condicionesLocales, setCondicionesLocales] = useState({}); // condicion UI inmediata por elemento
+  const [condicionesLocales, setCondicionesLocales] = useState({});
   const [showPlantacionForm, setShowPlantacionForm] = useState(null);
 
   const ejecutarDescuentoStock = (descuentos) => {
