@@ -2669,7 +2669,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   const [showNuevaTareaEmerg, setShowNuevaTareaEmerg] = React.useState(false);
   const [nuevaTareaEmerg, setNuevaTareaEmerg] = React.useState({ zona:"", tarea:"", notas:"" });
   // Estado de grupos colapsables — objeto {key: bool}
-  const [gruposAbiertos, setGruposAbiertos] = React.useState({diarias:true,corte:true,medicion:true,riego:true,fitosan:true,limpieza:true,otros:true});
+  const [gruposAbiertos, setGruposAbiertos] = React.useState({diarias:true}); // resto cerrados por defecto
   const [alturaInputs, setAlturaInputs] = React.useState({});
   const [rutinasGolfState, setRutinasGolfState] = React.useState({});
   const toggleGrupo = (key) => setGruposAbiertos(p=>({...p,[key]:!p[key]}));
@@ -3122,7 +3122,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
         {/* ══════════════════════════════════════════════════════════
              SECCIÓN 2 — REGISTROS GOLF (Alturas y Humedad)
              ══════════════════════════════════════════════════════════ */}
-        {fechaVer===hoy&&(
+        {fechaVer===hoy&&(normalizar(trabajador?.nombre||"").includes("bhalu")||normalizar(trabajador?.nombre||"").includes("armijo"))&&(
           <div style={{marginBottom:14,border:"1px solid rgba(96,165,250,0.2)",borderRadius:12,overflow:"hidden"}}>
             <div style={{padding:"12px 14px",background:"rgba(96,165,250,0.05)",borderBottom:"1px solid rgba(96,165,250,0.15)"}}>
               <div style={{fontSize:14,fontWeight:700,color:"#60a5fa",marginBottom:2}}>⛳ Registros Golf</div>
@@ -15901,6 +15901,7 @@ function PlanificadorSemanal({ S, MACROZONAS_BASE, getAllElems, getZD, getElemFr
   const [semanaBase, setSemanaBase] = React.useState(lunesHoy);
   const [asignaciones, setAsignaciones] = React.useState({}); // {taskKey: fecha}
   const [guardado, setGuardado] = React.useState(false);
+  const [grupoAbierto, setGrupoAbierto] = React.useState(null); // clave del grupo desplegado
 
   // Días de la semana (lunes a sábado, sin domingo)
   const diasSemana = Array.from({length:6},(_,i)=>{
@@ -16073,30 +16074,47 @@ function PlanificadorSemanal({ S, MACROZONAS_BASE, getAllElems, getZD, getElemFr
           <tbody>
             {grupos.map(g=>(
               <React.Fragment key={g.tarea}>
-                {/* Header de grupo */}
-                <tr>
-                  <td colSpan={8} style={{padding:"10px 12px 4px",background:"rgba(255,255,255,0.03)",
-                    fontSize:12,fontWeight:700,color:"#c0dac0",borderTop:"1px solid rgba(255,255,255,0.08)"}}>
-                    {g.tarea}
-                    <span style={{fontSize:10,color:"#5a9a7a",marginLeft:8,fontWeight:400}}>
-                      {g.items.length} zona(s)
-                      {g.items.some(t=>t.urgente)&&<span style={{color:"#f87171",marginLeft:6}}>⚠️ urgente</span>}
-                    </span>
-                    {/* Botón asignar todos a un día */}
-                    <span style={{float:"right",display:"flex",gap:4}}>
-                      {diasSemana.map(d=>(
-                        <button key={d} onClick={()=>g.items.forEach(t=>setAsig(t.key,d))}
-                          style={{fontSize:9,padding:"1px 5px",borderRadius:4,cursor:"pointer",
-                            border:"1px solid rgba(52,211,153,0.3)",background:"rgba(52,211,153,0.08)",
-                            color:"#34d399"}}>
-                          {fmtDia(d).split(" ")[0]}
-                        </button>
-                      ))}
-                    </span>
-                  </td>
-                </tr>
-                {/* Filas de cada elemento */}
-                {g.items.map(t=>(
+                {/* Header de grupo — clickeable para desplegar/colapsar */}
+                {(()=>{
+                  const gKey = g.tarea;
+                  const abierto = grupoAbierto===gKey;
+                  const asignadasGrupo = g.items.filter(t=>asignaciones[t.key]).length;
+                  return (<>
+                    <tr onClick={()=>setGrupoAbierto(abierto?null:gKey)}
+                      style={{cursor:"pointer",userSelect:"none"}}>
+                      <td colSpan={8} style={{padding:"10px 12px",
+                        background:abierto?"rgba(52,211,153,0.06)":"rgba(255,255,255,0.02)",
+                        borderTop:"1px solid rgba(255,255,255,0.08)",
+                        borderLeft:abierto?"3px solid rgba(52,211,153,0.4)":"3px solid transparent"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8}}>
+                          <span style={{fontSize:13,color:abierto?"#34d399":"#9ca3af",transition:"transform 0.15s",
+                            display:"inline-block",transform:abierto?"rotate(90deg)":"rotate(0deg)"}}>▶</span>
+                          <span style={{fontSize:13,fontWeight:700,color:abierto?"#c0dac0":"#7aaa80",flex:1}}>
+                            {g.tarea}
+                          </span>
+                          <span style={{fontSize:10,color:"#5a9a7a"}}>
+                            {g.items.length} zona(s)
+                            {g.items.some(t=>t.urgente)&&<span style={{color:"#f87171",marginLeft:6}}>⚠️</span>}
+                            {asignadasGrupo>0&&<span style={{color:"#34d399",marginLeft:6}}>✓ {asignadasGrupo}/{g.items.length}</span>}
+                          </span>
+                          {/* Botones asignar todos — solo cuando está abierto */}
+                          {abierto&&(
+                            <span style={{display:"flex",gap:4}} onClick={e=>e.stopPropagation()}>
+                              {diasSemana.map(d=>(
+                                <button key={d} onClick={()=>g.items.forEach(t=>setAsig(t.key,d))}
+                                  style={{fontSize:9,padding:"2px 6px",borderRadius:4,cursor:"pointer",
+                                    border:"1px solid rgba(52,211,153,0.3)",background:"rgba(52,211,153,0.08)",
+                                    color:"#34d399"}}>
+                                  {fmtDia(d).split(" ")[0]}
+                                </button>
+                              ))}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                    {/* Filas — solo si está abierto */}
+                    {abierto&&g.items.map(t=>(
                   <tr key={t.key} style={{borderBottom:"1px solid rgba(255,255,255,0.04)",
                     background:t.urgente?"rgba(248,113,113,0.04)":"transparent"}}>
                     <td style={{padding:"5px 12px",fontSize:11}}>
@@ -16132,7 +16150,8 @@ function PlanificadorSemanal({ S, MACROZONAS_BASE, getAllElems, getZD, getElemFr
                     ))}
                   </tr>
                 ))}
-              </React.Fragment>
+                  </>);
+                })()}
             ))}
           </tbody>
         </table>
