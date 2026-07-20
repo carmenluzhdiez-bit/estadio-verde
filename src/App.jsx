@@ -13550,19 +13550,19 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
 
       // Excluir bonos individuales que correspondan a bonos masivos no seleccionados
       const bonosNoSel = bonosPendientes.filter(b=>!selBonos[b.id]);
+      // filasBonosInd: solo bonos individuales que NO correspondan a ningún bono masivo
+      // Los masivos ya aparecen en filasBonosMasivos — evitar duplicación
+      const todosBonosMasivos = [...bonosPendientes, ...bonosRendidos];
       const filasBonosInd = eventosT.filter(e=>{
         if(!["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)) return false;
-        // Excluir si tiene origenBonoId explícito
-        if(e.origenBonoId&&bonosNoSel.some(b=>String(b.id)===String(e.origenBonoId))) return false;
-        // Excluir si la descripción coincide con un bono masivo no seleccionado
+        // Excluir si corresponde a CUALQUIER bono masivo (seleccionado o no)
         const descE = (e.descripcion||"").toLowerCase().trim();
-        if(bonosNoSel.some(b=>{
+        return !todosBonosMasivos.some(b=>{
+          if(e.origenBonoId&&String(e.origenBonoId)===String(b.id)) return true;
           const descB = (b.descripcion||"").toLowerCase().trim();
-          // Match si descripción del evento contiene palabras clave del bono masivo
           const palabras = descB.split(" ").filter(p=>p.length>4);
-          return palabras.length>0 && palabras.filter(p=>descE.includes(p)).length >= Math.ceil(palabras.length*0.5);
-        })) return false;
-        return true;
+          return palabras.length>0 && palabras.filter(p=>descE.includes(p)).length >= Math.ceil(palabras.length*0.6);
+        });
       }).map(e=>`
         <tr><td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${e.fecha}</td>
         <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${e.descripcion||"Bono"}</td>
