@@ -2742,8 +2742,6 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
       if(normResp.includes("bhalu")&&nombreTrab.includes("osmar")) return true;
       return false;
     });
-    console.log("VistaWorker filtro:", trabajador?.nombre, "tareas total:", combinadas.length, "mis tareas:", resultado.length, combinadas.map(t=>t.responsable+"|"+t.tarea).join(", "));
-    return resultado;
   }, [tareas, fechaVer, trabajador]
   );
   const misTareasDiarias  = React.useMemo(()=>sortTareas(todasMisTareas.filter(t=>esDiaria(t))),[todasMisTareas]);
@@ -3132,13 +3130,13 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
               <div style={{fontSize:11,color:"#4a7a9a"}}>Medición de alturas y humedad de greens</div>
             </div>
             <div style={{padding:"12px 14px",display:"flex",gap:8,flexWrap:"wrap"}}>
-              <button onClick={()=>onAccesoRapido?.("medicion")}
+              <button onClick={()=>onAccesoRapido?.("golf","mediciones")}
                 style={{flex:1,minWidth:140,cursor:"pointer",border:"1px solid rgba(52,211,153,0.35)",borderRadius:10,padding:"12px 10px",background:"rgba(52,211,153,0.08)",color:"#34d399",fontFamily:"'Georgia',serif",fontSize:13,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
                 <span style={{fontSize:22}}>📏</span>
                 <span style={{fontWeight:600}}>Registrar alturas</span>
                 <span style={{fontSize:10,color:"#5a9a7a"}}>Medir mm cada green</span>
               </button>
-              <button onClick={()=>onAccesoRapido?.("humedad")}
+              <button onClick={()=>onAccesoRapido?.("golf","humedad")}
                 style={{flex:1,minWidth:140,cursor:"pointer",border:"1px solid rgba(96,165,250,0.35)",borderRadius:10,padding:"12px 10px",background:"rgba(96,165,250,0.08)",color:"#60a5fa",fontFamily:"'Georgia',serif",fontSize:13,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
                 <span style={{fontSize:22}}>💧</span>
                 <span style={{fontWeight:600}}>Registrar humedad</span>
@@ -11480,8 +11478,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   const [showHumForm,    setShowHumForm]    = React.useState(false);
   // Abrir formulario de humedad automáticamente cuando jefa navega a ese tab
   React.useEffect(()=>{
-    if(subTab==="humedad" && esJefa) setShowHumForm(true);
-  },[subTab, esJefa]);
+    if(subTab==="humedad") setShowHumForm(true); // jefa y trabajadores pueden registrar
+  },[subTab]);
   const emptyHumForm = {fecha:hoy,hora:new Date().toTimeString().slice(0,5),motivo:"rutina",responsable:"",valores:{},valorVivero:"",decision:"sin-cambio",obs:"",generarTarea:false};
   const [humForm,        setHumForm]        = React.useState(emptyHumForm);
   const [selectedGreen,  setSelectedGreen]  = React.useState("g1");
@@ -17940,8 +17938,7 @@ export default function App() {
                       </div>
                       <div style={{display:"flex",gap:8,alignItems:"center"}}>
                         <button className="btn-p" style={S.btn} onClick={()=>{
-                          console.log("Agregar elem: zonaId=",zonaId,"newElem=",newElem); if(newElem.nombre.trim()){
-                            addCustomElem(zonaId,newElem);
+                                                      addCustomElem(zonaId,newElem);
                             setNewElem(p=>({...p,nombre:""}));
                           }
                         }}>✓ Agregar</button>
@@ -18320,8 +18317,8 @@ export default function App() {
                       [fecha]:(prev[fecha]||[]).map(t=>t.id===tid?{...t,metodoLimpieza:metodo}:t)
                     }));
                   }}
-                  onAccesoRapido={(tipo)=>{
-                    const tab = tipo==="medicion"?"mediciones":tipo==="humedad"?"humedad":"greens";
+                  onAccesoRapido={(vista,subTab)=>{
+                    const tab = subTab||(vista==="medicion"?"mediciones":vista==="humedad"?"humedad":"greens");
                     setGolfInitTab(tab);
                     setVista("golf");
                   }}
