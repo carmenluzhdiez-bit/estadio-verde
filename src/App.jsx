@@ -16541,9 +16541,13 @@ export default function App() {
   };
 
   const todasLasZonas = (() => {
-    const base = [...MACROZONAS_BASE];
+    const base = MACROZONAS_BASE.map(z=>{
+      const zd = getZD(z.id);
+      return zd.nombreCustom||zd.categoriaCustom||zd.iconoCustom
+        ? {...z, nombre:zd.nombreCustom||z.nombre, categoria:zd.categoriaCustom||z.categoria, icono:zd.iconoCustom||z.icono}
+        : z;
+    });
     const nombresBase = new Set(base.map(z=>z.nombre.toLowerCase().trim()));
-    // Solo agregar custom si no duplica un nombre base
     const custom = macrozonasCust.filter(z=>!nombresBase.has((z.nombre||"").toLowerCase().trim()));
     return [...base, ...custom];
   })();
@@ -17403,10 +17407,10 @@ export default function App() {
                     <div style={{paddingLeft:6}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
                         <div style={{display:"flex",alignItems:"center",gap:8}}>
-                          <span style={{fontSize:22}}>{z.icono}</span>
+                          <span style={{fontSize:22}}>{getZD(z.id).iconoCustom||z.icono}</span>
                           <div>
-                            <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,lineHeight:1.2}}>{z.nombre}</div>
-                            <div style={{fontSize:10,color:"#5a8a6a",marginTop:1}}>{z.categoria}</div>
+                            <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,lineHeight:1.2}}>{getZD(z.id).nombreCustom||z.nombre}</div>
+                            <div style={{fontSize:10,color:"#5a8a6a",marginTop:1}}>{getZD(z.id).categoriaCustom||z.categoria}</div>
                           </div>
                         </div>
                         <span style={{fontSize:10,fontWeight:600,color:est.color,background:est.bg,padding:"2px 7px",borderRadius:8,border:`1px solid ${est.color}35`,flexShrink:0}}>{est.label}</span>
