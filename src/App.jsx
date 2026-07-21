@@ -16730,7 +16730,7 @@ export default function App() {
   };
 
   const renderElemCard = (e) => {
-    const est = ESTADOS_ELEM[e.edData.estado||"bueno"];
+    const est = ESTADOS_ELEM[e.edData.estado||"bueno"] || ESTADOS_ELEM["bueno"];
     const abierto = editElem?.eid===e.id;
     const frecs = getElemFrecs(zonaId,e.id,e.tipo,e.isCustom);
     const mesAct = new Date().getMonth()+1;
@@ -17378,7 +17378,7 @@ export default function App() {
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(230px,1fr))",gap:14}}>
               {filteredZonas.map(z=>{
-                const dzd=getZD(z.id); const est=ESTADOS_ZONA[dzd.estadoGeneral||"bueno"];
+                const dzd=getZD(z.id); const est=ESTADOS_ZONA[dzd.estadoGeneral||"bueno"]||{color:"#22c55e",bg:"rgba(34,197,94,0.12)",label:"Bueno"};
                 const allElems=getAllElems(z.id);
                 const criticos=allElems.filter(e=>e.edData.estado==="critico").length;
                 const pendTareas=(dzd.tareas||[]).filter(t=>!t.completada).length;
