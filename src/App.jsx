@@ -16553,14 +16553,14 @@ export default function App() {
   }).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
 
   const stats = {
-    total: MACROZONAS_BASE.length,
-    bueno: MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral==="bueno").length,
-    regular: MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral==="regular").length,
-    critico: MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral==="critico").length,
-    mantenimiento: MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral==="mantenimiento").length,
+    total: todasLasZonas.length,
+    bueno: todasLasZonas.filter(z=>getZD(z.id).estadoGeneral==="bueno").length,
+    regular: todasLasZonas.filter(z=>getZD(z.id).estadoGeneral==="regular").length,
+    critico: todasLasZonas.filter(z=>getZD(z.id).estadoGeneral==="critico").length,
+    mantenimiento: todasLasZonas.filter(z=>getZD(z.id).estadoGeneral==="mantenimiento").length,
   };
-  const totalElems = MACROZONAS_BASE.reduce((a,z)=>a+getAllElems(z.id).length,0);
-  const elemsOk = MACROZONAS_BASE.reduce((a,z)=>a+getAllElems(z.id).filter(e=>e.edData.estado==="bueno").length,0);
+  const totalElems = todasLasZonas.reduce((a,z)=>a+getAllElems(z.id).length,0);
+  const elemsOk = todasLasZonas.reduce((a,z)=>a+getAllElems(z.id).filter(e=>e.edData.estado==="bueno").length,0);
 
   const addTareaZona = (zid, texto, tareaObj) => {
     if(!texto.trim()) return;
@@ -17957,7 +17957,7 @@ export default function App() {
                     +"</style></head><body>"
                     +"<h1>📋 Reporte General de Áreas Verdes — Estadio Español</h1>"
                     +"<div class='sub'>Fecha del reporte: "+new Date(fechaReporte+"T12:00:00").toLocaleDateString("es-CL",{weekday:"long",year:"numeric",month:"long",day:"numeric"})+" · Generado: "+new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"})+"</div>"
-                    +"<div class='stats'>"+estadoStats+" &nbsp;·&nbsp; <b>Total zonas: "+MACROZONAS_BASE.length+"</b></div>"
+                    +"<div class='stats'>"+estadoStats+" &nbsp;·&nbsp; <b>Total zonas: "+todasLasZonas.length+"</b></div>"
                     +"<table><thead><tr><th>Zona</th><th>Categoría</th><th>Estado</th><th>Elementos</th><th>Críticos</th><th>Últ. Mant.</th><th>Próx. Mant.</th><th>Tareas Pend.</th></tr></thead><tbody>"+zonaRows+"</tbody></table>"
                     +"<div class='pie'><span>Estadio Español de Las Condes · Departamento de Áreas Verdes</span><span>"+new Date().getFullYear()+"</span></div>"
                     +"</body></html>";
@@ -17979,7 +17979,7 @@ export default function App() {
                 <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,marginBottom:14}}>📊 Zonas por Estado</div>
                 {Object.entries(ESTADOS_ZONA).map(([k,v])=>{
                   const statC2=MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral===k).length;
-                  const pct=Math.round((statC2/MACROZONAS_BASE.length)*100);
+                  const pct=Math.round((statC2/todasLasZonas.length)*100);
                   return (
                     <div key={k} style={{marginBottom:10}}>
                       <div style={{display:"flex",justifyContent:"space-between",marginBottom:3,fontSize:13}}>
