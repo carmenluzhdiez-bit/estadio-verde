@@ -86,6 +86,8 @@ const CATEGORIAS_ELEM = {
   trepadoras:      { label: "Trepadoras",           color: "#2dd4bf", icon: "🪴", parent: "vegetacion" },
   rastreras:       { label: "Rastreras",            color: "#6ee7b7", icon: "🍃", parent: "vegetacion" },
   jardineras:      { label: "Jardineras",           color: "#f472b6", icon: "🪻", parent: "vegetacion" },
+  macizos:         { label: "Macizos",               color: "#e879f9", icon: "🌺", parent: "vegetacion" },
+  setos:           { label: "Setos",                 color: "#84cc16", icon: "🌿", parent: "vegetacion" },
   macetas_piso:    { label: "Macetas a piso",       color: "#e879f9", icon: "🌷", parent: "vegetacion" },
   colgantes:       { label: "Colgantes",            color: "#c084fc", icon: "🌺", parent: "vegetacion" },
   infraestructura: { label: "Estructuras y Construcciones", color: "#f59e0b", icon: "🏗️" },
@@ -95,10 +97,11 @@ const CATEGORIAS_ELEM = {
   canchas:         { label: "Canchas Deportivas",    color: "#0ea5e9", icon: "🏟️" },
   mobiliario:      { label: "Mobiliario Urbano",     color: "#fb923c", icon: "🪑" },
   maceteros:       { label: "Maceteros",              color: "#e879f9", icon: "🪴" },
+  jardinera_infra: { label: "Jardineras (contenedor)", color: "#f472b6", icon: "🪻" },
   bodegas:         { label: "Bodegas",               color: "#94a3b8", icon: "🏚️" },
 };
-const VEGETACION_SUBS = ["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
-const OTRAS_CATS      = ["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","maceteros","bodegas"];
+const VEGETACION_SUBS = ["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macizos","setos","macetas_piso","colgantes"];
+const OTRAS_CATS      = ["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","maceteros","jardinera_infra","bodegas"];
 // ─── ESTACIONES ──────────────────────────────────────────────────────────────
 const limpiarUndef = (obj) => JSON.parse(JSON.stringify(obj, function(limpKey,limpVal){ return limpVal===undefined?null:limpVal; }));
 
@@ -3594,6 +3597,247 @@ function PlanificadorSemanal({ S, MACROZONAS_BASE, getAllElems, getZD, getElemFr
 }
 
 
+// ─── CATÁLOGO DE TAREAS ESTÁNDAR ─────────────────────────────────────────────
+const CATALOGO_TAREAS = [
+  // ── LABORES ──────────────────────────────────────────────────────────────
+  { id:"ct_01", cat:"Labores", tarea:"Corte de césped" },
+  { id:"ct_02", cat:"Labores", tarea:"Corte de bordes" },
+  { id:"ct_03", cat:"Labores", tarea:"Orillado" },
+  { id:"ct_04", cat:"Labores", tarea:"Desmalezado" },
+  { id:"ct_05", cat:"Labores", tarea:"Aireado/Escarificado" },
+  { id:"ct_06", cat:"Labores", tarea:"Verticorte" },
+  { id:"ct_07", cat:"Labores", tarea:"Cambio de hoyos" },
+  { id:"ct_08", cat:"Labores", tarea:"Enmendar" },
+  { id:"ct_09", cat:"Labores", tarea:"Fertilización" },
+  { id:"ct_10", cat:"Labores", tarea:"Fumigación" },
+  { id:"ct_11", cat:"Labores", tarea:"Plantación" },
+  { id:"ct_12", cat:"Labores", tarea:"Poda de formación" },
+  { id:"ct_13", cat:"Labores", tarea:"Poda de mantenimiento" },
+  { id:"ct_14", cat:"Labores", tarea:"Poda sanitaria" },
+  { id:"ct_15", cat:"Labores", tarea:"Poda en altura" },
+  { id:"ct_16", cat:"Labores", tarea:"Tala" },
+  { id:"ct_17", cat:"Labores", tarea:"Resiembra" },
+  { id:"ct_18", cat:"Labores", tarea:"Siembra" },
+  { id:"ct_19", cat:"Labores", tarea:"Trasplante" },
+  { id:"ct_20", cat:"Labores", tarea:"Riego manual" },
+  { id:"ct_21", cat:"Labores", tarea:"Riego por aspersión" },
+  { id:"ct_22", cat:"Labores", tarea:"Fertirriego" },
+  { id:"ct_23", cat:"Labores", tarea:"Protección de plantas" },
+  // ── LIMPIEZA ──────────────────────────────────────────────────────────────
+  { id:"ct_30", cat:"Limpieza", tarea:"Limpieza general" },
+  { id:"ct_31", cat:"Limpieza", tarea:"Soplado/Barrido" },
+  { id:"ct_32", cat:"Limpieza", tarea:"Limpiar césped" },
+  { id:"ct_33", cat:"Limpieza", tarea:"Limpiar maicillo" },
+  { id:"ct_34", cat:"Limpieza", tarea:"Limpiar filtro de riego" },
+  { id:"ct_35", cat:"Limpieza", tarea:"Limpiar fuentes" },
+  { id:"ct_36", cat:"Limpieza", tarea:"Limpiar maquinaria" },
+  { id:"ct_37", cat:"Limpieza", tarea:"Limpiar plantas" },
+  { id:"ct_38", cat:"Limpieza", tarea:"Limpiar vivero" },
+  { id:"ct_39", cat:"Limpieza", tarea:"Limpiar basurero" },
+  { id:"ct_40", cat:"Limpieza", tarea:"Limpiar bodega" },
+  // ── REVISIÓN ──────────────────────────────────────────────────────────────
+  { id:"ct_50", cat:"Revisión", tarea:"Revisión fitosanitaria" },
+  { id:"ct_51", cat:"Revisión", tarea:"Revisión de plagas y enfermedades" },
+  { id:"ct_52", cat:"Revisión", tarea:"Revisión de plantas" },
+  { id:"ct_53", cat:"Revisión", tarea:"Revisión de humedad" },
+  { id:"ct_54", cat:"Revisión", tarea:"Revisión de sistema de riego" },
+  { id:"ct_55", cat:"Revisión", tarea:"Revisión de controles de riego" },
+  { id:"ct_56", cat:"Revisión", tarea:"Revisión de maquinaria y herramienta" },
+  { id:"ct_57", cat:"Revisión", tarea:"Revisión de mulch" },
+  { id:"ct_58", cat:"Revisión", tarea:"Revisión de macetero" },
+  { id:"ct_59", cat:"Revisión", tarea:"Revisión de peligros" },
+  // ── REPOSICIÓN ────────────────────────────────────────────────────────────
+  { id:"ct_70", cat:"Reposición", tarea:"Reponer arena" },
+  { id:"ct_71", cat:"Reposición", tarea:"Reponer compost" },
+  { id:"ct_72", cat:"Reposición", tarea:"Reponer macetas" },
+  { id:"ct_73", cat:"Reposición", tarea:"Reponer maicillo" },
+  { id:"ct_74", cat:"Reposición", tarea:"Reponer mulch" },
+  // ── REPARACIÓN/OBRA ───────────────────────────────────────────────────────
+  { id:"ct_80", cat:"Reparación", tarea:"Reparar herramienta" },
+  { id:"ct_81", cat:"Reparación", tarea:"Reparar maquinaria" },
+  { id:"ct_82", cat:"Reparación", tarea:"Reparar sistema de riego" },
+  { id:"ct_83", cat:"Reparación", tarea:"Obras de drenaje" },
+  // ── ADMINISTRACIÓN ────────────────────────────────────────────────────────
+  { id:"ct_90", cat:"Administración", tarea:"Preparación de terreno" },
+  { id:"ct_91", cat:"Administración", tarea:"Inventario" },
+  { id:"ct_92", cat:"Administración", tarea:"Ordenar bodega" },
+  { id:"ct_93", cat:"Administración", tarea:"Sacar nidos" },
+  // ── GOLF ESPECÍFICO ───────────────────────────────────────────────────────
+  { id:"ct_100", cat:"Golf", tarea:"Corte de greens" },
+  { id:"ct_101", cat:"Golf", tarea:"Corte de tees" },
+  { id:"ct_102", cat:"Golf", tarea:"Corte de fairways" },
+  { id:"ct_103", cat:"Golf", tarea:"Rastrillado de búnkers" },
+  { id:"ct_104", cat:"Golf", tarea:"Syringing greens" },
+  { id:"ct_105", cat:"Golf", tarea:"Topdressing" },
+  { id:"ct_106", cat:"Golf", tarea:"Medición de altura greens" },
+  { id:"ct_107", cat:"Golf", tarea:"Revisión de humedad greens" },
+];
+
+// ─── NORMALIZADOR DE TAREAS ───────────────────────────────────────────────────
+function NormalizadorTareas({ S, tareasProg, setTareasProg, esJefa }) {
+  const [mapeo, setMapeo] = React.useState({}); // {tareaVieja: tareaEstandar}
+  const [aplicado, setAplicado] = React.useState({});
+  const [buscador, setBuscador] = React.useState({});
+
+  // Recopilar todas las tareas únicas existentes en Firebase
+  const tareasUnicas = React.useMemo(()=>{
+    const normArr = v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+    const set = {};
+    Object.entries(tareasProg).forEach(([fecha, arr])=>{
+      normArr(arr).forEach(t=>{
+        if(!t?.tarea) return;
+        const k = t.tarea.trim();
+        if(!set[k]) set[k] = {tarea:k, count:0, fechas:[]};
+        set[k].count++;
+        if(!set[k].fechas.includes(fecha)) set[k].fechas.push(fecha);
+      });
+    });
+    return Object.values(set).sort((a,b)=>b.count-a.count);
+  }, [tareasProg]);
+
+  // Detectar si ya es estándar
+  const esEstandar = (tarea) =>
+    CATALOGO_TAREAS.some(c=>c.tarea.toLowerCase()===tarea.toLowerCase());
+
+  // Sugerencia automática
+  const sugerirEstandar = (tarea) => {
+    const t = tarea.toLowerCase();
+    return CATALOGO_TAREAS.find(c=>c.tarea.toLowerCase()===t)
+      || CATALOGO_TAREAS.find(c=>c.tarea.toLowerCase().includes(t))
+      || CATALOGO_TAREAS.find(c=>t.includes(c.tarea.toLowerCase().split(" ")[0]));
+  };
+
+  const aplicarMapeo = (tareaVieja, tareaNueva) => {
+    if(!tareaNueva||tareaVieja===tareaNueva) return;
+    const normArr = v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+    const nuevo = {};
+    Object.entries(tareasProg).forEach(([fecha, arr])=>{
+      nuevo[fecha] = normArr(arr).map(t=>
+        t?.tarea?.trim()===tareaVieja ? {...t, tarea:tareaNueva} : t
+      );
+    });
+    setTareasProg(prev=>({...prev,...nuevo}));
+    setAplicado(p=>({...p,[tareaVieja]:tareaNueva}));
+  };
+
+  const noEstandar = tareasUnicas.filter(t=>!esEstandar(t.tarea)&&!aplicado[t.tarea]);
+  const yaEstandar = tareasUnicas.filter(t=>esEstandar(t.tarea)||aplicado[t.tarea]);
+
+  if(!esJefa) return null;
+
+  return (
+    <div className="ein">
+      <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,marginBottom:4}}>
+        🔧 Normalizar nombres de tareas
+      </div>
+      <div style={{fontSize:11,color:"#5a9a7a",marginBottom:16}}>
+        Estandariza los nombres existentes usando el catálogo oficial.
+        Los cambios se aplican a todas las tareas programadas.
+      </div>
+
+      {/* Resumen */}
+      <div style={{...S.card,padding:"10px 14px",marginBottom:16,display:"flex",gap:16}}>
+        <span style={{fontSize:12}}><b style={{color:"#f87171"}}>{noEstandar.length}</b> <span style={{color:"#9ca3af"}}>por normalizar</span></span>
+        <span style={{fontSize:12}}><b style={{color:"#34d399"}}>{yaEstandar.length}</b> <span style={{color:"#9ca3af"}}>ya estándar o normalizadas</span></span>
+        <span style={{fontSize:12}}><b style={{color:"#c0dac0"}}>{tareasUnicas.length}</b> <span style={{color:"#9ca3af"}}>tareas únicas totales</span></span>
+      </div>
+
+      {/* Lista de tareas por normalizar */}
+      {noEstandar.length===0
+        ? <div style={{...S.card,padding:24,textAlign:"center",color:"#34d399",fontSize:13}}>
+            ✅ Todas las tareas ya están estandarizadas
+          </div>
+        : <div style={{...S.card,padding:0,overflow:"hidden",marginBottom:16}}>
+            <div style={{padding:"8px 14px",borderBottom:"1px solid rgba(255,255,255,0.08)",
+              fontSize:10,color:"#5a9a7a",textTransform:"uppercase",letterSpacing:"0.5px",
+              display:"grid",gridTemplateColumns:"1fr auto 1fr auto",gap:8}}>
+              <span>Nombre actual</span><span>usos</span><span>Reemplazar por</span><span></span>
+            </div>
+            {noEstandar.map(({tarea,count})=>{
+              const sugerida = sugerirEstandar(tarea);
+              const seleccion = mapeo[tarea]||(sugerida?.tarea||"");
+              const busqLocal = buscador[tarea]||"";
+              const filtCat = busqLocal.length>=1
+                ? CATALOGO_TAREAS.filter(c=>c.tarea.toLowerCase().includes(busqLocal.toLowerCase()))
+                : CATALOGO_TAREAS;
+              return (
+                <div key={tarea} style={{padding:"10px 14px",borderBottom:"1px solid rgba(255,255,255,0.05)",
+                  display:"grid",gridTemplateColumns:"1fr auto 1fr auto",gap:8,alignItems:"center"}}>
+                  <div>
+                    <div style={{fontSize:13,color:"#f87171",fontWeight:500}}>{tarea}</div>
+                    <div style={{fontSize:10,color:"#5a9a7a"}}>{count} uso(s)</div>
+                  </div>
+                  <div style={{color:"#4a7a5a",fontSize:16}}>→</div>
+                  <div style={{position:"relative"}}>
+                    <input
+                      placeholder="Buscar tarea estándar..."
+                      value={busqLocal||seleccion}
+                      onChange={e=>{
+                        setBuscador(p=>({...p,[tarea]:e.target.value}));
+                        setMapeo(p=>({...p,[tarea]:e.target.value}));
+                      }}
+                      style={{...S.input,fontSize:12,width:"100%"}}/>
+                    {busqLocal.length>=1&&(
+                      <div style={{position:"absolute",zIndex:999,top:"100%",left:0,right:0,
+                        background:"#1a2e1a",border:"1px solid rgba(52,211,153,0.3)",
+                        borderRadius:"0 0 8px 8px",maxHeight:160,overflowY:"auto",
+                        boxShadow:"0 4px 16px rgba(0,0,0,0.4)"}}>
+                        {filtCat.slice(0,10).map(c=>(
+                          <div key={c.id}
+                            onClick={()=>{
+                              setMapeo(p=>({...p,[tarea]:c.tarea}));
+                              setBuscador(p=>({...p,[tarea]:""}));
+                            }}
+                            style={{padding:"6px 12px",fontSize:12,color:"#c0dac0",cursor:"pointer",
+                              borderBottom:"1px solid rgba(255,255,255,0.04)"}}
+                            onMouseEnter={e=>e.currentTarget.style.background="rgba(52,211,153,0.1)"}
+                            onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                            <span style={{fontSize:9,color:"#4a7a5a",marginRight:6}}>{c.cat}</span>
+                            {c.tarea}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    disabled={!seleccion||seleccion===tarea}
+                    onClick={()=>{aplicarMapeo(tarea, mapeo[tarea]||sugerida?.tarea||"");}}
+                    style={{...S.btn,fontSize:11,padding:"4px 10px",
+                      background:seleccion&&seleccion!==tarea?"rgba(34,197,94,0.15)":"rgba(255,255,255,0.04)",
+                      color:seleccion&&seleccion!==tarea?"#22c55e":"#4a7a5a",
+                      border:`1px solid ${seleccion&&seleccion!==tarea?"rgba(34,197,94,0.3)":"rgba(255,255,255,0.08)"}`,
+                      cursor:seleccion&&seleccion!==tarea?"pointer":"not-allowed",
+                      whiteSpace:"nowrap"}}>
+                    ✓ Aplicar
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+      }
+
+      {/* Ya estandarizadas */}
+      {yaEstandar.length>0&&(
+        <details style={{...S.card,padding:10}}>
+          <summary style={{fontSize:12,color:"#5a9a7a",cursor:"pointer"}}>
+            ✅ {yaEstandar.length} tareas ya estandarizadas
+          </summary>
+          <div style={{marginTop:8}}>
+            {yaEstandar.map(({tarea,count})=>(
+              <div key={tarea} style={{display:"flex",justifyContent:"space-between",
+                padding:"4px 8px",fontSize:11,color:"#34d399"}}>
+                <span>{aplicado[tarea]?"✓ "+aplicado[tarea]:tarea}</span>
+                <span style={{color:"#5a9a7a"}}>{count} uso(s)</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+    </div>
+  );
+}
+
+
 function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACROZONAS_BASE, tareas, setTareas, tareasZonaHoy=0, esJefa=false, configSemanal={}, setConfigSemanal, puedeCrear=false, cierresTurno={}, onReabrirTurno, getElemFrecs, setElemFrecs, aplicaciones=[], setAplicaciones, stockFito, setStockFito, crearNotificacion }) {
   const hoy = fechaLocal();
   const [fecha, setFecha] = React.useState(hoy);
@@ -3876,7 +4120,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
 
       {/* Tabs */}
       <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
-        {[["programa","📆 Programar"],["semana","🗓 Semana"],["frecuencias","🔄 Frecuencias"],["fitosanitario","⚗ Fitosanitario"],["historial","📜 Historial"]].map(([t,l])=>(
+        {[["programa","📆 Programar"],["semana","🗓 Semana"],["frecuencias","🔄 Frecuencias"],["fitosanitario","⚗ Fitosanitario"],["normalizar","🔧 Normalizar"],["historial","📜 Historial"]].map(([t,l])=>(
           <button key={t} className={`tab${tabProg===t?" on":""}`} onClick={()=>setTabProg(t)}>{l}</button>
         ))}
       </div>
@@ -3902,6 +4146,10 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           tareasProg={tareas} setTareasProg={setTareas}
           stockFito={stockFito} setStockFito={setStockFito}
           crearNotificacion={crearNotificacion} esJefa={esJefa}/>
+      )}
+
+      {tabProg==="normalizar"&&(
+        <NormalizadorTareas S={S} tareasProg={tareas} setTareasProg={setTareas} esJefa={esJefa}/>
       )}
 
       {tabProg==="historial" && (
@@ -4122,29 +4370,56 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                 </div>
                 <div style={{gridColumn:"1/-1"}}>
                   <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>TAREA</label>
-                  <select style={{...S.input,fontSize:13}} value={nuevaTarea.tarea}
-                    onChange={e=>setNuevaTarea(p=>({...p,tarea:e.target.value==="__otro__"?"":e.target.value,responsable:p.responsable||(getResponsablePorTipo(e.target.value==="__otro__"?"":e.target.value,configSemanal)||"")}))}>
-                    <option value="">Seleccionar tarea...</option>
-                    {tareasDisp.map(t=><option key={t} value={t}>{t}</option>)}
-                    <option value="__otro__">✏️ Escribir otra...</option>
-                  </select>
-                  {(nuevaTarea.tarea===""||nuevaTarea.tarea==="__otro__")&&(
-                    <input style={{...S.input,fontSize:13,marginTop:6}} autoFocus
-                      placeholder="Describir tarea..."
-                      value={nuevaTarea.tarea==="__otro__"?"":nuevaTarea.tarea}
-                      onChange={e=>{const v=e.target.value;setNuevaTarea(p=>({...p,tarea:v||"__otro__",responsable:p.responsable||(getResponsablePorTipo(v,configSemanal)||"")}));}}/>
-                  )}
+                  <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>TAREA</label>
+                  <div style={{position:"relative"}}>
+                    <input
+                      placeholder="Buscar tarea del catálogo o escribir..."
+                      value={nuevaTarea.tarea}
+                      onChange={e=>{
+                        const v=e.target.value;
+                        setNuevaTarea(p=>({...p,tarea:v,
+                          responsable:p.responsable||(getResponsablePorTipo(v,configSemanal,p.zona)||"")}));
+                      }}
+                      style={{...S.input,fontSize:13,width:"100%"}}
+                      autoComplete="off"/>
+                    {nuevaTarea.tarea.length>=2&&(()=>{
+                      const busq=nuevaTarea.tarea.toLowerCase();
+                      const filtradas=CATALOGO_TAREAS.filter(c=>c.tarea.toLowerCase().includes(busq)&&c.tarea.toLowerCase()!==busq);
+                      if(filtradas.length===0) return null;
+                      const cats=[...new Set(filtradas.map(c=>c.cat))];
+                      return (
+                        <div style={{position:"absolute",zIndex:999,top:"100%",left:0,right:0,
+                          background:"#1a2e1a",border:"1px solid rgba(52,211,153,0.3)",
+                          borderRadius:"0 0 8px 8px",maxHeight:200,overflowY:"auto",
+                          boxShadow:"0 4px 16px rgba(0,0,0,0.4)"}}>
+                          {cats.map(cat=>(
+                            <div key={cat}>
+                              <div style={{padding:"3px 12px",fontSize:9,color:"#4a7a5a",textTransform:"uppercase",letterSpacing:"0.5px",background:"rgba(0,0,0,0.2)"}}>{cat}</div>
+                              {filtradas.filter(c=>c.cat===cat).map(c=>(
+                                <div key={c.id}
+                                  onClick={()=>setNuevaTarea(p=>({...p,tarea:c.tarea,
+                                    responsable:p.responsable||(getResponsablePorTipo(c.tarea,configSemanal,p.zona)||"")}))}
+                                  style={{padding:"7px 14px",fontSize:12,color:"#c0dac0",cursor:"pointer",
+                                    borderBottom:"1px solid rgba(255,255,255,0.04)",userSelect:"none"}}
+                                  onMouseEnter={e=>e.currentTarget.style.background="rgba(52,211,153,0.1)"}
+                                  onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                                  {c.tarea}
+                                </div>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
                   {nuevaTarea.tarea==="Plantar desde Vivero"&&(
                     <div style={{marginTop:8,padding:"10px 12px",background:"rgba(74,222,128,0.08)",border:"1px solid rgba(74,222,128,0.25)",borderRadius:8,fontSize:12,color:"#4ade80"}}>
                       🌱 Para plantar desde Vivero con descuento de stock e insumos, usa el botón <strong>"🌱 Plantar desde Vivero"</strong> en la ficha de la macrozona → tab <strong>✅ Tareas</strong>.<br/>
                       <span style={{color:"#5a9a7a",fontSize:11}}>Esta tarea se registrará aquí automáticamente al completar ese formulario.</span>
                     </div>
                   )}
-                </div>
-                <div>
-                  <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>RESPONSABLE</label>
-                  <ResponsableSelector
-                    value={nuevaTarea.responsable}
+
+
                     personal={personal}
                     onChange={v=>setNuevaTarea(p=>({...p,responsable:v,estado:v?"pendiente":"por_designar"}))}
                     S={S}
@@ -16768,8 +17043,8 @@ export default function App() {
                   value={editElem.tipoEdit!==undefined?editElem.tipoEdit:e.tipo}
                   onChange={ev=>setEditElem(p=>({...p,tipoEdit:ev.target.value}))}>
                   {(()=>{
-                    const vk=["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
-                    const ok=["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","maceteros","bodegas"];
+                    const vk=["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macizos","setos","macetas_piso","colgantes"];
+                    const ok=["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","maceteros","jardinera_infra","bodegas"];
                     return(<>
                       <optgroup label="🌿 Vegetación">{vk.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup>
                       <optgroup label="🏗️ Infraestructura / Pavimentos">{ok.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup>
@@ -17590,8 +17865,8 @@ export default function App() {
                           style={{...S.input,flex:"2 1 200px"}}/>
                         <div style={{flex:"1 1 150px",maxWidth:220}}>
                           {(()=>{
-                            const vk=["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
-                            const ok=["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","maceteros","bodegas"];
+                            const vk=["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macizos","setos","macetas_piso","colgantes"];
+                            const ok=["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","maceteros","jardinera_infra","bodegas"];
                             const esVege = vk.includes(newElem.tipo);
                             return (<>
                               {/* Selector de grupo */}
