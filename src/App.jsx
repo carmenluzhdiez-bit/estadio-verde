@@ -3606,15 +3606,19 @@ const CATALOGO_TAREAS = [
   { id:"ct_04", cat:"Labores", tarea:"Desmalezado" },
   { id:"ct_05", cat:"Labores", tarea:"Aireado/Escarificado" },
   { id:"ct_06", cat:"Labores", tarea:"Verticorte" },
-  { id:"ct_07", cat:"Labores", tarea:"Cambio de hoyos" },
+  { id:"ct_06b", cat:"Labores", tarea:"Verticorte con groomer fuerte" },
+  { id:"ct_07", cat:"Labores", tarea:"Cambio de banderas" },
   { id:"ct_08", cat:"Labores", tarea:"Enmendar" },
   { id:"ct_09", cat:"Labores", tarea:"Fertilización" },
-  { id:"ct_10", cat:"Labores", tarea:"Fumigación" },
+  { id:"ct_10", cat:"Labores", tarea:"Control fitosanitario" },
+  { id:"ct_10b", cat:"Labores", tarea:"Fumigación" },
   { id:"ct_11", cat:"Labores", tarea:"Plantación" },
-  { id:"ct_12", cat:"Labores", tarea:"Poda de formación" },
-  { id:"ct_13", cat:"Labores", tarea:"Poda de mantenimiento" },
-  { id:"ct_14", cat:"Labores", tarea:"Poda sanitaria" },
-  { id:"ct_15", cat:"Labores", tarea:"Poda en altura" },
+  { id:"ct_11b", cat:"Labores", tarea:"Plantar desde Vivero" },
+  { id:"ct_12", cat:"Poda", tarea:"Poda de formación" },
+  { id:"ct_13", cat:"Poda", tarea:"Poda de mantenimiento" },
+  { id:"ct_13b", cat:"Poda", tarea:"Poda de limpieza" },
+  { id:"ct_14", cat:"Poda", tarea:"Poda sanitaria" },
+  { id:"ct_15", cat:"Poda", tarea:"Poda en altura" },
   { id:"ct_16", cat:"Labores", tarea:"Tala" },
   { id:"ct_17", cat:"Labores", tarea:"Resiembra" },
   { id:"ct_18", cat:"Labores", tarea:"Siembra" },
@@ -3627,6 +3631,7 @@ const CATALOGO_TAREAS = [
   { id:"ct_30", cat:"Limpieza", tarea:"Limpieza general" },
   { id:"ct_31", cat:"Limpieza", tarea:"Soplado/Barrido" },
   { id:"ct_32", cat:"Limpieza", tarea:"Limpiar césped" },
+  { id:"ct_32b", cat:"Limpieza", tarea:"Limpieza césped sintético" },
   { id:"ct_33", cat:"Limpieza", tarea:"Limpiar maicillo" },
   { id:"ct_34", cat:"Limpieza", tarea:"Limpiar filtro de riego" },
   { id:"ct_35", cat:"Limpieza", tarea:"Limpiar fuentes" },
@@ -3671,6 +3676,20 @@ const CATALOGO_TAREAS = [
   { id:"ct_105", cat:"Golf", tarea:"Topdressing" },
   { id:"ct_106", cat:"Golf", tarea:"Medición de altura greens" },
   { id:"ct_107", cat:"Golf", tarea:"Revisión de humedad greens" },
+  { id:"ct_108", cat:"Golf", tarea:"Verticorte con groomer fuerte" },
+  // ── PRE-TORNEO ────────────────────────────────────────────────────────────
+  { id:"ct_110", cat:"Pre-torneo", tarea:"Revisar pronóstico del tiempo y ajustar planes" },
+  { id:"ct_111", cat:"Pre-torneo", tarea:"Cambio de banderas (pre-torneo)" },
+  { id:"ct_112", cat:"Pre-torneo", tarea:"Cambio de banderas (post-torneo)" },
+  { id:"ct_113", cat:"Pre-torneo", tarea:"Corte final greens (HOC 4.5mm)" },
+  { id:"ct_114", cat:"Pre-torneo", tarea:"Reparación pitch marks" },
+  // ── FITOSANITARIO GOLF ────────────────────────────────────────────────────
+  { id:"ct_120", cat:"Fitosanitario", tarea:"Control fitosanitario" },
+  { id:"ct_121", cat:"Fitosanitario", tarea:"Delimitar zona afectada" },
+  { id:"ct_122", cat:"Fitosanitario", tarea:"Aplicar tratamiento fitosanitario" },
+  { id:"ct_123", cat:"Fitosanitario", tarea:"Registrar agente causal" },
+  { id:"ct_124", cat:"Fitosanitario", tarea:"Monitoreo diario" },
+  { id:"ct_125", cat:"Fitosanitario", tarea:"Cierre de zona Golf" },
 ];
 
 // ─── NORMALIZADOR DE TAREAS ───────────────────────────────────────────────────
@@ -4128,7 +4147,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
       {/* ── FRECUENCIAS POR MACROZONA ── */}
       {tabProg==="semana"&&(
         <PlanificadorSemanal
-          S={S} MACROZONAS_BASE={MACROZONAS_BASE} getAllElems={getAllElems}
+          S={S} MACROZONAS_BASE={zonasConCust} getAllElems={getAllElems}
           getZD={getZD} getElemFrecs={getElemFrecs}
           tareas={tareas} setTareas={setTareas}
           personal={personal} configSemanal={configSemanal} esJefa={esJefa}/>
@@ -16397,7 +16416,7 @@ export default function App() {
   const [zonaId, setZonaId] = useState(null);
   const [tab, setTab] = useState("elementos");
   const [filtroCat, setFiltroCat] = useState("Todas");
-  const [macrozonasCust, setMacrozonasCust] = useState([]);
+  const [macrozonasCust, setMacrozonasCust, macCustReady] = useFirebaseState("macrozonasCust", []);
   // Combinar zonas base con personalizadas — debe ir después de ambos estados
   const zonasConCust = React.useMemo(()=>[...zonas,...macrozonasCust],[zonas,macrozonasCust]);
   const [showNuevaMacrozona, setShowNuevaMacrozona] = useState(false);
@@ -17566,6 +17585,16 @@ export default function App() {
                   <div>
                     <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Ícono</label>
                     <input style={S.input} value={nuevaMacrozona.icono} onChange={e=>setNuevaMacrozona(p=>({...p,icono:e.target.value}))} placeholder="🌿"/>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:5}}>
+                      {["🌿","🌳","🌺","🌸","🍃","🏡","⛳","🏊","🏟️","🎾","🛤️","🌊","🏋️","🏃","🌻","🌴","🏠","🌱"].map(ico=>(
+                        <button key={ico} onClick={()=>setNuevaMacrozona(p=>({...p,icono:ico}))}
+                          style={{fontSize:18,padding:"2px 4px",borderRadius:4,cursor:"pointer",
+                            border:`1px solid ${nuevaMacrozona.icono===ico?"rgba(52,211,153,0.5)":"rgba(255,255,255,0.1)"}`,
+                            background:nuevaMacrozona.icono===ico?"rgba(52,211,153,0.1)":"transparent"}}>
+                          {ico}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   <div style={{gridColumn:"1/-1"}}>
                     <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Descripción (opcional)</label>
@@ -17704,6 +17733,26 @@ export default function App() {
                           onClick={getSugerenciaAI} disabled={aiLoading}>
                           {aiLoading?<><span className="spin"/> Analizando...</>:"🤖 Sugerencia IA"}
                         </button>
+                        {zona.esPersonalizada&&esJefa&&(<>
+                          <button style={{...S.btn,fontSize:11,background:"rgba(96,165,250,0.1)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.2)"}}
+                            onClick={()=>{
+                              const nuevoNombre=window.prompt("Nuevo nombre:",zona.nombre);
+                              if(!nuevoNombre?.trim()) return;
+                              const nuevoIcono=window.prompt("Ícono (emoji):",zona.icono||"🌿");
+                              setMacrozonasCust(prev=>prev.map(z=>z.id===zona.id
+                                ?{...z,nombre:nuevoNombre.trim(),icono:nuevoIcono||z.icono}:z));
+                            }}>
+                            ✏️ Editar nombre
+                          </button>
+                          <button style={{...S.btn,fontSize:11,background:"rgba(239,68,68,0.08)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.2)"}}
+                            onClick={()=>{
+                              if(!window.confirm("¿Eliminar "+zona.nombre+"? Esta acción es permanente.")) return;
+                              setMacrozonasCust(prev=>prev.filter(z=>z.id!==zona.id));
+                              setZonaId(null);
+                            }}>
+                            🗑 Eliminar macrozona
+                          </button>
+                        </>)}
                       </div>
                     </div>
                     {/* Fechas de mantenimiento si existen */}
@@ -17747,8 +17796,8 @@ export default function App() {
               <div className="ein">
                 {(()=>{
                   const todosElems = getAllElems(zonaId);
-                  const VEGE_KEYS  = ["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
-                  const INFRA_KEYS = ["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","bodegas"];
+                  const VEGE_KEYS  = ["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macizos","setos","macetas_piso","colgantes"];
+                  const INFRA_KEYS = ["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","maceteros","jardinera_infra","bodegas"];
                   const vegeElems  = todosElems.filter(e=>VEGE_KEYS.includes(e.tipo));
                   const infraElems = todosElems.filter(e=>INFRA_KEYS.includes(e.tipo));
                   const otrosElems = todosElems.filter(e=>!VEGE_KEYS.includes(e.tipo)&&!INFRA_KEYS.includes(e.tipo));
@@ -18195,7 +18244,7 @@ export default function App() {
 
         {/* PROGRAMACIÓN */}
         {vista==="programacion"&&(
-          <ProgramacionDiaria key="prog" S={S} zonas={zonas} data={data} personal={personal} getZD={getZD} getAllElems={getAllElems} MACROZONAS_BASE={MACROZONAS_BASE} tareas={tareasProg} setTareas={setTareasProg} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal}
+          <ProgramacionDiaria key="prog" S={S} zonas={zonasConCust} data={data} personal={personal} getZD={getZD} getAllElems={getAllElems} MACROZONAS_BASE={MACROZONAS_BASE} tareas={tareasProg} setTareas={setTareasProg} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal}
             getElemFrecs={getElemFrecs} setElemFrecs={setElemFrecs} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} stockFito={stockFito} setStockFito={setStockFito} crearNotificacion={crearNotificacion}
             tareasZonaHoy={(tareasProg[new Date().toISOString().slice(0,10)]||[]).filter(t=>t.origenZona&&t.estado==="por_designar").length}
             esJefa={rolLogueado==="jefa"}
