@@ -6,7 +6,7 @@ import * as React from "react";
 
 // ─── FIREBASE ────────────────────────────────────────────────────────────────
 import { initializeApp } from "firebase/app";
-import { getDatabase, ref, onValue, set as fbSet, update as fbUpdate } from "firebase/database";
+import { getDatabase, ref, onValue, set as fbSet, update as fbUpdate, get } from "firebase/database";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
 
 const firebaseConfig = {
@@ -43,27 +43,38 @@ function useFirebaseState(path, defaultValue) {
   const fullPath = `${ROOT}/${path}`;
   const [value, setValueLocal] = useState(defaultValue);
   const [ready,  setReady]     = useState(false);
-  const skipRef = useRef(false);
+  const valueRef = useRef(defaultValue); // referencia siempre actualizada
+  const pendingRef = useRef(false); // hay una escritura pendiente
 
   useEffect(() => {
     const fbRef = ref(db, fullPath);
     const unsub = onValue(fbRef, (snap) => {
-      if (skipRef.current) { skipRef.current = false; return; }
+      if (pendingRef.current) return; // ignorar actualizaciones mientras escribimos
       const snapV = snap.val();
-      setValueLocal(snapV !== null && snapV !== undefined ? snapV : defaultValue);
+      const newVal = snapV !== null && snapV !== undefined ? snapV : defaultValue;
+      valueRef.current = newVal;
+      setValueLocal(newVal);
       setReady(true);
     });
     return () => unsub();
   }, [fullPath]);
 
   const setValue = (newVal) => {
-    const resolved = typeof newVal === "function" ? newVal(value) : newVal;
-    setValueLocal(resolved); // actualiza local inmediatamente
-    skipRef.current = true;
-    fbSet(ref(db, fullPath), resolved).catch(() => { skipRef.current = false; });
+    const resolved = typeof newVal === "function" ? newVal(valueRef.current) : newVal;
+    valueRef.current = resolved;
+    setValueLocal(resolved);
+    pendingRef.current = true;
+    fbSet(ref(db, fullPath), resolved)
+      .then(() => { setTimeout(() => { pendingRef.current = false; }, 3000); })
+      .catch(() => { pendingRef.current = false; });
   };
 
-  return [value, setValue, ready];
+  const setValueLocalOnly = (newVal) => {
+    const resolved = typeof newVal === "function" ? newVal(valueRef.current) : newVal;
+    valueRef.current = resolved;
+    setValueLocal(resolved);
+  };
+  return [value, setValue, ready, setValueLocalOnly];
 }
 
 // ─── CATEGORÍAS DE ELEMENTOS ────────────────────────────────────────────────
@@ -75,6 +86,8 @@ const CATEGORIAS_ELEM = {
   trepadoras:      { label: "Trepadoras",           color: "#2dd4bf", icon: "🪴", parent: "vegetacion" },
   rastreras:       { label: "Rastreras",            color: "#6ee7b7", icon: "🍃", parent: "vegetacion" },
   jardineras:      { label: "Jardineras",           color: "#f472b6", icon: "🪻", parent: "vegetacion" },
+  macizos:         { label: "Macizos",               color: "#e879f9", icon: "🌺", parent: "vegetacion" },
+  setos:           { label: "Setos",                 color: "#84cc16", icon: "🌿", parent: "vegetacion" },
   macetas_piso:    { label: "Macetas a piso",       color: "#e879f9", icon: "🌷", parent: "vegetacion" },
   colgantes:       { label: "Colgantes",            color: "#c084fc", icon: "🌺", parent: "vegetacion" },
   infraestructura: { label: "Estructuras y Construcciones", color: "#f59e0b", icon: "🏗️" },
@@ -83,10 +96,12 @@ const CATEGORIAS_ELEM = {
   cesped_sintetico:{ label: "Césped Sintético",      color: "#7c3aed", icon: "🟪" },
   canchas:         { label: "Canchas Deportivas",    color: "#0ea5e9", icon: "🏟️" },
   mobiliario:      { label: "Mobiliario Urbano",     color: "#fb923c", icon: "🪑" },
+  maceteros:       { label: "Maceteros",              color: "#e879f9", icon: "🪴" },
+  jardinera_infra: { label: "Jardineras (contenedor)", color: "#f472b6", icon: "🪻" },
   bodegas:         { label: "Bodegas",               color: "#94a3b8", icon: "🏚️" },
 };
-const VEGETACION_SUBS = ["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
-const OTRAS_CATS      = ["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","bodegas"];
+const VEGETACION_SUBS = ["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macizos","setos","macetas_piso","colgantes"];
+const OTRAS_CATS      = ["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","maceteros","jardinera_infra","bodegas"];
 // ─── ESTACIONES ──────────────────────────────────────────────────────────────
 const limpiarUndef = (obj) => JSON.parse(JSON.stringify(obj, function(limpKey,limpVal){ return limpVal===undefined?null:limpVal; }));
 
@@ -640,36 +655,68 @@ const MACROZONAS_BASE = [
   {
     id: 31, nombre: "Golf", categoria: "Deportivo", icono: "⛳",
     elementos: [
-      // Greens individuales — cada uno con su propio panel de frecuencias
-      { id: "green_g1", nombre: "Green 01 (Hoyo 01-10)", tipo: "cesped" },
-      { id: "green_g2", nombre: "Green 02 (Hoyo 02-11)", tipo: "cesped" },
-      { id: "green_g3", nombre: "Green 03 (Hoyo 03-12)", tipo: "cesped" },
-      { id: "green_g4", nombre: "Green 04 (Hoyo 04-13)", tipo: "cesped" },
-      { id: "green_g5", nombre: "Green 05 (Hoyo 05-14)", tipo: "cesped" },
-      { id: "green_g6", nombre: "Green 06 (Hoyo 06-15)", tipo: "cesped" },
-      { id: "green_g7", nombre: "Green 07 (Hoyo 07-16)", tipo: "cesped" },
-      { id: "green_g8", nombre: "Green 08 (Hoyo 08-17)", tipo: "cesped" },
-      { id: "green_g9", nombre: "Green 09 (Hoyo 09-18)", tipo: "cesped" },
+      // ── GREENS (9 + Vivero) ──────────────────────────────────────
+      { id: "green_g1", nombre: "Green 01", tipo: "cesped", hoyo: "Hoyo 01-10" },
+      { id: "green_g2", nombre: "Green 02", tipo: "cesped", hoyo: "Hoyo 02-11" },
+      { id: "green_g3", nombre: "Green 03", tipo: "cesped", hoyo: "Hoyo 03-12" },
+      { id: "green_g4", nombre: "Green 04", tipo: "cesped", hoyo: "Hoyo 04-13" },
+      { id: "green_g5", nombre: "Green 05", tipo: "cesped", hoyo: "Hoyo 05-14" },
+      { id: "green_g6", nombre: "Green 06", tipo: "cesped", hoyo: "Hoyo 06-15" },
+      { id: "green_g7", nombre: "Green 07", tipo: "cesped", hoyo: "Hoyo 07-16" },
+      { id: "green_g8", nombre: "Green 08", tipo: "cesped", hoyo: "Hoyo 08-17" },
+      { id: "green_g9", nombre: "Green 09", tipo: "cesped", hoyo: "Hoyo 09-18" },
       { id: "green_vivero", nombre: "Vivero de greens", tipo: "cesped" },
-      // Otras superficies del campo
-      { id: "e1", nombre: "Fairways (calles de golf)", tipo: "cesped" },
-      { id: "e3", nombre: "Rough (zona alta)", tipo: "cesped" },
-      { id: "e4", nombre: "Bunkers (arena)", tipo: "pavimentos" },
-      { id: "tees_golf", nombre: "Tees de salida", tipo: "cesped" },
-      // Zonas especiales
+      // ── TEES (18 posiciones → 9 hoyos) ──────────────────────────
+      { id: "tee_01a", nombre: "Tee 01A", tipo: "cesped", hoyo: "Hoyo 01", posicion: "A" },
+      { id: "tee_01b", nombre: "Tee 01B", tipo: "cesped", hoyo: "Hoyo 01", posicion: "B" },
+      { id: "tee_02a", nombre: "Tee 02A", tipo: "cesped", hoyo: "Hoyo 02", posicion: "A" },
+      { id: "tee_02b", nombre: "Tee 02B", tipo: "cesped", hoyo: "Hoyo 02", posicion: "B" },
+      { id: "tee_03a", nombre: "Tee 03A", tipo: "cesped", hoyo: "Hoyo 03", posicion: "A" },
+      { id: "tee_03b", nombre: "Tee 03B", tipo: "cesped", hoyo: "Hoyo 03", posicion: "B" },
+      { id: "tee_04a", nombre: "Tee 04A", tipo: "cesped", hoyo: "Hoyo 04", posicion: "A" },
+      { id: "tee_04b", nombre: "Tee 04B", tipo: "cesped", hoyo: "Hoyo 04", posicion: "B" },
+      { id: "tee_05a", nombre: "Tee 05A", tipo: "cesped", hoyo: "Hoyo 05", posicion: "A" },
+      { id: "tee_05b", nombre: "Tee 05B", tipo: "cesped", hoyo: "Hoyo 05", posicion: "B" },
+      { id: "tee_06a", nombre: "Tee 06A", tipo: "cesped", hoyo: "Hoyo 06", posicion: "A" },
+      { id: "tee_06b", nombre: "Tee 06B", tipo: "cesped", hoyo: "Hoyo 06", posicion: "B" },
+      { id: "tee_07a", nombre: "Tee 07A", tipo: "cesped", hoyo: "Hoyo 07", posicion: "A" },
+      { id: "tee_07b", nombre: "Tee 07B", tipo: "cesped", hoyo: "Hoyo 07", posicion: "B" },
+      { id: "tee_08a", nombre: "Tee 08A", tipo: "cesped", hoyo: "Hoyo 08", posicion: "A" },
+      { id: "tee_08b", nombre: "Tee 08B", tipo: "cesped", hoyo: "Hoyo 08", posicion: "B" },
+      { id: "tee_09a", nombre: "Tee 09A", tipo: "cesped", hoyo: "Hoyo 09", posicion: "A" },
+      { id: "tee_09b", nombre: "Tee 09B", tipo: "cesped", hoyo: "Hoyo 09", posicion: "B" },
+      // ── FAIRWAYS (9) ─────────────────────────────────────────────
+      { id: "fw_01", nombre: "Fairway 01", tipo: "cesped", hoyo: "Hoyo 01" },
+      { id: "fw_02", nombre: "Fairway 02", tipo: "cesped", hoyo: "Hoyo 02" },
+      { id: "fw_03", nombre: "Fairway 03", tipo: "cesped", hoyo: "Hoyo 03" },
+      { id: "fw_04", nombre: "Fairway 04", tipo: "cesped", hoyo: "Hoyo 04" },
+      { id: "fw_05", nombre: "Fairway 05", tipo: "cesped", hoyo: "Hoyo 05" },
+      { id: "fw_06", nombre: "Fairway 06", tipo: "cesped", hoyo: "Hoyo 06" },
+      { id: "fw_07", nombre: "Fairway 07", tipo: "cesped", hoyo: "Hoyo 07" },
+      { id: "fw_08", nombre: "Fairway 08", tipo: "cesped", hoyo: "Hoyo 08" },
+      { id: "fw_09", nombre: "Fairway 09", tipo: "cesped", hoyo: "Hoyo 09" },
+      // ── BUNKERS (5) ──────────────────────────────────────────────
+      { id: "bk_01", nombre: "Búnker 01", tipo: "pavimentos" },
+      { id: "bk_02", nombre: "Búnker 02", tipo: "pavimentos" },
+      { id: "bk_03", nombre: "Búnker 03", tipo: "pavimentos" },
+      { id: "bk_04", nombre: "Búnker 04", tipo: "pavimentos" },
+      { id: "bk_05", nombre: "Búnker 05", tipo: "pavimentos" },
+      // ── OTRAS SUPERFICIES ────────────────────────────────────────
       { id: "antegreen_golf", nombre: "Ante-greens", tipo: "cesped" },
       { id: "lomas_golf", nombre: "Lomas", tipo: "cesped" },
+      { id: "rough_golf", nombre: "Rough", tipo: "cesped" },
+      { id: "e1", nombre: "Fairways (zona general)", tipo: "cesped" },
+      // ── VEGETACIÓN ───────────────────────────────────────────────
+      { id: "arboles_golf", nombre: "Árboles y arboledas", tipo: "arboles" },
+      { id: "arbustos_golf", nombre: "Arbustos decorativos", tipo: "arbustos" },
       { id: "macizos_golf", nombre: "Macizos (acceso/interior/exterior)", tipo: "arbustos" },
+      // ── INFRAESTRUCTURA ──────────────────────────────────────────
+      { id: "caminos_golf", nombre: "Caminos carros golf", tipo: "pavimentos" },
       { id: "isla_golf", nombre: "Isla de Arena", tipo: "pavimentos" },
       { id: "jaula_golf", nombre: "Jaula de práctica", tipo: "infraestructura" },
-      // Vegetación y otros
-      { id: "e5", nombre: "Árboles y arboledas", tipo: "arboles" },
-      { id: "e6", nombre: "Arbustos decorativos", tipo: "arbustos" },
       { id: "e7", nombre: "Banderines y hoyos", tipo: "infraestructura" },
-      { id: "e8", nombre: "Sistema de riego", tipo: "sistemas" },
-      { id: "e9", nombre: "Caminos carros golf", tipo: "pavimentos" },
       { id: "e10", nombre: "Luminarias perimetrales", tipo: "infraestructura" },
-      // Infraestructura Golf
+      { id: "e8", nombre: "Sistema de riego", tipo: "sistemas" },
       { id: "estanque_golf", nombre: "Estanque de agua", tipo: "sistemas" },
       { id: "caseta_bomba", nombre: "Caseta de bombas", tipo: "infraestructura" },
       { id: "sala_maquinas", nombre: "Sala de máquinas Golf", tipo: "infraestructura" },
@@ -1138,10 +1185,10 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
       else if(t.estado==="no_pudo") porTrab[n].noPudo++;
       else porTrab[n].pend++;
       const hpZona=t.zona||"Sin zona";
-      if(!porZona[z]) porZona[z]={total:0,hechas:0,noPudo:0,tareas:[]};
-      porZona[z].total++; if(esHecha(t)) porZona[z].hechas++;
-      else if(t.estado==="no_pudo") porZona[z].noPudo++;
-      porZona[z].tareas.push(t);
+      if(!porZona[hpZona]) porZona[hpZona]={total:0,hechas:0,noPudo:0,tareas:[]};
+      porZona[hpZona].total++; if(esHecha(t)) porZona[hpZona].hechas++;
+      else if(t.estado==="no_pudo") porZona[hpZona].noPudo++;
+      porZona[hpZona].tareas.push(t);
       const zonaObj=MACROZONAS_BASE.find(z2=>z2.nombre===t.zona);
       const cat=zonaObj?.categoria||t.zona||"Sin categoría";
       if(!porCategoria[cat]) porCategoria[cat]={total:0,hechas:0,noPudo:0,tareas:[]};
@@ -1166,11 +1213,11 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
 
   const tareasDeportes = todasTareas.filter(t=>{
     const hpZ=MACROZONAS_BASE.find(z2=>z2.nombre===t.zona);
-    return z&&IDS_DEPORTES.includes(z.id);
+    return hpZ&&IDS_DEPORTES.includes(hpZ.id);
   });
   const tareasGeneral = todasTareas.filter(t=>{
     const hpZ=MACROZONAS_BASE.find(z2=>z2.nombre===t.zona);
-    return !z||IDS_GENERAL.includes(z.id);
+    return !hpZ||IDS_GENERAL.includes(hpZ.id);
   });
   const statsDeportes=calcStats(tareasDeportes), statsGeneral=calcStats(tareasGeneral), statsTotal=calcStats(todasTareas);
   const incFitoPeriodo=incidenciasFito.filter(i=>i.fecha>=(dias[0]||"")&&i.fecha<=(dias[dias.length-1]||""));
@@ -1609,14 +1656,14 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
               </tr></thead>
               <tbody>
                 {Object.entries(statsTotal.porTrab).sort((a,b)=>b[1].hechas-a[1].hechas).map(([n,d],i)=>{
-                  const hpPct=hpD.total?Math.round(hpD.hechas/d.total*100):0;
+                  const hpPct=d.total?Math.round(d.hechas/d.total*100):0;
                   return (<tr key={n} style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
                     <td style={{padding:"4px 8px",fontWeight:600,color:"#ede9e0"}}>{n}</td>
                     <td style={{padding:"4px",textAlign:"center",color:"#5a9a7a"}}>{d.total}</td>
                     <td style={{padding:"4px",textAlign:"center",color:"#22c55e",fontWeight:600}}>{d.hechas}</td>
                     <td style={{padding:"4px",textAlign:"center",color:d.noPudo>0?"#ef4444":"#4a7a5a"}}>{d.noPudo||"—"}</td>
                     <td style={{padding:"4px",textAlign:"center",color:d.pend>0?"#f59e0b":"#4a7a5a"}}>{d.pend||"—"}</td>
-                    <td style={{padding:"4px",textAlign:"center",fontWeight:700,color:p>=80?"#22c55e":p>=50?"#f59e0b":"#ef4444"}}>{p}%</td>
+                    <td style={{padding:"4px",textAlign:"center",fontWeight:700,color:hpPct>=80?"#22c55e":hpPct>=50?"#f59e0b":"#ef4444"}}>{hpPct}%</td>
                   </tr>);
                 })}
               </tbody>
@@ -1690,11 +1737,11 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
   };
 
   // Opciones únicas para filtros
-  const allTareas = Object.values(tareas).flat().filter(t => (t.zona||"") !== "Golf");
-  const todasTareas = [...new Set(allTareas.map(t=>t.tarea))].sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
+  const allTareas = Object.values(tareas).flat().filter(t => (hpTask.zona||"") !== "Golf");
+  const todasTareas = [...new Set(allTareas.map(t=>hpTask.tarea))].sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
   // Excluir tareas de Golf del programa general (Golf tiene su propio módulo)
   const allTareasSinGolf = allTareas; // ya excluye Golf
-  const todasZonas  = [...new Set(allTareasSinGolf.map(t=>t.zona).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
+  const todasZonas  = [...new Set(allTareasSinGolf.map(t=>hpTask.zona).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
 
   const diasOrdenados = Object.keys(tareas)
     .filter(dKey => (tareas[dKey]||[]).length > 0)
@@ -1757,7 +1804,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
           const estCls = ["hecha","completada"].includes(hpTask.estado)?"est-ok":hpTask.estado==="no_pudo"?"est-bad":["haciendose","en_curso"].includes(hpTask.estado)?"est-blue":["pendiente"].includes(hpTask.estado)?"est-pend":"est-gray";
           const estLabel = EC[hpTask.estado]?.label || hpTask.estado;
           const icono = MACROZONAS_BASE.find(z=>z.nombre===hpTask.zona)?.icono||""
-          return '<tr>'+'<td class="'+estCls+'">'+( EC[hpTask.estado]?.icon||"-")+" "+estLabel+"</td>"+'<td><b>'+hpTask.tarea+'</b></td>'+'<td>'+(t.elemento||"-")+"</td>"+'<td>'+icono+" "+(hpTask.zona||"-")+"</td>"+'<td>'+(hpTask.responsable||"<i>Sin asignar</i>")+"</td>"+'<td>'+(t.notaWorker?"⚠️ "+t.notaWorker:"-")+"</td>"+'</tr>';
+          return '<tr>'+'<td class="'+estCls+'">'+( EC[hpTask.estado]?.icon||"-")+" "+estLabel+"</td>"+'<td><b>'+hpTask.tarea+'</b></td>'+'<td>'+(hpTask.elemento||"-")+"</td>"+'<td>'+icono+" "+(hpTask.zona||"-")+"</td>"+'<td>'+(hpTask.responsable||"<i>Sin asignar</i>")+"</td>"+'<td>'+(hpTask.notaWorker?"⚠️ "+hpTask.notaWorker:"-")+"</td>"+'</tr>';
         }).join("")}
       </tbody>
     </table>
@@ -1925,7 +1972,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
                       <span style={{color:"#ede9e0",flex:1}}>{hpTask.tarea}</span>
                       <span style={{color:"#5a9a7a"}}>{hpTask.zona}</span>
                       <span style={{color:"#9ca3af"}}>{hpTask.responsable||""}</span>
-                      {t.notas&&<span style={{color:"#4a7a5a",fontStyle:"italic",fontSize:10}}>{t.notas}</span>}
+                      {hpTask.notas&&<span style={{color:"#4a7a5a",fontStyle:"italic",fontSize:10}}>{hpTask.notas}</span>}
                     </div>
                   ))}
                 </div>
@@ -2050,7 +2097,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginBottom:2}}>
                         <span style={{fontSize:13,fontWeight:600}}>{hpTask.tarea}</span>
-                        {t.elemento&&<span style={{fontSize:11,color:"#5a8a6a",background:"rgba(255,255,255,0.05)",padding:"1px 6px",borderRadius:6}}>{t.elemento}</span>}
+                        {hpTask.elemento&&<span style={{fontSize:11,color:"#5a8a6a",background:"rgba(255,255,255,0.05)",padding:"1px 6px",borderRadius:6}}>{hpTask.elemento}</span>}
                         {(()=>{
                           const resp=hpTask.responsable||"";
                           const key=`${d}_${resp.split(" ")[0]?.toLowerCase()||""}`;
@@ -2062,8 +2109,8 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
                         <span style={{fontSize:11,color:"#5a7a7a"}}>{MACROZONAS_BASE.find(z=>z.nombre===hpTask.zona)?.icono||""} {hpTask.zona}</span>
                         {hpTask.responsable&&<span style={{fontSize:11,color:"#7a9a8a"}}>👤 {hpTask.responsable}</span>}
                       </div>
-                      {t.notaWorker&&<div style={{fontSize:11,color:hpTask.estado==="no_pudo"?"#f87171":"#a0c8a0",marginTop:3,fontStyle:"italic"}}>💬 {t.notaWorker}</div>}
-                      {t.notaJefa&&<div style={{fontSize:10,color:"#fbbf24",marginTop:2,fontStyle:"italic"}}>📋 Revisión jefa: {t.notaJefa}</div>}
+                      {hpTask.notaWorker&&<div style={{fontSize:11,color:hpTask.estado==="no_pudo"?"#f87171":"#a0c8a0",marginTop:3,fontStyle:"italic"}}>💬 {hpTask.notaWorker}</div>}
+                      {hpTask.notaJefa&&<div style={{fontSize:10,color:"#fbbf24",marginTop:2,fontStyle:"italic"}}>📋 Revisión jefa: {hpTask.notaJefa}</div>}
                       {esJefa&&(
                         <div style={{marginTop:6,display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
                           <select value={hpTask.estado}
@@ -2075,7 +2122,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
                             {Object.entries(EC).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
                           </select>
                           <input placeholder="Nota de revisión..."
-                            value={t.notaJefa||""}
+                            value={hpTask.notaJefa||""}
                             onChange={e=>{
                               const nA=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
                               setTareas(prev=>({...prev,[d]:nA(prev[d]).map(x=>x.id===hpTask.id?{...x,notaJefa:e.target.value}:x)}));
@@ -2175,11 +2222,11 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
                                 <span style={{fontSize:12,flexShrink:0}}>{est.icon}</span>
                                 <div style={{flex:1,minWidth:0}}>
                                   <div style={{fontSize:12,fontWeight:600}}>{(hpTask.tarea||"").replace("⛳ ","")}</div>
-                                  {hpTask.zona&&<div style={{fontSize:10,color:"#5a7a7a"}}>📍 {hpTask.zona}{t.elemento?` · ${t.elemento}`:""}</div>}
-                                  {t.alturaCorte&&<div style={{fontSize:10,color:"#fbbf24"}}>✂️ HOC indicada: {t.alturaCorte}mm</div>}
-                                  {t.alturaCorteReal&&<div style={{fontSize:10,color:"#22c55e",fontWeight:600}}>✂️ HOC real: {t.alturaCorteReal}mm</div>}
-                                  {t.notaWorker&&<div style={{fontSize:10,color:hpTask.estado==="no_pudo"?"#f87171":"#a0c8a0",fontStyle:"italic"}}>💬 {t.notaWorker}</div>}
-                                  {t.notaJefa&&<div style={{fontSize:10,color:"#fbbf24",fontStyle:"italic"}}>📋 {t.notaJefa}</div>}
+                                  {hpTask.zona&&<div style={{fontSize:10,color:"#5a7a7a"}}>📍 {hpTask.zona}{hpTask.elemento?` · ${hpTask.elemento}`:""}</div>}
+                                  {hpTask.alturaCorte&&<div style={{fontSize:10,color:"#fbbf24"}}>✂️ HOC indicada: {hpTask.alturaCorte}mm</div>}
+                                  {hpTask.alturaCorteReal&&<div style={{fontSize:10,color:"#22c55e",fontWeight:600}}>✂️ HOC real: {hpTask.alturaCorteReal}mm</div>}
+                                  {hpTask.notaWorker&&<div style={{fontSize:10,color:hpTask.estado==="no_pudo"?"#f87171":"#a0c8a0",fontStyle:"italic"}}>💬 {hpTask.notaWorker}</div>}
+                                  {hpTask.notaJefa&&<div style={{fontSize:10,color:"#fbbf24",fontStyle:"italic"}}>📋 {hpTask.notaJefa}</div>}
                                 </div>
                                 <div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
                                   <select value={hpTask.estado}
@@ -2187,8 +2234,8 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
                                     style={{fontSize:10,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:5,color:"#ede9e0",padding:"2px 3px",cursor:"pointer"}}>
                                     {Object.entries(EC).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
                                   </select>
-                                  <input placeholder="nota..." defaultValue={t.notaJefa||""}
-                                    onBlur={e=>{if(e.target.value!==t.notaJefa){const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);setTareas(prev=>({...prev,[dia]:nA2(prev[dia]).map(x=>x.id===hpTask.id?{...x,notaJefa:e.target.value}:x)}));}}}
+                                  <input placeholder="nota..." defaultValue={hpTask.notaJefa||""}
+                                    onBlur={e=>{if(e.target.value!==hpTask.notaJefa){const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);setTareas(prev=>({...prev,[dia]:nA2(prev[dia]).map(x=>x.id===hpTask.id?{...x,notaJefa:e.target.value}:x)}));}}}
                                     style={{fontSize:10,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:5,color:"#ede9e0",padding:"2px 4px",width:90}}/>
                                   <button onClick={()=>{if(window.confirm(`¿Eliminar "${(hpTask.tarea||"").replace("⛳ ","")}"?`)){const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);setTareas(prev=>({...prev,[dia]:nA2(prev[dia]).filter(x=>x.id!==hpTask.id)}));}}}
                                     style={{cursor:"pointer",border:"1px solid rgba(239,68,68,0.2)",borderRadius:5,padding:"1px 5px",background:"rgba(239,68,68,0.06)",color:"#f87171",fontSize:10}}>🗑</button>
@@ -2237,12 +2284,10 @@ function ConfiguradorSemanal({ S, personal, configSemanal, setConfigSemanal, esJ
   };
 
   const semana = (() => {
-    const hoy = new Date();
-    const dow = hoy.getDay(); // 0=dom, 1=lun ... 6=sab
-    // Días hasta el próximo lunes
-    const diasAlLunes = dow === 1 ? 7 : dow === 0 ? 1 : (8 - dow);
-    const lun = new Date(hoy);
-    lun.setDate(hoy.getDate() + diasAlLunes);
+    const base = new Date(fechaLocal()+"T12:00:00");
+    const dow = base.getDay();
+    const lun = new Date(base);
+    lun.setDate(base.getDate() - ((dow+6)%7));
     const sab = new Date(lun); sab.setDate(lun.getDate()+5);
     const fmt = d => d.toLocaleDateString("es-CL",{day:"2-digit",month:"short"});
     return `Semana ${fmt(lun)} – ${fmt(sab)}`;
@@ -2303,63 +2348,35 @@ function ConfiguradorSemanal({ S, personal, configSemanal, setConfigSemanal, esJ
 }
 
 // Función global para obtener el responsable por defecto según tipo de tarea
-const getResponsablePorTipo = (tarea, configSemanal) => {
+const getResponsablePorTipo = (tarea, configSemanal, zona) => {
   const t = (tarea||"").toLowerCase();
+  const z = (zona||"").toLowerCase();
+  // Golf → siempre Bhalú
+  if(z.includes("golf")||t.includes("golf")||t.includes("green")||t.includes("green")||t.includes("tee")||t.includes("fairway")||t.includes("bunker"))
+    return configSemanal?.corte_golf||"Osmar Bhalú Armijo Zúñiga";
   if(t.includes("corte")&&(t.includes("golf")||t.includes("green"))) return configSemanal?.corte_golf||"Osmar Bhalú Armijo Zúñiga";
-  if(t.includes("corte")&&t.includes("tractor")) return configSemanal?.corte_tractor||"";
+  if(t.includes("corte")&&(t.includes("tractor")||t.includes("mz")||t.includes("ts"))) return configSemanal?.corte_tractor||"";
+  if(t.includes("corte")) return configSemanal?.corte_tractor||"";
   if(t.includes("orill")) return configSemanal?.orillado||"";
-  if(t.includes("riego")) return configSemanal?.riego||"";
-  if(t.includes("pesticida")||t.includes("fungicida")||t.includes("fumigac")) return configSemanal?.pesticidas||"";
-  if(t.includes("poda")||t.includes("arbust")) return configSemanal?.poda||"";
-  if(t.includes("siembra")||t.includes("trasplante")) return configSemanal?.siembra||"";
-  if(t.includes("limpieza")) return configSemanal?.limpieza||"";
-  if(t.includes("árbol")||t.includes("arbol")||t.includes("poda árbol")) return configSemanal?.arboles||"";
+  if(t.includes("riego")||t.includes("regar")||t.includes("syringing")||t.includes("fertirriego")) return configSemanal?.riego||"";
+  if(t.includes("pesticida")||t.includes("fungicida")||t.includes("fumigac")||t.includes("herbicida")||t.includes("fitosanit")) return configSemanal?.pesticidas||"";
+  if(t.includes("poda")||t.includes("arbust")||t.includes("árbol")||t.includes("arbol")) return configSemanal?.poda||"";
+  if(t.includes("siembra")||t.includes("trasplante")||t.includes("plantar")||t.includes("vivero")) return configSemanal?.siembra||"";
+  if(t.includes("limpieza")||t.includes("limpiar")||t.includes("barrido")||t.includes("soplad")) return configSemanal?.limpieza||"";
+  if(t.includes("fertil")||t.includes("abono")||t.includes("novatec")||t.includes("salitre")) return configSemanal?.pesticidas||"";
   return "";
 };
 
 
 // ─── TAREAS DIARIAS GOLF (rutinas que Bhalú hace todos los días) ──────────────
 const TAREAS_DIARIAS_GOLF = [
-  {
-    id: "tdg_limpieza_greens",
-    tarea: "Limpieza de rines/hojas",
-    categoria: "limpieza",
-    icon: "🧹",
-    subzonas: [
-      "Green 01","Green 02","Green 03","Green 04","Green 05",
-      "Green 06","Green 07","Green 08","Green 09","Vivero"
-    ],
-    responsable: "Osmar Bhalú Armijo Zúñiga",
-    obs: "Barrer hojas, ramas, restos de corte. Revisar estado general del green."
-  },
-  {
-    id: "tdg_limpieza_tees",
-    tarea: "Limpieza de tees",
-    categoria: "limpieza",
-    icon: "🧹",
-    subzonas: ["Tee 01","Tee 02","Tee 03","Tee 04","Tee 05","Tee 06","Tee 07","Tee 08","Tee 09"],
-    responsable: "Osmar Bhalú Armijo Zúñiga",
-    obs: "Limpiar superficies, retirar residuos, revisar divisores."
-  },
-  {
-    id: "tdg_bandera_hoyo",
-    tarea: "Rotación de banderas y hoyos",
-    categoria: "revision",
-    icon: "🚩",
-    subzonas: ["Todos los greens"],
-    responsable: "Osmar Bhalú Armijo Zúñiga",
-    obs: "Rotar posición del hoyo según pauta semanal."
-  },
-  {
-    id: "tdg_revision_general",
-    tarea: "Revisión estado general cancha",
-    categoria: "revision",
-    icon: "🔍",
-    subzonas: ["Cancha Golf completa"],
-    responsable: "Osmar Bhalú Armijo Zúñiga",
-    obs: "Recorrido general: daños, plagas visibles, riego irregular."
-  },
+  { id:"tdg_1", tarea:"Limpieza Tee 01",                          icon:"🧹", obs:"" },
+  { id:"tdg_2", tarea:"Revisión estado general greens (visual)",   icon:"🔍", obs:"Recorrido visual de los greens" },
+  { id:"tdg_4", tarea:"Revisión estado fitosanitario",             icon:"🦠", obs:"Buscar signos de plagas o enfermedades" },
+  { id:"tdg_5", tarea:"Soplado/Barrido",                           icon:"💨", obs:"Limpiar hojas y residuos de greens" },
+  { id:"tdg_6", tarea:"Pediluvios — llenado y revisión",           icon:"🪣", obs:"Verificar nivel y cambiar si corresponde" },
 ];
+// Nota: "Revisión humedad greens" tiene frecuencia semanal — aparece en Programación, no en rutinas diarias
 
 
 // ─── FRECUENCIAS INICIALES GOLF (se cargan si el elemento no tiene frecuencias en Firebase) ──
@@ -2498,7 +2515,146 @@ const GOLF_FRECS_INIT = {
   e8: [
     { id:"e8_rev",      tarea:"Revisión sistema riego",     modo:"estacion", verano:"quincenal", otono:"quincenal", invierno:"quincenal",   primavera:"quincenal", ultimaVez:"2026-06-06", obs:"Verificar señal, alcances" },
   ],
+  "tee_01a": [
+    { id:"tee_01a_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_01a_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_01b": [
+    { id:"tee_01b_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_01b_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_02a": [
+    { id:"tee_02a_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_02a_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_02b": [
+    { id:"tee_02b_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_02b_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_03a": [
+    { id:"tee_03a_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_03a_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_03b": [
+    { id:"tee_03b_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_03b_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_04a": [
+    { id:"tee_04a_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_04a_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_04b": [
+    { id:"tee_04b_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_04b_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_05a": [
+    { id:"tee_05a_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_05a_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_05b": [
+    { id:"tee_05b_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_05b_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_06a": [
+    { id:"tee_06a_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_06a_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_06b": [
+    { id:"tee_06b_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_06b_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_07a": [
+    { id:"tee_07a_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_07a_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_07b": [
+    { id:"tee_07b_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_07b_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_08a": [
+    { id:"tee_08a_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_08a_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_08b": [
+    { id:"tee_08b_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_08b_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_09a": [
+    { id:"tee_09a_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_09a_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "tee_09b": [
+    { id:"tee_09b_corte",    tarea:"Corte",      modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"semanal",   primavera:"cada3dias", ultimaVez:"2026-07-01" },
+    { id:"tee_09b_limpieza", tarea:"Limpieza",   modo:"estacion", verano:"diario",   otono:"cada3dias", invierno:"cada5dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+  ],
+  "fw_01": [
+    { id:"fw_01_corte",   tarea:"Corte",        modo:"estacion", verano:"semanal",   otono:"quincenal", invierno:"mensual",  primavera:"semanal",   ultimaVez:"2026-07-07" },
+    { id:"fw_01_riego",   tarea:"Riego",         modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"noaplica", primavera:"cada3dias", ultimaVez:"2026-07-14" },
+    { id:"fw_01_fertil",  tarea:"Fertilización", modo:"estacion", verano:"mensual",   otono:"bimestral", invierno:"noaplica", primavera:"mensual",   ultimaVez:"2026-06-01" },
+  ],
+  "fw_02": [
+    { id:"fw_02_corte",   tarea:"Corte",        modo:"estacion", verano:"semanal",   otono:"quincenal", invierno:"mensual",  primavera:"semanal",   ultimaVez:"2026-07-07" },
+    { id:"fw_02_riego",   tarea:"Riego",         modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"noaplica", primavera:"cada3dias", ultimaVez:"2026-07-14" },
+    { id:"fw_02_fertil",  tarea:"Fertilización", modo:"estacion", verano:"mensual",   otono:"bimestral", invierno:"noaplica", primavera:"mensual",   ultimaVez:"2026-06-01" },
+  ],
+  "fw_03": [
+    { id:"fw_03_corte",   tarea:"Corte",        modo:"estacion", verano:"semanal",   otono:"quincenal", invierno:"mensual",  primavera:"semanal",   ultimaVez:"2026-07-07" },
+    { id:"fw_03_riego",   tarea:"Riego",         modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"noaplica", primavera:"cada3dias", ultimaVez:"2026-07-14" },
+    { id:"fw_03_fertil",  tarea:"Fertilización", modo:"estacion", verano:"mensual",   otono:"bimestral", invierno:"noaplica", primavera:"mensual",   ultimaVez:"2026-06-01" },
+  ],
+  "fw_04": [
+    { id:"fw_04_corte",   tarea:"Corte",        modo:"estacion", verano:"semanal",   otono:"quincenal", invierno:"mensual",  primavera:"semanal",   ultimaVez:"2026-07-07" },
+    { id:"fw_04_riego",   tarea:"Riego",         modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"noaplica", primavera:"cada3dias", ultimaVez:"2026-07-14" },
+    { id:"fw_04_fertil",  tarea:"Fertilización", modo:"estacion", verano:"mensual",   otono:"bimestral", invierno:"noaplica", primavera:"mensual",   ultimaVez:"2026-06-01" },
+  ],
+  "fw_05": [
+    { id:"fw_05_corte",   tarea:"Corte",        modo:"estacion", verano:"semanal",   otono:"quincenal", invierno:"mensual",  primavera:"semanal",   ultimaVez:"2026-07-07" },
+    { id:"fw_05_riego",   tarea:"Riego",         modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"noaplica", primavera:"cada3dias", ultimaVez:"2026-07-14" },
+    { id:"fw_05_fertil",  tarea:"Fertilización", modo:"estacion", verano:"mensual",   otono:"bimestral", invierno:"noaplica", primavera:"mensual",   ultimaVez:"2026-06-01" },
+  ],
+  "fw_06": [
+    { id:"fw_06_corte",   tarea:"Corte",        modo:"estacion", verano:"semanal",   otono:"quincenal", invierno:"mensual",  primavera:"semanal",   ultimaVez:"2026-07-07" },
+    { id:"fw_06_riego",   tarea:"Riego",         modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"noaplica", primavera:"cada3dias", ultimaVez:"2026-07-14" },
+    { id:"fw_06_fertil",  tarea:"Fertilización", modo:"estacion", verano:"mensual",   otono:"bimestral", invierno:"noaplica", primavera:"mensual",   ultimaVez:"2026-06-01" },
+  ],
+  "fw_07": [
+    { id:"fw_07_corte",   tarea:"Corte",        modo:"estacion", verano:"semanal",   otono:"quincenal", invierno:"mensual",  primavera:"semanal",   ultimaVez:"2026-07-07" },
+    { id:"fw_07_riego",   tarea:"Riego",         modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"noaplica", primavera:"cada3dias", ultimaVez:"2026-07-14" },
+    { id:"fw_07_fertil",  tarea:"Fertilización", modo:"estacion", verano:"mensual",   otono:"bimestral", invierno:"noaplica", primavera:"mensual",   ultimaVez:"2026-06-01" },
+  ],
+  "fw_08": [
+    { id:"fw_08_corte",   tarea:"Corte",        modo:"estacion", verano:"semanal",   otono:"quincenal", invierno:"mensual",  primavera:"semanal",   ultimaVez:"2026-07-07" },
+    { id:"fw_08_riego",   tarea:"Riego",         modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"noaplica", primavera:"cada3dias", ultimaVez:"2026-07-14" },
+    { id:"fw_08_fertil",  tarea:"Fertilización", modo:"estacion", verano:"mensual",   otono:"bimestral", invierno:"noaplica", primavera:"mensual",   ultimaVez:"2026-06-01" },
+  ],
+  "fw_09": [
+    { id:"fw_09_corte",   tarea:"Corte",        modo:"estacion", verano:"semanal",   otono:"quincenal", invierno:"mensual",  primavera:"semanal",   ultimaVez:"2026-07-07" },
+    { id:"fw_09_riego",   tarea:"Riego",         modo:"estacion", verano:"cada2dias", otono:"cada5dias", invierno:"noaplica", primavera:"cada3dias", ultimaVez:"2026-07-14" },
+    { id:"fw_09_fertil",  tarea:"Fertilización", modo:"estacion", verano:"mensual",   otono:"bimestral", invierno:"noaplica", primavera:"mensual",   ultimaVez:"2026-06-01" },
+  ],
+  "bk_01": [
+    { id:"bk_01_rastrillado", tarea:"Rastrillado de arena", modo:"estacion", verano:"diario", otono:"cada2dias", invierno:"cada3dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+    { id:"bk_01_limpieza",   tarea:"Limpieza bordes",      modo:"estacion", verano:"semanal", otono:"quincenal", invierno:"mensual",   primavera:"semanal",  ultimaVez:"2026-07-07" },
+  ],
+  "bk_02": [
+    { id:"bk_02_rastrillado", tarea:"Rastrillado de arena", modo:"estacion", verano:"diario", otono:"cada2dias", invierno:"cada3dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+    { id:"bk_02_limpieza",   tarea:"Limpieza bordes",      modo:"estacion", verano:"semanal", otono:"quincenal", invierno:"mensual",   primavera:"semanal",  ultimaVez:"2026-07-07" },
+  ],
+  "bk_03": [
+    { id:"bk_03_rastrillado", tarea:"Rastrillado de arena", modo:"estacion", verano:"diario", otono:"cada2dias", invierno:"cada3dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+    { id:"bk_03_limpieza",   tarea:"Limpieza bordes",      modo:"estacion", verano:"semanal", otono:"quincenal", invierno:"mensual",   primavera:"semanal",  ultimaVez:"2026-07-07" },
+  ],
+  "bk_04": [
+    { id:"bk_04_rastrillado", tarea:"Rastrillado de arena", modo:"estacion", verano:"diario", otono:"cada2dias", invierno:"cada3dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+    { id:"bk_04_limpieza",   tarea:"Limpieza bordes",      modo:"estacion", verano:"semanal", otono:"quincenal", invierno:"mensual",   primavera:"semanal",  ultimaVez:"2026-07-07" },
+  ],
+  "bk_05": [
+    { id:"bk_05_rastrillado", tarea:"Rastrillado de arena", modo:"estacion", verano:"diario", otono:"cada2dias", invierno:"cada3dias", primavera:"cada2dias", ultimaVez:"2026-07-14" },
+    { id:"bk_05_limpieza",   tarea:"Limpieza bordes",      modo:"estacion", verano:"semanal", otono:"quincenal", invierno:"mensual",   primavera:"semanal",  ultimaVez:"2026-07-07" },
+  ],
+
 };
+
 
 // Hook para inicializar frecuencias Golf si no existen en Firebase
 // useInitGolfFrecs movido a App
@@ -2506,25 +2662,30 @@ const GOLF_FRECS_INIT = {
 
 // ─── PROGRAMACIÓN DIARIA ─────────────────────────────────────────────────────
 // ─── VISTA TRABAJADOR ────────────────────────────────────────────────────────
-function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE, onAccesoRapido, onCambiarMetodo, cierresTurno={}, onCerrarTurno, onReabrirTurno, esJefaApp=false }) {
+function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE, onAccesoRapido, onCambiarMetodo, cierresTurno={}, onCerrarTurno, onReabrirTurno, crearNotificacion, esJefaApp=false, onGuardarRutinas, onGuardarAlertaFito }) {
   const hoy = fechaLocal();
   const [fechaVer, setFechaVer] = React.useState(fecha || hoy);
   // Cierre de turno
   const turnoCerradoKey = `${fechaVer}_${(trabajador?.nombre||"").split(" ")[0].toLowerCase()}`;
   const turnoCerrado = (cierresTurno||{})[turnoCerradoKey] || null;
   const puedeEditar = !turnoCerrado || esJefaApp;
+  const [showNuevaTareaEmerg, setShowNuevaTareaEmerg] = React.useState(false);
   const [nuevaTareaEmerg, setNuevaTareaEmerg] = React.useState({ zona:"", tarea:"", notas:"" });
   // Estado de grupos colapsables — objeto {key: bool}
-  const [gruposAbiertos, setGruposAbiertos] = React.useState({rutinas_golf:true,diarias:true,corte:true,medicion:true,riego:true,fitosan:true,limpieza:true,otros:true});
-  // Estado de subzonas por tarea diaria Golf: {tdg_id: {subzona: "hecha"|"no_pudo"|null, obs: string}}
+  const [gruposAbiertos, setGruposAbiertos] = React.useState({diarias:true});
+  const [alturaInputs, setAlturaInputs] = React.useState({});
   const [rutinasGolfState, setRutinasGolfState] = React.useState({});
   const toggleGrupo = (key) => setGruposAbiertos(p=>({...p,[key]:!p[key]}));
+  const abrirGrupo = (key) => setGruposAbiertos(p=>{
+    const ya = p[key]===true;
+    // Cerrar todos y abrir/cerrar el clickeado
+    return {diarias:p.diarias, [key]:!ya};
+  });
   const [showRegistroDiarioWorker, setShowRegistroDiarioWorker] = React.useState(true);
   const [showEmergente, setShowEmergente] = React.useState(false);
   const [emergenteForm, setEmergenteForm] = React.useState({zona:"",tarea:"",obs:""}); // abierto por defecto
   const [registroDiarioForm, setRegistroDiarioForm] = React.useState({tareas:{}, obsFito:"", obs:""});
-
-    const ESTADOS_TAREA = ESTADOS_TAREA_GLOBAL;
+  const ESTADOS_TAREA = ESTADOS_TAREA_GLOBAL;
 
   const getTareasDeZona = (nombreZona) => {
     const zona = MACROZONAS_BASE.find(z=>z.nombre===nombreZona);
@@ -2538,16 +2699,18 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   };
 
   const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
-  const ORDEN_ESTADO = {por_designar:0, pendiente:1, en_curso:2, haciendose:2, no_pudo:3, cancelada:3, hecha:4, completada:4};
+  const ORDEN_ESTADO = {pendiente:0, haciendose:1, no_pudo:2, hecha:3, por_designar:4};
   function esDiariaVW(tareaObj) {
     if(tareaObj.diaria === true) return true;
     const nombreED = (tareaObj.tarea||"").toLowerCase();
     const keywordsED = [
       "limpieza tee","limpieza —","revisión estado general",
-      "soplado","barrido","pediluvios",
-      "limpieza general","riego manual","orden y limpieza","registro diario"
+      "revisión estado fitosanitario","soplado/barrido","pediluvios",
+      "orden y limpieza","registro diario"
     ];
-    // NOTA: "revisión humedad greens" NO es diaria — tiene frecuencia semanal
+    // EXCLUIDOS intencionalmente: "riego manual" (no es diaria), "revisión humedad greens" (frecuencia semanal)
+    // Las rutinas de Golf (TAREAS_DIARIAS_GOLF) se muestran en sección separada — no duplicar
+    if(TAREAS_DIARIAS_GOLF.some(tg=>tg.tarea.toLowerCase()===(tareaObj.tarea||"").toLowerCase())) return false;
     for(let edI=0;edI<keywordsED.length;edI++){
       if(nombreED.includes(keywordsED[edI])) return true;
     }
@@ -2573,7 +2736,17 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
     if(utcStr!==fechaVer){
       normDia(tareas[utcStr]||[]).forEach(t=>{if(!combinadas.find(x=>String(x.id)===String(t.id)))combinadas.push(t);});
     }
-    return combinadas.filter(t => t.responsable && normalizar(t.responsable) === normalizar(trabajador?.nombre||""));
+    const nombreTrab = normalizar(trabajador?.nombre||"");
+    const resultado = combinadas.filter(t => {
+      if(!t.responsable) return false;
+      const normResp = normalizar(t.responsable);
+      if(normResp===nombreTrab) return true;
+      // Compatibilidad: Bhalu puede estar guardado con acento o sin él
+      if(nombreTrab.includes("bhalu")&&normResp.includes("bhalu")) return true;
+      if(nombreTrab.includes("bhalu")&&normResp.includes("osmar")) return true;
+      if(normResp.includes("bhalu")&&nombreTrab.includes("osmar")) return true;
+      return false;
+    });
   }, [tareas, fechaVer, trabajador]
   );
   const misTareasDiarias  = React.useMemo(()=>sortTareas(todasMisTareas.filter(t=>esDiaria(t))),[todasMisTareas]);
@@ -2677,92 +2850,102 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
         {/* ══════════════════════════════════════════════════════════
              SECCIÓN 1 — TAREAS DIARIAS (con observaciones integradas)
              ══════════════════════════════════════════════════════════ */}
-        {/* ── RUTINAS DIARIAS GOLF (solo para Bhalú) ── */}
-        {(trabajador?.nombre||"").toLowerCase().includes("bhalú")||(trabajador?.nombre||"").toLowerCase().includes("bhalu")||trabajador?.id===1004?(<>
-          {TAREAS_DIARIAS_GOLF.map(tarea=>{
-            const estado = rutinasGolfState[tarea.id] || {};
-            const todasHechas = tarea.subzonas.every(sz=>estado[sz]==="hecha");
-            const alguna_nopudo = tarea.subzonas.some(sz=>estado[sz]==="no_pudo");
-            const open = gruposAbiertos["rg_"+tarea.id]!==false;
-
-            const marcarSubzona = (sz, est) => {
-              setRutinasGolfState(prev=>({
-                ...prev,
-                [tarea.id]: {...(prev[tarea.id]||{}), [sz]: est}
-              }));
-            };
-            const marcarTodas = (est) => {
-              const nuevo = {};
-              tarea.subzonas.forEach(sz=>{ nuevo[sz]=est; });
-              setRutinasGolfState(prev=>({...prev, [tarea.id]: nuevo}));
-            };
-
-            return (
-              <div key={tarea.id} style={{marginBottom:10,border:`1px solid ${todasHechas?"rgba(34,197,94,0.3)":alguna_nopudo?"rgba(239,68,68,0.2)":"rgba(52,211,153,0.15)"}`,borderRadius:12,overflow:"hidden"}}>
-                {/* Header */}
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 14px",background:todasHechas?"rgba(34,197,94,0.08)":"rgba(52,211,153,0.05)",cursor:"pointer"}}
-                  onClick={()=>setGruposAbiertos(p=>({...p,["rg_"+tarea.id]:!open}))}>
-                  <div style={{display:"flex",alignItems:"center",gap:8}}>
-                    <span style={{fontSize:16}}>{tarea.icon}</span>
-                    <div>
-                      <div style={{fontSize:13,fontWeight:700,color:todasHechas?"#22c55e":"#34d399"}}>{tarea.tarea}</div>
-                      <div style={{fontSize:10,color:"#5a9a7a"}}>
-                        {todasHechas?"✅ Completado":tarea.subzonas.filter(sz=>estado[sz]==="hecha").length+" / "+tarea.subzonas.length+" hechos"}
-                      </div>
+        {/* ── RUTINAS DIARIAS GOLF ── */}
+        {((trabajador?.nombre||"").toLowerCase().includes("bhal")||trabajador?.id===1004)&&(
+          <div style={{marginBottom:14,border:"1px solid rgba(251,191,36,0.2)",borderRadius:12,overflow:"hidden"}}>
+            <div style={{padding:"10px 14px",background:"rgba(251,191,36,0.06)",borderBottom:"1px solid rgba(251,191,36,0.1)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#fbbf24"}}>⛳ Rutinas diarias Golf</div>
+              {puedeEditar&&TAREAS_DIARIAS_GOLF.some(t=>rutinasGolfState[t.id]!=="hecha")&&(
+                <button onClick={()=>{const n={};TAREAS_DIARIAS_GOLF.forEach(t=>{n[t.id]="hecha";});setRutinasGolfState(n);onGuardarRutinas&&onGuardarRutinas(n);}}
+                  style={{fontSize:11,padding:"3px 12px",border:"1px solid rgba(34,197,94,0.4)",borderRadius:6,background:"rgba(34,197,94,0.1)",color:"#22c55e",cursor:"pointer"}}>
+                  ✅ Marcar todas hechas
+                </button>
+              )}
+            </div>
+            <div style={{padding:"8px 14px",display:"flex",flexDirection:"column",gap:6}}>
+              {TAREAS_DIARIAS_GOLF.map(tarea=>{
+                const est=rutinasGolfState[tarea.id];
+                const hecha=est==="hecha", noPudo=est==="no_pudo";
+                return (
+                  <div key={tarea.id} style={{padding:"8px 10px",borderRadius:8,
+                    background:hecha?"rgba(34,197,94,0.06)":noPudo?"rgba(239,68,68,0.06)":"rgba(255,255,255,0.02)",
+                    border:`1px solid ${hecha?"rgba(34,197,94,0.2)":noPudo?"rgba(239,68,68,0.2)":"rgba(255,255,255,0.06)"}`}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <span>{tarea.icon}</span>
+                      <span style={{flex:1,fontSize:13,color:hecha?"#22c55e":noPudo?"#ef4444":"#c0dac0"}}>{tarea.tarea}</span>
+                      {puedeEditar&&<>
+                        <button onClick={()=>{
+                          const nuevoEst = hecha?null:"hecha";
+                          const nuevo = {...rutinasGolfState,[tarea.id]:nuevoEst};
+                          setRutinasGolfState(nuevo);
+                          onGuardarRutinas&&onGuardarRutinas(nuevo);
+                        }}
+                          style={{fontSize:11,padding:"2px 10px",borderRadius:5,border:`1px solid ${hecha?"rgba(34,197,94,0.5)":"rgba(255,255,255,0.1)"}`,background:hecha?"rgba(34,197,94,0.15)":"transparent",color:hecha?"#22c55e":"#5a9a7a",cursor:"pointer"}}>
+                          {hecha?"✅":"○"}
+                        </button>
+                        <button onClick={()=>{
+                          const nuevoEst = noPudo?null:"no_pudo";
+                          const nuevo = {...rutinasGolfState,[tarea.id]:nuevoEst};
+                          setRutinasGolfState(nuevo);
+                          onGuardarRutinas&&onGuardarRutinas(nuevo);
+                        }}
+                          style={{fontSize:11,padding:"2px 8px",borderRadius:5,border:`1px solid ${noPudo?"rgba(239,68,68,0.5)":"rgba(255,255,255,0.1)"}`,background:noPudo?"rgba(239,68,68,0.1)":"transparent",color:noPudo?"#ef4444":"#5a9a7a",cursor:"pointer"}}>✗</button>
+                      </>}
                     </div>
-                  </div>
-                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                    {puedeEditar&&!todasHechas&&(
-                      <button onClick={e=>{e.stopPropagation();marcarTodas("hecha");}}
-                        style={{fontSize:10,padding:"3px 10px",border:"1px solid rgba(34,197,94,0.4)",borderRadius:6,background:"rgba(34,197,94,0.1)",color:"#22c55e",cursor:"pointer"}}>
-                        ✅ Todos
-                      </button>
+                    {noPudo&&<input placeholder="¿Por qué no se pudo?"
+                      value={rutinasGolfState[tarea.id+"_obs"]||""}
+                      onChange={e=>setRutinasGolfState(p=>({...p,[tarea.id+"_obs"]:e.target.value}))}
+                      style={{marginTop:4,marginLeft:22,fontSize:11,padding:"3px 8px",borderRadius:5,border:"1px solid rgba(239,68,68,0.3)",background:"rgba(239,68,68,0.05)",color:"#fca5a5",width:"calc(100% - 22px)"}}/>}
+                    {/* Campo observación fitosanitaria */}
+                    {tarea.id==="tdg_4"&&(
+                      <div style={{marginTop:8,padding:"8px 10px",background:"rgba(167,139,250,0.06)",border:"1px solid rgba(167,139,250,0.2)",borderRadius:8}}>
+                        <div style={{fontSize:11,color:"#c4b5fd",fontWeight:600,marginBottom:4}}>🦠 Observación fitosanitaria</div>
+                        <input
+                          placeholder="Sin novedad · Mancha en Green 03 · Presencia de hongos..."
+                          value={rutinasGolfState["fito_obs"]||""}
+                          onChange={e=>setRutinasGolfState(p=>({...p,fito_obs:e.target.value}))}
+                          style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(167,139,250,0.3)",borderRadius:6,color:"#ede9e0",padding:"5px 8px",fontSize:11,boxSizing:"border-box"}}/>
+                        {rutinasGolfState.fito_obs?.trim()&&rutinasGolfState.fito_obs.toLowerCase()!=="sin novedad"&&(
+                          <button onClick={()=>{
+                            // Guardar alerta en Firebase incidencias
+                            onGuardarAlertaFito&&onGuardarAlertaFito({
+                              obs: rutinasGolfState.fito_obs,
+                              trabajador: trabajador?.nombre,
+                              fecha: fechaVer,
+                            });
+                            // Crear tarea urgente en programación
+                            onAddTarea&&onAddTarea({
+                              id:Date.now()+Math.random(),
+                              fecha:fechaVer,
+                              tarea:"🚨 ALERTA FITOSANITARIA: "+rutinasGolfState.fito_obs.slice(0,80),
+                              responsable:"",
+                              zona:"Golf",
+                              elemento:"",
+                              estado:"por_designar",
+                              notas:"Reportado por "+trabajador?.nombre+" · "+fechaVer,
+                              tipoEvento:"alerta_fito",
+                              urgente:true,
+                            });
+                            crearNotificacion&&crearNotificacion("alerta",{
+                              titulo:"🦠 Alerta fitosanitaria Golf",
+                              mensaje:rutinasGolfState.fito_obs+" · "+trabajador?.nombre+" · "+fechaVer,
+                              fecha:fechaVer,
+                              tipo:"golf_fito",
+                              urgente:true,
+                            });
+                            alert("⚠️ Alerta fitosanitaria generada y enviada a la jefa.");
+                          }} style={{marginTop:6,fontSize:11,padding:"3px 10px",borderRadius:5,border:"1px solid rgba(239,68,68,0.4)",background:"rgba(239,68,68,0.1)",color:"#fca5a5",cursor:"pointer"}}>
+                            🚨 Generar alerta fitosanitaria
+                          </button>
+                        )}
+                      </div>
                     )}
-                    <span style={{color:"#4a7a5a",fontSize:12}}>{open?"▲":"▼"}</span>
                   </div>
-                </div>
-                {/* Lista de subzonas */}
-                {open&&(
-                  <div style={{padding:"10px 14px",display:"flex",flexDirection:"column",gap:6}}>
-                    {tarea.obs&&<div style={{fontSize:10,color:"#5a9a7a",marginBottom:4,fontStyle:"italic"}}>{tarea.obs}</div>}
-                    {tarea.subzonas.map(sz=>{
-                      const est = estado[sz];
-                      const obsKey = sz+"_obs";
-                      return (
-                        <div key={sz} style={{display:"flex",flexDirection:"column",gap:4,padding:"6px 10px",borderRadius:8,background:est==="hecha"?"rgba(34,197,94,0.06)":est==="no_pudo"?"rgba(239,68,68,0.06)":"rgba(255,255,255,0.02)",border:`1px solid ${est==="hecha"?"rgba(34,197,94,0.2)":est==="no_pudo"?"rgba(239,68,68,0.2)":"rgba(255,255,255,0.06)"}`}}>
-                          <div style={{display:"flex",alignItems:"center",gap:8}}>
-                            <span style={{fontSize:12,flex:1,color:est==="hecha"?"#22c55e":est==="no_pudo"?"#ef4444":"#c0dac0"}}>{sz}</span>
-                            {puedeEditar&&(<>
-                              <button onClick={()=>marcarSubzona(sz, est==="hecha"?null:"hecha")}
-                                style={{fontSize:11,padding:"2px 8px",borderRadius:5,border:`1px solid ${est==="hecha"?"rgba(34,197,94,0.5)":"rgba(255,255,255,0.1)"}`,background:est==="hecha"?"rgba(34,197,94,0.15)":"transparent",color:est==="hecha"?"#22c55e":"#5a9a7a",cursor:"pointer"}}>
-                                {est==="hecha"?"✅ Hecha":"○ Marcar hecha"}
-                              </button>
-                              <button onClick={()=>marcarSubzona(sz, est==="no_pudo"?null:"no_pudo")}
-                                style={{fontSize:11,padding:"2px 8px",borderRadius:5,border:`1px solid ${est==="no_pudo"?"rgba(239,68,68,0.5)":"rgba(255,255,255,0.1)"}`,background:est==="no_pudo"?"rgba(239,68,68,0.1)":"transparent",color:est==="no_pudo"?"#ef4444":"#5a9a7a",cursor:"pointer"}}>
-                                {est==="no_pudo"?"✗ No pudo":"✗"}
-                              </button>
-                            </>)}
-                          </div>
-                          {est==="no_pudo"&&(
-                            <input
-                              placeholder="¿Por qué no se pudo? (obligatorio)"
-                              value={estado[obsKey]||""}
-                              onChange={e=>setRutinasGolfState(prev=>({
-                                ...prev,
-                                [tarea.id]:{...(prev[tarea.id]||{}),[obsKey]:e.target.value}
-                              }))}
-                              style={{fontSize:11,padding:"4px 8px",borderRadius:5,border:"1px solid rgba(239,68,68,0.3)",background:"rgba(239,68,68,0.05)",color:"#fca5a5",width:"100%"}}
-                            />
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </>):null}
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {misTareasDiarias.length>0&&(()=>{
           const hechasDiarias=misTareasDiarias.filter(t=>t.estado==="hecha").length;
@@ -2782,50 +2965,10 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                   <span style={{color:"#4a7a5a",fontSize:12,transform:openDiarias?"rotate(90deg)":"rotate(0deg)",transition:"transform .2s",display:"inline-block"}}>▶</span>
                 </div>
               </div>
-              {/* Botón marcar todas hechas */}
-              {puedeEditar&&!todasHechas&&(
-                <div style={{padding:"6px 14px",borderBottom:"1px solid rgba(255,255,255,0.04)",display:"flex",justifyContent:"flex-end"}}>
-                  <button
-                    onClick={()=>misTareasDiarias.forEach(t=>normalizarEstado(t.estado)!=="hecha"&&onUpdateTarea(fechaVer,t.id,{estado:"hecha"}))}
-                    style={{...S.btn,fontSize:11,padding:"3px 12px",background:"rgba(34,197,94,0.12)",color:"#22c55e",border:"1px solid rgba(34,197,94,0.3)"}}>
-                    ✅ Marcar todas hechas
-                  </button>
-                </div>
-              )}
-              {/* Lista de tareas diarias agrupadas por tipo */}
+              {/* Lista de tareas */}
               {openDiarias&&(
                 <div>
-                  {(()=>{
-                    const GRUPOS_D=[
-                      {key:"corte",   icon:"✂️",label:"Cortes",      match:t=>(t.tarea||"").toLowerCase().includes("corte")},
-                      {key:"limpieza",icon:"🧹",label:"Limpieza",    match:t=>(t.tarea||"").toLowerCase().includes("limpieza")||(t.tarea||"").toLowerCase().includes("barrido")||(t.tarea||"").toLowerCase().includes("soplado")},
-                      {key:"riego",   icon:"💧",label:"Riego",       match:t=>(t.tarea||"").toLowerCase().includes("riego")},
-                      {key:"revision",icon:"🔍",label:"Revisiones",  match:t=>(t.tarea||"").toLowerCase().includes("revisión")||(t.tarea||"").toLowerCase().includes("revision")},
-                      {key:"otros_d", icon:"🌿",label:"Otras",       match:t=>true},
-                    ];
-                    const asignadas=new Set();
-                    const gruposDiarias=[];
-                    GRUPOS_D.forEach(g=>{
-                      const ts=misTareasDiarias.filter(t=>!asignadas.has(t.id)&&g.match(t));
-                      ts.forEach(t=>asignadas.add(t.id));
-                      if(ts.length>0) gruposDiarias.push({...g,tareas:ts});
-                    });
-                    return gruposDiarias.map(gD=>(
-                      <div key={gD.key}>
-                        {gruposDiarias.length>1&&(
-                          <div style={{padding:"4px 14px",fontSize:10,color:"#4a7a5a",background:"rgba(255,255,255,0.02)",textTransform:"uppercase",letterSpacing:"0.5px"}}>
-                            {gD.icon} {gD.label}
-                            {/* Botón marcar grupo completo */}
-                            {puedeEditar&&gD.tareas.some(t=>normalizarEstado(t.estado)!=="hecha")&&(
-                              <button
-                                onClick={()=>gD.tareas.forEach(t=>normalizarEstado(t.estado)!=="hecha"&&onUpdateTarea(fechaVer,t.id,{estado:"hecha"}))}
-                                style={{marginLeft:8,fontSize:9,padding:"1px 6px",border:"1px solid rgba(34,197,94,0.3)",borderRadius:4,background:"rgba(34,197,94,0.08)",color:"#22c55e",cursor:"pointer"}}>
-                                ✅ todas
-                              </button>
-                            )}
-                          </div>
-                        )}
-                        {gD.tareas.map((t,i)=>{
+                  {misTareasDiarias.map((t,i)=>{
                     const est=ESTADOS_TAREA[normalizarEstado(t.estado)]||ESTADOS_TAREA.pendiente;
                     return (
                       <div key={t.id} style={{padding:"10px 14px",background:i%2===0?"rgba(255,255,255,0.02)":"rgba(255,255,255,0.04)",borderBottom:i<misTareasDiarias.length-1?"1px solid rgba(255,255,255,0.05)":"none"}}>
@@ -2863,28 +3006,37 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                           </div>
                         )}
                         {/* Campo altura real de corte — aparece al marcar como hecha si la tarea es de corte */}
-                        {(t.tarea||"").toLowerCase().includes("corte")&&(t.zona==="Golf"||(t.zona||"").includes("Golf"))&&(
-                          <div style={{marginTop:6,display:"flex",alignItems:"center",gap:8}}>
-                            <div style={{fontSize:11,color:"#fbbf24",fontWeight:600,marginBottom:4}}>✂️ Ratificar altura de corte (mm)</div>
-                              <div style={{fontSize:10,color:"#5a9a7a",marginBottom:4}}>HOC objetivo: <b style={{color:"#fbbf24"}}>{t.alturaCorteObj||t.alturaCorte||"—"}mm</b> — confirma o corrige el valor real</div>
-                            <input type="number" step="0.1" min="2" max="20"
-                              value={alturaInputs[t.id]??t.alturaCorteReal??""}
-                              onChange={e=>setAlturaInputs(p=>({...p,[t.id]:e.target.value}))}
-                              onBlur={e=>{
-                                const val = e.target.value;
-                                if(val && val !== (t.alturaCorteReal||"")) {
-                                  onUpdateTarea(fechaVer,t.id,{alturaCorteReal:val});
-                                }
-                              }}
-                              onKeyDown={e=>{
-                                if(e.key==="Enter"||e.key==="Tab") {
-                                  const val = e.target.value;
-                                  if(val) onUpdateTarea(fechaVer,t.id,{alturaCorteReal:val});
-                                }
-                              }}
-                              placeholder={t.alturaCorteObj||t.alturaCorte||"mm"}
-                              style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(251,191,36,0.3)",borderRadius:6,color:"#fbbf24",padding:"4px 8px",fontSize:13,fontFamily:"'Georgia',serif",width:80,outline:"none"}}/>
-                            {t.alturaCorteReal&&<span style={{fontSize:10,color:"#5a9a7a"}}>✓ {t.alturaCorteReal}mm registrado</span>}
+                        {(()=>{
+                          const esCorteGolf = (
+                            (t.tarea||"").toLowerCase().includes("corte") ||
+                            (t.tarea||"").toLowerCase().includes("cortar") ||
+                            (t.tarea||"").toLowerCase().includes("mow") ||
+                            (t.tarea||"").toLowerCase().includes("hoc")
+                          ) && (
+                            t.zona==="Golf" || (t.zona||"").includes("Golf") ||
+                            (t.elemento||"").toLowerCase().includes("green") ||
+                            (t.elemento||"").toLowerCase().includes("vivero") ||
+                            (t.tarea||"").toLowerCase().includes("green")
+                          );
+                          return esCorteGolf;
+                        })()&&(
+                          <div style={{marginTop:8,padding:"8px 12px",background:"rgba(251,191,36,0.06)",border:"1px solid rgba(251,191,36,0.2)",borderRadius:8}}>
+                            <div style={{fontSize:11,color:"#fbbf24",fontWeight:600,marginBottom:6}}>
+                              ✂️ Registrar altura de corte real
+                              {(t.alturaCorteObj||t.alturaCorte)&&<span style={{color:"#5a9a7a",fontWeight:400,marginLeft:6}}>· HOC indicada: {t.alturaCorteObj||t.alturaCorte}mm</span>}
+                            </div>
+                            <div style={{display:"flex",alignItems:"center",gap:8}}>
+                              <input type="number" step="0.1" min="2" max="20"
+                                style={{width:80,textAlign:"center",fontWeight:700,fontSize:15,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(251,191,36,0.3)",borderRadius:6,color:"#fbbf24",padding:"4px 8px"}}
+                                value={alturaInputs[t.id]??t.alturaCorteReal??""}
+                                placeholder={t.alturaCorteObj||t.alturaCorte||"mm"}
+                                onChange={e=>setAlturaInputs(p=>({...p,[t.id]:e.target.value}))}
+                                onBlur={e=>{const val=e.target.value;if(val&&val!==(t.alturaCorteReal||""))onUpdateTarea(fechaVer,t.id,{alturaCorteReal:val});}}
+                                onKeyDown={e=>{if(e.key==="Enter"||e.key==="Tab"){const val=e.target.value;if(val)onUpdateTarea(fechaVer,t.id,{alturaCorteReal:val});}}}/>
+                              <span style={{fontSize:11,color:"#5a9a7a"}}>mm</span>
+                              <button onClick={()=>{const val=alturaInputs[t.id]??t.alturaCorteReal??"";if(val)onUpdateTarea(fechaVer,t.id,{alturaCorteReal:String(val)});}} style={{fontSize:11,padding:"3px 10px",borderRadius:5,border:"1px solid rgba(251,191,36,0.4)",background:"rgba(251,191,36,0.1)",color:"#fbbf24",cursor:"pointer"}}>💾 Guardar</button>
+              {t.alturaCorteReal&&<span style={{fontSize:11,color:"#22c55e",marginLeft:4}}>✅ {t.alturaCorteReal}mm</span>}
+                            </div>
                           </div>
                         )}
                         {t.estado==="no_pudo"&&(
@@ -2893,13 +3045,49 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                             {!t.notaWorker&&<div style={{fontSize:10,color:"#ef4444",marginTop:2}}>⚠️ Explica el motivo para poder guardar</div>}
                           </div>
                         )}
+                        {/* Campo fitosanitario — aparece cuando se marca hecha la revisión */}
+                        {(t.tarea||"").toLowerCase().includes("fitosanit")&&(
+                          <div style={{marginTop:8,padding:"10px 12px",background:"rgba(167,139,250,0.06)",border:"1px solid rgba(167,139,250,0.2)",borderRadius:8}}>
+                            <div style={{fontSize:11,color:"#c4b5fd",fontWeight:600,marginBottom:6}}>🦠 Observación fitosanitaria</div>
+                            <input
+                              placeholder="Sin novedad · Mancha sospechosa en Green 03 · Presencia de hongos..."
+                              value={t.notaFito||""}
+                              onChange={e=>onUpdateTarea(fechaVer,t.id,{notaFito:e.target.value})}
+                              style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(167,139,250,0.3)",borderRadius:6,color:"#ede9e0",padding:"6px 10px",fontSize:12,fontFamily:"'Georgia',serif",boxSizing:"border-box"}}/>
+                            <div style={{fontSize:10,color:"#7a6a9a",marginTop:3}}>Si hay novedad, se generará una alerta fitosanitaria automáticamente.</div>
+                            {t.notaFito?.trim()&&t.notaFito.toLowerCase()!=="sin novedad"&&(
+                              <button onClick={()=>{
+                                // Crear alerta fitosanitaria real en el sistema
+                                onAddTarea&&onAddTarea({
+                                  id:Date.now()+Math.random(),
+                                  fecha:fechaVer,
+                                  tarea:"🚨 ALERTA FITOSANITARIA: "+t.notaFito.slice(0,80),
+                                  responsable:"",
+                                  zona:"Golf",
+                                  elemento:t.elemento||"",
+                                  estado:"por_designar",
+                                  notas:"Reportado por "+trabajador?.nombre+" · "+fechaVer+" · Tarea: "+t.tarea,
+                                  tipoEvento:"alerta_fito",
+                                  urgente:true,
+                                });
+                                alert("⚠️ Alerta fitosanitaria generada. La jefa será notificada.");
+                                crearNotificacion&&crearNotificacion("alerta",{
+                                  titulo:"🦠 Alerta fitosanitaria Golf",
+                                  mensaje:t.notaFito+" · "+trabajador?.nombre+" · "+fechaVer,
+                                  fecha:fechaVer,
+                                  tipo:"golf_fito",
+                                  urgente:true,
+                                });
+                              }} style={{marginTop:6,fontSize:11,padding:"4px 12px",borderRadius:6,border:"1px solid rgba(239,68,68,0.4)",background:"rgba(239,68,68,0.1)",color:"#fca5a5",cursor:"pointer"}}>
+                                🚨 Generar alerta fitosanitaria
+                              </button>
+                            )}
+                          </div>
+                        )}
                         {t.notaWorker&&t.estado!=="no_pudo"&&<div style={{fontSize:11,color:"#f59e0b",marginTop:4,fontStyle:"italic"}}>💬 {t.notaWorker}</div>}
                       </div>
                     );
                   })}
-                      </div>
-                    ));
-                  })()}
                   {/* ── Observaciones del turno integradas ── */}
                   <div style={{padding:"12px 14px",background:"rgba(52,211,153,0.03)",borderTop:"1px solid rgba(52,211,153,0.1)"}}>
                     <div style={{fontSize:11,fontWeight:600,color:"#34d399",marginBottom:10}}>📝 Observaciones del turno</div>
@@ -2940,20 +3128,20 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
         {/* ══════════════════════════════════════════════════════════
              SECCIÓN 2 — REGISTROS GOLF (Alturas y Humedad)
              ══════════════════════════════════════════════════════════ */}
-        {fechaVer===hoy&&(
+        {fechaVer===hoy&&(normalizar(trabajador?.nombre||"").includes("bhalu")||normalizar(trabajador?.nombre||"").includes("armijo"))&&(
           <div style={{marginBottom:14,border:"1px solid rgba(96,165,250,0.2)",borderRadius:12,overflow:"hidden"}}>
             <div style={{padding:"12px 14px",background:"rgba(96,165,250,0.05)",borderBottom:"1px solid rgba(96,165,250,0.15)"}}>
               <div style={{fontSize:14,fontWeight:700,color:"#60a5fa",marginBottom:2}}>⛳ Registros Golf</div>
               <div style={{fontSize:11,color:"#4a7a9a"}}>Medición de alturas y humedad de greens</div>
             </div>
             <div style={{padding:"12px 14px",display:"flex",gap:8,flexWrap:"wrap"}}>
-              <button onClick={()=>onAccesoRapido?.("medicion")}
+              <button onClick={()=>onAccesoRapido?.("golf","mediciones")}
                 style={{flex:1,minWidth:140,cursor:"pointer",border:"1px solid rgba(52,211,153,0.35)",borderRadius:10,padding:"12px 10px",background:"rgba(52,211,153,0.08)",color:"#34d399",fontFamily:"'Georgia',serif",fontSize:13,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
                 <span style={{fontSize:22}}>📏</span>
                 <span style={{fontWeight:600}}>Registrar alturas</span>
                 <span style={{fontSize:10,color:"#5a9a7a"}}>Medir mm cada green</span>
               </button>
-              <button onClick={()=>onAccesoRapido?.("humedad")}
+              <button onClick={()=>onAccesoRapido?.("golf","humedad")}
                 style={{flex:1,minWidth:140,cursor:"pointer",border:"1px solid rgba(96,165,250,0.35)",borderRadius:10,padding:"12px 10px",background:"rgba(96,165,250,0.08)",color:"#60a5fa",fontFamily:"'Georgia',serif",fontSize:13,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
                 <span style={{fontSize:22}}>💧</span>
                 <span style={{fontWeight:600}}>Registrar humedad</span>
@@ -2987,27 +3175,17 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
               <div style={{fontSize:12,fontWeight:600,color:"#34d399",marginBottom:8,paddingLeft:2}}>🌿 Otras tareas del día</div>
               {grupos.map(g=>{
                 const hechas=g.tareas.filter(t=>t.estado==="hecha").length;
-                const open=gruposAbiertos[g.key]!==false;
+                const open=gruposAbiertos[g.key]===true;
                 const col=hechas===g.tareas.length?"#22c55e":"#34d399";
                 return (
                   <div key={g.key} style={{marginBottom:8,border:`1px solid rgba(255,255,255,${hechas===g.tareas.length?0.1:0.07})`,borderRadius:10,overflow:"hidden"}}>
-                    <div onClick={()=>toggleGrupo(g.key)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 12px",background:"rgba(255,255,255,0.03)",cursor:"pointer",userSelect:"none"}}>
+                    <div onClick={()=>abrirGrupo(g.key)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 12px",background:"rgba(255,255,255,0.03)",cursor:"pointer",userSelect:"none"}}>
                       <div style={{display:"flex",alignItems:"center",gap:7}}>
                         <span>{g.icon}</span>
                         <span style={{fontSize:13,fontWeight:600,color:col}}>{g.label}</span>
                         <span style={{fontSize:10,color:"#5a9a7a",background:"rgba(255,255,255,0.05)",padding:"1px 6px",borderRadius:10}}>{hechas}/{g.tareas.length}</span>
                       </div>
                       <span style={{color:"#4a7a5a",fontSize:11,transform:open?"rotate(90deg)":"rotate(0deg)",transition:"transform .2s",display:"inline-block"}}>▶</span>
-                    {/* Botón marcar grupo completo */}
-                    {puedeEditar&&g.tareas.some(t=>normalizarEstado(t.estado)!=="hecha")&&(
-                      <div style={{padding:"4px 12px",borderBottom:"1px solid rgba(255,255,255,0.04)",display:"flex",justifyContent:"flex-end"}}>
-                        <button
-                          onClick={()=>g.tareas.forEach(t=>normalizarEstado(t.estado)!=="hecha"&&onUpdateTarea(fechaVer,t.id,{estado:"hecha"}))}
-                          style={{fontSize:10,padding:"2px 10px",border:"1px solid rgba(34,197,94,0.3)",borderRadius:4,background:"rgba(34,197,94,0.08)",color:"#22c55e",cursor:"pointer"}}>
-                          ✅ Marcar todas hechas
-                        </button>
-                      </div>
-                    )}
                     </div>
                     {open&&(
                       <div>
@@ -3166,11 +3344,14 @@ Una vez cerrado no podrás modificar las tareas. Solo la jefa puede reabrir el t
         {misTargets.length===0&&(
           <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:"32px 20px",textAlign:"center",marginBottom:14}}>
             <div style={{fontSize:36,marginBottom:10}}>🌿</div>
-            <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,marginBottom:6}}>Sin tareas asignadas</div>
-            <div style={{fontSize:13,marginBottom:12,color:"#5a8a6a"}}>No hay tareas para este día o aún no están designadas.</div>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,marginBottom:6}}>Sin tareas asignadas para hoy</div>
+            <div style={{fontSize:13,marginBottom:12,color:"#5a8a6a"}}>
+              No hay tareas programadas para <b style={{color:"#34d399"}}>{trabajador?.nombre?.split(" ")[0]}</b> hoy.
+              Consulta con la jefa para que las programe desde Programa → ✨ Proponer del día.
+            </div>
             {(tareas[fechaVer]||[]).length>0&&(
               <div style={{background:"rgba(255,255,255,0.05)",borderRadius:10,padding:"10px 14px",textAlign:"left",fontSize:12}}>
-                <div style={{marginBottom:6,fontWeight:600,color:"#6aaa7a"}}>Tareas del día ({(tareas[fechaVer]||[]).length}):</div>
+                <div style={{marginBottom:6,fontWeight:600,color:"#6aaa7a"}}>Tareas del día ({(tareas[fechaVer]||[]).length}) — ninguna asignada a ti:</div>
                 {(tareas[fechaVer]||[]).slice(0,5).map((t,i)=>(
                   <div key={i} style={{padding:"3px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
                     <span style={{color:normalizar(t.responsable)===normalizar(trabajador.nombre)?"#4ade80":"#ef4444"}}>{normalizar(t.responsable)===normalizar(trabajador.nombre)?"✓":"✗"}</span>
@@ -3188,7 +3369,498 @@ Una vez cerrado no podrás modificar las tareas. Solo la jefa puede reabrir el t
   );
 }
 
-function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACROZONAS_BASE, tareas, setTareas, tareasZonaHoy=0, esJefa=false, configSemanal={}, setConfigSemanal, puedeCrear=false, cierresTurno={}, onReabrirTurno, getElemFrecs, setElemFrecs }) {
+// ─── PLANIFICADOR SEMANAL ─────────────────────────────────────────────────────
+function PlanificadorSemanal({ S, MACROZONAS_BASE, getAllElems, getZD, getElemFrecs,
+  tareas, setTareas, personal, configSemanal, esJefa }) {
+
+  const hoy = fechaLocal();
+  const lunesHoy = (() => {
+    const d = new Date(hoy+"T12:00:00");
+    d.setDate(d.getDate()-((d.getDay()+6)%7));
+    return d.toISOString().slice(0,10);
+  })();
+
+  const [semanaBase, setSemanaBase] = React.useState(lunesHoy);
+  const [asignaciones, setAsignaciones] = React.useState({});
+  const [guardado, setGuardado] = React.useState(false);
+  const [grupoAbierto, setGrupoAbierto] = React.useState(null);
+
+  const diasSemana = Array.from({length:6},(_,i)=>{
+    const d = new Date(semanaBase+"T12:00:00");
+    d.setDate(d.getDate()+i);
+    return d.toISOString().slice(0,10);
+  });
+
+  const fmtDia = (f) => {
+    const d = new Date(f+"T12:00:00");
+    return d.toLocaleDateString("es-CL",{weekday:"short",day:"numeric",month:"short"});
+  };
+
+  const tareasSemanales = React.useMemo(()=>{
+    const estacion = (()=>{
+      const m = new Date().getMonth()+1;
+      if([12,1,2].includes(m)) return "verano";
+      if([3,4,5].includes(m)) return "otono";
+      if([6,7,8].includes(m)) return "invierno";
+      return "primavera";
+    })();
+    const lista = [];
+    MACROZONAS_BASE.forEach(z=>{
+      const elems = getAllElems(z.id);
+      elems.forEach(e=>{
+        const frecs = getElemFrecs(String(z.id), e.id, e.tipo, e.isCustom);
+        frecs.forEach(f=>{
+          if(!f.tarea) return;
+          const freq = f.modo==="diasSemana"?f.diasMinimos:f[estacion];
+          if(!freq||freq==="noaplica") return;
+          const ultima = f.ultimaVez||"2025-01-01";
+          const diasDesde = Math.round((new Date(semanaBase+"T12:00:00")-new Date(ultima+"T12:00:00"))/(1000*60*60*24));
+          const intervalo = freq==="diario"?1:freq==="cada2dias"?2:freq==="cada3dias"?3:
+            freq==="cada4dias"?4:freq==="cada5dias"?5:freq==="semanal"?7:
+            freq==="quincenal"?15:freq==="mensual"?30:freq==="bimestral"?60:
+            freq==="trimestral"?90:Number(f.diasMinimos)||7;
+          if(diasDesde < intervalo*0.7) return;
+          const esGolf = z.id===31||(z.nombre||"").toLowerCase().includes("golf");
+          const resp = esGolf?"Osmar Bhalú Armijo Zúñiga":getResponsablePorTipo(f.tarea,configSemanal,z.nombre)||"";
+          lista.push({
+            key:`${z.id}_${e.id}_${f.id}`,
+            zona:z.nombre, zonaIcono:z.icono, elemento:e.nombre,
+            tarea:f.tarea, frecuencia:freq, intervalo, diasDesde,
+            urgente:diasDesde>=intervalo*1.5, responsable:resp,
+            origenZid:String(z.id), origenEid:e.id, origenFrecId:f.id, origenEsCustom:!!e.isCustom,
+          });
+        });
+      });
+    });
+    lista.sort((a,b)=>a.tarea.localeCompare(b.tarea,"es",{sensitivity:"base"}));
+    return lista;
+  }, [semanaBase, MACROZONAS_BASE]);
+
+  const grupos = React.useMemo(()=>{
+    const g = {};
+    tareasSemanales.forEach(t=>{
+      const key = t.tarea.toLowerCase().trim();
+      if(!g[key]) g[key]={tarea:t.tarea, items:[]};
+      g[key].items.push(t);
+    });
+    return Object.values(g).sort((a,b)=>a.tarea.localeCompare(b.tarea,"es",{sensitivity:"base"}));
+  }, [tareasSemanales]);
+
+  const setAsig = (taskKey, fecha) =>
+    setAsignaciones(p=>({...p,[taskKey]:fecha===p[taskKey]?null:fecha}));
+
+  const confirmarSemana = () => {
+    const normArr = v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+    const nuevasTareas = {};
+    diasSemana.forEach(d=>{ nuevasTareas[d]=[...normArr(tareas[d]||[])]; });
+    tareasSemanales.forEach(t=>{
+      const fecha = asignaciones[t.key];
+      if(!fecha) return;
+      if(normArr(tareas[fecha]||[]).some(x=>x.zona===t.zona&&x.elemento===t.elemento&&x.tarea===t.tarea)) return;
+      if(!nuevasTareas[fecha]) nuevasTareas[fecha]=[];
+      nuevasTareas[fecha].push({
+        id:Date.now()+Math.random(), fecha, zona:t.zona, elemento:t.elemento,
+        tarea:t.tarea, responsable:t.responsable,
+        estado:t.responsable?"pendiente":"por_designar",
+        notas:"", auto:true,
+        origenZid:t.origenZid, origenEid:t.origenEid,
+        origenFrecId:t.origenFrecId, origenEsCustom:t.origenEsCustom,
+      });
+    });
+    setTareas(prev=>({...prev,...nuevasTareas}));
+    setGuardado(true);
+    setTimeout(()=>setGuardado(false),2000);
+  };
+
+  const sinAsignar = tareasSemanales.filter(t=>!asignaciones[t.key]).length;
+  const asignadas = tareasSemanales.filter(t=>asignaciones[t.key]).length;
+  const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
+
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
+        <div>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700}}>🗓 Planificación semanal</div>
+          <div style={{fontSize:11,color:"#5a9a7a"}}>Distribuye las tareas de la semana por tipo</div>
+        </div>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <button onClick={()=>{const d=new Date(semanaBase+"T12:00:00");d.setDate(d.getDate()-7);setSemanaBase(d.toISOString().slice(0,10));setAsignaciones({});setGrupoAbierto(null);}}
+            style={{...S.btn,fontSize:12,padding:"4px 10px"}}>◀</button>
+          <span style={{fontSize:12,color:"#c0dac0",fontWeight:600}}>{fmtDia(diasSemana[0])} – {fmtDia(diasSemana[5])}</span>
+          <button onClick={()=>{const d=new Date(semanaBase+"T12:00:00");d.setDate(d.getDate()+7);setSemanaBase(d.toISOString().slice(0,10));setAsignaciones({});setGrupoAbierto(null);}}
+            style={{...S.btn,fontSize:12,padding:"4px 10px"}}>▶</button>
+        </div>
+      </div>
+
+      <div style={{...S.card,padding:"10px 14px",marginBottom:14,display:"flex",gap:16,flexWrap:"wrap"}}>
+        <span style={{fontSize:12,color:"#c0dac0"}}><b style={{color:"#34d399"}}>{tareasSemanales.length}</b> tareas según frecuencias</span>
+        <span style={{fontSize:12,color:"#c0dac0"}}><b style={{color:"#60a5fa"}}>{asignadas}</b> asignadas</span>
+        <span style={{fontSize:12,color:"#c0dac0"}}><b style={{color:"#f59e0b"}}>{sinAsignar}</b> sin día</span>
+        <span style={{fontSize:12,color:"#c0dac0"}}><b style={{color:"#f87171"}}>{tareasSemanales.filter(t=>t.urgente).length}</b> urgentes</span>
+      </div>
+
+      {/* Días header */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr repeat(6,56px)",gap:4,padding:"0 14px 8px",fontSize:10,color:"#5a9a7a"}}>
+        <div></div>
+        {diasSemana.map(d=>(
+          <div key={d} style={{textAlign:"center",fontWeight:d===hoy?700:400,color:d===hoy?"#34d399":"#5a9a7a"}}>
+            {fmtDia(d).split(" ").slice(0,2).join(" ")}
+          </div>
+        ))}
+      </div>
+
+      {/* Grupos colapsables */}
+      <div style={{marginBottom:16}}>
+        {grupos.map(g=>{
+          const abierto = grupoAbierto===g.tarea;
+          const asignadasGrupo = g.items.filter(t=>asignaciones[t.key]).length;
+          return (
+            <div key={g.tarea} style={{marginBottom:4,borderRadius:8,overflow:"hidden",
+              border:`1px solid ${abierto?"rgba(52,211,153,0.2)":"rgba(255,255,255,0.06)"}`}}>
+              <div onClick={()=>setGrupoAbierto(abierto?null:g.tarea)}
+                style={{padding:"10px 14px",cursor:"pointer",userSelect:"none",
+                  background:abierto?"rgba(52,211,153,0.06)":"rgba(255,255,255,0.02)",
+                  borderLeft:`3px solid ${abierto?"rgba(52,211,153,0.5)":"transparent"}`,
+                  display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:11,color:abierto?"#34d399":"#6aaa7a",
+                  transform:abierto?"rotate(90deg)":"rotate(0deg)",
+                  transition:"transform 0.15s",display:"inline-block"}}>▶</span>
+                <span style={{fontSize:13,fontWeight:700,color:abierto?"#c0dac0":"#7aaa80",flex:1}}>{g.tarea}</span>
+                <span style={{fontSize:10,color:"#5a9a7a"}}>
+                  {g.items.length} zona(s)
+                  {g.items.some(t=>t.urgente)&&<span style={{color:"#f87171",marginLeft:6}}>⚠️</span>}
+                  {asignadasGrupo>0&&<span style={{color:"#34d399",marginLeft:6}}>✓ {asignadasGrupo}/{g.items.length}</span>}
+                </span>
+              </div>
+              {abierto&&(
+                <div style={{padding:"6px 0"}}>
+                  <div style={{padding:"4px 14px 8px",display:"flex",gap:4,alignItems:"center",borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
+                    <span style={{fontSize:10,color:"#5a9a7a",flex:1}}>Asignar todos →</span>
+                    {diasSemana.map(d=>(
+                      <button key={d} onClick={()=>g.items.forEach(t=>setAsig(t.key,d))}
+                        style={{fontSize:10,padding:"2px 8px",borderRadius:4,cursor:"pointer",
+                          border:"1px solid rgba(52,211,153,0.3)",background:"rgba(52,211,153,0.08)",color:"#34d399",width:52}}>
+                        {fmtDia(d).split(" ")[0]}
+                      </button>
+                    ))}
+                  </div>
+                  {g.items.map(t=>(
+                    <div key={t.key} style={{padding:"6px 14px",borderBottom:"1px solid rgba(255,255,255,0.04)",
+                      display:"grid",gridTemplateColumns:"1fr 72px repeat(6,52px)",gap:4,alignItems:"center",
+                      background:t.urgente?"rgba(248,113,113,0.04)":"transparent"}}>
+                      <div style={{fontSize:11}}>
+                        <span style={{color:"#5a9a7a"}}>{t.zonaIcono} {t.zona}</span>
+                        {t.elemento&&<span style={{color:"#4a7a5a",marginLeft:4,fontSize:10}}>· {t.elemento}</span>}
+                        {t.urgente&&<span style={{color:"#f87171",marginLeft:4,fontSize:9}}>⚠️ {t.diasDesde}d</span>}
+                      </div>
+                      <select value={t.responsable} onChange={e=>{t.responsable=e.target.value;}}
+                        style={{fontSize:10,padding:"1px 3px",background:"rgba(255,255,255,0.05)",
+                          border:"1px solid rgba(255,255,255,0.1)",borderRadius:4,color:"#c0dac0",width:"100%"}}>
+                        <option value="">—</option>
+                        {personalArr.map(p=>(
+                          <option key={p.id} value={p.nombre}>{p.nombre.split(" ")[0]}</option>
+                        ))}
+                      </select>
+                      {diasSemana.map(d=>(
+                        <button key={d} onClick={()=>setAsig(t.key,d)}
+                          style={{width:"100%",height:28,borderRadius:5,cursor:"pointer",fontSize:10,
+                            border:`1px solid ${asignaciones[t.key]===d?"rgba(52,211,153,0.6)":"rgba(255,255,255,0.08)"}`,
+                            background:asignaciones[t.key]===d?"rgba(52,211,153,0.2)":"transparent",
+                            color:asignaciones[t.key]===d?"#34d399":"#4a7a5a"}}>
+                          {asignaciones[t.key]===d?"✓":fmtDia(d).split(" ")[0].slice(0,2)}
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {grupos.length===0&&(
+          <div style={{textAlign:"center",color:"#4a7a5a",padding:32,fontSize:12}}>
+            No hay tareas pendientes según las frecuencias para esta semana.
+          </div>
+        )}
+      </div>
+
+      {asignadas>0&&(
+        <div style={{position:"sticky",bottom:16}}>
+          <button onClick={confirmarSemana}
+            style={{...S.btn,width:"100%",padding:"12px 0",fontWeight:700,fontSize:14,
+              background:guardado?"rgba(34,197,94,0.15)":"rgba(52,211,153,0.15)",
+              color:guardado?"#22c55e":"#34d399",
+              border:`1px solid ${guardado?"rgba(34,197,94,0.4)":"rgba(52,211,153,0.3)"}`}}>
+            {guardado?"✅ Semana programada":"📅 Confirmar ("+asignadas+" tareas)"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+// ─── CATÁLOGO DE TAREAS ESTÁNDAR ─────────────────────────────────────────────
+const CATALOGO_TAREAS = [
+  // ── LABORES ──────────────────────────────────────────────────────────────
+  { id:"ct_01", cat:"Labores", tarea:"Corte de césped" },
+  { id:"ct_02", cat:"Labores", tarea:"Corte de bordes" },
+  { id:"ct_03", cat:"Labores", tarea:"Orillado" },
+  { id:"ct_04", cat:"Labores", tarea:"Desmalezado" },
+  { id:"ct_05", cat:"Labores", tarea:"Aireado/Escarificado" },
+  { id:"ct_06", cat:"Labores", tarea:"Verticorte" },
+  { id:"ct_06b", cat:"Labores", tarea:"Verticorte con groomer fuerte" },
+  { id:"ct_07", cat:"Labores", tarea:"Cambio de banderas" },
+  { id:"ct_08", cat:"Labores", tarea:"Enmendar" },
+  { id:"ct_09", cat:"Labores", tarea:"Fertilización" },
+  { id:"ct_10", cat:"Labores", tarea:"Control fitosanitario" },
+  { id:"ct_10b", cat:"Labores", tarea:"Fumigación" },
+  { id:"ct_11", cat:"Labores", tarea:"Plantación" },
+  { id:"ct_11b", cat:"Labores", tarea:"Plantar desde Vivero" },
+  { id:"ct_12", cat:"Poda", tarea:"Poda de formación" },
+  { id:"ct_13", cat:"Poda", tarea:"Poda de mantenimiento" },
+  { id:"ct_13b", cat:"Poda", tarea:"Poda de limpieza" },
+  { id:"ct_14", cat:"Poda", tarea:"Poda sanitaria" },
+  { id:"ct_15", cat:"Poda", tarea:"Poda en altura" },
+  { id:"ct_16", cat:"Labores", tarea:"Tala" },
+  { id:"ct_17", cat:"Labores", tarea:"Resiembra" },
+  { id:"ct_18", cat:"Labores", tarea:"Siembra" },
+  { id:"ct_19", cat:"Labores", tarea:"Trasplante" },
+  { id:"ct_20", cat:"Labores", tarea:"Riego manual" },
+  { id:"ct_21", cat:"Labores", tarea:"Riego por aspersión" },
+  { id:"ct_22", cat:"Labores", tarea:"Fertirriego" },
+  { id:"ct_23", cat:"Labores", tarea:"Protección de plantas" },
+  // ── LIMPIEZA ──────────────────────────────────────────────────────────────
+  { id:"ct_30", cat:"Limpieza", tarea:"Limpieza general" },
+  { id:"ct_31", cat:"Limpieza", tarea:"Soplado/Barrido" },
+  { id:"ct_32", cat:"Limpieza", tarea:"Limpiar césped" },
+  { id:"ct_32b", cat:"Limpieza", tarea:"Limpieza césped sintético" },
+  { id:"ct_33", cat:"Limpieza", tarea:"Limpiar maicillo" },
+  { id:"ct_34", cat:"Limpieza", tarea:"Limpiar filtro de riego" },
+  { id:"ct_35", cat:"Limpieza", tarea:"Limpiar fuentes" },
+  { id:"ct_36", cat:"Limpieza", tarea:"Limpiar maquinaria" },
+  { id:"ct_37", cat:"Limpieza", tarea:"Limpiar plantas" },
+  { id:"ct_38", cat:"Limpieza", tarea:"Limpiar vivero" },
+  { id:"ct_39", cat:"Limpieza", tarea:"Limpiar basurero" },
+  { id:"ct_40", cat:"Limpieza", tarea:"Limpiar bodega" },
+  // ── REVISIÓN ──────────────────────────────────────────────────────────────
+  { id:"ct_50", cat:"Revisión", tarea:"Revisión fitosanitaria" },
+  { id:"ct_51", cat:"Revisión", tarea:"Revisión de plagas y enfermedades" },
+  { id:"ct_52", cat:"Revisión", tarea:"Revisión de plantas" },
+  { id:"ct_53", cat:"Revisión", tarea:"Revisión de humedad" },
+  { id:"ct_54", cat:"Revisión", tarea:"Revisión de sistema de riego" },
+  { id:"ct_55", cat:"Revisión", tarea:"Revisión de controles de riego" },
+  { id:"ct_56", cat:"Revisión", tarea:"Revisión de maquinaria y herramienta" },
+  { id:"ct_57", cat:"Revisión", tarea:"Revisión de mulch" },
+  { id:"ct_58", cat:"Revisión", tarea:"Revisión de macetero" },
+  { id:"ct_59", cat:"Revisión", tarea:"Revisión de peligros" },
+  // ── REPOSICIÓN ────────────────────────────────────────────────────────────
+  { id:"ct_70", cat:"Reposición", tarea:"Reponer arena" },
+  { id:"ct_71", cat:"Reposición", tarea:"Reponer compost" },
+  { id:"ct_72", cat:"Reposición", tarea:"Reponer macetas" },
+  { id:"ct_73", cat:"Reposición", tarea:"Reponer maicillo" },
+  { id:"ct_74", cat:"Reposición", tarea:"Reponer mulch" },
+  // ── REPARACIÓN/OBRA ───────────────────────────────────────────────────────
+  { id:"ct_80", cat:"Reparación", tarea:"Reparar herramienta" },
+  { id:"ct_81", cat:"Reparación", tarea:"Reparar maquinaria" },
+  { id:"ct_82", cat:"Reparación", tarea:"Reparar sistema de riego" },
+  { id:"ct_83", cat:"Reparación", tarea:"Obras de drenaje" },
+  // ── ADMINISTRACIÓN ────────────────────────────────────────────────────────
+  { id:"ct_90", cat:"Administración", tarea:"Preparación de terreno" },
+  { id:"ct_91", cat:"Administración", tarea:"Inventario" },
+  { id:"ct_92", cat:"Administración", tarea:"Ordenar bodega" },
+  { id:"ct_93", cat:"Administración", tarea:"Sacar nidos" },
+  // ── GOLF ESPECÍFICO ───────────────────────────────────────────────────────
+  { id:"ct_100", cat:"Golf", tarea:"Corte de greens" },
+  { id:"ct_101", cat:"Golf", tarea:"Corte de tees" },
+  { id:"ct_102", cat:"Golf", tarea:"Corte de fairways" },
+  { id:"ct_103", cat:"Golf", tarea:"Rastrillado de búnkers" },
+  { id:"ct_104", cat:"Golf", tarea:"Syringing greens" },
+  { id:"ct_105", cat:"Golf", tarea:"Topdressing" },
+  { id:"ct_106", cat:"Golf", tarea:"Medición de altura greens" },
+  { id:"ct_107", cat:"Golf", tarea:"Revisión de humedad greens" },
+  { id:"ct_108", cat:"Golf", tarea:"Verticorte con groomer fuerte" },
+  // ── PRE-TORNEO ────────────────────────────────────────────────────────────
+  { id:"ct_110", cat:"Pre-torneo", tarea:"Revisar pronóstico del tiempo y ajustar planes" },
+  { id:"ct_111", cat:"Pre-torneo", tarea:"Cambio de banderas (pre-torneo)" },
+  { id:"ct_112", cat:"Pre-torneo", tarea:"Cambio de banderas (post-torneo)" },
+  { id:"ct_113", cat:"Pre-torneo", tarea:"Corte final greens (HOC 4.5mm)" },
+  { id:"ct_114", cat:"Pre-torneo", tarea:"Reparación pitch marks" },
+  // ── FITOSANITARIO GOLF ────────────────────────────────────────────────────
+  { id:"ct_120", cat:"Fitosanitario", tarea:"Control fitosanitario" },
+  { id:"ct_121", cat:"Fitosanitario", tarea:"Delimitar zona afectada" },
+  { id:"ct_122", cat:"Fitosanitario", tarea:"Aplicar tratamiento fitosanitario" },
+  { id:"ct_123", cat:"Fitosanitario", tarea:"Registrar agente causal" },
+  { id:"ct_124", cat:"Fitosanitario", tarea:"Monitoreo diario" },
+  { id:"ct_125", cat:"Fitosanitario", tarea:"Cierre de zona Golf" },
+];
+
+// ─── NORMALIZADOR DE TAREAS ───────────────────────────────────────────────────
+function NormalizadorTareas({ S, tareasProg, setTareasProg, esJefa }) {
+  const [mapeo, setMapeo] = React.useState({}); // {tareaVieja: tareaEstandar}
+  const [aplicado, setAplicado] = React.useState({});
+  const [buscador, setBuscador] = React.useState({});
+
+  // Recopilar todas las tareas únicas existentes en Firebase
+  const tareasUnicas = React.useMemo(()=>{
+    const normArr = v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+    const set = {};
+    Object.entries(tareasProg).forEach(([fecha, arr])=>{
+      normArr(arr).forEach(t=>{
+        if(!t?.tarea) return;
+        const k = t.tarea.trim();
+        if(!set[k]) set[k] = {tarea:k, count:0, fechas:[]};
+        set[k].count++;
+        if(!set[k].fechas.includes(fecha)) set[k].fechas.push(fecha);
+      });
+    });
+    return Object.values(set).sort((a,b)=>b.count-a.count);
+  }, [tareasProg]);
+
+  // Detectar si ya es estándar
+  const esEstandar = (tarea) =>
+    CATALOGO_TAREAS.some(c=>c.tarea.toLowerCase()===tarea.toLowerCase());
+
+  // Sugerencia automática
+  const sugerirEstandar = (tarea) => {
+    const t = tarea.toLowerCase();
+    return CATALOGO_TAREAS.find(c=>c.tarea.toLowerCase()===t)
+      || CATALOGO_TAREAS.find(c=>c.tarea.toLowerCase().includes(t))
+      || CATALOGO_TAREAS.find(c=>t.includes(c.tarea.toLowerCase().split(" ")[0]));
+  };
+
+  const aplicarMapeo = (tareaVieja, tareaNueva) => {
+    if(!tareaNueva||tareaVieja===tareaNueva) return;
+    const normArr = v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+    const nuevo = {};
+    Object.entries(tareasProg).forEach(([fecha, arr])=>{
+      nuevo[fecha] = normArr(arr).map(t=>
+        t?.tarea?.trim()===tareaVieja ? {...t, tarea:tareaNueva} : t
+      );
+    });
+    setTareasProg(prev=>({...prev,...nuevo}));
+    setAplicado(p=>({...p,[tareaVieja]:tareaNueva}));
+  };
+
+  const noEstandar = tareasUnicas.filter(t=>!esEstandar(t.tarea)&&!aplicado[t.tarea]);
+  const yaEstandar = tareasUnicas.filter(t=>esEstandar(t.tarea)||aplicado[t.tarea]);
+
+  if(!esJefa) return null;
+
+  return (
+    <div className="ein">
+      <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,marginBottom:4}}>
+        🔧 Normalizar nombres de tareas
+      </div>
+      <div style={{fontSize:11,color:"#5a9a7a",marginBottom:16}}>
+        Estandariza los nombres existentes usando el catálogo oficial.
+        Los cambios se aplican a todas las tareas programadas.
+      </div>
+
+      {/* Resumen */}
+      <div style={{...S.card,padding:"10px 14px",marginBottom:16,display:"flex",gap:16}}>
+        <span style={{fontSize:12}}><b style={{color:"#f87171"}}>{noEstandar.length}</b> <span style={{color:"#9ca3af"}}>por normalizar</span></span>
+        <span style={{fontSize:12}}><b style={{color:"#34d399"}}>{yaEstandar.length}</b> <span style={{color:"#9ca3af"}}>ya estándar o normalizadas</span></span>
+        <span style={{fontSize:12}}><b style={{color:"#c0dac0"}}>{tareasUnicas.length}</b> <span style={{color:"#9ca3af"}}>tareas únicas totales</span></span>
+      </div>
+
+      {/* Lista de tareas por normalizar */}
+      {noEstandar.length===0
+        ? <div style={{...S.card,padding:24,textAlign:"center",color:"#34d399",fontSize:13}}>
+            ✅ Todas las tareas ya están estandarizadas
+          </div>
+        : <div style={{...S.card,padding:0,overflow:"hidden",marginBottom:16}}>
+            <div style={{padding:"8px 14px",borderBottom:"1px solid rgba(255,255,255,0.08)",
+              fontSize:10,color:"#5a9a7a",textTransform:"uppercase",letterSpacing:"0.5px",
+              display:"grid",gridTemplateColumns:"1fr auto 1fr auto",gap:8}}>
+              <span>Nombre actual</span><span>usos</span><span>Reemplazar por</span><span></span>
+            </div>
+            {noEstandar.map(({tarea,count})=>{
+              const sugerida = sugerirEstandar(tarea);
+              const seleccion = mapeo[tarea]||(sugerida?.tarea||"");
+              const busqLocal = buscador[tarea]||"";
+              const filtCat = busqLocal.length>=1
+                ? CATALOGO_TAREAS.filter(c=>c.tarea.toLowerCase().includes(busqLocal.toLowerCase()))
+                : CATALOGO_TAREAS;
+              return (
+                <div key={tarea} style={{padding:"10px 14px",borderBottom:"1px solid rgba(255,255,255,0.05)",
+                  display:"grid",gridTemplateColumns:"1fr auto 1fr auto",gap:8,alignItems:"center"}}>
+                  <div>
+                    <div style={{fontSize:13,color:"#f87171",fontWeight:500}}>{tarea}</div>
+                    <div style={{fontSize:10,color:"#5a9a7a"}}>{count} uso(s)</div>
+                  </div>
+                  <div style={{color:"#4a7a5a",fontSize:16}}>→</div>
+                  <div style={{position:"relative"}}>
+                    <input
+                      placeholder="Buscar tarea estándar..."
+                      value={busqLocal||seleccion}
+                      onChange={e=>{
+                        setBuscador(p=>({...p,[tarea]:e.target.value}));
+                        setMapeo(p=>({...p,[tarea]:e.target.value}));
+                      }}
+                      style={{...S.input,fontSize:12,width:"100%"}}/>
+                    {busqLocal.length>=1&&(
+                      <div style={{position:"absolute",zIndex:999,top:"100%",left:0,right:0,
+                        background:"#1a2e1a",border:"1px solid rgba(52,211,153,0.3)",
+                        borderRadius:"0 0 8px 8px",maxHeight:160,overflowY:"auto",
+                        boxShadow:"0 4px 16px rgba(0,0,0,0.4)"}}>
+                        {filtCat.slice(0,10).map(c=>(
+                          <div key={c.id}
+                            onClick={()=>{
+                              setMapeo(p=>({...p,[tarea]:c.tarea}));
+                              setBuscador(p=>({...p,[tarea]:""}));
+                            }}
+                            style={{padding:"6px 12px",fontSize:12,color:"#c0dac0",cursor:"pointer",
+                              borderBottom:"1px solid rgba(255,255,255,0.04)"}}
+                            onMouseEnter={e=>e.currentTarget.style.background="rgba(52,211,153,0.1)"}
+                            onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                            <span style={{fontSize:9,color:"#4a7a5a",marginRight:6}}>{c.cat}</span>
+                            {c.tarea}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    disabled={!seleccion||seleccion===tarea}
+                    onClick={()=>{aplicarMapeo(tarea, mapeo[tarea]||sugerida?.tarea||"");}}
+                    style={{...S.btn,fontSize:11,padding:"4px 10px",
+                      background:seleccion&&seleccion!==tarea?"rgba(34,197,94,0.15)":"rgba(255,255,255,0.04)",
+                      color:seleccion&&seleccion!==tarea?"#22c55e":"#4a7a5a",
+                      border:`1px solid ${seleccion&&seleccion!==tarea?"rgba(34,197,94,0.3)":"rgba(255,255,255,0.08)"}`,
+                      cursor:seleccion&&seleccion!==tarea?"pointer":"not-allowed",
+                      whiteSpace:"nowrap"}}>
+                    ✓ Aplicar
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+      }
+
+      {/* Ya estandarizadas */}
+      {yaEstandar.length>0&&(
+        <details style={{...S.card,padding:10}}>
+          <summary style={{fontSize:12,color:"#5a9a7a",cursor:"pointer"}}>
+            ✅ {yaEstandar.length} tareas ya estandarizadas
+          </summary>
+          <div style={{marginTop:8}}>
+            {yaEstandar.map(({tarea,count})=>(
+              <div key={tarea} style={{display:"flex",justifyContent:"space-between",
+                padding:"4px 8px",fontSize:11,color:"#34d399"}}>
+                <span>{aplicado[tarea]?"✓ "+aplicado[tarea]:tarea}</span>
+                <span style={{color:"#5a9a7a"}}>{count} uso(s)</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+    </div>
+  );
+}
+
+
+function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACROZONAS_BASE, tareas, setTareas, tareasZonaHoy=0, esJefa=false, configSemanal={}, setConfigSemanal, puedeCrear=false, cierresTurno={}, onReabrirTurno, getElemFrecs, setElemFrecs, aplicaciones=[], setAplicaciones, stockFito, setStockFito, crearNotificacion }) {
   const hoy = fechaLocal();
   const [fecha, setFecha] = React.useState(hoy);
   const [tabProg, setTabProg] = React.useState("programa");
@@ -3241,16 +3913,25 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           // Solo proponer si la fecha calculada ya llegó (vencida o es hoy) — no proponer tareas futuras todavía lejanas
           if(prox.diff > 0) return;
           const esVencida = prox.diff < 0;
-          const item = { id: Date.now()+Math.random(), fecha, zona:z.nombre, elemento:e.nombre, tarea:f.tarea, responsable:"", estado:"por_designar", notas:f.obs||"", frecuencia:f.modo==="diasSemana"?`cada ${f.diasMinimos||"?"} días`:f[estProp], estacion:estProp, auto:true, fechaCorrespondiente:prox.fecha, origenZid:String(z.id), origenEid:e.id, origenFrecId:f.id, origenEsCustom:!!e.isCustom };
+          // Asignar responsable por defecto según zona y tipo de tarea
+          const esZonaGolf = z.id===31||(z.nombre||"").toLowerCase().includes("golf");
+          const respDefault = esZonaGolf
+            ? "Osmar Bhalú Armijo Zúñiga"  // Golf → Bhalú por defecto
+            : getResponsablePorTipo(f.tarea, configSemanal, z.nombre)||"";
+          if(esZonaGolf) console.log("Golf tarea:", f.tarea, "→ resp:", respDefault);
+          const item = { id: Date.now()+Math.random(), fecha, zona:z.nombre, elemento:e.nombre, tarea:f.tarea, responsable:respDefault, estado:respDefault?"pendiente":"por_designar", notas:f.obs||"", frecuencia:f.modo==="diasSemana"?`cada ${f.diasMinimos||"?"} días`:f[estProp], estacion:estProp, auto:true, fechaCorrespondiente:prox.fecha, origenZid:String(z.id), origenEid:e.id, origenFrecId:f.id, origenEsCustom:!!e.isCustom };
           propuestas.push(item);
-          if(esVencida) vencidas.push(`${z.nombre} — ${f.tarea} (vencida desde ${prox.fecha})`);
+          if(esVencida) { const vKey=`${z.nombre} — ${f.tarea}`; if(!vencidas.includes(vKey)) vencidas.push(vKey); }
         });
       });
     });
+    // No proponer tareas en domingo
+    const diaSemana = new Date(fecha+"T12:00:00").getDay();
+    if(diaSemana===0) return alert("⚠️ Es domingo. Las tareas no se programan automáticamente en domingo. Agrégalas manualmente si hay turno especial.");
     if(propuestas.length===0) return alert("No hay tareas pendientes según las frecuencias definidas para esta fecha.\n\nRevisa que las macrozonas tengan 'Última realización' registrada en sus frecuencias.");
     setTareasDelDia(fecha, [...getTareasDelDia(fecha), ...propuestas]);
     if(esDomingo(fecha)) setAviso("⚠️ El día seleccionado es domingo. Las tareas fueron cargadas igual, pero considera mover la programación a otro día.");
-    else if(vencidas.length>0) setAviso(`⚠️ ${vencidas.length} tarea(s) están vencidas según su frecuencia: ${vencidas.slice(0,3).join(" · ")}${vencidas.length>3?"...":""}`);
+    else if(vencidas.length>0) setAviso(`✅ ${propuestas.length} tarea(s) propuestas. ${vencidas.length} estaban vencidas y se programaron para hoy: ${vencidas.slice(0,3).join(" · ")}${vencidas.length>3?" y más...":""}`);
   };
 
     const ESTADOS_TAREA = ESTADOS_TAREA_GLOBAL;
@@ -3291,6 +3972,22 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           <button onClick={proponerTareas} style={{...S.btn,background:"rgba(59,130,246,0.2)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)",fontSize:13}}>✨ Proponer del día</button>
           {esJefa&&(
             <button onClick={()=>{
+              if(!window.confirm("Esto actualizará Golf en Firebase con la nueva estructura (Tees 01A-09B, Fairways 01-09, Búnkers 01-05). Los elementos custom se mantendrán. ¿Continuar?")) return;
+              const golfBase = MACROZONAS_BASE.find(z=>z.id===31);
+              if(!golfBase) return;
+              const nuevosElems = {};
+              golfBase.elementos.forEach(e=>{
+                nuevosElems[e.id] = { estado:"bueno", notas:"", frecuencias:[] };
+              });
+              fbUpdate(ref(db, ROOT+"/data/31"), { elementos: nuevosElems })
+                .then(()=>alert("✅ Golf actualizado en Firebase con la nueva estructura"))
+                .catch(e=>alert("Error: "+e));
+            }} style={{...S.btn,background:"rgba(96,165,250,0.1)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.2)",fontSize:11,marginBottom:8,width:"100%"}}>
+              🔄 Actualizar estructura Golf en Firebase
+            </button>
+          )}
+          {esJefa&&(
+            <button onClick={()=>{
               if(!window.confirm("¿Eliminar TODAS las tareas auto-generadas de Golf (auto:true) de todos los días? Esto limpia los duplicados.")) return;
               setTareas(prev=>{
                 const limpio={};
@@ -3303,6 +4000,133 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
               });
             }} style={{...S.btn,background:"rgba(239,68,68,0.1)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.2)",fontSize:11}}>
               🧹 Limpiar tareas auto Golf
+            </button>
+          )}
+          {esJefa&&(
+            <button onClick={()=>{
+              const hoy = fecha;
+              setTareas(prev=>{
+                const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+                const arr = normArr(prev[hoy]||[]);
+                const count = arr.filter(t=>(t.zona==="Golf"||(t.zona||"").toLowerCase().includes("golf"))&&!t.responsable).length;
+                if(count===0){alert("No hay tareas de Golf sin asignar hoy.");return prev;}
+                const updated = arr.map(t=>{
+                  const esGolf=(t.zona==="Golf"||(t.zona||"").toLowerCase().includes("golf"));
+                  return esGolf&&!t.responsable?{...t,responsable:"Osmar Bhalú Armijo Zúñiga",estado:"pendiente"}:t;
+                });
+                alert(count+" tarea(s) de Golf asignadas a Bhalú.");
+                return {...prev,[hoy]:updated};
+              });
+            }} style={{...S.btn,background:"rgba(251,191,36,0.1)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.2)",fontSize:11}}>
+              ⛳ Asignar Golf → Bhalú
+            </button>
+          )}
+          {esJefa&&(
+            <button onClick={()=>{
+              // MODO LLUVIA
+              const diaSemana = new Date(fecha+"T12:00:00").getDay();
+              const normArr = v=>Array.isArray(v)?v:Object.values(v||{});
+              const tareasHoy = normArr(tareas[fecha]||[]);
+              
+              // Palabras clave de tareas que NO se cancelan por lluvia
+              const BAJO_TECHO = ["bajo techo","invernadero","vivero","bodega","sala","interior","oficina","taller"];
+              const EXTERIOR_CANCELAR = ["corte","poda","fumiga","fungicida","pestici","herbicida","siembra","plantaci","trasplant","aireaci","vertic","fertiliz","abono","soplad","barrido"];
+              
+              const esBajoTecho = t => {
+                // 1. Verificar campo condicion en data del elemento
+                if(t.zona && t.elemento) {
+                  const zonaObj = MACROZONAS_BASE.find(z=>z.nombre===t.zona);
+                  if(zonaObj) {
+                    const zdat = getZD ? getZD(String(zonaObj.id)) : {};
+                    const elemBase = zdat.elementos?.[zonaObj.elementos?.find(e=>e.nombre===t.elemento)?.id];
+                    const elemCustom = (zdat.elementosCustom||[]).find(e=>e.nombre===t.elemento);
+                    const condicion = elemBase?.condicion || elemCustom?.condicion;
+                    if(condicion==="bajo_techo") return true;
+                    if(condicion==="exterior") return false;
+                    if(condicion==="mixto") return false; // mixto = revisar manual
+                  }
+                }
+                // 2. Fallback: keywords en texto
+                return BAJO_TECHO.some(k=>(t.tarea+" "+(t.notas||"")).toLowerCase().includes(k));
+              };
+              const esExterior = t => EXTERIOR_CANCELAR.some(k=>(t.tarea||t.elemento||"").toLowerCase().includes(k));
+              const esRiego = t => (t.tarea||t.elemento||"").toLowerCase().includes("riego")||(t.tarea||t.elemento||"").toLowerCase().includes("regar");
+              
+              const aPosponer = tareasHoy.filter(t=>
+                normalizarEstado(t.estado)!=="hecha" &&
+                !esBajoTecho(t) &&
+                (esExterior(t) || (!esRiego(t) && !esBajoTecho(t)))
+              );
+              
+              const aRevisar = tareasHoy.filter(t=>esRiego(t)&&normalizarEstado(t.estado)!=="hecha");
+              
+              if(aPosponer.length===0&&aRevisar.length===0){
+                alert("No hay tareas que posponer por lluvia."); return;
+              }
+              
+              const msg = [
+                aPosponer.length>0 ? aPosponer.length+" tarea(s) de exterior se marcarán como 'No se pudo (lluvia)' y se reprogramarán en 2 días hábiles." : "",
+                aRevisar.length>0 ? aRevisar.length+" tarea(s) de riego requieren revisión manual (algunas pueden estar bajo techo)." : "",
+              ].filter(Boolean).join("\n");
+              if(!window.confirm("🌧️ MODO LLUVIA\n\n"+msg+"\n\n¿Continuar?")) return;
+              if(!window.confirm("Modo Lluvia: "+msg+" Continuar?")) return;
+              
+              // Destino = +2 días hábiles (sin domingo)
+              const destino = diasHabiles(fecha, 2);
+              
+              // Marcar como no_pudo y reprogramar
+              const nuevasTareasDestino = [];
+              setTareas(prev=>{
+                const normA = v=>Array.isArray(v)?v:Object.values(v||{});
+                const hoy = normA(prev[fecha]||[]).map(t=>{
+                  if(aPosponer.some(p=>p.id===t.id)){
+                    return {...t, estado:"no_pudo", notaWorker:"No se pudo — Lluvia"};
+                  }
+                  return t;
+                });
+                // Crear copias para el día destino
+                aPosponer.forEach(t=>{
+                  nuevasTareasDestino.push({...t,
+                    id:Date.now()+Math.random(),
+                    fecha:destino,
+                    estado:"pendiente",
+                    notaWorker:"",
+                    notas:(t.notas?t.notas+" | ":"")+"Reprogramada por lluvia desde "+fecha,
+                  });
+                });
+                const destArr = [...normA(prev[destino]||[]),...nuevasTareasDestino];
+                return {...prev,[fecha]:hoy,[destino]:destArr};
+              });
+              
+              setTimeout(()=>alert("Modo lluvia aplicado. "+aPosponer.length+" tarea(s) reprogramadas para "+destino+". "+(aRevisar.length>0?aRevisar.length+" riego(s) a revisar manualmente.":"")),200);
+            }} style={{...S.btn,background:"rgba(96,165,250,0.1)",color:"#93c5fd",border:"1px solid rgba(96,165,250,0.2)",fontSize:11}}>
+              🌧️ Modo lluvia
+            </button>
+          )}
+          {esJefa&&(
+            <button onClick={()=>{
+              // Próximo día hábil (salta domingo)
+              const mananaStr = diasHabiles(fecha, 1);
+              // Obtener TODAS las tareas del día normalizando el array
+              const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+              const todasHoy = normArr(tareas[fecha]||[]);
+              console.log("Reprogramar: fecha="+fecha+" total="+todasHoy.length, todasHoy.map(t=>t.tarea+"→"+t.estado));
+              const pendientes = todasHoy.filter(t=>{
+                const est = normalizarEstado(t.estado);
+                return est!=="hecha" && est!=="no_pudo";
+              });
+              console.log("Pendientes:", pendientes.length);
+              if(pendientes.length===0) return alert("No hay tareas pendientes para reprogramar.");
+              const tareasManana = normArr(tareas[mananaStr]||[]);
+              const yaExisten = tareasManana.map(t=>t.zona+"_"+t.tarea);
+              const nuevas = pendientes
+                .filter(t=>!yaExisten.includes(t.zona+"_"+t.tarea))
+                .map(t=>({...t, id:Date.now()+Math.random(), fecha:mananaStr, estado:"pendiente"}));
+              if(nuevas.length===0) return alert("Todas las tareas pendientes ya existen para mañana.");
+              setTareasDelDia(mananaStr, [...normArr(tareas[mananaStr]||[]), ...nuevas]);
+              alert(`✅ ${nuevas.length} tarea(s) pendientes reprogramadas para ${mananaStr}`);
+            }} style={{...S.btn,background:"rgba(251,191,36,0.1)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.2)",fontSize:11}}>
+              📅 Reprogramar pendientes para mañana
             </button>
           )}
           <button onClick={()=>{
@@ -3318,17 +4142,38 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
 
       {/* Tabs */}
       <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
-        {[["programa","📆 Programar"],["frecuencias","🔄 Frecuencias"],["historial","📜 Historial"]].map(([t,l])=>(
+        {[["programa","📆 Programar"],["semana","🗓 Semana"],["frecuencias","🔄 Frecuencias"],["fitosanitario","⚗ Fitosanitario"],["normalizar","🔧 Normalizar"],["historial","📜 Historial"]].map(([t,l])=>(
           <button key={t} className={`tab${tabProg===t?" on":""}`} onClick={()=>setTabProg(t)}>{l}</button>
         ))}
       </div>
 
       {/* ── FRECUENCIAS POR MACROZONA ── */}
+      {tabProg==="semana"&&(
+        <PlanificadorSemanal
+          S={S} MACROZONAS_BASE={zonasConCust} getAllElems={getAllElems}
+          getZD={getZD} getElemFrecs={getElemFrecs}
+          tareas={tareas} setTareas={setTareas}
+          personal={personal} configSemanal={configSemanal} esJefa={esJefa}/>
+      )}
+
       {tabProg==="frecuencias"&&(
-        <PanelFrecuenciasZona S={S} zonas={zonas} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} esJefa={esJefa}/>
+        <PanelFrecuenciasZona S={S} zonas={MACROZONAS_BASE} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} esJefa={esJefa}/>
       )}
 
       {/* ── HISTORIAL ── */}
+      {tabProg==="fitosanitario"&&(
+        <PanelFitosanitarioGlobal
+          S={S} MACROZONAS_BASE={MACROZONAS_BASE} getAllElems={getAllElems}
+          personal={personal} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones}
+          tareasProg={tareas} setTareasProg={setTareas}
+          stockFito={stockFito} setStockFito={setStockFito}
+          crearNotificacion={crearNotificacion} esJefa={esJefa}/>
+      )}
+
+      {tabProg==="normalizar"&&(
+        <NormalizadorTareas S={S} tareasProg={tareas} setTareasProg={setTareas} esJefa={esJefa}/>
+      )}
+
       {tabProg==="historial" && (
         <HistorialProg tareas={tareas} setTareas={setTareas} MACROZONAS_BASE={MACROZONAS_BASE} S={S} esJefa={esJefa} puedeCrear={puedeCrear} cierresTurno={cierresTurno} onReabrirTurno={onReabrirTurno}/>
       )}
@@ -3420,10 +4265,10 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
 
           {/* ── VISTA SEMANAL ── */}
           {vistaSemanal&&(()=>{
-            const hoyD = new Date(hoy+"T12:00:00");
-            // Semana próxima: lunes siguiente
-            const diasHastaLunes = ((8 - hoyD.getDay()) % 7) || 7; // días hasta próximo lunes
-            const lunes = new Date(hoyD); lunes.setDate(hoyD.getDate()+diasHastaLunes);
+            const fechaD = new Date(fecha+"T12:00:00");
+            // Semana del día seleccionado (lunes de esa semana)
+            const lunes = new Date(fechaD);
+            lunes.setDate(fechaD.getDate()-((fechaD.getDay()+6)%7));
             const dias7 = Array.from({length:7},(_,i)=>{
               const d = new Date(lunes); d.setDate(lunes.getDate()+i);
               return d.toISOString().slice(0,10);
@@ -3495,17 +4340,17 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                   </tbody>
                 </table>
                 <div style={{fontSize:10,color:"#4a7a5a",marginTop:8}}>
-                  Clic en el estado para ir al día · Semana {new Date(lunes+"T12:00:00").toLocaleDateString("es-CL",{day:"2-digit",month:"short"})} – {new Date(dias7[6]+"T12:00:00").toLocaleDateString("es-CL",{day:"2-digit",month:"short"})}
+                  Clic en el estado para ir al día · Semana {new Date(dias7[0]+"T12:00:00").toLocaleDateString("es-CL",{day:"2-digit",month:"short"})} – {new Date(dias7[6]+"T12:00:00").toLocaleDateString("es-CL",{day:"2-digit",month:"short"})}
                 </div>
               </div>
             );
           })()}
 
-          {!vistaSemanal&&showAgregar && (
+          {showAgregar && (
             <div style={{...S.card,padding:18,marginBottom:16}} className="ein">
               <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:14}}>Nueva Tarea — {fecha}</div>
               {(()=>{
-                const zonasSinGolf=[...MACROZONAS_BASE].filter(z=>z.id!==31).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+                const zonasSinGolf=[...MACROZONAS_BASE].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
                 const zonaObj=zonasSinGolf.find(z=>z.nombre===nuevaTarea.zona);
                 const elemsZona=zonaObj?getAllElems(zonaObj.id):[];
                 const elemObj=elemsZona.find(e=>e.nombre===nuevaTarea.elemento);
@@ -3519,7 +4364,12 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                 <div>
                   <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>MACROZONA</label>
                   <select style={{...S.input,fontSize:13}} value={nuevaTarea.zona}
-                    onChange={e=>setNuevaTarea(p=>({...p,zona:e.target.value,elemento:"",tarea:""}))}>
+                    onChange={e=>setNuevaTarea(p=>{
+                        const esGolf = (e.target.value||"").toLowerCase().includes("golf");
+                        return {...p, zona:e.target.value, elemento:"", tarea:"",
+                          responsable: esGolf ? "Osmar Bhalú Armijo Zúñiga" : (p.responsable||"")
+                        };
+                      })}>
                     <option value="">Seleccionar zona...</option>
                     {zonasSinGolf.map(z=>(
                       <option key={z.id} value={z.nombre}>{z.icono} {z.nombre}</option>
@@ -3542,28 +4392,56 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                 </div>
                 <div style={{gridColumn:"1/-1"}}>
                   <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>TAREA</label>
-                  <select style={{...S.input,fontSize:13}} value={nuevaTarea.tarea}
-                    onChange={e=>setNuevaTarea(p=>({...p,tarea:e.target.value==="__otro__"?"":e.target.value,responsable:p.responsable||(getResponsablePorTipo(e.target.value==="__otro__"?"":e.target.value,configSemanal)||"")}))}>
-                    <option value="">Seleccionar tarea...</option>
-                    {tareasDisp.map(t=><option key={t} value={t}>{t}</option>)}
-                    <option value="__otro__">✏️ Escribir otra...</option>
-                  </select>
-                  {nuevaTarea.tarea===""&&(
-                    <input style={{...S.input,fontSize:13,marginTop:6}} autoFocus
-                      placeholder="Describir tarea..."
-                      onChange={e=>setNuevaTarea(p=>({...p,tarea:e.target.value,responsable:p.responsable||(getResponsablePorTipo(e.target.value,configSemanal)||"")}))}/>
-                  )}
+                  <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>TAREA</label>
+                  <div style={{position:"relative"}}>
+                    <input
+                      placeholder="Buscar tarea del catálogo o escribir..."
+                      value={nuevaTarea.tarea}
+                      onChange={e=>{
+                        const v=e.target.value;
+                        setNuevaTarea(p=>({...p,tarea:v,
+                          responsable:p.responsable||(getResponsablePorTipo(v,configSemanal,p.zona)||"")}));
+                      }}
+                      style={{...S.input,fontSize:13,width:"100%"}}
+                      autoComplete="off"/>
+                    {nuevaTarea.tarea.length>=2&&(()=>{
+                      const busq=nuevaTarea.tarea.toLowerCase();
+                      const filtradas=CATALOGO_TAREAS.filter(c=>c.tarea.toLowerCase().includes(busq)&&c.tarea.toLowerCase()!==busq);
+                      if(filtradas.length===0) return null;
+                      const cats=[...new Set(filtradas.map(c=>c.cat))];
+                      return (
+                        <div style={{position:"absolute",zIndex:999,top:"100%",left:0,right:0,
+                          background:"#1a2e1a",border:"1px solid rgba(52,211,153,0.3)",
+                          borderRadius:"0 0 8px 8px",maxHeight:200,overflowY:"auto",
+                          boxShadow:"0 4px 16px rgba(0,0,0,0.4)"}}>
+                          {cats.map(cat=>(
+                            <div key={cat}>
+                              <div style={{padding:"3px 12px",fontSize:9,color:"#4a7a5a",textTransform:"uppercase",letterSpacing:"0.5px",background:"rgba(0,0,0,0.2)"}}>{cat}</div>
+                              {filtradas.filter(c=>c.cat===cat).map(c=>(
+                                <div key={c.id}
+                                  onClick={()=>setNuevaTarea(p=>({...p,tarea:c.tarea,
+                                    responsable:p.responsable||(getResponsablePorTipo(c.tarea,configSemanal,p.zona)||"")}))}
+                                  style={{padding:"7px 14px",fontSize:12,color:"#c0dac0",cursor:"pointer",
+                                    borderBottom:"1px solid rgba(255,255,255,0.04)",userSelect:"none"}}
+                                  onMouseEnter={e=>e.currentTarget.style.background="rgba(52,211,153,0.1)"}
+                                  onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                                  {c.tarea}
+                                </div>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
                   {nuevaTarea.tarea==="Plantar desde Vivero"&&(
                     <div style={{marginTop:8,padding:"10px 12px",background:"rgba(74,222,128,0.08)",border:"1px solid rgba(74,222,128,0.25)",borderRadius:8,fontSize:12,color:"#4ade80"}}>
                       🌱 Para plantar desde Vivero con descuento de stock e insumos, usa el botón <strong>"🌱 Plantar desde Vivero"</strong> en la ficha de la macrozona → tab <strong>✅ Tareas</strong>.<br/>
                       <span style={{color:"#5a9a7a",fontSize:11}}>Esta tarea se registrará aquí automáticamente al completar ese formulario.</span>
                     </div>
                   )}
-                </div>
-                <div>
-                  <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>RESPONSABLE</label>
-                  <ResponsableSelector
-                    value={nuevaTarea.responsable}
+
+
                     personal={personal}
                     onChange={v=>setNuevaTarea(p=>({...p,responsable:v,estado:v?"pendiente":"por_designar"}))}
                     S={S}
@@ -3584,7 +4462,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
               </>);})()}
               <div style={{display:"flex",gap:8}}>
                 <button className="btn-p" style={S.btn} onClick={()=>{
-                  if(!nuevaTarea.zona||!nuevaTarea.tarea) return;
+                  if(!nuevaTarea.zona||!nuevaTarea.tarea||nuevaTarea.tarea==="__otro__") return;
                   addTarea(nuevaTarea);
                   setNuevaTarea({zona:"",elemento:"",tarea:"",responsable:"",estado:"por_designar",notas:""});
                   setShowAgregar(false);
@@ -4686,10 +5564,15 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
     {v:1,l:"Lun",full:"Lunes"},{v:2,l:"Mar",full:"Martes"},{v:3,l:"Mié",full:"Miércoles"},
     {v:4,l:"Jue",full:"Jueves"},{v:5,l:"Vie",full:"Viernes"},{v:6,l:"Sáb",full:"Sábado"},{v:0,l:"Dom",full:"Domingo"},
   ];
-  const frecuencias = getFrecs(zid, eid, tipo, isCustom);
-  const updateFila = (idx, campo, valor) => { const arr = frecuencias.map((f,i)=>i===idx?{...f,[campo]:valor}:f); setFrecs(zid,eid,isCustom,arr); };
-  const addFila = () => { setFrecs(zid,eid,isCustom,[...frecuencias,{id:eid+"_"+Date.now(),modo:"estacion",tarea:"",verano:"semanal",otono:"semanal",invierno:"noaplica",primavera:"semanal",ultimaVez:"",diasSemana:[],diasProhibidos:[0,6],diasMinimos:""}]); };
-  const removeFila = (idx) => { setFrecs(zid,eid,isCustom,frecuencias.filter((_,i)=>i!==idx)); };
+  const frecuenciasBase = getFrecs(zid, eid, tipo, isCustom);
+  const [frecLocal, setFrecLocal] = React.useState(frecuenciasBase);
+  const [guardado, setGuardado] = React.useState(false);
+  React.useEffect(()=>{ setFrecLocal(getFrecs(zid,eid,tipo,isCustom)); setGuardado(false); },[zid,eid]);
+  const frecuencias = frecLocal;
+  const updateFila = (idx, campo, valor) => { setFrecLocal(arr=>arr.map((f,i)=>i===idx?{...f,[campo]:valor}:f)); setGuardado(false); };
+  const addFila = () => { setFrecLocal(arr=>[...arr,{id:eid+"_"+Date.now(),modo:"estacion",tarea:"",verano:"semanal",otono:"semanal",invierno:"noaplica",primavera:"semanal",ultimaVez:"",diasSemana:[],diasProhibidos:[0,6],diasMinimos:""}]); setGuardado(false); };
+  const removeFila = (idx) => { setFrecLocal(arr=>arr.filter((_,i)=>i!==idx)); setGuardado(false); };
+  const guardarFrecuencias = () => { setFrecs(zid,eid,isCustom,frecLocal); setGuardado(true); setTimeout(()=>setGuardado(false),2000); };
 
   // Convierte frecuencia a días
   const frecToDias = (frec) => {
@@ -4741,7 +5624,20 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
     return null;
   };
 
-  const calcProxima = (f) => f.modo==="diasSemana" ? calcProximaDiaSemana(f) : calcProximaEstacion(f);
+  const calcProximaIntervalo = (f) => {
+    if(!f.ultimaVez||!f.intervaloDias) return null;
+    const dias = Number(f.intervaloDias);
+    if(!dias||dias<=0) return null;
+    const ultima = new Date(f.ultimaVez+"T12:00:00");
+    const proxima = new Date(ultima.getTime() + dias*24*60*60*1000);
+    const hoyD = new Date(); hoyD.setHours(12,0,0,0);
+    const diff = Math.round((proxima-hoyD)/(24*60*60*1000));
+    return { fecha: proxima.toISOString().slice(0,10), diff };
+  };
+  const calcProxima = (f) =>
+    f.modo==="diasSemana" ? calcProximaDiaSemana(f) :
+    f.modo==="intervalo"  ? calcProximaIntervalo(f)  :
+    calcProximaEstacion(f);
   const esSinFrecuencia = (f) => f.modo!=="diasSemana" && f.modo!=="intervalo" && ["unavez","segunecesidad"].includes(f[estActual]);
 
   const inputSt = {background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:7,color:"#ede9e0",padding:"7px 10px",fontFamily:"'Georgia',serif",fontSize:13,width:"100%",outline:"none"};
@@ -4953,6 +5849,9 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
 
       <button onClick={addFila} style={{background:"rgba(61,122,82,0.2)",border:"1px solid rgba(61,122,82,0.3)",borderRadius:8,color:"#80c890",padding:"8px 16px",fontFamily:"'Georgia',serif",fontSize:13,cursor:"pointer",width:"100%"}}>
         ＋ Agregar tarea de mantención
+      </button>
+      <button onClick={guardarFrecuencias} style={{marginTop:8,width:"100%",padding:"8px 16px",borderRadius:8,cursor:"pointer",fontFamily:"'Georgia',serif",fontSize:13,background:guardado?"rgba(34,197,94,0.15)":"rgba(59,130,246,0.1)",color:guardado?"#22c55e":"#60a5fa",border:`1px solid ${guardado?"rgba(34,197,94,0.4)":"rgba(59,130,246,0.3)"}`}}>
+        {guardado?"✅ Frecuencias guardadas":"💾 Guardar frecuencias"}
       </button>
     </div>
   );
@@ -5833,7 +6732,7 @@ const REINGRESO_DIAS = {
 // Estado inicial vacío — se inicializa desde localStorage
 const INCIDENCIAS_INICIAL = [];
 
-function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, tareasProg, setTareasProg, incidenciasFito, setIncidenciasFito, crearNotificacion, zonasFito }) {
+function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, tareasProg, setTareasProg, incidenciasFito, setIncidenciasFito, crearNotificacion, zonasFito, stockFito, setStockFito }) {
   const hoy = new Date();
   const mesActual = hoy.getMonth() + 1;
   const [subTab, setSubTab] = React.useState("historial");
@@ -5850,10 +6749,9 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
   const incidencias = incidenciasFito;
   const setIncidencias = setIncidenciasFito;
 
-  // ── Stock (inicializa desde localStorage o desde STOCK_INICIAL) ──────────────
-  const initStock = () => { try { const s=localStorage.getItem("ev2-fung-stock"); return s?JSON.parse(s):STOCK_INICIAL; } catch { return STOCK_INICIAL; } };
-  const [stock, setStock] = React.useState(initStock);
-  React.useEffect(() => { try { localStorage.setItem("ev2-fung-stock", JSON.stringify(stock)); } catch {} }, [stock]);
+  // ── Stock desde Firebase (compartido entre dispositivos) ──────────────
+  const stock = (stockFito && Object.keys(stockFito).length > 0) ? stockFito : STOCK_INICIAL;
+  const setStock = setStockFito || (() => {});
 
   // ── Pedidos (inicializa con el pedido 7609) ──────────────────────────────────
   const initPedidos = () => { try { const s=localStorage.getItem("ev2-fung-pedidos"); return s?JSON.parse(s):PEDIDO_INICIAL; } catch { return PEDIDO_INICIAL; } };
@@ -5997,6 +6895,24 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
     if(!form.producto.trim()||!form.fecha) return;
     const nueva = { ...form, id:Date.now(), mes:mesActual, sectorFinal };
     setAplicaciones(prev=>[nueva, ...prev].slice(0,200));
+    // Descontar stock si hay producto y cantidad usada
+    if(form.producto && form.cantidadUsada) {
+      const cant = Number(form.cantidadUsada);
+      if(cant > 0) {
+        setStock(prev => {
+          const key = form.producto.trim().toLowerCase();
+          // Buscar el producto en stock (match parcial)
+          const stockKey = Object.keys(prev).find(k => k.toLowerCase().includes(key) || key.includes(k.toLowerCase()));
+          if(!stockKey) return prev;
+          const actual = Number(prev[stockKey]?.cantidad || prev[stockKey] || 0);
+          const nuevo = Math.max(0, actual - cant);
+          if(typeof prev[stockKey] === "object") {
+            return {...prev, [stockKey]: {...prev[stockKey], cantidad: nuevo}};
+          }
+          return {...prev, [stockKey]: nuevo};
+        });
+      }
+    }
 
     // Enviar a programa del día si está marcado
     if(form.enviarProg && form.fecha) {
@@ -6006,8 +6922,8 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
         zona: sectorFinal || form.superficie || "Fungicidas",
         elemento: "",
         tarea: `🧪 Aplicación fungicida: ${form.producto}${form.dosis ? " · "+form.dosis : ""}${sectorFinal ? " → "+sectorFinal : ""}`,
-        responsable: form.responsable || "",
-        estado: "por_designar",
+        responsable: form.responsable || (sectorFinal==="Golf"||(sectorFinal||"").toLowerCase().includes("golf")?"Osmar Bhalú Armijo Zúñiga":""),
+        estado: form.responsable ? "pendiente" : "por_designar",
         notas: form.obs || "",
         auto: false,
         origenFungicida: true,
@@ -6368,12 +7284,12 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                       </div>
                       {incidForm.productoAplicar&&(()=>{
                         const reapert1 = calcReapertura(incidForm.productoAplicar, incidForm.fechaAplicacion, incidForm.horaAplicacion);
-                        if(!r.label) return null;
+                        if(!reapert1.label) return null;
                         return (
                           <div style={{gridColumn:"1/-1",background:"rgba(34,197,94,0.08)",border:"1px solid rgba(34,197,94,0.25)",borderRadius:10,padding:"10px 14px"}}>
                             <div style={{fontSize:12,color:"#86efac",fontWeight:600,marginBottom:4}}>📅 Reapertura estimada según ficha técnica</div>
-                            <div style={{fontSize:15,color:"#4ade80",fontWeight:700,marginBottom:4}}>{r.label}</div>
-                            <div style={{fontSize:11,color:"#5a9a7a",fontStyle:"italic"}}>{r.nota}</div>
+                            <div style={{fontSize:15,color:"#4ade80",fontWeight:700,marginBottom:4}}>{reapert1.label}</div>
+                            <div style={{fontSize:11,color:"#5a9a7a",fontStyle:"italic"}}>{reapert1.nota}</div>
                           </div>
                         );
                       })()}
@@ -6444,7 +7360,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                   </div>
                   {(()=>{
                     const reapert2 = calcReapertura(incidForm.productoAplicar, incidForm.fechaAplicacion, incidForm.horaAplicacion);
-                    if(!r.label) return null;
+                    if(!reapert1.label) return null;
                     return (
                       <div style={{...S.card,padding:14,marginBottom:12,background:"rgba(34,197,94,0.08)",borderColor:"rgba(34,197,94,0.25)"}}>
                         <div style={{fontSize:12,color:"#86efac",fontWeight:600,marginBottom:3}}>✅ Reapertura estimada</div>
@@ -7184,7 +8100,7 @@ function CuentaSelector({ value, onChange, S, CUENTAS_INTERNAS, CUENTAS_EXTERNAS
             <div style={{padding:"8px 14px 4px",fontSize:10,color:"#4ade80",fontWeight:700,letterSpacing:"1px",textTransform:"uppercase",background:"rgba(74,222,128,0.05)"}}>
               🏛️ Internas — Beneficio general socios
             </div>
-            {CUENTAS_INTERNAS.map(cuentaGrp=>(
+            {CUENTAS_INTERNAS.map(c=>(
               <div key={c} style={{padding:"9px 14px 9px 22px",cursor:"pointer",fontSize:13,color:value===c?"#86efac":"#ede9e0",background:value===c?"rgba(34,197,94,0.1)":"transparent",borderLeft:value===c?"2px solid #86efac":"2px solid transparent"}}
                 onClick={()=>{onChange(c);setOpen(false);}}>
                 {c}
@@ -7194,7 +8110,7 @@ function CuentaSelector({ value, onChange, S, CUENTAS_INTERNAS, CUENTAS_EXTERNAS
             <div style={{padding:"8px 14px 4px",fontSize:10,color:"#60a5fa",fontWeight:700,letterSpacing:"1px",textTransform:"uppercase",background:"rgba(96,165,250,0.05)",borderTop:"1px solid rgba(255,255,255,0.06)",marginTop:4}}>
               🏢 Externas — Beneficio área específica
             </div>
-            {CUENTAS_EXTERNAS.map(cuentaGrp=>(
+            {CUENTAS_EXTERNAS.map(c=>(
               <div key={c} style={{padding:"9px 14px 9px 22px",cursor:"pointer",fontSize:13,color:value===c?"#93c5fd":"#ede9e0",background:value===c?"rgba(59,130,246,0.1)":"transparent",borderLeft:value===c?"2px solid #93c5fd":"2px solid transparent"}}
                 onClick={()=>{onChange(c);setOpen(false);}}>
                 {c}
@@ -7719,7 +8635,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
 
       {/* Sub-tabs */}
       <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
-        {[["fondo","📊 Resumen"],["lista","📋 Compras"],["rendiciones","📤 Rendiciones"],["gastos","🔍 Gastos por ítem"]].map(([t,l])=>{
+        {[["fondo","📊 Resumen"],["lista","📋 Compras"],["rendiciones","📤 Rendiciones"],["gastos","📊 Gastos por categoría"]].map(([t,l])=>{
           const badge=t==="lista"?compras.filter(c=>c.estado==="pendiente").length:t==="rendiciones"?rendiciones.filter(r=>!r.reembolso).length:0;
           return <button key={t} className={`tab${subTab===t?" on":""}`} onClick={()=>{setSubTab(t);setShowForm(false);}} style={{position:"relative"}}>
             {l}{badge>0&&<span style={{position:"absolute",top:1,right:1,background:"#ef4444",color:"#fff",borderRadius:"50%",width:14,height:14,fontSize:9,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>{badge}</span>}
@@ -7851,26 +8767,22 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                     // Informe de gastos por ítem con filtros de período
                     const mesActual = new Date().toISOString().slice(0,7);
                     const anioActual = new Date().getFullYear();
-                    // Recopilar todos los ítems de todas las compras del año
-                    const comprasAnio = compras.filter(c=>c.fecha?.startsWith(String(anioActual)) && c.tipoDoc!=="Nota de Crédito" && c.tipoDoc!=="Cotización" && c.tipoDoc!=="Nota de Pedido");
-                    // Construir tabla por ítem agrupado por descripcion+categoria
-                    const porItem = {};
+                    // Agrupar por CATEGORÍA
+                    const comprasAnio = compras.filter(c=>c.fecha?.startsWith(String(anioActual)) && c.tipoDoc!=="Cotización" && c.tipoDoc!=="Nota de Pedido");
+                    const porCatInf = {};
                     comprasAnio.forEach(comp=>{
+                      const signo = comp.tipoDoc==="Nota de Crédito"?-1:1;
                       (comp.items||[]).forEach(it=>{
-                        if(!it.descripcion?.trim()) return;
-                        const key = it.descripcion.trim().toLowerCase();
-                        if(!porItem[key]) porItem[key]={desc:it.descripcion.trim(),cat:it.categoria||"Sin categoría",meses:{},totalAnio:0,cantTotal:0};
+                        const cat = it.categoria||"Sin categoría";
                         const mes = comp.fecha?.slice(0,7)||"";
-                        const monto = Number(it.totalBruto||it.totalNeto||0) * (comp.tipoDoc==="Nota de Crédito"?-1:1);
-                        const cant = Number(it.cantidad||0);
-                        if(!porItem[key].meses[mes]) porItem[key].meses[mes]={monto:0,cant:0};
-                        porItem[key].meses[mes].monto += monto;
-                        porItem[key].meses[mes].cant += cant;
-                        porItem[key].totalAnio += monto;
-                        porItem[key].cantTotal += cant;
+                        const monto = signo*Number(it.totalBruto||it.totalNeto||0);
+                        if(!porCatInf[cat]) porCatInf[cat]={desc:cat,meses:{},totalAnio:0};
+                        if(!porCatInf[cat].meses[mes]) porCatInf[cat].meses[mes]={monto:0};
+                        porCatInf[cat].meses[mes].monto += monto;
+                        porCatInf[cat].totalAnio += monto;
                       });
                     });
-                    const items = Object.values(porItem).sort((a,b)=>b.totalAnio-a.totalAnio);
+                    const items = Object.values(porCatInf).sort((a,b)=>b.totalAnio-a.totalAnio);
                     // Generar meses del año actual
                     const MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
                     const mesesCols = Array.from({length:12},(_,i)=>`${anioActual}-${String(i+1).padStart(2,"0")}`);
@@ -7880,29 +8792,28 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                     const filas = items.map(it=>`
                       <tr>
                         <td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;font-weight:500">${it.desc}</td>
-                        <td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;font-size:11px;color:#888">${it.cat}</td>
                         ${mesesConDatos.map(m=>`<td style="padding:6px 8px;border-bottom:1px solid #f0f0f0;text-align:right;font-size:11px">${it.meses[m]?`$${it.meses[m].monto.toLocaleString("es-CL")}`:"—"}</td>`).join("")}
                         <td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;text-align:right;font-weight:700;color:#1a5c2a">$${it.totalAnio.toLocaleString("es-CL")}</td>
                       </tr>`).join("");
                     const totFila = `<tr style="background:#f0fdf4;font-weight:700">
-                      <td colspan="2" style="padding:7px 10px;border-top:2px solid #16a34a">TOTAL MES</td>
+                      <td style="padding:7px 10px;border-top:2px solid #16a34a">TOTAL MES</td>
                       ${mesesConDatos.map(m=>`<td style="padding:7px 8px;border-top:2px solid #16a34a;text-align:right;color:#1a5c2a">$${(totalPorMes[m]||0).toLocaleString("es-CL")}</td>`).join("")}
                       <td style="padding:7px 10px;border-top:2px solid #16a34a;text-align:right;color:#1a5c2a">$${items.reduce((s,it)=>s+it.totalAnio,0).toLocaleString("es-CL")}</td>
                     </tr>`;
                     const hoy = new Date().toLocaleDateString("es-CL",{day:"2-digit",month:"long",year:"numeric"});
                     const winG = window.open("","_blank","width=1100,height=700");
                     winG.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-                    <title>Informe de Gastos ${anioActual}</title>
+                    <title>Informe de Gastos por Categoría ${anioActual}</title>
                     <style>body{font-family:Calibri,Arial,sans-serif;color:#222;padding:28px;font-size:13px}
                     h1{font-size:19px;color:#1a5c2a;margin-bottom:2px}h2{font-size:12px;color:#888;font-weight:normal;margin-top:0}
                     table{width:100%;border-collapse:collapse}th{background:#1a5c2a;color:#fff;padding:8px 8px;font-size:11px;text-align:left}
                     th.num{text-align:right}tr:nth-child(even){background:#fafafa}
                     .noprint{display:block}@media print{.noprint{display:none}}</style></head><body>
-                    <h1>📊 Informe de Gastos por Ítem — ${anioActual}</h1>
+                    <h1>📊 Informe de Gastos por Categoría — ${anioActual}</h1>
                     <h2>Departamento de Áreas Verdes · Estadio Español de Las Condes · Generado el ${hoy}</h2>
                     <table>
                       <thead><tr>
-                        <th>Ítem / Producto</th><th>Categoría</th>
+                        <th>Categoría</th>
                         ${mesesConDatos.map(m=>`<th class="num">${MESES[Number(m.slice(5))-1]}</th>`).join("")}
                         <th class="num">Total ${anioActual}</th>
                       </tr></thead>
@@ -7914,7 +8825,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                     </div></body></html>`);
                     winG.document.close();
                   }}>
-                  📊 Informe gastos por ítem
+                  📊 Informe gastos por categoría
                 </button>
               </div>
               <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,marginBottom:10}}>💰 Gasto por cuenta</div>
@@ -8236,7 +9147,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
             <div style={{...S.card,padding:36,textAlign:"center",color:"#4a8a5a"}}><div style={{fontSize:32,marginBottom:8}}>🛒</div><div>Sin compras registradas</div></div>
           ):(
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
-              {comprasFilt.map(optC=>{
+              {comprasFilt.map(c=>{
                 const est=ESTADO_C[c.estado]||ESTADO_C.pendiente;
                 const sel=seleccionadas.includes(c.id);
                 const selectable=["pendiente","pagada","pagada_efectivo"].includes(c.estado);
@@ -8314,172 +9225,196 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
 
       {/* ── RENDICIONES ── */}
       {subTab==="gastos"&&(()=>{
-        // Recopilar todos los ítems únicos de todas las compras
-        const todosItems = {};
+        // ── GASTOS POR CATEGORÍA ──────────────────────────────────────────
+        const MESES_NOM = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+        const todasCats = [...new Set([
+          ...CATEGORIAS,
+          ...compras.flatMap(c=>(c.items||[]).map(it=>it.categoria)).filter(Boolean)
+        ])].sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
+
+        // Calcular gasto total por categoría para el año/período seleccionado
+        const gastoPorCat = {};
+        const anioN = Number(gastoAnio);
         compras.forEach(comp=>{
+          if(gastoPeriodo!=="anual"&&!comp.fecha?.startsWith(String(anioN))) return;
+          const signo = comp.tipoDoc==="Nota de Crédito"?-1:1;
           (comp.items||[]).forEach(it=>{
-            if(!it.descripcion?.trim()) return;
-            const key = it.descripcion.trim().toLowerCase();
-            if(!todosItems[key]) todosItems[key] = {nombre:it.descripcion.trim(), cat:it.categoria||""};
+            const cat = it.categoria||"Sin categoría";
+            if(!gastoPorCat[cat]) gastoPorCat[cat]={total:0,cant:0,ndocs:0,meses:{}};
+            const monto = signo*Number(it.totalBruto||it.totalNeto||0);
+            gastoPorCat[cat].total += monto;
+            gastoPorCat[cat].cant  += Number(it.cantidad||0);
+            gastoPorCat[cat].ndocs++;
+            if(comp.fecha) {
+              const mes = comp.fecha.slice(5,7);
+              if(!gastoPorCat[cat].meses[mes]) gastoPorCat[cat].meses[mes]=0;
+              gastoPorCat[cat].meses[mes] += monto;
+            }
           });
         });
-        const listaItems = Object.values(todosItems).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
-        const itemsFiltrados = gastoItemBusq
-          ? listaItems.filter(i=>i.nombre.toLowerCase().includes(gastoItemBusq.toLowerCase()))
-          : listaItems;
 
-        // Calcular datos para el ítem seleccionado
+        const catsSorted = Object.entries(gastoPorCat)
+          .sort((a,b)=>b[1].total-a[1].total);
+        const totalGeneral = catsSorted.reduce((s,[,v])=>s+v.total,0);
+
+        // Detalle de la categoría seleccionada
         let filasDatos = [];
         let totalSel = 0;
         if(gastoItemSel) {
           const anio = Number(gastoAnio);
-          const comprasConItem = compras.filter(c=>
-            c.fecha?.startsWith(String(anio)) &&
-            (c.items||[]).some(it=>it.descripcion?.trim().toLowerCase()===gastoItemSel.toLowerCase())
+          const comprasCat = compras.filter(c=>
+            (gastoPeriodo==="anual"||c.fecha?.startsWith(String(anio)))&&
+            (c.items||[]).some(it=>(it.categoria||"Sin categoría")===gastoItemSel)
           );
           if(gastoPeriodo==="mensual") {
-            const meses = Array.from({length:12},(_,i)=>String(i+1).padStart(2,"0"));
-            const MESES_NOM = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-            filasDatos = meses.map((m,i)=>{
-              const cMes = comprasConItem.filter(c=>c.fecha?.slice(5,7)===m);
+            filasDatos = Array.from({length:12},(_,i)=>{
+              const m = String(i+1).padStart(2,"0");
+              const cMes = comprasCat.filter(c=>c.fecha?.slice(5,7)===m);
               const monto = cMes.reduce((s,c)=>{
                 const signo = c.tipoDoc==="Nota de Crédito"?-1:1;
-                return s+signo*(c.items||[]).filter(it=>it.descripcion?.trim().toLowerCase()===gastoItemSel.toLowerCase())
+                return s+signo*(c.items||[]).filter(it=>(it.categoria||"Sin categoría")===gastoItemSel)
                   .reduce((ss,it)=>ss+Number(it.totalBruto||it.totalNeto||0),0);
               },0);
-              const cant = cMes.reduce((s,c)=>(c.items||[]).filter(it=>it.descripcion?.trim().toLowerCase()===gastoItemSel.toLowerCase())
+              const cant = cMes.reduce((s,c)=>(c.items||[]).filter(it=>(it.categoria||"Sin categoría")===gastoItemSel)
                 .reduce((ss,it)=>ss+Number(it.cantidad||0),s),0);
               totalSel += monto;
-              return {periodo:MESES_NOM[i], monto, cant, ndocs:cMes.length};
+              return {periodo:MESES_NOM[i],monto,cant,ndocs:cMes.length};
             }).filter(f=>f.ndocs>0||f.monto!==0);
-          } else if(gastoPeriodo==="semanal") {
-            // Agrupar por semana del año
-            const porSemana = {};
-            comprasConItem.forEach(comp=>{
-              const fecha = new Date(comp.fecha+"T12:00:00");
-              const inicio = new Date(fecha); inicio.setDate(inicio.getDate()-(inicio.getDay()===0?6:inicio.getDay()-1));
-              const semKey = inicio.toISOString().slice(0,10);
-              if(!porSemana[semKey]) porSemana[semKey]={monto:0,cant:0,ndocs:0};
-              const signo = comp.tipoDoc==="Nota de Crédito"?-1:1;
-              (comp.items||[]).filter(it=>it.descripcion?.trim().toLowerCase()===gastoItemSel.toLowerCase()).forEach(it=>{
-                porSemana[semKey].monto += signo*Number(it.totalBruto||it.totalNeto||0);
-                porSemana[semKey].cant  += Number(it.cantidad||0);
-                porSemana[semKey].ndocs++;
-              });
-            });
-            filasDatos = Object.entries(porSemana).sort((a,b)=>a[0].localeCompare(b[0])).map(([sem,val])=>{
-              const fin = new Date(sem+"T12:00:00"); fin.setDate(fin.getDate()+6);
-              totalSel += val.monto;
-              return {periodo:`${new Date(sem+"T12:00:00").toLocaleDateString("es-CL",{day:"2-digit",month:"short"})} – ${fin.toLocaleDateString("es-CL",{day:"2-digit",month:"short"})}`, ...val};
-            });
-          } else { // anual — por año
-            const anios = [...new Set(compras.map(compraC=>compraC.fecha?.slice(0,4)).filter(Boolean))].sort();
+          } else if(gastoPeriodo==="anual") {
+            const anios = [...new Set(compras.map(c=>c.fecha?.slice(0,4)).filter(Boolean))].sort();
             filasDatos = anios.map(a=>{
-              const cAnio = compras.filter(c=>c.fecha?.startsWith(a)&&(c.items||[]).some(it=>it.descripcion?.trim().toLowerCase()===gastoItemSel.toLowerCase()));
+              const cAnio = compras.filter(c=>c.fecha?.startsWith(a)&&(c.items||[]).some(it=>(it.categoria||"Sin categoría")===gastoItemSel));
               const monto = cAnio.reduce((s,c)=>{
                 const signo = c.tipoDoc==="Nota de Crédito"?-1:1;
-                return s+signo*(c.items||[]).filter(it=>it.descripcion?.trim().toLowerCase()===gastoItemSel.toLowerCase()).reduce((ss,it)=>ss+Number(it.totalBruto||it.totalNeto||0),0);
+                return s+signo*(c.items||[]).filter(it=>(it.categoria||"Sin categoría")===gastoItemSel)
+                  .reduce((ss,it)=>ss+Number(it.totalBruto||it.totalNeto||0),0);
               },0);
-              const cant = cAnio.reduce((s,c)=>(c.items||[]).filter(it=>it.descripcion?.trim().toLowerCase()===gastoItemSel.toLowerCase()).reduce((ss,it)=>ss+Number(it.cantidad||0),s),0);
+              const cant = cAnio.reduce((s,c)=>(c.items||[]).filter(it=>(it.categoria||"Sin categoría")===gastoItemSel)
+                .reduce((ss,it)=>ss+Number(it.cantidad||0),s),0);
               totalSel += monto;
-              return {periodo:a, monto, cant, ndocs:cAnio.length};
+              return {periodo:a,monto,cant,ndocs:cAnio.length};
             }).filter(f=>f.ndocs>0);
           }
         }
 
+        const fmt = n => new Intl.NumberFormat("es-CL",{style:"currency",currency:"CLP",maximumFractionDigits:0}).format(n);
+        const pct = (v,t) => t?Math.round(v/t*100):0;
+
         return (
           <div className="ein">
-            <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,marginBottom:14}}>🔍 Gastos por ítem</div>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,marginBottom:4}}>📊 Gastos por categoría</div>
+            <div style={{fontSize:11,color:"#5a9a7a",marginBottom:14}}>Distribución del gasto por categoría de compra</div>
+
             {/* Controles */}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:10,marginBottom:16,alignItems:"end"}}>
               <div>
-                <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Buscar ítem</label>
-                <input style={S.input} value={gastoItemBusq} onChange={e=>{setGastoItemBusq(e.target.value);setGastoItemSel("");}} placeholder="ej: Bencina, Compost, Fungicida..."/>
-              </div>
-              <div>
                 <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Período</label>
-                <select style={S.input} value={gastoPeriodo} onChange={e=>setGastoPeriodo(e.target.value)}>
-                  <option value="mensual">Mensual (por mes)</option>
-                  <option value="semanal">Semanal (por semana)</option>
-                  <option value="anual">Anual (comparar años)</option>
+                <select style={S.input} value={gastoPeriodo} onChange={e=>{setGastoPeriodo(e.target.value);setGastoItemSel("");}}>
+                  <option value="mensual">Mensual</option>
+                  <option value="anual">Comparar años</option>
                 </select>
               </div>
               {gastoPeriodo!=="anual"&&(
                 <div>
                   <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Año</label>
-                  <select style={S.input} value={gastoAnio} onChange={e=>setGastoAnio(e.target.value)}>
-                    {[...new Set(compras.map(compraC=>compraC.fecha?.slice(0,4)).filter(Boolean))].sort().reverse().map(a=><option key={a} value={a}>{a}</option>)}
+                  <select style={S.input} value={gastoAnio} onChange={e=>{setGastoAnio(e.target.value);setGastoItemSel("");}}>
+                    {[...new Set(compras.map(c=>c.fecha?.slice(0,4)).filter(Boolean))].sort().reverse().map(a=><option key={a} value={a}>{a}</option>)}
                   </select>
                 </div>
               )}
+              <button onClick={()=>{
+                const anioActual = gastoPeriodo==="anual"?"todos los años":gastoAnio;
+                const win = window.open("","_blank");
+                win.document.write(`<!DOCTYPE html><html lang="es"><head>
+                  <meta charset="UTF-8"/><title>Gastos por Categoría ${anioActual}</title>
+                  <style>body{font-family:Calibri,Arial,sans-serif;padding:24px;color:#1a1a2e}
+                  h1{font-size:18px;color:#065f46}table{width:100%;border-collapse:collapse;font-size:12px}
+                  th{background:#f0fdf4;padding:6px 10px;text-align:left;font-size:11px;text-transform:uppercase;color:#065f46}
+                  td{padding:5px 10px;border-bottom:1px solid #e5e7eb}
+                  .bar{height:8px;background:#34d399;border-radius:4px;display:inline-block}
+                  .total{font-weight:700;color:#065f46}.footer{margin-top:24px;font-size:10px;color:#9ca3af;text-align:center}
+                  @media print{.no-print{display:none}}</style></head><body>
+                  <button onclick="window.print()" class="no-print" style="float:right;padding:6px 14px;background:#065f46;color:#fff;border:none;border-radius:5px;cursor:pointer">🖨️ Imprimir / PDF</button>
+                  <h1>📊 Informe de Gastos por Categoría — ${anioActual}</h1>
+                  <p style="font-size:12px;color:#6b7280">Estadio Español de Las Condes · Departamento de Áreas Verdes</p>
+                  <table><thead><tr><th>Categoría</th><th>N° docs</th><th>Monto total</th><th>% del total</th><th>Distribución</th></tr></thead><tbody>
+                  ${catsSorted.map(([cat,v])=>`
+                    <tr><td>${cat}</td><td>${v.ndocs}</td><td class="total">${new Intl.NumberFormat("es-CL",{style:"currency",currency:"CLP",maximumFractionDigits:0}).format(v.total)}</td>
+                    <td>${pct(v.total,totalGeneral)}%</td>
+                    <td><span class="bar" style="width:${pct(v.total,totalGeneral)*2}px"></span></td></tr>`).join("")}
+                  <tr style="background:#f0fdf4"><td><b>TOTAL</b></td><td></td><td class="total">${new Intl.NumberFormat("es-CL",{style:"currency",currency:"CLP",maximumFractionDigits:0}).format(totalGeneral)}</td><td>100%</td><td></td></tr>
+                  </tbody></table>
+                  <div class="footer">Estadio Verde · ${new Date().toLocaleDateString("es-CL")}</div>
+                </body></html>`);
+                win.document.close();win.focus();
+              }} style={{...S.btn,background:"rgba(52,211,153,0.12)",color:"#34d399",border:"1px solid rgba(52,211,153,0.3)",whiteSpace:"nowrap",fontSize:12}}>
+                🖨️ Informe PDF
+              </button>
             </div>
 
-            {/* Lista de ítems para seleccionar */}
+            {/* Tabla resumen por categoría */}
             {!gastoItemSel&&(
-              <div style={{...S.card,padding:12,marginBottom:16}}>
-                <div style={{fontSize:11,color:"#5a9a7a",marginBottom:8}}>
-                  {gastoItemBusq ? `${itemsFiltrados.length} resultado(s) — selecciona uno para ver su historial:` : `${listaItems.length} ítems en el historial de compras:`}
+              <div style={{...S.card,padding:0,overflow:"hidden"}}>
+                <div style={{padding:"10px 14px",borderBottom:"1px solid rgba(255,255,255,0.06)",fontSize:11,color:"#5a9a7a",display:"flex",justifyContent:"space-between"}}>
+                  <span>Total {gastoPeriodo==="anual"?"(todos los años)":gastoAnio}: <b style={{color:"#34d399"}}>{fmt(totalGeneral)}</b></span>
+                  <span>Clic en una categoría para ver detalle</span>
                 </div>
-                <div style={{display:"flex",flexWrap:"wrap",gap:6,maxHeight:220,overflowY:"auto"}}>
-                  {itemsFiltrados.map(it=>(
-                    <button key={it.nombre} onClick={()=>setGastoItemSel(it.nombre)}
-                      style={{...S.btn,fontSize:11,padding:"4px 12px",background:"rgba(255,255,255,0.05)",color:"#ede9e0",border:"1px solid rgba(255,255,255,0.1)",borderRadius:20}}>
-                      {it.nombre}{it.cat&&<span style={{color:"#5a9a7a",marginLeft:4,fontSize:10}}>· {it.cat}</span>}
-                    </button>
-                  ))}
-                  {itemsFiltrados.length===0&&<div style={{color:"#5a9a7a",fontSize:12}}>Sin resultados para "{gastoItemBusq}"</div>}
-                </div>
+                {catsSorted.map(([cat,v])=>(
+                  <div key={cat} onClick={()=>setGastoItemSel(cat)}
+                    style={{padding:"10px 14px",borderBottom:"1px solid rgba(255,255,255,0.05)",cursor:"pointer",
+                      display:"grid",gridTemplateColumns:"1fr auto auto",gap:10,alignItems:"center",
+                      background:"transparent",transition:"background 0.15s"}}
+                    onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.03)"}
+                    onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                    <div>
+                      <div style={{fontSize:13,color:"#c0dac0",fontWeight:500}}>{cat}</div>
+                      <div style={{marginTop:4,height:5,borderRadius:3,background:"rgba(52,211,153,0.1)",overflow:"hidden"}}>
+                        <div style={{width:pct(v.total,totalGeneral)+"%",height:"100%",background:"#34d399",borderRadius:3}}/>
+                      </div>
+                    </div>
+                    <div style={{textAlign:"right",fontSize:11,color:"#5a9a7a"}}>{v.ndocs} doc(s)</div>
+                    <div style={{textAlign:"right",fontSize:13,fontWeight:700,color:"#34d399",minWidth:100}}>{fmt(v.total)}</div>
+                  </div>
+                ))}
+                {catsSorted.length===0&&<div style={{padding:24,textAlign:"center",color:"#5a9a7a",fontSize:12}}>Sin datos para mostrar</div>}
               </div>
             )}
 
-            {/* Resultados del ítem seleccionado */}
+            {/* Detalle de categoría seleccionada */}
             {gastoItemSel&&(
               <div>
-                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
-                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,color:"#34d399"}}>{gastoItemSel}</div>
-                  <button onClick={()=>setGastoItemSel("")} style={{...S.btn,fontSize:10,padding:"2px 8px",background:"rgba(255,255,255,0.05)",color:"#5a9a7a"}}>✕ cambiar</button>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700}}>{gastoItemSel}</div>
+                  <button onClick={()=>setGastoItemSel("")} style={{...S.btn,fontSize:11,padding:"3px 10px"}}>← Volver</button>
                 </div>
-                {filasDatos.length===0?(
-                  <div style={{...S.card,padding:24,textAlign:"center",color:"#5a9a7a"}}>Sin compras de este ítem en {gastoPeriodo==="anual"?"ningún año":gastoAnio}</div>
-                ):(
-                  <>
+                {filasDatos.length===0
+                  ? <div style={{color:"#5a9a7a",fontSize:12,textAlign:"center",padding:20}}>Sin gastos en esta categoría para el período seleccionado</div>
+                  : <>
                     <div style={{...S.card,padding:0,overflow:"hidden",marginBottom:12}}>
-                      <table style={{width:"100%",borderCollapse:"collapse"}}>
-                        <thead>
-                          <tr style={{background:"rgba(52,211,153,0.08)"}}>
-                            <th style={{padding:"9px 14px",fontSize:11,fontWeight:700,color:"#34d399",textAlign:"left",textTransform:"uppercase",letterSpacing:"0.5px"}}>Período</th>
-                            <th style={{padding:"9px 14px",fontSize:11,fontWeight:700,color:"#34d399",textAlign:"right",textTransform:"uppercase",letterSpacing:"0.5px"}}>Cantidad</th>
-                            <th style={{padding:"9px 14px",fontSize:11,fontWeight:700,color:"#34d399",textAlign:"right",textTransform:"uppercase",letterSpacing:"0.5px"}}>Monto</th>
-                            <th style={{padding:"9px 14px",fontSize:11,fontWeight:700,color:"#34d399",textAlign:"center",textTransform:"uppercase",letterSpacing:"0.5px"}}>Docs</th>
-                          </tr>
-                        </thead>
+                      <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                        <thead><tr style={{borderBottom:"1px solid rgba(255,255,255,0.1)"}}>
+                          <th style={{padding:"8px 12px",textAlign:"left",fontSize:10,color:"#5a9a7a",textTransform:"uppercase"}}>Período</th>
+                          <th style={{padding:"8px 12px",textAlign:"right",fontSize:10,color:"#5a9a7a",textTransform:"uppercase"}}>N° docs</th>
+                          <th style={{padding:"8px 12px",textAlign:"right",fontSize:10,color:"#5a9a7a",textTransform:"uppercase"}}>Monto</th>
+                        </tr></thead>
                         <tbody>
                           {filasDatos.map((f,i)=>(
-                            <tr key={i} style={{borderTop:"1px solid rgba(255,255,255,0.05)",background:i%2===0?"transparent":"rgba(255,255,255,0.02)"}}>
-                              <td style={{padding:"8px 14px",fontSize:13}}>{f.periodo}</td>
-                              <td style={{padding:"8px 14px",fontSize:13,textAlign:"right",color:"#5a9a7a"}}>{f.cant>0?f.cant:"—"}</td>
-                              <td style={{padding:"8px 14px",fontSize:13,fontWeight:600,textAlign:"right",color:f.monto<0?"#ef4444":"#ede9e0"}}>{f.monto!==0?`${f.monto<0?"-":""}$${Math.abs(f.monto).toLocaleString("es-CL")}`:"—"}</td>
-                              <td style={{padding:"8px 14px",fontSize:12,textAlign:"center",color:"#5a9a7a"}}>{f.ndocs}</td>
+                            <tr key={i} style={{borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                              <td style={{padding:"7px 12px",color:"#c0dac0"}}>{f.periodo}</td>
+                              <td style={{padding:"7px 12px",textAlign:"right",color:"#5a9a7a"}}>{f.ndocs}</td>
+                              <td style={{padding:"7px 12px",textAlign:"right",fontWeight:700,color:"#34d399"}}>{fmt(f.monto)}</td>
                             </tr>
                           ))}
-                          <tr style={{borderTop:"2px solid rgba(52,211,153,0.3)",background:"rgba(52,211,153,0.05)"}}>
-                            <td colSpan={2} style={{padding:"9px 14px",fontSize:13,fontWeight:700,color:"#34d399"}}>TOTAL</td>
-                            <td style={{padding:"9px 14px",fontSize:14,fontWeight:900,textAlign:"right",color:totalSel<0?"#ef4444":"#34d399"}}>{totalSel<0?"-":""}${Math.abs(totalSel).toLocaleString("es-CL")}</td>
-                            <td style={{padding:"9px 14px",fontSize:12,textAlign:"center",color:"#5a9a7a"}}>{filasDatos.reduce((s,f)=>s+f.ndocs,0)}</td>
+                          <tr style={{borderTop:"2px solid rgba(52,211,153,0.3)"}}>
+                            <td style={{padding:"8px 12px",fontWeight:700,color:"#c0dac0"}}>TOTAL</td>
+                            <td></td>
+                            <td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,color:"#34d399",fontSize:14}}>{fmt(totalSel)}</td>
                           </tr>
                         </tbody>
                       </table>
                     </div>
-                    <button style={{...S.btn,fontSize:11,padding:"5px 14px",background:"rgba(52,211,153,0.1)",color:"#34d399",border:"1px solid rgba(52,211,153,0.3)"}}
-                      onClick={()=>{
-                        const hoy = new Date().toLocaleDateString("es-CL",{day:"2-digit",month:"long",year:"numeric"});
-                        const filas = filasDatos.map(f=>`<tr><td style="padding:7px 12px;border-bottom:1px solid #f0f0f0">${f.periodo}</td><td style="padding:7px 12px;border-bottom:1px solid #f0f0f0;text-align:right">${f.cant||"—"}</td><td style="padding:7px 12px;border-bottom:1px solid #f0f0f0;text-align:right;font-weight:600;color:${f.monto<0?"#dc2626":"#1a5c2a"}">${f.monto!==0?`${f.monto<0?"-":""}$${Math.abs(f.monto).toLocaleString("es-CL")}`:"—"}</td><td style="padding:7px 12px;border-bottom:1px solid #f0f0f0;text-align:center">${f.ndocs}</td></tr>`).join("");
-                        const winI = window.open("","_blank","width=700,height=600");
-                        winI.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Gasto ${gastoItemSel}</title><style>body{font-family:Calibri,Arial,sans-serif;padding:28px;color:#222;font-size:13px}h1{font-size:18px;color:#1a5c2a;margin-bottom:2px}h2{font-size:12px;color:#888;font-weight:normal;margin-top:0}table{width:100%;border-collapse:collapse}th{background:#1a5c2a;color:#fff;padding:8px 12px;font-size:11px;text-align:left}th.r{text-align:right}tr:nth-child(even){background:#f9fafb}.tot{background:#f0fdf4;font-weight:700}@media print{button{display:none}}</style></head><body><h1>📊 Historial de Gasto — ${gastoItemSel}</h1><h2>Período: ${gastoPeriodo==="mensual"?`Mensual ${gastoAnio}`:gastoPeriodo==="semanal"?`Semanal ${gastoAnio}`:"Comparativo anual"} · Generado el ${hoy}</h2><table><thead><tr><th>Período</th><th class="r">Cantidad</th><th class="r">Monto</th><th class="r">Docs</th></tr></thead><tbody>${filas}<tr class="tot"><td colspan="2">TOTAL</td><td style="text-align:right;color:${totalSel<0?"#dc2626":"#1a5c2a"}">${totalSel<0?"-":""}$${Math.abs(totalSel).toLocaleString("es-CL")}</td><td style="text-align:right">${filasDatos.reduce((s,f)=>s+f.ndocs,0)}</td></tr></tbody></table><div style="margin-top:14px;text-align:center"><button onclick="window.print()" style="background:#1a5c2a;color:#fff;border:none;padding:9px 22px;border-radius:6px;cursor:pointer">🖨️ Imprimir / PDF</button></div></body></html>`);
-                        winI.document.close();
-                      }}>🖨️ Imprimir / exportar PDF</button>
                   </>
-                )}
+                }
               </div>
             )}
           </div>
@@ -8519,7 +9454,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                       </div>
                     </div>
                     <div style={{borderTop:"1px solid rgba(255,255,255,0.07)",paddingTop:10,marginBottom:10}}>
-                      {itemsRend.map(optC=>{
+                      {itemsRend.map(c=>{
                         const items=c.items||[{descripcion:c.descripcion}];
                         return <div key={c.id} style={{fontSize:12,color:"#7aaa80",padding:"3px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
                           <div style={{display:"flex",justifyContent:"space-between"}}>
@@ -10548,8 +11483,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   const [showHumForm,    setShowHumForm]    = React.useState(false);
   // Abrir formulario de humedad automáticamente cuando jefa navega a ese tab
   React.useEffect(()=>{
-    if(subTab==="humedad" && esJefa) setShowHumForm(true);
-  },[subTab, esJefa]);
+    if(subTab==="humedad") setShowHumForm(true); // jefa y trabajadores pueden registrar
+  },[subTab]);
   const emptyHumForm = {fecha:hoy,hora:new Date().toTimeString().slice(0,5),motivo:"rutina",responsable:"",valores:{},valorVivero:"",decision:"sin-cambio",obs:"",generarTarea:false};
   const [humForm,        setHumForm]        = React.useState(emptyHumForm);
   const [selectedGreen,  setSelectedGreen]  = React.useState("g1");
@@ -10939,7 +11874,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               const extraerAlturaCorte = (t) => {
                 if(t?.alturaCorte) return Number(t.alturaCorte);
                 const pgM=(t?.tarea||t?.descripcion||"").match(/(?:HOC|a)\s*([0-9]+(?:\.[0-9]+))\s*mm/i);
-                return m?Number(pgM[1]):null;
+                return pgM?Number(pgM[1]):null;
               };
               const altCorteReal = extraerAlturaCorte(infoCorte);
               const altObjetivo=infoCorte?.alturaObjetivo?Number(infoCorte.alturaObjetivo):(rango.min*1.5);
@@ -10964,7 +11899,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               if(!tasa&&histG.length>=2){
                 const a1=Number(histG[0].alturas[g.id]),a2=Number(histG[1].alturas[g.id]);
                 const dHist3=Math.round((new Date(histG[0].fecha+"T12:00:00")-new Date(histG[1].fecha+"T12:00:00"))/(1000*60*60*24));
-                if(dHist1>0&&a1>a2) tasa=(a1-a2)/dHist1;
+                if(dHist3>0&&a1>a2) tasa=(a1-a2)/dHist3;
               }
               const altN=Number(alt);
               if(altN>=altObjetivo) return {g,diasRestantes:0,urgencia:"cortar",alt:altN,tasa,altObjetivo,infoCorte};
@@ -13112,7 +14047,16 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
     const ini={};
     bonosPendientes.forEach(b=>{ini[b.id]=true;});
     setSelBonos(ini);
-  },[bonosMasivos]);
+    // Inicializar selEventos con todos los eventos seleccionados
+    const iniEv={};
+    const personalArr2 = Array.isArray(personal)?personal:Object.values(personal||{});
+    personalArr2.forEach(t=>{
+      (t.eventos||[]).filter(e=>e.estado!=="rendido").forEach(e=>{
+        iniEv[`${t.id}_${e.id}`]=true;
+      });
+    });
+    setSelEventos(iniEv);
+  },[bonosMasivos, personal]);
 
   // Construir HTML del informe
   const construirHTML = (titulo) => {
@@ -13140,7 +14084,22 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
           <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px;text-align:right;font-weight:700;color:#7b1fa2">$${Number(bonoP3?.monto||0).toLocaleString("es-CL")}</td>
         </tr>`;}).join("");
 
-      const filasBonosInd = eventosT.filter(e=>["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)).map(e=>`
+      // Excluir bonos individuales que correspondan a bonos masivos no seleccionados
+      const bonosNoSel = bonosPendientes.filter(b=>!selBonos[b.id]);
+      const filasBonosInd = eventosT.filter(e=>{
+        if(!["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)) return false;
+        // Excluir si tiene origenBonoId explícito
+        if(e.origenBonoId&&bonosNoSel.some(b=>String(b.id)===String(e.origenBonoId))) return false;
+        // Excluir si la descripción coincide con un bono masivo no seleccionado
+        const descE = (e.descripcion||"").toLowerCase().trim();
+        if(bonosNoSel.some(b=>{
+          const descB = (b.descripcion||"").toLowerCase().trim();
+          // Match si descripción del evento contiene palabras clave del bono masivo
+          const palabras = descB.split(" ").filter(p=>p.length>4);
+          return palabras.length>0 && palabras.filter(p=>descE.includes(p)).length >= Math.ceil(palabras.length*0.5);
+        })) return false;
+        return true;
+      }).map(e=>`
         <tr><td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${e.fecha}</td>
         <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${e.descripcion||"Bono"}</td>
         <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px;text-align:right;font-weight:700;color:#7b1fa2">${e.valor?`$${Number(e.valor).toLocaleString("es-CL")}`:"—"}</td></tr>`).join("");
@@ -13419,7 +14378,7 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
                     {selEventos[`${t.id}_${e.id}`]&&<span style={{color:"#000",fontSize:10,fontWeight:700}}>✓</span>}
                   </div>
                   <div style={{flex:1,fontSize:12}}>
-                    <span>{e.tipo==="horaExtra"?"⏰":e.tipo==="permiso"?"📋":e.tipo==="vacaciones"?"🏖️":e.tipo==="licencia"?"🏥":"💰"}</span>
+                    <span style={{fontWeight:["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)?700:400,color:["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)?"#c4b5fd":"inherit"}}>{e.tipo==="horaExtra"?"⏰":e.tipo==="bonoConstruccion"||e.tipo==="bonoPesado"||e.tipo==="bonoEspecializado"?"🎖️":e.tipo==="permiso"?"📋":e.tipo==="vacaciones"?"🏖️":e.tipo==="licencia"?"🏥":"💰"}</span>
                     {" "}{e.descripcion||e.tipo} · {e.fecha}{e.fechaFin?` → ${e.fechaFin}`:""}
                     {e.tipo==="horaExtra"&&e.estado!=="aprobado"&&<span style={{fontSize:10,color:"#f59e0b",marginLeft:6,background:"rgba(245,158,11,0.1)",padding:"1px 6px",borderRadius:8,border:"1px solid rgba(245,158,11,0.2)"}}>⚠️ Pendiente aprobación — no se sumará</span>}
                   </div>
@@ -13617,7 +14576,11 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
       valorMercado:Number(form.valorMercado), fondoTotal, obs:form.obs,
       estado:"generado", participantes,
     };
-    setBonosMasivos(p=>[nuevoBono,...(Array.isArray(p)?p:Object.values(p||{}))]);
+    setBonosMasivos(p=>{
+      const arr = Array.isArray(p)?p:Object.values(p||{});
+      const existe = arr.some(b=>b.id===nuevoBono.id);
+      return existe ? arr.map(b=>b.id===nuevoBono.id?nuevoBono:b) : [nuevoBono,...arr];
+    });
     // Agregar bono en ficha de cada trabajador
     setPersonal(p=>{
       const arr=Array.isArray(p)?p:Object.values(p||{});
@@ -13668,7 +14631,11 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
       modo: "jornada", valorJornada: valorJornadaNum, totalJornadas, fondoTotal: totalBonoJornada,
       obs: formJornada.obs, estado: "generado", participantes,
     };
-    setBonosMasivos(p=>[nuevoBono,...(Array.isArray(p)?p:Object.values(p||{}))]);
+    setBonosMasivos(p=>{
+      const arr = Array.isArray(p)?p:Object.values(p||{});
+      const existe = arr.some(b=>b.id===nuevoBono.id);
+      return existe ? arr.map(b=>b.id===nuevoBono.id?nuevoBono:b) : [nuevoBono,...arr];
+    });
     setPersonal(p=>{
       const arr=Array.isArray(p)?p:Object.values(p||{});
       return arr.map(t=>{
@@ -13958,6 +14925,7 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
                     </>)}
                   </div>
                   <button style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(255,255,255,0.06)",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)"}} onClick={()=>{setEditBonoId(bono.id);setEditBonoForm({...bono});}}>✏️ Editar</button>
+                  <button style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(239,68,68,0.08)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.2)"}} onClick={()=>{if(window.confirm("¿Eliminar este bono? Esta acción no se puede deshacer."))setBonosMasivos(p=>(Array.isArray(p)?p:Object.values(p||{})).filter(b=>b.id!==bono.id));}}>🗑 Eliminar</button>
                   <button style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}} onClick={()=>imprimirBono(bono)}>🖨️ Informe RRHH</button>
                 </div>
               </div>
@@ -14057,7 +15025,11 @@ function PanelFrecuenciasZona({ S, zonas, getAllElems, getZD, setElemFrecs, esJe
   const elemsActFrec = zonaActFrec ? getAllElems(String(zonaActFrec.id)) : [];
   const zdActFrec = zonaActFrec ? getZD(String(zonaActFrec.id)) : {};
   const elemActFrec = elemSelFrec ? elemsActFrec.find(e=>e.id===elemSelFrec) : null;
-  const frecsActuales = elemActFrec ? (zdActFrec.elementos?.[elemActFrec.id]?.frecuencias||[]) : [];
+  const frecsActuales = elemActFrec ? (
+    elemActFrec.isCustom
+      ? (zdActFrec.elementosCustom||[]).find(e=>e.id===elemActFrec.id)?.frecuencias||[]
+      : zdActFrec.elementos?.[elemActFrec.id]?.frecuencias||[]
+  ) : [];
 
   return (
     <div className="ein">
@@ -14094,9 +15066,13 @@ function PanelFrecuenciasZona({ S, zonas, getAllElems, getZD, setElemFrecs, esJe
           eid={elemActFrec.id}
           tipo={elemActFrec.tipo||"arboles"}
           isCustom={elemActFrec.isCustom||false}
-          getFrecs={()=> zdActFrec.elementos?.[elemActFrec.id]?.frecuencias||[]}
+          getFrecs={(zidA,eidA,tipoA,isCustomA)=>
+            elemActFrec.isCustom
+              ? (zdActFrec.elementosCustom||[]).find(e=>e.id===elemActFrec.id)?.frecuencias||[]
+              : zdActFrec.elementos?.[elemActFrec.id]?.frecuencias||[]
+          }
           setFrecs={(zidArg, eidArg, isCustomArg, nuevasFrecs)=>{
-            setElemFrecs(String(zonaActFrec.id), elemActFrec.id, nuevasFrecs, elemActFrec.isCustom||false);
+            setElemFrecs(String(zonaActFrec.id), elemActFrec.id, elemActFrec.isCustom||false, nuevasFrecs);
           }}
         />
       )}
@@ -14228,7 +15204,7 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
   );
 }
 
-function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotificaciones, marcarTodasLeidas, notifNoLeidas, MACROZONAS_BASE, personal, tareasProg, setTareasProg, crearNotificacion, esJefa, autoOpen, onAutoOpenDone }) {
+function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotificaciones, marcarTodasLeidas, notifNoLeidas, MACROZONAS_BASE, personal, tareasProg, setTareasProg, crearNotificacion, onGuardarDirecto, esJefa, autoOpen, onAutoOpenDone }) {
   const [tabAlerta, setTabAlerta] = React.useState("incidencias");
   const [showNuevaAlerta, setShowNuevaAlerta] = React.useState(false);
   React.useEffect(()=>{
@@ -14293,7 +15269,7 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
   const incActivas = incArr.filter(i=>i.estado==="activa"||i.estado==="en_gestion").sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
   const incResueltas = incArr.filter(i=>i.estado==="resuelta").sort((a,b)=>(b.fechaResolucion||b.fecha||"").localeCompare(a.fechaResolucion||a.fecha||""));
   const notifArr = Array.isArray(notificaciones)?notificaciones:Object.values(notificaciones||{});
-  const notifSorted = notifArr.filter(n=>n&&n.titulo).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
+  const notifSorted = notifArr.filter(n=>n&&n.titulo&&n.tipo!=="bono_cancha").sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
   const URGENCIA_COLORS = {inmediata:"#ef4444",alta:"#f59e0b",media:"#60a5fa"};
 
   const guardarAlerta = () => {
@@ -14302,7 +15278,10 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
     const tipoObj = TIPOS_ALERTA.find(t=>t.id===alertaForm.tipo)||TIPOS_ALERTA[0];
     const nuevaId = Date.now()+Math.random();
     const nuevaAlerta = limpiarUndef({id:nuevaId,estado:"activa",tipo:alertaForm.tipo,tipoLabel:tipoObj.label,tipoIcon:tipoObj.icon,zonas:alertaForm.zonas,origen:alertaForm.origen,urgencia:alertaForm.urgencia,descripcion:alertaForm.descripcion,responsable:alertaForm.responsable,fecha:alertaForm.fecha,hora:alertaForm.hora,fechaCreacion:new Date().toISOString(),tareas:tareasEditables.filter(t=>t.incluir).map(t=>({texto:t.texto,responsable:t.responsable,estado:"pendiente"})),historial:[{accion:"Alerta creada",fecha:alertaForm.fecha,hora:alertaForm.hora,responsable:alertaForm.responsable}]});
-    setIncidencias([nuevaAlerta,...incArr]);
+    setIncidencias(prev=>{
+      const arr = Array.isArray(prev)?prev:Object.values(prev||{});
+      return [nuevaAlerta, ...arr];
+    });
     // Determinar si la alerta es de Golf
     const esGolf = alertaForm.zonas.some(z=>z==="Golf"||(z||"").toLowerCase().includes("golf")) ||
                    alertaForm.tipo==="golf_incid";
@@ -14346,6 +15325,8 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
       return {...prev,[alertaForm.fecha]:[tareaCierre,...tareasGen,...tareasInst,...normArr(prev[alertaForm.fecha]||[])].map(limpiarUndef)};
     });
     crearNotificacion?.("alerta",{titulo:`${tipoObj.icon} Nueva alerta: ${alertaForm.zonas.join(", ")}`,mensaje:alertaForm.descripcion,fecha:alertaForm.fecha});
+    // Guardar directamente en Firebase como respaldo
+    onGuardarDirecto&&onGuardarDirecto(nuevaAlerta);
     setAlertaForm(emptyAlerta);
     setShowNuevaAlerta(false);
     setTabAlerta("incidencias");
@@ -14720,13 +15701,725 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+// ─── PANEL PROTOCOLOS ─────────────────────────────────────────────────────────
+function PanelProtocolos({ S, personal, esJefa, crearNotificacion }) {
+  const [tabProt, setTabProt] = React.useState("poda");
+
+  return (
+    <div className="ein">
+      <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:700,marginBottom:4}}>📋 Protocolos de Seguridad</div>
+      <div style={{fontSize:12,color:"#5a9a7a",marginBottom:16}}>Registros de autorización para trabajos de riesgo</div>
+      <div style={{display:"flex",gap:6,marginBottom:16}}>
+        {[["poda","🌿 Poda en altura"]].map(([t,l])=>(
+          <button key={t} className={`tab${tabProt===t?" on":""}`} onClick={()=>setTabProt(t)}
+            style={{cursor:"pointer",border:`1px solid ${tabProt===t?"#34d399":"rgba(255,255,255,0.12)"}`,borderRadius:8,padding:"5px 14px",fontSize:12,background:tabProt===t?"rgba(52,211,153,0.12)":"transparent",color:tabProt===t?"#34d399":"#6aaa7a"}}>
+            {l}
+          </button>
+        ))}
+      </div>
+      {tabProt==="poda"&&<ProtocoloPodaAltura S={S} personal={personal} esJefa={esJefa} crearNotificacion={crearNotificacion}/>}
+    </div>
+  );
+}
+
+// ─── PROTOCOLO PODA EN ALTURA ─────────────────────────────────────────────────
+const PROT_PATH = "estadio-verde-data/protocolos/poda_altura";
+const PROT_TRABAJADORES = ["Andrés Astorga","Osmar Bhalú Armijo Zúñiga","Sergio Esteban Peña","Saúl Molina"];
+const PROT_SUPERVISOR = "Juber Leopoldo Juárez Burgos";
+const PROT_STEPS = [
+  {id:1,label:"Trabajadores"},
+  {id:2,label:"Árbol / sitio"},
+  {id:3,label:"Equipo"},
+  {id:4,label:"Briefing"},
+  {id:5,label:"Autorización"},
+];
+const protEmptyForm = () => ({
+  fecha: new Date().toISOString().slice(0,10),
+  operadores:[], sitio:"", especie:"",
+  historialFalla:null, grietasCavidades:null, viento:"", humedad:null, interferencias:null,
+  arnes:null, cuerdas:null, casco:null, certificacionVigente:null, comunicacion:null,
+  rolesClaros:null, senalesAcordadas:null, perimetroDelimitado:null, planEmergencia:null,
+  supervisorNombre:"", justificacion:"",
+});
+const protEmptyOp = (nombre) => ({nombre, descanso:null, preocupacion:null, confianzaExcesiva:null, nota:""});
+
+function ProtToggle({ value, onChange, labelYes="Sí", labelNo="No" }) {
+  return (
+    <div style={{display:"flex",gap:6}}>
+      <button type="button" onClick={()=>onChange(true)}
+        style={{flex:1,padding:"7px 0",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",
+          border:`1px solid ${value===true?"rgba(34,197,94,0.6)":"rgba(255,255,255,0.1)"}`,
+          background:value===true?"rgba(34,197,94,0.15)":"transparent",
+          color:value===true?"#22c55e":"#7aaa80"}}>
+        {labelYes}
+      </button>
+      <button type="button" onClick={()=>onChange(false)}
+        style={{flex:1,padding:"7px 0",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",
+          border:`1px solid ${value===false?"rgba(245,158,11,0.6)":"rgba(255,255,255,0.1)"}`,
+          background:value===false?"rgba(245,158,11,0.12)":"transparent",
+          color:value===false?"#f59e0b":"#7aaa80"}}>
+        {labelNo}
+      </button>
+    </div>
+  );
+}
+
+function ProtItem({ children, value, onChange, invert }) {
+  const flagged = invert ? value===true : value===false;
+  return (
+    <div style={{padding:"10px 12px",borderRadius:10,border:`1px solid ${flagged?"rgba(245,158,11,0.4)":"rgba(255,255,255,0.08)"}`,
+      background:flagged?"rgba(245,158,11,0.06)":"rgba(255,255,255,0.02)",marginBottom:6}}>
+      <div style={{fontSize:12,color:"#c0dac0",marginBottom:6}}>{children}</div>
+      <ProtToggle value={value} onChange={onChange}/>
+    </div>
+  );
+}
+
+function ProtocoloPodaAltura({ S, personal, esJefa, crearNotificacion, rolLogueado }) {
+  const [form, setForm] = React.useState(protEmptyForm());
+  const [step, setStep] = React.useState(1);
+  const [history, setHistory] = React.useState([]);
+  const [showHistory, setShowHistory] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const [saved, setSaved] = React.useState(false);
+
+  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+  const agregarOp = (nombre) => { if(!nombre) return; setForm(f=>f.operadores.some(o=>o.nombre===nombre)?f:{...f,operadores:[...f.operadores,protEmptyOp(nombre)]}); };
+  const quitarOp = (nombre) => setForm(f=>({...f,operadores:f.operadores.filter(o=>o.nombre!==nombre)}));
+  const setOpCampo = (nombre,campo,valor) => setForm(f=>({...f,operadores:f.operadores.map(o=>o.nombre===nombre?{...o,[campo]:valor}:o)}));
+
+  React.useEffect(()=>{
+    // Escuchar historial en tiempo real
+    const fbRef = ref(db, PROT_PATH);
+    const unsub = onValue(fbRef, snap=>{
+      if(snap.val()) {
+        const arr = Object.entries(snap.val()).map(([k,v])=>({id:k,...v}))
+          .sort((a,b)=>(b.creadoEn||"").localeCompare(a.creadoEn||""));
+        setHistory(arr);
+      } else {
+        setHistory([]);
+      }
+    });
+    return ()=>unsub();
+  },[]);
+
+  const flags = [];
+  form.operadores.forEach(o=>{
+    if(o.descanso===false) flags.push(`${o.nombre}: descanso insuficiente`);
+    if(o.preocupacion===true) flags.push(`${o.nombre}: reporta preocupación / distracción`);
+    if(o.confianzaExcesiva===true) flags.push(`${o.nombre}: riesgo de exceso de confianza`);
+  });
+  if(form.historialFalla===true) flags.push("Árbol con historial previo de falla de rama");
+  if(form.grietasCavidades===true) flags.push("Grietas, cavidades u hongos visibles");
+  if(form.viento&&Number(form.viento)>30) flags.push(`Viento registrado (${form.viento} km/h) supera umbral de 30 km/h`);
+  if(form.humedad===true) flags.push("Madera húmeda por lluvia reciente");
+  if(form.interferencias===true) flags.push("Cableado, estructuras o tránsito bajo la zona de trabajo");
+  if(form.arnes===false) flags.push("Arnés no aprobado");
+  if(form.cuerdas===false) flags.push("Cuerdas / mosquetones no aprobados");
+  if(form.casco===false) flags.push("Casco no aprobado");
+  if(form.certificacionVigente===false) flags.push("Certificación de equipo no vigente");
+  if(form.comunicacion===false) flags.push("Sin kit de comunicación operativo");
+  if(form.rolesClaros===false) flags.push("Roles del equipo no definidos");
+  if(form.senalesAcordadas===false) flags.push("Señales de comunicación no acordadas");
+  if(form.perimetroDelimitado===false) flags.push("Perímetro de seguridad no delimitado");
+  if(form.planEmergencia===false) flags.push("Sin plan de emergencia claro");
+
+  const stepOk = (n) => {
+    if(n===1) return form.operadores.length>0&&form.sitio&&form.operadores.every(o=>o.descanso!==null&&o.preocupacion!==null&&o.confianzaExcesiva!==null);
+    if(n===2) return form.historialFalla!==null&&form.grietasCavidades!==null&&form.viento!==""&&form.humedad!==null&&form.interferencias!==null;
+    if(n===3) return [form.arnes,form.cuerdas,form.casco,form.certificacionVigente,form.comunicacion].every(v=>v!==null);
+    if(n===4) return [form.rolesClaros,form.senalesAcordadas,form.perimetroDelimitado,form.planEmergencia].every(v=>v!==null);
+    return true;
+  };
+  const allDone = [1,2,3,4].every(stepOk);
+  const canAuth = allDone&&form.operadores.length>0&&form.sitio&&form.supervisorNombre&&(flags.length===0||form.justificacion.trim().length>0);
+
+  async function guardar() {
+    setSaving(true);
+    const id = "prot_"+Date.now();
+    const record = {...form, flags, autorizado:flags.length===0?"sin observaciones":"autorizado con justificación escrita", creadoEn:new Date().toISOString()};
+    try {
+      await fbUpdate(ref(db, PROT_PATH+"/"+id), record);
+      setSaved(true);
+      crearNotificacion&&crearNotificacion("protocolo",{titulo:"✅ Protocolo de subida registrado",mensaje:`${form.sitio} · ${form.fecha} · ${form.supervisorNombre}`,fecha:form.fecha});
+      setTimeout(()=>{ setForm(protEmptyForm()); setStep(1); setSaved(false); }, 2000);
+    } catch(e) { console.error("Error al guardar protocolo",e); }
+    finally { setSaving(false); }
+  }
+
+  const nodeColor = (n) => {
+    if(n<step) return stepOk(n)?"#22c55e":"#f59e0b";
+    if(n===step) return "#34d399";
+    return "#3a5a3a";
+  };
+
+  const imprimirProtocolo = (r) => {
+    const win = window.open("","_blank");
+    const flags = r.flags||[];
+    const ops = (r.operadores||[]).map(o=>`
+      <tr style="border-bottom:1px solid #e5e7eb">
+        <td style="padding:6px 10px;font-weight:600">${o.nombre}</td>
+        <td style="padding:6px 10px;text-align:center">${o.descanso===true?"✅ Sí":o.descanso===false?"⚠️ No":"—"}</td>
+        <td style="padding:6px 10px;text-align:center">${o.preocupacion===true?"⚠️ Sí":o.preocupacion===false?"✅ No":"—"}</td>
+        <td style="padding:6px 10px;text-align:center">${o.confianzaExcesiva===true?"⚠️ Sí":o.confianzaExcesiva===false?"✅ No":"—"}</td>
+        ${o.nota?`<td style="padding:6px 10px;font-style:italic;color:#6b7280">${o.nota}</td>`:"<td></td>"}
+      </tr>`).join("");
+    win.document.write(`<!DOCTYPE html><html lang="es"><head>
+      <meta charset="UTF-8"/>
+      <title>Protocolo de Subida — ${r.fecha}</title>
+      <style>
+        body{font-family:'Segoe UI',sans-serif;color:#1a1a2e;padding:32px;max-width:800px;margin:0 auto}
+        h1{font-size:22px;color:#065f46;margin:0 0 4px}
+        h2{font-size:14px;color:#374151;border-bottom:2px solid #d1fae5;padding-bottom:4px;margin:20px 0 10px}
+        .meta{font-size:12px;color:#6b7280;margin-bottom:20px}
+        table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:12px}
+        th{background:#f0fdf4;padding:6px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#065f46}
+        .ok{color:#065f46;font-weight:600} .warn{color:#b45309;font-weight:600}
+        .flag-box{background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:12px;margin:12px 0}
+        .flag-box ul{margin:4px 0;padding-left:18px;font-size:12px;color:#92400e}
+        .auth-box{background:#f0fdf4;border:1px solid #6ee7b7;border-radius:8px;padding:14px;margin-top:16px}
+        .just-box{background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px;margin:8px 0;font-style:italic;font-size:12px;color:#92400e}
+        .footer{margin-top:32px;font-size:10px;color:#9ca3af;text-align:center;border-top:1px solid #e5e7eb;padding-top:12px}
+        @media print{body{padding:16px}.no-print{display:none}}
+      </style>
+    </head><body>
+      <button onclick="window.print()" class="no-print" style="float:right;padding:8px 16px;background:#065f46;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">🖨️ Imprimir / Guardar PDF</button>
+      <h1>Estadio Español · DAV</h1>
+      <div style="font-size:13px;color:#065f46;font-weight:600;margin-bottom:2px">Protocolo de Subida — Poda en Altura</div>
+      <div class="meta">
+        <b>Fecha:</b> ${r.fecha} &nbsp;·&nbsp;
+        <b>Sitio:</b> ${r.sitio||"—"} &nbsp;·&nbsp;
+        <b>Especie:</b> ${r.especie||"—"} &nbsp;·&nbsp;
+        <b>Registrado:</b> ${new Date(r.creadoEn||"").toLocaleString("es-CL")}
+      </div>
+
+      <h2>1. Trabajadores</h2>
+      <table>
+        <thead><tr>
+          <th>Nombre</th><th>Descanso</th><th>Preocupación</th><th>Exceso confianza</th><th>Notas</th>
+        </tr></thead>
+        <tbody>${ops}</tbody>
+      </table>
+
+      <h2>2. Árbol / Sitio</h2>
+      <table><tbody>
+        <tr><td style="padding:5px 10px;width:220px">Historial previo de falla</td><td style="padding:5px 10px" class="${r.historialFalla?"warn":"ok"}">${r.historialFalla?"⚠️ Sí":"✅ No"}</td></tr>
+        <tr><td style="padding:5px 10px">Grietas, cavidades u hongos</td><td style="padding:5px 10px" class="${r.grietasCavidades?"warn":"ok"}">${r.grietasCavidades?"⚠️ Sí":"✅ No"}</td></tr>
+        <tr><td style="padding:5px 10px">Viento registrado</td><td style="padding:5px 10px" class="${r.viento&&Number(r.viento)>30?"warn":"ok"}">${r.viento||"—"} km/h${r.viento&&Number(r.viento)>30?" ⚠️ Sobre umbral":""}</td></tr>
+        <tr><td style="padding:5px 10px">Madera húmeda</td><td style="padding:5px 10px" class="${r.humedad?"warn":"ok"}">${r.humedad?"⚠️ Sí":"✅ No"}</td></tr>
+        <tr><td style="padding:5px 10px">Interferencias bajo zona de trabajo</td><td style="padding:5px 10px" class="${r.interferencias?"warn":"ok"}">${r.interferencias?"⚠️ Sí":"✅ No"}</td></tr>
+      </tbody></table>
+
+      <h2>3. Equipo</h2>
+      <table><tbody>
+        <tr><td style="padding:5px 10px;width:220px">Arnés</td><td style="padding:5px 10px" class="${r.arnes===false?"warn":"ok"}">${r.arnes?"✅ Aprobado":"⚠️ No aprobado"}</td></tr>
+        <tr><td style="padding:5px 10px">Cuerdas y mosquetones</td><td style="padding:5px 10px" class="${r.cuerdas===false?"warn":"ok"}">${r.cuerdas?"✅ Aprobado":"⚠️ No aprobado"}</td></tr>
+        <tr><td style="padding:5px 10px">Casco</td><td style="padding:5px 10px" class="${r.casco===false?"warn":"ok"}">${r.casco?"✅ Aprobado":"⚠️ No aprobado"}</td></tr>
+        <tr><td style="padding:5px 10px">Certificación vigente</td><td style="padding:5px 10px" class="${r.certificacionVigente===false?"warn":"ok"}">${r.certificacionVigente?"✅ Vigente":"⚠️ No vigente"}</td></tr>
+        <tr><td style="padding:5px 10px">Kit de comunicación</td><td style="padding:5px 10px" class="${r.comunicacion===false?"warn":"ok"}">${r.comunicacion?"✅ Operativo":"⚠️ No operativo"}</td></tr>
+      </tbody></table>
+
+      <h2>4. Briefing</h2>
+      <table><tbody>
+        <tr><td style="padding:5px 10px;width:220px">Roles definidos</td><td style="padding:5px 10px" class="${r.rolesClaros===false?"warn":"ok"}">${r.rolesClaros?"✅ Sí":"⚠️ No"}</td></tr>
+        <tr><td style="padding:5px 10px">Señales acordadas</td><td style="padding:5px 10px" class="${r.senalesAcordadas===false?"warn":"ok"}">${r.senalesAcordadas?"✅ Sí":"⚠️ No"}</td></tr>
+        <tr><td style="padding:5px 10px">Perímetro delimitado</td><td style="padding:5px 10px" class="${r.perimetroDelimitado===false?"warn":"ok"}">${r.perimetroDelimitado?"✅ Sí":"⚠️ No"}</td></tr>
+        <tr><td style="padding:5px 10px">Plan de emergencia</td><td style="padding:5px 10px" class="${r.planEmergencia===false?"warn":"ok"}">${r.planEmergencia?"✅ Sí":"⚠️ No"}</td></tr>
+      </tbody></table>
+
+      ${flags.length>0?`
+        <div class="flag-box">
+          <b style="color:#92400e">⚠️ ${flags.length} alerta(s) detectada(s):</b>
+          <ul>${flags.map(f=>`<li>${f}</li>`).join("")}</ul>
+        </div>
+        ${r.justificacion?`<div class="just-box"><b>Justificación:</b> "${r.justificacion}"</div>`:""}
+      `:""}
+
+      <div class="auth-box">
+        <div style="font-size:13px;font-weight:600;color:#065f46;margin-bottom:6px">
+          ${flags.length===0?"✅ Autorizado sin observaciones":"✅ Autorizado con justificación escrita"}
+        </div>
+        <div style="font-size:12px"><b>Supervisor:</b> ${r.supervisorNombre||"—"}</div>
+      </div>
+
+      <div class="footer">Estadio Español de Las Condes · Departamento de Áreas Verdes · Generado desde Estadio Verde</div>
+    </body></html>`);
+    win.document.close();
+    win.focus();
+  };
+
+  if(showHistory) return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <div style={{fontWeight:700,fontSize:14}}>📂 Registros guardados ({history.length})</div>
+        <button onClick={()=>setShowHistory(false)} style={{...S.btn,fontSize:11}}>← Nuevo checklist</button>
+      </div>
+      {history.length===0&&<div style={{textAlign:"center",color:"#5a9a7a",padding:30}}>Aún no hay registros guardados.</div>}
+      {history.map((r,i)=>(
+        <div key={i} style={{...S.card,padding:12,marginBottom:8}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",marginBottom:4}}>
+            <div>
+              <div style={{fontSize:13,fontWeight:600,color:"#c0dac0"}}>{r.operadores?.map(o=>o.nombre).join(", ")}</div>
+              <div style={{fontSize:11,color:"#5a9a7a"}}>{r.sitio} · {r.fecha}</div>
+            </div>
+            <div style={{display:"flex",gap:6,alignItems:"center"}}>
+              <span style={{fontSize:10,padding:"2px 8px",borderRadius:8,
+                background:r.flags?.length?"rgba(245,158,11,0.12)":"rgba(34,197,94,0.1)",
+                color:r.flags?.length?"#f59e0b":"#22c55e",border:`1px solid ${r.flags?.length?"rgba(245,158,11,0.3)":"rgba(34,197,94,0.3)"}`}}>
+                {r.flags?.length?`${r.flags.length} alerta(s)`:"sin observaciones"}
+              </span>
+              <button onClick={()=>imprimirProtocolo(r)}
+                style={{fontSize:10,padding:"2px 8px",borderRadius:6,border:"1px solid rgba(96,165,250,0.3)",background:"rgba(96,165,250,0.08)",color:"#60a5fa",cursor:"pointer"}}>
+                🖨️ PDF
+              </button>
+            </div>
+          </div>
+          {r.flags?.length>0&&<ul style={{fontSize:11,color:"#f59e0b",marginTop:4,paddingLeft:16}}>{r.flags.map((f,j)=><li key={j}>{f}</li>)}</ul>}
+          {r.justificacion&&<div style={{fontSize:11,color:"#7aaa80",marginTop:4,fontStyle:"italic"}}>"{r.justificacion}"</div>}
+          <div style={{fontSize:10,color:"#4a7a5a",marginTop:4}}>Autorizó: {r.supervisorNombre}</div>
+        </div>
+      ))}
+    </div>
+  );
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        <div>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700}}>🌿 Protocolo de subida</div>
+          <div style={{fontSize:11,color:"#5a9a7a"}}>Revisión previa a poda en altura — completar antes de anclar</div>
+        </div>
+        <button onClick={()=>setShowHistory(true)} style={{...S.btn,fontSize:11,color:"#60a5fa"}}>
+          📂 Ver registros ({history.length})
+        </button>
+      </div>
+
+      {/* Stepper */}
+      <div style={{...S.card,padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+        {PROT_STEPS.map((s,idx)=>(
+          <React.Fragment key={s.id}>
+            <button onClick={()=>setStep(s.id)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,background:"none",border:"none",cursor:"pointer"}}>
+              <div style={{width:26,height:26,borderRadius:"50%",background:nodeColor(s.id)+"22",border:`2px solid ${nodeColor(s.id)}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:nodeColor(s.id)}}>
+                {step>s.id&&stepOk(s.id)?"✓":s.id}
+              </div>
+              <span style={{fontSize:9,color:step===s.id?"#34d399":"#4a7a5a",textTransform:"uppercase",letterSpacing:"0.3px"}}>{s.label}</span>
+            </button>
+            {idx<PROT_STEPS.length-1&&<div style={{flex:1,height:1,background:"rgba(255,255,255,0.08)",margin:"0 4px"}}/>}
+          </React.Fragment>
+        ))}
+      </div>
+
+      {/* Contenido por step */}
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {step===1&&(<>
+          {/* Selector de personal desde Firebase */}
+          {(()=>{
+            const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
+            const disponibles = personalArr
+              .filter(p=>!form.operadores.some(o=>o.nombre===p.nombre))
+              .sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+            return (
+              <select value="" onChange={e=>agregarOp(e.target.value)} style={S.input}>
+                <option value="">+ Agregar miembro del equipo a la faena</option>
+                {disponibles.map(p=>(
+                  <option key={p.id} value={p.nombre}>{p.nombre} — {p.cargo}</option>
+                ))}
+              </select>
+            );
+          })()}
+          {/* Agregar trabajador externo */}
+          <div style={{display:"flex",gap:6}}>
+            <input
+              value={form._externoNombre||""} 
+              onChange={e=>set("_externoNombre",e.target.value)}
+              placeholder="Externo: nombre completo..."
+              style={{...S.input,flex:1}}/>
+            <button onClick={()=>{
+              const n=(form._externoNombre||"EXTERNO").trim();
+              if(!n) return;
+              agregarOp(n+" (externo)");
+              set("_externoNombre","");
+            }} style={{...S.btn,whiteSpace:"nowrap",background:"rgba(96,165,250,0.1)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.3)"}}>
+              + Agregar externo
+            </button>
+          </div>
+          <input value={form.sitio} onChange={e=>set("sitio",e.target.value)} placeholder="Sitio / árbol (ej. Alameda Central, Q3)" style={S.input}/>
+          {form.operadores.length===0&&<div style={{textAlign:"center",color:"#5a9a7a",fontSize:12,padding:"16px 0"}}>Agrega al menos un trabajador para evaluar su estado antes de subir.</div>}
+          {form.operadores.map(o=>(
+            <div key={o.nombre} style={{...S.card,padding:12}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+                <div style={{fontWeight:700,color:"#34d399"}}>{o.nombre.split(" ")[0]} {o.nombre.split(" ")[1]||""}</div>
+                <button onClick={()=>quitarOp(o.nombre)} style={{fontSize:11,color:"#5a9a7a",background:"none",border:"none",cursor:"pointer"}}>✕ quitar</button>
+              </div>
+              <ProtItem value={o.descanso} onChange={v=>setOpCampo(o.nombre,"descanso",v)}>¿Descansó bien anoche?</ProtItem>
+              <ProtItem value={o.preocupacion} onChange={v=>setOpCampo(o.nombre,"preocupacion",v)} invert>¿Reporta preocupación personal o laboral que lo distraiga hoy?</ProtItem>
+              <ProtItem value={o.confianzaExcesiva} onChange={v=>setOpCampo(o.nombre,"confianzaExcesiva",v)} invert>¿Se detecta exceso de confianza?</ProtItem>
+              <textarea value={o.nota} onChange={e=>setOpCampo(o.nombre,"nota",e.target.value)} placeholder="Observaciones adicionales (opcional)" style={{...S.input,resize:"vertical",marginTop:6}} rows={2}/>
+            </div>
+          ))}
+        </>)}
+
+        {step===2&&(<>
+          <input value={form.especie} onChange={e=>set("especie",e.target.value)} placeholder="Especie (ej. Quercus, Ciprés)" style={S.input}/>
+          <ProtItem value={form.historialFalla} onChange={v=>set("historialFalla",v)} invert>¿Este árbol tiene historial previo de falla de rama?</ProtItem>
+          <ProtItem value={form.grietasCavidades} onChange={v=>set("grietasCavidades",v)} invert>¿Se observan grietas, cavidades u hongos?</ProtItem>
+          <div style={{...S.card,padding:10}}>
+            <div style={{fontSize:12,color:"#c0dac0",marginBottom:6}}>Viento registrado (km/h)</div>
+            <input type="number" value={form.viento} onChange={e=>set("viento",e.target.value)} placeholder="ej. 18" style={{...S.input,width:120}}/>
+            {form.viento&&Number(form.viento)>30&&<div style={{fontSize:11,color:"#f59e0b",marginTop:4}}>⚠️ Sobre el umbral de 30 km/h — suspender faena</div>}
+          </div>
+          <ProtItem value={form.humedad} onChange={v=>set("humedad",v)} invert>¿Madera húmeda por lluvia reciente?</ProtItem>
+          <ProtItem value={form.interferencias} onChange={v=>set("interferencias",v)} invert>¿Hay cableado, estructuras o tránsito bajo la zona de trabajo?</ProtItem>
+        </>)}
+
+        {step===3&&(<>
+          <ProtItem value={form.arnes} onChange={v=>set("arnes",v)}>Arnés inspeccionado y aprobado</ProtItem>
+          <ProtItem value={form.cuerdas} onChange={v=>set("cuerdas",v)}>Cuerdas y mosquetones inspeccionados y aprobados</ProtItem>
+          <ProtItem value={form.casco} onChange={v=>set("casco",v)}>Casco en buen estado</ProtItem>
+          <ProtItem value={form.certificacionVigente} onChange={v=>set("certificacionVigente",v)}>Certificación del equipo vigente</ProtItem>
+          <ProtItem value={form.comunicacion} onChange={v=>set("comunicacion",v)}>Kit de comunicación (radio/celular) operativo</ProtItem>
+        </>)}
+
+        {step===4&&(<>
+          <ProtItem value={form.rolesClaros} onChange={v=>set("rolesClaros",v)}>Roles definidos (quién sube, quién asegura, quién delimita)</ProtItem>
+          <ProtItem value={form.senalesAcordadas} onChange={v=>set("senalesAcordadas",v)}>Señales de comunicación acordadas</ProtItem>
+          <ProtItem value={form.perimetroDelimitado} onChange={v=>set("perimetroDelimitado",v)}>Perímetro de seguridad delimitado</ProtItem>
+          <ProtItem value={form.planEmergencia} onChange={v=>set("planEmergencia",v)}>Plan de emergencia y botiquín identificados</ProtItem>
+        </>)}
+
+        {step===5&&(
+          <div style={{...S.card,padding:14}}>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:8}}>Resumen</div>
+            <div style={{fontSize:12,color:"#7aaa80",marginBottom:8}}>{form.operadores.map(o=>o.nombre).join(", ")||"—"} · {form.sitio||"—"} · {form.fecha}</div>
+            {flags.length===0
+              ? <div style={{fontSize:12,color:"#22c55e",padding:"8px 10px",background:"rgba(34,197,94,0.06)",borderRadius:8}}>✅ Sin observaciones. Condiciones aptas para iniciar la faena.</div>
+              : <>
+                  <div style={{fontSize:12,color:"#f59e0b",fontWeight:600,marginBottom:4}}>⚠️ {flags.length} alerta(s) detectada(s):</div>
+                  <ul style={{fontSize:11,color:"#f59e0b",paddingLeft:16,marginBottom:8}}>{flags.map((f,i)=><li key={i}>{f}</li>)}</ul>
+                </>
+            }
+            {flags.length>0&&(
+              <textarea value={form.justificacion} onChange={e=>set("justificacion",e.target.value)}
+                placeholder="Justificación escrita para autorizar pese a las alertas (obligatoria)"
+                style={{...S.input,border:"1px solid rgba(245,158,11,0.4)",resize:"vertical",marginBottom:8}} rows={3}/>
+            )}
+            <div style={{padding:"10px 12px",background:"rgba(34,197,94,0.05)",borderRadius:8,border:"1px solid rgba(34,197,94,0.2)"}}>
+              <div style={{fontSize:11,color:"#5a9a7a",marginBottom:6}}>La autorización recae en la <b style={{color:"#34d399"}}>Jefa de Áreas Verdes</b></div>
+              <select value={form.supervisorNombre} onChange={e=>set("supervisorNombre",e.target.value)} style={{...S.input,marginBottom:0}}>
+                <option value="">Seleccionar quien autoriza...</option>
+                <option value="Carmen Luz Hermosilla Diez">Carmen Luz Hermosilla Diez — Jefa DAV</option>
+              </select>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Navegación */}
+      <div style={{display:"flex",gap:8,marginTop:16}}>
+        {step>1&&<button onClick={()=>setStep(s=>s-1)} style={{...S.btn,flex:1,padding:"10px 0",background:"transparent",border:"1px solid rgba(255,255,255,0.1)",color:"#7aaa80"}}>← Atrás</button>}
+        {step<5
+          ? <button onClick={()=>setStep(s=>s+1)} disabled={!stepOk(step)}
+              style={{...S.btn,flex:1,padding:"10px 0",background:stepOk(step)?"rgba(52,211,153,0.15)":"rgba(255,255,255,0.04)",
+                color:stepOk(step)?"#34d399":"#4a7a5a",border:`1px solid ${stepOk(step)?"rgba(52,211,153,0.3)":"rgba(255,255,255,0.06)"}`,
+                cursor:stepOk(step)?"pointer":"not-allowed"}}>
+              Siguiente →
+            </button>
+          : <button onClick={guardar} disabled={!canAuth||saving}
+              style={{...S.btn,flex:1,padding:"10px 0",fontWeight:700,
+                background:canAuth?"rgba(34,197,94,0.15)":"rgba(255,255,255,0.04)",
+                color:canAuth?"#22c55e":"#4a7a5a",border:`1px solid ${canAuth?"rgba(34,197,94,0.4)":"rgba(255,255,255,0.06)"}`,
+                cursor:canAuth?"pointer":"not-allowed"}}>
+              {saved?"✅ Guardado":saving?"Guardando...":"Autorizar e iniciar faena"}
+            </button>
+        }
+      </div>
+      <div style={{fontSize:10,color:"#3a5a3a",textAlign:"center",marginTop:8}}>Los registros quedan guardados en Firebase para auditoría.</div>
+    </div>
+  );
+}
+
+
+// ─── PANEL FITOSANITARIO GLOBAL ───────────────────────────────────────────────
+function PanelFitosanitarioGlobal({ S, MACROZONAS_BASE, getAllElems, personal, aplicaciones, setAplicaciones, tareasProg, setTareasProg, stockFito, setStockFito, crearNotificacion, esJefa }) {
+  const hoy = fechaLocal();
+  const [zonaSelId, setZonaSelId] = React.useState("");
+  const [subZonasSel, setSubZonasSel] = React.useState([]); // múltiples sub-zonas
+  const [form, setForm] = React.useState({
+    fecha: hoy, producto:"", dosis:"", cantidadUsada:"", unidadUsada:"L",
+    responsable:"", obs:"", clima:"", volAgua:"", enviarProg:true,
+  });
+  const [showForm, setShowForm] = React.useState(false);
+  const [saved, setSaved] = React.useState(false);
+
+  const zonaSel = MACROZONAS_BASE.find(z=>String(z.id)===zonaSelId);
+  const elemsZona = zonaSel ? getAllElems(zonaSel.id) : [];
+  const esGolfZona = zonaSelId==="31"||(zonaSel?.nombre||"").toLowerCase().includes("golf");
+
+  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+
+  const toggleSubZona = (nombre) => {
+    setSubZonasSel(prev => prev.includes(nombre) ? prev.filter(x=>x!==nombre) : [...prev,nombre]);
+  };
+
+  const guardar = () => {
+    if(!form.producto.trim()||!form.fecha||!zonaSelId) return;
+    const zonasAplicar = subZonasSel.length>0 ? subZonasSel : [zonaSel?.nombre||"General"];
+    const respDefault = esGolfZona ? "Osmar Bhalú Armijo Zúñiga" : (form.responsable||"");
+    const resp = form.responsable || respDefault;
+
+    // Crear una aplicación por zona
+    const nuevasAplic = zonasAplicar.map(zona => limpiarUndef({
+      id: Date.now()+Math.random(),
+      fecha: form.fecha,
+      producto: form.producto,
+      dosis: form.dosis,
+      cantidadUsada: form.cantidadUsada,
+      unidadUsada: form.unidadUsada,
+      superficie: zonaSel?.nombre,
+      sectorDetalle: zona,
+      responsable: resp,
+      obs: form.obs,
+      clima: form.clima,
+      volAgua: form.volAgua,
+      mes: new Date(form.fecha+"T12:00:00").getMonth()+1,
+    }));
+
+    setAplicaciones(prev => {
+      const arr = Array.isArray(prev)?prev:Object.values(prev||{});
+      return [...nuevasAplic, ...arr].slice(0,500);
+    });
+
+    // Descontar stock
+    if(form.cantidadUsada && Number(form.cantidadUsada)>0) {
+      const cant = Number(form.cantidadUsada) / zonasAplicar.length;
+      setStockFito&&setStockFito(prev=>{
+        const key = Object.keys(prev||{}).find(k=>k.toLowerCase().includes(form.producto.toLowerCase().split(" ")[0]));
+        if(!key) return prev;
+        const actual = Number(prev[key]?.cantidad||prev[key]||0);
+        return typeof prev[key]==="object"
+          ? {...prev,[key]:{...prev[key],cantidad:Math.max(0,actual-cant*zonasAplicar.length)}}
+          : {...prev,[key]:Math.max(0,actual-cant*zonasAplicar.length)};
+      });
+    }
+
+    // Enviar tareas a programación
+    if(form.enviarProg) {
+      const nuevasTareas = zonasAplicar.map(zona => limpiarUndef({
+        id: Date.now()+Math.random(),
+        fecha: form.fecha,
+        zona: esGolfZona ? "Golf" : (zonaSel?.nombre||zona),
+        elemento: zona,
+        tarea: "⚗ Aplicación fitosanitaria: "+form.producto+(form.dosis?" · "+form.dosis:""),
+        responsable: resp,
+        estado: resp ? "pendiente" : "por_designar",
+        notas: "Dosis: "+form.dosis+" · Cantidad: "+form.cantidadUsada+" "+form.unidadUsada+(form.obs?" · "+form.obs:""),
+        auto: false,
+        origenFungicida: true,
+      }));
+      setTareasProg(prev=>({
+        ...prev,
+        [form.fecha]: [...(Array.isArray(prev[form.fecha])?prev[form.fecha]:Object.values(prev[form.fecha]||{})), ...nuevasTareas],
+      }));
+    }
+
+    crearNotificacion&&crearNotificacion("fito",{
+      titulo:"⚗ Aplicación fitosanitaria registrada",
+      mensaje:form.producto+" · "+zonasAplicar.join(", ")+" · "+form.fecha,
+      fecha:form.fecha,
+    });
+
+    setSaved(true);
+    setTimeout(()=>{
+      setSaved(false);
+      setForm({fecha:hoy,producto:"",dosis:"",cantidadUsada:"",unidadUsada:"L",responsable:"",obs:"",clima:"",volAgua:"",enviarProg:true});
+      setSubZonasSel([]);
+      setShowForm(false);
+    },1500);
+  };
+
+  const listaPersonal = Array.isArray(personal)?personal:Object.values(personal||{});
+  const aplicFiltradas = (Array.isArray(aplicaciones)?aplicaciones:Object.values(aplicaciones||{}))
+    .filter(a=>!zonaSelId||(a.superficie===zonaSel?.nombre||(a.sectorDetalle||a.superficie||"")===(zonaSel?.nombre)))
+    .slice(0,20);
+
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        <div>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700}}>⚗ Fitosanitario</div>
+          <div style={{fontSize:11,color:"#5a9a7a"}}>Registro de aplicaciones por zona</div>
+        </div>
+        {esJefa&&<button onClick={()=>setShowForm(s=>!s)} style={{...S.btn,background:"rgba(167,139,250,0.12)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.3)"}}>
+          {showForm?"✕ Cancelar":"+ Nueva aplicación"}
+        </button>}
+      </div>
+
+      {/* Formulario */}
+      {showForm&&(
+        <div style={{...S.card,padding:16,marginBottom:16,border:"1px solid rgba(167,139,250,0.2)"}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+            <div>
+              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>FECHA</label>
+              <input type="date" value={form.fecha} onChange={e=>set("fecha",e.target.value)} style={S.input}/>
+            </div>
+            <div>
+              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>MACROZONA</label>
+              <select value={zonaSelId} onChange={e=>{setZonaSelId(e.target.value);setSubZonasSel([]);}} style={S.input}>
+                <option value="">Seleccionar zona...</option>
+                {[...MACROZONAS_BASE].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(z=>(
+                  <option key={z.id} value={String(z.id)}>{z.icono} {z.nombre}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Sub-zonas múltiples */}
+          {elemsZona.length>0&&(
+            <div style={{marginBottom:10}}>
+              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4}}>ELEMENTOS / SUB-ZONAS (selecciona uno o varios)</label>
+              <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                <button onClick={()=>setSubZonasSel(elemsZona.map(e=>e.nombre))}
+                  style={{fontSize:10,padding:"2px 8px",borderRadius:6,border:"1px solid rgba(167,139,250,0.3)",background:"rgba(167,139,250,0.08)",color:"#c4b5fd",cursor:"pointer"}}>
+                  ✓ Todos
+                </button>
+                <button onClick={()=>setSubZonasSel([])}
+                  style={{fontSize:10,padding:"2px 8px",borderRadius:6,border:"1px solid rgba(255,255,255,0.1)",background:"transparent",color:"#5a9a7a",cursor:"pointer"}}>
+                  ✕ Ninguno
+                </button>
+                {elemsZona.map(e=>(
+                  <button key={e.id} onClick={()=>toggleSubZona(e.nombre)}
+                    style={{fontSize:11,padding:"3px 10px",borderRadius:6,cursor:"pointer",
+                      border:`1px solid ${subZonasSel.includes(e.nombre)?"rgba(167,139,250,0.5)":"rgba(255,255,255,0.1)"}`,
+                      background:subZonasSel.includes(e.nombre)?"rgba(167,139,250,0.15)":"transparent",
+                      color:subZonasSel.includes(e.nombre)?"#c4b5fd":"#7aaa80"}}>
+                    {e.nombre}
+                  </button>
+                ))}
+              </div>
+              {subZonasSel.length>0&&<div style={{fontSize:10,color:"#c4b5fd",marginTop:4}}>
+                {subZonasSel.length} zona(s) seleccionada(s) — se creará una tarea por cada una
+              </div>}
+            </div>
+          )}
+
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+            <div>
+              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>PRODUCTO</label>
+              <input value={form.producto} onChange={e=>set("producto",e.target.value)} placeholder="ej: Roundup, Azufre..." style={S.input}/>
+            </div>
+            <div>
+              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>DOSIS</label>
+              <input value={form.dosis} onChange={e=>set("dosis",e.target.value)} placeholder="ej: 5cc/L" style={S.input}/>
+            </div>
+            <div>
+              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>CANTIDAD TOTAL USADA</label>
+              <div style={{display:"flex",gap:4}}>
+                <input type="number" value={form.cantidadUsada} onChange={e=>set("cantidadUsada",e.target.value)} placeholder="0" style={{...S.input,flex:1}}/>
+                <select value={form.unidadUsada} onChange={e=>set("unidadUsada",e.target.value)} style={{...S.input,width:70}}>
+                  <option>L</option><option>mL</option><option>kg</option><option>g</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>VOL. AGUA (L)</label>
+              <input type="number" value={form.volAgua} onChange={e=>set("volAgua",e.target.value)} placeholder="ej: 100" style={S.input}/>
+            </div>
+            <div>
+              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>RESPONSABLE</label>
+              <select value={form.responsable} onChange={e=>set("responsable",e.target.value)} style={S.input}>
+                <option value="">{esGolfZona?"Osmar Bhalú Armijo Zúñiga (por defecto)":"Seleccionar..."}</option>
+                {listaPersonal.sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(p=>(
+                  <option key={p.id} value={p.nombre}>{p.nombre}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>CLIMA</label>
+              <input value={form.clima} onChange={e=>set("clima",e.target.value)} placeholder="ej: Despejado, 18°C" style={S.input}/>
+            </div>
+          </div>
+
+          <div style={{marginBottom:10}}>
+            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>OBSERVACIONES</label>
+            <textarea rows={2} value={form.obs} onChange={e=>set("obs",e.target.value)} placeholder="Motivo, condiciones, notas..." style={{...S.input,resize:"vertical"}}/>
+          </div>
+
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+            <input type="checkbox" checked={form.enviarProg} onChange={e=>set("enviarProg",e.target.checked)} id="envProg"/>
+            <label htmlFor="envProg" style={{fontSize:12,color:"#c0dac0",cursor:"pointer"}}>
+              Generar tarea en Programación del día para el responsable
+            </label>
+          </div>
+
+          <button onClick={guardar} disabled={!form.producto||!form.fecha||!zonaSelId}
+            style={{...S.btn,width:"100%",padding:"10px 0",fontWeight:700,
+              background:saved?"rgba(34,197,94,0.15)":"rgba(167,139,250,0.12)",
+              color:saved?"#22c55e":"#c4b5fd",
+              border:`1px solid ${saved?"rgba(34,197,94,0.4)":"rgba(167,139,250,0.3)"}`,
+              cursor:form.producto&&form.fecha&&zonaSelId?"pointer":"not-allowed"}}>
+            {saved?"✅ Guardado":"💾 Guardar aplicación"}
+          </button>
+        </div>
+      )}
+
+      {/* Historial de aplicaciones */}
+      <div style={{...S.card,padding:14}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+          <div style={{fontSize:13,fontWeight:600,color:"#c0dac0"}}>Últimas aplicaciones</div>
+          <select value={zonaSelId} onChange={e=>{setZonaSelId(e.target.value);setSubZonasSel([]);}}
+            style={{...S.input,maxWidth:200,fontSize:12}}>
+            <option value="">Todas las zonas</option>
+            {[...MACROZONAS_BASE].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(z=>(
+              <option key={z.id} value={String(z.id)}>{z.icono} {z.nombre}</option>
+            ))}
+          </select>
+        </div>
+        {aplicFiltradas.length===0
+          ? <div style={{textAlign:"center",color:"#4a7a5a",padding:20,fontSize:12}}>Sin aplicaciones registradas</div>
+          : aplicFiltradas.map((a,i)=>(
+            <div key={i} style={{padding:"8px 0",borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"start"}}>
+                <div>
+                  <span style={{fontSize:13,fontWeight:600,color:"#c4b5fd"}}>{a.producto}</span>
+                  {a.dosis&&<span style={{fontSize:11,color:"#5a9a7a",marginLeft:8}}>· {a.dosis}</span>}
+                  {a.cantidadUsada&&<span style={{fontSize:11,color:"#5a9a7a",marginLeft:4}}>· {a.cantidadUsada}{a.unidadUsada}</span>}
+                </div>
+                <span style={{fontSize:10,color:"#5a9a7a"}}>{a.fecha}</span>
+              </div>
+              <div style={{fontSize:11,color:"#5a9a7a",marginTop:2}}>
+                {a.superficie&&<span>📍 {a.superficie}</span>}
+                {a.sectorDetalle&&a.sectorDetalle!==a.superficie&&<span> → {a.sectorDetalle}</span>}
+                {a.responsable&&<span style={{marginLeft:8}}>👤 {a.responsable.split(" ")[0]}</span>}
+              </div>
+              {a.obs&&<div style={{fontSize:11,color:"#4a7a5a",fontStyle:"italic",marginTop:2}}>{a.obs}</div>}
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  );
+}
+
+
+// ─── HELPER: próximo día hábil (salta domingos) ──────────────────────────────
+const diasHabiles = (fechaStr, n=1) => {
+  const d = new Date(fechaStr+"T12:00:00");
+  let sumados = 0;
+  while(sumados < n) {
+    d.setDate(d.getDate()+1);
+    if(d.getDay() !== 0) sumados++; // 0 = domingo
+  }
+  return d.toISOString().slice(0,10);
+};
+
 export default function App() {
   const [zonas, setZonas] = useState(()=>MACROZONAS_BASE);
   const [vista, setVista] = useState("dashboard");
   const [zonaId, setZonaId] = useState(null);
   const [tab, setTab] = useState("elementos");
   const [filtroCat, setFiltroCat] = useState("Todas");
-  const [macrozonasCust, setMacrozonasCust] = useState([]);
+  const [macrozonasCust, setMacrozonasCust, macCustReady] = useFirebaseState("macrozonasCust", []);
   // Combinar zonas base con personalizadas — debe ir después de ambos estados
   const zonasConCust = React.useMemo(()=>[...zonas,...macrozonasCust],[zonas,macrozonasCust]);
   const [showNuevaMacrozona, setShowNuevaMacrozona] = useState(false);
@@ -14739,6 +16432,7 @@ export default function App() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiText, setAiText] = useState("");
   const [editElem, setEditElem] = useState(null);
+  const [condicionesLocales, setCondicionesLocales] = useState({});
   const [showPlantacionForm, setShowPlantacionForm] = useState(null);
 
   const ejecutarDescuentoStock = (descuentos) => {
@@ -14810,9 +16504,10 @@ export default function App() {
 
   const handleLogout = () => signOut(auth);
   const CUENTAS_DEFAULT = ["Rama Golf","Mantenimiento Jardines","Obras","Insumos Generales","Maquinaria y Equipos","Fitosanitarios","Semillas y Plantas","Uniformes y EPP"];
-  const [data,           setData,           dataReady]     = useFirebaseState("data",           initData());
+  const [data,           setData,           dataReady, setDataLocal]     = useFirebaseState("data",           initData());
   const [personal, setPersonal, personalReady] = useFirebaseState("personal", PERSONAL_INICIAL);
   const [tareasProg,     setTareasProg,     progReady]     = useFirebaseState("prog",           {});
+  const [stockFito, setStockFito]  = useFirebaseState("fung-stock", {});
   const [aplicaciones,   setAplicaciones,   aplReady]      = useFirebaseState("fungicidas",     []);
   const [incidenciasFito,setIncidenciasFito,incidReady]    = useFirebaseState("fung-incid",     []);
   const [comprasData,    setComprasData,    comprasReady]  = useFirebaseState("compras",  {compras:[],cuentas:CUENTAS_DEFAULT});
@@ -14879,42 +16574,63 @@ export default function App() {
     return arr.filter(n => !n.leida);
   }, [notificaciones]);
 
-  // Detección automática y centralizada: bono especializado por limpieza de Cancha de Fútbol Sintética.
-  // Vigila tareasProg completo (sin importar desde qué pantalla se haya cambiado el estado).
-  // Marca la tarea con bonoCanchaNotificado:true en Firebase para que la marca persista entre recargas.
+  // Detección automática: bono especializado por limpieza de Cancha Sintética
+  // Solo procesa tareas nuevas (bonoCanchaNotificado===false/undefined)
   React.useEffect(()=>{
     if(!progReady) return;
     const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
     Object.entries(tareasProg).forEach(([fecha, tareasDelDia])=>{
       const lista = normArr(tareasDelDia);
-      let huboCambios = false;
-      const listaActualizada = lista.map(t=>{
-        if(!t || !t.id) return t;
-        const yaCompletada = t.estado==="hecha"||t.estado==="completada";
-        if(!yaCompletada) return t;
-        if(t.bonoCanchaNotificado) return t; // ya procesado anteriormente (persistido en Firebase)
+      const aMarcar = lista.filter(t=>{
+        if(!t?.id) return false;
+        if(t.bonoCanchaNotificado) return false; // ya procesado
+        if(t.estado!=="hecha"&&t.estado!=="completada") return false;
         const tNom=(t.tarea||"").toLowerCase();
         const tZona=(t.zona||"").toLowerCase();
         const tElem=(t.elemento||"").toLowerCase();
-        const esCanchaSint = tZona.includes("fútbol sintétic")||tZona.includes("futbol sintetic")||(tZona.includes("cancha")&&tZona.includes("sintétic"))||tElem.includes("césped sintético")||tElem.includes("cesped sintetico")||tElem.includes("alfombra");
-        const esLimpieza = tNom.includes("limpie")||tNom.includes("sopla")||tNom.includes("barrid")||tNom.includes("cepill")||tNom.includes("aspirad")||tNom.includes("escobill");
-        if(esCanchaSint && esLimpieza){
-          crearNotificacion("bono_cancha",{
-            titulo:"🎖️ Bono especializado disponible",
-            mensaje:`${t.responsable||"Trabajador"} completó limpieza de la Cancha de Fútbol Sintética (alfombra) — generar bono especializado`,
-            trabajadorNombre:t.responsable||"",
-            tareaFecha:fecha,
-            descripcionBono:`Limpieza profunda césped sintético — Cancha de Fútbol — ${fecha}`,
-          });
-        }
-        huboCambios = true;
-        return {...t, bonoCanchaNotificado:true};
+        const esCanchaSint = tZona.includes("fútbol sintétic")||tZona.includes("futbol sintetic")||(tZona.includes("cancha")&&(tZona.includes("sintétic")||tZona.includes("sintetic")))||tElem.includes("césped sintético")||tElem.includes("cesped sintetico")||tElem.includes("alfombra")||tNom.includes("alfombra")||tNom.includes("sintético");
+        const esLimpieza = tNom.includes("limpie")||tNom.includes("sopla")||tNom.includes("barrid")||tNom.includes("cepill")||tNom.includes("aspirad")||tNom.includes("escobill")||tNom.includes("mantenci")||tNom.includes("mantención");
+        return esCanchaSint && esLimpieza;
       });
-      if(huboCambios){
-        fbUpdate(ref(db, `${ROOT}/prog`), {[fecha]: listaActualizada}).catch(e=>console.error("Error marcando bonoCanchaNotificado:", e));
-      }
+      if(aMarcar.length===0) return;
+      // Generar bono directamente en personal — no como alerta
+      aMarcar.forEach(t=>{
+        const trabajadorNombre = t.responsable||"";
+        if(!trabajadorNombre) return;
+        // Buscar el trabajador en personal
+        const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
+        const trab = personalArr.find(p=>p.nombre===trabajadorNombre);
+        if(!trab) return;
+        const nuevoBono = {
+          id:"bc_"+Date.now()+Math.random(),
+          tipo:"bonoEspecializado",
+          fecha,
+          descripcion:`Limpieza/mantención césped sintético — Cancha de Fútbol — ${fecha}`,
+          estado:"pendiente",
+          monto:0, // la jefa define el monto
+          origen:"automatico",
+          tareaId:t.id,
+        };
+        // Agregar bono a la ficha del trabajador
+        setPersonal(prev=>{
+          const arr = Array.isArray(prev)?prev:Object.values(prev||{});
+          return arr.map(p=>{
+            if(p.nombre!==trabajadorNombre) return p;
+            const bonos = Array.isArray(p.bonos)?p.bonos:[];
+            // No duplicar
+            if(bonos.some(b=>b.tareaId===t.id)) return p;
+            return {...p, bonos:[...bonos, nuevoBono]};
+          });
+        });
+      });
+      // Marcar como notificado en Firebase
+      const listaActualizada = lista.map(t=>
+        aMarcar.some(a=>a.id===t.id) ? {...t, bonoCanchaNotificado:true} : t
+      );
+      fbUpdate(ref(db, `${ROOT}/prog`), {[fecha]: listaActualizada})
+        .catch(e=>console.error("Error marcando bonoCanchaNotificado:", e));
     });
-  }, [tareasProg, progReady, crearNotificacion]);
+  }, [progReady]); // ← Solo al cargar, no en cada cambio de tareasProg
 
   const marcarTodasLeidas = () => {
     const arr = Array.isArray(notificaciones) ? notificaciones : Object.values(notificaciones||{});
@@ -15011,7 +16727,7 @@ export default function App() {
       const arr = Array.isArray(personal)?personal:Object.values(personal||{});
       if(arr.length>0){
         const fbP = arr.find(x=>x.email?.toLowerCase()===fbUser.email?.toLowerCase());
-        if(p){
+        if(fbP){
           setWorkerLogueado(fbP.id);
           setVistaWorker(true);
           setVista("miturno");
@@ -15047,7 +16763,19 @@ export default function App() {
 
   // updateZona — actualiza una zona en el estado data
 
-  const updateZona = (id, patch) => setData(p => ({ ...p, [String(id)]: { ...p[String(id)], ...patch } }));
+  const updateZona = (id, patch) => {
+    const zidStr = String(id);
+    // Actualizar estado local inmediatamente
+    setData(prev => {
+      const existing = prev[zidStr] || {};
+      return { ...prev, [zidStr]: { ...existing, ...patch } };
+    });
+    // Escribir en Firebase solo el campo modificado (no todo el objeto data)
+    Object.entries(patch).forEach(([key, val]) => {
+      fbUpdate(ref(db, ROOT+"/data/"+zidStr), { [key]: val })
+        .catch(e=>console.error("updateZona firebase error:", key, e));
+    });
+  };
   const addHistorial = (id, txt) => setData(p => ({
     ...p, [String(id)]: { ...p[String(id)], historial: [{ txt, fecha: new Date().toLocaleDateString("es-CL"), hora: new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"}) }, ...(p[id]?.historial||[])].slice(0,30) }
   }));
@@ -15071,7 +16799,7 @@ export default function App() {
     const zidS = String(zid);
     const zonaZ = zonas.find(x=>String(x.id)===zidS);
     const zdat = getZD(zidS);
-    const base = (zonaZ?.elementos||[]).map(e=>({...e,isCustom:false,edData:zdat.elementos?.[e.id]||{estado:"bueno",notas:""}}));
+    const base = (zonaZ?.elementos||[]).map(e=>({...e,isCustom:false,edData:{estado:"bueno",notas:"",...(zdat.elementos?.[e.id]||{})}}));
     const custom = (zdat.elementosCustom||[]).map(e=>({...e,isCustom:true,edData:{estado:e.estado||"bueno",notas:e.notas||""}}));
     return [...base,...custom].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
   };
@@ -15122,21 +16850,103 @@ export default function App() {
   };
   const toggleTareaZona = (zid, tid) => { const arr=(getZD(zid).tareas||[]).map(t=>t.id===tid?{...t,completada:!t.completada}:t); updateZona(zid,{tareas:arr}); };
 
+  const setElemCondicion = (zid,eid,isCustom,condicion) => {
+    if(isCustom){ updateCustomElemField(zid,eid,{condicion}); return; }
+    // Actualizar estado local
+    setDataLocal(prev=>{
+      const zidStr=String(zid);
+      const ex=prev[zidStr]||{};
+      const exElems=ex.elementos||{};
+      return {...prev,[zidStr]:{...ex,elementos:{...exElems,[eid]:{...exElems[eid],condicion}}}};
+    });
+    // Escribir en Firebase con path notation para no sobreescribir otros campos
+    fbUpdate(ref(db, ROOT+"/data/"+String(zid)+"/elementos/"+eid), {condicion})
+      .catch(e=>console.error("setElemCondicion error:",e));
+  };
+
   const setElemEstado = (zid,eid,isCustom,estado) => {
-    if(isCustom){const arr=[...(data[zid].elementosCustom||[])];const i=arr.findIndex(e=>e.id===eid);if(i>=0){arr[i]={...arr[i],estado};updateZona(zid,{elementosCustom:arr});}}
-    else{updateZona(zid,{elementos:{...data[zid]?.elementos,[eid]:{...data[zid]?.elementos?.[eid],estado}}});}
+    if(isCustom){ updateCustomElemField(zid,eid,{estado}); return; }
+    // Actualizar local y Firebase con path específico
+    setDataLocal(prev=>{
+      const zidStr=String(zid);
+      const ex=prev[zidStr]||{};
+      const exElems=ex.elementos||{};
+      return {...prev,[zidStr]:{...ex,elementos:{...exElems,[eid]:{...exElems[eid],estado}}}};
+    });
+    fbUpdate(ref(db, ROOT+"/data/"+String(zid)+"/elementos/"+eid), {estado})
+      .catch(e=>console.error("setElemEstado error:",e));
     addHistorial(zid,`Estado "${getElemNombre(zid,eid,isCustom)}" → ${ESTADOS_ELEM[estado]?.label}`);
   };
+  // Helper: actualizar campo de elemento custom leyendo desde Firebase
+  const updateCustomElemField = (zid, eid, fieldPatch) => {
+    const zidStr = String(zid);
+    get(ref(db, ROOT+"/data/"+zidStr+"/elementosCustom")).then(snap=>{
+      const snapVal = snap.val();
+      const elems = Array.isArray(snapVal) ? snapVal
+        : snapVal && typeof snapVal==="object" ? Object.values(snapVal) : [];
+      const arr = elems.map(e=>e.id===eid?{...e,...fieldPatch}:e);
+      fbUpdate(ref(db, ROOT+"/data/"+zidStr), {elementosCustom:arr})
+        .then(()=>setData(prev=>({...prev,[zidStr]:{...(prev[zidStr]||{}),elementosCustom:arr}})));
+    }).catch(()=>{
+      const arr=[...(data[zidStr]?.elementosCustom||[])];
+      const i=arr.findIndex(e=>e.id===eid);
+      if(i>=0){arr[i]={...arr[i],...fieldPatch};updateZona(zidStr,{elementosCustom:arr});}
+    });
+  };
   const setElemNotas = (zid,eid,isCustom,notas) => {
-    if(isCustom){const arr=[...(data[zid].elementosCustom||[])];const i=arr.findIndex(e=>e.id===eid);if(i>=0){arr[i]={...arr[i],notas};updateZona(zid,{elementosCustom:arr});}}
+    if(isCustom){ updateCustomElemField(zid,eid,{notas}); return; }
     else{updateZona(zid,{elementos:{...data[zid]?.elementos,[eid]:{...data[zid]?.elementos?.[eid],notas}}});}
   };
   const getElemNombre = (zid,eid,isCustom) => {
     if(isCustom) return (data[zid]?.elementosCustom||[]).find(e=>e.id===eid)?.nombre||"";
     return zonasConCust.find(z=>String(z.id)===String(zid))?.elementos.find(e=>e.id===eid)?.nombre||"";
   };
-  const addCustomElem = (zid,elem) => { const id="c"+Date.now(); const arr=[...(data[String(zid)]?.elementosCustom||[]),{...elem,id,estado:"bueno",notas:""}]; updateZona(zid,{elementosCustom:arr}); addHistorial(zid,`Elemento agregado: ${elem.nombre}`); };
-  const removeCustomElem = (zid,eid) => { const arr=(data[zid]?.elementosCustom||[]).filter(e=>e.id!==eid); updateZona(zid,{elementosCustom:arr}); };
+  const addCustomElem = (zid,elem) => {
+    if(!zid||!elem?.nombre?.trim()) return;
+    const id = "c"+Date.now();
+    const zidStr = String(zid);
+    const newElemObj = {...elem, id, estado:"bueno", notas:""};
+    // Leer desde Firebase para no perder elementos agregados en otras sesiones
+    const fbRef = ref(db, ROOT+"/data/"+zidStr+"/elementosCustom");
+    get(fbRef).then(snap=>{
+      const snapVal = snap.val();
+      const currentElems = Array.isArray(snapVal) ? snapVal
+        : snapVal && typeof snapVal==="object" ? Object.values(snapVal)
+        : [];
+      const arr = [...currentElems, newElemObj];
+      fbUpdate(ref(db, ROOT+"/data/"+zidStr), {elementosCustom: arr})
+        .then(()=>{
+          setData(prev=>{
+            const ex = prev[zidStr]||{};
+            return {...prev, [zidStr]:{...ex, elementosCustom:arr}};
+          });
+        })
+        .catch(e=>console.error("addCustomElem error:", e));
+    }).catch(()=>{
+      // Si falla la lectura, usar estado local
+      const existing = data[zidStr]?.elementosCustom;
+      const currentElems = Array.isArray(existing)?existing:Object.values(existing||{});
+      const arr = [...currentElems, newElemObj];
+      fbUpdate(ref(db, ROOT+"/data/"+zidStr), {elementosCustom: arr});
+      setData(prev=>({...prev,[zidStr]:{...(prev[zidStr]||{}),elementosCustom:arr}}));
+    });
+    addHistorial(zidStr, `Elemento agregado: ${elem.nombre}`);
+  };
+  const removeCustomElem = (zid,eid) => {
+    const zidStr = String(zid);
+    get(ref(db, ROOT+"/data/"+zidStr+"/elementosCustom")).then(snap=>{
+      const snapVal = snap.val();
+      const currentElems = Array.isArray(snapVal) ? snapVal
+        : snapVal && typeof snapVal==="object" ? Object.values(snapVal) : [];
+      const arr = currentElems.filter(e=>e.id!==eid);
+      fbUpdate(ref(db, ROOT+"/data/"+zidStr), {elementosCustom: arr})
+        .then(()=>setData(prev=>({...prev,[zidStr]:{...(prev[zidStr]||{}),elementosCustom:arr}})))
+        .catch(e=>console.error("removeCustomElem error:", e));
+    }).catch(()=>{
+      const arr=(data[zidStr]?.elementosCustom||[]).filter(e=>e.id!==eid);
+      updateZona(zidStr,{elementosCustom:arr});
+    });
+  };
   const removeBaseElem = (zid,eid) => { setZonas(prev=>prev.map(z=>String(z.id)===String(zid)?{...z,elementos:z.elementos.filter(e=>e.id!==eid)}:z)); const elems={...data[String(zid)]?.elementos}; delete elems[eid]; updateZona(zid,{elementos:elems}); addHistorial(zid,`Elemento eliminado`); };
 
   const addTrabajador = (t) => { const id=Date.now(); setPersonal(p=>[...(Array.isArray(p)?p:Object.values(p||{})),{...t,id,eventos:[]}]); };
@@ -15255,8 +17065,8 @@ export default function App() {
                   value={editElem.tipoEdit!==undefined?editElem.tipoEdit:e.tipo}
                   onChange={ev=>setEditElem(p=>({...p,tipoEdit:ev.target.value}))}>
                   {(()=>{
-                    const vk=["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
-                    const ok=["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","bodegas"];
+                    const vk=["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macizos","setos","macetas_piso","colgantes"];
+                    const ok=["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","maceteros","jardinera_infra","bodegas"];
                     return(<>
                       <optgroup label="🌿 Vegetación">{vk.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup>
                       <optgroup label="🏗️ Infraestructura / Pavimentos">{ok.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup>
@@ -15301,8 +17111,41 @@ export default function App() {
               <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.6px",textTransform:"uppercase"}}>Observaciones</label>
               <textarea rows={2} style={{...S.input,resize:"vertical",fontSize:13}}
                 placeholder="Observaciones del elemento..."
-                value={e.edData.notas||""}
-                onChange={ev=>setElemNotas(zonaId,e.id,e.isCustom,ev.target.value)}/>
+                defaultValue={e.edData.notas||""}
+                onBlur={ev=>{ if(ev.target.value!==(e.edData.notas||"")) setElemNotas(zonaId,e.id,e.isCustom,ev.target.value); }}
+                key={e.id+"_notas"}/>
+              <button onClick={ev=>{
+                const ta = ev.target.previousSibling;
+                setElemNotas(zonaId,e.id,e.isCustom,ta.value);
+                ta.style.border="1px solid rgba(34,197,94,0.5)";
+                setTimeout(()=>{ ta.style.border=""; },1200);
+              }} style={{marginTop:4,fontSize:11,padding:"3px 12px",borderRadius:6,
+                border:"1px solid rgba(34,197,94,0.3)",background:"rgba(34,197,94,0.08)",
+                color:"#22c55e",cursor:"pointer"}}>
+                💾 Guardar observaciones
+              </button>
+            </div>
+
+            {/* Condición: exterior / bajo techo */}
+            <div style={{marginTop:10}}>
+              <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",textTransform:"uppercase",display:"block",marginBottom:4}}>Condición</label>
+              <div style={{display:"flex",gap:6}}>
+                {[["exterior","🌿 Exterior","#34d399"],["bajo_techo","🏠 Bajo techo","#60a5fa"],["mixto","🔀 Mixto","#f59e0b"]].map(([k,lbl,color])=>{
+                  const condActual = condicionesLocales[e.id] ?? (e.edData.condicion||"exterior");
+                  return (
+                    <button key={k} onClick={()=>{
+                      setCondicionesLocales(p=>({...p,[e.id]:k}));
+                      setElemCondicion(zonaId,e.id,e.isCustom,k);
+                    }}
+                      style={{flex:1,fontSize:11,padding:"5px 0",borderRadius:7,cursor:"pointer",
+                        border:`1px solid ${condActual===k?color+"60":"rgba(255,255,255,0.1)"}`,
+                        background:condActual===k?"rgba(255,255,255,0.06)":"transparent",
+                        color:condActual===k?color:"#5a9a7a",fontWeight:condActual===k?600:400}}>
+                      {lbl}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Frecuencias de mantención → ver en Programa */}
@@ -15447,9 +17290,9 @@ export default function App() {
         </div>
         <div style={S.headerNav} className="headerNav">
           {(fbRol==="jefa"
-            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["compras","🛒","Compras"],["bodegas","🏪","Bodegas"],["golf","🏌️","Golf"],["personal","👷","Personal"],["notificaciones","🔔","Alertas"]]
+            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["compras","🛒","Compras"],["bodegas","🏪","Bodegas"],["golf","🏌️","Golf"],["personal","👷","Personal"],["protocolos","📋","Protocolos"],["notificaciones","🔔","Alertas"]]
             : fbRol==="supervisor"
-            ? [["dashboard","📊","Panel"],["programacion","📆","Programa"],["reporte","📋","Reporte"],["golf","🏌️","Golf"],["miturno","🌿","Mi Turno"]]
+            ? [["dashboard","📊","Panel"],["programacion","📆","Programa"],["reporte","📋","Reporte"],["golf","🏌️","Golf"],["protocolos","📋","Protocolos"],["miturno","🌿","Mi Turno"]]
             : [["miturno","🌿","Mi Turno"]]
           ).map(([v,ico,lbl])=>(
             <button key={v} onClick={()=>{setVista(v);setZonaId(null);setAiText("");if(v==="notificaciones")marcarTodasLeidas();}} style={{cursor:"pointer",border:"none",background:"transparent",color:vista===v?"#fff":"#7aaa80",fontFamily:"'Georgia',serif",fontSize:12,padding:"10px 14px",borderBottom:vista===v?"2px solid #4a9a64":"2px solid transparent",transition:"all .15s",whiteSpace:"nowrap",display:"flex",flexDirection:"column",alignItems:"center",gap:2,flexShrink:0,position:"relative"}}>
@@ -15478,7 +17321,7 @@ export default function App() {
       <div style={S.main}>
         {/* DASHBOARD */}
         {/* ── JEFA REVISA TURNO DE UN TRABAJADOR ── */}
-        {workerARevisar&&rolLogueado==="jefa"&&(()=>{
+        {workerARevisar&&rolLogueado==="jefa"&&vista!=="golf"&&(()=>{
           const arr=Array.isArray(personal)?personal:Object.values(personal||{});
           const trab=arr.find(x=>String(x.id)===String(workerARevisar));
           if(!trab) return null;
@@ -15499,6 +17342,30 @@ export default function App() {
                 tareas={tareasProg}
                 S={S}
                 esJefaApp={true}
+                crearNotificacion={crearNotificacion}
+                onGuardarRutinas={(estado)=>{
+                  const tId = workerLogueado;
+                  if(!tId) return;
+                  fbUpdate(ref(db, ROOT+"/rutinas-golf/"+fechaLocal()+"/"+tId), estado)
+                    .catch(e=>console.error("rutinas firebase:",e));
+                }}
+                onGuardarAlertaFito={({obs, trabajador: trab, fecha: fec})=>{
+                  const nueva = {
+                    id:"fito_"+Date.now(),
+                    tipo:"enfermedad",
+                    descripcion:"🦠 Alerta fitosanitaria: "+obs,
+                    zonas:["Golf"],
+                    responsable:trab||"Bhalú",
+                    fecha:fec||fechaLocal(),
+                    estado:"activa",
+                    origen:"trabajador",
+                    creadoEn:new Date().toISOString(),
+                  };
+                  setIncidencias(prev=>{
+                    const arr=Array.isArray(prev)?prev:Object.values(prev||{});
+                    return [nueva,...arr];
+                  });
+                }}
                 cierresTurno={cierresTurno}
                 onUpdateTarea={(fecha,tid,patch)=>{
                   const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
@@ -15569,9 +17436,12 @@ export default function App() {
                 onAddTarea={(t)=>{
                   setTareasProg(prev=>{
                     const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-                    const lista=[...normArr(prev[t.fecha]||[]),t];
-                    fbUpdate(ref(db,`${ROOT}/prog`),{[t.fecha]:lista}).catch(e=>console.error(e));
-                    return {...prev,[t.fecha]:lista};
+                    // Auto-asignar Bhalú si zona Golf y sin responsable
+                    const esGolfT = (t.zona||"")==="Golf"||(t.zona||"").toLowerCase().includes("golf");
+                    const tFinal = esGolfT&&!t.responsable ? {...t, responsable:"Osmar Bhalú Armijo Zúñiga", estado:"pendiente"} : t;
+                    const lista=[...normArr(prev[tFinal.fecha]||[]),tFinal];
+                    fbUpdate(ref(db,`${ROOT}/prog`),{[tFinal.fecha]:lista}).catch(e=>console.error(e));
+                    return {...prev,[tFinal.fecha]:lista};
                   });
                 }}
                 onSetFrecs={setElemFrecs}
@@ -15582,7 +17452,7 @@ export default function App() {
                   return {frecs,eid:elem.id,isCustom:false};
                 }}
                 MACROZONAS_BASE={MACROZONAS_BASE}
-                onAccesoRapido={(vista,subTab)=>{setVista(vista);if(subTab)setGolfInitTab(subTab);setWorkerARevisar(null);}}
+                onAccesoRapido={(vista,subTab)=>{setWorkerARevisar(null);setVista(vista);if(subTab)setGolfInitTab(subTab);}}
                 onCambiarMetodo={()=>{}}
                 onCerrarTurno={()=>{}}
                 onReabrirTurno={(fecha,nombre)=>{
@@ -15718,6 +17588,16 @@ export default function App() {
                   <div>
                     <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Ícono</label>
                     <input style={S.input} value={nuevaMacrozona.icono} onChange={e=>setNuevaMacrozona(p=>({...p,icono:e.target.value}))} placeholder="🌿"/>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:5}}>
+                      {["🌿","🌳","🌺","🌸","🍃","🏡","⛳","🏊","🏟️","🎾","🛤️","🌊","🏋️","🏃","🌻","🌴","🏠","🌱"].map(ico=>(
+                        <button key={ico} onClick={()=>setNuevaMacrozona(p=>({...p,icono:ico}))}
+                          style={{fontSize:18,padding:"2px 4px",borderRadius:4,cursor:"pointer",
+                            border:`1px solid ${nuevaMacrozona.icono===ico?"rgba(52,211,153,0.5)":"rgba(255,255,255,0.1)"}`,
+                            background:nuevaMacrozona.icono===ico?"rgba(52,211,153,0.1)":"transparent"}}>
+                          {ico}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   <div style={{gridColumn:"1/-1"}}>
                     <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Descripción (opcional)</label>
@@ -15856,6 +17736,26 @@ export default function App() {
                           onClick={getSugerenciaAI} disabled={aiLoading}>
                           {aiLoading?<><span className="spin"/> Analizando...</>:"🤖 Sugerencia IA"}
                         </button>
+                        {zona.esPersonalizada&&esJefa&&(<>
+                          <button style={{...S.btn,fontSize:11,background:"rgba(96,165,250,0.1)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.2)"}}
+                            onClick={()=>{
+                              const nuevoNombre=window.prompt("Nuevo nombre:",zona.nombre);
+                              if(!nuevoNombre?.trim()) return;
+                              const nuevoIcono=window.prompt("Ícono (emoji):",zona.icono||"🌿");
+                              setMacrozonasCust(prev=>prev.map(z=>z.id===zona.id
+                                ?{...z,nombre:nuevoNombre.trim(),icono:nuevoIcono||z.icono}:z));
+                            }}>
+                            ✏️ Editar nombre
+                          </button>
+                          <button style={{...S.btn,fontSize:11,background:"rgba(239,68,68,0.08)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.2)"}}
+                            onClick={()=>{
+                              if(!window.confirm("¿Eliminar "+zona.nombre+"? Esta acción es permanente.")) return;
+                              setMacrozonasCust(prev=>prev.filter(z=>z.id!==zona.id));
+                              setZonaId(null);
+                            }}>
+                            🗑 Eliminar macrozona
+                          </button>
+                        </>)}
                       </div>
                     </div>
                     {/* Fechas de mantenimiento si existen */}
@@ -15899,8 +17799,8 @@ export default function App() {
               <div className="ein">
                 {(()=>{
                   const todosElems = getAllElems(zonaId);
-                  const VEGE_KEYS  = ["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
-                  const INFRA_KEYS = ["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","bodegas"];
+                  const VEGE_KEYS  = ["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macizos","setos","macetas_piso","colgantes"];
+                  const INFRA_KEYS = ["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","maceteros","jardinera_infra","bodegas"];
                   const vegeElems  = todosElems.filter(e=>VEGE_KEYS.includes(e.tipo));
                   const infraElems = todosElems.filter(e=>INFRA_KEYS.includes(e.tipo));
                   const otrosElems = todosElems.filter(e=>!VEGE_KEYS.includes(e.tipo)&&!INFRA_KEYS.includes(e.tipo));
@@ -16017,8 +17917,8 @@ export default function App() {
                           style={{...S.input,flex:"2 1 200px"}}/>
                         <div style={{flex:"1 1 150px",maxWidth:220}}>
                           {(()=>{
-                            const vk=["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
-                            const ok=["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","bodegas"];
+                            const vk=["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macizos","setos","macetas_piso","colgantes"];
+                            const ok=["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","maceteros","jardinera_infra","bodegas"];
                             const esVege = vk.includes(newElem.tipo);
                             return (<>
                               {/* Selector de grupo */}
@@ -16027,7 +17927,7 @@ export default function App() {
                                   style={{flex:1,cursor:"pointer",border:`1px solid ${esVege?"rgba(34,197,94,0.5)":"rgba(255,255,255,0.1)"}`,borderRadius:6,padding:"4px 6px",fontSize:11,background:esVege?"rgba(34,197,94,0.1)":"transparent",color:esVege?"#4ade80":"#6aaa7a",fontFamily:"'Georgia',serif"}}>
                                   🌿 Vegetación
                                 </button>
-                                <button onClick={()=>setNewElem(p=>({...p,tipo:"infraestructura"}))}
+                                <button onClick={()=>setNewElem(p=>({...p,tipo:OTRAS_CATS[0]}))}
                                   style={{flex:1,cursor:"pointer",border:`1px solid ${!esVege?"rgba(245,158,11,0.5)":"rgba(255,255,255,0.1)"}`,borderRadius:6,padding:"4px 6px",fontSize:11,background:!esVege?"rgba(245,158,11,0.1)":"transparent",color:!esVege?"#fbbf24":"#6aaa7a",fontFamily:"'Georgia',serif"}}>
                                   🏗️ Infraestructura
                                 </button>
@@ -16043,8 +17943,7 @@ export default function App() {
                       </div>
                       <div style={{display:"flex",gap:8,alignItems:"center"}}>
                         <button className="btn-p" style={S.btn} onClick={()=>{
-                          if(newElem.nombre.trim()){
-                            addCustomElem(zonaId,newElem);
+                                                      addCustomElem(zonaId,newElem);
                             setNewElem(p=>({...p,nombre:""}));
                           }
                         }}>✓ Agregar</button>
@@ -16347,8 +18246,8 @@ export default function App() {
 
         {/* PROGRAMACIÓN */}
         {vista==="programacion"&&(
-          <ProgramacionDiaria key="prog" S={S} zonas={zonas} data={data} personal={personal} getZD={getZD} getAllElems={getAllElems} MACROZONAS_BASE={MACROZONAS_BASE} tareas={tareasProg} setTareas={setTareasProg} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal}
-            getElemFrecs={getElemFrecs} setElemFrecs={setElemFrecs}
+          <ProgramacionDiaria key="prog" S={S} zonas={zonasConCust} data={data} personal={personal} getZD={getZD} getAllElems={getAllElems} MACROZONAS_BASE={MACROZONAS_BASE} tareas={tareasProg} setTareas={setTareasProg} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal}
+            getElemFrecs={getElemFrecs} setElemFrecs={setElemFrecs} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} stockFito={stockFito} setStockFito={setStockFito} crearNotificacion={crearNotificacion}
             tareasZonaHoy={(tareasProg[new Date().toISOString().slice(0,10)]||[]).filter(t=>t.origenZona&&t.estado==="por_designar").length}
             esJefa={rolLogueado==="jefa"}
             puedeCrear={rolLogueado==="jefa"||rolLogueado==="supervisor"}
@@ -16423,8 +18322,8 @@ export default function App() {
                       [fecha]:(prev[fecha]||[]).map(t=>t.id===tid?{...t,metodoLimpieza:metodo}:t)
                     }));
                   }}
-                  onAccesoRapido={(tipo)=>{
-                    const tab = tipo==="medicion"?"mediciones":tipo==="humedad"?"humedad":"greens";
+                  onAccesoRapido={(vista,subTab)=>{
+                    const tab = subTab||(vista==="medicion"?"mediciones":vista==="humedad"?"humedad":"greens");
                     setGolfInitTab(tab);
                     setVista("golf");
                   }}
@@ -16567,7 +18466,7 @@ export default function App() {
 
         {/* FUNGICIDAS */}
         {vista==="fungicidas"&&(
-          <PanelFungicidas S={S} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} />
+          <PanelFungicidas S={S} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} stockFito={stockFito} setStockFito={setStockFito} crearNotificacion={crearNotificacion}/>
         )}
 
         {/* COMPRAS */}
@@ -16730,8 +18629,18 @@ export default function App() {
         )}
 
         {/* ── ALERTAS / NOTIFICACIONES ── */}
+          {vista==="protocolos"&&(
+            <PanelProtocolos S={S} personal={personal} esJefa={esJefa} crearNotificacion={crearNotificacion} rolLogueado={rolLogueado}/>
+          )}
         {vista==="notificaciones"&&(<ErrorBoundary>
-          <PanelAlertas S={S} incidencias={incidencias} setIncidencias={setIncidencias} autoOpen={autoOpenAlerta} onAutoOpenDone={()=>setAutoOpenAlerta(false)} notificaciones={notificaciones} setNotificaciones={setNotificaciones} marcarTodasLeidas={marcarTodasLeidas} notifNoLeidas={notifNoLeidas} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} tareasProg={tareasProg} setTareasProg={setTareasProg} crearNotificacion={crearNotificacion} esJefa={esJefa}/>
+          <PanelAlertas S={S} incidencias={incidencias} setIncidencias={setIncidencias}
+              onGuardarDirecto={(alerta)=>{
+                const id = "inc_"+Date.now();
+                fbUpdate(ref(db, ROOT+"/incidencias/"+id), alerta)
+                  .then(()=>console.log("✅ Alerta guardada en Firebase:",id))
+                  .catch(e=>console.error("❌ Error guardando alerta:",e));
+              }}
+              autoOpen={autoOpenAlerta} onAutoOpenDone={()=>setAutoOpenAlerta(false)} notificaciones={notificaciones} setNotificaciones={setNotificaciones} marcarTodasLeidas={marcarTodasLeidas} notifNoLeidas={notifNoLeidas} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} tareasProg={tareasProg} setTareasProg={setTareasProg} crearNotificacion={crearNotificacion} esJefa={esJefa}/>
         </ErrorBoundary>)}
 
         {showCierreSectorial&&<ModalCierreSectorial S={S} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} onClose={()=>setShowCierreSectorial(false)}/>}
