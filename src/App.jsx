@@ -16540,7 +16540,13 @@ export default function App() {
     return [...base,...custom].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
   };
 
-  const todasLasZonas = [...MACROZONAS_BASE, ...macrozonasCust];
+  const todasLasZonas = (() => {
+    const base = [...MACROZONAS_BASE];
+    const nombresBase = new Set(base.map(z=>z.nombre.toLowerCase().trim()));
+    // Solo agregar custom si no duplica un nombre base
+    const custom = macrozonasCust.filter(z=>!nombresBase.has((z.nombre||"").toLowerCase().trim()));
+    return [...base, ...custom];
+  })();
   const filteredZonas = todasLasZonas.filter(z=>{
     const matchC=filtroCat==="Todas"||z.categoria===filtroCat;
     const matchE=filtroEst==="Todos"||getZD(z.id).estadoGeneral===filtroEst;
@@ -17439,14 +17445,14 @@ export default function App() {
                         <div>
                           <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:21,fontWeight:900,marginBottom:6,lineHeight:1.2}}>{zd.nombreCustom||zona.nombre}</h2>
                           {esJefa&&!editZonaForm&&(
-                            <button onClick={()=>setEditZonaForm({nombre:zd.nombreCustom||zona.nombre,icono:zd.iconoCustom||zona.icono,descripcion:zd.descripcion||zona.descripcion||""})}
+                            <button onClick={()=>setEditZonaForm({nombre:zd.nombreCustom||zona.nombre,icono:zd.iconoCustom||zona.icono,descripcion:zd.descripcion||zona.descripcion||"",categoria:zd.categoriaCustom||zona.categoria||""})}
                               style={{fontSize:11,padding:"2px 8px",borderRadius:5,cursor:"pointer",border:"1px solid rgba(96,165,250,0.3)",background:"rgba(96,165,250,0.08)",color:"#60a5fa"}}>
                               ✏️ Editar
                             </button>
                           )}
                           <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
                             <span style={{fontSize:11,color:"#6aaa7a",background:"rgba(255,255,255,0.06)",padding:"2px 8px",borderRadius:6,border:"1px solid rgba(255,255,255,0.1)"}}>
-                              📂 {zona.categoria}
+                              📂 {zd.categoriaCustom||zona.categoria}
                             </span>
                             <span style={{fontSize:11,color:"#6ab0c0",background:"rgba(96,176,192,0.08)",padding:"2px 8px",borderRadius:6,border:"1px solid rgba(96,176,192,0.15)"}}>
                               📋 {elemsZona.length} elementos
@@ -17533,6 +17539,12 @@ export default function App() {
                   </div>
                 </div>
                 <div style={{marginBottom:8}}>
+                  <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Categoría</label>
+                  <select value={editZonaForm.categoria} onChange={e=>setEditZonaForm(p=>({...p,categoria:e.target.value}))} style={S.input}>
+                    {[...new Set([...MACROZONAS_BASE.map(z=>z.categoria),"Deportivo","Jardines","Calles y Accesos","Áreas Comunes","Instalaciones","Golf","Otro"])].sort().map(c=><option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div style={{marginBottom:8}}>
                   <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Descripción</label>
                   <input value={editZonaForm.descripcion} onChange={e=>setEditZonaForm(p=>({...p,descripcion:e.target.value}))} placeholder="Descripción breve de esta zona..." style={S.input}/>
                 </div>
@@ -17549,9 +17561,9 @@ export default function App() {
                 <div style={{display:"flex",gap:8,marginTop:12}}>
                   <button onClick={()=>{
                     if(zona.esPersonalizada){
-                      setMacrozonasCust(prev=>prev.map(z=>z.id===zona.id?{...z,nombre:editZonaForm.nombre,icono:editZonaForm.icono,descripcion:editZonaForm.descripcion}:z));
+                      setMacrozonasCust(prev=>prev.map(z=>z.id===zona.id?{...z,nombre:editZonaForm.nombre,icono:editZonaForm.icono,descripcion:editZonaForm.descripcion,categoria:editZonaForm.categoria}:z));
                     } else {
-                      updateZona(zonaId,{nombreCustom:editZonaForm.nombre,iconoCustom:editZonaForm.icono,descripcion:editZonaForm.descripcion});
+                      updateZona(zonaId,{nombreCustom:editZonaForm.nombre,iconoCustom:editZonaForm.icono,descripcion:editZonaForm.descripcion,categoriaCustom:editZonaForm.categoria});
                     }
                     setEditZonaForm(null);
                   }} style={{...S.btn,background:"rgba(52,211,153,0.12)",color:"#34d399",border:"1px solid rgba(52,211,153,0.3)"}}>
