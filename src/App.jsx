@@ -17943,10 +17943,6 @@ export default function App() {
                       </div>
                       <div style={{display:"flex",gap:8,alignItems:"center"}}>
                         <button className="btn-p" style={S.btn} onClick={()=>{
-                                                      addCustomElem(zonaId,newElem);
-                            setNewElem(p=>({...p,nombre:""}));
-                          }
-                        }}>✓ Agregar</button>
                         <span style={{fontSize:11,color:"#4a7a5a"}}>o presiona Enter</span>
                         <button className="btn-g" style={{...S.btn,marginLeft:"auto"}} onClick={()=>{setShowAddElem(false);setNewElem({nombre:"",tipo:"arboles"});}}>Listo ✓</button>
                       </div>
