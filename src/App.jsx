@@ -86,8 +86,6 @@ const CATEGORIAS_ELEM = {
   trepadoras:      { label: "Trepadoras",           color: "#2dd4bf", icon: "🪴", parent: "vegetacion" },
   rastreras:       { label: "Rastreras",            color: "#6ee7b7", icon: "🍃", parent: "vegetacion" },
   jardineras:      { label: "Jardineras",           color: "#f472b6", icon: "🪻", parent: "vegetacion" },
-  macizos:         { label: "Macizos",               color: "#e879f9", icon: "🌺", parent: "vegetacion" },
-  setos:           { label: "Setos",                 color: "#84cc16", icon: "🌿", parent: "vegetacion" },
   macetas_piso:    { label: "Macetas a piso",       color: "#e879f9", icon: "🌷", parent: "vegetacion" },
   colgantes:       { label: "Colgantes",            color: "#c084fc", icon: "🌺", parent: "vegetacion" },
   infraestructura: { label: "Estructuras y Construcciones", color: "#f59e0b", icon: "🏗️" },
@@ -97,11 +95,10 @@ const CATEGORIAS_ELEM = {
   canchas:         { label: "Canchas Deportivas",    color: "#0ea5e9", icon: "🏟️" },
   mobiliario:      { label: "Mobiliario Urbano",     color: "#fb923c", icon: "🪑" },
   maceteros:       { label: "Maceteros",              color: "#e879f9", icon: "🪴" },
-  jardinera_infra: { label: "Jardineras (contenedor)", color: "#f472b6", icon: "🪻" },
   bodegas:         { label: "Bodegas",               color: "#94a3b8", icon: "🏚️" },
 };
-const VEGETACION_SUBS = ["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macizos","setos","macetas_piso","colgantes"];
-const OTRAS_CATS      = ["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","maceteros","jardinera_infra","bodegas"];
+const VEGETACION_SUBS = ["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
+const OTRAS_CATS      = ["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","maceteros","bodegas"];
 // ─── ESTACIONES ──────────────────────────────────────────────────────────────
 const limpiarUndef = (obj) => JSON.parse(JSON.stringify(obj, function(limpKey,limpVal){ return limpVal===undefined?null:limpVal; }));
 
@@ -2675,13 +2672,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   const [gruposAbiertos, setGruposAbiertos] = React.useState({diarias:true});
   const [alturaInputs, setAlturaInputs] = React.useState({});
   const [rutinasGolfState, setRutinasGolfState] = React.useState({});
-  const toggleGrupo = (key) => setGruposAbiertos(p=>({...p,[key]:!p[key]}));
-  const abrirGrupo = (key) => setGruposAbiertos(p=>{
-    const ya = p[key]===true;
-    // Cerrar todos y abrir/cerrar el clickeado
-    return {diarias:p.diarias, [key]:!ya};
-  });
-  const [showRegistroDiarioWorker, setShowRegistroDiarioWorker] = React.useState(true);
+  const toggleGrupo = (key) => setGruposAbiertos(p=>({diarias:p.diarias,[key]:p[key]!==true}));
   const [showEmergente, setShowEmergente] = React.useState(false);
   const [emergenteForm, setEmergenteForm] = React.useState({zona:"",tarea:"",obs:""}); // abierto por defecto
   const [registroDiarioForm, setRegistroDiarioForm] = React.useState({tareas:{}, obsFito:"", obs:""});
@@ -2747,6 +2738,8 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
       if(normResp.includes("bhalu")&&nombreTrab.includes("osmar")) return true;
       return false;
     });
+    console.log("VistaWorker filtro:", trabajador?.nombre, "tareas total:", combinadas.length, "mis tareas:", resultado.length, combinadas.map(t=>t.responsable+"|"+t.tarea).join(", "));
+    return resultado;
   }, [tareas, fechaVer, trabajador]
   );
   const misTareasDiarias  = React.useMemo(()=>sortTareas(todasMisTareas.filter(t=>esDiaria(t))),[todasMisTareas]);
@@ -3135,13 +3128,13 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
               <div style={{fontSize:11,color:"#4a7a9a"}}>Medición de alturas y humedad de greens</div>
             </div>
             <div style={{padding:"12px 14px",display:"flex",gap:8,flexWrap:"wrap"}}>
-              <button onClick={()=>onAccesoRapido?.("golf","mediciones")}
+              <button onClick={()=>onAccesoRapido?.("medicion")}
                 style={{flex:1,minWidth:140,cursor:"pointer",border:"1px solid rgba(52,211,153,0.35)",borderRadius:10,padding:"12px 10px",background:"rgba(52,211,153,0.08)",color:"#34d399",fontFamily:"'Georgia',serif",fontSize:13,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
                 <span style={{fontSize:22}}>📏</span>
                 <span style={{fontWeight:600}}>Registrar alturas</span>
                 <span style={{fontSize:10,color:"#5a9a7a"}}>Medir mm cada green</span>
               </button>
-              <button onClick={()=>onAccesoRapido?.("golf","humedad")}
+              <button onClick={()=>onAccesoRapido?.("humedad")}
                 style={{flex:1,minWidth:140,cursor:"pointer",border:"1px solid rgba(96,165,250,0.35)",borderRadius:10,padding:"12px 10px",background:"rgba(96,165,250,0.08)",color:"#60a5fa",fontFamily:"'Georgia',serif",fontSize:13,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
                 <span style={{fontSize:22}}>💧</span>
                 <span style={{fontWeight:600}}>Registrar humedad</span>
@@ -3179,7 +3172,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                 const col=hechas===g.tareas.length?"#22c55e":"#34d399";
                 return (
                   <div key={g.key} style={{marginBottom:8,border:`1px solid rgba(255,255,255,${hechas===g.tareas.length?0.1:0.07})`,borderRadius:10,overflow:"hidden"}}>
-                    <div onClick={()=>abrirGrupo(g.key)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 12px",background:"rgba(255,255,255,0.03)",cursor:"pointer",userSelect:"none"}}>
+                    <div onClick={()=>toggleGrupo(g.key)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 12px",background:"rgba(255,255,255,0.03)",cursor:"pointer",userSelect:"none"}}>
                       <div style={{display:"flex",alignItems:"center",gap:7}}>
                         <span>{g.icon}</span>
                         <span style={{fontSize:13,fontWeight:600,color:col}}>{g.label}</span>
@@ -3369,240 +3362,8 @@ Una vez cerrado no podrás modificar las tareas. Solo la jefa puede reabrir el t
   );
 }
 
-// ─── PLANIFICADOR SEMANAL ─────────────────────────────────────────────────────
-function PlanificadorSemanal({ S, MACROZONAS_BASE, getAllElems, getZD, getElemFrecs,
-  tareas, setTareas, personal, configSemanal, esJefa }) {
-
-  const hoy = fechaLocal();
-  const lunesHoy = (() => {
-    const d = new Date(hoy+"T12:00:00");
-    d.setDate(d.getDate()-((d.getDay()+6)%7));
-    return d.toISOString().slice(0,10);
-  })();
-
-  const [semanaBase, setSemanaBase] = React.useState(lunesHoy);
-  const [asignaciones, setAsignaciones] = React.useState({});
-  const [guardado, setGuardado] = React.useState(false);
-  const [grupoAbierto, setGrupoAbierto] = React.useState(null);
-
-  const diasSemana = Array.from({length:6},(_,i)=>{
-    const d = new Date(semanaBase+"T12:00:00");
-    d.setDate(d.getDate()+i);
-    return d.toISOString().slice(0,10);
-  });
-
-  const fmtDia = (f) => {
-    const d = new Date(f+"T12:00:00");
-    return d.toLocaleDateString("es-CL",{weekday:"short",day:"numeric",month:"short"});
-  };
-
-  const tareasSemanales = React.useMemo(()=>{
-    const estacion = (()=>{
-      const m = new Date().getMonth()+1;
-      if([12,1,2].includes(m)) return "verano";
-      if([3,4,5].includes(m)) return "otono";
-      if([6,7,8].includes(m)) return "invierno";
-      return "primavera";
-    })();
-    const lista = [];
-    MACROZONAS_BASE.forEach(z=>{
-      const elems = getAllElems(z.id);
-      elems.forEach(e=>{
-        const frecs = getElemFrecs(String(z.id), e.id, e.tipo, e.isCustom);
-        frecs.forEach(f=>{
-          if(!f.tarea) return;
-          const freq = f.modo==="diasSemana"?f.diasMinimos:f[estacion];
-          if(!freq||freq==="noaplica") return;
-          const ultima = f.ultimaVez||"2025-01-01";
-          const diasDesde = Math.round((new Date(semanaBase+"T12:00:00")-new Date(ultima+"T12:00:00"))/(1000*60*60*24));
-          const intervalo = freq==="diario"?1:freq==="cada2dias"?2:freq==="cada3dias"?3:
-            freq==="cada4dias"?4:freq==="cada5dias"?5:freq==="semanal"?7:
-            freq==="quincenal"?15:freq==="mensual"?30:freq==="bimestral"?60:
-            freq==="trimestral"?90:Number(f.diasMinimos)||7;
-          if(diasDesde < intervalo*0.7) return;
-          const esGolf = z.id===31||(z.nombre||"").toLowerCase().includes("golf");
-          const resp = esGolf?"Osmar Bhalú Armijo Zúñiga":getResponsablePorTipo(f.tarea,configSemanal,z.nombre)||"";
-          lista.push({
-            key:`${z.id}_${e.id}_${f.id}`,
-            zona:z.nombre, zonaIcono:z.icono, elemento:e.nombre,
-            tarea:f.tarea, frecuencia:freq, intervalo, diasDesde,
-            urgente:diasDesde>=intervalo*1.5, responsable:resp,
-            origenZid:String(z.id), origenEid:e.id, origenFrecId:f.id, origenEsCustom:!!e.isCustom,
-          });
-        });
-      });
-    });
-    lista.sort((a,b)=>a.tarea.localeCompare(b.tarea,"es",{sensitivity:"base"}));
-    return lista;
-  }, [semanaBase, MACROZONAS_BASE]);
-
-  const grupos = React.useMemo(()=>{
-    const g = {};
-    tareasSemanales.forEach(t=>{
-      const key = t.tarea.toLowerCase().trim();
-      if(!g[key]) g[key]={tarea:t.tarea, items:[]};
-      g[key].items.push(t);
-    });
-    return Object.values(g).sort((a,b)=>a.tarea.localeCompare(b.tarea,"es",{sensitivity:"base"}));
-  }, [tareasSemanales]);
-
-  const setAsig = (taskKey, fecha) =>
-    setAsignaciones(p=>({...p,[taskKey]:fecha===p[taskKey]?null:fecha}));
-
-  const confirmarSemana = () => {
-    const normArr = v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-    const nuevasTareas = {};
-    diasSemana.forEach(d=>{ nuevasTareas[d]=[...normArr(tareas[d]||[])]; });
-    tareasSemanales.forEach(t=>{
-      const fecha = asignaciones[t.key];
-      if(!fecha) return;
-      if(normArr(tareas[fecha]||[]).some(x=>x.zona===t.zona&&x.elemento===t.elemento&&x.tarea===t.tarea)) return;
-      if(!nuevasTareas[fecha]) nuevasTareas[fecha]=[];
-      nuevasTareas[fecha].push({
-        id:Date.now()+Math.random(), fecha, zona:t.zona, elemento:t.elemento,
-        tarea:t.tarea, responsable:t.responsable,
-        estado:t.responsable?"pendiente":"por_designar",
-        notas:"", auto:true,
-        origenZid:t.origenZid, origenEid:t.origenEid,
-        origenFrecId:t.origenFrecId, origenEsCustom:t.origenEsCustom,
-      });
-    });
-    setTareas(prev=>({...prev,...nuevasTareas}));
-    setGuardado(true);
-    setTimeout(()=>setGuardado(false),2000);
-  };
-
-  const sinAsignar = tareasSemanales.filter(t=>!asignaciones[t.key]).length;
-  const asignadas = tareasSemanales.filter(t=>asignaciones[t.key]).length;
-  const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
-
-  return (
-    <div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
-        <div>
-          <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700}}>🗓 Planificación semanal</div>
-          <div style={{fontSize:11,color:"#5a9a7a"}}>Distribuye las tareas de la semana por tipo</div>
-        </div>
-        <div style={{display:"flex",gap:8,alignItems:"center"}}>
-          <button onClick={()=>{const d=new Date(semanaBase+"T12:00:00");d.setDate(d.getDate()-7);setSemanaBase(d.toISOString().slice(0,10));setAsignaciones({});setGrupoAbierto(null);}}
-            style={{...S.btn,fontSize:12,padding:"4px 10px"}}>◀</button>
-          <span style={{fontSize:12,color:"#c0dac0",fontWeight:600}}>{fmtDia(diasSemana[0])} – {fmtDia(diasSemana[5])}</span>
-          <button onClick={()=>{const d=new Date(semanaBase+"T12:00:00");d.setDate(d.getDate()+7);setSemanaBase(d.toISOString().slice(0,10));setAsignaciones({});setGrupoAbierto(null);}}
-            style={{...S.btn,fontSize:12,padding:"4px 10px"}}>▶</button>
-        </div>
-      </div>
-
-      <div style={{...S.card,padding:"10px 14px",marginBottom:14,display:"flex",gap:16,flexWrap:"wrap"}}>
-        <span style={{fontSize:12,color:"#c0dac0"}}><b style={{color:"#34d399"}}>{tareasSemanales.length}</b> tareas según frecuencias</span>
-        <span style={{fontSize:12,color:"#c0dac0"}}><b style={{color:"#60a5fa"}}>{asignadas}</b> asignadas</span>
-        <span style={{fontSize:12,color:"#c0dac0"}}><b style={{color:"#f59e0b"}}>{sinAsignar}</b> sin día</span>
-        <span style={{fontSize:12,color:"#c0dac0"}}><b style={{color:"#f87171"}}>{tareasSemanales.filter(t=>t.urgente).length}</b> urgentes</span>
-      </div>
-
-      {/* Días header */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr repeat(6,56px)",gap:4,padding:"0 14px 8px",fontSize:10,color:"#5a9a7a"}}>
-        <div></div>
-        {diasSemana.map(d=>(
-          <div key={d} style={{textAlign:"center",fontWeight:d===hoy?700:400,color:d===hoy?"#34d399":"#5a9a7a"}}>
-            {fmtDia(d).split(" ").slice(0,2).join(" ")}
-          </div>
-        ))}
-      </div>
-
-      {/* Grupos colapsables */}
-      <div style={{marginBottom:16}}>
-        {grupos.map(g=>{
-          const abierto = grupoAbierto===g.tarea;
-          const asignadasGrupo = g.items.filter(t=>asignaciones[t.key]).length;
-          return (
-            <div key={g.tarea} style={{marginBottom:4,borderRadius:8,overflow:"hidden",
-              border:`1px solid ${abierto?"rgba(52,211,153,0.2)":"rgba(255,255,255,0.06)"}`}}>
-              <div onClick={()=>setGrupoAbierto(abierto?null:g.tarea)}
-                style={{padding:"10px 14px",cursor:"pointer",userSelect:"none",
-                  background:abierto?"rgba(52,211,153,0.06)":"rgba(255,255,255,0.02)",
-                  borderLeft:`3px solid ${abierto?"rgba(52,211,153,0.5)":"transparent"}`,
-                  display:"flex",alignItems:"center",gap:8}}>
-                <span style={{fontSize:11,color:abierto?"#34d399":"#6aaa7a",
-                  transform:abierto?"rotate(90deg)":"rotate(0deg)",
-                  transition:"transform 0.15s",display:"inline-block"}}>▶</span>
-                <span style={{fontSize:13,fontWeight:700,color:abierto?"#c0dac0":"#7aaa80",flex:1}}>{g.tarea}</span>
-                <span style={{fontSize:10,color:"#5a9a7a"}}>
-                  {g.items.length} zona(s)
-                  {g.items.some(t=>t.urgente)&&<span style={{color:"#f87171",marginLeft:6}}>⚠️</span>}
-                  {asignadasGrupo>0&&<span style={{color:"#34d399",marginLeft:6}}>✓ {asignadasGrupo}/{g.items.length}</span>}
-                </span>
-              </div>
-              {abierto&&(
-                <div style={{padding:"6px 0"}}>
-                  <div style={{padding:"4px 14px 8px",display:"flex",gap:4,alignItems:"center",borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
-                    <span style={{fontSize:10,color:"#5a9a7a",flex:1}}>Asignar todos →</span>
-                    {diasSemana.map(d=>(
-                      <button key={d} onClick={()=>g.items.forEach(t=>setAsig(t.key,d))}
-                        style={{fontSize:10,padding:"2px 8px",borderRadius:4,cursor:"pointer",
-                          border:"1px solid rgba(52,211,153,0.3)",background:"rgba(52,211,153,0.08)",color:"#34d399",width:52}}>
-                        {fmtDia(d).split(" ")[0]}
-                      </button>
-                    ))}
-                  </div>
-                  {g.items.map(t=>(
-                    <div key={t.key} style={{padding:"6px 14px",borderBottom:"1px solid rgba(255,255,255,0.04)",
-                      display:"grid",gridTemplateColumns:"1fr 72px repeat(6,52px)",gap:4,alignItems:"center",
-                      background:t.urgente?"rgba(248,113,113,0.04)":"transparent"}}>
-                      <div style={{fontSize:11}}>
-                        <span style={{color:"#5a9a7a"}}>{t.zonaIcono} {t.zona}</span>
-                        {t.elemento&&<span style={{color:"#4a7a5a",marginLeft:4,fontSize:10}}>· {t.elemento}</span>}
-                        {t.urgente&&<span style={{color:"#f87171",marginLeft:4,fontSize:9}}>⚠️ {t.diasDesde}d</span>}
-                      </div>
-                      <select value={t.responsable} onChange={e=>{t.responsable=e.target.value;}}
-                        style={{fontSize:10,padding:"1px 3px",background:"rgba(255,255,255,0.05)",
-                          border:"1px solid rgba(255,255,255,0.1)",borderRadius:4,color:"#c0dac0",width:"100%"}}>
-                        <option value="">—</option>
-                        {personalArr.map(p=>(
-                          <option key={p.id} value={p.nombre}>{p.nombre.split(" ")[0]}</option>
-                        ))}
-                      </select>
-                      {diasSemana.map(d=>(
-                        <button key={d} onClick={()=>setAsig(t.key,d)}
-                          style={{width:"100%",height:28,borderRadius:5,cursor:"pointer",fontSize:10,
-                            border:`1px solid ${asignaciones[t.key]===d?"rgba(52,211,153,0.6)":"rgba(255,255,255,0.08)"}`,
-                            background:asignaciones[t.key]===d?"rgba(52,211,153,0.2)":"transparent",
-                            color:asignaciones[t.key]===d?"#34d399":"#4a7a5a"}}>
-                          {asignaciones[t.key]===d?"✓":fmtDia(d).split(" ")[0].slice(0,2)}
-                        </button>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
-        {grupos.length===0&&(
-          <div style={{textAlign:"center",color:"#4a7a5a",padding:32,fontSize:12}}>
-            No hay tareas pendientes según las frecuencias para esta semana.
-          </div>
-        )}
-      </div>
-
-      {asignadas>0&&(
-        <div style={{position:"sticky",bottom:16}}>
-          <button onClick={confirmarSemana}
-            style={{...S.btn,width:"100%",padding:"12px 0",fontWeight:700,fontSize:14,
-              background:guardado?"rgba(34,197,94,0.15)":"rgba(52,211,153,0.15)",
-              color:guardado?"#22c55e":"#34d399",
-              border:`1px solid ${guardado?"rgba(34,197,94,0.4)":"rgba(52,211,153,0.3)"}`}}>
-            {guardado?"✅ Semana programada":"📅 Confirmar ("+asignadas+" tareas)"}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-
 // ─── CATÁLOGO DE TAREAS ESTÁNDAR ─────────────────────────────────────────────
 const CATALOGO_TAREAS = [
-  // ── LABORES ──────────────────────────────────────────────────────────────
   { id:"ct_01", cat:"Labores", tarea:"Corte de césped" },
   { id:"ct_02", cat:"Labores", tarea:"Corte de bordes" },
   { id:"ct_03", cat:"Labores", tarea:"Orillado" },
@@ -3630,7 +3391,6 @@ const CATALOGO_TAREAS = [
   { id:"ct_21", cat:"Labores", tarea:"Riego por aspersión" },
   { id:"ct_22", cat:"Labores", tarea:"Fertirriego" },
   { id:"ct_23", cat:"Labores", tarea:"Protección de plantas" },
-  // ── LIMPIEZA ──────────────────────────────────────────────────────────────
   { id:"ct_30", cat:"Limpieza", tarea:"Limpieza general" },
   { id:"ct_31", cat:"Limpieza", tarea:"Soplado/Barrido" },
   { id:"ct_32", cat:"Limpieza", tarea:"Limpiar césped" },
@@ -3643,7 +3403,6 @@ const CATALOGO_TAREAS = [
   { id:"ct_38", cat:"Limpieza", tarea:"Limpiar vivero" },
   { id:"ct_39", cat:"Limpieza", tarea:"Limpiar basurero" },
   { id:"ct_40", cat:"Limpieza", tarea:"Limpiar bodega" },
-  // ── REVISIÓN ──────────────────────────────────────────────────────────────
   { id:"ct_50", cat:"Revisión", tarea:"Revisión fitosanitaria" },
   { id:"ct_51", cat:"Revisión", tarea:"Revisión de plagas y enfermedades" },
   { id:"ct_52", cat:"Revisión", tarea:"Revisión de plantas" },
@@ -3654,23 +3413,19 @@ const CATALOGO_TAREAS = [
   { id:"ct_57", cat:"Revisión", tarea:"Revisión de mulch" },
   { id:"ct_58", cat:"Revisión", tarea:"Revisión de macetero" },
   { id:"ct_59", cat:"Revisión", tarea:"Revisión de peligros" },
-  // ── REPOSICIÓN ────────────────────────────────────────────────────────────
   { id:"ct_70", cat:"Reposición", tarea:"Reponer arena" },
   { id:"ct_71", cat:"Reposición", tarea:"Reponer compost" },
   { id:"ct_72", cat:"Reposición", tarea:"Reponer macetas" },
   { id:"ct_73", cat:"Reposición", tarea:"Reponer maicillo" },
   { id:"ct_74", cat:"Reposición", tarea:"Reponer mulch" },
-  // ── REPARACIÓN/OBRA ───────────────────────────────────────────────────────
   { id:"ct_80", cat:"Reparación", tarea:"Reparar herramienta" },
   { id:"ct_81", cat:"Reparación", tarea:"Reparar maquinaria" },
   { id:"ct_82", cat:"Reparación", tarea:"Reparar sistema de riego" },
   { id:"ct_83", cat:"Reparación", tarea:"Obras de drenaje" },
-  // ── ADMINISTRACIÓN ────────────────────────────────────────────────────────
   { id:"ct_90", cat:"Administración", tarea:"Preparación de terreno" },
   { id:"ct_91", cat:"Administración", tarea:"Inventario" },
   { id:"ct_92", cat:"Administración", tarea:"Ordenar bodega" },
   { id:"ct_93", cat:"Administración", tarea:"Sacar nidos" },
-  // ── GOLF ESPECÍFICO ───────────────────────────────────────────────────────
   { id:"ct_100", cat:"Golf", tarea:"Corte de greens" },
   { id:"ct_101", cat:"Golf", tarea:"Corte de tees" },
   { id:"ct_102", cat:"Golf", tarea:"Corte de fairways" },
@@ -3680,13 +3435,11 @@ const CATALOGO_TAREAS = [
   { id:"ct_106", cat:"Golf", tarea:"Medición de altura greens" },
   { id:"ct_107", cat:"Golf", tarea:"Revisión de humedad greens" },
   { id:"ct_108", cat:"Golf", tarea:"Verticorte con groomer fuerte" },
-  // ── PRE-TORNEO ────────────────────────────────────────────────────────────
   { id:"ct_110", cat:"Pre-torneo", tarea:"Revisar pronóstico del tiempo y ajustar planes" },
   { id:"ct_111", cat:"Pre-torneo", tarea:"Cambio de banderas (pre-torneo)" },
   { id:"ct_112", cat:"Pre-torneo", tarea:"Cambio de banderas (post-torneo)" },
   { id:"ct_113", cat:"Pre-torneo", tarea:"Corte final greens (HOC 4.5mm)" },
   { id:"ct_114", cat:"Pre-torneo", tarea:"Reparación pitch marks" },
-  // ── FITOSANITARIO GOLF ────────────────────────────────────────────────────
   { id:"ct_120", cat:"Fitosanitario", tarea:"Control fitosanitario" },
   { id:"ct_121", cat:"Fitosanitario", tarea:"Delimitar zona afectada" },
   { id:"ct_122", cat:"Fitosanitario", tarea:"Aplicar tratamiento fitosanitario" },
@@ -3695,164 +3448,179 @@ const CATALOGO_TAREAS = [
   { id:"ct_125", cat:"Fitosanitario", tarea:"Cierre de zona Golf" },
 ];
 
+// ─── PLANIFICADOR SEMANAL ─────────────────────────────────────────────────────
+function PlanificadorSemanal({ S, MACROZONAS_BASE, getAllElems, getZD, getElemFrecs, tareas, setTareas, personal, configSemanal, esJefa }) {
+  const hoy = fechaLocal();
+  const lunesHoy = (()=>{ const d=new Date(hoy+"T12:00:00"); d.setDate(d.getDate()-((d.getDay()+6)%7)); return d.toISOString().slice(0,10); })();
+  const [semanaBase, setSemanaBase] = React.useState(lunesHoy);
+  const [asignaciones, setAsignaciones] = React.useState({});
+  const [guardado, setGuardado] = React.useState(false);
+  const [grupoAbierto, setGrupoAbierto] = React.useState(null);
+  const diasSemana = Array.from({length:6},(_,i)=>{ const d=new Date(semanaBase+"T12:00:00"); d.setDate(d.getDate()+i); return d.toISOString().slice(0,10); });
+  const fmtDia = (f) => new Date(f+"T12:00:00").toLocaleDateString("es-CL",{weekday:"short",day:"numeric",month:"short"});
+  const tareasSemanales = React.useMemo(()=>{
+    const estacion=(()=>{ const m=new Date().getMonth()+1; if([12,1,2].includes(m))return"verano"; if([3,4,5].includes(m))return"otono"; if([6,7,8].includes(m))return"invierno"; return"primavera"; })();
+    const lista=[];
+    MACROZONAS_BASE.forEach(z=>{ getAllElems(z.id).forEach(e=>{ getElemFrecs(String(z.id),e.id,e.tipo,e.isCustom).forEach(f=>{
+      if(!f.tarea) return;
+      const freq=f.modo==="diasSemana"?f.diasMinimos:f[estacion];
+      if(!freq||freq==="noaplica") return;
+      const diasDesde=Math.round((new Date(semanaBase+"T12:00:00")-new Date((f.ultimaVez||"2025-01-01")+"T12:00:00"))/(1000*60*60*24));
+      const intervalo=freq==="diario"?1:freq==="cada2dias"?2:freq==="cada3dias"?3:freq==="cada4dias"?4:freq==="cada5dias"?5:freq==="semanal"?7:freq==="quincenal"?15:freq==="mensual"?30:freq==="bimestral"?60:freq==="trimestral"?90:Number(f.diasMinimos)||7;
+      if(diasDesde<intervalo*0.7) return;
+      const esGolf=z.id===31||(z.nombre||"").toLowerCase().includes("golf");
+      lista.push({key:`${z.id}_${e.id}_${f.id}`,zona:z.nombre,zonaIcono:z.icono,elemento:e.nombre,tarea:f.tarea,intervalo,diasDesde,urgente:diasDesde>=intervalo*1.5,responsable:esGolf?"Osmar Bhalú Armijo Zúñiga":getResponsablePorTipo(f.tarea,configSemanal,z.nombre)||"",origenZid:String(z.id),origenEid:e.id,origenFrecId:f.id,origenEsCustom:!!e.isCustom});
+    }); }); });
+    lista.sort((a,b)=>a.tarea.localeCompare(b.tarea,"es",{sensitivity:"base"}));
+    return lista;
+  },[semanaBase,MACROZONAS_BASE]);
+  const grupos = React.useMemo(()=>{ const g={}; tareasSemanales.forEach(t=>{ const k=t.tarea.toLowerCase().trim(); if(!g[k])g[k]={tarea:t.tarea,items:[]}; g[k].items.push(t); }); return Object.values(g).sort((a,b)=>a.tarea.localeCompare(b.tarea,"es",{sensitivity:"base"})); },[tareasSemanales]);
+  const setAsig=(key,fecha)=>setAsignaciones(p=>({...p,[key]:fecha===p[key]?null:fecha}));
+  const confirmarSemana=()=>{
+    const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+    const nt={};
+    diasSemana.forEach(d=>{nt[d]=[...normArr(tareas[d]||[])];});
+    tareasSemanales.forEach(t=>{ const f=asignaciones[t.key]; if(!f)return; if(normArr(tareas[f]||[]).some(x=>x.zona===t.zona&&x.elemento===t.elemento&&x.tarea===t.tarea))return; if(!nt[f])nt[f]=[]; nt[f].push({id:Date.now()+Math.random(),fecha:f,zona:t.zona,elemento:t.elemento,tarea:t.tarea,responsable:t.responsable,estado:t.responsable?"pendiente":"por_designar",notas:"",auto:true,origenZid:t.origenZid,origenEid:t.origenEid,origenFrecId:t.origenFrecId,origenEsCustom:t.origenEsCustom}); });
+    setTareas(prev=>({...prev,...nt}));
+    setGuardado(true); setTimeout(()=>setGuardado(false),2000);
+  };
+  const sinAsignar=tareasSemanales.filter(t=>!asignaciones[t.key]).length;
+  const asignadas=tareasSemanales.filter(t=>asignaciones[t.key]).length;
+  const personalArr=Array.isArray(personal)?personal:Object.values(personal||{});
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
+        <div><div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700}}>🗓 Planificación semanal</div><div style={{fontSize:11,color:"#5a9a7a"}}>Distribuye las tareas de la semana por tipo</div></div>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <button onClick={()=>{const d=new Date(semanaBase+"T12:00:00");d.setDate(d.getDate()-7);setSemanaBase(d.toISOString().slice(0,10));setAsignaciones({});setGrupoAbierto(null);}} style={{...S.btn,fontSize:12,padding:"4px 10px"}}>◀</button>
+          <span style={{fontSize:12,color:"#c0dac0",fontWeight:600}}>{fmtDia(diasSemana[0])} – {fmtDia(diasSemana[5])}</span>
+          <button onClick={()=>{const d=new Date(semanaBase+"T12:00:00");d.setDate(d.getDate()+7);setSemanaBase(d.toISOString().slice(0,10));setAsignaciones({});setGrupoAbierto(null);}} style={{...S.btn,fontSize:12,padding:"4px 10px"}}>▶</button>
+        </div>
+      </div>
+      <div style={{...S.card,padding:"10px 14px",marginBottom:14,display:"flex",gap:16,flexWrap:"wrap"}}>
+        <span style={{fontSize:12,color:"#c0dac0"}}><b style={{color:"#34d399"}}>{tareasSemanales.length}</b> tareas</span>
+        <span style={{fontSize:12,color:"#c0dac0"}}><b style={{color:"#60a5fa"}}>{asignadas}</b> asignadas</span>
+        <span style={{fontSize:12,color:"#c0dac0"}}><b style={{color:"#f59e0b"}}>{sinAsignar}</b> sin día</span>
+        <span style={{fontSize:12,color:"#c0dac0"}}><b style={{color:"#f87171"}}>{tareasSemanales.filter(t=>t.urgente).length}</b> urgentes</span>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr repeat(6,52px)",gap:4,padding:"0 14px 8px",fontSize:10,color:"#5a9a7a"}}>
+        <div></div>
+        {diasSemana.map(d=><div key={d} style={{textAlign:"center",fontWeight:d===hoy?700:400,color:d===hoy?"#34d399":"#5a9a7a"}}>{fmtDia(d).split(" ").slice(0,2).join(" ")}</div>)}
+      </div>
+      <div style={{marginBottom:16}}>
+        {grupos.map(g=>{
+          const abierto=grupoAbierto===g.tarea;
+          const asignadasG=g.items.filter(t=>asignaciones[t.key]).length;
+          return (
+            <div key={g.tarea} style={{marginBottom:4,borderRadius:8,overflow:"hidden",border:`1px solid ${abierto?"rgba(52,211,153,0.2)":"rgba(255,255,255,0.06)"}`}}>
+              <div onClick={()=>setGrupoAbierto(abierto?null:g.tarea)} style={{padding:"10px 14px",cursor:"pointer",userSelect:"none",background:abierto?"rgba(52,211,153,0.06)":"rgba(255,255,255,0.02)",borderLeft:`3px solid ${abierto?"rgba(52,211,153,0.5)":"transparent"}`,display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:11,color:abierto?"#34d399":"#6aaa7a",transform:abierto?"rotate(90deg)":"rotate(0deg)",transition:"transform 0.15s",display:"inline-block"}}>▶</span>
+                <span style={{fontSize:13,fontWeight:700,color:abierto?"#c0dac0":"#7aaa80",flex:1}}>{g.tarea}</span>
+                <span style={{fontSize:10,color:"#5a9a7a"}}>{g.items.length} zona(s){g.items.some(t=>t.urgente)&&<span style={{color:"#f87171",marginLeft:6}}>⚠️</span>}{asignadasG>0&&<span style={{color:"#34d399",marginLeft:6}}>✓ {asignadasG}/{g.items.length}</span>}</span>
+              </div>
+              {abierto&&(
+                <div style={{padding:"6px 0"}}>
+                  <div style={{padding:"4px 14px 8px",display:"flex",gap:4,alignItems:"center",borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
+                    <span style={{fontSize:10,color:"#5a9a7a",flex:1}}>Asignar todos →</span>
+                    {diasSemana.map(d=><button key={d} onClick={()=>g.items.forEach(t=>setAsig(t.key,d))} style={{fontSize:10,padding:"2px 8px",borderRadius:4,cursor:"pointer",border:"1px solid rgba(52,211,153,0.3)",background:"rgba(52,211,153,0.08)",color:"#34d399",width:52}}>{fmtDia(d).split(" ")[0]}</button>)}
+                  </div>
+                  {g.items.map(t=>(
+                    <div key={t.key} style={{padding:"6px 14px",borderBottom:"1px solid rgba(255,255,255,0.04)",display:"grid",gridTemplateColumns:"1fr 72px repeat(6,52px)",gap:4,alignItems:"center",background:t.urgente?"rgba(248,113,113,0.04)":"transparent"}}>
+                      <div style={{fontSize:11}}><span style={{color:"#5a9a7a"}}>{t.zonaIcono} {t.zona}</span>{t.elemento&&<span style={{color:"#4a7a5a",marginLeft:4,fontSize:10}}>· {t.elemento}</span>}{t.urgente&&<span style={{color:"#f87171",marginLeft:4,fontSize:9}}>⚠️ {t.diasDesde}d</span>}</div>
+                      <select value={t.responsable} onChange={e=>{t.responsable=e.target.value;}} style={{fontSize:10,padding:"1px 3px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:4,color:"#c0dac0",width:"100%"}}>
+                        <option value="">—</option>
+                        {personalArr.map(p=><option key={p.id} value={p.nombre}>{p.nombre.split(" ")[0]}</option>)}
+                      </select>
+                      {diasSemana.map(d=><button key={d} onClick={()=>setAsig(t.key,d)} style={{width:"100%",height:28,borderRadius:5,cursor:"pointer",fontSize:10,border:`1px solid ${asignaciones[t.key]===d?"rgba(52,211,153,0.6)":"rgba(255,255,255,0.08)"}`,background:asignaciones[t.key]===d?"rgba(52,211,153,0.2)":"transparent",color:asignaciones[t.key]===d?"#34d399":"#4a7a5a"}}>{asignaciones[t.key]===d?"✓":fmtDia(d).split(" ")[0].slice(0,2)}</button>)}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {grupos.length===0&&<div style={{textAlign:"center",color:"#4a7a5a",padding:32,fontSize:12}}>No hay tareas pendientes según las frecuencias para esta semana.</div>}
+      </div>
+      {asignadas>0&&<div style={{position:"sticky",bottom:16}}><button onClick={confirmarSemana} style={{...S.btn,width:"100%",padding:"12px 0",fontWeight:700,fontSize:14,background:guardado?"rgba(34,197,94,0.15)":"rgba(52,211,153,0.15)",color:guardado?"#22c55e":"#34d399",border:`1px solid ${guardado?"rgba(34,197,94,0.4)":"rgba(52,211,153,0.3)"}`}}>{guardado?"✅ Semana programada":"📅 Confirmar ("+asignadas+" tareas)"}</button></div>}
+    </div>
+  );
+}
+
 // ─── NORMALIZADOR DE TAREAS ───────────────────────────────────────────────────
 function NormalizadorTareas({ S, tareasProg, setTareasProg, esJefa }) {
-  const [mapeo, setMapeo] = React.useState({}); // {tareaVieja: tareaEstandar}
+  const [mapeo, setMapeo] = React.useState({});
   const [aplicado, setAplicado] = React.useState({});
   const [buscador, setBuscador] = React.useState({});
-
-  // Recopilar todas las tareas únicas existentes en Firebase
   const tareasUnicas = React.useMemo(()=>{
-    const normArr = v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-    const set = {};
-    Object.entries(tareasProg).forEach(([fecha, arr])=>{
-      normArr(arr).forEach(t=>{
-        if(!t?.tarea) return;
-        const k = t.tarea.trim();
-        if(!set[k]) set[k] = {tarea:k, count:0, fechas:[]};
-        set[k].count++;
-        if(!set[k].fechas.includes(fecha)) set[k].fechas.push(fecha);
-      });
-    });
+    const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+    const set={};
+    Object.entries(tareasProg).forEach(([fecha,arr])=>{ normArr(arr).forEach(t=>{ if(!t?.tarea)return; const k=t.tarea.trim(); if(!set[k])set[k]={tarea:k,count:0}; set[k].count++; }); });
     return Object.values(set).sort((a,b)=>b.count-a.count);
-  }, [tareasProg]);
-
-  // Detectar si ya es estándar
-  const esEstandar = (tarea) =>
-    CATALOGO_TAREAS.some(c=>c.tarea.toLowerCase()===tarea.toLowerCase());
-
-  // Sugerencia automática
-  const sugerirEstandar = (tarea) => {
-    const t = tarea.toLowerCase();
-    return CATALOGO_TAREAS.find(c=>c.tarea.toLowerCase()===t)
-      || CATALOGO_TAREAS.find(c=>c.tarea.toLowerCase().includes(t))
-      || CATALOGO_TAREAS.find(c=>t.includes(c.tarea.toLowerCase().split(" ")[0]));
-  };
-
-  const aplicarMapeo = (tareaVieja, tareaNueva) => {
-    if(!tareaNueva||tareaVieja===tareaNueva) return;
-    const normArr = v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-    const nuevo = {};
-    Object.entries(tareasProg).forEach(([fecha, arr])=>{
-      nuevo[fecha] = normArr(arr).map(t=>
-        t?.tarea?.trim()===tareaVieja ? {...t, tarea:tareaNueva} : t
-      );
-    });
+  },[tareasProg]);
+  const esEstandar=(tarea)=>CATALOGO_TAREAS.some(c=>c.tarea.toLowerCase()===tarea.toLowerCase());
+  const sugerirEstandar=(tarea)=>{ const t=tarea.toLowerCase(); return CATALOGO_TAREAS.find(c=>c.tarea.toLowerCase()===t)||CATALOGO_TAREAS.find(c=>c.tarea.toLowerCase().includes(t))||CATALOGO_TAREAS.find(c=>t.includes(c.tarea.toLowerCase().split(" ")[0])); };
+  const aplicarMapeo=(tareaVieja,tareaNueva)=>{
+    if(!tareaNueva||tareaVieja===tareaNueva)return;
+    const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+    const nuevo={};
+    Object.entries(tareasProg).forEach(([f,arr])=>{ nuevo[f]=normArr(arr).map(t=>t?.tarea?.trim()===tareaVieja?{...t,tarea:tareaNueva}:t); });
     setTareasProg(prev=>({...prev,...nuevo}));
     setAplicado(p=>({...p,[tareaVieja]:tareaNueva}));
   };
-
-  const noEstandar = tareasUnicas.filter(t=>!esEstandar(t.tarea)&&!aplicado[t.tarea]);
-  const yaEstandar = tareasUnicas.filter(t=>esEstandar(t.tarea)||aplicado[t.tarea]);
-
+  const noEstandar=tareasUnicas.filter(t=>!esEstandar(t.tarea)&&!aplicado[t.tarea]);
+  const yaEstandar=tareasUnicas.filter(t=>esEstandar(t.tarea)||aplicado[t.tarea]);
   if(!esJefa) return null;
-
   return (
     <div className="ein">
-      <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,marginBottom:4}}>
-        🔧 Normalizar nombres de tareas
-      </div>
-      <div style={{fontSize:11,color:"#5a9a7a",marginBottom:16}}>
-        Estandariza los nombres existentes usando el catálogo oficial.
-        Los cambios se aplican a todas las tareas programadas.
-      </div>
-
-      {/* Resumen */}
+      <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,marginBottom:4}}>🔧 Normalizar nombres de tareas</div>
+      <div style={{fontSize:11,color:"#5a9a7a",marginBottom:16}}>Estandariza los nombres usando el catálogo oficial. Los cambios se aplican a todas las fechas.</div>
       <div style={{...S.card,padding:"10px 14px",marginBottom:16,display:"flex",gap:16}}>
         <span style={{fontSize:12}}><b style={{color:"#f87171"}}>{noEstandar.length}</b> <span style={{color:"#9ca3af"}}>por normalizar</span></span>
-        <span style={{fontSize:12}}><b style={{color:"#34d399"}}>{yaEstandar.length}</b> <span style={{color:"#9ca3af"}}>ya estándar o normalizadas</span></span>
-        <span style={{fontSize:12}}><b style={{color:"#c0dac0"}}>{tareasUnicas.length}</b> <span style={{color:"#9ca3af"}}>tareas únicas totales</span></span>
+        <span style={{fontSize:12}}><b style={{color:"#34d399"}}>{yaEstandar.length}</b> <span style={{color:"#9ca3af"}}>ya estándar</span></span>
+        <span style={{fontSize:12}}><b style={{color:"#c0dac0"}}>{tareasUnicas.length}</b> <span style={{color:"#9ca3af"}}>totales</span></span>
       </div>
-
-      {/* Lista de tareas por normalizar */}
       {noEstandar.length===0
-        ? <div style={{...S.card,padding:24,textAlign:"center",color:"#34d399",fontSize:13}}>
-            ✅ Todas las tareas ya están estandarizadas
-          </div>
+        ? <div style={{...S.card,padding:24,textAlign:"center",color:"#34d399",fontSize:13}}>✅ Todas las tareas ya están estandarizadas</div>
         : <div style={{...S.card,padding:0,overflow:"hidden",marginBottom:16}}>
-            <div style={{padding:"8px 14px",borderBottom:"1px solid rgba(255,255,255,0.08)",
-              fontSize:10,color:"#5a9a7a",textTransform:"uppercase",letterSpacing:"0.5px",
-              display:"grid",gridTemplateColumns:"1fr auto 1fr auto",gap:8}}>
+            <div style={{padding:"8px 14px",borderBottom:"1px solid rgba(255,255,255,0.08)",fontSize:10,color:"#5a9a7a",textTransform:"uppercase",display:"grid",gridTemplateColumns:"1fr auto 1fr auto",gap:8}}>
               <span>Nombre actual</span><span>usos</span><span>Reemplazar por</span><span></span>
             </div>
             {noEstandar.map(({tarea,count})=>{
-              const sugerida = sugerirEstandar(tarea);
-              const seleccion = mapeo[tarea]||(sugerida?.tarea||"");
-              const busqLocal = buscador[tarea]||"";
-              const filtCat = busqLocal.length>=1
-                ? CATALOGO_TAREAS.filter(c=>c.tarea.toLowerCase().includes(busqLocal.toLowerCase()))
-                : CATALOGO_TAREAS;
+              const sugerida=sugerirEstandar(tarea);
+              const seleccion=mapeo[tarea]||(sugerida?.tarea||"");
+              const busqLocal=buscador[tarea]||"";
               return (
-                <div key={tarea} style={{padding:"10px 14px",borderBottom:"1px solid rgba(255,255,255,0.05)",
-                  display:"grid",gridTemplateColumns:"1fr auto 1fr auto",gap:8,alignItems:"center"}}>
-                  <div>
-                    <div style={{fontSize:13,color:"#f87171",fontWeight:500}}>{tarea}</div>
-                    <div style={{fontSize:10,color:"#5a9a7a"}}>{count} uso(s)</div>
-                  </div>
+                <div key={tarea} style={{padding:"10px 14px",borderBottom:"1px solid rgba(255,255,255,0.05)",display:"grid",gridTemplateColumns:"1fr auto 1fr auto",gap:8,alignItems:"center"}}>
+                  <div><div style={{fontSize:13,color:"#f87171",fontWeight:500}}>{tarea}</div><div style={{fontSize:10,color:"#5a9a7a"}}>{count} uso(s)</div></div>
                   <div style={{color:"#4a7a5a",fontSize:16}}>→</div>
                   <div style={{position:"relative"}}>
-                    <input
-                      placeholder="Buscar tarea estándar..."
-                      value={busqLocal||seleccion}
-                      onChange={e=>{
-                        setBuscador(p=>({...p,[tarea]:e.target.value}));
-                        setMapeo(p=>({...p,[tarea]:e.target.value}));
-                      }}
+                    <input placeholder="Buscar tarea estándar..." value={busqLocal||seleccion}
+                      onChange={e=>{setBuscador(p=>({...p,[tarea]:e.target.value}));setMapeo(p=>({...p,[tarea]:e.target.value}));}}
                       style={{...S.input,fontSize:12,width:"100%"}}/>
                     {busqLocal.length>=1&&(
-                      <div style={{position:"absolute",zIndex:999,top:"100%",left:0,right:0,
-                        background:"#1a2e1a",border:"1px solid rgba(52,211,153,0.3)",
-                        borderRadius:"0 0 8px 8px",maxHeight:160,overflowY:"auto",
-                        boxShadow:"0 4px 16px rgba(0,0,0,0.4)"}}>
-                        {filtCat.slice(0,10).map(c=>(
-                          <div key={c.id}
-                            onClick={()=>{
-                              setMapeo(p=>({...p,[tarea]:c.tarea}));
-                              setBuscador(p=>({...p,[tarea]:""}));
-                            }}
-                            style={{padding:"6px 12px",fontSize:12,color:"#c0dac0",cursor:"pointer",
-                              borderBottom:"1px solid rgba(255,255,255,0.04)"}}
+                      <div style={{position:"absolute",zIndex:999,top:"100%",left:0,right:0,background:"#1a2e1a",border:"1px solid rgba(52,211,153,0.3)",borderRadius:"0 0 8px 8px",maxHeight:160,overflowY:"auto",boxShadow:"0 4px 16px rgba(0,0,0,0.4)"}}>
+                        {CATALOGO_TAREAS.filter(c=>c.tarea.toLowerCase().includes(busqLocal.toLowerCase())).slice(0,10).map(c=>(
+                          <div key={c.id} onClick={()=>{setMapeo(p=>({...p,[tarea]:c.tarea}));setBuscador(p=>({...p,[tarea]:""}));}}
+                            style={{padding:"6px 12px",fontSize:12,color:"#c0dac0",cursor:"pointer",borderBottom:"1px solid rgba(255,255,255,0.04)"}}
                             onMouseEnter={e=>e.currentTarget.style.background="rgba(52,211,153,0.1)"}
                             onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                            <span style={{fontSize:9,color:"#4a7a5a",marginRight:6}}>{c.cat}</span>
-                            {c.tarea}
+                            <span style={{fontSize:9,color:"#4a7a5a",marginRight:6}}>{c.cat}</span>{c.tarea}
                           </div>
                         ))}
                       </div>
                     )}
                   </div>
-                  <button
-                    disabled={!seleccion||seleccion===tarea}
-                    onClick={()=>{aplicarMapeo(tarea, mapeo[tarea]||sugerida?.tarea||"");}}
-                    style={{...S.btn,fontSize:11,padding:"4px 10px",
-                      background:seleccion&&seleccion!==tarea?"rgba(34,197,94,0.15)":"rgba(255,255,255,0.04)",
-                      color:seleccion&&seleccion!==tarea?"#22c55e":"#4a7a5a",
-                      border:`1px solid ${seleccion&&seleccion!==tarea?"rgba(34,197,94,0.3)":"rgba(255,255,255,0.08)"}`,
-                      cursor:seleccion&&seleccion!==tarea?"pointer":"not-allowed",
-                      whiteSpace:"nowrap"}}>
-                    ✓ Aplicar
-                  </button>
+                  <button disabled={!seleccion||seleccion===tarea} onClick={()=>aplicarMapeo(tarea,mapeo[tarea]||sugerida?.tarea||"")}
+                    style={{...S.btn,fontSize:11,padding:"4px 10px",background:seleccion&&seleccion!==tarea?"rgba(34,197,94,0.15)":"rgba(255,255,255,0.04)",color:seleccion&&seleccion!==tarea?"#22c55e":"#4a7a5a",border:`1px solid ${seleccion&&seleccion!==tarea?"rgba(34,197,94,0.3)":"rgba(255,255,255,0.08)"}`,cursor:seleccion&&seleccion!==tarea?"pointer":"not-allowed",whiteSpace:"nowrap"}}>✓ Aplicar</button>
                 </div>
               );
             })}
           </div>
       }
-
-      {/* Ya estandarizadas */}
       {yaEstandar.length>0&&(
         <details style={{...S.card,padding:10}}>
-          <summary style={{fontSize:12,color:"#5a9a7a",cursor:"pointer"}}>
-            ✅ {yaEstandar.length} tareas ya estandarizadas
-          </summary>
-          <div style={{marginTop:8}}>
-            {yaEstandar.map(({tarea,count})=>(
-              <div key={tarea} style={{display:"flex",justifyContent:"space-between",
-                padding:"4px 8px",fontSize:11,color:"#34d399"}}>
-                <span>{aplicado[tarea]?"✓ "+aplicado[tarea]:tarea}</span>
-                <span style={{color:"#5a9a7a"}}>{count} uso(s)</span>
-              </div>
-            ))}
-          </div>
+          <summary style={{fontSize:12,color:"#5a9a7a",cursor:"pointer"}}>✅ {yaEstandar.length} tareas ya estandarizadas</summary>
+          <div style={{marginTop:8}}>{yaEstandar.map(({tarea,count})=><div key={tarea} style={{display:"flex",justifyContent:"space-between",padding:"4px 8px",fontSize:11,color:"#34d399"}}><span>{aplicado[tarea]?"✓ "+aplicado[tarea]:tarea}</span><span style={{color:"#5a9a7a"}}>{count} uso(s)</span></div>)}</div>
         </details>
       )}
     </div>
@@ -4149,11 +3917,11 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
 
       {/* ── FRECUENCIAS POR MACROZONA ── */}
       {tabProg==="semana"&&(
-        <PlanificadorSemanal
-          S={S} MACROZONAS_BASE={zonasConCust} getAllElems={getAllElems}
-          getZD={getZD} getElemFrecs={getElemFrecs}
-          tareas={tareas} setTareas={setTareas}
-          personal={personal} configSemanal={configSemanal} esJefa={esJefa}/>
+        <PlanificadorSemanal S={S} MACROZONAS_BASE={zonasConCust} getAllElems={getAllElems} getZD={getZD} getElemFrecs={getElemFrecs} tareas={tareas} setTareas={setTareas} personal={personal} configSemanal={configSemanal} esJefa={esJefa}/>
+      )}
+
+      {tabProg==="normalizar"&&(
+        <NormalizadorTareas S={S} tareasProg={tareas} setTareasProg={setTareas} esJefa={esJefa}/>
       )}
 
       {tabProg==="frecuencias"&&(
@@ -4168,10 +3936,6 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           tareasProg={tareas} setTareasProg={setTareas}
           stockFito={stockFito} setStockFito={setStockFito}
           crearNotificacion={crearNotificacion} esJefa={esJefa}/>
-      )}
-
-      {tabProg==="normalizar"&&(
-        <NormalizadorTareas S={S} tareasProg={tareas} setTareasProg={setTareas} esJefa={esJefa}/>
       )}
 
       {tabProg==="historial" && (
@@ -4392,56 +4156,29 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                 </div>
                 <div style={{gridColumn:"1/-1"}}>
                   <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>TAREA</label>
-                  <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>TAREA</label>
-                  <div style={{position:"relative"}}>
-                    <input
-                      placeholder="Buscar tarea del catálogo o escribir..."
-                      value={nuevaTarea.tarea}
-                      onChange={e=>{
-                        const v=e.target.value;
-                        setNuevaTarea(p=>({...p,tarea:v,
-                          responsable:p.responsable||(getResponsablePorTipo(v,configSemanal,p.zona)||"")}));
-                      }}
-                      style={{...S.input,fontSize:13,width:"100%"}}
-                      autoComplete="off"/>
-                    {nuevaTarea.tarea.length>=2&&(()=>{
-                      const busq=nuevaTarea.tarea.toLowerCase();
-                      const filtradas=CATALOGO_TAREAS.filter(c=>c.tarea.toLowerCase().includes(busq)&&c.tarea.toLowerCase()!==busq);
-                      if(filtradas.length===0) return null;
-                      const cats=[...new Set(filtradas.map(c=>c.cat))];
-                      return (
-                        <div style={{position:"absolute",zIndex:999,top:"100%",left:0,right:0,
-                          background:"#1a2e1a",border:"1px solid rgba(52,211,153,0.3)",
-                          borderRadius:"0 0 8px 8px",maxHeight:200,overflowY:"auto",
-                          boxShadow:"0 4px 16px rgba(0,0,0,0.4)"}}>
-                          {cats.map(cat=>(
-                            <div key={cat}>
-                              <div style={{padding:"3px 12px",fontSize:9,color:"#4a7a5a",textTransform:"uppercase",letterSpacing:"0.5px",background:"rgba(0,0,0,0.2)"}}>{cat}</div>
-                              {filtradas.filter(c=>c.cat===cat).map(c=>(
-                                <div key={c.id}
-                                  onClick={()=>setNuevaTarea(p=>({...p,tarea:c.tarea,
-                                    responsable:p.responsable||(getResponsablePorTipo(c.tarea,configSemanal,p.zona)||"")}))}
-                                  style={{padding:"7px 14px",fontSize:12,color:"#c0dac0",cursor:"pointer",
-                                    borderBottom:"1px solid rgba(255,255,255,0.04)",userSelect:"none"}}
-                                  onMouseEnter={e=>e.currentTarget.style.background="rgba(52,211,153,0.1)"}
-                                  onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                                  {c.tarea}
-                                </div>
-                              ))}
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    })()}
-                  </div>
+                  <select style={{...S.input,fontSize:13}} value={nuevaTarea.tarea}
+                    onChange={e=>setNuevaTarea(p=>({...p,tarea:e.target.value==="__otro__"?"":e.target.value,responsable:p.responsable||(getResponsablePorTipo(e.target.value==="__otro__"?"":e.target.value,configSemanal)||"")}))}>
+                    <option value="">Seleccionar tarea...</option>
+                    {tareasDisp.map(t=><option key={t} value={t}>{t}</option>)}
+                    <option value="__otro__">✏️ Escribir otra...</option>
+                  </select>
+                  {(nuevaTarea.tarea===""||nuevaTarea.tarea==="__otro__")&&(
+                    <input style={{...S.input,fontSize:13,marginTop:6}} autoFocus
+                      placeholder="Describir tarea..."
+                      value={nuevaTarea.tarea==="__otro__"?"":nuevaTarea.tarea}
+                      onChange={e=>{const v=e.target.value;setNuevaTarea(p=>({...p,tarea:v||"__otro__",responsable:p.responsable||(getResponsablePorTipo(v,configSemanal)||"")}));}}/>
+                  )}
                   {nuevaTarea.tarea==="Plantar desde Vivero"&&(
                     <div style={{marginTop:8,padding:"10px 12px",background:"rgba(74,222,128,0.08)",border:"1px solid rgba(74,222,128,0.25)",borderRadius:8,fontSize:12,color:"#4ade80"}}>
                       🌱 Para plantar desde Vivero con descuento de stock e insumos, usa el botón <strong>"🌱 Plantar desde Vivero"</strong> en la ficha de la macrozona → tab <strong>✅ Tareas</strong>.<br/>
                       <span style={{color:"#5a9a7a",fontSize:11}}>Esta tarea se registrará aquí automáticamente al completar ese formulario.</span>
                     </div>
                   )}
-
-
+                </div>
+                <div>
+                  <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>RESPONSABLE</label>
+                  <ResponsableSelector
+                    value={nuevaTarea.responsable}
                     personal={personal}
                     onChange={v=>setNuevaTarea(p=>({...p,responsable:v,estado:v?"pendiente":"por_designar"}))}
                     S={S}
@@ -9611,52 +9348,51 @@ const TAREAS_TEES = ["Limpieza","Corte y orillado","Riego","Reparación divots",
 
 // Plantilla pre-torneo por día
 const PLANTILLA_PRE_TORNEO = {
-  // tarea: nombre estándar del catálogo | obs: instrucción específica del torneo
   "Día -6 (Lunes)": [
     {cat:"Árboles", tarea:"Poda de limpieza", obs:"Despeje de troncos en línea de tiro — verificar árboles que interfieren con el juego"},
   ],
   "Día -3 (Miércoles)": [
-    {cat:"Greens",       tarea:"Revisión de maquinaria y herramienta", obs:"Limpieza y afilado de cuchillas cortadora de greens"},
-    {cat:"Greens",       tarea:"Riego manual",                          obs:"Riego profundo greens"},
-    {cat:"Bunkers",      tarea:"Corte de bordes",                       obs:"Recortar bordes del césped alrededor de búnkers"},
-    {cat:"Tees y Calles",tarea:"Corte de césped",                       obs:"Cortar rough a altura de torneo"},
+    {cat:"Greens",        tarea:"Revisión de maquinaria y herramienta", obs:"Limpieza y afilado de cuchillas cortadora de greens"},
+    {cat:"Greens",        tarea:"Riego manual",                          obs:"Riego profundo greens"},
+    {cat:"Bunkers",       tarea:"Corte de bordes",                       obs:"Recortar bordes del césped alrededor de búnkers"},
+    {cat:"Tees y Calles", tarea:"Corte de césped",                       obs:"Cortar rough a altura de torneo"},
     {cat:"Administración",tarea:"Revisar pronóstico del tiempo y ajustar planes", obs:""},
   ],
   "Día -2 (Jueves)": [
-    {cat:"Greens",       tarea:"Corte de greens",              obs:"Corte inicial — HOC 4.7mm"},
-    {cat:"Greens",       tarea:"Corte de greens",              obs:"Rodado inicial de greens"},
-    {cat:"Bunkers",      tarea:"Rastrillado de búnkers",       obs:"Rastrillar y labrar arena a profundidad uniforme"},
-    {cat:"Bunkers",      tarea:"Reponer arena",                obs:"Rellenar búnker con arena si es necesario"},
-    {cat:"Tees y Calles",tarea:"Corte de tees",                obs:"Cortar tees a altura final de torneo"},
-    {cat:"Tees y Calles",tarea:"Corte de fairways",            obs:"Cortar fairways y lomas a altura final de torneo"},
-    {cat:"Tees y Calles",tarea:"Riego manual",                 obs:"Riego profundo tees y calles"},
-    {cat:"Administración",tarea:"Revisar pronóstico del tiempo", obs:""},
+    {cat:"Greens",        tarea:"Corte de greens",    obs:"Corte inicial — HOC 4.7mm"},
+    {cat:"Greens",        tarea:"Corte de greens",    obs:"Rodado inicial de greens"},
+    {cat:"Bunkers",       tarea:"Rastrillado de búnkers", obs:"Rastrillar y labrar arena a profundidad uniforme"},
+    {cat:"Bunkers",       tarea:"Reponer arena",       obs:"Rellenar búnker con arena si es necesario"},
+    {cat:"Tees y Calles", tarea:"Corte de tees",       obs:"Cortar tees a altura final de torneo"},
+    {cat:"Tees y Calles", tarea:"Corte de fairways",   obs:"Cortar fairways y lomas a altura final de torneo"},
+    {cat:"Tees y Calles", tarea:"Riego manual",         obs:"Riego profundo tees y calles"},
+    {cat:"Administración",tarea:"Revisar pronóstico del tiempo y ajustar planes", obs:""},
   ],
   "Día -1 (Viernes)": [
-    {cat:"Greens",       tarea:"Corte de greens",              obs:"Corte final — HOC 4.5mm"},
-    {cat:"Greens",       tarea:"Corte de greens",              obs:"Doble rodado greens"},
-    {cat:"Greens",       tarea:"Cambio de banderas",           obs:"Perforar nuevos hoyos y colocar banderas"},
-    {cat:"Greens",       tarea:"Syringing greens",             obs:"Riego ligero (Syringing) tarde"},
-    {cat:"Greens",       tarea:"Corte de greens",              obs:"Corte ante-greens"},
-    {cat:"Bunkers",      tarea:"Rastrillado de búnkers",       obs:"Rastrillado superficial — recoger piedras y escombros"},
-    {cat:"Tees y Calles",tarea:"Riego manual",                 obs:"Riego profundo tees y calles"},
-    {cat:"Limpieza",     tarea:"Soplado/Barrido",              obs:"Soplar y barrer recortes de todas las superficies"},
-    {cat:"Limpieza",     tarea:"Limpiar basurero",             obs:"Limpiar basureros y retirar basura del campo"},
-    {cat:"Maquinaria",   tarea:"Revisión de maquinaria y herramienta", obs:"Revisión final — toda la maquinaria lista para la mañana"},
-    {cat:"Administración",tarea:"Revisar pronóstico del tiempo", obs:""},
+    {cat:"Greens",        tarea:"Corte de greens",    obs:"Corte final — HOC 4.5mm"},
+    {cat:"Greens",        tarea:"Corte de greens",    obs:"Doble rodado greens"},
+    {cat:"Greens",        tarea:"Cambio de banderas", obs:"Perforar nuevos hoyos y colocar banderas"},
+    {cat:"Greens",        tarea:"Syringing greens",   obs:"Riego ligero (Syringing) tarde"},
+    {cat:"Greens",        tarea:"Corte de greens",    obs:"Corte ante-greens"},
+    {cat:"Bunkers",       tarea:"Rastrillado de búnkers", obs:"Rastrillado superficial — recoger piedras y escombros"},
+    {cat:"Tees y Calles", tarea:"Riego manual",        obs:"Riego profundo tees y calles"},
+    {cat:"Limpieza",      tarea:"Soplado/Barrido",     obs:"Soplar y barrer recortes de todas las superficies"},
+    {cat:"Limpieza",      tarea:"Limpiar basurero",    obs:"Limpiar basureros y retirar basura del campo"},
+    {cat:"Maquinaria",    tarea:"Revisión de maquinaria y herramienta", obs:"Revisión final — toda la maquinaria lista para la mañana"},
+    {cat:"Administración",tarea:"Revisar pronóstico del tiempo y ajustar planes", obs:""},
   ],
   "Día Torneo (Sábado)": [
     {cat:"Greens",   tarea:"Corte de greens",        obs:"Corte final de torneo — HOC 4.5mm"},
     {cat:"Greens",   tarea:"Corte de greens",        obs:"Doble rodado greens"},
     {cat:"Bunkers",  tarea:"Rastrillado de búnkers", obs:"Rastrillado superficial — recoger piedras y escombros"},
     {cat:"Limpieza", tarea:"Soplado/Barrido",        obs:"Soplar y barrer recortes de todas las superficies"},
-    {cat:"Administración",tarea:"Revisar pronóstico del tiempo", obs:""},
+    {cat:"Administración",tarea:"Revisar pronóstico del tiempo y ajustar planes", obs:""},
   ],
   "Día Torneo (Domingo)": [
     {cat:"Greens",   tarea:"Corte de greens",        obs:"Doble corte — máxima velocidad (opcional según condiciones)"},
     {cat:"Bunkers",  tarea:"Rastrillado de búnkers", obs:"Rastrillado superficial — recoger piedras y escombros"},
     {cat:"Limpieza", tarea:"Soplado/Barrido",        obs:"Soplar y barrer recortes de todas las superficies"},
-    {cat:"Administración",tarea:"Revisar pronóstico del tiempo", obs:""},
+    {cat:"Administración",tarea:"Revisar pronóstico del tiempo y ajustar planes", obs:""},
   ],
 };
 
@@ -11481,7 +11217,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   const [showHumForm,    setShowHumForm]    = React.useState(false);
   // Abrir formulario de humedad automáticamente cuando jefa navega a ese tab
   React.useEffect(()=>{
-    if(subTab==="humedad") setShowHumForm(true); // jefa y trabajadores pueden registrar
+    if(subTab==="humedad") setShowHumForm(true);
   },[subTab]);
   const emptyHumForm = {fecha:hoy,hora:new Date().toTimeString().slice(0,5),motivo:"rutina",responsable:"",valores:{},valorVivero:"",decision:"sin-cambio",obs:"",generarTarea:false};
   const [humForm,        setHumForm]        = React.useState(emptyHumForm);
@@ -11623,16 +11359,11 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           fecha:fechaStr,
           zona:"Golf",
           elemento:t.cat,
-          tarea:t.tarea, // nombre estándar del catálogo
+          tarea:t.tarea,
           responsable:"Osmar Bhalú Armijo Zúñiga",
           estado:"pendiente",
-          notas:[
-            `🏆 Torneo: ${evento.nombre}`,
-            `📅 ${dia}`,
-            t.obs ? `📋 ${t.obs}` : "",
-          ].filter(Boolean).join(" · "),
-          origenTorneo: evento.nombre,
-          origenDia: dia,
+          notas:[`🏆 Torneo: ${evento.nombre}`,`📅 ${dia}`,t.obs?`📋 ${t.obs}`:""].filter(Boolean).join(" · "),
+          origenTorneo:evento.nombre, origenDia:dia,
           auto:true,
         });
       });
@@ -17069,8 +16800,8 @@ export default function App() {
                   value={editElem.tipoEdit!==undefined?editElem.tipoEdit:e.tipo}
                   onChange={ev=>setEditElem(p=>({...p,tipoEdit:ev.target.value}))}>
                   {(()=>{
-                    const vk=["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macizos","setos","macetas_piso","colgantes"];
-                    const ok=["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","maceteros","jardinera_infra","bodegas"];
+                    const vk=["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
+                    const ok=["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","maceteros","bodegas"];
                     return(<>
                       <optgroup label="🌿 Vegetación">{vk.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup>
                       <optgroup label="🏗️ Infraestructura / Pavimentos">{ok.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup>
@@ -17740,26 +17471,6 @@ export default function App() {
                           onClick={getSugerenciaAI} disabled={aiLoading}>
                           {aiLoading?<><span className="spin"/> Analizando...</>:"🤖 Sugerencia IA"}
                         </button>
-                        {zona.esPersonalizada&&esJefa&&(<>
-                          <button style={{...S.btn,fontSize:11,background:"rgba(96,165,250,0.1)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.2)"}}
-                            onClick={()=>{
-                              const nuevoNombre=window.prompt("Nuevo nombre:",zona.nombre);
-                              if(!nuevoNombre?.trim()) return;
-                              const nuevoIcono=window.prompt("Ícono (emoji):",zona.icono||"🌿");
-                              setMacrozonasCust(prev=>prev.map(z=>z.id===zona.id
-                                ?{...z,nombre:nuevoNombre.trim(),icono:nuevoIcono||z.icono}:z));
-                            }}>
-                            ✏️ Editar nombre
-                          </button>
-                          <button style={{...S.btn,fontSize:11,background:"rgba(239,68,68,0.08)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.2)"}}
-                            onClick={()=>{
-                              if(!window.confirm("¿Eliminar "+zona.nombre+"? Esta acción es permanente.")) return;
-                              setMacrozonasCust(prev=>prev.filter(z=>z.id!==zona.id));
-                              setZonaId(null);
-                            }}>
-                            🗑 Eliminar macrozona
-                          </button>
-                        </>)}
                       </div>
                     </div>
                     {/* Fechas de mantenimiento si existen */}
@@ -17804,7 +17515,7 @@ export default function App() {
                 {(()=>{
                   const todosElems = getAllElems(zonaId);
                   const VEGE_KEYS  = ["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macizos","setos","macetas_piso","colgantes"];
-                  const INFRA_KEYS = ["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","maceteros","jardinera_infra","bodegas"];
+                  const INFRA_KEYS = ["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","bodegas"];
                   const vegeElems  = todosElems.filter(e=>VEGE_KEYS.includes(e.tipo));
                   const infraElems = todosElems.filter(e=>INFRA_KEYS.includes(e.tipo));
                   const otrosElems = todosElems.filter(e=>!VEGE_KEYS.includes(e.tipo)&&!INFRA_KEYS.includes(e.tipo));
@@ -17921,8 +17632,8 @@ export default function App() {
                           style={{...S.input,flex:"2 1 200px"}}/>
                         <div style={{flex:"1 1 150px",maxWidth:220}}>
                           {(()=>{
-                            const vk=["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macizos","setos","macetas_piso","colgantes"];
-                            const ok=["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","maceteros","jardinera_infra","bodegas"];
+                            const vk=["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
+                            const ok=["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","maceteros","bodegas"];
                             const esVege = vk.includes(newElem.tipo);
                             return (<>
                               {/* Selector de grupo */}
@@ -17947,6 +17658,11 @@ export default function App() {
                       </div>
                       <div style={{display:"flex",gap:8,alignItems:"center"}}>
                         <button className="btn-p" style={S.btn} onClick={()=>{
+                          console.log("Agregar elem: zonaId=",zonaId,"newElem=",newElem); if(newElem.nombre.trim()){
+                            addCustomElem(zonaId,newElem);
+                            setNewElem(p=>({...p,nombre:""}));
+                          }
+                        }}>✓ Agregar</button>
                         <span style={{fontSize:11,color:"#4a7a5a"}}>o presiona Enter</span>
                         <button className="btn-g" style={{...S.btn,marginLeft:"auto"}} onClick={()=>{setShowAddElem(false);setNewElem({nombre:"",tipo:"arboles"});}}>Listo ✓</button>
                       </div>
@@ -18322,8 +18038,8 @@ export default function App() {
                       [fecha]:(prev[fecha]||[]).map(t=>t.id===tid?{...t,metodoLimpieza:metodo}:t)
                     }));
                   }}
-                  onAccesoRapido={(vista,subTab)=>{
-                    const tab = subTab||(vista==="medicion"?"mediciones":vista==="humedad"?"humedad":"greens");
+                  onAccesoRapido={(tipo)=>{
+                    const tab = tipo==="medicion"?"mediciones":tipo==="humedad"?"humedad":"greens";
                     setGolfInitTab(tab);
                     setVista("golf");
                   }}
