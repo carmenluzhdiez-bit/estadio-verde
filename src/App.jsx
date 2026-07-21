@@ -16167,6 +16167,7 @@ export default function App() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiText, setAiText] = useState("");
   const [editElem, setEditElem] = useState(null);
+  const [editZonaForm, setEditZonaForm] = useState(null); // {nombre, icono, descripcion}
   const [condicionesLocales, setCondicionesLocales] = useState({});
   const [showPlantacionForm, setShowPlantacionForm] = useState(null);
 
@@ -17434,9 +17435,15 @@ export default function App() {
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12}}>
                       {/* Izquierda: icono + nombre + chips */}
                       <div style={{display:"flex",alignItems:"center",gap:14,flex:1,minWidth:200}}>
-                        <span style={{fontSize:44,lineHeight:1}}>{zona.icono}</span>
+                        <span style={{fontSize:44,lineHeight:1}}>{zd.iconoCustom||zona.icono}</span>
                         <div>
-                          <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:21,fontWeight:900,marginBottom:6,lineHeight:1.2}}>{zona.nombre}</h2>
+                          <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:21,fontWeight:900,marginBottom:6,lineHeight:1.2}}>{zd.nombreCustom||zona.nombre}</h2>
+                          {esJefa&&!editZonaForm&&(
+                            <button onClick={()=>setEditZonaForm({nombre:zd.nombreCustom||zona.nombre,icono:zd.iconoCustom||zona.icono,descripcion:zd.descripcion||zona.descripcion||""})}
+                              style={{fontSize:11,padding:"2px 8px",borderRadius:5,cursor:"pointer",border:"1px solid rgba(96,165,250,0.3)",background:"rgba(96,165,250,0.08)",color:"#60a5fa"}}>
+                              ✏️ Editar
+                            </button>
+                          )}
                           <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
                             <span style={{fontSize:11,color:"#6aaa7a",background:"rgba(255,255,255,0.06)",padding:"2px 8px",borderRadius:6,border:"1px solid rgba(255,255,255,0.1)"}}>
                               📂 {zona.categoria}
@@ -17471,6 +17478,33 @@ export default function App() {
                           onClick={getSugerenciaAI} disabled={aiLoading}>
                           {aiLoading?<><span className="spin"/> Analizando...</>:"🤖 Sugerencia IA"}
                         </button>
+                        {esJefa&&(
+                          <button style={{...S.btn,fontSize:11,background:"rgba(96,165,250,0.1)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.2)"}}
+                            onClick={()=>{
+                              const n=window.prompt("Nuevo nombre para esta macrozona:",zona.nombre);
+                              if(!n?.trim()) return;
+                              const ic=window.prompt("Ícono (emoji):",zona.icono||"🌿");
+                              const desc=window.prompt("Descripción (opcional):",zona.descripcion||"");
+                              if(zona.esPersonalizada) {
+                                setMacrozonasCust(prev=>prev.map(z=>z.id===zona.id?{...z,nombre:n.trim(),icono:ic||z.icono,descripcion:desc}:z));
+                              } else {
+                                // Para macrozonas base: guardar nombre e ícono custom en Firebase
+                                updateZona(zonaId,{nombreCustom:n.trim(),iconoCustom:ic||zona.icono,descripcion:desc});
+                              }
+                            }}>
+                            ✏️ Editar nombre
+                          </button>
+                        )}
+                        {esJefa&&zona.esPersonalizada&&(
+                          <button style={{...S.btn,fontSize:11,background:"rgba(239,68,68,0.08)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.2)"}}
+                            onClick={()=>{
+                              if(!window.confirm("¿Eliminar "+zona.nombre+"? Esta acción es permanente.")) return;
+                              setMacrozonasCust(prev=>prev.filter(z=>z.id!==zona.id));
+                              setZonaId(null);
+                            }}>
+                            🗑 Eliminar
+                          </button>
+                        )}
                       </div>
                     </div>
                     {/* Fechas de mantenimiento si existen */}
@@ -17484,6 +17518,59 @@ export default function App() {
                 </div>
               );
             })()}
+            {/* Formulario edición nombre/ícono/descripción */}
+            {editZonaForm&&esJefa&&(
+              <div style={{...S.card,padding:14,marginBottom:14,border:"1px solid rgba(96,165,250,0.25)"}}>
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:"#60a5fa",marginBottom:12}}>✏️ Editar macrozona</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 80px",gap:8,marginBottom:8}}>
+                  <div>
+                    <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Nombre</label>
+                    <input value={editZonaForm.nombre} onChange={e=>setEditZonaForm(p=>({...p,nombre:e.target.value}))} style={S.input}/>
+                  </div>
+                  <div>
+                    <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Ícono</label>
+                    <input value={editZonaForm.icono} onChange={e=>setEditZonaForm(p=>({...p,icono:e.target.value}))} style={{...S.input,textAlign:"center",fontSize:20}}/>
+                  </div>
+                </div>
+                <div style={{marginBottom:8}}>
+                  <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Descripción</label>
+                  <input value={editZonaForm.descripcion} onChange={e=>setEditZonaForm(p=>({...p,descripcion:e.target.value}))} placeholder="Descripción breve de esta zona..." style={S.input}/>
+                </div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {["🌿","🌳","🌺","🌸","🏡","⛳","🏊","🏟️","🎾","🛤️","🌻","🌴","🏠","🌱","🍃","🏋️"].map(ico=>(
+                    <button key={ico} onClick={()=>setEditZonaForm(p=>({...p,icono:ico}))}
+                      style={{fontSize:16,padding:"2px 4px",borderRadius:4,cursor:"pointer",
+                        border:`1px solid ${editZonaForm.icono===ico?"rgba(52,211,153,0.5)":"rgba(255,255,255,0.1)"}`,
+                        background:editZonaForm.icono===ico?"rgba(52,211,153,0.1)":"transparent"}}>
+                      {ico}
+                    </button>
+                  ))}
+                </div>
+                <div style={{display:"flex",gap:8,marginTop:12}}>
+                  <button onClick={()=>{
+                    if(zona.esPersonalizada){
+                      setMacrozonasCust(prev=>prev.map(z=>z.id===zona.id?{...z,nombre:editZonaForm.nombre,icono:editZonaForm.icono,descripcion:editZonaForm.descripcion}:z));
+                    } else {
+                      updateZona(zonaId,{nombreCustom:editZonaForm.nombre,iconoCustom:editZonaForm.icono,descripcion:editZonaForm.descripcion});
+                    }
+                    setEditZonaForm(null);
+                  }} style={{...S.btn,background:"rgba(52,211,153,0.12)",color:"#34d399",border:"1px solid rgba(52,211,153,0.3)"}}>
+                    💾 Guardar
+                  </button>
+                  <button onClick={()=>setEditZonaForm(null)} style={{...S.btn}}>Cancelar</button>
+                  {zona.esPersonalizada&&(
+                    <button onClick={()=>{
+                      if(!window.confirm("¿Eliminar "+zona.nombre+"? Esta acción es permanente."))return;
+                      setMacrozonasCust(prev=>prev.filter(z=>z.id!==zona.id));
+                      setZonaId(null);setEditZonaForm(null);
+                    }} style={{...S.btn,background:"rgba(239,68,68,0.08)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.2)",marginLeft:"auto"}}>
+                      🗑 Eliminar macrozona
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
             {(aiLoading||aiText)&&(
               <div style={{background:"rgba(40,100,60,0.15)",border:"1px solid rgba(61,122,82,0.35)",borderRadius:12,padding:18,marginBottom:18}}>
                 <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:10,color:"#90d4a0"}}>🤖 Recomendaciones del Asistente</div>
