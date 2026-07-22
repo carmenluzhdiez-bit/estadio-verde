@@ -3666,7 +3666,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     const propuestas = [];
     const vencidas = [];
     const existentes = getTareasDelDia(fecha).map(t => t.zona+"_"+t.elemento+"_"+t.tarea);
-    MACROZONAS_BASE.forEach(z => {
+    zonas.forEach(z => {
       const zdat = getZD(z.id);
       const elems = getAllElems(z.id);
       elems.forEach(e => {
@@ -3925,7 +3925,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
       )}
 
       {tabProg==="frecuencias"&&(
-        <PanelFrecuenciasZona S={S} zonas={MACROZONAS_BASE} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} esJefa={esJefa}/>
+        <PanelFrecuenciasZona S={S} zonas={zonas} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} esJefa={esJefa}/>
       )}
 
       {/* ── HISTORIAL ── */}
@@ -16148,6 +16148,53 @@ const diasHabiles = (fechaStr, n=1) => {
   return d.toISOString().slice(0,10);
 };
 
+// ─── ESTADO AUTOMÁTICO DE MACROZONA ──────────────────────────────────────────
+const calcularEstadoZona = (zid, getAllElems, getElemFrecs, data) => {
+  // Si está en mantenimiento manual, respetar
+  const zdat = data[String(zid)];
+  if(zdat?.estadoGeneral === "mantenimiento") return "mantenimiento";
+
+  const estacion = (()=>{
+    const m = new Date().getMonth()+1;
+    if([12,1,2].includes(m)) return "verano";
+    if([3,4,5].includes(m)) return "otono";
+    if([6,7,8].includes(m)) return "invierno";
+    return "primavera";
+  })();
+
+  const hoy = new Date();
+  hoy.setHours(12,0,0,0);
+
+  const elems = getAllElems(zid);
+
+  // Verificar si hay elementos críticos
+  const hayCriticos = elems.some(e=>(e.edData?.estado||"bueno")==="critico");
+  if(hayCriticos) return "critico";
+
+  let maxDiasVencido = 0;
+
+  elems.forEach(e=>{
+    const frecs = getElemFrecs(String(zid), e.id, e.tipo, e.isCustom);
+    frecs.forEach(f=>{
+      const freq = f.modo==="diasSemana" ? f.diasMinimos : f[estacion];
+      if(!freq || freq==="noaplica") return;
+      const intervalo = freq==="diario"?1:freq==="cada2dias"?2:freq==="cada3dias"?3:
+        freq==="cada4dias"?4:freq==="cada5dias"?5:freq==="semanal"?7:
+        freq==="quincenal"?15:freq==="mensual"?30:freq==="bimestral"?60:
+        freq==="trimestral"?90:Number(f.diasMinimos)||30;
+      if(!f.ultimaVez) return;
+      const ultima = new Date(f.ultimaVez+"T12:00:00");
+      const diasDesde = Math.round((hoy - ultima)/(1000*60*60*24));
+      const diasVencido = diasDesde - intervalo;
+      if(diasVencido > maxDiasVencido) maxDiasVencido = diasVencido;
+    });
+  });
+
+  if(maxDiasVencido > 30) return "critico";
+  if(maxDiasVencido > 0)  return "regular";
+  return "bueno";
+};
+
 export default function App() {
   const [zonas, setZonas] = useState(()=>MACROZONAS_BASE);
   const [vista, setVista] = useState("dashboard");
@@ -16553,7 +16600,7 @@ export default function App() {
   })();
   const filteredZonas = todasLasZonas.filter(z=>{
     const matchC=filtroCat==="Todas"||z.categoria===filtroCat;
-    const matchE=filtroEst==="Todos"||getZD(z.id).estadoGeneral===filtroEst;
+    const matchE=filtroEst==="Todos"||getEstadoZona(z.id)===filtroEst;
     const filtQ=(busq||"").trim().toLowerCase();
     const matchB=!filtQ||
       z.nombre.toLowerCase().includes(filtQ)||
@@ -16562,12 +16609,15 @@ export default function App() {
     return matchC&&matchE&&matchB;
   }).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
 
+  // Estado calculado automáticamente según frecuencias
+  const getEstadoZona = (zid) => calcularEstadoZona(zid, getAllElems, getElemFrecs, data);
+
   const stats = {
     total: todasLasZonas.length,
-    bueno: todasLasZonas.filter(z=>getZD(z.id).estadoGeneral==="bueno").length,
-    regular: todasLasZonas.filter(z=>getZD(z.id).estadoGeneral==="regular").length,
-    critico: todasLasZonas.filter(z=>getZD(z.id).estadoGeneral==="critico").length,
-    mantenimiento: todasLasZonas.filter(z=>getZD(z.id).estadoGeneral==="mantenimiento").length,
+    bueno: todasLasZonas.filter(z=>getEstadoZona(z.id)==="bueno").length,
+    regular: todasLasZonas.filter(z=>getEstadoZona(z.id)==="regular").length,
+    critico: todasLasZonas.filter(z=>getEstadoZona(z.id)==="critico").length,
+    mantenimiento: todasLasZonas.filter(z=>getEstadoZona(z.id)==="mantenimiento").length,
   };
   const totalElems = todasLasZonas.reduce((a,z)=>a+getAllElems(z.id).length,0);
   const elemsOk = todasLasZonas.reduce((a,z)=>a+getAllElems(z.id).filter(e=>e.edData.estado==="bueno").length,0);
@@ -17388,7 +17438,7 @@ export default function App() {
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(230px,1fr))",gap:14}}>
               {filteredZonas.map(z=>{
-                const dzd=getZD(z.id); const est=ESTADOS_ZONA[dzd.estadoGeneral||"bueno"]||{color:"#22c55e",bg:"rgba(34,197,94,0.12)",label:"Bueno"};
+                const dzd=getZD(z.id); const estCalc=getEstadoZona(z.id); const est=ESTADOS_ZONA[estCalc]||{color:"#22c55e",bg:"rgba(34,197,94,0.12)",label:"Bueno"};
                 const allElems=getAllElems(z.id);
                 const criticos=allElems.filter(e=>e.edData.estado==="critico").length;
                 const pendTareas=(dzd.tareas||[]).filter(t=>!t.completada).length;
@@ -17433,7 +17483,8 @@ export default function App() {
           <div className="ein">
             <button style={{...S.btn,background:"transparent",color:"#a0c8a0",border:"1px solid rgba(160,200,140,0.22)",marginBottom:20}} onClick={()=>{setZonaId(null);setAiText("");}}>← Volver</button>
             {(()=>{
-              const estZona = ESTADOS_ZONA[zd.estadoGeneral||"bueno"]||{color:"#22c55e",bg:"rgba(34,197,94,0.1)",label:"Bueno"};
+              const estadoCalculado = calcularEstadoZona(zonaId, getAllElems, getElemFrecs, data);
+              const estZona = ESTADOS_ZONA[estadoCalculado]||ESTADOS_ZONA["bueno"];
               const elemsZona = getAllElems(zonaId);
               const criticosZona = elemsZona.filter(e=>e.estado==="critico").length;
               const regularesZona = elemsZona.filter(e=>e.estado==="regular").length;
@@ -17478,11 +17529,15 @@ export default function App() {
                       <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
                         <div style={{display:"flex",alignItems:"center",gap:6,background:estZona.bg,border:`1px solid ${estZona.color}40`,borderRadius:8,padding:"4px 6px 4px 10px"}}>
                           <span style={{fontSize:12,color:estZona.color,fontWeight:600}}>{estZona.label}</span>
-                          <select value={zd.estadoGeneral||"bueno"}
-                            onChange={e=>{updateZona(zonaId,{estadoGeneral:e.target.value});addHistorial(zonaId,`Estado zona → ${ESTADOS_ZONA[e.target.value].label}`);}}
-                            style={{background:"transparent",border:"none",color:estZona.color,fontSize:11,cursor:"pointer",padding:"2px 0"}}>
-                            {Object.entries(ESTADOS_ZONA).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
-                          </select>
+                          <span style={{fontSize:11,color:"#6aaa7a",cursor:"pointer"}} title="Solo 'En Mantenimiento' es manual — el resto se calcula automáticamente"
+                              onClick={()=>{
+                                const actual = zd.estadoGeneral;
+                                const nuevo = actual==="mantenimiento" ? null : "mantenimiento";
+                                updateZona(zonaId,{estadoGeneral:nuevo});
+                                addHistorial(zonaId, nuevo?"→ En Mantenimiento":"← Mantenimiento removido");
+                              }}>
+                              {zd.estadoGeneral==="mantenimiento" ? "🔧 Quitar mantenimiento" : "🔧 Poner en mantenimiento"}
+                            </span>
                         </div>
                         <button style={{...S.btn,background:"rgba(61,122,82,0.2)",color:"#a0d8b0",border:"1px solid rgba(61,122,82,0.35)",fontSize:12}}
                           onClick={getSugerenciaAI} disabled={aiLoading}>
