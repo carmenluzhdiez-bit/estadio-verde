@@ -9471,7 +9471,10 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
     const tasaReal = (ultimaTasaReal && (!corteRecZ || ultimaTasaReal.fecha > corteRecZ.fecha)) ? ultimaTasaReal.tasa : null;
     const diasUltimoIntervalo = tasaReal !== null ? ultimaTasaReal.dias : null;
     const deltaUltimo = tasaReal !== null ? ultimaTasaReal.delta : null;
-    const tasaUsar = tasaReal !== null ? tasaReal : (tasaGlobal || 0.4);
+    // Si la tasa real es muy alta (>1mm/día) y la base ya supera el umbral,
+    // es probable que haya cortes no registrados — usar tasa global o conservadora
+    const tasaSospechosa = tasaReal !== null && tasaReal > 1.0 && altBase > 5.5;
+    const tasaUsar = tasaSospechosa ? (tasaGlobal || 0.5) : (tasaReal !== null ? tasaReal : (tasaGlobal || 0.4));
     const categoria = anal ? anal.categoria : "Sin datos";
 
     const proj = diasProx.map(d=>{
@@ -9512,6 +9515,7 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
                     {baseOrigen==="corte"?"✂️":baseOrigen==="medicion"?"📏":"📏?"}
                   </span>
                   <span style={{fontSize:9,display:"block",color:"#4a7a5a"}}>{altBase}mm · {fechaBase}</span>
+                  {altBase > altCorte && <span style={{fontSize:9,color:"#ef4444",fontWeight:700,display:"block"}}>⚠️ YA SOBRE UMBRAL — CORTAR</span>}
                 </td>
                 <td style={{padding:"7px 8px",textAlign:"center",fontSize:12,fontWeight:700}}>
                   {tasaReal!==null
