@@ -10281,8 +10281,10 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
   const sectorColor = esSecaEstacion?"#f59e0b":"#60a5fa";
   const ultimaHum = [...humedades].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""))[0];
 
-  const calcDecision = (valores) => {
-    const vals = Object.values(valores).map(v=>Number(v.valor||0)).filter(v=>v>0);
+  const calcDecision = (valores, valorVivero) => {
+    const allVals = {...valores};
+    if(valorVivero) allVals["vivero"] = {valor:valorVivero};
+    const vals = Object.values(allVals).map(v=>Number(v.valor||0)).filter(v=>v>0);
     if(!vals.length) return null;
     const extremo = esSecaEstacion?Math.min(...vals):Math.max(...vals);
     if(extremo<=2) return "riego-urgente";
@@ -10293,7 +10295,12 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
 
   const guardarHumedad = () => {
     if(!humForm.responsable) return;
-    const nueva = {...humForm, id:Date.now()};
+    // Normalizar vivero al mismo formato que los demás greens
+    const valoresConVivero = {...humForm.valores};
+    if(humForm.valorVivero) {
+      valoresConVivero["vivero"] = {valor:humForm.valorVivero, obs:humForm.obsVivero||""};
+    }
+    const nueva = {...humForm, valores:valoresConVivero, id:Date.now()};
     setHumedades([nueva,...humedades].slice(0,200));
     if(humForm.generarTarea&&(humForm.decision==="cerrar-cancha"||humForm.decision==="abrir-cancha"||humForm.decision==="riego-urgente")){
       const txt = humForm.decision==="cerrar-cancha"
@@ -10566,7 +10573,7 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
                     {m.responsable&&<span style={{fontSize:11,color:"#5a9a7a"}}>👤 {m.responsable}</span>}
                   </div>
                   <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:4}}>
-                    {GREENS_DEF.map(g=>{
+                    {[...GREENS_DEF,{id:"vivero",nombre:"Vivero",hoyos:""}].map(g=>{
                       const humV2=m.valores?.[g.id]?.valor;
                       if(!humV2) return null;
                       const info=ESCALA_HUM_GOLF[Math.min(Math.max(Number(humV2),1),8)];
