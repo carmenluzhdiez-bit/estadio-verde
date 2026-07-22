@@ -9420,13 +9420,18 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
     const ultMed = [...medOrdenadas].reverse().find(m=>m.alturas?.[z.id]);
     const zonaNum = z.id.replace(/[^0-9]/g,"");
     const corteRecZ = todosLosCortes.find(c=>{
-      const elem = c.elemento.toLowerCase();
-      const tar = c.tarea.toLowerCase();
-      if(z.id.includes("vivero")) return elem.includes("vivero")||tar.includes("vivero");
-      return (zonaNum && elem.includes(`green ${zonaNum.padStart(2,"0")}`)) ||
-             (zonaNum && elem.includes(`green ${Number(zonaNum)}`)) ||
-             (zonaNum && tar.includes(`green ${zonaNum.padStart(2,"0")}`)) ||
-             tar.includes("todos") || elem.includes("todos");
+      const elem = (c.elemento||"").toLowerCase();
+      const tar = (c.tarea||"").toLowerCase();
+      if(z.id.includes("vivero")) return elem.includes("vivero")||tar.includes("vivero")||elem.includes("todos")||tar.includes("todos");
+      // Corte general (todos los greens) — incluye tareas con elemento vacío o "todos"
+      if(elem.includes("todos")||tar.includes("todos")||elem===""||elem.includes("greens")) return true;
+      // Match por número de green en ELEMENTO
+      return zonaNum && (
+        elem.includes(`green ${zonaNum.padStart(2,"0")}`) ||
+        elem.includes(`green ${Number(zonaNum)}`) ||
+        elem.includes(`green0${zonaNum}`) ||
+        elem === `green ${zonaNum}`
+      );
     });
 
     let altBase, fechaBase, baseOrigen;
@@ -9597,19 +9602,23 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
     const todosCortes = Object.entries(tareasProg||{}).flatMap(([fecha, ts])=>
       (ts||[]).filter(t=>{
         if(t.estado!=="hecha" && t.estado!=="completada") return false;
-        if(!(t.tarea||"").toLowerCase().includes("corte")) return false;
+        // Identificar corte de greens: tarea de corte en zona Golf
+        const esCorte = (t.tarea||"").toLowerCase().includes("corte");
+        if(!esCorte) return false;
         if(!(t.zona==="Golf" || (t.zona||"").includes("Golf"))) return false;
-        if(esVivero) return (t.elemento||"").toLowerCase().includes("vivero") || (t.tarea||"").toLowerCase().includes("vivero") || (t.elemento||"").toLowerCase().includes("green 10") || (t.tarea||"").toLowerCase().includes("todos");
         const elem = (t.elemento||"").toLowerCase();
         const tar = (t.tarea||"").toLowerCase();
-        // Coincidir por número de green: "green 01", "green 1", "green0X" etc
+        // Vivero
+        if(esVivero) return elem.includes("vivero") || tar.includes("vivero") || elem.includes("todos") || tar.includes("todos");
+        // Corte general (todos los greens)
+        if(elem.includes("todos") || tar.includes("todos") || elem==="" || elem.includes("greens")) return true;
+        // Coincidir por número de green en el ELEMENTO (fuente de verdad)
         const numMatch = zonaNum && (
           elem.includes(`green ${zonaNum.padStart(2,"0")}`) ||
           elem.includes(`green ${Number(zonaNum)}`) ||
           elem.includes(`green0${zonaNum}`) ||
-          tar.includes(`green ${zonaNum.padStart(2,"0")}`) ||
-          tar.includes(`todos`) ||
-          elem.includes("todos")
+          elem.includes(`g${zonaNum} `) ||
+          elem === `green ${zonaNum}`
         );
         return numMatch;
       }).map(t=>({fecha, alturaCorte:t.alturaCorteReal?Number(t.alturaCorteReal):(t.alturaCorte?Number(t.alturaCorte):null)}))
@@ -12615,9 +12624,9 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                         const esTareaCorte=t=>t.zona==="Golf"&&(t.tarea?.toLowerCase().includes("corte")||t.tipo?.toLowerCase().includes("corte"))&&(t.elemento?.includes(pgG.nombre)||t.tarea?.includes(pgG.nombre)||t.elemento?.toLowerCase().includes("todos")||t.tarea?.toLowerCase().includes("todos"));
                         const cortesG=Object.values(tareasProg).flat().filter(t=>esTareaCorte(t)&&["hecha","completada"].includes(t.estado)).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
                         infoCorte=cortesG[0]||null;
-                        alturaMaxCorte=infoCorte?.alturaObjetivo||(rango.corte*1.1)||(rango.min*1.5);
+                         alturaMaxCorte=infoCorte?.alturaObjetivo||rango.max;
                         const histG=[...mediciones].filter(m=>m.alturas?.[g.id]&&m.fecha).sort((a,b)=>b.fecha.localeCompare(a.fecha));
-                        if(diasCrecimiento&&Number(diasCrecimiento)>0&&Number(alt)>0){tasaCalculada=Number(alt)/Number(diasCrecimiento);tasaFuente="manual";}
+                         if(diasCrecimiento&&Number(diasCrecimiento)>0&&Number(alt)>0&&Number(alt)>rango.min){tasaCalculada=(Number(alt)-rango.min)/Number(diasCrecimiento);tasaFuente="manual";}
                         else if(infoCorte?.alturaCorte&&histG[0]){const dDiasG=Math.round((new Date(histG[0].fecha+"T12:00:00")-new Date(infoCorte.fecha+"T12:00:00"))/86400000);const a1=Number(histG[0].alturas?.[g.id]);const altC=Number(infoCorte.alturaCorte);if(dDiasG>0&&a1>altC){tasaCalculada=(a1-altC)/dDiasG;tasaFuente="auto";}}
                         else if(histG.length>=2){const a1=Number(histG[0].alturas?.[g.id]);const a2=Number(histG[1].alturas?.[g.id]);const dDiasH=Math.round((new Date(histG[0].fecha+"T12:00:00")-new Date(histG[1].fecha+"T12:00:00"))/86400000);if(dDiasH>0&&a1>a2){tasaCalculada=(a1-a2)/dDiasH;tasaFuente="histórico";}}
                         if(Number(alt)>=Number(alturaMaxCorte)){proyeccion="⚠️ Cortar ya";}
@@ -17175,7 +17184,7 @@ export default function App() {
                       // Se dispara cuando: (a) se marca hecha y ya tenía altura, o
                       //                   (b) se guarda altura y ya estaba hecha
                       const esCorteGolf = (tActualizada.zona==="Golf"||(tActualizada.zona||"").includes("Golf")) &&
-                                          (tActualizada.tarea||"").toLowerCase().includes("corte");
+                                          ((tActualizada.tarea||"").toLowerCase().includes("corte")||(tActualizada.tarea||"").toLowerCase().includes("green"));
                       const estadoHecho = normalizarEstado(tActualizada.estado)==="hecha";
                       const altReal = tActualizada.alturaCorteReal ? Number(tActualizada.alturaCorteReal) : null;
                       // Solo crear medición si este patch es el que completa el par hecha+altura
@@ -17191,8 +17200,9 @@ export default function App() {
                         const zonaGolf = (tActualizada.elemento||tActualizada.subZona||"").toLowerCase();
                         const tareaGolfNombre = (tActualizada.tarea||"").toLowerCase();
                         const alturas = {};
+                        // Corte general: elemento vacío, "todos", o la tarea es corte de césped sin green específico
                         const esCorteGeneral = zonaGolf.includes("todos")||tareaGolfNombre.includes("todos")||
-                                               tareaGolfNombre.includes("greens + vivero")||zonaGolf==="";
+                                               tareaGolfNombre.includes("greens + vivero")||zonaGolf===""||                                               (tareaGolfNombre.includes("césped")||tareaGolfNombre.includes("cesped"))&&!zonaGolf.includes("green");
                         if(esCorteGeneral) {
                           // Corte de todos los greens y vivero
                           ["g1","g2","g3","g4","g5","g6","g7","g8","g9","vivero"].forEach(z=>{ alturas[z]=altReal; });
