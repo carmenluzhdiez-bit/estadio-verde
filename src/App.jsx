@@ -9448,6 +9448,8 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
       baseOrigen = "corte";
     } else if(ultMed && (!corteRecZ || ultMed.fecha > corteRecZ.fecha)) {
       // Medición posterior al corte → partir desde medición
+      const diasDesdeUltMed2 = Math.round((new Date(hoyProjStr+"T12:00:00")-new Date(ultMed.fecha+"T12:00:00"))/(1000*60*60*24));
+      if(diasDesdeUltMed2 > 30) return null; // medición demasiado antigua
       altBase = Number(ultMed.alturas[z.id]);
       fechaBase = ultMed.fecha;
       baseOrigen = "medicion";
@@ -9459,7 +9461,7 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
     } else if(ultMed) {
       // Solo hay medición histórica
       const diasDesdeUltMed = Math.round((new Date(hoyProjStr+"T12:00:00")-new Date(ultMed.fecha+"T12:00:00"))/(1000*60*60*24));
-      if(diasDesdeUltMed > 7) return null;
+      if(diasDesdeUltMed > 30) return null; // demasiado antigua — datos no confiables
       altBase = Number(ultMed.alturas[z.id]);
       fechaBase = ultMed.fecha;
       baseOrigen = "medicion_antigua";
@@ -9678,19 +9680,23 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
           delta = svgP.alt - pPrev.alt;
           diasRef = diasTotal;
           metodo = "directo";
-          if(delta <= 0) {
-            // Delta negativo con intervalo largo (>5d): probablemente hubo corte no registrado
-            // Usar valor absoluto como estimación mínima de crecimiento real
-            if(diasTotal > 5) {
-              // No sabemos la altura del corte, pero sí que el green creció algo
-              // Estimación conservadora: descartamos este intervalo pero lo anotamos
-              continue;
-            } else {
-              continue; // intervalo corto con baja: ignorar
-            }
+
+          // Si el intervalo es largo (>14 días), casi seguro hubo cortes no registrados
+          // Un green no puede crecer 5+ mm sin ser cortado — descartar el intervalo
+          if(diasTotal > 14) {
+            continue; // intervalo muy largo = dato no confiable
           }
-          // Con mediciones semanales, el delta puede subestimar el crecimiento real
-          // si el green fue cortado entre mediciones — pero sin datos de corte no podemos corregir
+
+          if(delta <= 0) {
+            // Delta negativo: probablemente hubo corte no registrado → ignorar
+            continue;
+          }
+
+          // Si el delta implica una tasa > 1mm/día sin corte conocido → sospechoso
+          const tasaImplicita = delta / diasRef;
+          if(tasaImplicita > 1.0) {
+            continue; // tasa imposible para greens → descartar
+          }
         }
       }
 
