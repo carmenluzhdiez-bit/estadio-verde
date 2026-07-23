@@ -2659,28 +2659,8 @@ const GOLF_FRECS_INIT = {
 
 // ─── PROGRAMACIÓN DIARIA ─────────────────────────────────────────────────────
 // ─── VISTA TRABAJADOR ────────────────────────────────────────────────────────
-function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE, onAccesoRapido, onCambiarMetodo, cierresTurno={}, onCerrarTurno, onReabrirTurno, crearNotificacion, esJefaApp=false, onGuardarRutinas, onGuardarAlertaFito, golfData={}, setGolfData, setHumedadesData }) {
+function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE, onAccesoRapido, onCambiarMetodo, cierresTurno={}, onCerrarTurno, onReabrirTurno, crearNotificacion, esJefaApp=false, onGuardarRutinas, onGuardarAlertaFito }) {
   const hoy = fechaLocal();
-  const setG = (patch) => {
-    if(!setGolfData) return;
-    if(patch.humedades !== undefined) {
-      setHumedadesData&&setHumedadesData(patch.humedades);
-    } else {
-      setGolfData(p=>({...p,...patch}));
-    }
-  };
-  // Estados humedad para SeccionHumedad
-  const getEmptyHumFormVW = () => ({
-    fecha:fechaLocal(),
-    hora:new Date().toTimeString().slice(0,5),
-    motivo:"rutina",
-    responsable:trabajador?.nombre||"",
-    valores:{},valorVivero:"",
-    decision:"sin-cambio",obs:"",generarTarea:false
-  });
-  const emptyHumFormVW = getEmptyHumFormVW();
-  const [showHumFormVW, setShowHumFormVW] = React.useState(true);
-  const [humFormVW, setHumFormVW] = React.useState(getEmptyHumFormVW);
   const [fechaVer, setFechaVer] = React.useState(fecha || hoy);
   // Cierre de turno
   const turnoCerradoKey = `${fechaVer}_${(trabajador?.nombre||"").split(" ")[0].toLowerCase()}`;
@@ -2689,10 +2669,11 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   const [showNuevaTareaEmerg, setShowNuevaTareaEmerg] = React.useState(false);
   const [nuevaTareaEmerg, setNuevaTareaEmerg] = React.useState({ zona:"", tarea:"", notas:"" });
   // Estado de grupos colapsables — objeto {key: bool}
-  const [gruposAbiertos, setGruposAbiertos] = React.useState({diarias:true});
+  const [gruposAbiertos, setGruposAbiertos] = React.useState({diarias:true,corte:true,medicion:true,riego:true,fitosan:true,limpieza:true,otros:true});
   const [alturaInputs, setAlturaInputs] = React.useState({});
   const [rutinasGolfState, setRutinasGolfState] = React.useState({});
-  const toggleGrupo = (key) => setGruposAbiertos(p=>({diarias:p.diarias,[key]:p[key]!==true}));
+  const toggleGrupo = (key) => setGruposAbiertos(p=>({...p,[key]:!p[key]}));
+  const [showRegistroDiarioWorker, setShowRegistroDiarioWorker] = React.useState(true);
   const [showEmergente, setShowEmergente] = React.useState(false);
   const [emergenteForm, setEmergenteForm] = React.useState({zona:"",tarea:"",obs:""}); // abierto por defecto
   const [registroDiarioForm, setRegistroDiarioForm] = React.useState({tareas:{}, obsFito:"", obs:""});
@@ -2710,17 +2691,6 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   };
 
   const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
-// Primer nombre de la ficha de personal (ej: "Bhalú" de "Osmar Bhalú Armijo Zúñiga")
-// El orden en la ficha manda — el primer campo "nombre" es el nombre base
-const getNombreRef = (nombreCompleto) => {
-  if(!nombreCompleto) return "";
-  const partes = nombreCompleto.trim().split(" ").filter(p=>p.length>1);
-  // Si el nombre tiene más de 2 palabras, usar la segunda (apellidos al final)
-  // Para Bhalú: "Osmar Bhalú Armijo Zúñiga" → segundo nombre es el apodo
-  // Para Carmen Luz: "Carmen Luz Hermosilla Diez" → primer nombre
-  // Regla: usar el primer nombre tal como está en el campo "nombre"
-  return partes[0]||nombreCompleto;
-};
   const ORDEN_ESTADO = {pendiente:0, haciendose:1, no_pudo:2, hecha:3, por_designar:4};
   function esDiariaVW(tareaObj) {
     if(tareaObj.diaria === true) return true;
@@ -3152,7 +3122,7 @@ const getNombreRef = (nombreCompleto) => {
         {/* ══════════════════════════════════════════════════════════
              SECCIÓN 2 — REGISTROS GOLF (Alturas y Humedad)
              ══════════════════════════════════════════════════════════ */}
-        {fechaVer===hoy&&(normalizar(trabajador?.nombre||"").includes("bhalu")||normalizar(trabajador?.nombre||"").includes("armijo"))&&(
+        {fechaVer===hoy&&(
           <div style={{marginBottom:14,border:"1px solid rgba(96,165,250,0.2)",borderRadius:12,overflow:"hidden"}}>
             <div style={{padding:"12px 14px",background:"rgba(96,165,250,0.05)",borderBottom:"1px solid rgba(96,165,250,0.15)"}}>
               <div style={{fontSize:14,fontWeight:700,color:"#60a5fa",marginBottom:2}}>⛳ Registros Golf</div>
@@ -3199,7 +3169,7 @@ const getNombreRef = (nombreCompleto) => {
               <div style={{fontSize:12,fontWeight:600,color:"#34d399",marginBottom:8,paddingLeft:2}}>🌿 Otras tareas del día</div>
               {grupos.map(g=>{
                 const hechas=g.tareas.filter(t=>t.estado==="hecha").length;
-                const open=gruposAbiertos[g.key]===true;
+                const open=gruposAbiertos[g.key]!==false;
                 const col=hechas===g.tareas.length?"#22c55e":"#34d399";
                 return (
                   <div key={g.key} style={{marginBottom:8,border:`1px solid rgba(255,255,255,${hechas===g.tareas.length?0.1:0.07})`,borderRadius:10,overflow:"hidden"}}>
@@ -3393,317 +3363,6 @@ Una vez cerrado no podrás modificar las tareas. Solo la jefa puede reabrir el t
   );
 }
 
-// ─── CATÁLOGO DE TAREAS ESTÁNDAR ─────────────────────────────────────────────
-const CATALOGO_TAREAS = [
-  { id:"ct_01", cat:"Labores", tarea:"Corte de césped" },
-  { id:"ct_02", cat:"Labores", tarea:"Corte de bordes" },
-  { id:"ct_03", cat:"Labores", tarea:"Orillado" },
-  { id:"ct_04", cat:"Labores", tarea:"Desmalezado" },
-  { id:"ct_05", cat:"Labores", tarea:"Aireado/Escarificado" },
-  { id:"ct_06", cat:"Labores", tarea:"Verticorte" },
-  { id:"ct_06b", cat:"Labores", tarea:"Verticorte con groomer fuerte" },
-  { id:"ct_07", cat:"Labores", tarea:"Cambio de banderas" },
-  { id:"ct_08", cat:"Labores", tarea:"Enmendar" },
-  { id:"ct_09", cat:"Labores", tarea:"Fertilización" },
-  { id:"ct_10", cat:"Labores", tarea:"Control fitosanitario" },
-  { id:"ct_10b", cat:"Labores", tarea:"Fumigación" },
-  { id:"ct_11", cat:"Labores", tarea:"Plantación" },
-  { id:"ct_11b", cat:"Labores", tarea:"Plantar desde Vivero" },
-  { id:"ct_12", cat:"Poda", tarea:"Poda de formación" },
-  { id:"ct_13", cat:"Poda", tarea:"Poda de mantenimiento" },
-  { id:"ct_13b", cat:"Poda", tarea:"Poda de limpieza" },
-  { id:"ct_14", cat:"Poda", tarea:"Poda sanitaria" },
-  { id:"ct_15", cat:"Poda", tarea:"Poda en altura" },
-  { id:"ct_16", cat:"Labores", tarea:"Tala" },
-  { id:"ct_17", cat:"Labores", tarea:"Resiembra" },
-  { id:"ct_18", cat:"Labores", tarea:"Siembra" },
-  { id:"ct_19", cat:"Labores", tarea:"Trasplante" },
-  { id:"ct_20", cat:"Labores", tarea:"Riego manual" },
-  { id:"ct_21", cat:"Labores", tarea:"Riego por aspersión" },
-  { id:"ct_22", cat:"Labores", tarea:"Fertirriego" },
-  { id:"ct_23", cat:"Labores", tarea:"Protección de plantas" },
-  { id:"ct_30", cat:"Limpieza", tarea:"Limpieza general" },
-  { id:"ct_31", cat:"Limpieza", tarea:"Soplado/Barrido" },
-  { id:"ct_32", cat:"Limpieza", tarea:"Limpiar césped" },
-  { id:"ct_32b", cat:"Limpieza", tarea:"Limpieza césped sintético" },
-  { id:"ct_33", cat:"Limpieza", tarea:"Limpiar maicillo" },
-  { id:"ct_34", cat:"Limpieza", tarea:"Limpiar filtro de riego" },
-  { id:"ct_35", cat:"Limpieza", tarea:"Limpiar fuentes" },
-  { id:"ct_36", cat:"Limpieza", tarea:"Limpiar maquinaria" },
-  { id:"ct_37", cat:"Limpieza", tarea:"Limpiar plantas" },
-  { id:"ct_38", cat:"Limpieza", tarea:"Limpiar vivero" },
-  { id:"ct_39", cat:"Limpieza", tarea:"Limpiar basurero" },
-  { id:"ct_40", cat:"Limpieza", tarea:"Limpiar bodega" },
-  { id:"ct_50", cat:"Revisión", tarea:"Revisión fitosanitaria" },
-  { id:"ct_51", cat:"Revisión", tarea:"Revisión de plagas y enfermedades" },
-  { id:"ct_52", cat:"Revisión", tarea:"Revisión de plantas" },
-  { id:"ct_53", cat:"Revisión", tarea:"Revisión de humedad" },
-  { id:"ct_54", cat:"Revisión", tarea:"Revisión de sistema de riego" },
-  { id:"ct_55", cat:"Revisión", tarea:"Revisión de controles de riego" },
-  { id:"ct_56", cat:"Revisión", tarea:"Revisión de maquinaria y herramienta" },
-  { id:"ct_57", cat:"Revisión", tarea:"Revisión de mulch" },
-  { id:"ct_58", cat:"Revisión", tarea:"Revisión de macetero" },
-  { id:"ct_59", cat:"Revisión", tarea:"Revisión de peligros" },
-  { id:"ct_70", cat:"Reposición", tarea:"Reponer arena" },
-  { id:"ct_71", cat:"Reposición", tarea:"Reponer compost" },
-  { id:"ct_72", cat:"Reposición", tarea:"Reponer macetas" },
-  { id:"ct_73", cat:"Reposición", tarea:"Reponer maicillo" },
-  { id:"ct_74", cat:"Reposición", tarea:"Reponer mulch" },
-  { id:"ct_80", cat:"Reparación", tarea:"Reparar herramienta" },
-  { id:"ct_81", cat:"Reparación", tarea:"Reparar maquinaria" },
-  { id:"ct_82", cat:"Reparación", tarea:"Reparar sistema de riego" },
-  { id:"ct_83", cat:"Reparación", tarea:"Obras de drenaje" },
-  { id:"ct_90", cat:"Administración", tarea:"Preparación de terreno" },
-  { id:"ct_91", cat:"Administración", tarea:"Inventario" },
-  { id:"ct_92", cat:"Administración", tarea:"Ordenar bodega" },
-  { id:"ct_93", cat:"Administración", tarea:"Sacar nidos" },
-  { id:"ct_100", cat:"Golf", tarea:"Corte de greens" },
-  { id:"ct_101", cat:"Golf", tarea:"Corte de tees" },
-  { id:"ct_102", cat:"Golf", tarea:"Corte de fairways" },
-  { id:"ct_103", cat:"Golf", tarea:"Rastrillado de búnkers" },
-  { id:"ct_104", cat:"Golf", tarea:"Syringing greens" },
-  { id:"ct_105", cat:"Golf", tarea:"Topdressing" },
-  { id:"ct_106", cat:"Golf", tarea:"Medición de altura greens" },
-  { id:"ct_107", cat:"Golf", tarea:"Revisión de humedad greens" },
-  { id:"ct_108", cat:"Golf", tarea:"Verticorte con groomer fuerte" },
-  { id:"ct_110", cat:"Pre-torneo", tarea:"Revisar pronóstico del tiempo y ajustar planes" },
-  { id:"ct_111", cat:"Pre-torneo", tarea:"Cambio de banderas (pre-torneo)" },
-  { id:"ct_112", cat:"Pre-torneo", tarea:"Cambio de banderas (post-torneo)" },
-  { id:"ct_113", cat:"Pre-torneo", tarea:"Corte final greens (HOC 4.5mm)" },
-  { id:"ct_114", cat:"Pre-torneo", tarea:"Reparación pitch marks" },
-  { id:"ct_120", cat:"Fitosanitario", tarea:"Control fitosanitario" },
-  { id:"ct_121", cat:"Fitosanitario", tarea:"Delimitar zona afectada" },
-  { id:"ct_122", cat:"Fitosanitario", tarea:"Aplicar tratamiento fitosanitario" },
-  { id:"ct_123", cat:"Fitosanitario", tarea:"Registrar agente causal" },
-  { id:"ct_124", cat:"Fitosanitario", tarea:"Monitoreo diario" },
-  { id:"ct_125", cat:"Fitosanitario", tarea:"Cierre de zona Golf" },
-];
-
-// ─── PLANIFICADOR SEMANAL ─────────────────────────────────────────────────────
-function PlanificadorSemanal({ S, MACROZONAS_BASE, getAllElems, getZD, getElemFrecs, tareas, setTareas, personal, configSemanal, esJefa }) {
-  const hoy = fechaLocal();
-  const lunesHoy = (()=>{ const d=new Date(hoy+"T12:00:00"); d.setDate(d.getDate()-((d.getDay()+6)%7)); return d.toISOString().slice(0,10); })();
-  const [semanaBase, setSemanaBase] = React.useState(lunesHoy);
-  const [asignaciones, setAsignaciones] = React.useState({});
-  const [guardado, setGuardado] = React.useState(false);
-  const [grupoAbierto, setGrupoAbierto] = React.useState(null);
-  const diasSemana = Array.from({length:6},(_,i)=>{ const d=new Date(semanaBase+"T12:00:00"); d.setDate(d.getDate()+i); return d.toISOString().slice(0,10); });
-  const fmtDia = (f) => new Date(f+"T12:00:00").toLocaleDateString("es-CL",{weekday:"short",day:"numeric",month:"short"});
-  const tareasSemanales = React.useMemo(()=>{
-    const estacion=(()=>{ const m=new Date().getMonth()+1; if([12,1,2].includes(m))return"verano"; if([3,4,5].includes(m))return"otono"; if([6,7,8].includes(m))return"invierno"; return"primavera"; })();
-    const lista=[];
-    MACROZONAS_BASE.forEach(z=>{ getAllElems(z.id).forEach(e=>{ getElemFrecs(String(z.id),e.id,e.tipo,e.isCustom).forEach(f=>{
-      if(!f.tarea) return;
-      const freq=f.modo==="diasSemana"?f.diasMinimos:f[estacion];
-      if(!freq||freq==="noaplica") return;
-      const diasDesde=Math.round((new Date(semanaBase+"T12:00:00")-new Date((f.ultimaVez||"2025-01-01")+"T12:00:00"))/(1000*60*60*24));
-      const intervalo=freq==="diario"?1:freq==="cada2dias"?2:freq==="cada3dias"?3:freq==="cada4dias"?4:freq==="cada5dias"?5:freq==="semanal"?7:freq==="quincenal"?15:freq==="mensual"?30:freq==="bimestral"?60:freq==="trimestral"?90:Number(f.diasMinimos)||7;
-      if(diasDesde<intervalo*0.7) return;
-      const esGolf=z.id===31||(z.nombre||"").toLowerCase().includes("golf");
-      lista.push({key:`${z.id}_${e.id}_${f.id}`,zona:z.nombre,zonaIcono:z.icono,elemento:e.nombre,tarea:f.tarea,intervalo,diasDesde,urgente:diasDesde>=intervalo*1.5,responsable:esGolf?"Osmar Bhalú Armijo Zúñiga":getResponsablePorTipo(f.tarea,configSemanal,z.nombre)||"",origenZid:String(z.id),origenEid:e.id,origenFrecId:f.id,origenEsCustom:!!e.isCustom});
-    }); }); });
-    lista.sort((a,b)=>a.tarea.localeCompare(b.tarea,"es",{sensitivity:"base"}));
-    return lista;
-  },[semanaBase,MACROZONAS_BASE]);
-  const grupos = React.useMemo(()=>{ const g={}; tareasSemanales.forEach(t=>{ const k=t.tarea.toLowerCase().trim(); if(!g[k])g[k]={tarea:t.tarea,items:[]}; g[k].items.push(t); }); return Object.values(g).sort((a,b)=>a.tarea.localeCompare(b.tarea,"es",{sensitivity:"base"})); },[tareasSemanales]);
-  const setAsig=(key,fecha)=>setAsignaciones(p=>({...p,[key]:fecha===p[key]?null:fecha}));
-  const confirmarSemana=()=>{
-    const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-    const nt={};
-    diasSemana.forEach(d=>{nt[d]=[...normArr(tareas[d]||[])];});
-    tareasSemanales.forEach(t=>{ const f=asignaciones[t.key]; if(!f)return; if(normArr(tareas[f]||[]).some(x=>x.zona===t.zona&&x.elemento===t.elemento&&x.tarea===t.tarea))return; if(!nt[f])nt[f]=[]; nt[f].push({id:Date.now()+Math.random(),fecha:f,zona:t.zona,elemento:t.elemento,tarea:t.tarea,responsable:t.responsable,estado:t.responsable?"pendiente":"por_designar",notas:"",auto:true,origenZid:t.origenZid,origenEid:t.origenEid,origenFrecId:t.origenFrecId,origenEsCustom:t.origenEsCustom}); });
-    setTareas(prev=>({...prev,...nt}));
-    setGuardado(true); setTimeout(()=>setGuardado(false),2000);
-  };
-  const sinAsignar=tareasSemanales.filter(t=>!asignaciones[t.key]).length;
-  const asignadas=tareasSemanales.filter(t=>asignaciones[t.key]).length;
-  const personalArr=Array.isArray(personal)?personal:Object.values(personal||{});
-  return (
-    <div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
-        <div><div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700}}>🗓 Planificación semanal</div><div style={{fontSize:11,color:"#5a9a7a"}}>Distribuye las tareas de la semana por tipo</div></div>
-        <div style={{display:"flex",gap:8,alignItems:"center"}}>
-          <button onClick={()=>{const d=new Date(semanaBase+"T12:00:00");d.setDate(d.getDate()-7);setSemanaBase(d.toISOString().slice(0,10));setAsignaciones({});setGrupoAbierto(null);}} style={{...S.btn,fontSize:12,padding:"4px 10px"}}>◀</button>
-          <span style={{fontSize:12,color:"#c0dac0",fontWeight:600}}>{fmtDia(diasSemana[0])} – {fmtDia(diasSemana[5])}</span>
-          <button onClick={()=>{const d=new Date(semanaBase+"T12:00:00");d.setDate(d.getDate()+7);setSemanaBase(d.toISOString().slice(0,10));setAsignaciones({});setGrupoAbierto(null);}} style={{...S.btn,fontSize:12,padding:"4px 10px"}}>▶</button>
-        </div>
-      </div>
-      <div style={{...S.card,padding:"10px 14px",marginBottom:14,display:"flex",gap:16,flexWrap:"wrap"}}>
-        <span style={{fontSize:12,color:"#c0dac0"}}><b style={{color:"#34d399"}}>{tareasSemanales.length}</b> tareas</span>
-        <span style={{fontSize:12,color:"#c0dac0"}}><b style={{color:"#60a5fa"}}>{asignadas}</b> asignadas</span>
-        <span style={{fontSize:12,color:"#c0dac0"}}><b style={{color:"#f59e0b"}}>{sinAsignar}</b> sin día</span>
-        <span style={{fontSize:12,color:"#c0dac0"}}><b style={{color:"#f87171"}}>{tareasSemanales.filter(t=>t.urgente).length}</b> urgentes</span>
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr repeat(6,52px)",gap:4,padding:"0 14px 8px",fontSize:10,color:"#5a9a7a"}}>
-        <div></div>
-        {diasSemana.map(d=><div key={d} style={{textAlign:"center",fontWeight:d===hoy?700:400,color:d===hoy?"#34d399":"#5a9a7a"}}>{fmtDia(d).split(" ").slice(0,2).join(" ")}</div>)}
-      </div>
-      <div style={{marginBottom:16}}>
-        {grupos.map(g=>{
-          const abierto=grupoAbierto===g.tarea;
-          const asignadasG=g.items.filter(t=>asignaciones[t.key]).length;
-          return (
-            <div key={g.tarea} style={{marginBottom:4,borderRadius:8,overflow:"hidden",border:`1px solid ${abierto?"rgba(52,211,153,0.2)":"rgba(255,255,255,0.06)"}`}}>
-              <div onClick={()=>setGrupoAbierto(abierto?null:g.tarea)} style={{padding:"10px 14px",cursor:"pointer",userSelect:"none",background:abierto?"rgba(52,211,153,0.06)":"rgba(255,255,255,0.02)",borderLeft:`3px solid ${abierto?"rgba(52,211,153,0.5)":"transparent"}`,display:"flex",alignItems:"center",gap:8}}>
-                <span style={{fontSize:11,color:abierto?"#34d399":"#6aaa7a",transform:abierto?"rotate(90deg)":"rotate(0deg)",transition:"transform 0.15s",display:"inline-block"}}>▶</span>
-                <span style={{fontSize:13,fontWeight:700,color:abierto?"#c0dac0":"#7aaa80",flex:1}}>{g.tarea}</span>
-                <span style={{fontSize:10,color:"#5a9a7a"}}>{g.items.length} zona(s){g.items.some(t=>t.urgente)&&<span style={{color:"#f87171",marginLeft:6}}>⚠️</span>}{asignadasG>0&&<span style={{color:"#34d399",marginLeft:6}}>✓ {asignadasG}/{g.items.length}</span>}</span>
-              </div>
-              {abierto&&(
-                <div style={{padding:"6px 0"}}>
-                  <div style={{padding:"4px 14px 8px",display:"flex",gap:4,alignItems:"center",borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
-                    <span style={{fontSize:10,color:"#5a9a7a",flex:1}}>Asignar todos →</span>
-                    {diasSemana.map(d=><button key={d} onClick={()=>g.items.forEach(t=>setAsig(t.key,d))} style={{fontSize:10,padding:"2px 8px",borderRadius:4,cursor:"pointer",border:"1px solid rgba(52,211,153,0.3)",background:"rgba(52,211,153,0.08)",color:"#34d399",width:52}}>{fmtDia(d).split(" ")[0]}</button>)}
-                  </div>
-                  {g.items.map(t=>(
-                    <div key={t.key} style={{padding:"6px 14px",borderBottom:"1px solid rgba(255,255,255,0.04)",display:"grid",gridTemplateColumns:"1fr 72px repeat(6,52px)",gap:4,alignItems:"center",background:t.urgente?"rgba(248,113,113,0.04)":"transparent"}}>
-                      <div style={{fontSize:11}}><span style={{color:"#5a9a7a"}}>{t.zonaIcono} {t.zona}</span>{t.elemento&&<span style={{color:"#4a7a5a",marginLeft:4,fontSize:10}}>· {t.elemento}</span>}{t.urgente&&<span style={{color:"#f87171",marginLeft:4,fontSize:9}}>⚠️ {t.diasDesde}d</span>}</div>
-                      <select value={t.responsable} onChange={e=>{t.responsable=e.target.value;}} style={{fontSize:10,padding:"1px 3px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:4,color:"#c0dac0",width:"100%"}}>
-                        <option value="">—</option>
-                        {personalArr.map(p=><option key={p.id} value={p.nombre}>{getNombreRef(p.nombre)}</option>)}
-                      </select>
-                      {diasSemana.map(d=><button key={d} onClick={()=>setAsig(t.key,d)} style={{width:"100%",height:28,borderRadius:5,cursor:"pointer",fontSize:10,border:`1px solid ${asignaciones[t.key]===d?"rgba(52,211,153,0.6)":"rgba(255,255,255,0.08)"}`,background:asignaciones[t.key]===d?"rgba(52,211,153,0.2)":"transparent",color:asignaciones[t.key]===d?"#34d399":"#4a7a5a"}}>{asignaciones[t.key]===d?"✓":fmtDia(d).split(" ")[0].slice(0,2)}</button>)}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
-        {grupos.length===0&&<div style={{textAlign:"center",color:"#4a7a5a",padding:32,fontSize:12}}>No hay tareas pendientes según las frecuencias para esta semana.</div>}
-      </div>
-      {asignadas>0&&<div style={{position:"sticky",bottom:16}}><button onClick={confirmarSemana} style={{...S.btn,width:"100%",padding:"12px 0",fontWeight:700,fontSize:14,background:guardado?"rgba(34,197,94,0.15)":"rgba(52,211,153,0.15)",color:guardado?"#22c55e":"#34d399",border:`1px solid ${guardado?"rgba(34,197,94,0.4)":"rgba(52,211,153,0.3)"}`}}>{guardado?"✅ Semana programada":"📅 Confirmar ("+asignadas+" tareas)"}</button></div>}
-    </div>
-  );
-}
-
-// ─── NORMALIZADOR DE TAREAS ───────────────────────────────────────────────────
-function NormalizadorTareas({ S, tareasProg, setTareasProg, esJefa }) {
-  const [mapeo, setMapeo] = React.useState({});
-  const [aplicado, setAplicado] = React.useState({});
-  const [buscador, setBuscador] = React.useState({});
-  const tareasUnicas = React.useMemo(()=>{
-    const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-    const set={};
-    Object.entries(tareasProg).forEach(([fecha,arr])=>{ normArr(arr).forEach(t=>{ if(!t?.tarea)return; const k=t.tarea.trim(); if(!set[k])set[k]={tarea:k,count:0}; set[k].count++; }); });
-    return Object.values(set).sort((a,b)=>b.count-a.count);
-  },[tareasProg]);
-  const esEstandar=(tarea)=>CATALOGO_TAREAS.some(c=>c.tarea.toLowerCase()===tarea.toLowerCase());
-  const sugerirEstandar=(tarea)=>{
-    const t=tarea.toLowerCase().trim();
-    // 1. Coincidencia exacta
-    const exacta = CATALOGO_TAREAS.find(c=>c.tarea.toLowerCase()===t);
-    if(exacta) return exacta;
-    // 2. Coincidencia por raíz: limpiar/limpieza, corte/cortar, riego/regar, poda/podar, etc.
-    const raices = {
-      'limpiar':'limpiez','limpieza':'limpiar',
-      'cortar':'corte','corte':'cortar',
-      'regar':'riego','riego':'regar',
-      'podar':'poda','poda':'podar',
-      'fertilizar':'fertiliz','fertilización':'fertiliz',
-      'revisar':'revisión','revisión':'revisar',
-      'reparar':'reparac','reparación':'reparar',
-      'reponer':'repos','reposición':'reponer',
-    };
-    // Normalizar el texto buscando raíces comunes
-    const palabrasT = t.split(' ').filter(p=>p.length>3);
-    const porPalabras = CATALOGO_TAREAS.find(c=>{
-      const ct = c.tarea.toLowerCase();
-      return palabrasT.some(p=>{
-        // Buscar por raíz (primeros 5 caracteres de palabras largas)
-        if(p.length>=5 && ct.includes(p.slice(0,5))) return true;
-        // Buscar raíces equivalentes
-        const raizP = raices[p];
-        if(raizP && ct.includes(raizP)) return true;
-        return false;
-      }) && palabrasT.filter(p=>p.length>3).every(p=>{
-        const raizP = raices[p]||p.slice(0,5);
-        return ct.includes(p)||ct.includes(raizP)||p.includes(ct.split(' ')[0]);
-      });
-    });
-    if(porPalabras) return porPalabras;
-    // 3. El catálogo contiene el texto
-    const catalContiene = CATALOGO_TAREAS.find(c=>c.tarea.toLowerCase().includes(t));
-    if(catalContiene) return catalContiene;
-    // 4. El texto contiene la primera palabra del catálogo
-    return CATALOGO_TAREAS.find(c=>t.includes(c.tarea.toLowerCase().split(' ')[0]));
-  };
-  const aplicarMapeo=(tareaVieja,tareaNueva)=>{
-    if(!tareaNueva||tareaVieja===tareaNueva)return;
-    const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-    const nuevo={};
-    Object.entries(tareasProg).forEach(([f,arr])=>{ nuevo[f]=normArr(arr).map(t=>t?.tarea?.trim()===tareaVieja?{...t,tarea:tareaNueva}:t); });
-    setTareasProg(prev=>({...prev,...nuevo}));
-    setAplicado(p=>({...p,[tareaVieja]:tareaNueva}));
-  };
-  const noEstandar=tareasUnicas.filter(t=>!esEstandar(t.tarea)&&!aplicado[t.tarea]);
-  const yaEstandar=tareasUnicas.filter(t=>esEstandar(t.tarea)||aplicado[t.tarea]);
-  if(!esJefa) return null;
-  return (
-    <div className="ein">
-      <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,marginBottom:4}}>🔧 Normalizar nombres de tareas</div>
-      <div style={{fontSize:11,color:"#5a9a7a",marginBottom:16}}>Estandariza los nombres usando el catálogo oficial. Los cambios se aplican a todas las fechas.</div>
-      <div style={{...S.card,padding:"10px 14px",marginBottom:16,display:"flex",gap:16}}>
-        <span style={{fontSize:12}}><b style={{color:"#f87171"}}>{noEstandar.length}</b> <span style={{color:"#9ca3af"}}>por normalizar</span></span>
-        <span style={{fontSize:12}}><b style={{color:"#34d399"}}>{yaEstandar.length}</b> <span style={{color:"#9ca3af"}}>ya estándar</span></span>
-        <span style={{fontSize:12}}><b style={{color:"#c0dac0"}}>{tareasUnicas.length}</b> <span style={{color:"#9ca3af"}}>totales</span></span>
-      </div>
-      {noEstandar.length===0
-        ? <div style={{...S.card,padding:24,textAlign:"center",color:"#34d399",fontSize:13}}>✅ Todas las tareas ya están estandarizadas</div>
-        : <div style={{...S.card,padding:0,overflow:"hidden",marginBottom:16}}>
-            <div style={{padding:"8px 14px",borderBottom:"1px solid rgba(255,255,255,0.08)",fontSize:10,color:"#5a9a7a",textTransform:"uppercase",display:"grid",gridTemplateColumns:"1fr auto 1fr auto",gap:8}}>
-              <span>Nombre actual</span><span>usos</span><span>Reemplazar por</span><span></span>
-            </div>
-            {noEstandar.map(({tarea,count})=>{
-              const sugerida=sugerirEstandar(tarea);
-              const seleccion=mapeo[tarea]||(sugerida?.tarea||"");
-              const busqLocal=buscador[tarea]||"";
-              return (
-                <div key={tarea} style={{padding:"10px 14px",borderBottom:"1px solid rgba(255,255,255,0.05)",display:"grid",gridTemplateColumns:"1fr auto 1fr auto",gap:8,alignItems:"center"}}>
-                  <div><div style={{fontSize:13,color:"#f87171",fontWeight:500}}>{tarea}</div><div style={{fontSize:10,color:"#5a9a7a"}}>{count} uso(s)</div></div>
-                  <div style={{color:"#4a7a5a",fontSize:16}}>→</div>
-                  <div style={{position:"relative"}}>
-                    <input placeholder="Buscar tarea estándar..." value={busqLocal||seleccion}
-                      onChange={e=>{setBuscador(p=>({...p,[tarea]:e.target.value}));setMapeo(p=>({...p,[tarea]:e.target.value}));}}
-                      style={{...S.input,fontSize:12,width:"100%"}}/>
-                    {busqLocal.length>=1&&(
-                      <div style={{position:"absolute",zIndex:999,top:"100%",left:0,right:0,background:"#1a2e1a",border:"1px solid rgba(52,211,153,0.3)",borderRadius:"0 0 8px 8px",maxHeight:160,overflowY:"auto",boxShadow:"0 4px 16px rgba(0,0,0,0.4)"}}>
-                        {CATALOGO_TAREAS.filter(c=>{
-                          const bl=busqLocal.toLowerCase().trim();
-                          const ct=c.tarea.toLowerCase();
-                          if(ct.includes(bl)) return true;
-                          // Buscar por palabras clave
-                          const palabras=bl.split(' ').filter(p=>p.length>=4);
-                          return palabras.length>0&&palabras.some(p=>ct.includes(p.slice(0,5)));
-                        }).slice(0,10).map(c=>(
-                          <div key={c.id} onClick={()=>{setMapeo(p=>({...p,[tarea]:c.tarea}));setBuscador(p=>({...p,[tarea]:""}));}}
-                            style={{padding:"6px 12px",fontSize:12,color:"#c0dac0",cursor:"pointer",borderBottom:"1px solid rgba(255,255,255,0.04)"}}
-                            onMouseEnter={e=>e.currentTarget.style.background="rgba(52,211,153,0.1)"}
-                            onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                            <span style={{fontSize:9,color:"#4a7a5a",marginRight:6}}>{c.cat}</span>{c.tarea}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <button disabled={!seleccion||seleccion===tarea} onClick={()=>aplicarMapeo(tarea,mapeo[tarea]||sugerida?.tarea||"")}
-                    style={{...S.btn,fontSize:11,padding:"4px 10px",background:seleccion&&seleccion!==tarea?"rgba(34,197,94,0.15)":"rgba(255,255,255,0.04)",color:seleccion&&seleccion!==tarea?"#22c55e":"#4a7a5a",border:`1px solid ${seleccion&&seleccion!==tarea?"rgba(34,197,94,0.3)":"rgba(255,255,255,0.08)"}`,cursor:seleccion&&seleccion!==tarea?"pointer":"not-allowed",whiteSpace:"nowrap"}}>✓ Aplicar</button>
-                </div>
-              );
-            })}
-          </div>
-      }
-      {yaEstandar.length>0&&(
-        <details style={{...S.card,padding:10}}>
-          <summary style={{fontSize:12,color:"#5a9a7a",cursor:"pointer"}}>✅ {yaEstandar.length} tareas ya estandarizadas</summary>
-          <div style={{marginTop:8}}>{yaEstandar.map(({tarea,count})=><div key={tarea} style={{display:"flex",justifyContent:"space-between",padding:"4px 8px",fontSize:11,color:"#34d399"}}><span>{aplicado[tarea]?"✓ "+aplicado[tarea]:tarea}</span><span style={{color:"#5a9a7a"}}>{count} uso(s)</span></div>)}</div>
-        </details>
-      )}
-    </div>
-  );
-}
-
-
 function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACROZONAS_BASE, tareas, setTareas, tareasZonaHoy=0, esJefa=false, configSemanal={}, setConfigSemanal, puedeCrear=false, cierresTurno={}, onReabrirTurno, getElemFrecs, setElemFrecs, aplicaciones=[], setAplicaciones, stockFito, setStockFito, crearNotificacion }) {
   const hoy = fechaLocal();
   const [fecha, setFecha] = React.useState(hoy);
@@ -3742,7 +3401,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     const propuestas = [];
     const vencidas = [];
     const existentes = getTareasDelDia(fecha).map(t => t.zona+"_"+t.elemento+"_"+t.tarea);
-    zonas.forEach(z => {
+    MACROZONAS_BASE.forEach(z => {
       const zdat = getZD(z.id);
       const elems = getAllElems(z.id);
       elems.forEach(e => {
@@ -3830,9 +3489,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
               🔄 Actualizar estructura Golf en Firebase
             </button>
           )}
-          )}
-
-          {esJefa&&(
+                              {esJefa&&(
             <button onClick={()=>{
               // MODO LLUVIA
               const diaSemana = new Date(fecha+"T12:00:00").getDay();
@@ -3953,22 +3610,14 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
 
       {/* Tabs */}
       <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
-        {[["programa","📆 Programar"],["semana","🗓 Semana"],["frecuencias","🔄 Frecuencias"],["fitosanitario","⚗ Fitosanitario"],["normalizar","🔧 Normalizar"],["historial","📜 Historial"]].map(([t,l])=>(
+        {[["programa","📆 Programar"],["frecuencias","🔄 Frecuencias"],["fitosanitario","⚗ Fitosanitario"],["historial","📜 Historial"]].map(([t,l])=>(
           <button key={t} className={`tab${tabProg===t?" on":""}`} onClick={()=>setTabProg(t)}>{l}</button>
         ))}
       </div>
 
       {/* ── FRECUENCIAS POR MACROZONA ── */}
-      {tabProg==="semana"&&(
-        <PlanificadorSemanal S={S} MACROZONAS_BASE={zonasConCust} getAllElems={getAllElems} getZD={getZD} getElemFrecs={getElemFrecs} tareas={tareas} setTareas={setTareas} personal={personal} configSemanal={configSemanal} esJefa={esJefa}/>
-      )}
-
-      {tabProg==="normalizar"&&(
-        <NormalizadorTareas S={S} tareasProg={tareas} setTareasProg={setTareas} esJefa={esJefa}/>
-      )}
-
       {tabProg==="frecuencias"&&(
-        <PanelFrecuenciasZona S={S} zonas={zonas} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} esJefa={esJefa}/>
+        <PanelFrecuenciasZona S={S} zonas={MACROZONAS_BASE} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} esJefa={esJefa}/>
       )}
 
       {/* ── HISTORIAL ── */}
@@ -9392,50 +9041,53 @@ const TAREAS_TEES = ["Limpieza","Corte y orillado","Riego","Reparación divots",
 // Plantilla pre-torneo por día
 const PLANTILLA_PRE_TORNEO = {
   "Día -6 (Lunes)": [
-    {cat:"Árboles", tarea:"Poda de limpieza", obs:"Despeje de troncos en línea de tiro — verificar árboles que interfieren con el juego"},
+    {cat:"Árboles",tarea:"Despeje de troncos en línea de tiro — verificar y despejar árboles que interfieren con el juego"},
   ],
   "Día -3 (Miércoles)": [
-    {cat:"Greens",        tarea:"Revisión de maquinaria y herramienta", obs:"Limpieza y afilado de cuchillas cortadora de greens"},
-    {cat:"Greens",        tarea:"Riego manual",                          obs:"Riego profundo greens"},
-    {cat:"Bunkers",       tarea:"Corte de bordes",                       obs:"Recortar bordes del césped alrededor de búnkers"},
-    {cat:"Tees y Calles", tarea:"Corte de césped",                       obs:"Cortar rough a altura de torneo"},
-    {cat:"Administración",tarea:"Revisar pronóstico del tiempo y ajustar planes", obs:""},
+    {cat:"Greens",tarea:"Limpieza y afilado de cuchillas cortadora de greens"},
+    {cat:"Greens",tarea:"Riego profundo greens"},
+    {cat:"Bunkers",tarea:"Recortar bordes del césped alrededor de bunkers"},
+    {cat:"Tees y Calles",tarea:"Cortar rough a altura de torneo"},
+    {cat:"Administración",tarea:"Revisar pronóstico del tiempo y ajustar planes"},
   ],
   "Día -2 (Jueves)": [
-    {cat:"Greens",        tarea:"Corte de greens",    obs:"Corte inicial — HOC 4.7mm"},
-    {cat:"Greens",        tarea:"Corte de greens",    obs:"Rodado inicial de greens"},
-    {cat:"Bunkers",       tarea:"Rastrillado de búnkers", obs:"Rastrillar y labrar arena a profundidad uniforme"},
-    {cat:"Bunkers",       tarea:"Reponer arena",       obs:"Rellenar búnker con arena si es necesario"},
-    {cat:"Tees y Calles", tarea:"Corte de tees",       obs:"Cortar tees a altura final de torneo"},
-    {cat:"Tees y Calles", tarea:"Corte de fairways",   obs:"Cortar fairways y lomas a altura final de torneo"},
-    {cat:"Tees y Calles", tarea:"Riego manual",         obs:"Riego profundo tees y calles"},
-    {cat:"Administración",tarea:"Revisar pronóstico del tiempo y ajustar planes", obs:""},
+    {cat:"Greens",tarea:"Corte inicial greens (HOC 4.7mm)"},
+    {cat:"Greens",tarea:"Rodado inicial de greens"},
+    {cat:"Bunkers",tarea:"Rastrillar y labrar arena (profundidad uniforme)"},
+    {cat:"Bunkers",tarea:"Rellenar con arena si es necesario"},
+    {cat:"Tees y Calles",tarea:"Cortar tees y calles a altura final de torneo"},
+    {cat:"Tees y Calles",tarea:"Cortar lomas de cancha"},
+    {cat:"Tees y Calles",tarea:"Riego profundo tees y calles"},
+    {cat:"Administración",tarea:"Revisar pronóstico del tiempo"},
   ],
   "Día -1 (Viernes)": [
-    {cat:"Greens",        tarea:"Corte de greens",    obs:"Corte final — HOC 4.5mm"},
-    {cat:"Greens",        tarea:"Corte de greens",    obs:"Doble rodado greens"},
-    {cat:"Greens",        tarea:"Cambio de banderas", obs:"Perforar nuevos hoyos y colocar banderas"},
-    {cat:"Greens",        tarea:"Syringing greens",   obs:"Riego ligero (Syringing) tarde"},
-    {cat:"Greens",        tarea:"Corte de greens",    obs:"Corte ante-greens"},
-    {cat:"Bunkers",       tarea:"Rastrillado de búnkers", obs:"Rastrillado superficial — recoger piedras y escombros"},
-    {cat:"Tees y Calles", tarea:"Riego manual",        obs:"Riego profundo tees y calles"},
-    {cat:"Limpieza",      tarea:"Soplado/Barrido",     obs:"Soplar y barrer recortes de todas las superficies"},
-    {cat:"Limpieza",      tarea:"Limpiar basurero",    obs:"Limpiar basureros y retirar basura del campo"},
-    {cat:"Maquinaria",    tarea:"Revisión de maquinaria y herramienta", obs:"Revisión final — toda la maquinaria lista para la mañana"},
-    {cat:"Administración",tarea:"Revisar pronóstico del tiempo y ajustar planes", obs:""},
+    {cat:"Greens",tarea:"Corte final greens (HOC 4.5mm)"},
+    {cat:"Greens",tarea:"Doble rodado greens"},
+    {cat:"Greens",tarea:"Perforar nuevos hoyos"},
+    {cat:"Greens",tarea:"Riego ligero (Syringing) tarde"},
+    {cat:"Greens",tarea:"Corte ante-greens"},
+    {cat:"Bunkers",tarea:"Rastrillado superficial bunkers"},
+    {cat:"Bunkers",tarea:"Recoger piedras/escombros"},
+    {cat:"Tees y Calles",tarea:"Riego profundo"},
+    {cat:"Estética",tarea:"Soplar/barrer recortes de todas las superficies"},
+    {cat:"Estética",tarea:"Limpiar basureros y retirar basura"},
+    {cat:"Maquinaria",tarea:"Revisión final de maquinaria lista para la mañana"},
+    {cat:"Administración",tarea:"Revisar pronóstico del tiempo"},
   ],
   "Día Torneo (Sábado)": [
-    {cat:"Greens",   tarea:"Corte de greens",        obs:"Corte final de torneo — HOC 4.5mm"},
-    {cat:"Greens",   tarea:"Corte de greens",        obs:"Doble rodado greens"},
-    {cat:"Bunkers",  tarea:"Rastrillado de búnkers", obs:"Rastrillado superficial — recoger piedras y escombros"},
-    {cat:"Limpieza", tarea:"Soplado/Barrido",        obs:"Soplar y barrer recortes de todas las superficies"},
-    {cat:"Administración",tarea:"Revisar pronóstico del tiempo y ajustar planes", obs:""},
+    {cat:"Greens",tarea:"Corte final greens (HOC 4.5mm)"},
+    {cat:"Greens",tarea:"Doble rodado greens"},
+    {cat:"Bunkers",tarea:"Rastrillado superficial bunkers"},
+    {cat:"Bunkers",tarea:"Recoger piedras/escombros"},
+    {cat:"Estética",tarea:"Soplar/barrer recortes de todas las superficies"},
+    {cat:"Administración",tarea:"Revisar pronóstico del tiempo"},
   ],
   "Día Torneo (Domingo)": [
-    {cat:"Greens",   tarea:"Corte de greens",        obs:"Doble corte — máxima velocidad (opcional según condiciones)"},
-    {cat:"Bunkers",  tarea:"Rastrillado de búnkers", obs:"Rastrillado superficial — recoger piedras y escombros"},
-    {cat:"Limpieza", tarea:"Soplado/Barrido",        obs:"Soplar y barrer recortes de todas las superficies"},
-    {cat:"Administración",tarea:"Revisar pronóstico del tiempo y ajustar planes", obs:""},
+    {cat:"Greens",tarea:"Doble corte (opcional, máxima velocidad)"},
+    {cat:"Bunkers",tarea:"Rastrillado superficial bunkers"},
+    {cat:"Bunkers",tarea:"Recoger piedras/escombros"},
+    {cat:"Estética",tarea:"Soplar/barrer recortes de todas las superficies"},
+    {cat:"Administración",tarea:"Revisar pronóstico del tiempo"},
   ],
 };
 
@@ -9463,18 +9115,13 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
     const ultMed = [...medOrdenadas].reverse().find(m=>m.alturas?.[z.id]);
     const zonaNum = z.id.replace(/[^0-9]/g,"");
     const corteRecZ = todosLosCortes.find(c=>{
-      const elem = (c.elemento||"").toLowerCase();
-      const tar = (c.tarea||"").toLowerCase();
-      if(z.id.includes("vivero")) return elem.includes("vivero")||tar.includes("vivero")||elem.includes("todos")||tar.includes("todos");
-      // Corte general (todos los greens) — incluye tareas con elemento vacío o "todos"
-      if(elem.includes("todos")||tar.includes("todos")||elem===""||elem.includes("greens")) return true;
-      // Match por número de green en ELEMENTO
-      return zonaNum && (
-        elem.includes(`green ${zonaNum.padStart(2,"0")}`) ||
-        elem.includes(`green ${Number(zonaNum)}`) ||
-        elem.includes(`green0${zonaNum}`) ||
-        elem === `green ${zonaNum}`
-      );
+      const elem = c.elemento.toLowerCase();
+      const tar = c.tarea.toLowerCase();
+      if(z.id.includes("vivero")) return elem.includes("vivero")||tar.includes("vivero");
+      return (zonaNum && elem.includes(`green ${zonaNum.padStart(2,"0")}`)) ||
+             (zonaNum && elem.includes(`green ${Number(zonaNum)}`)) ||
+             (zonaNum && tar.includes(`green ${zonaNum.padStart(2,"0")}`)) ||
+             tar.includes("todos") || elem.includes("todos");
     });
 
     let altBase, fechaBase, baseOrigen;
@@ -9491,8 +9138,6 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
       baseOrigen = "corte";
     } else if(ultMed && (!corteRecZ || ultMed.fecha > corteRecZ.fecha)) {
       // Medición posterior al corte → partir desde medición
-      const diasDesdeUltMed2 = Math.round((new Date(hoyProjStr+"T12:00:00")-new Date(ultMed.fecha+"T12:00:00"))/(1000*60*60*24));
-      if(diasDesdeUltMed2 > 30) return null; // medición demasiado antigua
       altBase = Number(ultMed.alturas[z.id]);
       fechaBase = ultMed.fecha;
       baseOrigen = "medicion";
@@ -9504,7 +9149,7 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
     } else if(ultMed) {
       // Solo hay medición histórica
       const diasDesdeUltMed = Math.round((new Date(hoyProjStr+"T12:00:00")-new Date(ultMed.fecha+"T12:00:00"))/(1000*60*60*24));
-      if(diasDesdeUltMed > 30) return null; // demasiado antigua — datos no confiables
+      if(diasDesdeUltMed > 7) return null;
       altBase = Number(ultMed.alturas[z.id]);
       fechaBase = ultMed.fecha;
       baseOrigen = "medicion_antigua";
@@ -9516,10 +9161,7 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
     const tasaReal = (ultimaTasaReal && (!corteRecZ || ultimaTasaReal.fecha > corteRecZ.fecha)) ? ultimaTasaReal.tasa : null;
     const diasUltimoIntervalo = tasaReal !== null ? ultimaTasaReal.dias : null;
     const deltaUltimo = tasaReal !== null ? ultimaTasaReal.delta : null;
-    // Si la tasa real es muy alta (>1mm/día) y la base ya supera el umbral,
-    // es probable que haya cortes no registrados — usar tasa global o conservadora
-    const tasaSospechosa = tasaReal !== null && tasaReal > 1.0 && altBase > 5.5;
-    const tasaUsar = tasaSospechosa ? (tasaGlobal || 0.5) : (tasaReal !== null ? tasaReal : (tasaGlobal || 0.4));
+    const tasaUsar = tasaReal !== null ? tasaReal : (tasaGlobal || 0.4);
     const categoria = anal ? anal.categoria : "Sin datos";
 
     const proj = diasProx.map(d=>{
@@ -9560,7 +9202,6 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
                     {baseOrigen==="corte"?"✂️":baseOrigen==="medicion"?"📏":"📏?"}
                   </span>
                   <span style={{fontSize:9,display:"block",color:"#4a7a5a"}}>{altBase}mm · {fechaBase}</span>
-                  {altBase > altCorte && <span style={{fontSize:9,color:"#ef4444",fontWeight:700,display:"block"}}>⚠️ YA SOBRE UMBRAL — CORTAR</span>}
                 </td>
                 <td style={{padding:"7px 8px",textAlign:"center",fontSize:12,fontWeight:700}}>
                   {tasaReal!==null
@@ -9651,23 +9292,19 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
     const todosCortes = Object.entries(tareasProg||{}).flatMap(([fecha, ts])=>
       (ts||[]).filter(t=>{
         if(t.estado!=="hecha" && t.estado!=="completada") return false;
-        // Identificar corte de greens: tarea de corte en zona Golf
-        const esCorte = (t.tarea||"").toLowerCase().includes("corte");
-        if(!esCorte) return false;
+        if(!(t.tarea||"").toLowerCase().includes("corte")) return false;
         if(!(t.zona==="Golf" || (t.zona||"").includes("Golf"))) return false;
+        if(esVivero) return (t.elemento||"").toLowerCase().includes("vivero") || (t.tarea||"").toLowerCase().includes("vivero") || (t.elemento||"").toLowerCase().includes("green 10") || (t.tarea||"").toLowerCase().includes("todos");
         const elem = (t.elemento||"").toLowerCase();
         const tar = (t.tarea||"").toLowerCase();
-        // Vivero
-        if(esVivero) return elem.includes("vivero") || tar.includes("vivero") || elem.includes("todos") || tar.includes("todos");
-        // Corte general (todos los greens)
-        if(elem.includes("todos") || tar.includes("todos") || elem==="" || elem.includes("greens")) return true;
-        // Coincidir por número de green en el ELEMENTO (fuente de verdad)
+        // Coincidir por número de green: "green 01", "green 1", "green0X" etc
         const numMatch = zonaNum && (
           elem.includes(`green ${zonaNum.padStart(2,"0")}`) ||
           elem.includes(`green ${Number(zonaNum)}`) ||
           elem.includes(`green0${zonaNum}`) ||
-          elem.includes(`g${zonaNum} `) ||
-          elem === `green ${zonaNum}`
+          tar.includes(`green ${zonaNum.padStart(2,"0")}`) ||
+          tar.includes(`todos`) ||
+          elem.includes("todos")
         );
         return numMatch;
       }).map(t=>({fecha, alturaCorte:t.alturaCorteReal?Number(t.alturaCorteReal):(t.alturaCorte?Number(t.alturaCorte):null)}))
@@ -9723,23 +9360,19 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
           delta = svgP.alt - pPrev.alt;
           diasRef = diasTotal;
           metodo = "directo";
-
-          // Si el intervalo es largo (>14 días), casi seguro hubo cortes no registrados
-          // Un green no puede crecer 5+ mm sin ser cortado — descartar el intervalo
-          if(diasTotal > 14) {
-            continue; // intervalo muy largo = dato no confiable
-          }
-
           if(delta <= 0) {
-            // Delta negativo: probablemente hubo corte no registrado → ignorar
-            continue;
+            // Delta negativo con intervalo largo (>5d): probablemente hubo corte no registrado
+            // Usar valor absoluto como estimación mínima de crecimiento real
+            if(diasTotal > 5) {
+              // No sabemos la altura del corte, pero sí que el green creció algo
+              // Estimación conservadora: descartamos este intervalo pero lo anotamos
+              continue;
+            } else {
+              continue; // intervalo corto con baja: ignorar
+            }
           }
-
-          // Si el delta implica una tasa > 1mm/día sin corte conocido → sospechoso
-          const tasaImplicita = delta / diasRef;
-          if(tasaImplicita > 1.0) {
-            continue; // tasa imposible para greens → descartar
-          }
+          // Con mediciones semanales, el delta puede subestimar el crecimiento real
+          // si el green fue cortado entre mediciones — pero sin datos de corte no podemos corregir
         }
       }
 
@@ -10334,10 +9967,8 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
   const sectorColor = esSecaEstacion?"#f59e0b":"#60a5fa";
   const ultimaHum = [...humedades].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""))[0];
 
-  const calcDecision = (valores, valorVivero) => {
-    const allVals = {...valores};
-    if(valorVivero) allVals["vivero"] = {valor:valorVivero};
-    const vals = Object.values(allVals).map(v=>Number(v.valor||0)).filter(v=>v>0);
+  const calcDecision = (valores) => {
+    const vals = Object.values(valores).map(v=>Number(v.valor||0)).filter(v=>v>0);
     if(!vals.length) return null;
     const extremo = esSecaEstacion?Math.min(...vals):Math.max(...vals);
     if(extremo<=2) return "riego-urgente";
@@ -10347,15 +9978,8 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
   };
 
   const guardarHumedad = () => {
-    // Requerir al menos un valor ingresado
-    const tieneValores = Object.values(humForm.valores||{}).some(v=>v?.valor) || humForm.valorVivero;
-    if(!tieneValores) return;
-    // Normalizar vivero al mismo formato que los demás greens
-    const valoresConVivero = {...humForm.valores};
-    if(humForm.valorVivero) {
-      valoresConVivero["vivero"] = {valor:humForm.valorVivero, obs:humForm.obsVivero||""};
-    }
-    const nueva = {...humForm, valores:valoresConVivero, id:Date.now()};
+    if(!humForm.responsable) return;
+    const nueva = {...humForm, id:Date.now()};
     setHumedades([nueva,...humedades].slice(0,200));
     if(humForm.generarTarea&&(humForm.decision==="cerrar-cancha"||humForm.decision==="abrir-cancha"||humForm.decision==="riego-urgente")){
       const txt = humForm.decision==="cerrar-cancha"
@@ -10406,7 +10030,7 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
       ];
       return {...prev, [fechaHum]: listaFinalH};
     });
-    setHumForm(emptyHumForm());
+    setHumForm(emptyHumForm);
     setShowHumForm(false);
     if(crearNotificacion) {
       const vals = Object.entries(nueva.valores||{})
@@ -10568,43 +10192,6 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
         </div>
       )}
 
-      {/* Mediciones de hoy — visible para Bhalú */}
-      {!esJefa&&(()=>{
-        const hoyStr = fechaLocal();
-        const medHoy = [...humedades].filter(m=>m.fecha===hoyStr).sort((a,b)=>(b.hora||"").localeCompare(a.hora||""));
-        if(!medHoy.length) return null;
-        return (
-          <div style={{marginTop:16}}>
-            <div style={{fontFamily:"'Playfair Display',serif",fontSize:13,fontWeight:700,color:"#60a5fa",marginBottom:8}}>
-              💧 Mediciones de hoy
-            </div>
-            {medHoy.map(m=>(
-              <div key={m.id} style={{...S.card,padding:"12px 14px",marginBottom:8,borderLeft:"3px solid rgba(96,165,250,0.4)"}}>
-                <div style={{fontSize:11,color:"#6aaa7a",marginBottom:6}}>
-                  {m.hora&&<span>{m.hora} · </span>}
-                  {m.responsable&&<span>👤 {m.responsable}</span>}
-                </div>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(72px,1fr))",gap:4}}>
-                  {[...GREENS_DEF,{id:"vivero",nombre:"Vivero"}].map(g=>{
-                    const humV = m.valores?.[g.id]?.valor;
-                    if(!humV) return null;
-                    const info = ESCALA_HUM_GOLF[Math.min(Math.max(Number(humV),1),8)];
-                    return (
-                      <div key={g.id} style={{background:info?info.bg:"rgba(255,255,255,0.04)",borderRadius:6,padding:"4px 6px",textAlign:"center",border:`1px solid ${info?info.color+"30":"rgba(255,255,255,0.08)"}`}}>
-                        <div style={{fontSize:9,color:"#34d399",fontWeight:600}}>{g.nombre.replace("Green ","G")}</div>
-                        <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:info?info.color:"#c0dac0"}}>{humV}</div>
-                        {info&&<div style={{fontSize:8,color:info.color}}>{info.label}</div>}
-                      </div>
-                    );
-                  })}
-                </div>
-                {m.obs&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:6,fontStyle:"italic"}}>{m.obs}</div>}
-              </div>
-            ))}
-          </div>
-        );
-      })()}
-
       {/* Última medición y historial — solo jefa */}
       {esJefa&&ultimaHum&&(
         <div style={{...S.card,padding:16,marginBottom:16,borderLeft:"3px solid #60a5fa"}}>
@@ -10665,7 +10252,7 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
                     {m.responsable&&<span style={{fontSize:11,color:"#5a9a7a"}}>👤 {m.responsable}</span>}
                   </div>
                   <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:4}}>
-                    {[...GREENS_DEF,{id:"vivero",nombre:"Vivero",hoyos:""}].map(g=>{
+                    {GREENS_DEF.map(g=>{
                       const humV2=m.valores?.[g.id]?.valor;
                       if(!humV2) return null;
                       const info=ESCALA_HUM_GOLF[Math.min(Math.max(Number(humV2),1),8)];
@@ -11300,14 +10887,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   // Exponer para acceso rápido desde VistaWorker
   React.useEffect(()=>{ window.__golfSubTab = setSubTab; return ()=>{ window.__golfSubTab=null; }; },[]);
 
-  const setG = (patch) => {
-    if(patch.humedades !== undefined) {
-      // Humedades van a su propio path para evitar problemas con arrays en Firebase
-      setHumedadesData(patch.humedades);
-    } else {
-      setGolfData(p=>({...p,...patch}));
-    }
-  };
+  const setG = (patch) => setGolfData(p=>({...p,...patch}));
 
   const greens    = golfData.greens    || {};
   const tees      = golfData.tees      || {};
@@ -11332,10 +10912,9 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   const [showHumForm,    setShowHumForm]    = React.useState(false);
   // Abrir formulario de humedad automáticamente cuando jefa navega a ese tab
   React.useEffect(()=>{
-    // Para trabajador abrir automáticamente, jefa lo abre manualmente
-    if(subTab==="humedad" && !esJefa) setShowHumForm(true);
-  },[subTab]);
-  const emptyHumForm = () => ({fecha:fechaLocal(),hora:new Date().toTimeString().slice(0,5),motivo:"rutina",responsable:"",valores:{},valorVivero:"",decision:"sin-cambio",obs:"",generarTarea:false});
+    if(subTab==="humedad" && esJefa) setShowHumForm(true);
+  },[subTab, esJefa]);
+  const emptyHumForm = {fecha:hoy,hora:new Date().toTimeString().slice(0,5),motivo:"rutina",responsable:"",valores:{},valorVivero:"",decision:"sin-cambio",obs:"",generarTarea:false};
   const [humForm,        setHumForm]        = React.useState(emptyHumForm);
   const [selectedGreen,  setSelectedGreen]  = React.useState("g1");
   const [selectedTee,    setSelectedTee]    = React.useState("t1");
@@ -11475,11 +11054,10 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           fecha:fechaStr,
           zona:"Golf",
           elemento:t.cat,
-          tarea:t.tarea,
-          responsable:"Osmar Bhalú Armijo Zúñiga",
-          estado:"pendiente",
-          notas:[`🏆 Torneo: ${evento.nombre}`,`📅 ${dia}`,t.obs?`📋 ${t.obs}`:""].filter(Boolean).join(" · "),
-          origenTorneo:evento.nombre, origenDia:dia,
+          tarea:`⛳ Pre-torneo ${evento.nombre} — ${t.tarea}`,
+          responsable:"",
+          estado:"por_designar",
+          notas:`Preparación torneo: ${dia}`,
           auto:true,
         });
       });
@@ -11631,7 +11209,15 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           </div>
         )}
         {/* Humedad */}
-        {subTab==="humedad"&&(
+        {subTab==="config_golf"&&rolLogueado!=="trabajador"&&(
+        <div className="ein">
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,color:"#fbbf24",marginBottom:14}}>⚙️ Programación de Golf</div>
+          <div style={{fontSize:12,color:"#5a9a7a",marginBottom:16}}>Programa y asigna tareas de Golf. La vista semanal se ve en 📅 Semana Golf.</div>
+          <div style={{...S.card,padding:20,textAlign:"center",color:"#5a9a7a",fontSize:13}}>🚧 Módulo en construcción — próxima sesión</div>
+        </div>
+      )}
+
+      {subTab==="humedad"&&(
           <SeccionHumedad S={S} golfData={golfData} setG={setG} listaPersonal={listaPersonal}
             hoy={hoy} esJefa={false} tareasProg={tareasProg} setTareasProg={setTareasProg}
             showHumForm={showHumForm} setShowHumForm={setShowHumForm}
@@ -11664,10 +11250,10 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
         {(()=>{
           // Tabs según rol: trabajador solo ve lo que le corresponde
-          const todosTabs = [["panel","📊 Panel"],["greens","⛳ Greens"],["tees","🎯 Tees"],["bunkers","🏖️ Búnkers"],["fairways","🌾 Fairways"],["zonas","🌿 Zonas"],["arboles","🌳 Árboles"],["mediciones","📏 Alturas"],["humedad","💧 Humedad"],["eventos","🏆 Eventos"],["fitosanitario","⚗ Fitosanitario"],["programacion_golf","📅 Programación Golf"]];
+          const todosTabs = [["panel","📊 Panel"],["greens","⛳ Greens"],["tees","🎯 Tees"],["bunkers","🏖️ Búnkers"],["fairways","🌾 Fairways"],["zonas","🌿 Zonas"],["arboles","🌳 Árboles"],["mediciones","📏 Alturas"],["humedad","💧 Humedad"],["eventos","🏆 Eventos"],["fitosanitario","⚗ Fitosanitario"],["programacion_golf","📅 Semana Golf"],["config_golf","⚙️ Programación Golf"]];
           const tabsWorker = [["mediciones","📏 Alturas"],["humedad","💧 Humedad"]];
           // Agregar Programación solo para jefa/supervisor
-          const todosTabs2 = [...todosTabs, ["programacion_golf","📅 Programación Golf"]];
+          const todosTabs2 = todosTabs;
           const tabsVisibles = (rolLogueado==="trabajador") ? tabsWorker : todosTabs2;
           return tabsVisibles;
         })().map(([t,l])=>(
@@ -12731,9 +12317,9 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                         const esTareaCorte=t=>t.zona==="Golf"&&(t.tarea?.toLowerCase().includes("corte")||t.tipo?.toLowerCase().includes("corte"))&&(t.elemento?.includes(pgG.nombre)||t.tarea?.includes(pgG.nombre)||t.elemento?.toLowerCase().includes("todos")||t.tarea?.toLowerCase().includes("todos"));
                         const cortesG=Object.values(tareasProg).flat().filter(t=>esTareaCorte(t)&&["hecha","completada"].includes(t.estado)).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
                         infoCorte=cortesG[0]||null;
-                         alturaMaxCorte=infoCorte?.alturaObjetivo||rango.max;
+                        alturaMaxCorte=infoCorte?.alturaObjetivo||(rango.corte*1.1)||(rango.min*1.5);
                         const histG=[...mediciones].filter(m=>m.alturas?.[g.id]&&m.fecha).sort((a,b)=>b.fecha.localeCompare(a.fecha));
-                         if(diasCrecimiento&&Number(diasCrecimiento)>0&&Number(alt)>0&&Number(alt)>rango.min){tasaCalculada=(Number(alt)-rango.min)/Number(diasCrecimiento);tasaFuente="manual";}
+                        if(diasCrecimiento&&Number(diasCrecimiento)>0&&Number(alt)>0){tasaCalculada=Number(alt)/Number(diasCrecimiento);tasaFuente="manual";}
                         else if(infoCorte?.alturaCorte&&histG[0]){const dDiasG=Math.round((new Date(histG[0].fecha+"T12:00:00")-new Date(infoCorte.fecha+"T12:00:00"))/86400000);const a1=Number(histG[0].alturas?.[g.id]);const altC=Number(infoCorte.alturaCorte);if(dDiasG>0&&a1>altC){tasaCalculada=(a1-altC)/dDiasG;tasaFuente="auto";}}
                         else if(histG.length>=2){const a1=Number(histG[0].alturas?.[g.id]);const a2=Number(histG[1].alturas?.[g.id]);const dDiasH=Math.round((new Date(histG[0].fecha+"T12:00:00")-new Date(histG[1].fecha+"T12:00:00"))/86400000);if(dDiasH>0&&a1>a2){tasaCalculada=(a1-a2)/dDiasH;tasaFuente="histórico";}}
                         if(Number(alt)>=Number(alturaMaxCorte)){proyeccion="⚠️ Cortar ya";}
@@ -12816,14 +12402,24 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           )}
         </div>
       )}
-
-      {/* ── HUMEDAD — JEFA/SUPERVISOR ── */}
-      {subTab==="humedad"&&rolLogueado!=="trabajador"&&(
-        <SeccionHumedad S={S} golfData={golfData} setG={setG} listaPersonal={listaPersonal}
-          hoy={hoy} esJefa={true} tareasProg={tareasProg} setTareasProg={setTareasProg}
-          showHumForm={showHumForm} setShowHumForm={setShowHumForm}
-          humForm={humForm} setHumForm={setHumForm} emptyHumForm={emptyHumForm}
-          onRegistroGuardado={onRegistroGuardado} crearNotificacion={crearNotificacion}/>
+      {subTab==="humedad"&&(
+        <SeccionHumedad
+          S={S}
+          golfData={golfData}
+          setG={setG}
+          listaPersonal={listaPersonal}
+          hoy={hoy}
+          esJefa={esJefa}
+          tareasProg={tareasProg}
+          setTareasProg={setTareasProg}
+          onRegistroGuardado={onRegistroGuardado}
+          crearNotificacion={crearNotificacion}
+          showHumForm={showHumForm}
+          setShowHumForm={setShowHumForm}
+          humForm={humForm}
+          setHumForm={setHumForm}
+          emptyHumForm={emptyHumForm}
+        />
       )}
 
             {/* ── EVENTOS / TORNEOS ── */}
@@ -12919,6 +12515,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                     </tbody>
                   </table>
                 </div>
+                
               </div>
             );
           })()}
@@ -16251,60 +15848,13 @@ const diasHabiles = (fechaStr, n=1) => {
   return d.toISOString().slice(0,10);
 };
 
-// ─── ESTADO AUTOMÁTICO DE MACROZONA ──────────────────────────────────────────
-const calcularEstadoZona = (zid, getAllElems, getElemFrecs, data) => {
-  // Si está en mantenimiento manual, respetar
-  const zdat = data[String(zid)];
-  if(zdat?.estadoGeneral === "mantenimiento") return "mantenimiento";
-
-  const estacion = (()=>{
-    const m = new Date().getMonth()+1;
-    if([12,1,2].includes(m)) return "verano";
-    if([3,4,5].includes(m)) return "otono";
-    if([6,7,8].includes(m)) return "invierno";
-    return "primavera";
-  })();
-
-  const hoy = new Date();
-  hoy.setHours(12,0,0,0);
-
-  const elems = getAllElems(zid);
-
-  // Verificar si hay elementos críticos
-  const hayCriticos = elems.some(e=>(e.edData?.estado||"bueno")==="critico");
-  if(hayCriticos) return "critico";
-
-  let maxDiasVencido = 0;
-
-  elems.forEach(e=>{
-    const frecs = getElemFrecs(String(zid), e.id, e.tipo, e.isCustom);
-    frecs.forEach(f=>{
-      const freq = f.modo==="diasSemana" ? f.diasMinimos : f[estacion];
-      if(!freq || freq==="noaplica") return;
-      const intervalo = freq==="diario"?1:freq==="cada2dias"?2:freq==="cada3dias"?3:
-        freq==="cada4dias"?4:freq==="cada5dias"?5:freq==="semanal"?7:
-        freq==="quincenal"?15:freq==="mensual"?30:freq==="bimestral"?60:
-        freq==="trimestral"?90:Number(f.diasMinimos)||30;
-      if(!f.ultimaVez) return;
-      const ultima = new Date(f.ultimaVez+"T12:00:00");
-      const diasDesde = Math.round((hoy - ultima)/(1000*60*60*24));
-      const diasVencido = diasDesde - intervalo;
-      if(diasVencido > maxDiasVencido) maxDiasVencido = diasVencido;
-    });
-  });
-
-  if(maxDiasVencido > 30) return "critico";
-  if(maxDiasVencido > 0)  return "regular";
-  return "bueno";
-};
-
 export default function App() {
   const [zonas, setZonas] = useState(()=>MACROZONAS_BASE);
   const [vista, setVista] = useState("dashboard");
   const [zonaId, setZonaId] = useState(null);
   const [tab, setTab] = useState("elementos");
   const [filtroCat, setFiltroCat] = useState("Todas");
-  const [macrozonasCust, setMacrozonasCust, macCustReady] = useFirebaseState("macrozonasCust", []);
+  const [macrozonasCust, setMacrozonasCust] = useState([]);
   // Combinar zonas base con personalizadas — debe ir después de ambos estados
   const zonasConCust = React.useMemo(()=>[...zonas,...macrozonasCust],[zonas,macrozonasCust]);
   const [showNuevaMacrozona, setShowNuevaMacrozona] = useState(false);
@@ -16317,8 +15867,7 @@ export default function App() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiText, setAiText] = useState("");
   const [editElem, setEditElem] = useState(null);
-  const [editZonaForm, setEditZonaForm] = useState(null); // {nombre, icono, descripcion}
-  const [condicionesLocales, setCondicionesLocales] = useState({});
+  const [condicionesLocales, setCondicionesLocales] = useState({}); // condicion UI inmediata por elemento
   const [showPlantacionForm, setShowPlantacionForm] = useState(null);
 
   const ejecutarDescuentoStock = (descuentos) => {
@@ -16399,7 +15948,6 @@ export default function App() {
   const [comprasData,    setComprasData,    comprasReady]  = useFirebaseState("compras",  {compras:[],cuentas:CUENTAS_DEFAULT});
   const [bodegasData,    setBodegasData,    bodegasReady]  = useFirebaseState("bodegas",  {});
   const [golfData,       setGolfData,       golfReady]     = useFirebaseState("golf", {greens:{},tees:{},arboles:[],eventos:[],mediciones:[]});
-  const [humedadesData,  setHumedadesData,  humReady]      = useFirebaseState("golf-humedades", []);
   const [bonosConfig,    setBonosConfig,    bonosReady]    = useFirebaseState("bonos-config", {
     pctFondo:50, pctEjecutor:50, pctAyudante:30, pctApoyo:20, año:new Date().getFullYear()
   });
@@ -16691,20 +16239,10 @@ export default function App() {
     return [...base,...custom].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
   };
 
-  const todasLasZonas = (() => {
-    const base = MACROZONAS_BASE.map(z=>{
-      const zd = getZD(z.id);
-      return zd.nombreCustom||zd.categoriaCustom||zd.iconoCustom
-        ? {...z, nombre:zd.nombreCustom||z.nombre, categoria:zd.categoriaCustom||z.categoria, icono:zd.iconoCustom||z.icono}
-        : z;
-    });
-    const nombresBase = new Set(base.map(z=>z.nombre.toLowerCase().trim()));
-    const custom = macrozonasCust.filter(z=>!nombresBase.has((z.nombre||"").toLowerCase().trim()));
-    return [...base, ...custom];
-  })();
+  const todasLasZonas = [...MACROZONAS_BASE, ...macrozonasCust];
   const filteredZonas = todasLasZonas.filter(z=>{
-    const matchC=filtroCat==="Todas"||(z.categoria||"Sin categoría")===filtroCat;
-    const matchE=filtroEst==="Todos"||getEstadoZona(z.id)===filtroEst;
+    const matchC=filtroCat==="Todas"||z.categoria===filtroCat;
+    const matchE=filtroEst==="Todos"||getZD(z.id).estadoGeneral===filtroEst;
     const filtQ=(busq||"").trim().toLowerCase();
     const matchB=!filtQ||
       z.nombre.toLowerCase().includes(filtQ)||
@@ -16713,18 +16251,15 @@ export default function App() {
     return matchC&&matchE&&matchB;
   }).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
 
-  // Estado calculado automáticamente según frecuencias
-  const getEstadoZona = (zid) => calcularEstadoZona(zid, getAllElems, getElemFrecs, data);
-
   const stats = {
-    total: todasLasZonas.length,
-    bueno: todasLasZonas.filter(z=>getEstadoZona(z.id)==="bueno").length,
-    regular: todasLasZonas.filter(z=>getEstadoZona(z.id)==="regular").length,
-    critico: todasLasZonas.filter(z=>getEstadoZona(z.id)==="critico").length,
-    mantenimiento: todasLasZonas.filter(z=>getEstadoZona(z.id)==="mantenimiento").length,
+    total: MACROZONAS_BASE.length,
+    bueno: MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral==="bueno").length,
+    regular: MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral==="regular").length,
+    critico: MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral==="critico").length,
+    mantenimiento: MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral==="mantenimiento").length,
   };
-  const totalElems = todasLasZonas.reduce((a,z)=>a+getAllElems(z.id).length,0);
-  const elemsOk = todasLasZonas.reduce((a,z)=>a+getAllElems(z.id).filter(e=>e.edData.estado==="bueno").length,0);
+  const totalElems = MACROZONAS_BASE.reduce((a,z)=>a+getAllElems(z.id).length,0);
+  const elemsOk = MACROZONAS_BASE.reduce((a,z)=>a+getAllElems(z.id).filter(e=>e.edData.estado==="bueno").length,0);
 
   const addTareaZona = (zid, texto, tareaObj) => {
     if(!texto.trim()) return;
@@ -16894,7 +16429,7 @@ export default function App() {
   };
 
   const renderElemCard = (e) => {
-    const est = ESTADOS_ELEM[e.edData.estado||"bueno"] || ESTADOS_ELEM["bueno"];
+    const est = ESTADOS_ELEM[e.edData.estado||"bueno"];
     const abierto = editElem?.eid===e.id;
     const frecs = getElemFrecs(zonaId,e.id,e.tipo,e.isCustom);
     const mesAct = new Date().getMonth()+1;
@@ -17221,7 +16756,7 @@ export default function App() {
       <div style={S.main}>
         {/* DASHBOARD */}
         {/* ── JEFA REVISA TURNO DE UN TRABAJADOR ── */}
-        {workerARevisar&&rolLogueado==="jefa"&&vista!=="golf"&&(()=>{
+        {workerARevisar&&rolLogueado==="jefa"&&(()=>{
           const arr=Array.isArray(personal)?personal:Object.values(personal||{});
           const trab=arr.find(x=>String(x.id)===String(workerARevisar));
           if(!trab) return null;
@@ -17242,12 +16777,6 @@ export default function App() {
                 tareas={tareasProg}
                 S={S}
                 esJefaApp={true}
-                golfData={{...golfData,humedades:[
-                  ...(Array.isArray(humedadesData)?humedadesData:Object.values(humedadesData||{})),
-                  ...(Array.isArray(golfData.humedades)?golfData.humedades:Object.values(golfData.humedades||{}))
-                ]}}
-                setGolfData={setGolfData}
-                setHumedadesData={setHumedadesData}
                 crearNotificacion={crearNotificacion}
                 onGuardarRutinas={(estado)=>{
                   const tId = workerLogueado;
@@ -17285,7 +16814,7 @@ export default function App() {
                       // Se dispara cuando: (a) se marca hecha y ya tenía altura, o
                       //                   (b) se guarda altura y ya estaba hecha
                       const esCorteGolf = (tActualizada.zona==="Golf"||(tActualizada.zona||"").includes("Golf")) &&
-                                          ((tActualizada.tarea||"").toLowerCase().includes("corte")||(tActualizada.tarea||"").toLowerCase().includes("green"));
+                                          (tActualizada.tarea||"").toLowerCase().includes("corte");
                       const estadoHecho = normalizarEstado(tActualizada.estado)==="hecha";
                       const altReal = tActualizada.alturaCorteReal ? Number(tActualizada.alturaCorteReal) : null;
                       // Solo crear medición si este patch es el que completa el par hecha+altura
@@ -17301,9 +16830,8 @@ export default function App() {
                         const zonaGolf = (tActualizada.elemento||tActualizada.subZona||"").toLowerCase();
                         const tareaGolfNombre = (tActualizada.tarea||"").toLowerCase();
                         const alturas = {};
-                        // Corte general: elemento vacío, "todos", o la tarea es corte de césped sin green específico
                         const esCorteGeneral = zonaGolf.includes("todos")||tareaGolfNombre.includes("todos")||
-                                               tareaGolfNombre.includes("greens + vivero")||zonaGolf===""||                                               (tareaGolfNombre.includes("césped")||tareaGolfNombre.includes("cesped"))&&!zonaGolf.includes("green");
+                                               tareaGolfNombre.includes("greens + vivero")||zonaGolf==="";
                         if(esCorteGeneral) {
                           // Corte de todos los greens y vivero
                           ["g1","g2","g3","g4","g5","g6","g7","g8","g9","vivero"].forEach(z=>{ alturas[z]=altReal; });
@@ -17359,7 +16887,7 @@ export default function App() {
                   return {frecs,eid:elem.id,isCustom:false};
                 }}
                 MACROZONAS_BASE={MACROZONAS_BASE}
-                onAccesoRapido={(vista,subTab)=>{setWorkerARevisar(null);setVista(vista);if(subTab)setGolfInitTab(subTab);}}
+                onAccesoRapido={(vista,subTab)=>{setVista(vista);if(subTab)setGolfInitTab(subTab);setWorkerARevisar(null);}}
                 onCambiarMetodo={()=>{}}
                 onCerrarTurno={()=>{}}
                 onReabrirTurno={(fecha,nombre)=>{
@@ -17467,7 +16995,7 @@ export default function App() {
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",marginBottom:20,flexWrap:"wrap",gap:12}}>
               <div>
                 <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:24,fontWeight:900}}>Macrozonas</h1>
-                <p style={{color:"#6aaa7a",fontSize:14}}>{filteredZonas.length} de {todasLasZonas.length} zonas</p>
+                <p style={{color:"#6aaa7a",fontSize:14}}>{filteredZonas.length} de {MACROZONAS_BASE.length+macrozonasCust.length} zonas</p>
               </div>
               {esJefa&&(
                 <button onClick={()=>setShowNuevaMacrozona(true)}
@@ -17489,22 +17017,12 @@ export default function App() {
                   <div>
                     <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Categoría</label>
                     <select style={S.input} value={nuevaMacrozona.categoria} onChange={e=>setNuevaMacrozona(p=>({...p,categoria:e.target.value}))}>
-                      {[...new Set(todasLasZonas.map(z=>z.categoria).filter(Boolean))].sort().map(c=><option key={c} value={c}>{c}</option>)}
+                      {[...new Set(MACROZONAS_BASE.map(z=>z.categoria))].map(c=><option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
                   <div>
                     <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Ícono</label>
                     <input style={S.input} value={nuevaMacrozona.icono} onChange={e=>setNuevaMacrozona(p=>({...p,icono:e.target.value}))} placeholder="🌿"/>
-                    <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:5}}>
-                      {["🌿","🌳","🌺","🌸","🍃","🏡","⛳","🏊","🏟️","🎾","🛤️","🌊","🏋️","🏃","🌻","🌴","🏠","🌱"].map(ico=>(
-                        <button key={ico} onClick={()=>setNuevaMacrozona(p=>({...p,icono:ico}))}
-                          style={{fontSize:18,padding:"2px 4px",borderRadius:4,cursor:"pointer",
-                            border:`1px solid ${nuevaMacrozona.icono===ico?"rgba(52,211,153,0.5)":"rgba(255,255,255,0.1)"}`,
-                            background:nuevaMacrozona.icono===ico?"rgba(52,211,153,0.1)":"transparent"}}>
-                          {ico}
-                        </button>
-                      ))}
-                    </div>
                   </div>
                   <div style={{gridColumn:"1/-1"}}>
                     <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Descripción (opcional)</label>
@@ -17549,7 +17067,7 @@ export default function App() {
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(230px,1fr))",gap:14}}>
               {filteredZonas.map(z=>{
-                const dzd=getZD(z.id); const estCalc=getEstadoZona(z.id); const est=ESTADOS_ZONA[estCalc]||{color:"#22c55e",bg:"rgba(34,197,94,0.12)",label:"Bueno"};
+                const dzd=getZD(z.id); const est=ESTADOS_ZONA[dzd.estadoGeneral||"bueno"];
                 const allElems=getAllElems(z.id);
                 const criticos=allElems.filter(e=>e.edData.estado==="critico").length;
                 const pendTareas=(dzd.tareas||[]).filter(t=>!t.completada).length;
@@ -17568,10 +17086,10 @@ export default function App() {
                     <div style={{paddingLeft:6}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
                         <div style={{display:"flex",alignItems:"center",gap:8}}>
-                          <span style={{fontSize:22}}>{getZD(z.id).iconoCustom||z.icono}</span>
+                          <span style={{fontSize:22}}>{z.icono}</span>
                           <div>
-                            <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,lineHeight:1.2}}>{getZD(z.id).nombreCustom||z.nombre}</div>
-                            <div style={{fontSize:10,color:"#5a8a6a",marginTop:1}}>{getZD(z.id).categoriaCustom||z.categoria}</div>
+                            <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,lineHeight:1.2}}>{z.nombre}</div>
+                            <div style={{fontSize:10,color:"#5a8a6a",marginTop:1}}>{z.categoria}</div>
                           </div>
                         </div>
                         <span style={{fontSize:10,fontWeight:600,color:est.color,background:est.bg,padding:"2px 7px",borderRadius:8,border:`1px solid ${est.color}35`,flexShrink:0}}>{est.label}</span>
@@ -17594,8 +17112,7 @@ export default function App() {
           <div className="ein">
             <button style={{...S.btn,background:"transparent",color:"#a0c8a0",border:"1px solid rgba(160,200,140,0.22)",marginBottom:20}} onClick={()=>{setZonaId(null);setAiText("");}}>← Volver</button>
             {(()=>{
-              const estadoCalculado = calcularEstadoZona(zonaId, getAllElems, getElemFrecs, data);
-              const estZona = ESTADOS_ZONA[estadoCalculado]||ESTADOS_ZONA["bueno"];
+              const estZona = ESTADOS_ZONA[zd.estadoGeneral||"bueno"]||{color:"#22c55e",bg:"rgba(34,197,94,0.1)",label:"Bueno"};
               const elemsZona = getAllElems(zonaId);
               const criticosZona = elemsZona.filter(e=>e.estado==="critico").length;
               const regularesZona = elemsZona.filter(e=>e.estado==="regular").length;
@@ -17607,18 +17124,12 @@ export default function App() {
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12}}>
                       {/* Izquierda: icono + nombre + chips */}
                       <div style={{display:"flex",alignItems:"center",gap:14,flex:1,minWidth:200}}>
-                        <span style={{fontSize:44,lineHeight:1}}>{zd.iconoCustom||zona.icono}</span>
+                        <span style={{fontSize:44,lineHeight:1}}>{zona.icono}</span>
                         <div>
-                          <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:21,fontWeight:900,marginBottom:6,lineHeight:1.2}}>{zd.nombreCustom||zona.nombre}</h2>
-                          {esJefa&&!editZonaForm&&(
-                            <button onClick={()=>setEditZonaForm({nombre:zd.nombreCustom||zona.nombre,icono:zd.iconoCustom||zona.icono,descripcion:zd.descripcion||zona.descripcion||"",categoria:zd.categoriaCustom||zona.categoria||""})}
-                              style={{fontSize:11,padding:"2px 8px",borderRadius:5,cursor:"pointer",border:"1px solid rgba(96,165,250,0.3)",background:"rgba(96,165,250,0.08)",color:"#60a5fa"}}>
-                              ✏️ Editar
-                            </button>
-                          )}
+                          <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:21,fontWeight:900,marginBottom:6,lineHeight:1.2}}>{zona.nombre}</h2>
                           <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
                             <span style={{fontSize:11,color:"#6aaa7a",background:"rgba(255,255,255,0.06)",padding:"2px 8px",borderRadius:6,border:"1px solid rgba(255,255,255,0.1)"}}>
-                              📂 {zd.categoriaCustom||zona.categoria}
+                              📂 {zona.categoria}
                             </span>
                             <span style={{fontSize:11,color:"#6ab0c0",background:"rgba(96,176,192,0.08)",padding:"2px 8px",borderRadius:6,border:"1px solid rgba(96,176,192,0.15)"}}>
                               📋 {elemsZona.length} elementos
@@ -17640,47 +17151,16 @@ export default function App() {
                       <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
                         <div style={{display:"flex",alignItems:"center",gap:6,background:estZona.bg,border:`1px solid ${estZona.color}40`,borderRadius:8,padding:"4px 6px 4px 10px"}}>
                           <span style={{fontSize:12,color:estZona.color,fontWeight:600}}>{estZona.label}</span>
-                          <span style={{fontSize:11,color:"#6aaa7a",cursor:"pointer"}} title="Solo 'En Mantenimiento' es manual — el resto se calcula automáticamente"
-                              onClick={()=>{
-                                const actual = zd.estadoGeneral;
-                                const nuevo = actual==="mantenimiento" ? null : "mantenimiento";
-                                updateZona(zonaId,{estadoGeneral:nuevo});
-                                addHistorial(zonaId, nuevo?"→ En Mantenimiento":"← Mantenimiento removido");
-                              }}>
-                              {zd.estadoGeneral==="mantenimiento" ? "🔧 Quitar mantenimiento" : "🔧 Poner en mantenimiento"}
-                            </span>
+                          <select value={zd.estadoGeneral||"bueno"}
+                            onChange={e=>{updateZona(zonaId,{estadoGeneral:e.target.value});addHistorial(zonaId,`Estado zona → ${ESTADOS_ZONA[e.target.value].label}`);}}
+                            style={{background:"transparent",border:"none",color:estZona.color,fontSize:11,cursor:"pointer",padding:"2px 0"}}>
+                            {Object.entries(ESTADOS_ZONA).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
+                          </select>
                         </div>
                         <button style={{...S.btn,background:"rgba(61,122,82,0.2)",color:"#a0d8b0",border:"1px solid rgba(61,122,82,0.35)",fontSize:12}}
                           onClick={getSugerenciaAI} disabled={aiLoading}>
                           {aiLoading?<><span className="spin"/> Analizando...</>:"🤖 Sugerencia IA"}
                         </button>
-                        {esJefa&&(
-                          <button style={{...S.btn,fontSize:11,background:"rgba(96,165,250,0.1)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.2)"}}
-                            onClick={()=>{
-                              const n=window.prompt("Nuevo nombre para esta macrozona:",zona.nombre);
-                              if(!n?.trim()) return;
-                              const ic=window.prompt("Ícono (emoji):",zona.icono||"🌿");
-                              const desc=window.prompt("Descripción (opcional):",zona.descripcion||"");
-                              if(zona.esPersonalizada) {
-                                setMacrozonasCust(prev=>prev.map(z=>z.id===zona.id?{...z,nombre:n.trim(),icono:ic||z.icono,descripcion:desc}:z));
-                              } else {
-                                // Para macrozonas base: guardar nombre e ícono custom en Firebase
-                                updateZona(zonaId,{nombreCustom:n.trim(),iconoCustom:ic||zona.icono,descripcion:desc});
-                              }
-                            }}>
-                            ✏️ Editar nombre
-                          </button>
-                        )}
-                        {esJefa&&zona.esPersonalizada&&(
-                          <button style={{...S.btn,fontSize:11,background:"rgba(239,68,68,0.08)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.2)"}}
-                            onClick={()=>{
-                              if(!window.confirm("¿Eliminar "+zona.nombre+"? Esta acción es permanente.")) return;
-                              setMacrozonasCust(prev=>prev.filter(z=>z.id!==zona.id));
-                              setZonaId(null);
-                            }}>
-                            🗑 Eliminar
-                          </button>
-                        )}
                       </div>
                     </div>
                     {/* Fechas de mantenimiento si existen */}
@@ -17694,65 +17174,6 @@ export default function App() {
                 </div>
               );
             })()}
-            {/* Formulario edición nombre/ícono/descripción */}
-            {editZonaForm&&esJefa&&(
-              <div style={{...S.card,padding:14,marginBottom:14,border:"1px solid rgba(96,165,250,0.25)"}}>
-                <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:"#60a5fa",marginBottom:12}}>✏️ Editar macrozona</div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 80px",gap:8,marginBottom:8}}>
-                  <div>
-                    <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Nombre</label>
-                    <input value={editZonaForm.nombre} onChange={e=>setEditZonaForm(p=>({...p,nombre:e.target.value}))} style={S.input}/>
-                  </div>
-                  <div>
-                    <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Ícono</label>
-                    <input value={editZonaForm.icono} onChange={e=>setEditZonaForm(p=>({...p,icono:e.target.value}))} style={{...S.input,textAlign:"center",fontSize:20}}/>
-                  </div>
-                </div>
-                <div style={{marginBottom:8}}>
-                  <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Categoría</label>
-                  <select value={editZonaForm.categoria} onChange={e=>setEditZonaForm(p=>({...p,categoria:e.target.value}))} style={S.input}>
-                    {[...new Set([...MACROZONAS_BASE.map(z=>z.categoria),"Deportivo","Jardines","Calles y Accesos","Áreas Comunes","Instalaciones","Golf","Otro"])].sort().map(c=><option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-                <div style={{marginBottom:8}}>
-                  <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Descripción</label>
-                  <input value={editZonaForm.descripcion} onChange={e=>setEditZonaForm(p=>({...p,descripcion:e.target.value}))} placeholder="Descripción breve de esta zona..." style={S.input}/>
-                </div>
-                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                  {["🌿","🌳","🌺","🌸","🏡","⛳","🏊","🏟️","🎾","🛤️","🌻","🌴","🏠","🌱","🍃","🏋️"].map(ico=>(
-                    <button key={ico} onClick={()=>setEditZonaForm(p=>({...p,icono:ico}))}
-                      style={{fontSize:16,padding:"2px 4px",borderRadius:4,cursor:"pointer",
-                        border:`1px solid ${editZonaForm.icono===ico?"rgba(52,211,153,0.5)":"rgba(255,255,255,0.1)"}`,
-                        background:editZonaForm.icono===ico?"rgba(52,211,153,0.1)":"transparent"}}>
-                      {ico}
-                    </button>
-                  ))}
-                </div>
-                <div style={{display:"flex",gap:8,marginTop:12}}>
-                  <button onClick={()=>{
-                    if(zona.esPersonalizada){
-                      setMacrozonasCust(prev=>prev.map(z=>z.id===zona.id?{...z,nombre:editZonaForm.nombre,icono:editZonaForm.icono,descripcion:editZonaForm.descripcion,categoria:editZonaForm.categoria}:z));
-                    } else {
-                      updateZona(zonaId,{nombreCustom:editZonaForm.nombre,iconoCustom:editZonaForm.icono,descripcion:editZonaForm.descripcion,categoriaCustom:editZonaForm.categoria});
-                    }
-                    setEditZonaForm(null);
-                  }} style={{...S.btn,background:"rgba(52,211,153,0.12)",color:"#34d399",border:"1px solid rgba(52,211,153,0.3)"}}>
-                    💾 Guardar
-                  </button>
-                  <button onClick={()=>setEditZonaForm(null)} style={{...S.btn}}>Cancelar</button>
-                  {zona.esPersonalizada&&(
-                    <button onClick={()=>{
-                      if(!window.confirm("¿Eliminar "+zona.nombre+"? Esta acción es permanente."))return;
-                      setMacrozonasCust(prev=>prev.filter(z=>z.id!==zona.id));
-                      setZonaId(null);setEditZonaForm(null);
-                    }} style={{...S.btn,background:"rgba(239,68,68,0.08)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.2)",marginLeft:"auto"}}>
-                      🗑 Eliminar macrozona
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-
             {(aiLoading||aiText)&&(
               <div style={{background:"rgba(40,100,60,0.15)",border:"1px solid rgba(61,122,82,0.35)",borderRadius:12,padding:18,marginBottom:18}}>
                 <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:10,color:"#90d4a0"}}>🤖 Recomendaciones del Asistente</div>
@@ -17761,7 +17182,7 @@ export default function App() {
               </div>
             )}
             <div style={{display:"flex",gap:4,marginBottom:16,borderBottom:"1px solid rgba(255,255,255,0.08)",paddingBottom:0,overflowX:"auto"}}>
-              {[["elementos","🌿","Elementos"],["info","📝","Info"],["tareas","✅","Tareas"],["historial","📜","Historial"],...(zona?.categoria==="Bodegas"?[["recursos","🏗️","Recursos"]]:[])].map(([t,ico,lbl])=>(
+              {[["elementos","🌿","Elementos"],...(String(zona?.id)!=="31"?[["historial","📜","Historial"]]:[]),...(zona?.categoria==="Bodegas"?[["recursos","🏗️","Recursos"]]:[])].map(([t,ico,lbl])=>(
                 <button key={t} onClick={()=>setTab(t)} style={{
                   cursor:"pointer",border:"none",background:"transparent",
                   color:tab===t?"#34d399":"#6aaa7a",
@@ -17783,7 +17204,7 @@ export default function App() {
               <div className="ein">
                 {(()=>{
                   const todosElems = getAllElems(zonaId);
-                  const VEGE_KEYS  = ["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macizos","setos","macetas_piso","colgantes"];
+                  const VEGE_KEYS  = ["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
                   const INFRA_KEYS = ["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","bodegas"];
                   const vegeElems  = todosElems.filter(e=>VEGE_KEYS.includes(e.tipo));
                   const infraElems = todosElems.filter(e=>INFRA_KEYS.includes(e.tipo));
@@ -18139,7 +17560,7 @@ export default function App() {
                     +"</style></head><body>"
                     +"<h1>📋 Reporte General de Áreas Verdes — Estadio Español</h1>"
                     +"<div class='sub'>Fecha del reporte: "+new Date(fechaReporte+"T12:00:00").toLocaleDateString("es-CL",{weekday:"long",year:"numeric",month:"long",day:"numeric"})+" · Generado: "+new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"})+"</div>"
-                    +"<div class='stats'>"+estadoStats+" &nbsp;·&nbsp; <b>Total zonas: "+todasLasZonas.length+"</b></div>"
+                    +"<div class='stats'>"+estadoStats+" &nbsp;·&nbsp; <b>Total zonas: "+MACROZONAS_BASE.length+"</b></div>"
                     +"<table><thead><tr><th>Zona</th><th>Categoría</th><th>Estado</th><th>Elementos</th><th>Críticos</th><th>Últ. Mant.</th><th>Próx. Mant.</th><th>Tareas Pend.</th></tr></thead><tbody>"+zonaRows+"</tbody></table>"
                     +"<div class='pie'><span>Estadio Español de Las Condes · Departamento de Áreas Verdes</span><span>"+new Date().getFullYear()+"</span></div>"
                     +"</body></html>";
@@ -18161,7 +17582,7 @@ export default function App() {
                 <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,marginBottom:14}}>📊 Zonas por Estado</div>
                 {Object.entries(ESTADOS_ZONA).map(([k,v])=>{
                   const statC2=MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral===k).length;
-                  const pct=Math.round((statC2/todasLasZonas.length)*100);
+                  const pct=Math.round((statC2/MACROZONAS_BASE.length)*100);
                   return (
                     <div key={k} style={{marginBottom:10}}>
                       <div style={{display:"flex",justifyContent:"space-between",marginBottom:3,fontSize:13}}>
@@ -18231,7 +17652,7 @@ export default function App() {
 
         {/* PROGRAMACIÓN */}
         {vista==="programacion"&&(
-          <ProgramacionDiaria key="prog" S={S} zonas={zonasConCust} data={data} personal={personal} getZD={getZD} getAllElems={getAllElems} MACROZONAS_BASE={MACROZONAS_BASE} tareas={tareasProg} setTareas={setTareasProg} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal}
+          <ProgramacionDiaria key="prog" S={S} zonas={zonas} data={data} personal={personal} getZD={getZD} getAllElems={getAllElems} MACROZONAS_BASE={MACROZONAS_BASE} tareas={tareasProg} setTareas={setTareasProg} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal}
             getElemFrecs={getElemFrecs} setElemFrecs={setElemFrecs} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} stockFito={stockFito} setStockFito={setStockFito} crearNotificacion={crearNotificacion}
             tareasZonaHoy={(tareasProg[new Date().toISOString().slice(0,10)]||[]).filter(t=>t.origenZona&&t.estado==="por_designar").length}
             esJefa={rolLogueado==="jefa"}
@@ -18274,12 +17695,6 @@ export default function App() {
                   tareas={tareasProg}
                   S={S}
                   MACROZONAS_BASE={MACROZONAS_BASE}
-                  golfData={{...golfData,humedades:[
-                  ...(Array.isArray(humedadesData)?humedadesData:Object.values(humedadesData||{})),
-                  ...(Array.isArray(golfData.humedades)?golfData.humedades:Object.values(golfData.humedades||{}))
-                ]}}
-                  setGolfData={setGolfData}
-                  setHumedadesData={setHumedadesData}
                   onUpdateTarea={(fecha,tid,patch)=>{
                     const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
                     setTareasProg(prev=>{
