@@ -2324,7 +2324,7 @@ function ConfiguradorSemanal({ S, personal, configSemanal, setConfigSemanal, esJ
                       onChange={e=>setResp(t.id, e.target.value)}>
                       <option value="">— Sin asignar —</option>
                       {jardineros.map(p=>(
-                        <option key={p.id} value={p.nombre}>{p.nombre.split(" ")[0]} {p.nombre.split(" ")[1]||""}</option>
+                        <option key={p.id} value={p.nombre}>{getNombreRef(p.nombre)} {p.nombre.split(" ")[1]||""}</option>
                       ))}
                     </select>
                 }
@@ -2710,6 +2710,17 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   };
 
   const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
+// Primer nombre de la ficha de personal (ej: "Bhalú" de "Osmar Bhalú Armijo Zúñiga")
+// El orden en la ficha manda — el primer campo "nombre" es el nombre base
+const getNombreRef = (nombreCompleto) => {
+  if(!nombreCompleto) return "";
+  const partes = nombreCompleto.trim().split(" ").filter(p=>p.length>1);
+  // Si el nombre tiene más de 2 palabras, usar la segunda (apellidos al final)
+  // Para Bhalú: "Osmar Bhalú Armijo Zúñiga" → segundo nombre es el apodo
+  // Para Carmen Luz: "Carmen Luz Hermosilla Diez" → primer nombre
+  // Regla: usar el primer nombre tal como está en el campo "nombre"
+  return partes[0]||nombreCompleto;
+};
   const ORDEN_ESTADO = {pendiente:0, haciendose:1, no_pudo:2, hecha:3, por_designar:4};
   function esDiariaVW(tareaObj) {
     if(tareaObj.diaria === true) return true;
@@ -3549,7 +3560,7 @@ function PlanificadorSemanal({ S, MACROZONAS_BASE, getAllElems, getZD, getElemFr
                       <div style={{fontSize:11}}><span style={{color:"#5a9a7a"}}>{t.zonaIcono} {t.zona}</span>{t.elemento&&<span style={{color:"#4a7a5a",marginLeft:4,fontSize:10}}>· {t.elemento}</span>}{t.urgente&&<span style={{color:"#f87171",marginLeft:4,fontSize:9}}>⚠️ {t.diasDesde}d</span>}</div>
                       <select value={t.responsable} onChange={e=>{t.responsable=e.target.value;}} style={{fontSize:10,padding:"1px 3px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:4,color:"#c0dac0",width:"100%"}}>
                         <option value="">—</option>
-                        {personalArr.map(p=><option key={p.id} value={p.nombre}>{p.nombre.split(" ")[0]}</option>)}
+                        {personalArr.map(p=><option key={p.id} value={p.nombre}>{getNombreRef(p.nombre)}</option>)}
                       </select>
                       {diasSemana.map(d=><button key={d} onClick={()=>setAsig(t.key,d)} style={{width:"100%",height:28,borderRadius:5,cursor:"pointer",fontSize:10,border:`1px solid ${asignaciones[t.key]===d?"rgba(52,211,153,0.6)":"rgba(255,255,255,0.08)"}`,background:asignaciones[t.key]===d?"rgba(52,211,153,0.2)":"transparent",color:asignaciones[t.key]===d?"#34d399":"#4a7a5a"}}>{asignaciones[t.key]===d?"✓":fmtDia(d).split(" ")[0].slice(0,2)}</button>)}
                     </div>
@@ -3819,41 +3830,8 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
               🔄 Actualizar estructura Golf en Firebase
             </button>
           )}
-          {esJefa&&(
-            <button onClick={()=>{
-              if(!window.confirm("¿Eliminar TODAS las tareas auto-generadas de Golf (auto:true) de todos los días? Esto limpia los duplicados.")) return;
-              setTareas(prev=>{
-                const limpio={};
-                Object.entries(prev||{}).forEach(([d,arr])=>{
-                  const a=Array.isArray(arr)?arr:Object.values(arr||{});
-                  const filtrada=a.filter(t=>!(t.auto===true&&(t.zona==="Golf"||(t.zona||"").includes("Golf"))&&!t.origenAlerta));
-                  if(filtrada.length>0) limpio[d]=filtrada;
-                });
-                return limpio;
-              });
-            }} style={{...S.btn,background:"rgba(239,68,68,0.1)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.2)",fontSize:11}}>
-              🧹 Limpiar tareas auto Golf
-            </button>
           )}
-          {esJefa&&(
-            <button onClick={()=>{
-              const hoy = fecha;
-              setTareas(prev=>{
-                const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-                const arr = normArr(prev[hoy]||[]);
-                const count = arr.filter(t=>(t.zona==="Golf"||(t.zona||"").toLowerCase().includes("golf"))&&!t.responsable).length;
-                if(count===0){alert("No hay tareas de Golf sin asignar hoy.");return prev;}
-                const updated = arr.map(t=>{
-                  const esGolf=(t.zona==="Golf"||(t.zona||"").toLowerCase().includes("golf"));
-                  return esGolf&&!t.responsable?{...t,responsable:"Osmar Bhalú Armijo Zúñiga",estado:"pendiente"}:t;
-                });
-                alert(count+" tarea(s) de Golf asignadas a Bhalú.");
-                return {...prev,[hoy]:updated};
-              });
-            }} style={{...S.btn,background:"rgba(251,191,36,0.1)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.2)",fontSize:11}}>
-              ⛳ Asignar Golf → Bhalú
-            </button>
-          )}
+
           {esJefa&&(
             <button onClick={()=>{
               // MODO LLUVIA
@@ -4076,7 +4054,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                 {(Array.isArray(personal)?personal:Object.values(personal||{}))
                   .sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}))
                   .map(p=>(
-                    <option key={p.id} value={p.nombre}>{p.nombre.split(" ")[0]} {p.nombre.split(" ")[1]||""}</option>
+                    <option key={p.id} value={p.nombre}>{getNombreRef(p.nombre)} {p.nombre.split(" ")[1]||""}</option>
                   ))
                 }
               </select>
@@ -11686,10 +11664,10 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
         {(()=>{
           // Tabs según rol: trabajador solo ve lo que le corresponde
-          const todosTabs = [["panel","📊 Panel"],["greens","⛳ Greens"],["tees","🎯 Tees"],["bunkers","🏖️ Búnkers"],["fairways","🌾 Fairways"],["zonas","🌿 Zonas"],["arboles","🌳 Árboles"],["mediciones","📏 Alturas"],["humedad","💧 Humedad"],["eventos","🏆 Eventos"],["fitosanitario","⚗ Fitosanitario"],["programacion_golf","📅 Semana Golf"]];
+          const todosTabs = [["panel","📊 Panel"],["greens","⛳ Greens"],["tees","🎯 Tees"],["bunkers","🏖️ Búnkers"],["fairways","🌾 Fairways"],["zonas","🌿 Zonas"],["arboles","🌳 Árboles"],["mediciones","📏 Alturas"],["humedad","💧 Humedad"],["eventos","🏆 Eventos"],["fitosanitario","⚗ Fitosanitario"],["programacion_golf","📅 Programación Golf"]];
           const tabsWorker = [["mediciones","📏 Alturas"],["humedad","💧 Humedad"]];
           // Agregar Programación solo para jefa/supervisor
-          const todosTabs2 = [...todosTabs, ["programacion_golf","📅 Programación"]];
+          const todosTabs2 = [...todosTabs, ["programacion_golf","📅 Programación Golf"]];
           const tabsVisibles = (rolLogueado==="trabajador") ? tabsWorker : todosTabs2;
           return tabsVisibles;
         })().map(([t,l])=>(
@@ -12940,9 +12918,6 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                       })}
                     </tbody>
                   </table>
-                </div>
-                <div style={{fontSize:10,color:"#4a7a5a",marginTop:8}}>
-                  Edita en <b>Programa → 📆 Programar</b> · Para cortar greens usa <b>Golf → 📏 Alturas</b>
                 </div>
               </div>
             );
@@ -17267,7 +17242,10 @@ export default function App() {
                 tareas={tareasProg}
                 S={S}
                 esJefaApp={true}
-                golfData={{...golfData,humedades:Array.isArray(humedadesData)?humedadesData:Object.values(humedadesData||{})}}
+                golfData={{...golfData,humedades:[
+                  ...(Array.isArray(humedadesData)?humedadesData:Object.values(humedadesData||{})),
+                  ...(Array.isArray(golfData.humedades)?golfData.humedades:Object.values(golfData.humedades||{}))
+                ]}}
                 setGolfData={setGolfData}
                 setHumedadesData={setHumedadesData}
                 crearNotificacion={crearNotificacion}
@@ -18296,7 +18274,10 @@ export default function App() {
                   tareas={tareasProg}
                   S={S}
                   MACROZONAS_BASE={MACROZONAS_BASE}
-                  golfData={{...golfData,humedades:Array.isArray(humedadesData)?humedadesData:Object.values(humedadesData||{})}}
+                  golfData={{...golfData,humedades:[
+                  ...(Array.isArray(humedadesData)?humedadesData:Object.values(humedadesData||{})),
+                  ...(Array.isArray(golfData.humedades)?golfData.humedades:Object.values(golfData.humedades||{}))
+                ]}}
                   setGolfData={setGolfData}
                   setHumedadesData={setHumedadesData}
                   onUpdateTarea={(fecha,tid,patch)=>{
