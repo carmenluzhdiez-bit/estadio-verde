@@ -2663,10 +2663,17 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   const hoy = fechaLocal();
   const setG = (patch) => setGolfData&&setGolfData(p=>({...p,...patch}));
   // Estados humedad para SeccionHumedad
-  const hoyVW = fechaLocal();
-  const emptyHumFormVW = {fecha:hoyVW,hora:new Date().toTimeString().slice(0,5),motivo:"rutina",responsable:trabajador?.nombre||"",valores:{},valorVivero:"",decision:"sin-cambio",obs:"",generarTarea:false};
+  const getEmptyHumFormVW = () => ({
+    fecha:fechaLocal(),
+    hora:new Date().toTimeString().slice(0,5),
+    motivo:"rutina",
+    responsable:trabajador?.nombre||"",
+    valores:{},valorVivero:"",
+    decision:"sin-cambio",obs:"",generarTarea:false
+  });
+  const emptyHumFormVW = getEmptyHumFormVW();
   const [showHumFormVW, setShowHumFormVW] = React.useState(true);
-  const [humFormVW, setHumFormVW] = React.useState(emptyHumFormVW);
+  const [humFormVW, setHumFormVW] = React.useState(getEmptyHumFormVW);
   const [fechaVer, setFechaVer] = React.useState(fecha || hoy);
   // Cierre de turno
   const turnoCerradoKey = `${fechaVer}_${(trabajador?.nombre||"").split(" ")[0].toLowerCase()}`;
@@ -10412,7 +10419,7 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
       ];
       return {...prev, [fechaHum]: listaFinalH};
     });
-    setHumForm(emptyHumForm);
+    setHumForm(emptyHumForm());
     setShowHumForm(false);
     if(crearNotificacion) {
       const vals = Object.entries(nueva.valores||{})
@@ -11296,7 +11303,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   React.useEffect(()=>{
     if(subTab==="humedad") setShowHumForm(true);
   },[subTab]);
-  const emptyHumForm = {fecha:hoy,hora:new Date().toTimeString().slice(0,5),motivo:"rutina",responsable:"",valores:{},valorVivero:"",decision:"sin-cambio",obs:"",generarTarea:false};
+  const emptyHumForm = () => ({fecha:fechaLocal(),hora:new Date().toTimeString().slice(0,5),motivo:"rutina",responsable:"",valores:{},valorVivero:"",decision:"sin-cambio",obs:"",generarTarea:false});
   const [humForm,        setHumForm]        = React.useState(emptyHumForm);
   const [selectedGreen,  setSelectedGreen]  = React.useState("g1");
   const [selectedTee,    setSelectedTee]    = React.useState("t1");
