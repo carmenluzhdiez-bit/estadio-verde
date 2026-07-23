@@ -12784,25 +12784,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           )}
         </div>
       )}
-      {subTab==="humedad"&&(
-        <SeccionHumedad
-          S={S}
-          golfData={golfData}
-          setG={setG}
-          listaPersonal={[trabajador].filter(Boolean)}
-          hoy={fechaLocal()}
-          esJefa={false}
-          tareasProg={tareas}
-          setTareasProg={()=>{}}
-          onRegistroGuardado={()=>{}}
-          crearNotificacion={crearNotificacion}
-          showHumForm={showHumFormVW}
-          setShowHumForm={setShowHumFormVW}
-          humForm={humFormVW}
-          setHumForm={setHumFormVW}
-          emptyHumForm={emptyHumFormVW}
-        />
-      )}
+
 
             {/* ── EVENTOS / TORNEOS ── */}
             {subTab==="programacion_golf"&&rolLogueado!=="trabajador"&&hoy&&(
