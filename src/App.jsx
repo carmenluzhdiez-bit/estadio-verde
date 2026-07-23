@@ -2690,7 +2690,11 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
     return [...tareaSet].sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
   };
 
-  const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
+  const getNombreRef = (nombreCompleto) => {
+  if(!nombreCompleto) return "";
+  return nombreCompleto.trim().split(" ")[0]||nombreCompleto;
+};
+const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
   const ORDEN_ESTADO = {pendiente:0, haciendose:1, no_pudo:2, hecha:3, por_designar:4};
   function esDiariaVW(tareaObj) {
     if(tareaObj.diaria === true) return true;
@@ -4989,305 +4993,271 @@ function GestionRecursos({ zonaId, S, personal, recursos, setRecursos, esJefa })
 // ─── PANEL DE FRECUENCIAS DE MANTENCIÓN ─────────────────────────────────────
 function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
   const ESTACIONES_LIST = ["verano","otono","invierno","primavera"];
+  const ESTACIONES_LABEL = {verano:"☀️ Verano",otono:"🍂 Otoño",invierno:"❄️ Invierno",primavera:"🌸 Primavera"};
   const DIAS_SEMANA = [
-    {v:1,l:"Lun",full:"Lunes"},{v:2,l:"Mar",full:"Martes"},{v:3,l:"Mié",full:"Miércoles"},
-    {v:4,l:"Jue",full:"Jueves"},{v:5,l:"Vie",full:"Viernes"},{v:6,l:"Sáb",full:"Sábado"},{v:0,l:"Dom",full:"Domingo"},
+    {v:1,l:"Lun"},{v:2,l:"Mar"},{v:3,l:"Mié"},{v:4,l:"Jue"},{v:5,l:"Vie"},{v:6,l:"Sáb"},{v:0,l:"Dom"},
   ];
+  const FRECUENCIAS_OPTS = [
+    {v:"diario",l:"Diario (1d)"},{v:"cada2dias",l:"Cada 2 días"},{v:"cada3dias",l:"Cada 3 días"},
+    {v:"cada5dias",l:"Cada 5 días"},{v:"semanal",l:"Semanal (7d)"},{v:"quincenal",l:"Quincenal (15d)"},
+    {v:"mensual",l:"Mensual (30d)"},{v:"bimestral",l:"Bimestral (60d)"},{v:"trimestral",l:"Trimestral (90d)"},
+    {v:"noaplica",l:"No aplica"},{v:"segunecesidad",l:"Según necesidad"},
+  ];
+
   const frecuenciasBase = getFrecs(zid, eid, tipo, isCustom);
   const [frecLocal, setFrecLocal] = React.useState(frecuenciasBase);
   const [guardado, setGuardado] = React.useState(false);
+  const [expandida, setExpandida] = React.useState(null); // idx de fila expandida
   React.useEffect(()=>{ setFrecLocal(getFrecs(zid,eid,tipo,isCustom)); setGuardado(false); },[zid,eid]);
-  const frecuencias = frecLocal;
-  const updateFila = (idx, campo, valor) => { setFrecLocal(arr=>arr.map((f,i)=>i===idx?{...f,[campo]:valor}:f)); setGuardado(false); };
-  const addFila = () => { setFrecLocal(arr=>[...arr,{id:eid+"_"+Date.now(),modo:"estacion",tarea:"",verano:"semanal",otono:"semanal",invierno:"noaplica",primavera:"semanal",ultimaVez:"",diasSemana:[],diasProhibidos:[0,6],diasMinimos:""}]); setGuardado(false); };
-  const removeFila = (idx) => { setFrecLocal(arr=>arr.filter((_,i)=>i!==idx)); setGuardado(false); };
-  const guardarFrecuencias = () => { setFrecs(zid,eid,isCustom,frecLocal); setGuardado(true); setTimeout(()=>setGuardado(false),2000); };
 
-  // Convierte frecuencia a días
-  const frecToDias = (frec) => {
-    const map = {diario:1,cada2dias:2,cada3dias:3,cada5dias:5,semanal:7,quincenal:15,mensual:30,bimestral:60,trimestral:90,semestral:180,anual:365,unavez:null,segunecesidad:null};
-    return map[frec]||null;
+  const frecuencias = frecLocal;
+  const updateFila = (i, campo, valor) => setFrecLocal(arr=>arr.map((f,j)=>j===i?{...f,[campo]:valor}:f));
+  const updateEstacion = (i, est, campo, valor) => setFrecLocal(arr=>arr.map((f,j)=>j===i?{...f,[est]:{...(f[est]||{}), [campo]:valor}}:f));
+
+  const addFila = () => {
+    const nueva = {
+      id:eid+"_"+Date.now(), tarea:"", ultimaVez:"",
+      verano:{tipo:"cadaXdias",cadaDias:"7",diasEspecificos:[]},
+      otono:{tipo:"cadaXdias",cadaDias:"15",diasEspecificos:[]},
+      invierno:{tipo:"noaplica",cadaDias:"",diasEspecificos:[]},
+      primavera:{tipo:"cadaXdias",cadaDias:"7",diasEspecificos:[]},
+      tareaEnlazada:"",
+    };
+    setFrecLocal(arr=>[...arr, nueva]);
+    setExpandida(frecLocal.length);
   };
 
-  // Estación actual (hemisferio sur)
+  const removeFila = (i) => { setFrecLocal(arr=>arr.filter((_,j)=>j!==i)); if(expandida===i) setExpandida(null); };
+  const guardarFrecuencias = () => { setFrecs(zid,eid,isCustom,frecLocal); setGuardado(true); setTimeout(()=>setGuardado(false),2000); };
+
   const fpMes = new Date().getMonth()+1;
   const estActual = [12,1,2].includes(fpMes)?"verano":[3,4,5].includes(fpMes)?"otono":[6,7,8].includes(fpMes)?"invierno":"primavera";
 
-  // Calcula próxima fecha — modo "estación" (por días desde última vez)
-  const calcProximaEstacion = (f) => {
-    const frecVal = f[estActual];
-    if(!frecVal||frecVal==="noaplica"||frecVal==="unavez"||frecVal==="segunecesidad") return null;
+  const getDiasConfig = (f, est) => {
+    // Compatible con el formato viejo (modo/verano/otono etc. como string) y nuevo (objeto por estación)
+    const estObj = f[est];
+    if(typeof estObj === "object" && estObj !== null) return estObj;
+    // Formato viejo — convertir
+    const frecVal = typeof estObj === "string" ? estObj : (f[est]||"noaplica");
+    return {tipo: frecVal==="noaplica"?"noaplica": frecVal==="segunecesidad"?"segunecesidad":"cadaXdias", cadaDias:"7", diasEspecificos:[]};
+  };
+
+  const getProximaDias = (f) => {
     if(!f.ultimaVez) return null;
-    const dias = frecToDias(frecVal);
+    const cfg = getDiasConfig(f, estActual);
+    if(!cfg||cfg.tipo==="noaplica"||cfg.tipo==="segunecesidad") return null;
+    let dias = null;
+    if(cfg.tipo==="cadaXdias") dias = Number(cfg.cadaDias)||null;
+    if(cfg.tipo==="porDiaSemana") dias = Number(cfg.cadaDias)||7;
     if(!dias) return null;
     const ultima = new Date(f.ultimaVez+"T12:00:00");
-    const proxima = new Date(ultima.getTime() + dias*24*60*60*1000);
+    const proxima = new Date(ultima.getTime()+dias*24*60*60*1000);
     const hoy = new Date(); hoy.setHours(12,0,0,0);
-    const diff = Math.round((proxima-hoy)/(24*60*60*1000));
-    return { fecha: proxima.toISOString().slice(0,10), diff };
+    return Math.round((proxima-hoy)/(24*60*60*1000));
   };
 
-  // Calcula próxima fecha — modo "diasSemana" (día específico de la semana, respetando mínimo de días y prohibidos)
-  const calcProximaDiaSemana = (f) => {
-    const hoy = new Date(); hoy.setHours(12,0,0,0);
-    const minimoDias = Number(f.diasMinimos)||0;
-    const prohibidos = f.diasProhibidos||[];
-    const hayDiasEspecificos = f.diasSemana && f.diasSemana.length>0;
-    // Sin última vez registrada no se puede proyectar nada
-    if(!f.ultimaVez) return null;
-    const ultima = new Date(f.ultimaVez+"T12:00:00");
-    // Fecha base: última vez + mínimo de días
-    let base = new Date(ultima.getTime() + minimoDias*24*60*60*1000);
-    if(base < hoy) base = hoy>base?base:hoy; // proyecta desde la fecha calculada aunque ya haya pasado (se mostrará vencida)
-    // Buscar el próximo día válido:
-    // - si hay días de semana específicos marcados: debe caer en uno de esos días Y no estar prohibido
-    // - si NO hay días específicos: solo evita los días prohibidos (ej. nunca sábado/domingo)
-    for(let i=0;i<400;i++){
-      const candidato = new Date(base.getTime() + i*24*60*60*1000);
-      const dow = candidato.getDay();
-      if(prohibidos.includes(dow)) continue;
-      if(hayDiasEspecificos && !f.diasSemana.includes(dow)) continue;
-      const diff = Math.round((candidato-hoy)/(24*60*60*1000));
-      return { fecha: candidato.toISOString().slice(0,10), diff, diaNombre: DIAS_SEMANA.find(d=>d.v===dow)?.full };
-    }
-    return null;
-  };
-
-  const calcProximaIntervalo = (f) => {
-    if(!f.ultimaVez||!f.intervaloDias) return null;
-    const dias = Number(f.intervaloDias);
-    if(!dias||dias<=0) return null;
-    const ultima = new Date(f.ultimaVez+"T12:00:00");
-    const proxima = new Date(ultima.getTime() + dias*24*60*60*1000);
-    const hoyD = new Date(); hoyD.setHours(12,0,0,0);
-    const diff = Math.round((proxima-hoyD)/(24*60*60*1000));
-    return { fecha: proxima.toISOString().slice(0,10), diff };
-  };
-  const calcProxima = (f) =>
-    f.modo==="diasSemana" ? calcProximaDiaSemana(f) :
-    f.modo==="intervalo"  ? calcProximaIntervalo(f)  :
-    calcProximaEstacion(f);
-  const esSinFrecuencia = (f) => f.modo!=="diasSemana" && f.modo!=="intervalo" && ["unavez","segunecesidad"].includes(f[estActual]);
-
-  const inputSt = {background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:7,color:"#ede9e0",padding:"7px 10px",fontFamily:"'Georgia',serif",fontSize:13,width:"100%",outline:"none"};
+  const inputSt = {background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:6,color:"#c0dac0",padding:"5px 8px",fontSize:12,width:"100%"};
   const labelSt = {fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
 
   return (
     <div style={{marginTop:14,borderTop:"1px solid rgba(255,255,255,0.08)",paddingTop:14}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:6}}>
-        <div style={{fontFamily:"'Playfair Display',serif",fontSize:13,fontWeight:700,color:"#a0d8b0"}}>📅 Frecuencias de Mantención</div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <div style={{fontFamily:"'Playfair Display',serif",fontSize:13,fontWeight:700,color:"#a0d8b0"}}>
+          🔄 Frecuencias de mantenimiento
+        </div>
         <div style={{fontSize:11,color:"#5a8a6a"}}>
           Estación actual: <b style={{color:ESTACIONES[estActual].color}}>{ESTACIONES[estActual].icon} {ESTACIONES[estActual].label}</b>
-          <span style={{marginLeft:8,color:"#ef4444",fontSize:10}}>■ vencida</span>
-          <span style={{marginLeft:6,color:"#f59e0b",fontSize:10}}>■ ≤7d</span>
-          <span style={{marginLeft:6,color:"#fcd34d",fontSize:10}}>■ ≤30d</span>
-          <span style={{marginLeft:6,color:"#22c55e",fontSize:10}}>■ ok</span>
         </div>
       </div>
 
-      {frecuencias.length===0 && (
-        <div style={{padding:"16px",textAlign:"center",color:"#4a8a5a",fontSize:13,background:"rgba(255,255,255,0.03)",borderRadius:8,marginBottom:10}}>
+      {frecuencias.length===0&&(
+        <div style={{padding:16,textAlign:"center",color:"#4a8a5a",fontSize:13,background:"rgba(255,255,255,0.03)",borderRadius:8,marginBottom:10}}>
           Sin tareas definidas. Agrega una abajo.
         </div>
       )}
 
-      <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:12}}>
-        {frecuencias.map((f,idx)=>{
-          const modo = f.modo||"estacion";
-          const prox = calcProxima(f);
-          const diasColor = prox===null?"#5a8a7a":prox.diff<0?"#ef4444":prox.diff<=7?"#f59e0b":prox.diff<=30?"#fcd34d":"#22c55e";
-          const diasLabel = prox===null?"—":prox.diff===0?"Hoy":prox.diff<0?`${Math.abs(prox.diff)}d atrás`:`${prox.diff}d`;
+      <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
+        {frecuencias.map((f,i)=>{
+          const abierta = expandida===i;
+          const diffDias = getProximaDias(f);
+          const diasColor = diffDias===null?"#5a8a7a":diffDias<0?"#ef4444":diffDias<=7?"#f59e0b":"#22c55e";
+          const diasLabel = diffDias===null?"—":diffDias===0?"Hoy":diffDias<0?`${Math.abs(diffDias)}d vencida`:`en ${diffDias}d`;
           return (
-            <div key={idx} style={{background:"rgba(255,255,255,0.04)",border:`1px solid ${prox&&prox.diff<0?"rgba(239,68,68,0.3)":prox&&prox.diff<=7?"rgba(245,158,11,0.3)":"rgba(255,255,255,0.08)"}`,borderRadius:10,padding:"12px 14px",borderLeft:`3px solid ${prox&&prox.diff<0?"#ef4444":prox&&prox.diff<=7?"#f59e0b":"rgba(61,122,82,0.4)"}`}}>
-              {/* Fila 1: Nombre tarea + badge días + botón eliminar */}
-              <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:10}}>
-                <div style={{flex:1}}>
-                  <label style={labelSt}>Nombre de la tarea</label>
-                  <input style={{...inputSt,fontSize:14,fontWeight:600}} value={f.tarea} onChange={e=>updateFila(idx,"tarea",e.target.value)} placeholder="Ej: Poda de limpieza, Riego, Corte de césped..."/>
-                </div>
-                <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,flexShrink:0}}>
-                  {/* Última vez + días transcurridos */}
-                  {f.ultimaVez&&(()=>{
-                    const hoyUlt=new Date();hoyUlt.setHours(12,0,0,0);
-                    const diasDesde=Math.round((hoyUlt-new Date(f.ultimaVez+"T12:00:00"))/(24*60*60*1000));
-                    const colD=diasDesde===0?"#22c55e":diasDesde<=7?"#f59e0b":"#94a3b8";
-                    return(<div style={{textAlign:"center",marginBottom:4}}>
-                      <div style={{fontSize:9,color:"#5a9a7a"}}>Última vez</div>
-                      <div style={{fontSize:11,fontWeight:700,color:colD}}>{diasDesde===0?"Hoy":`hace ${diasDesde}d`}</div>
-                      <div style={{fontSize:9,color:"#4a7a5a"}}>{new Date(f.ultimaVez+"T12:00:00").toLocaleDateString("es-CL",{day:"2-digit",month:"short",year:"2-digit"})}</div>
-                    </div>);
-                  })()}
-                  {esSinFrecuencia(f) ? (
-                    <span style={{fontSize:11,color:"#c084fc",background:"rgba(192,132,252,0.12)",padding:"4px 10px",borderRadius:8,border:"1px solid rgba(192,132,252,0.25)",whiteSpace:"nowrap"}}>
-                      {f[estActual]==="unavez"?"1 sola vez":"Según necesidad"}
-                    </span>
-                  ) : (
-                    <span style={{fontSize:12,fontWeight:700,color:diasColor,background:`${diasColor}18`,padding:"4px 10px",borderRadius:8,whiteSpace:"nowrap",border:`1px solid ${diasColor}35`}}>
-                      {diasLabel}
-                    </span>
-                  )}
-                  {prox&&(
-                    <div style={{fontSize:10,color:"#c084fc",textAlign:"center"}}>
-                      📌 {new Date(prox.fecha+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"short"})}
-                      {prox.diaNombre&&<div style={{fontSize:9,color:"#9a8acc"}}>{prox.diaNombre}</div>}
+            <div key={f.id||i} style={{background:"rgba(255,255,255,0.04)",border:`1px solid ${diffDias!==null&&diffDias<0?"rgba(239,68,68,0.3)":"rgba(255,255,255,0.1)"}`,borderRadius:10,overflow:"hidden"}}>
+              {/* Header de la fila — siempre visible */}
+              <div onClick={()=>setExpandida(abierta?null:i)}
+                style={{display:"flex",gap:8,alignItems:"center",padding:"10px 14px",cursor:"pointer",userSelect:"none",
+                  background:abierta?"rgba(52,211,153,0.05)":"transparent"}}>
+                <span style={{fontSize:11,color:abierta?"#34d399":"#6aaa7a",transform:abierta?"rotate(90deg)":"rotate(0deg)",transition:"transform 0.15s",display:"inline-block"}}>▶</span>
+                <span style={{fontWeight:600,fontSize:13,color:f.tarea?"#c0dac0":"#5a9a7a",flex:1}}>
+                  {f.tarea||"(sin nombre)"}
+                  {f.tareaEnlazada&&<span style={{fontSize:10,color:"#a78bfa",marginLeft:8}}>🔗 {f.tareaEnlazada}</span>}
+                </span>
+                {f.ultimaVez&&<span style={{fontSize:11,color:"#5a8a6a"}}>últ: {new Date(f.ultimaVez+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"short"})}</span>}
+                <span style={{fontSize:11,fontWeight:700,color:diasColor,background:`${diasColor}18`,padding:"2px 7px",borderRadius:8}}>{diasLabel}</span>
+                <button onClick={e=>{e.stopPropagation();removeFila(i);}}
+                  style={{background:"rgba(239,68,68,0.1)",border:"none",borderRadius:6,color:"#fca5a5",cursor:"pointer",padding:"2px 6px",fontSize:11}}>✕</button>
+              </div>
+
+              {/* Contenido expandido */}
+              {abierta&&(
+                <div style={{padding:"0 14px 14px"}}>
+                  {/* Nombre de tarea — selector del catálogo */}
+                  <div style={{marginBottom:10}}>
+                    <label style={labelSt}>Tarea</label>
+                    <div style={{position:"relative"}}>
+                      <input value={f.tarea}
+                        onChange={e=>updateFila(i,"tarea",e.target.value)}
+                        placeholder="Buscar tarea del catálogo o escribir nueva..."
+                        style={inputSt} autoComplete="off"/>
+                      {f.tarea.length>=2&&(()=>{
+                        const busq=f.tarea.toLowerCase();
+                        const sugs=CATALOGO_TAREAS.filter(c=>c.tarea.toLowerCase().includes(busq)&&c.tarea.toLowerCase()!==busq).slice(0,8);
+                        if(!sugs.length) return null;
+                        return (
+                          <div style={{position:"absolute",zIndex:999,top:"100%",left:0,right:0,background:"#1a2e1a",border:"1px solid rgba(52,211,153,0.3)",borderRadius:"0 0 8px 8px",maxHeight:180,overflowY:"auto",boxShadow:"0 4px 16px rgba(0,0,0,0.4)"}}>
+                            {sugs.map(c=>(
+                              <div key={c.id} onClick={()=>updateFila(i,"tarea",c.tarea)}
+                                style={{padding:"7px 12px",fontSize:12,color:"#c0dac0",cursor:"pointer",borderBottom:"1px solid rgba(255,255,255,0.04)"}}
+                                onMouseEnter={e=>e.currentTarget.style.background="rgba(52,211,153,0.1)"}
+                                onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                                <span style={{fontSize:9,color:"#4a7a5a",marginRight:6}}>{c.cat}</span>{c.tarea}
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
                     </div>
-                  )}
-                  <button onClick={()=>removeFila(idx)} style={{background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:6,color:"#fca5a5",cursor:"pointer",fontSize:12,padding:"3px 8px",marginTop:2}}>✕ Quitar</button>
-                </div>
-              </div>
+                  </div>
 
-              {/* Selector de modo */}
-              <div style={{display:"flex",gap:6,marginBottom:10}}>
-                <button onClick={()=>updateFila(idx,"modo","estacion")}
-                  style={{flex:1,cursor:"pointer",border:`1px solid ${modo==="estacion"?"rgba(52,211,153,0.5)":"rgba(255,255,255,0.1)"}`,borderRadius:7,padding:"6px 10px",fontSize:11,background:modo==="estacion"?"rgba(52,211,153,0.1)":"transparent",color:modo==="estacion"?"#34d399":"#7aaa80",fontFamily:"'Georgia',serif"}}>
-                  🌦️ Por estación
-                </button>
-                <button onClick={()=>updateFila(idx,"modo","intervalo")}
-                  style={{flex:1,cursor:"pointer",border:`1px solid ${modo==="intervalo"?"rgba(251,191,36,0.5)":"rgba(255,255,255,0.1)"}`,borderRadius:7,padding:"6px 10px",fontSize:11,background:modo==="intervalo"?"rgba(251,191,36,0.1)":"transparent",color:modo==="intervalo"?"#fbbf24":"#7aaa80",fontFamily:"'Georgia',serif"}}>
-                  📏 Cada X días
-                </button>
-                <button onClick={()=>updateFila(idx,"modo","diasSemana")}
-                  style={{flex:1,cursor:"pointer",border:`1px solid ${modo==="diasSemana"?"rgba(96,165,250,0.5)":"rgba(255,255,255,0.1)"}`,borderRadius:7,padding:"6px 10px",fontSize:11,background:modo==="diasSemana"?"rgba(96,165,250,0.1)":"transparent",color:modo==="diasSemana"?"#60a5fa":"#7aaa80",fontFamily:"'Georgia',serif"}}>
-                  📆 Por días/semana
-                </button>
-              </div>
+                  {/* Configuración POR ESTACIÓN */}
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
+                    {ESTACIONES_LIST.map(est=>{
+                      const cfg = getDiasConfig(f, est);
+                      const esActual = est===estActual;
+                      return (
+                        <div key={est} style={{border:`1px solid ${esActual?"rgba(52,211,153,0.4)":"rgba(255,255,255,0.08)"}`,borderRadius:8,padding:8,background:esActual?"rgba(52,211,153,0.04)":"rgba(255,255,255,0.02)"}}>
+                          <div style={{fontSize:10,fontWeight:700,color:esActual?"#34d399":"#6aaa7a",marginBottom:6}}>
+                            {ESTACIONES_LABEL[est]}{esActual&&" ← actual"}
+                          </div>
+                          {/* Tipo de frecuencia */}
+                          <div style={{display:"flex",gap:4,marginBottom:6}}>
+                            {[["cadaXdias","📏 Cada X días"],["porDiaSemana","📅 Por días/sem"],["noaplica","— No aplica"]].map(([t,l])=>(
+                              <button key={t} onClick={()=>updateEstacion(i,est,"tipo",t)}
+                                style={{flex:1,fontSize:9,padding:"3px 2px",borderRadius:4,cursor:"pointer",
+                                  border:`1px solid ${cfg.tipo===t?"rgba(52,211,153,0.5)":"rgba(255,255,255,0.1)"}`,
+                                  background:cfg.tipo===t?"rgba(52,211,153,0.1)":"transparent",
+                                  color:cfg.tipo===t?"#34d399":"#6aaa7a"}}>
+                                {l}
+                              </button>
+                            ))}
+                          </div>
 
-              {/* Modo: Por estación */}
-              {modo==="estacion"&&(
-                <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:10}}>
-                  {ESTACIONES_LIST.map(est=>{
-                    const esNA=f[est]==="noaplica";
-                    return (
-                      <div key={est}>
-                        <label style={{...labelSt,color:ESTACIONES[est].color}}>{ESTACIONES[est].icon} {ESTACIONES[est].label}</label>
-                        <select value={f[est]||"noaplica"} onChange={e=>updateFila(idx,est,e.target.value)}
-                          style={{background:esNA?"rgba(255,255,255,0.04)":`${ESTACIONES[est].color}15`,border:`1px solid ${esNA?"rgba(255,255,255,0.08)":ESTACIONES[est].color+"35"}`,borderRadius:7,color:esNA?"#4a7a6a":ESTACIONES[est].color,padding:"6px 8px",fontFamily:"'Georgia',serif",fontSize:12,outline:"none",cursor:"pointer",width:"100%"}}>
-                          {FRECUENCIAS.map(fr=><option key={fr.value} value={fr.value}>{fr.label}</option>)}
-                        </select>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                          {/* CADA X DÍAS */}
+                          {cfg.tipo==="cadaXdias"&&(
+                            <div>
+                              <label style={labelSt}>Intervalo</label>
+                              <select value={cfg.cadaDias||"7"} onChange={e=>updateEstacion(i,est,"cadaDias",e.target.value)} style={{...inputSt,marginBottom:4}}>
+                                {FRECUENCIAS_OPTS.filter(o=>!["noaplica","segunecesidad"].includes(o.v)).map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
+                                <option value="segunecesidad">Según necesidad</option>
+                              </select>
+                              <label style={{...labelSt,marginTop:4}}>Días específicos (opcional)</label>
+                              <div style={{display:"flex",gap:2,flexWrap:"wrap"}}>
+                                {DIAS_SEMANA.map(d=>{
+                                  const sel=(cfg.diasEspecificos||[]).includes(d.v);
+                                  return <button key={d.v} onClick={()=>updateEstacion(i,est,"diasEspecificos",sel?(cfg.diasEspecificos||[]).filter(x=>x!==d.v):[...(cfg.diasEspecificos||[]),d.v])}
+                                    style={{fontSize:9,padding:"2px 5px",borderRadius:4,cursor:"pointer",
+                                      border:`1px solid ${sel?"rgba(96,165,250,0.5)":"rgba(255,255,255,0.08)"}`,
+                                      background:sel?"rgba(96,165,250,0.1)":"transparent",
+                                      color:sel?"#60a5fa":"#6aaa7a"}}>{d.l}</button>;
+                                })}
+                              </div>
+                            </div>
+                          )}
 
-              {/* Modo: Cada X días (intervalo fijo) */}
-              {modo==="intervalo"&&(
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                          {/* POR DÍAS/SEMANA */}
+                          {cfg.tipo==="porDiaSemana"&&(
+                            <div>
+                              <label style={labelSt}>Días de la semana</label>
+                              <div style={{display:"flex",gap:2,flexWrap:"wrap",marginBottom:4}}>
+                                {DIAS_SEMANA.map(d=>{
+                                  const sel=(cfg.diasEspecificos||[]).includes(d.v);
+                                  return <button key={d.v} onClick={()=>updateEstacion(i,est,"diasEspecificos",sel?(cfg.diasEspecificos||[]).filter(x=>x!==d.v):[...(cfg.diasEspecificos||[]),d.v])}
+                                    style={{fontSize:9,padding:"3px 6px",borderRadius:4,cursor:"pointer",
+                                      border:`1px solid ${sel?"rgba(52,211,153,0.5)":"rgba(255,255,255,0.08)"}`,
+                                      background:sel?"rgba(52,211,153,0.12)":"transparent",
+                                      color:sel?"#34d399":"#6aaa7a",fontWeight:sel?700:400}}>{d.l}</button>;
+                                })}
+                              </div>
+                              <label style={labelSt}>Mínimo días entre repeticiones</label>
+                              <input type="number" min="1" max="60" value={cfg.cadaDias||"7"}
+                                onChange={e=>updateEstacion(i,est,"cadaDias",e.target.value)}
+                                style={{...inputSt,width:60}} placeholder="7"/>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Tarea enlazada */}
+                  <div style={{marginBottom:8}}>
+                    <label style={labelSt}>🔗 Tarea enlazada (se programa el mismo día)</label>
+                    <div style={{position:"relative"}}>
+                      <input value={f.tareaEnlazada||""}
+                        onChange={e=>updateFila(i,"tareaEnlazada",e.target.value)}
+                        placeholder="Ej: Orillado (se hace junto con Corte de césped)"
+                        style={inputSt}/>
+                      {(f.tareaEnlazada||"").length>=2&&(()=>{
+                        const busq=(f.tareaEnlazada||"").toLowerCase();
+                        const sugs=CATALOGO_TAREAS.filter(c=>c.tarea.toLowerCase().includes(busq)&&c.tarea!==f.tarea).slice(0,6);
+                        if(!sugs.length) return null;
+                        return (
+                          <div style={{position:"absolute",zIndex:999,top:"100%",left:0,right:0,background:"#1a2e1a",border:"1px solid rgba(167,139,250,0.3)",borderRadius:"0 0 8px 8px",maxHeight:140,overflowY:"auto"}}>
+                            {sugs.map(c=>(
+                              <div key={c.id} onClick={()=>updateFila(i,"tareaEnlazada",c.tarea)}
+                                style={{padding:"6px 12px",fontSize:12,color:"#c0dac0",cursor:"pointer"}}
+                                onMouseEnter={e=>e.currentTarget.style.background="rgba(167,139,250,0.1)"}
+                                onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                                🔗 {c.tarea}
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+
+                  {/* Última vez */}
                   <div>
-                    <label style={{...labelSt,color:"#fbbf24"}}>Cada cuántos días</label>
-                    <input type="number" min="1" max="365" style={{...inputSt,fontSize:16,fontWeight:700}}
-                      value={f.intervaloDias||""}
-                      onChange={e=>updateFila(idx,"intervaloDias",e.target.value)}
-                      placeholder="ej: 7"/>
-                    <div style={{fontSize:10,color:"#5a9a7a",marginTop:3}}>
-                      {f.intervaloDias?`Cada ${f.intervaloDias} días — ${Math.round(365/Number(f.intervaloDias))} veces al año`:""}
-                    </div>
-                  </div>
-                  <div>
-                    <label style={{...labelSt,color:"#fbbf24"}}>Última vez</label>
-                    <input type="date" style={inputSt}
-                      value={f.ultimaVez||""}
-                      onChange={e=>updateFila(idx,"ultimaVez",e.target.value)}/>
-                  </div>
-                  <div style={{gridColumn:"1/-1"}}>
-                    <label style={labelSt}>Observaciones</label>
-                    <input style={inputSt} value={f.obs||""} onChange={e=>updateFila(idx,"obs",e.target.value)} placeholder="Notas sobre esta tarea..."/>
+                    <label style={labelSt}>Última vez realizada</label>
+                    <input type="date" value={f.ultimaVez||""} onChange={e=>updateFila(i,"ultimaVez",e.target.value)} style={{...inputSt,width:"auto"}}/>
                   </div>
                 </div>
               )}
-
-              {/* Modo: Días específicos de la semana */}
-              {modo==="diasSemana"&&(
-                <div style={{marginBottom:10}}>
-                  <div style={{fontSize:10,color:"#5a9a7a",padding:"6px 10px",background:"rgba(96,165,250,0.06)",borderRadius:6,marginBottom:8}}>
-                    <b style={{color:"#60a5fa"}}>Días preferidos</b>: días en que idealmente se realiza · <b style={{color:"#f87171"}}>Días prohibidos</b>: nunca se puede hacer · <b style={{color:"#fbbf24"}}>Mínimo</b>: días mínimos entre repeticiones
-                  </div>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-                    <div>
-                      <label style={{...labelSt,color:"#60a5fa"}}>Días específicos (opcional — solo si DEBE ser justo ese día)</label>
-                      <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-                        {DIAS_SEMANA.map(d=>{
-                          const sel=(f.diasSemana||[]).includes(d.v);
-                          const prohibido=(f.diasProhibidos||[]).includes(d.v);
-                          return (
-                            <button key={d.v} disabled={prohibido}
-                              onClick={()=>{
-                                const arr=f.diasSemana||[];
-                                updateFila(idx,"diasSemana",sel?arr.filter(x=>x!==d.v):[...arr,d.v]);
-                              }}
-                              title={prohibido?`${d.full} está marcado como prohibido`:d.full}
-                              style={{cursor:prohibido?"not-allowed":"pointer",border:`1px solid ${sel?"rgba(96,165,250,0.5)":"rgba(255,255,255,0.12)"}`,borderRadius:6,padding:"5px 8px",fontSize:11,background:prohibido?"rgba(239,68,68,0.06)":sel?"rgba(96,165,250,0.15)":"transparent",color:prohibido?"#7a4a4a":sel?"#60a5fa":"#7aaa80",fontFamily:"'Georgia',serif",opacity:prohibido?0.5:1,textDecoration:prohibido?"line-through":"none"}}>
-                              {d.l}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                    <div>
-                      <label style={{...labelSt,color:"#f87171"}}>Días prohibidos (nunca)</label>
-                      <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-                        {DIAS_SEMANA.map(d=>{
-                          const proh=(f.diasProhibidos||[]).includes(d.v);
-                          return (
-                            <button key={d.v}
-                              onClick={()=>{
-                                const arr=f.diasProhibidos||[];
-                                const nuevosProh=proh?arr.filter(x=>x!==d.v):[...arr,d.v];
-                                // Si se prohíbe un día que estaba seleccionado como permitido, quitarlo también
-                                const nuevosSel=(f.diasSemana||[]).filter(x=>!nuevosProh.includes(x));
-                                updateFila(idx,"diasProhibidos",nuevosProh);
-                                if(nuevosSel.length!==(f.diasSemana||[]).length) updateFila(idx,"diasSemana",nuevosSel);
-                              }}
-                              style={{cursor:"pointer",border:`1px solid ${proh?"rgba(239,68,68,0.5)":"rgba(255,255,255,0.12)"}`,borderRadius:6,padding:"5px 8px",fontSize:11,background:proh?"rgba(239,68,68,0.15)":"transparent",color:proh?"#f87171":"#7aaa80",fontFamily:"'Georgia',serif"}}>
-                              {d.l}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{maxWidth:220}}>
-                    <label style={{...labelSt,color:"#fbbf24"}}>Mínimo de días entre repeticiones</label>
-                    <input type="number" min="0" max="60" value={f.diasMinimos||""}
-                      onChange={e=>updateFila(idx,"diasMinimos",e.target.value)}
-                      placeholder="Ej: 3"
-                      style={{...inputSt,color:"#fbbf24",border:"1px solid rgba(251,191,36,0.25)",background:"rgba(251,191,36,0.05)"}}/>
-                    <div style={{fontSize:10,color:"#5a8a6a",marginTop:3}}>Ej: 183 días. Si no marcas días específicos arriba, solo evita los días prohibidos.</div>
-                  </div>
-                </div>
-              )}
-
-              {/* Fila: Última vez + Observaciones */}
-              <div style={{display:"grid",gridTemplateColumns:"160px 1fr",gap:10}}>
-                <div>
-                  <label style={{...labelSt,color:"#a0c8e0"}}>📅 Última realización</label>
-                  <input type="date" value={f.ultimaVez||""} onChange={e=>updateFila(idx,"ultimaVez",e.target.value)}
-                    style={{...inputSt,color:"#a0c8e0",border:"1px solid rgba(160,200,224,0.25)",background:"rgba(160,200,224,0.06)"}}/>
-                </div>
-                <div>
-                  <label style={{...labelSt,color:"#fbbf24"}}>📝 Observaciones / Especificaciones técnicas</label>
-                  <input value={f.obs||""} onChange={e=>updateFila(idx,"obs",e.target.value)}
-                    placeholder="Ej: Cortar a 3&quot; de altura · Usar EPP · Retirar no más del 30% copa..."
-                    style={{...inputSt,color:"#fde68a",border:"1px solid rgba(251,191,36,0.25)",background:"rgba(251,191,36,0.05)"}}/>
-                </div>
-              </div>
             </div>
           );
         })}
       </div>
 
-      <button onClick={addFila} style={{background:"rgba(61,122,82,0.2)",border:"1px solid rgba(61,122,82,0.3)",borderRadius:8,color:"#80c890",padding:"8px 16px",fontFamily:"'Georgia',serif",fontSize:13,cursor:"pointer",width:"100%"}}>
-        ＋ Agregar tarea de mantención
-      </button>
-      <button onClick={guardarFrecuencias} style={{marginTop:8,width:"100%",padding:"8px 16px",borderRadius:8,cursor:"pointer",fontFamily:"'Georgia',serif",fontSize:13,background:guardado?"rgba(34,197,94,0.15)":"rgba(59,130,246,0.1)",color:guardado?"#22c55e":"#60a5fa",border:`1px solid ${guardado?"rgba(34,197,94,0.4)":"rgba(59,130,246,0.3)"}`}}>
-        {guardado?"✅ Frecuencias guardadas":"💾 Guardar frecuencias"}
-      </button>
+      <div style={{display:"flex",gap:8}}>
+        <button onClick={addFila}
+          style={{flex:1,padding:"9px 0",borderRadius:8,cursor:"pointer",border:"1px dashed rgba(52,211,153,0.3)",background:"rgba(52,211,153,0.05)",color:"#34d399",fontSize:12}}>
+          ＋ Agregar tarea
+        </button>
+        <button onClick={guardarFrecuencias}
+          style={{...S.btn,padding:"9px 18px",fontWeight:700,fontSize:13,
+            background:guardado?"rgba(34,197,94,0.15)":"rgba(52,211,153,0.12)",
+            color:guardado?"#22c55e":"#34d399",
+            border:`1px solid ${guardado?"rgba(34,197,94,0.4)":"rgba(52,211,153,0.3)"}`}}>
+          {guardado?"✅ Guardado":"💾 Guardar frecuencias"}
+        </button>
+      </div>
     </div>
   );
 }
 
-// ─── FICHA TRABAJADOR ────────────────────────────────────────────────────────
-// ─── SELECTOR TIPO EVENTO ─────────────────────────────────────────────────────
+
 function TipoEventoSelector({ value, onChange, S, TIPO_EVENTO }) {
   const [open, setOpen] = React.useState(false);
   const grupos = [
