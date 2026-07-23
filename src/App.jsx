@@ -2659,9 +2659,16 @@ const GOLF_FRECS_INIT = {
 
 // ─── PROGRAMACIÓN DIARIA ─────────────────────────────────────────────────────
 // ─── VISTA TRABAJADOR ────────────────────────────────────────────────────────
-function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE, onAccesoRapido, onCambiarMetodo, cierresTurno={}, onCerrarTurno, onReabrirTurno, crearNotificacion, esJefaApp=false, onGuardarRutinas, onGuardarAlertaFito, golfData={}, setGolfData }) {
+function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE, onAccesoRapido, onCambiarMetodo, cierresTurno={}, onCerrarTurno, onReabrirTurno, crearNotificacion, esJefaApp=false, onGuardarRutinas, onGuardarAlertaFito, golfData={}, setGolfData, setHumedadesData }) {
   const hoy = fechaLocal();
-  const setG = (patch) => setGolfData&&setGolfData(p=>({...p,...patch}));
+  const setG = (patch) => {
+    if(!setGolfData) return;
+    if(patch.humedades !== undefined) {
+      setHumedadesData&&setHumedadesData(patch.humedades);
+    } else {
+      setGolfData(p=>({...p,...patch}));
+    }
+  };
   // Estados humedad para SeccionHumedad
   const getEmptyHumFormVW = () => ({
     fecha:fechaLocal(),
@@ -10362,7 +10369,9 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
   };
 
   const guardarHumedad = () => {
-    if(!humForm.responsable) return;
+    // Requerir al menos un valor ingresado
+    const tieneValores = Object.values(humForm.valores||{}).some(v=>v?.valor) || humForm.valorVivero;
+    if(!tieneValores) return;
     // Normalizar vivero al mismo formato que los demás greens
     const valoresConVivero = {...humForm.valores};
     if(humForm.valorVivero) {
@@ -11276,7 +11285,14 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   // Exponer para acceso rápido desde VistaWorker
   React.useEffect(()=>{ window.__golfSubTab = setSubTab; return ()=>{ window.__golfSubTab=null; }; },[]);
 
-  const setG = (patch) => setGolfData(p=>({...p,...patch}));
+  const setG = (patch) => {
+    if(patch.humedades !== undefined) {
+      // Humedades van a su propio path para evitar problemas con arrays en Firebase
+      setHumedadesData(patch.humedades);
+    } else {
+      setGolfData(p=>({...p,...patch}));
+    }
+  };
 
   const greens    = golfData.greens    || {};
   const tees      = golfData.tees      || {};
@@ -16370,6 +16386,7 @@ export default function App() {
   const [comprasData,    setComprasData,    comprasReady]  = useFirebaseState("compras",  {compras:[],cuentas:CUENTAS_DEFAULT});
   const [bodegasData,    setBodegasData,    bodegasReady]  = useFirebaseState("bodegas",  {});
   const [golfData,       setGolfData,       golfReady]     = useFirebaseState("golf", {greens:{},tees:{},arboles:[],eventos:[],mediciones:[]});
+  const [humedadesData,  setHumedadesData,  humReady]      = useFirebaseState("golf-humedades", []);
   const [bonosConfig,    setBonosConfig,    bonosReady]    = useFirebaseState("bonos-config", {
     pctFondo:50, pctEjecutor:50, pctAyudante:30, pctApoyo:20, año:new Date().getFullYear()
   });
@@ -17212,8 +17229,9 @@ export default function App() {
                 tareas={tareasProg}
                 S={S}
                 esJefaApp={true}
-                golfData={golfData}
+                golfData={{...golfData,humedades:Array.isArray(humedadesData)?humedadesData:Object.values(humedadesData||{})}}
                 setGolfData={setGolfData}
+                setHumedadesData={setHumedadesData}
                 crearNotificacion={crearNotificacion}
                 onGuardarRutinas={(estado)=>{
                   const tId = workerLogueado;
@@ -18240,8 +18258,9 @@ export default function App() {
                   tareas={tareasProg}
                   S={S}
                   MACROZONAS_BASE={MACROZONAS_BASE}
-                  golfData={golfData}
+                  golfData={{...golfData,humedades:Array.isArray(humedadesData)?humedadesData:Object.values(humedadesData||{})}}
                   setGolfData={setGolfData}
+                  setHumedadesData={setHumedadesData}
                   onUpdateTarea={(fecha,tid,patch)=>{
                     const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
                     setTareasProg(prev=>{
