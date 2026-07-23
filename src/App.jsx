@@ -12785,6 +12785,14 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
         </div>
       )}
 
+      {/* ── HUMEDAD — JEFA/SUPERVISOR ── */}
+      {subTab==="humedad"&&rolLogueado!=="trabajador"&&(
+        <SeccionHumedad S={S} golfData={golfData} setG={setG} listaPersonal={listaPersonal}
+          hoy={hoy} esJefa={true} tareasProg={tareasProg} setTareasProg={setTareasProg}
+          showHumForm={showHumForm} setShowHumForm={setShowHumForm}
+          humForm={humForm} setHumForm={setHumForm} emptyHumForm={emptyHumForm}
+          onRegistroGuardado={onRegistroGuardado} crearNotificacion={crearNotificacion}/>
+      )}
 
             {/* ── EVENTOS / TORNEOS ── */}
             {subTab==="programacion_golf"&&rolLogueado!=="trabajador"&&hoy&&(
