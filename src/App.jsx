@@ -10590,6 +10590,43 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
         </div>
       )}
 
+      {/* Mediciones de hoy — visible para Bhalú */}
+      {!esJefa&&(()=>{
+        const hoyStr = fechaLocal();
+        const medHoy = [...humedades].filter(m=>m.fecha===hoyStr).sort((a,b)=>(b.hora||"").localeCompare(a.hora||""));
+        if(!medHoy.length) return null;
+        return (
+          <div style={{marginTop:16}}>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:13,fontWeight:700,color:"#60a5fa",marginBottom:8}}>
+              💧 Mediciones de hoy
+            </div>
+            {medHoy.map(m=>(
+              <div key={m.id} style={{...S.card,padding:"12px 14px",marginBottom:8,borderLeft:"3px solid rgba(96,165,250,0.4)"}}>
+                <div style={{fontSize:11,color:"#6aaa7a",marginBottom:6}}>
+                  {m.hora&&<span>{m.hora} · </span>}
+                  {m.responsable&&<span>👤 {m.responsable}</span>}
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(72px,1fr))",gap:4}}>
+                  {[...GREENS_DEF,{id:"vivero",nombre:"Vivero"}].map(g=>{
+                    const humV = m.valores?.[g.id]?.valor;
+                    if(!humV) return null;
+                    const info = ESCALA_HUM_GOLF[Math.min(Math.max(Number(humV),1),8)];
+                    return (
+                      <div key={g.id} style={{background:info?info.bg:"rgba(255,255,255,0.04)",borderRadius:6,padding:"4px 6px",textAlign:"center",border:`1px solid ${info?info.color+"30":"rgba(255,255,255,0.08)"}`}}>
+                        <div style={{fontSize:9,color:"#34d399",fontWeight:600}}>{g.nombre.replace("Green ","G")}</div>
+                        <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:info?info.color:"#c0dac0"}}>{humV}</div>
+                        {info&&<div style={{fontSize:8,color:info.color}}>{info.label}</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+                {m.obs&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:6,fontStyle:"italic"}}>{m.obs}</div>}
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
       {/* Última medición y historial — solo jefa */}
       {esJefa&&ultimaHum&&(
         <div style={{...S.card,padding:16,marginBottom:16,borderLeft:"3px solid #60a5fa"}}>
@@ -11317,7 +11354,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   const [showHumForm,    setShowHumForm]    = React.useState(false);
   // Abrir formulario de humedad automáticamente cuando jefa navega a ese tab
   React.useEffect(()=>{
-    if(subTab==="humedad") setShowHumForm(true);
+    // Para trabajador abrir automáticamente, jefa lo abre manualmente
+    if(subTab==="humedad" && !esJefa) setShowHumForm(true);
   },[subTab]);
   const emptyHumForm = () => ({fecha:fechaLocal(),hora:new Date().toTimeString().slice(0,5),motivo:"rutina",responsable:"",valores:{},valorVivero:"",decision:"sin-cambio",obs:"",generarTarea:false});
   const [humForm,        setHumForm]        = React.useState(emptyHumForm);
