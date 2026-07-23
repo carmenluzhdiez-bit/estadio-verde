@@ -2659,8 +2659,14 @@ const GOLF_FRECS_INIT = {
 
 // ─── PROGRAMACIÓN DIARIA ─────────────────────────────────────────────────────
 // ─── VISTA TRABAJADOR ────────────────────────────────────────────────────────
-function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE, onAccesoRapido, onCambiarMetodo, cierresTurno={}, onCerrarTurno, onReabrirTurno, crearNotificacion, esJefaApp=false, onGuardarRutinas, onGuardarAlertaFito }) {
+function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE, onAccesoRapido, onCambiarMetodo, cierresTurno={}, onCerrarTurno, onReabrirTurno, crearNotificacion, esJefaApp=false, onGuardarRutinas, onGuardarAlertaFito, golfData={}, setGolfData }) {
   const hoy = fechaLocal();
+  const setG = (patch) => setGolfData&&setGolfData(p=>({...p,...patch}));
+  // Estados humedad para SeccionHumedad
+  const hoyVW = fechaLocal();
+  const emptyHumFormVW = {fecha:hoyVW,hora:new Date().toTimeString().slice(0,5),motivo:"rutina",responsable:trabajador?.nombre||"",valores:{},valorVivero:"",decision:"sin-cambio",obs:"",generarTarea:false};
+  const [showHumFormVW, setShowHumFormVW] = React.useState(true);
+  const [humFormVW, setHumFormVW] = React.useState(emptyHumFormVW);
   const [fechaVer, setFechaVer] = React.useState(fecha || hoy);
   // Cierre de turno
   const turnoCerradoKey = `${fechaVer}_${(trabajador?.nombre||"").split(" ")[0].toLowerCase()}`;
@@ -3558,7 +3564,45 @@ function NormalizadorTareas({ S, tareasProg, setTareasProg, esJefa }) {
     return Object.values(set).sort((a,b)=>b.count-a.count);
   },[tareasProg]);
   const esEstandar=(tarea)=>CATALOGO_TAREAS.some(c=>c.tarea.toLowerCase()===tarea.toLowerCase());
-  const sugerirEstandar=(tarea)=>{ const t=tarea.toLowerCase(); return CATALOGO_TAREAS.find(c=>c.tarea.toLowerCase()===t)||CATALOGO_TAREAS.find(c=>c.tarea.toLowerCase().includes(t))||CATALOGO_TAREAS.find(c=>t.includes(c.tarea.toLowerCase().split(" ")[0])); };
+  const sugerirEstandar=(tarea)=>{
+    const t=tarea.toLowerCase().trim();
+    // 1. Coincidencia exacta
+    const exacta = CATALOGO_TAREAS.find(c=>c.tarea.toLowerCase()===t);
+    if(exacta) return exacta;
+    // 2. Coincidencia por raíz: limpiar/limpieza, corte/cortar, riego/regar, poda/podar, etc.
+    const raices = {
+      'limpiar':'limpiez','limpieza':'limpiar',
+      'cortar':'corte','corte':'cortar',
+      'regar':'riego','riego':'regar',
+      'podar':'poda','poda':'podar',
+      'fertilizar':'fertiliz','fertilización':'fertiliz',
+      'revisar':'revisión','revisión':'revisar',
+      'reparar':'reparac','reparación':'reparar',
+      'reponer':'repos','reposición':'reponer',
+    };
+    // Normalizar el texto buscando raíces comunes
+    const palabrasT = t.split(' ').filter(p=>p.length>3);
+    const porPalabras = CATALOGO_TAREAS.find(c=>{
+      const ct = c.tarea.toLowerCase();
+      return palabrasT.some(p=>{
+        // Buscar por raíz (primeros 5 caracteres de palabras largas)
+        if(p.length>=5 && ct.includes(p.slice(0,5))) return true;
+        // Buscar raíces equivalentes
+        const raizP = raices[p];
+        if(raizP && ct.includes(raizP)) return true;
+        return false;
+      }) && palabrasT.filter(p=>p.length>3).every(p=>{
+        const raizP = raices[p]||p.slice(0,5);
+        return ct.includes(p)||ct.includes(raizP)||p.includes(ct.split(' ')[0]);
+      });
+    });
+    if(porPalabras) return porPalabras;
+    // 3. El catálogo contiene el texto
+    const catalContiene = CATALOGO_TAREAS.find(c=>c.tarea.toLowerCase().includes(t));
+    if(catalContiene) return catalContiene;
+    // 4. El texto contiene la primera palabra del catálogo
+    return CATALOGO_TAREAS.find(c=>t.includes(c.tarea.toLowerCase().split(' ')[0]));
+  };
   const aplicarMapeo=(tareaVieja,tareaNueva)=>{
     if(!tareaNueva||tareaVieja===tareaNueva)return;
     const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
@@ -3599,7 +3643,14 @@ function NormalizadorTareas({ S, tareasProg, setTareasProg, esJefa }) {
                       style={{...S.input,fontSize:12,width:"100%"}}/>
                     {busqLocal.length>=1&&(
                       <div style={{position:"absolute",zIndex:999,top:"100%",left:0,right:0,background:"#1a2e1a",border:"1px solid rgba(52,211,153,0.3)",borderRadius:"0 0 8px 8px",maxHeight:160,overflowY:"auto",boxShadow:"0 4px 16px rgba(0,0,0,0.4)"}}>
-                        {CATALOGO_TAREAS.filter(c=>c.tarea.toLowerCase().includes(busqLocal.toLowerCase())).slice(0,10).map(c=>(
+                        {CATALOGO_TAREAS.filter(c=>{
+                          const bl=busqLocal.toLowerCase().trim();
+                          const ct=c.tarea.toLowerCase();
+                          if(ct.includes(bl)) return true;
+                          // Buscar por palabras clave
+                          const palabras=bl.split(' ').filter(p=>p.length>=4);
+                          return palabras.length>0&&palabras.some(p=>ct.includes(p.slice(0,5)));
+                        }).slice(0,10).map(c=>(
                           <div key={c.id} onClick={()=>{setMapeo(p=>({...p,[tarea]:c.tarea}));setBuscador(p=>({...p,[tarea]:""}));}}
                             style={{padding:"6px 12px",fontSize:12,color:"#c0dac0",cursor:"pointer",borderBottom:"1px solid rgba(255,255,255,0.04)"}}
                             onMouseEnter={e=>e.currentTarget.style.background="rgba(52,211,153,0.1)"}
@@ -12731,18 +12782,18 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           S={S}
           golfData={golfData}
           setG={setG}
-          listaPersonal={listaPersonal}
-          hoy={hoy}
-          esJefa={esJefa}
-          tareasProg={tareasProg}
-          setTareasProg={setTareasProg}
-          onRegistroGuardado={onRegistroGuardado}
+          listaPersonal={[trabajador].filter(Boolean)}
+          hoy={fechaLocal()}
+          esJefa={false}
+          tareasProg={tareas}
+          setTareasProg={()=>{}}
+          onRegistroGuardado={()=>{}}
           crearNotificacion={crearNotificacion}
-          showHumForm={showHumForm}
-          setShowHumForm={setShowHumForm}
-          humForm={humForm}
-          setHumForm={setHumForm}
-          emptyHumForm={emptyHumForm}
+          showHumForm={showHumFormVW}
+          setShowHumForm={setShowHumFormVW}
+          humForm={humFormVW}
+          setHumForm={setHumFormVW}
+          emptyHumForm={emptyHumFormVW}
         />
       )}
 
@@ -16625,7 +16676,7 @@ export default function App() {
     return [...base, ...custom];
   })();
   const filteredZonas = todasLasZonas.filter(z=>{
-    const matchC=filtroCat==="Todas"||z.categoria===filtroCat;
+    const matchC=filtroCat==="Todas"||(z.categoria||"Sin categoría")===filtroCat;
     const matchE=filtroEst==="Todos"||getEstadoZona(z.id)===filtroEst;
     const filtQ=(busq||"").trim().toLowerCase();
     const matchB=!filtQ||
@@ -17164,6 +17215,8 @@ export default function App() {
                 tareas={tareasProg}
                 S={S}
                 esJefaApp={true}
+                golfData={golfData}
+                setGolfData={setGolfData}
                 crearNotificacion={crearNotificacion}
                 onGuardarRutinas={(estado)=>{
                   const tId = workerLogueado;
@@ -17383,7 +17436,7 @@ export default function App() {
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",marginBottom:20,flexWrap:"wrap",gap:12}}>
               <div>
                 <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:24,fontWeight:900}}>Macrozonas</h1>
-                <p style={{color:"#6aaa7a",fontSize:14}}>{filteredZonas.length} de {MACROZONAS_BASE.length+macrozonasCust.length} zonas</p>
+                <p style={{color:"#6aaa7a",fontSize:14}}>{filteredZonas.length} de {todasLasZonas.length} zonas</p>
               </div>
               {esJefa&&(
                 <button onClick={()=>setShowNuevaMacrozona(true)}
@@ -17405,7 +17458,7 @@ export default function App() {
                   <div>
                     <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Categoría</label>
                     <select style={S.input} value={nuevaMacrozona.categoria} onChange={e=>setNuevaMacrozona(p=>({...p,categoria:e.target.value}))}>
-                      {[...new Set(MACROZONAS_BASE.map(z=>z.categoria))].map(c=><option key={c} value={c}>{c}</option>)}
+                      {[...new Set(todasLasZonas.map(z=>z.categoria).filter(Boolean))].sort().map(c=><option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
                   <div>
@@ -18190,6 +18243,8 @@ export default function App() {
                   tareas={tareasProg}
                   S={S}
                   MACROZONAS_BASE={MACROZONAS_BASE}
+                  golfData={golfData}
+                  setGolfData={setGolfData}
                   onUpdateTarea={(fecha,tid,patch)=>{
                     const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
                     setTareasProg(prev=>{
