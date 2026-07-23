@@ -16887,7 +16887,8 @@ export default function App() {
             </div>
             {/* ── Tag Golf ── */}
             {(()=>{
-              const estadoGolf = calcularEstadoZona("31", getAllElems, getElemFrecs, data);
+              const zdGolf = getZD("31");
+              const estadoGolf = zdGolf.estadoGeneral||"bueno";
               const colGolf = estadoGolf==="bueno"?"#22c55e":estadoGolf==="regular"?"#f59e0b":estadoGolf==="critico"?"#ef4444":"#3b82f6";
               const labelGolf = estadoGolf==="bueno"?"✅ Buen estado":estadoGolf==="regular"?"⚠️ Estado regular":estadoGolf==="critico"?"🔴 Estado crítico":"🔧 En mantenimiento";
               const tareasGolfHoy=(()=>{
@@ -16980,7 +16981,7 @@ export default function App() {
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(210px,1fr))",gap:12}}>
               {[...new Set(todasLasZonas.map(z=>z.categoria).filter(Boolean))].sort().map(cat=>{
                 const zc=todasLasZonas.filter(z=>z.categoria===cat).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
-                const ok=zc.filter(z=>calcularEstadoZona(String(z.id),getAllElems,getElemFrecs,data)==="bueno").length;
+                const ok=zc.filter(z=>getZD(String(z.id)).estadoGeneral!=="critico"&&getZD(String(z.id)).estadoGeneral!=="regular").length;
                 const pct=Math.round((ok/zc.length)*100);
                 return (
                   <div key={cat} style={{...S.card,padding:16,cursor:"pointer"}} className="hov" onClick={()=>{setFiltroCat(cat);setVista("zonas");}}>
