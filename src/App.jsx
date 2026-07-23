@@ -2659,6 +2659,11 @@ const GOLF_FRECS_INIT = {
 
 // ─── PROGRAMACIÓN DIARIA ─────────────────────────────────────────────────────
 // ─── VISTA TRABAJADOR ────────────────────────────────────────────────────────
+const getNombreRef = (nombreCompleto) => {
+  if(!nombreCompleto) return "";
+  return nombreCompleto.trim().split(" ")[0]||nombreCompleto;
+};
+
 function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE, onAccesoRapido, onCambiarMetodo, cierresTurno={}, onCerrarTurno, onReabrirTurno, crearNotificacion, esJefaApp=false, onGuardarRutinas, onGuardarAlertaFito }) {
   const hoy = fechaLocal();
   const [fechaVer, setFechaVer] = React.useState(fecha || hoy);
@@ -2690,10 +2695,6 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
     return [...tareaSet].sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
   };
 
-  const getNombreRef = (nombreCompleto) => {
-  if(!nombreCompleto) return "";
-  return nombreCompleto.trim().split(" ")[0]||nombreCompleto;
-};
 const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
   const ORDEN_ESTADO = {pendiente:0, haciendose:1, no_pudo:2, hecha:3, por_designar:4};
   function esDiariaVW(tareaObj) {
@@ -16884,6 +16885,39 @@ export default function App() {
                 </div>
               ))}
             </div>
+            {/* ── Tag Golf ── */}
+            {(()=>{
+              const estadoGolf = calcularEstadoZona("31", getAllElems, getElemFrecs, data);
+              const colGolf = estadoGolf==="bueno"?"#22c55e":estadoGolf==="regular"?"#f59e0b":estadoGolf==="critico"?"#ef4444":"#3b82f6";
+              const labelGolf = estadoGolf==="bueno"?"✅ Buen estado":estadoGolf==="regular"?"⚠️ Estado regular":estadoGolf==="critico"?"🔴 Estado crítico":"🔧 En mantenimiento";
+              const tareasGolfHoy=(()=>{
+                const h=fechaLocal();
+                const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+                return normArr(tareasProg[h]||[]).filter(t=>(t.zona||"").toLowerCase().includes("golf"));
+              })();
+              const hechasGolf=tareasGolfHoy.filter(t=>["hecha","completada"].includes(t.estado)).length;
+              return (
+                <div onClick={()=>setVista("golf")}
+                  style={{...S.card,padding:16,marginBottom:22,cursor:"pointer",
+                    border:`1px solid ${colGolf}40`,
+                    background:`${colGolf}08`,
+                    display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
+                  <span style={{fontSize:28}}>⛳</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,color:"#fbbf24"}}>Golf — Estadio Español</div>
+                    <div style={{fontSize:12,color:colGolf,marginTop:2}}>{labelGolf}</div>
+                  </div>
+                  {tareasGolfHoy.length>0&&(
+                    <div style={{textAlign:"center"}}>
+                      <div style={{fontSize:18,fontWeight:700,color:"#fbbf24"}}>{hechasGolf}/{tareasGolfHoy.length}</div>
+                      <div style={{fontSize:10,color:"#5a9a7a"}}>tareas hoy</div>
+                    </div>
+                  )}
+                  <span style={{fontSize:11,color:"#5a9a7a"}}>Ver Golf →</span>
+                </div>
+              );
+            })()}
+
             {stats.critico>0&&(
               <div style={{background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:12,padding:16,marginBottom:22}}>
                 <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:10,color:"#fca5a5"}}>🚨 Zonas en Estado Crítico</div>
@@ -16900,7 +16934,13 @@ export default function App() {
               const tdNorm=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
               const tdTareas=tdNorm(tareasProg[tdHoy]);
               const tdPersonal=Array.isArray(personal)?personal:Object.values(personal||{});
-              const tdTrabs=tdPersonal.filter(w=>tdTareas.some(x=>x.responsable===w.nombre));
+              // Incluir también trabajadores con tareas de Golf (golfData)
+              const tdTareasGolf=(()=>{
+                const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+                return normArr(golfData?.tareasProg?.[tdHoy]||[]);
+              })();
+              const tdTareasAll=[...tdTareas,...tdTareasGolf];
+              const tdTrabs=tdPersonal.filter(w=>tdTareasAll.some(x=>x.responsable===w.nombre));
               if(tdTrabs.length===0) return null;
               return (
                 <div style={{marginBottom:22}}>
@@ -16909,7 +16949,7 @@ export default function App() {
                     {tdTrabs.map(w=>{
                       const tdKey=`${tdHoy}_${w.nombre.split(" ")[0].toLowerCase()}`;
                       const tdCerrado=cierresTurno?.[tdKey];
-                      const tdTT=tdTareas.filter(x=>x.responsable===w.nombre);
+                      const tdTT=tdTareasAll.filter(x=>x.responsable===w.nombre);
                       const tdHechas=tdTT.filter(t=>["hecha","completada"].includes(t.estado)).length;
                       const tdPct=tdTT.length?Math.round((tdHechas/tdTT.length)*100):0;
                       return (
@@ -16938,9 +16978,9 @@ export default function App() {
             })()}
             <div style={{marginBottom:12,fontFamily:"'Playfair Display',serif",fontSize:19,fontWeight:700}}>Por Categoría</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(210px,1fr))",gap:12}}>
-              {[...new Set(MACROZONAS_BASE.map(z=>z.categoria))].map(cat=>{
-                const zc=[...MACROZONAS_BASE].filter(z=>z.categoria===cat).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
-                const ok=zc.filter(z=>getZD(z.id).estadoGeneral==="bueno").length;
+              {[...new Set(todasLasZonas.map(z=>z.categoria).filter(Boolean))].sort().map(cat=>{
+                const zc=todasLasZonas.filter(z=>z.categoria===cat).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+                const ok=zc.filter(z=>calcularEstadoZona(String(z.id),getAllElems,getElemFrecs,data)==="bueno").length;
                 const pct=Math.round((ok/zc.length)*100);
                 return (
                   <div key={cat} style={{...S.card,padding:16,cursor:"pointer"}} className="hov" onClick={()=>{setFiltroCat(cat);setVista("zonas");}}>
