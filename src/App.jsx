@@ -1734,11 +1734,11 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
   };
 
   // Opciones únicas para filtros
-  const allTareas = Object.values(tareas).flat().filter(t => (hpTask.zona||"") !== "Golf");
-  const todasTareas = [...new Set(allTareas.map(t=>hpTask.tarea))].sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
+  const allTareas = Object.values(tareas).flat().filter(t => (t.zona||"") !== "Golf");
+  const todasTareas = [...new Set(allTareas.map(t=>t.tarea).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
   // Excluir tareas de Golf del programa general (Golf tiene su propio módulo)
-  const allTareasSinGolf = allTareas; // ya excluye Golf
-  const todasZonas  = [...new Set(allTareasSinGolf.map(t=>hpTask.zona).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
+  const allTareasSinGolf = allTareas;
+  const todasZonas  = [...new Set(allTareasSinGolf.map(t=>t.zona).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
 
   const diasOrdenados = Object.keys(tareas)
     .filter(dKey => (tareas[dKey]||[]).length > 0)
@@ -3373,6 +3373,12 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
   const [fecha, setFecha] = React.useState(hoy);
   const [tabProg, setTabProg] = React.useState("programa");
   const [showAgregar, setShowAgregar] = React.useState(false);
+  const [zonasColapsadas, setZonasColapsadas] = React.useState({__init:true}); // {zona: true/false}
+  const toggleZonaColapso = (zona) => setZonasColapsadas(p=>{
+    const {__init, ...rest} = p;
+    const estaColapso = __init ? true : p[zona]!==false;
+    return {...rest, [zona]:!estaColapso};
+  });
   const [nuevaTarea, setNuevaTarea] = React.useState({ zona:"", elemento:"", tarea:"", responsable:"", estado:"por_designar", notas:"" });
   const [filtroEstado, setFiltroEstado] = React.useState("todos");
   const [filtroZona, setFiltroZona] = React.useState("todas");
@@ -3914,14 +3920,21 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
             </div>
           )}
 
-          {Object.entries(porZona).sort(([a],[b])=>a.localeCompare(b,"es")).map(([zona,tz])=>(
-            <div key={zona} style={{marginBottom:20}}>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,paddingBottom:6,borderBottom:"1px solid rgba(255,255,255,0.08)"}}>
-                <span style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700}}>{MACROZONAS_BASE.find(z=>z.nombre===zona)?.icono||"📍"} {zona}</span>
+          {Object.entries(porZona).sort(([a],[b])=>a.localeCompare(b,"es")).map(([zona,tz])=>{
+            const zonaColapso = zonasColapsadas.__init ? true : zonasColapsadas[zona]!==false;
+            const hechasZona = tz.filter(t=>["hecha","completada"].includes(t.estado)).length;
+            return (
+            <div key={zona} style={{marginBottom:12,borderRadius:10,overflow:"hidden",border:"1px solid rgba(255,255,255,0.07)"}}>
+              <div onClick={()=>toggleZonaColapso(zona)}
+                style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",cursor:"pointer",userSelect:"none",
+                  background:zonaColapso?"rgba(255,255,255,0.02)":"rgba(52,211,153,0.04)",
+                  borderBottom:zonaColapso?"none":"1px solid rgba(255,255,255,0.08)"}}>
+                <span style={{fontSize:11,color:zonaColapso?"#6aaa7a":"#34d399",transform:zonaColapso?"rotate(0deg)":"rotate(90deg)",transition:"transform 0.15s",display:"inline-block"}}>▶</span>
+                <span style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,flex:1}}>{MACROZONAS_BASE.find(z=>z.nombre===zona)?.icono||"📍"} {zona}</span>
                 <span style={{display:"inline-flex",padding:"2px 8px",borderRadius:20,fontSize:11,background:"rgba(255,255,255,0.07)",color:"#7aaa80"}}>{tz.length}</span>
                 <span style={{fontSize:11,color:"#22c55e"}}>{tz.filter(t=>["hecha","completada"].includes(t.estado)).length} ✓</span>
               </div>
-              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {!zonaColapso&&<div style={{display:"flex",flexDirection:"column",gap:8,padding:"8px 0"}}>
                 {(()=>{
                   const TIPOS_PD=[
                     {key:"corte",   icon:"✂️", label:"Cortes",        match:t=>(t.tarea||"").toLowerCase().includes("corte")},
@@ -3982,10 +3995,11 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                     </div>
                   ));
                 })()}
-              </div>
+              </div>}
             </div>
-          ))}
-        </>
+          );
+          }
+          )}
       )}
     </div>
   );
