@@ -3383,80 +3383,75 @@ Una vez cerrado no podrás modificar las tareas. Solo la jefa puede reabrir el t
 function ZonaRow({ zona, tz, zonasColapsadas, toggleZonaColapso, MACROZONAS_BASE, ESTADOS_TAREA, EC, updateTarea, deleteTarea, puedeCrear, S }) {
   const zonaColapso = zonasColapsadas.__init ? true : zonasColapsadas[zona]!==false;
   const hechasZona = tz.filter(t=>["hecha","completada"].includes(t.estado)).length;
-  const icono = MACROZONAS_BASE.find(z=>z.nombre===zona)?.icono||"📍";
-  
+  const icono = (MACROZONAS_BASE.find(z=>z.nombre===zona)||{icono:"📍"}).icono;
+
+  // Calcular grupos de tareas ANTES del return
+  const TIPOS_PD = [
+    {key:"corte",    icon:"✂️",  label:"Cortes",        match:t=>(t.tarea||"").toLowerCase().includes("corte")},
+    {key:"riego",    icon:"💧",  label:"Riego",          match:t=>(t.tarea||"").toLowerCase().includes("riego")},
+    {key:"poda",     icon:"🌿",  label:"Poda/Arbusto",   match:t=>(t.tarea||"").toLowerCase().includes("poda")||(t.tarea||"").toLowerCase().includes("arbusto")},
+    {key:"limpieza", icon:"🧹",  label:"Limpieza",       match:t=>(t.tarea||"").toLowerCase().includes("limpiar")||(t.tarea||"").toLowerCase().includes("limpieza")},
+    {key:"fertil",   icon:"🌱",  label:"Fertilización",  match:t=>(t.tarea||"").toLowerCase().includes("fertil")},
+    {key:"otros",    icon:"📋",  label:"Otras",          match:t=>true},
+  ];
+  const usados = new Set();
+  const grupos = [];
+  TIPOS_PD.forEach(g => {
+    const ts = tz.filter(t => !usados.has(t.id) && g.match(t));
+    ts.forEach(t => usados.add(t.id));
+    if(ts.length > 0) grupos.push({...g, tareas:ts});
+  });
+
+  const normEstado = e => e==="hecha"?"hecha":e==="completada"?"hecha":e==="haciendose"?"haciendose":e==="en_curso"?"haciendose":e==="no_pudo"?"no_pudo":e==="cancelada"?"cancelada":e==="por_designar"?"por_designar":"pendiente";
+
   return (
-  <div key={zona} style={{marginBottom:12,borderRadius:10,overflow:"hidden",border:"1px solid rgba(255,255,255,0.07)"}}>
-    <div onClick={()=>toggleZonaColapso(zona)}
-      style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",cursor:"pointer",userSelect:"none",
-        background:zonaColapso?"rgba(255,255,255,0.02)":"rgba(52,211,153,0.04)",
-        borderBottom:zonaColapso?"none":"1px solid rgba(255,255,255,0.08)"}}>
-      <span style={{fontSize:11,color:zonaColapso?"#6aaa7a":"#34d399",transform:zonaColapso?"rotate(0deg)":"rotate(90deg)",transition:"transform 0.15s",display:"inline-block"}}>▶</span>
-      <span style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,flex:1}}>{MACROZONAS_BASE.find(z=>z.nombre===zona)?.icono||"📍"} {zona}</span>
-      <span style={{display:"inline-flex",padding:"2px 8px",borderRadius:20,fontSize:11,background:"rgba(255,255,255,0.07)",color:"#7aaa80"}}>{tz.length}</span>
-      <span style={{fontSize:11,color:"#22c55e"}}>{tz.filter(t=>["hecha","completada"].includes(t.estado)).length} ✓</span>
-    </div>
-    <div style={{display:zonaColapso?"none":"flex",flexDirection:"column",gap:8,padding:"8px 0"}}>
-      {(()=>{
-        const TIPOS_PD=[
-          {key:"corte",   icon:"✂️", label:"Cortes",        match:t=>(t.tarea||"").toLowerCase().includes("corte")},
-          {key:"riego",   icon:"💧", label:"Riego",          match:t=>(t.tarea||"").toLowerCase().includes("riego")||(t.tarea||"").toLowerCase().includes("regar")},
-          {key:"poda",    icon:"🌿", label:"Poda / Arbusto", match:t=>(t.tarea||"").toLowerCase().includes("poda")||(t.tarea||"").toLowerCase().includes("arbusto")},
-          {key:"limpieza",icon:"🧹", label:"Limpieza",       match:t=>(t.tarea||"").toLowerCase().includes("limpieza")||(t.tarea||"").toLowerCase().includes("barrido")},
-          {key:"fertil",  icon:"🌱", label:"Fertilización",  match:t=>(t.tarea||"").toLowerCase().includes("fertil")||(t.tarea||"").toLowerCase().includes("abono")},
-          {key:"otros",   icon:"📋", label:"Otras",          match:t=>true},
-        ];
-        const usados=new Set();
-        const grupos=[];
-        TIPOS_PD.forEach(g=>{
-          const ts=tz.filter(t=>!usados.has(t.id)&&g.match(t));
-          ts.forEach(t=>usados.add(t.id));
-          if(ts.length>0) grupos.push({...g,tareas:ts});
-        });
-        return grupos.map(gp=>(
-          <div key={gp.key}>
-            {grupos.length>1&&<div style={{fontSize:10,color:"#4a7a5a",padding:"3px 0 5px",textTransform:"uppercase",letterSpacing:"0.5px",fontWeight:600}}>{gp.icon} {gp.label} <span style={{color:"#3a5a3a"}}>({gp.tareas.length})</span></div>}
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {gp.tareas.map(t=>{
-        const est=ESTADOS_TAREA[normalizarEstado(t.estado)]||ESTADOS_TAREA.por_designar;
-        return (
-          <div key={t.id} style={{...S.card,padding:"12px 14px",borderLeft:`3px solid ${est.color}`,opacity:t.estado==="cancelada"?0.5:1}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",gap:10,flexWrap:"wrap"}}>
-    <div style={{flex:1,minWidth:0}}>
-      <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginBottom:4}}>
-        <span style={{fontSize:14,fontWeight:600}}>{t.tarea}</span>
-        {t.elemento&&<span style={{fontSize:11,color:"#5a8a6a",background:"rgba(255,255,255,0.06)",padding:"1px 7px",borderRadius:10}}>{t.elemento}</span>}
-        {t.auto&&<span style={{fontSize:10,color:"#4a8a7a",background:"rgba(59,130,246,0.1)",padding:"1px 6px",borderRadius:10,border:"1px solid rgba(59,130,246,0.2)"}}>auto</span>}
-        {t.origenZona&&<span style={{fontSize:10,color:"#c084fc",background:"rgba(192,132,252,0.1)",padding:"1px 6px",borderRadius:10,border:"1px solid rgba(192,132,252,0.2)"}}>📍 zona</span>}
+    <div style={{marginBottom:12,borderRadius:10,overflow:"hidden",border:"1px solid rgba(255,255,255,0.07)"}}>
+      <div onClick={()=>toggleZonaColapso(zona)}
+        style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",cursor:"pointer",userSelect:"none",
+          background:zonaColapso?"rgba(255,255,255,0.02)":"rgba(52,211,153,0.04)",
+          borderBottom:zonaColapso?"none":"1px solid rgba(255,255,255,0.08)"}}>
+        <span style={{fontSize:11,color:zonaColapso?"#6aaa7a":"#34d399",transform:zonaColapso?"rotate(0deg)":"rotate(90deg)",transition:"transform 0.15s",display:"inline-block"}}>▶</span>
+        <span style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,flex:1}}>{icono} {zona}</span>
+        <span style={{padding:"2px 8px",borderRadius:20,fontSize:11,background:"rgba(255,255,255,0.07)",color:"#7aaaa0"}}>{tz.length} tarea{tz.length!==1?"s":""}</span>
+        <span style={{fontSize:11,color:"#22c55e"}}>{hechasZona}/{tz.length} ✓</span>
       </div>
-      <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-        <span style={{fontSize:11,color:"#5a8a6a"}}>👤</span>
-        <ResponsableSelector
-          value={t.responsable||""}
-          personal={personal}
-          onChange={v=>updateTarea(t.id,{responsable:v,estado:v&&t.estado==="por_designar"?"pendiente":t.estado})}
-          S={S}
-          inline={true}
-        />
-      </div>
-      {t.notas&&<div style={{fontSize:11,color:"#5a8a6a",marginTop:3,fontStyle:"italic"}}>{t.notas}</div>}
-      {t.notaWorker&&<div style={{fontSize:11,color:t.estado==="no_pudo"?"#fca5a5":"#7aaa80",marginTop:3,fontStyle:"italic",padding:"4px 8px",background:"rgba(255,255,255,0.04)",borderRadius:6}}>{t.estado==="no_pudo"?"⚠️ ":""}{t.notaWorker}</div>}
-    </div>
-    <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0,flexWrap:"wrap"}}>
-      <select value={t.estado} onChange={e=>updateTarea(t.id,{estado:e.target.value})}
-        style={{background:est.bg,border:`1px solid ${est.color}40`,borderRadius:7,color:est.color,padding:"4px 7px",fontFamily:"'Georgia',serif",fontSize:12,outline:"none",cursor:"pointer"}}>
-        {Object.entries(ESTADOS_TAREA).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
-      </select>
-      <button onClick={()=>deleteTarea(t.id)} style={{background:"transparent",border:"none",color:"#7a5a5a",cursor:"pointer",fontSize:14,padding:"3px 5px"}}>🗑</button>
-    </div>
+      <div style={{display:zonaColapso?"none":"flex",flexDirection:"column",gap:8,padding:"8px 0"}}>
+        {grupos.map(gp => (
+          <div key={gp.key} style={{padding:"4px 0"}}>
+            {grupos.length>1 && <div style={{fontSize:10,color:"#4a7a5a",padding:"2px 14px 4px",textTransform:"uppercase",letterSpacing:"0.5px",fontWeight:600}}>{gp.icon} {gp.label} ({gp.tareas.length})</div>}
+            <div style={{display:"flex",flexDirection:"column",gap:8,padding:"0 10px"}}>
+              {gp.tareas.map(t => {
+                const est = ESTADOS_TAREA[normEstado(t.estado)] || ESTADOS_TAREA.por_designar;
+                return (
+                  <div key={t.id} style={{...S.card,padding:"12px 14px",borderLeft:`3px solid ${est.color}`,opacity:t.estado==="cancelada"?0.5:1}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",gap:10,flexWrap:"wrap"}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontWeight:600,fontSize:13,color:"#c0dac0",marginBottom:2}}>{t.tarea}</div>
+                        {t.elemento && <div style={{fontSize:11,color:"#5a8a6a"}}>{t.elemento}</div>}
+                        {t.responsable && <div style={{fontSize:11,color:"#7aaaba"}}>👤 {t.responsable}</div>}
+                        {t.notas && <div style={{fontSize:11,color:"#5a8a6a",marginTop:3,fontStyle:"italic"}}>{t.notas}</div>}
+                        {t.notaWorker && <div style={{fontSize:11,color:t.estado==="no_pudo"?"#fca5a5":"#7aaa80",marginTop:2}}>💬 {t.notaWorker}</div>}
+                      </div>
+                      <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0,flexWrap:"wrap"}}>
+                        <select value={t.estado} onChange={e=>updateTarea(t.id,{estado:e.target.value})}
+                          style={{background:est.bg,border:`1px solid ${est.color}40`,borderRadius:7,color:est.color,padding:"4px 7px",fontFamily:"'Georgia',serif",fontSize:12,outline:"none",cursor:"pointer"}}>
+                          {Object.entries(ESTADOS_TAREA).map(([k,v]) => <option key={k} value={k}>{v.icon} {v.label}</option>)}
+                        </select>
+                        <button onClick={()=>deleteTarea(t.id)} style={{background:"transparent",border:"none",color:"#7a5a5a",cursor:"pointer",fontSize:14,padding:"3px 5px"}}>🗑</button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
-        );
-      })}
+        ))}
+      </div>
     </div>
-
   );
 }
+
+
 
 
 function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACROZONAS_BASE, tareas, setTareas, tareasZonaHoy=0, esJefa=false, configSemanal={}, setConfigSemanal, puedeCrear=false, cierresTurno={}, onReabrirTurno, getElemFrecs, setElemFrecs, aplicaciones=[], setAplicaciones, stockFito, setStockFito, crearNotificacion }) {
@@ -3738,7 +3733,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
 
       {/* ── PROGRAMAR ── */}
       {tabProg==="programa" && (
-        <>
+        <React.Fragment>
           {/* Aviso turno cerrado hoy — acceso rápido para jefa */}
           {esJefa&&Object.keys(cierresTurno||{}).some(k=>k.startsWith(new Date().toISOString().slice(0,10)))&&(
             <div style={{background:"rgba(34,197,94,0.06)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:10,padding:"10px 14px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap"}}>
@@ -3907,7 +3902,6 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           {showAgregar && (
             <div style={{...S.card,padding:18,marginBottom:16}} className="ein">
               <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:14}}>Nueva Tarea — {fecha}</div>
-              {(()=>{
                 const zonasSinGolf=[...MACROZONAS_BASE].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
                 const zonaObj=zonasSinGolf.find(z=>z.nombre===nuevaTarea.zona);
                 const elemsZona=zonaObj?getAllElems(zonaObj.id):[];
@@ -3917,7 +3911,6 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                   :elemsZona.length>0
                     ?[...new Set(elemsZona.flatMap(e=>(TAREAS_DEFAULT[e.tipo]||[]).map(t=>t.tarea)))].sort()
                     :TAREAS_PRESET;
-                return(<>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
                 <div>
                   <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>MACROZONA</label>
@@ -3990,7 +3983,6 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                   <textarea rows={2} style={{...S.input,resize:"vertical",fontSize:13}} value={nuevaTarea.notas} onChange={e=>setNuevaTarea(p=>({...p,notas:e.target.value}))}/>
                 </div>
               </div>
-              </>);})()}
               <div style={{display:"flex",gap:8}}>
                 <button className="btn-p" style={S.btn} onClick={()=>{
                   if(!nuevaTarea.zona||!nuevaTarea.tarea||nuevaTarea.tarea==="__otro__") return;
@@ -4024,6 +4016,8 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
               S={S}
             />
           ))
+        </React.Fragment>
+      )}
     </div>
   );
 }
