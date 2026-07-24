@@ -3459,6 +3459,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
   const [fecha, setFecha] = React.useState(hoy);
   const [tabProg, setTabProg] = React.useState("programa");
   const [showAgregar, setShowAgregar] = React.useState(false);
+  const EC = {hecha:{color:"#22c55e",icon:"✅",label:"Hecha"},completada:{color:"#22c55e",icon:"✅",label:"Hecha"},no_pudo:{color:"#ef4444",icon:"🔴",label:"No se pudo"},haciendose:{color:"#3b82f6",icon:"🔵",label:"Haciéndose"},en_curso:{color:"#3b82f6",icon:"🔵",label:"En curso"},pendiente:{color:"#f59e0b",icon:"⏳",label:"Pendiente"},por_designar:{color:"#94a3b8",icon:"⬜",label:"Por designar"},cancelada:{color:"#ef4444",icon:"❌",label:"Cancelada"}};
   const [zonasColapsadas, setZonasColapsadas] = React.useState({__init:true}); // {zona: true/false}
   const toggleZonaColapso = (zona) => setZonasColapsadas(p=>{
     const {__init, ...rest} = p;
