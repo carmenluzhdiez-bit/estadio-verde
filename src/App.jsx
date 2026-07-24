@@ -15952,7 +15952,7 @@ export default function App() {
   const [zonaId, setZonaId] = useState(null);
   const [tab, setTab] = useState("elementos");
   const [filtroCat, setFiltroCat] = useState("Todas");
-  const [macrozonasCust, setMacrozonasCust] = useState([]);
+  const [macrozonasCust, setMacrozonasCust, macCustReady] = useFirebaseState("macrozonasCust", []);
   // Combinar zonas base con personalizadas — debe ir después de ambos estados
   const zonasConCust = React.useMemo(()=>[...zonas,...macrozonasCust],[zonas,macrozonasCust]);
   const [showNuevaMacrozona, setShowNuevaMacrozona] = useState(false);
@@ -15965,6 +15965,7 @@ export default function App() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiText, setAiText] = useState("");
   const [editElem, setEditElem] = useState(null);
+  const [editZonaForm, setEditZonaForm] = useState(null);
   const [condicionesLocales, setCondicionesLocales] = useState({}); // condicion UI inmediata por elemento
   const [showPlantacionForm, setShowPlantacionForm] = useState(null);
 
@@ -16337,7 +16338,17 @@ export default function App() {
     return [...base,...custom].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
   };
 
-  const todasLasZonas = [...MACROZONAS_BASE, ...macrozonasCust];
+  const todasLasZonas = (() => {
+    const base = MACROZONAS_BASE.map(z=>{
+      const zd = getZD(z.id);
+      return zd.nombreCustom||zd.categoriaCustom||zd.iconoCustom
+        ? {...z, nombre:zd.nombreCustom||z.nombre, categoria:zd.categoriaCustom||z.categoria, icono:zd.iconoCustom||z.icono}
+        : z;
+    });
+    const nombresBase = new Set(base.map(z=>z.nombre.toLowerCase().trim()));
+    const custom = macrozonasCust.filter(z=>!nombresBase.has((z.nombre||"").toLowerCase().trim()));
+    return [...base, ...custom];
+  })();
   const filteredZonas = todasLasZonas.filter(z=>{
     const matchC=filtroCat==="Todas"||z.categoria===filtroCat;
     const matchE=filtroEst==="Todos"||getZD(z.id).estadoGeneral===filtroEst;
@@ -16350,8 +16361,8 @@ export default function App() {
   }).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
 
   const stats = {
-    total: MACROZONAS_BASE.length,
-    bueno: MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral==="bueno").length,
+    total: todasLasZonas.length,
+    bueno: todasLasZonas.filter(z=>getZD(z.id).estadoGeneral==="bueno").length,
     regular: MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral==="regular").length,
     critico: MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral==="critico").length,
     mantenimiento: MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral==="mantenimiento").length,
@@ -17161,6 +17172,16 @@ export default function App() {
                   <div>
                     <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Ícono</label>
                     <input style={S.input} value={nuevaMacrozona.icono} onChange={e=>setNuevaMacrozona(p=>({...p,icono:e.target.value}))} placeholder="🌿"/>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:5}}>
+                      {["🌿","🌳","🌺","🌸","🏡","⛳","🏊","🏟️","🎾","🛤️","🌻","🌴","🏠","🌱","🍃","🏋️"].map(ico=>(
+                        <button key={ico} onClick={()=>setNuevaMacrozona(p=>({...p,icono:ico}))}
+                          style={{fontSize:18,padding:"2px 4px",borderRadius:4,cursor:"pointer",
+                            border:`1px solid ${nuevaMacrozona.icono===ico?"rgba(52,211,153,0.5)":"rgba(255,255,255,0.1)"}`,
+                            background:nuevaMacrozona.icono===ico?"rgba(52,211,153,0.1)":"transparent"}}>
+                          {ico}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   <div style={{gridColumn:"1/-1"}}>
                     <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Descripción (opcional)</label>
@@ -17226,7 +17247,7 @@ export default function App() {
                         <div style={{display:"flex",alignItems:"center",gap:8}}>
                           <span style={{fontSize:22}}>{z.icono}</span>
                           <div>
-                            <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,lineHeight:1.2}}>{z.nombre}</div>
+                            <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,lineHeight:1.2}}>{getZD(z.id).nombreCustom||z.nombre}</div>
                             <div style={{fontSize:10,color:"#5a8a6a",marginTop:1}}>{z.categoria}</div>
                           </div>
                         </div>
@@ -17262,9 +17283,15 @@ export default function App() {
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12}}>
                       {/* Izquierda: icono + nombre + chips */}
                       <div style={{display:"flex",alignItems:"center",gap:14,flex:1,minWidth:200}}>
-                        <span style={{fontSize:44,lineHeight:1}}>{zona.icono}</span>
+                        <span style={{fontSize:44,lineHeight:1}}>{zd.iconoCustom||zona.icono}</span>
                         <div>
-                          <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:21,fontWeight:900,marginBottom:6,lineHeight:1.2}}>{zona.nombre}</h2>
+                          <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:21,fontWeight:900,marginBottom:6,lineHeight:1.2}}>{zd.nombreCustom||zona.nombre}</h2>
+                          {esJefa&&!editZonaForm&&(
+                            <button onClick={()=>setEditZonaForm({nombre:zd.nombreCustom||zona.nombre,icono:zd.iconoCustom||zona.icono,descripcion:zd.descripcion||zona.descripcion||"",categoria:zd.categoriaCustom||zona.categoria||""})}
+                              style={{fontSize:11,padding:"2px 8px",borderRadius:5,cursor:"pointer",border:"1px solid rgba(96,165,250,0.3)",background:"rgba(96,165,250,0.08)",color:"#60a5fa"}}>
+                              ✏️ Editar
+                            </button>
+                          )}
                           <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
                             <span style={{fontSize:11,color:"#6aaa7a",background:"rgba(255,255,255,0.06)",padding:"2px 8px",borderRadius:6,border:"1px solid rgba(255,255,255,0.1)"}}>
                               📂 {zona.categoria}
@@ -17312,6 +17339,65 @@ export default function App() {
                 </div>
               );
             })()}
+            {/* Formulario edición nombre/ícono/categoría/descripción */}
+            {editZonaForm&&esJefa&&(
+              <div style={{...S.card,padding:14,marginBottom:14,border:"1px solid rgba(96,165,250,0.25)"}}>
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:"#60a5fa",marginBottom:12}}>✏️ Editar macrozona</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 80px",gap:8,marginBottom:8}}>
+                  <div>
+                    <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Nombre</label>
+                    <input value={editZonaForm.nombre} onChange={e=>setEditZonaForm(p=>({...p,nombre:e.target.value}))} style={S.input}/>
+                  </div>
+                  <div>
+                    <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Ícono</label>
+                    <input value={editZonaForm.icono} onChange={e=>setEditZonaForm(p=>({...p,icono:e.target.value}))} style={{...S.input,textAlign:"center",fontSize:20}}/>
+                  </div>
+                </div>
+                <div style={{marginBottom:8}}>
+                  <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Categoría</label>
+                  <select value={editZonaForm.categoria} onChange={e=>setEditZonaForm(p=>({...p,categoria:e.target.value}))} style={S.input}>
+                    {[...new Set([...MACROZONAS_BASE.map(z=>z.categoria),"Deportivo","Jardines","Calles y Accesos","Áreas Comunes","Instalaciones","Golf","Otro"])].sort().map(c=><option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div style={{marginBottom:8}}>
+                  <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Descripción</label>
+                  <input value={editZonaForm.descripcion} onChange={e=>setEditZonaForm(p=>({...p,descripcion:e.target.value}))} placeholder="Descripción breve..." style={S.input}/>
+                </div>
+                <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:10}}>
+                  {["🌿","🌳","🌺","🌸","🏡","⛳","🏊","🏟️","🎾","🛤️","🌻","🌴","🏠","🌱","🍃","🏋️"].map(ico=>(
+                    <button key={ico} onClick={()=>setEditZonaForm(p=>({...p,icono:ico}))}
+                      style={{fontSize:16,padding:"2px 4px",borderRadius:4,cursor:"pointer",
+                        border:`1px solid ${editZonaForm.icono===ico?"rgba(52,211,153,0.5)":"rgba(255,255,255,0.1)"}`,
+                        background:editZonaForm.icono===ico?"rgba(52,211,153,0.1)":"transparent"}}>
+                      {ico}
+                    </button>
+                  ))}
+                </div>
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={()=>{
+                    if(zona.esPersonalizada){
+                      setMacrozonasCust(prev=>prev.map(z=>z.id===zona.id?{...z,nombre:editZonaForm.nombre,icono:editZonaForm.icono,descripcion:editZonaForm.descripcion,categoria:editZonaForm.categoria}:z));
+                    } else {
+                      updateZona(zonaId,{nombreCustom:editZonaForm.nombre,iconoCustom:editZonaForm.icono,descripcion:editZonaForm.descripcion,categoriaCustom:editZonaForm.categoria});
+                    }
+                    setEditZonaForm(null);
+                  }} style={{...S.btn,background:"rgba(52,211,153,0.12)",color:"#34d399",border:"1px solid rgba(52,211,153,0.3)"}}>
+                    💾 Guardar
+                  </button>
+                  <button onClick={()=>setEditZonaForm(null)} style={{...S.btn}}>Cancelar</button>
+                  {zona.esPersonalizada&&(
+                    <button onClick={()=>{
+                      if(!window.confirm("¿Eliminar "+zona.nombre+"?"))return;
+                      setMacrozonasCust(prev=>prev.filter(z=>z.id!==zona.id));
+                      setZonaId(null);setEditZonaForm(null);
+                    }} style={{...S.btn,background:"rgba(239,68,68,0.08)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.2)",marginLeft:"auto"}}>
+                      🗑 Eliminar
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
             {(aiLoading||aiText)&&(
               <div style={{background:"rgba(40,100,60,0.15)",border:"1px solid rgba(61,122,82,0.35)",borderRadius:12,padding:18,marginBottom:18}}>
                 <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:10,color:"#90d4a0"}}>🤖 Recomendaciones del Asistente</div>
@@ -17790,7 +17876,7 @@ export default function App() {
 
         {/* PROGRAMACIÓN */}
         {vista==="programacion"&&(
-          <ProgramacionDiaria key="prog" S={S} zonas={zonas} data={data} personal={personal} getZD={getZD} getAllElems={getAllElems} MACROZONAS_BASE={MACROZONAS_BASE} tareas={tareasProg} setTareas={setTareasProg} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal}
+          <ProgramacionDiaria key="prog" S={S} zonas={zonasConCust} data={data} personal={personal} getZD={getZD} getAllElems={getAllElems} MACROZONAS_BASE={MACROZONAS_BASE} tareas={tareasProg} setTareas={setTareasProg} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal}
             getElemFrecs={getElemFrecs} setElemFrecs={setElemFrecs} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} stockFito={stockFito} setStockFito={setStockFito} crearNotificacion={crearNotificacion}
             tareasZonaHoy={(tareasProg[new Date().toISOString().slice(0,10)]||[]).filter(t=>t.origenZona&&t.estado==="por_designar").length}
             esJefa={rolLogueado==="jefa"}
