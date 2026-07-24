@@ -183,6 +183,30 @@ const FRECUENCIAS = [
   { value:"noaplica",    label:"No aplica",           dias:0   },
 ];
 
+// Formatea el valor de frecuencia de una estación (string legado u objeto {tipo,cadaDias,diasEspecificos}) como texto legible para UI
+const DIAS_SEMANA_LBL = {0:"Dom",1:"Lun",2:"Mar",3:"Mié",4:"Jue",5:"Vie",6:"Sáb"};
+const formatFrecEstacion = (val) => {
+  if (val === null || val === undefined || val === "") return "—";
+  if (typeof val === "string") {
+    const found = FRECUENCIAS.find(o=>o.value===val);
+    return found ? found.label : val;
+  }
+  if (typeof val === "object") {
+    if (val.tipo === "noaplica") return "No aplica";
+    if (val.tipo === "segunecesidad") return "Según necesidad";
+    if (val.tipo === "porDiaSemana") {
+      const dias = (val.diasEspecificos||[]).map(d=>DIAS_SEMANA_LBL[d]).filter(Boolean).join(", ");
+      return dias ? `Días: ${dias}` : "Por días/sem";
+    }
+    // cadaXdias (u otro): cadaDias puede ser un valor de FRECUENCIAS ("semanal") o un número directo ("7")
+    const found = FRECUENCIAS.find(o=>o.value===val.cadaDias);
+    if (found) return found.label;
+    if (val.cadaDias) return `Cada ${val.cadaDias} días`;
+    return "—";
+  }
+  return String(val);
+};
+
 // ─── TAREAS PREDEFINIDAS POR SUBCATEGORÍA ────────────────────────────────────
 // Cada tarea: { tarea, verano, otono, invierno, primavera }
 const TAREAS_DEFAULT = {
@@ -16573,7 +16597,7 @@ export default function App() {
               <div style={{display:"flex",gap:4,marginTop:4,flexWrap:"wrap"}}>
                 {tareasActivas.slice(0,3).map(f=>(
                   <span key={f.tarea||f.id} style={{fontSize:10,color:"#4a8a6a",background:"rgba(61,122,82,0.1)",padding:"1px 6px",borderRadius:6,border:"1px solid rgba(61,122,82,0.18)"}}>
-                    {f.tarea}: {f[estacion]}
+                    {f.tarea}: {formatFrecEstacion(f[estacion])}
                   </span>
                 ))}
               </div>
