@@ -14599,8 +14599,11 @@ function PanelFrecuenciasZona({ S, zonas, getAllElems, getZD, setElemFrecs, esJe
           <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Macrozona</label>
           <select style={S.input} value={zonaSelFrec} onChange={e=>{setZonaSelFrec(e.target.value);setElemSelFrec("");}}>
             <option value="">— Seleccionar zona —</option>
-            {[...zonas].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(z=>(
-              <option key={z.id} value={String(z.id)}>{z.icono} {z.nombre}</option>
+            {[...zonas].map(z=>{
+              const zd=getZD(String(z.id))||{};
+              return {z, nombre:zd.nombreCustom||z.nombre, icono:zd.iconoCustom||z.icono};
+            }).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(({z,nombre,icono})=>(
+              <option key={z.id} value={String(z.id)}>{icono} {nombre}</option>
             ))}
           </select>
         </div>
