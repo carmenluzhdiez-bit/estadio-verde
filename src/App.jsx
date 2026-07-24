@@ -3466,6 +3466,16 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     return {...rest, [zona]:!estaColapso};
   });
   const [nuevaTarea, setNuevaTarea] = React.useState({ zona:"", elemento:"", tarea:"", responsable:"", estado:"por_designar", notas:"" });
+  // Cálculos para formulario de agregar tarea (dependen de nuevaTarea.zona/elemento)
+  const _zonasSinGolf = [...zonas].filter(z=>!z.nombre.toLowerCase().includes("golf")).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+  const _zonaObj = _zonasSinGolf.find(z=>z.nombre===nuevaTarea.zona);
+  const _elemsZona = _zonaObj ? getAllElems(_zonaObj.id) : [];
+  const _elemObj = _elemsZona.find(e=>e.nombre===nuevaTarea.elemento);
+  const _tareasDisp = _elemObj
+    ? [...new Set((TAREAS_DEFAULT[_elemObj.tipo]||[]).map(t=>t.tarea))].sort()
+    : __elemsZona.length>0
+      ? [...new Set(_elemsZona.flatMap(e=>(TAREAS_DEFAULT[e.tipo]||[]).map(t=>t.tarea)))].sort()
+      : TAREAS_PRESET;
   const [filtroEstado, setFiltroEstado] = React.useState("todos");
   const [filtroZona, setFiltroZona] = React.useState("todas");
   const [vistaSemanal, setVistaSemanal] = React.useState(false);
@@ -3902,15 +3912,6 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           {showAgregar && (
             <div style={{...S.card,padding:18,marginBottom:16}} className="ein">
               <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:14}}>Nueva Tarea — {fecha}</div>
-                const zonasSinGolf=[...MACROZONAS_BASE].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
-                const zonaObj=zonasSinGolf.find(z=>z.nombre===nuevaTarea.zona);
-                const elemsZona=zonaObj?getAllElems(zonaObj.id):[];
-                const elemObj=elemsZona.find(e=>e.nombre===nuevaTarea.elemento);
-                const tareasDisp=elemObj
-                  ?[...new Set((TAREAS_DEFAULT[elemObj.tipo]||[]).map(t=>t.tarea))].sort()
-                  :elemsZona.length>0
-                    ?[...new Set(elemsZona.flatMap(e=>(TAREAS_DEFAULT[e.tipo]||[]).map(t=>t.tarea)))].sort()
-                    :TAREAS_PRESET;
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
                 <div>
                   <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>MACROZONA</label>
@@ -3922,7 +3923,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                         };
                       })}>
                     <option value="">Seleccionar zona...</option>
-                    {zonasSinGolf.map(z=>(
+                    {_zonasSinGolf.map(z=>(
                       <option key={z.id} value={z.nombre}>{z.icono} {z.nombre}</option>
                     ))}
                   </select>
@@ -3930,11 +3931,11 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                 </div>
                 <div>
                   <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>ELEMENTO</label>
-                  {elemsZona.length>0?(
+                  {_elemsZona.length>0?(
                     <select style={{...S.input,fontSize:13}} value={nuevaTarea.elemento}
                       onChange={e=>setNuevaTarea(p=>({...p,elemento:e.target.value,tarea:""}))}>
                       <option value="">General / Todos</option>
-                      {elemsZona.map(e=><option key={e.id} value={e.nombre}>{e.nombre}</option>)}
+                      {_elemsZona.map(e=><option key={e.id} value={e.nombre}>{e.nombre}</option>)}
                     </select>
                   ):(
                     <input style={{...S.input,fontSize:13}} placeholder="Elemento..."
@@ -3946,7 +3947,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                   <select style={{...S.input,fontSize:13}} value={nuevaTarea.tarea}
                     onChange={e=>setNuevaTarea(p=>({...p,tarea:e.target.value==="__otro__"?"":e.target.value,responsable:p.responsable||(getResponsablePorTipo(e.target.value==="__otro__"?"":e.target.value,configSemanal)||"")}))}>
                     <option value="">Seleccionar tarea...</option>
-                    {tareasDisp.map(t=><option key={t} value={t}>{t}</option>)}
+                    {_tareasDisp.map(t=><option key={t} value={t}>{t}</option>)}
                     <option value="__otro__">✏️ Escribir otra...</option>
                   </select>
                   {(nuevaTarea.tarea===""||nuevaTarea.tarea==="__otro__")&&(
@@ -4016,6 +4017,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
               S={S}
             />
           ))
+          }
         </React.Fragment>
       )}
     </div>
@@ -15805,11 +15807,11 @@ function PanelFitosanitarioGlobal({ S, MACROZONAS_BASE, getAllElems, personal, a
           </div>
 
           {/* Sub-zonas múltiples */}
-          {elemsZona.length>0&&(
+          {_elemsZona.length>0&&(
             <div style={{marginBottom:10}}>
               <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4}}>ELEMENTOS / SUB-ZONAS (selecciona uno o varios)</label>
               <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
-                <button onClick={()=>setSubZonasSel(elemsZona.map(e=>e.nombre))}
+                <button onClick={()=>setSubZonasSel(_elemsZona.map(e=>e.nombre))}
                   style={{fontSize:10,padding:"2px 8px",borderRadius:6,border:"1px solid rgba(167,139,250,0.3)",background:"rgba(167,139,250,0.08)",color:"#c4b5fd",cursor:"pointer"}}>
                   ✓ Todos
                 </button>
@@ -15817,7 +15819,7 @@ function PanelFitosanitarioGlobal({ S, MACROZONAS_BASE, getAllElems, personal, a
                   style={{fontSize:10,padding:"2px 8px",borderRadius:6,border:"1px solid rgba(255,255,255,0.1)",background:"transparent",color:"#5a9a7a",cursor:"pointer"}}>
                   ✕ Ninguno
                 </button>
-                {elemsZona.map(e=>(
+                {_elemsZona.map(e=>(
                   <button key={e.id} onClick={()=>toggleSubZona(e.nombre)}
                     style={{fontSize:11,padding:"3px 10px",borderRadius:6,cursor:"pointer",
                       border:`1px solid ${subZonasSel.includes(e.nombre)?"rgba(167,139,250,0.5)":"rgba(255,255,255,0.1)"}`,
@@ -17267,7 +17269,7 @@ export default function App() {
                               📂 {zona.categoria}
                             </span>
                             <span style={{fontSize:11,color:"#6ab0c0",background:"rgba(96,176,192,0.08)",padding:"2px 8px",borderRadius:6,border:"1px solid rgba(96,176,192,0.15)"}}>
-                              📋 {elemsZona.length} elementos
+                              📋 {_elemsZona.length} elementos
                             </span>
                             {criticosZona>0&&(
                               <span style={{fontSize:11,color:"#fca5a5",background:"rgba(239,68,68,0.1)",padding:"2px 8px",borderRadius:6,border:"1px solid rgba(239,68,68,0.25)"}}>
