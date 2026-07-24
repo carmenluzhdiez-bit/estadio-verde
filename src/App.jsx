@@ -15808,11 +15808,11 @@ function PanelFitosanitarioGlobal({ S, MACROZONAS_BASE, getAllElems, personal, a
           </div>
 
           {/* Sub-zonas múltiples */}
-          {_elemsZona.length>0&&(
+          {elemsZona.length>0&&(
             <div style={{marginBottom:10}}>
               <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4}}>ELEMENTOS / SUB-ZONAS (selecciona uno o varios)</label>
               <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
-                <button onClick={()=>setSubZonasSel(_elemsZona.map(e=>e.nombre))}
+                <button onClick={()=>setSubZonasSel(elemsZona.map(e=>e.nombre))}
                   style={{fontSize:10,padding:"2px 8px",borderRadius:6,border:"1px solid rgba(167,139,250,0.3)",background:"rgba(167,139,250,0.08)",color:"#c4b5fd",cursor:"pointer"}}>
                   ✓ Todos
                 </button>
@@ -15820,7 +15820,7 @@ function PanelFitosanitarioGlobal({ S, MACROZONAS_BASE, getAllElems, personal, a
                   style={{fontSize:10,padding:"2px 8px",borderRadius:6,border:"1px solid rgba(255,255,255,0.1)",background:"transparent",color:"#5a9a7a",cursor:"pointer"}}>
                   ✕ Ninguno
                 </button>
-                {_elemsZona.map(e=>(
+                {elemsZona.map(e=>(
                   <button key={e.id} onClick={()=>toggleSubZona(e.nombre)}
                     style={{fontSize:11,padding:"3px 10px",borderRadius:6,cursor:"pointer",
                       border:`1px solid ${subZonasSel.includes(e.nombre)?"rgba(167,139,250,0.5)":"rgba(255,255,255,0.1)"}`,
@@ -17270,7 +17270,7 @@ export default function App() {
                               📂 {zona.categoria}
                             </span>
                             <span style={{fontSize:11,color:"#6ab0c0",background:"rgba(96,176,192,0.08)",padding:"2px 8px",borderRadius:6,border:"1px solid rgba(96,176,192,0.15)"}}>
-                              📋 {_elemsZona.length} elementos
+                              📋 {elemsZona.length} elementos
                             </span>
                             {criticosZona>0&&(
                               <span style={{fontSize:11,color:"#fca5a5",background:"rgba(239,68,68,0.1)",padding:"2px 8px",borderRadius:6,border:"1px solid rgba(239,68,68,0.25)"}}>
