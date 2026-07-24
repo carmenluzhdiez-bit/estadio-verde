@@ -16365,6 +16365,16 @@ export default function App() {
     return [...base,...custom].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
   };
 
+  // Estado automático de la zona = peor estado entre sus elementos reales (igual para todas las zonas, incl. Golf).
+  // "mantenimiento" es la única excepción: es un estado operativo manual (zona cerrada), no se infiere de los elementos.
+  const estadoZonaAuto = (zid) => {
+    if (getZD(zid).estadoGeneral==="mantenimiento") return "mantenimiento";
+    const elems = getAllElems(zid);
+    if (elems.some(e=>e.edData.estado==="critico")) return "critico";
+    if (elems.some(e=>e.edData.estado==="regular")) return "regular";
+    return "bueno";
+  };
+
   const todasLasZonas = (() => {
     const base = MACROZONAS_BASE.map(z=>{
       const zd = getZD(z.id);
@@ -16378,7 +16388,7 @@ export default function App() {
   })();
   const filteredZonas = todasLasZonas.filter(z=>{
     const matchC=filtroCat==="Todas"||z.categoria===filtroCat;
-    const matchE=filtroEst==="Todos"||getZD(z.id).estadoGeneral===filtroEst;
+    const matchE=filtroEst==="Todos"||estadoZonaAuto(z.id)===filtroEst;
     const filtQ=(busq||"").trim().toLowerCase();
     const matchB=!filtQ||
       z.nombre.toLowerCase().includes(filtQ)||
@@ -16389,10 +16399,10 @@ export default function App() {
 
   const stats = {
     total: todasLasZonas.length,
-    bueno: todasLasZonas.filter(z=>getZD(z.id).estadoGeneral==="bueno").length,
-    regular: MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral==="regular").length,
-    critico: MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral==="critico").length,
-    mantenimiento: MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral==="mantenimiento").length,
+    bueno: todasLasZonas.filter(z=>estadoZonaAuto(z.id)==="bueno").length,
+    regular: MACROZONAS_BASE.filter(z=>estadoZonaAuto(z.id)==="regular").length,
+    critico: MACROZONAS_BASE.filter(z=>estadoZonaAuto(z.id)==="critico").length,
+    mantenimiento: MACROZONAS_BASE.filter(z=>estadoZonaAuto(z.id)==="mantenimiento").length,
   };
   const totalElems = MACROZONAS_BASE.reduce((a,z)=>a+getAllElems(z.id).length,0);
   const elemsOk = MACROZONAS_BASE.reduce((a,z)=>a+getAllElems(z.id).filter(e=>e.edData.estado==="bueno").length,0);
@@ -16531,7 +16541,7 @@ export default function App() {
     if(!zona) return;
     setAiLoading(true); setAiText("");
     const elems=getAllElems(zona.id).map(e=>`${e.nombre} (${ESTADOS_ELEM[e.edData.estado]?.label||"Bueno"})`).join(", ");
-    const prompt=`Eres experto en mantenimiento de parques y jardines de un club español en Chile. Analiza la macrozona "${zona.nombre}" con estos elementos: ${elems}. Estado general: ${ESTADOS_ZONA[zd?.estadoGeneral]?.label}. Notas: ${zd?.notas||"Ninguna"}. Da recomendaciones específicas de mantenimiento para cada elemento en estado regular o crítico, y un plan de acción priorizado. Responde en español con viñetas y secciones claras.`;
+    const prompt=`Eres experto en mantenimiento de parques y jardines de un club español en Chile. Analiza la macrozona "${zona.nombre}" con estos elementos: ${elems}. Estado general: ${ESTADOS_ZONA[estadoZonaAuto(zona.id)]?.label}. Notas: ${zd?.notas||"Ninguna"}. Da recomendaciones específicas de mantenimiento para cada elemento en estado regular o crítico, y un plan de acción priorizado. Responde en español con viñetas y secciones claras.`;
     try {
       const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":"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","anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:prompt}]})});
       const json=await res.json();
@@ -17052,8 +17062,7 @@ export default function App() {
             </div>
             {/* ── Tag Golf ── */}
             {(()=>{
-              const zdGolf = getZD("31");
-              const estadoGolf = zdGolf.estadoGeneral||"bueno";
+              const estadoGolf = estadoZonaAuto("31");
               const colGolf = estadoGolf==="bueno"?"#22c55e":estadoGolf==="regular"?"#f59e0b":estadoGolf==="critico"?"#ef4444":"#3b82f6";
               const labelGolf = estadoGolf==="bueno"?"✅ Buen estado":estadoGolf==="regular"?"⚠️ Estado regular":estadoGolf==="critico"?"🔴 Estado crítico":"🔧 En mantenimiento";
               const tareasGolfHoy=(()=>{
@@ -17088,7 +17097,7 @@ export default function App() {
               <div style={{background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:12,padding:16,marginBottom:22}}>
                 <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:10,color:"#fca5a5"}}>🚨 Zonas en Estado Crítico</div>
                 <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-                  {MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral==="critico").map(z=>(
+                  {MACROZONAS_BASE.filter(z=>estadoZonaAuto(z.id)==="critico").map(z=>(
                     <span key={z.id} onClick={()=>{setZonaId(String(z.id));setVista("zonas");setTab("elementos");}} style={{...S.chip,background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)",cursor:"pointer"}}>{z.icono} {z.nombre}</span>
                   ))}
                 </div>
@@ -17146,7 +17155,7 @@ export default function App() {
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(210px,1fr))",gap:12}}>
               {[...new Set(todasLasZonas.map(z=>z.categoria).filter(Boolean))].sort().map(cat=>{
                 const zc=todasLasZonas.filter(z=>z.categoria===cat).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
-                const ok=zc.filter(z=>getZD(String(z.id)).estadoGeneral!=="critico"&&getZD(String(z.id)).estadoGeneral!=="regular").length;
+                const ok=zc.filter(z=>estadoZonaAuto(String(z.id))!=="critico"&&estadoZonaAuto(String(z.id))!=="regular").length;
                 const pct=Math.round((ok/zc.length)*100);
                 return (
                   <div key={cat} style={{...S.card,padding:16,cursor:"pointer"}} className="hov" onClick={()=>{setFiltroCat(cat);setVista("zonas");}}>
@@ -17253,7 +17262,7 @@ export default function App() {
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(230px,1fr))",gap:14}}>
               {filteredZonas.map(z=>{
-                const dzd=getZD(z.id); const est=ESTADOS_ZONA[dzd.estadoGeneral||"bueno"];
+                const dzd=getZD(z.id); const est=ESTADOS_ZONA[estadoZonaAuto(z.id)];
                 const allElems=getAllElems(z.id);
                 const criticos=allElems.filter(e=>e.edData.estado==="critico").length;
                 const pendTareas=(dzd.tareas||[]).filter(t=>!t.completada).length;
@@ -17298,10 +17307,10 @@ export default function App() {
           <div className="ein">
             <button style={{...S.btn,background:"transparent",color:"#a0c8a0",border:"1px solid rgba(160,200,140,0.22)",marginBottom:20}} onClick={()=>{setZonaId(null);setAiText("");}}>← Volver</button>
             {(()=>{
-              const estZona = ESTADOS_ZONA[zd.estadoGeneral||"bueno"]||{color:"#22c55e",bg:"rgba(34,197,94,0.1)",label:"Bueno"};
+              const estZona = ESTADOS_ZONA[estadoZonaAuto(zonaId)]||{color:"#22c55e",bg:"rgba(34,197,94,0.1)",label:"Bueno"};
               const elemsZona = getAllElems(zonaId);
-              const criticosZona = elemsZona.filter(e=>e.estado==="critico").length;
-              const regularesZona = elemsZona.filter(e=>e.estado==="regular").length;
+              const criticosZona = elemsZona.filter(e=>e.edData.estado==="critico").length;
+              const regularesZona = elemsZona.filter(e=>e.edData.estado==="regular").length;
               return (
                 <div style={{...S.card,padding:0,marginBottom:18,overflow:"hidden"}}>
                   {/* Banda de color superior según estado */}
@@ -17341,14 +17350,19 @@ export default function App() {
                       </div>
                       {/* Derecha: estado + IA */}
                       <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-                        <div style={{display:"flex",alignItems:"center",gap:6,background:estZona.bg,border:`1px solid ${estZona.color}40`,borderRadius:8,padding:"4px 6px 4px 10px"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:6,background:estZona.bg,border:`1px solid ${estZona.color}40`,borderRadius:8,padding:"4px 10px"}}>
                           <span style={{fontSize:12,color:estZona.color,fontWeight:600}}>{estZona.label}</span>
-                          <select value={zd.estadoGeneral||"bueno"}
-                            onChange={e=>{updateZona(zonaId,{estadoGeneral:e.target.value});addHistorial(zonaId,`Estado zona → ${ESTADOS_ZONA[e.target.value].label}`);}}
-                            style={{background:"transparent",border:"none",color:estZona.color,fontSize:11,cursor:"pointer",padding:"2px 0"}}>
-                            {Object.entries(ESTADOS_ZONA).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
-                          </select>
                         </div>
+                        {esJefa&&(
+                          <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:zd.estadoGeneral==="mantenimiento"?"rgba(59,130,246,0.18)":"rgba(255,255,255,0.05)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}}
+                            onClick={()=>{
+                              const nuevo = zd.estadoGeneral==="mantenimiento" ? "bueno" : "mantenimiento";
+                              updateZona(zonaId,{estadoGeneral:nuevo});
+                              addHistorial(zonaId,`Estado zona → ${ESTADOS_ZONA[nuevo].label}`);
+                            }}>
+                            {zd.estadoGeneral==="mantenimiento" ? "✓ Quitar mantenimiento" : "🔧 Marcar en mantenimiento"}
+                          </button>
+                        )}
                         <button style={{...S.btn,background:"rgba(61,122,82,0.2)",color:"#a0d8b0",border:"1px solid rgba(61,122,82,0.35)",fontSize:12}}
                           onClick={getSugerenciaAI} disabled={aiLoading}>
                           {aiLoading?<><span className="spin"/> Analizando...</>:"🤖 Sugerencia IA"}
@@ -17783,7 +17797,7 @@ export default function App() {
                     return "<tr>"
                       +"<td>"+z.icono+" "+z.nombre+"</td>"
                       +"<td>"+z.categoria+"</td>"
-                      +"<td style='color:"+COLORES[dzd2.estadoGeneral||"bueno"]+";font-weight:600'>"+LABELS[dzd2.estadoGeneral||"bueno"]+"</td>"
+                      +"<td style='color:"+COLORES[estadoZonaAuto(z.id)]+";font-weight:600'>"+LABELS[estadoZonaAuto(z.id)]+"</td>"
                       +"<td style='text-align:center'>"+allE.length+"</td>"
                       +"<td style='text-align:center;color:"+(crit>0?"#991b1b":"#166534")+"'>"+(crit>0?"🔴 "+crit:"—")+"</td>"
                       +"<td>"+(dzd2.ultimoMant||"—")+"</td>"
@@ -17792,7 +17806,7 @@ export default function App() {
                       +"</tr>";
                   }).join("");
                   const estadoStats = Object.entries({bueno:{label:"Bueno",color:"#166534"},regular:{label:"Regular",color:"#92400e"},critico:{label:"Crítico",color:"#991b1b"},mantenimiento:{label:"En Mant.",color:"#1e40af"}}).map(([k,v])=>{
-                    const statC=MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral===k).length;
+                    const statC=MACROZONAS_BASE.filter(z=>estadoZonaAuto(z.id)===k).length;
                     return "<span style='color:"+v.color+";font-weight:700'>"+v.label+": "+statC+"</span>";
                   }).join(" &nbsp;·&nbsp; ");
                   const html = "<!DOCTYPE html><html lang='es'><head><meta charset='UTF-8'>"
@@ -17832,7 +17846,7 @@ export default function App() {
               <div style={{...S.card,padding:20}}>
                 <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,marginBottom:14}}>📊 Zonas por Estado</div>
                 {Object.entries(ESTADOS_ZONA).map(([k,v])=>{
-                  const statC2=MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral===k).length;
+                  const statC2=MACROZONAS_BASE.filter(z=>estadoZonaAuto(z.id)===k).length;
                   const pct=Math.round((statC2/MACROZONAS_BASE.length)*100);
                   return (
                     <div key={k} style={{marginBottom:10}}>
