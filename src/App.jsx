@@ -3473,7 +3473,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
   const _elemObj = _elemsZona.find(e=>e.nombre===nuevaTarea.elemento);
   const _tareasDisp = _elemObj
     ? [...new Set((TAREAS_DEFAULT[_elemObj.tipo]||[]).map(t=>t.tarea))].sort()
-    : __elemsZona.length>0
+    : _elemsZona.length>0
       ? [...new Set(_elemsZona.flatMap(e=>(TAREAS_DEFAULT[e.tipo]||[]).map(t=>t.tarea)))].sort()
       : TAREAS_PRESET;
   const [filtroEstado, setFiltroEstado] = React.useState("todos");
