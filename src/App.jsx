@@ -8,6 +8,7 @@ import * as React from "react";
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, onValue, set as fbSet, update as fbUpdate, get } from "firebase/database";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
+import { getFunctions, httpsCallable } from "firebase/functions";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBgxVOk_OAh2XTouD9gLw5rycaNF-OWlnU",
@@ -22,7 +23,12 @@ const firebaseConfig = {
 const fbApp = initializeApp(firebaseConfig, "estadio-verde");
 const db    = getDatabase(fbApp);
 const auth  = getAuth(fbApp);
+// Proxy seguro para llamadas a la API de Claude — la API key vive solo en el servidor (Cloud Function),
+// nunca en el código del navegador. Ver /functions/index.js
+const fns   = getFunctions(fbApp);
+const sugerenciaIACloud = httpsCallable(fns, "sugerenciaIA");
 const ROOT  = "estadio-verde-data";
+
 
 // ─── ROLES POR EMAIL ─────────────────────────────────────────────────────────
 const ROLES_EMAIL = {
@@ -16543,9 +16549,8 @@ export default function App() {
     const elems=getAllElems(zona.id).map(e=>`${e.nombre} (${ESTADOS_ELEM[e.edData.estado]?.label||"Bueno"})`).join(", ");
     const prompt=`Eres experto en mantenimiento de parques y jardines de un club español en Chile. Analiza la macrozona "${zona.nombre}" con estos elementos: ${elems}. Estado general: ${ESTADOS_ZONA[estadoZonaAuto(zona.id)]?.label}. Notas: ${zd?.notas||"Ninguna"}. Da recomendaciones específicas de mantenimiento para cada elemento en estado regular o crítico, y un plan de acción priorizado. Responde en español con viñetas y secciones claras.`;
     try {
-      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":"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","anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:prompt}]})});
-      const json=await res.json();
-      setAiText(json.content?.[0]?.text||"Sin respuesta.");
+      const res = await sugerenciaIACloud({ prompt });
+      setAiText(res.data?.text||"Sin respuesta.");
     } catch { setAiText("Error al conectar con el asistente IA."); }
     setAiLoading(false);
   };
