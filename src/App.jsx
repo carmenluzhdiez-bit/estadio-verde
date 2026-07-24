@@ -141,12 +141,23 @@ const calcProximaFrecGlobal = (f, refFecha) => {
     }
     return null;
   }
-  // modo estación
+  // modo estación — compatible con formato viejo (string) y nuevo (objeto {tipo,cadaDias})
   const estCPFG = estacionDeFecha(refFecha);
-  const frecVal = f[estCPFG];
-  if(!frecVal||frecVal==="noaplica"||frecVal==="unavez"||frecVal==="segunecesidad") return null;
+  const estValRaw = f[estCPFG];
+  let frecVal, dias;
+  if(typeof estValRaw === "object" && estValRaw !== null) {
+    // Formato nuevo: {tipo:"cadaXdias", cadaDias:"7"}
+    if(estValRaw.tipo==="noaplica"||estValRaw.tipo==="segunecesidad") return null;
+    const diasMap = {diario:1,cada2dias:2,cada3dias:3,cada5dias:5,semanal:7,quincenal:15,mensual:30,bimestral:60,trimestral:90};
+    dias = Number(estValRaw.cadaDias) || diasMap[estValRaw.cadaDias] || null;
+    frecVal = String(dias||"");
+  } else {
+    // Formato viejo: string "semanal","quincenal",etc.
+    frecVal = estValRaw;
+    if(!frecVal||frecVal==="noaplica"||frecVal==="unavez"||frecVal==="segunecesidad") return null;
+    dias = frecToDiasGlobal(frecVal);
+  }
   if(!f.ultimaVez) return null;
-  const dias = frecToDiasGlobal(frecVal);
   if(!dias) return null;
   const ultima = new Date(f.ultimaVez+"T12:00:00");
   const proxima = new Date(ultima.getTime() + dias*24*60*60*1000);
@@ -3368,6 +3379,86 @@ Una vez cerrado no podrás modificar las tareas. Solo la jefa puede reabrir el t
   );
 }
 
+// Componente auxiliar para cada fila de zona en Programa
+function ZonaRow({ zona, tz, zonasColapsadas, toggleZonaColapso, MACROZONAS_BASE, ESTADOS_TAREA, EC, updateTarea, deleteTarea, puedeCrear, S }) {
+  const zonaColapso = zonasColapsadas.__init ? true : zonasColapsadas[zona]!==false;
+  const hechasZona = tz.filter(t=>["hecha","completada"].includes(t.estado)).length;
+  const icono = MACROZONAS_BASE.find(z=>z.nombre===zona)?.icono||"📍";
+  
+  return (
+  <div key={zona} style={{marginBottom:12,borderRadius:10,overflow:"hidden",border:"1px solid rgba(255,255,255,0.07)"}}>
+    <div onClick={()=>toggleZonaColapso(zona)}
+      style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",cursor:"pointer",userSelect:"none",
+        background:zonaColapso?"rgba(255,255,255,0.02)":"rgba(52,211,153,0.04)",
+        borderBottom:zonaColapso?"none":"1px solid rgba(255,255,255,0.08)"}}>
+      <span style={{fontSize:11,color:zonaColapso?"#6aaa7a":"#34d399",transform:zonaColapso?"rotate(0deg)":"rotate(90deg)",transition:"transform 0.15s",display:"inline-block"}}>▶</span>
+      <span style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,flex:1}}>{MACROZONAS_BASE.find(z=>z.nombre===zona)?.icono||"📍"} {zona}</span>
+      <span style={{display:"inline-flex",padding:"2px 8px",borderRadius:20,fontSize:11,background:"rgba(255,255,255,0.07)",color:"#7aaa80"}}>{tz.length}</span>
+      <span style={{fontSize:11,color:"#22c55e"}}>{tz.filter(t=>["hecha","completada"].includes(t.estado)).length} ✓</span>
+    </div>
+    <div style={{display:zonaColapso?"none":"flex",flexDirection:"column",gap:8,padding:"8px 0"}}>
+      {(()=>{
+        const TIPOS_PD=[
+          {key:"corte",   icon:"✂️", label:"Cortes",        match:t=>(t.tarea||"").toLowerCase().includes("corte")},
+          {key:"riego",   icon:"💧", label:"Riego",          match:t=>(t.tarea||"").toLowerCase().includes("riego")||(t.tarea||"").toLowerCase().includes("regar")},
+          {key:"poda",    icon:"🌿", label:"Poda / Arbusto", match:t=>(t.tarea||"").toLowerCase().includes("poda")||(t.tarea||"").toLowerCase().includes("arbusto")},
+          {key:"limpieza",icon:"🧹", label:"Limpieza",       match:t=>(t.tarea||"").toLowerCase().includes("limpieza")||(t.tarea||"").toLowerCase().includes("barrido")},
+          {key:"fertil",  icon:"🌱", label:"Fertilización",  match:t=>(t.tarea||"").toLowerCase().includes("fertil")||(t.tarea||"").toLowerCase().includes("abono")},
+          {key:"otros",   icon:"📋", label:"Otras",          match:t=>true},
+        ];
+        const usados=new Set();
+        const grupos=[];
+        TIPOS_PD.forEach(g=>{
+          const ts=tz.filter(t=>!usados.has(t.id)&&g.match(t));
+          ts.forEach(t=>usados.add(t.id));
+          if(ts.length>0) grupos.push({...g,tareas:ts});
+        });
+        return grupos.map(gp=>(
+          <div key={gp.key}>
+            {grupos.length>1&&<div style={{fontSize:10,color:"#4a7a5a",padding:"3px 0 5px",textTransform:"uppercase",letterSpacing:"0.5px",fontWeight:600}}>{gp.icon} {gp.label} <span style={{color:"#3a5a3a"}}>({gp.tareas.length})</span></div>}
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {gp.tareas.map(t=>{
+        const est=ESTADOS_TAREA[normalizarEstado(t.estado)]||ESTADOS_TAREA.por_designar;
+        return (
+          <div key={t.id} style={{...S.card,padding:"12px 14px",borderLeft:`3px solid ${est.color}`,opacity:t.estado==="cancelada"?0.5:1}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",gap:10,flexWrap:"wrap"}}>
+    <div style={{flex:1,minWidth:0}}>
+      <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginBottom:4}}>
+        <span style={{fontSize:14,fontWeight:600}}>{t.tarea}</span>
+        {t.elemento&&<span style={{fontSize:11,color:"#5a8a6a",background:"rgba(255,255,255,0.06)",padding:"1px 7px",borderRadius:10}}>{t.elemento}</span>}
+        {t.auto&&<span style={{fontSize:10,color:"#4a8a7a",background:"rgba(59,130,246,0.1)",padding:"1px 6px",borderRadius:10,border:"1px solid rgba(59,130,246,0.2)"}}>auto</span>}
+        {t.origenZona&&<span style={{fontSize:10,color:"#c084fc",background:"rgba(192,132,252,0.1)",padding:"1px 6px",borderRadius:10,border:"1px solid rgba(192,132,252,0.2)"}}>📍 zona</span>}
+      </div>
+      <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+        <span style={{fontSize:11,color:"#5a8a6a"}}>👤</span>
+        <ResponsableSelector
+          value={t.responsable||""}
+          personal={personal}
+          onChange={v=>updateTarea(t.id,{responsable:v,estado:v&&t.estado==="por_designar"?"pendiente":t.estado})}
+          S={S}
+          inline={true}
+        />
+      </div>
+      {t.notas&&<div style={{fontSize:11,color:"#5a8a6a",marginTop:3,fontStyle:"italic"}}>{t.notas}</div>}
+      {t.notaWorker&&<div style={{fontSize:11,color:t.estado==="no_pudo"?"#fca5a5":"#7aaa80",marginTop:3,fontStyle:"italic",padding:"4px 8px",background:"rgba(255,255,255,0.04)",borderRadius:6}}>{t.estado==="no_pudo"?"⚠️ ":""}{t.notaWorker}</div>}
+    </div>
+    <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0,flexWrap:"wrap"}}>
+      <select value={t.estado} onChange={e=>updateTarea(t.id,{estado:e.target.value})}
+        style={{background:est.bg,border:`1px solid ${est.color}40`,borderRadius:7,color:est.color,padding:"4px 7px",fontFamily:"'Georgia',serif",fontSize:12,outline:"none",cursor:"pointer"}}>
+        {Object.entries(ESTADOS_TAREA).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
+      </select>
+      <button onClick={()=>deleteTarea(t.id)} style={{background:"transparent",border:"none",color:"#7a5a5a",cursor:"pointer",fontSize:14,padding:"3px 5px"}}>🗑</button>
+    </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+
+  );
+}
+
+
 function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACROZONAS_BASE, tareas, setTareas, tareasZonaHoy=0, esJefa=false, configSemanal={}, setConfigSemanal, puedeCrear=false, cierresTurno={}, onReabrirTurno, getElemFrecs, setElemFrecs, aplicaciones=[], setAplicaciones, stockFito, setStockFito, crearNotificacion }) {
   const hoy = fechaLocal();
   const [fecha, setFecha] = React.useState(hoy);
@@ -3920,87 +4011,19 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
             </div>
           )}
 
-          {Object.entries(porZona).sort(([a],[b])=>a.localeCompare(b,"es")).map(([zona,tz])=>{
-            const zonaColapso = zonasColapsadas.__init ? true : zonasColapsadas[zona]!==false;
-            const hechasZona = tz.filter(t=>["hecha","completada"].includes(t.estado)).length;
-            return (
-            <div key={zona} style={{marginBottom:12,borderRadius:10,overflow:"hidden",border:"1px solid rgba(255,255,255,0.07)"}}>
-              <div onClick={()=>toggleZonaColapso(zona)}
-                style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",cursor:"pointer",userSelect:"none",
-                  background:zonaColapso?"rgba(255,255,255,0.02)":"rgba(52,211,153,0.04)",
-                  borderBottom:zonaColapso?"none":"1px solid rgba(255,255,255,0.08)"}}>
-                <span style={{fontSize:11,color:zonaColapso?"#6aaa7a":"#34d399",transform:zonaColapso?"rotate(0deg)":"rotate(90deg)",transition:"transform 0.15s",display:"inline-block"}}>▶</span>
-                <span style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,flex:1}}>{MACROZONAS_BASE.find(z=>z.nombre===zona)?.icono||"📍"} {zona}</span>
-                <span style={{display:"inline-flex",padding:"2px 8px",borderRadius:20,fontSize:11,background:"rgba(255,255,255,0.07)",color:"#7aaa80"}}>{tz.length}</span>
-                <span style={{fontSize:11,color:"#22c55e"}}>{tz.filter(t=>["hecha","completada"].includes(t.estado)).length} ✓</span>
-              </div>
-              {!zonaColapso&&<div style={{display:"flex",flexDirection:"column",gap:8,padding:"8px 0"}}>
-                {(()=>{
-                  const TIPOS_PD=[
-                    {key:"corte",   icon:"✂️", label:"Cortes",        match:t=>(t.tarea||"").toLowerCase().includes("corte")},
-                    {key:"riego",   icon:"💧", label:"Riego",          match:t=>(t.tarea||"").toLowerCase().includes("riego")||(t.tarea||"").toLowerCase().includes("regar")},
-                    {key:"poda",    icon:"🌿", label:"Poda / Arbusto", match:t=>(t.tarea||"").toLowerCase().includes("poda")||(t.tarea||"").toLowerCase().includes("arbusto")},
-                    {key:"limpieza",icon:"🧹", label:"Limpieza",       match:t=>(t.tarea||"").toLowerCase().includes("limpieza")||(t.tarea||"").toLowerCase().includes("barrido")},
-                    {key:"fertil",  icon:"🌱", label:"Fertilización",  match:t=>(t.tarea||"").toLowerCase().includes("fertil")||(t.tarea||"").toLowerCase().includes("abono")},
-                    {key:"otros",   icon:"📋", label:"Otras",          match:t=>true},
-                  ];
-                  const usados=new Set();
-                  const grupos=[];
-                  TIPOS_PD.forEach(g=>{
-                    const ts=tz.filter(t=>!usados.has(t.id)&&g.match(t));
-                    ts.forEach(t=>usados.add(t.id));
-                    if(ts.length>0) grupos.push({...g,tareas:ts});
-                  });
-                  return grupos.map(gp=>(
-                    <div key={gp.key}>
-                      {grupos.length>1&&<div style={{fontSize:10,color:"#4a7a5a",padding:"3px 0 5px",textTransform:"uppercase",letterSpacing:"0.5px",fontWeight:600}}>{gp.icon} {gp.label} <span style={{color:"#3a5a3a"}}>({gp.tareas.length})</span></div>}
-                      <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                      {gp.tareas.map(t=>{
-                  const est=ESTADOS_TAREA[normalizarEstado(t.estado)]||ESTADOS_TAREA.por_designar;
-                  return (
-                    <div key={t.id} style={{...S.card,padding:"12px 14px",borderLeft:`3px solid ${est.color}`,opacity:t.estado==="cancelada"?0.5:1}}>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",gap:10,flexWrap:"wrap"}}>
-                        <div style={{flex:1,minWidth:0}}>
-                          <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginBottom:4}}>
-                            <span style={{fontSize:14,fontWeight:600}}>{t.tarea}</span>
-                            {t.elemento&&<span style={{fontSize:11,color:"#5a8a6a",background:"rgba(255,255,255,0.06)",padding:"1px 7px",borderRadius:10}}>{t.elemento}</span>}
-                            {t.auto&&<span style={{fontSize:10,color:"#4a8a7a",background:"rgba(59,130,246,0.1)",padding:"1px 6px",borderRadius:10,border:"1px solid rgba(59,130,246,0.2)"}}>auto</span>}
-                            {t.origenZona&&<span style={{fontSize:10,color:"#c084fc",background:"rgba(192,132,252,0.1)",padding:"1px 6px",borderRadius:10,border:"1px solid rgba(192,132,252,0.2)"}}>📍 zona</span>}
-                          </div>
-                          <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                            <span style={{fontSize:11,color:"#5a8a6a"}}>👤</span>
-                            <ResponsableSelector
-                              value={t.responsable||""}
-                              personal={personal}
-                              onChange={v=>updateTarea(t.id,{responsable:v,estado:v&&t.estado==="por_designar"?"pendiente":t.estado})}
-                              S={S}
-                              inline={true}
-                            />
-                          </div>
-                          {t.notas&&<div style={{fontSize:11,color:"#5a8a6a",marginTop:3,fontStyle:"italic"}}>{t.notas}</div>}
-                          {t.notaWorker&&<div style={{fontSize:11,color:t.estado==="no_pudo"?"#fca5a5":"#7aaa80",marginTop:3,fontStyle:"italic",padding:"4px 8px",background:"rgba(255,255,255,0.04)",borderRadius:6}}>{t.estado==="no_pudo"?"⚠️ ":""}{t.notaWorker}</div>}
-                        </div>
-                        <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0,flexWrap:"wrap"}}>
-                          <select value={t.estado} onChange={e=>updateTarea(t.id,{estado:e.target.value})}
-                            style={{background:est.bg,border:`1px solid ${est.color}40`,borderRadius:7,color:est.color,padding:"4px 7px",fontFamily:"'Georgia',serif",fontSize:12,outline:"none",cursor:"pointer"}}>
-                            {Object.entries(ESTADOS_TAREA).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
-                          </select>
-                          <button onClick={()=>deleteTarea(t.id)} style={{background:"transparent",border:"none",color:"#7a5a5a",cursor:"pointer",fontSize:14,padding:"3px 5px"}}>🗑</button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-                      </div>
-                    </div>
-                  ));
-                })()}
-              </div>}
-            </div>
-          );
-          }
-          )}
-      )}
+          {Object.entries(porZona).sort(([a],[b])=>a.localeCompare(b,"es")).map(([zona,tz])=>(
+            <ZonaRow key={zona} zona={zona} tz={tz}
+              zonasColapsadas={zonasColapsadas}
+              toggleZonaColapso={toggleZonaColapso}
+              MACROZONAS_BASE={MACROZONAS_BASE}
+              ESTADOS_TAREA={ESTADOS_TAREA}
+              EC={EC}
+              updateTarea={updateTarea}
+              deleteTarea={deleteTarea}
+              puedeCrear={puedeCrear}
+              S={S}
+            />
+          ))
     </div>
   );
 }
@@ -5136,12 +5159,18 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
   const estActual = [12,1,2].includes(fpMes)?"verano":[3,4,5].includes(fpMes)?"otono":[6,7,8].includes(fpMes)?"invierno":"primavera";
 
   const getDiasConfig = (f, est) => {
-    // Compatible con el formato viejo (modo/verano/otono etc. como string) y nuevo (objeto por estación)
     const estObj = f[est];
     if(typeof estObj === "object" && estObj !== null) return estObj;
-    // Formato viejo — convertir
+    // Formato viejo — string como "semanal","quincenal",etc. → convertir a objeto nuevo
     const frecVal = typeof estObj === "string" ? estObj : (f[est]||"noaplica");
-    return {tipo: frecVal==="noaplica"?"noaplica": frecVal==="segunecesidad"?"segunecesidad":"cadaXdias", cadaDias:"7", diasEspecificos:[]};
+    const diasMap = {diario:"1",cada2dias:"2",cada3dias:"3",cada5dias:"5",semanal:"7",
+      quincenal:"15",mensual:"30",bimestral:"60",trimestral:"90"};
+    const cadaDias = diasMap[frecVal]||"7";
+    return {
+      tipo: frecVal==="noaplica"?"noaplica":frecVal==="segunecesidad"?"segunecesidad":"cadaXdias",
+      cadaDias,
+      diasEspecificos:[]
+    };
   };
 
   const getProximaDias = (f) => {
