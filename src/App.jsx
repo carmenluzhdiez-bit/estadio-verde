@@ -8,6 +8,7 @@ import * as React from "react";
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, onValue, set as fbSet, update as fbUpdate, get } from "firebase/database";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
+import { getFunctions, httpsCallable } from "firebase/functions";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBgxVOk_OAh2XTouD9gLw5rycaNF-OWlnU",
@@ -22,7 +23,12 @@ const firebaseConfig = {
 const fbApp = initializeApp(firebaseConfig, "estadio-verde");
 const db    = getDatabase(fbApp);
 const auth  = getAuth(fbApp);
+// Proxy seguro para llamadas a la API de Claude — la API key vive solo en el servidor (Cloud Function),
+// nunca en el código del navegador. Ver /functions/index.js
+const fns   = getFunctions(fbApp);
+const sugerenciaIACloud = httpsCallable(fns, "sugerenciaIA");
 const ROOT  = "estadio-verde-data";
+
 
 // ─── ROLES POR EMAIL ─────────────────────────────────────────────────────────
 const ROLES_EMAIL = {
@@ -182,6 +188,30 @@ const FRECUENCIAS = [
   { value:"segunecesidad", label:"Según necesidad",   dias:null },
   { value:"noaplica",    label:"No aplica",           dias:0   },
 ];
+
+// Formatea el valor de frecuencia de una estación (string legado u objeto {tipo,cadaDias,diasEspecificos}) como texto legible para UI
+const DIAS_SEMANA_LBL = {0:"Dom",1:"Lun",2:"Mar",3:"Mié",4:"Jue",5:"Vie",6:"Sáb"};
+const formatFrecEstacion = (val) => {
+  if (val === null || val === undefined || val === "") return "—";
+  if (typeof val === "string") {
+    const found = FRECUENCIAS.find(o=>o.value===val);
+    return found ? found.label : val;
+  }
+  if (typeof val === "object") {
+    if (val.tipo === "noaplica") return "No aplica";
+    if (val.tipo === "segunecesidad") return "Según necesidad";
+    if (val.tipo === "porDiaSemana") {
+      const dias = (val.diasEspecificos||[]).map(d=>DIAS_SEMANA_LBL[d]).filter(Boolean).join(", ");
+      return dias ? `Días: ${dias}` : "Por días/sem";
+    }
+    // cadaXdias (u otro): cadaDias puede ser un valor de FRECUENCIAS ("semanal") o un número directo ("7")
+    const found = FRECUENCIAS.find(o=>o.value===val.cadaDias);
+    if (found) return found.label;
+    if (val.cadaDias) return `Cada ${val.cadaDias} días`;
+    return "—";
+  }
+  return String(val);
+};
 
 // ─── TAREAS PREDEFINIDAS POR SUBCATEGORÍA ────────────────────────────────────
 // Cada tarea: { tarea, verano, otono, invierno, primavera }
@@ -2271,7 +2301,6 @@ function ConfiguradorSemanal({ S, personal, configSemanal, setConfigSemanal, esJ
 
   const TIPOS_TAREA = [
     { id:"corte_tractor",  label:"🚜 Corte con tractor",      restriccion:"capacitación tractor",  fijo:null },
-    { id:"corte_golf",     label:"⛳ Corte Golf / Greens",     restriccion:"Por defecto: Bhalú",    fijo:null },
     { id:"orillado",       label:"✂️ Orillado",                restriccion:null,                    fijo:null },
     { id:"riego",          label:"💧 Riego general",           restriccion:null,                    fijo:null },
     { id:"pesticidas",     label:"🧪 Aplicación pesticidas",   restriccion:"capacitación RILES",    fijo:null },
@@ -2331,7 +2360,7 @@ function ConfiguradorSemanal({ S, personal, configSemanal, setConfigSemanal, esJ
                     </div>
                   : <select
                       style={{...S.input,fontSize:11,padding:"4px 8px"}}
-                      value={configSemanal[t.id]||(t.id==="corte_golf"?"Osmar Bhalú Armijo Zúñiga":"")}
+                      value={configSemanal[t.id]||""}
                       onChange={e=>setResp(t.id, e.target.value)}>
                       <option value="">— Sin asignar —</option>
                       {jardineros.map(p=>(
@@ -3547,7 +3576,9 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
 
     const ESTADOS_TAREA = ESTADOS_TAREA_GLOBAL;
 
-  const tareasHoy = getTareasDelDia(fecha);
+  // Golf se gestiona íntegramente en su propio módulo (Golf → ⚙️ Programación Golf / 📅 Semana Golf),
+  // así que sus tareas no se muestran en la vista general de Programación Diaria.
+  const tareasHoy = getTareasDelDia(fecha).filter(t=>(t.zona||"")!=="Golf"&&!(t.zona||"").toLowerCase().includes("golf"));
   const filtradas = tareasHoy.filter(pdTask => {
     const mE = filtroEstado==="todos" || pdTask.estado===filtroEstado;
     const mZ = filtroZona==="todas" || pdTask.zona===filtroZona;
@@ -3725,7 +3756,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
 
       {/* ── FRECUENCIAS POR MACROZONA ── */}
       {tabProg==="frecuencias"&&(
-        <PanelFrecuenciasZona S={S} zonas={MACROZONAS_BASE} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} esJefa={esJefa}/>
+        <PanelFrecuenciasZona S={S} zonas={zonas} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} esJefa={esJefa}/>
       )}
 
       {/* ── HISTORIAL ── */}
@@ -3839,8 +3870,10 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
             });
             const diasLabels = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
             const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
+            // Golf se excluye de esta vista general — vive en Golf → Programación Golf
+            const tareasDiaSinGolf = (d) => (tareas[d]||[]).filter(t=>!(t.zona||"").toLowerCase().includes("golf"));
             // Obtener todos los trabajadores con tareas esta semana
-            const todosResp = [...new Set(dias7.flatMap(d=>(tareas[d]||[]).map(t=>t.responsable).filter(Boolean)))].sort();
+            const todosResp = [...new Set(dias7.flatMap(d=>tareasDiaSinGolf(d).map(t=>t.responsable).filter(Boolean)))].sort();
             // Filtrar trabajadores a mostrar
             const respMostrar = filtroTrabajador==="todos" ? todosResp : [filtroTrabajador];
             
@@ -3868,7 +3901,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                       <tr><td colSpan={8} style={{padding:20,textAlign:"center",color:"#4a7a5a"}}>Sin tareas esta semana</td></tr>
                     ):respMostrar.map(resp=>{
                       // Tareas únicas de este trabajador esta semana
-                      const tareasResp = dias7.flatMap(d=>(tareas[d]||[]).filter(t=>(t.responsable||"")===(resp||"")));
+                      const tareasResp = dias7.flatMap(d=>tareasDiaSinGolf(d).filter(t=>(t.responsable||"")===(resp||"")));
                       const tareasUnicas = [...new Set(tareasResp.map(t=>t.tarea))];
                       return tareasUnicas.map((nombreTarea,ti)=>{
                         const isFirst = ti===0;
@@ -3879,7 +3912,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                               <div style={{color:"#c0dac0",fontSize:11}}>{nombreTarea}</div>
                             </td>
                             {dias7.map(d=>{
-                              const tDia = (tareas[d]||[]).find(t=>t.responsable===resp&&t.tarea===nombreTarea);
+                              const tDia = tareasDiaSinGolf(d).find(t=>t.responsable===resp&&t.tarea===nombreTarea);
                               const est = tDia ? (ESTADOS_TAREA[normalizarEstado(tDia.estado)]||ESTADOS_TAREA.pendiente) : null;
                               return (
                                 <td key={d} style={{padding:"4px 6px",textAlign:"center",background:d===hoy?"rgba(251,191,36,0.04)":"transparent"}}>
@@ -9042,6 +9075,29 @@ const RANGOS_ALTURA = {
   invierno:  {min:4.8, max:4.9, label:"Invierno (Jun-Ago)"},
   primavera: {min:4.5, max:4.8, label:"Primavera (Sep-Nov)"},
 };
+// ── Altura de corte objetivo (HOC) por superficie y estación — editable en Golf ⚙️ Programación Golf ──
+const HOC_SUPERFICIES = [
+  {id:"greens",    label:"Greens",       unidad:"mm"},
+  {id:"antegreen", label:"Ante-greens",  unidad:"mm"},
+  {id:"tees",      label:"Tees",         unidad:"mm"},
+  {id:"fairways",  label:"Fairways",     unidad:"mm"},
+  {id:"rough",     label:"Rough / Lomas",unidad:"mm"},
+];
+const HOC_DEFAULT = {
+  greens:    {verano:7.0, otono:6.8, invierno:7.2, primavera:6.8},
+  antegreen: {verano:10,  otono:9.5, invierno:10.5,primavera:9.5},
+  tees:      {verano:12,  otono:11,  invierno:13,  primavera:11},
+  fairways:  {verano:17.5,otono:17.5,invierno:18,  primavera:17.5},
+  rough:     {verano:35,  otono:35,  invierno:40,  primavera:35},
+};
+// Lee el HOC configurado por la jefa (golfData.hocConfig) o el valor por defecto si no se ha personalizado
+const getHocObjetivo = (golfData, superficie, estacion) => {
+  const cfg = golfData?.hocConfig?.[superficie]?.[estacion];
+  if(cfg!==undefined && cfg!==null && cfg!=="") return Number(cfg);
+  return HOC_DEFAULT[superficie]?.[estacion] ?? HOC_DEFAULT.greens[estacion];
+};
+// ── Responsable único semanal para toda el área Golf (config_golf) — reutiliza la misma
+// clave "corte_golf" que ya usa getResponsablePorTipo para asignar cualquier tarea de Golf
 const getMesEstacion = () => {
   const gmesMes = new Date().getMonth()+1;
   if(gmesMes>=12||gmesMes<=2) return "verano";
@@ -10960,7 +11016,7 @@ function TareasGolfPanel({ tareasGolfHoy, hoy, esJefa, setTareasProg, tareasProg
 }
 
 
-function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito, onCierreSectorial, onNuevaAlerta, configSemanal={} }) {
+function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito, onCierreSectorial, onNuevaAlerta, configSemanal={}, setConfigSemanal }) {
   const GOLF_ZONA_ID = 31; // ID macrozona Golf
   const sincronizarMacrozona = (tipo, detalle) => {
     if(!updateZona) return;
@@ -11307,13 +11363,77 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           </div>
         )}
         {/* Humedad */}
-        {subTab==="config_golf"&&rolLogueado!=="trabajador"&&(
+        {subTab==="config_golf"&&rolLogueado!=="trabajador"&&(()=>{
+          const setHoc = (superficie, est, valor) => {
+            const actual = golfData.hocConfig || {};
+            setG({hocConfig:{...actual,[superficie]:{...(actual[superficie]||{}),[est]:valor}}});
+          };
+          const setRespSemanal = (tipoId, nombre) => {
+            if(!setConfigSemanal) return;
+            setConfigSemanal(prev=>({...(prev||{}),[tipoId]:nombre}));
+          };
+          return (
         <div className="ein">
-          <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,color:"#fbbf24",marginBottom:14}}>⚙️ Programación de Golf</div>
-          <div style={{fontSize:12,color:"#5a9a7a",marginBottom:16}}>Programa y asigna tareas de Golf. La vista semanal se ve en 📅 Semana Golf.</div>
-          <div style={{...S.card,padding:20,textAlign:"center",color:"#5a9a7a",fontSize:13}}>🚧 Módulo en construcción — próxima sesión</div>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,color:"#fbbf24",marginBottom:4}}>⚙️ Programación de Golf</div>
+          <div style={{fontSize:12,color:"#5a9a7a",marginBottom:18}}>Responsables fijos de la semana y altura de corte objetivo por superficie. Esto alimenta las sugerencias de 📅 Semana Golf y las tareas de corte.</div>
+
+          {/* ── Responsable único de la semana para toda el área Golf ── */}
+          <div style={{...S.card,padding:16,marginBottom:18}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#34d399",marginBottom:4}}>👷 Responsable de Golf esta semana</div>
+            <div style={{fontSize:11,color:"#5a9a7a",marginBottom:12}}>Todas las tareas de Golf de la semana (corte, riego, fertilización, fitosanitario, búnkers, árboles, etc.) se asignarán por defecto a esta persona.</div>
+            <select style={{...S.input,maxWidth:320,fontSize:13}}
+              value={configSemanal?.corte_golf||""}
+              onChange={e=>setRespSemanal("corte_golf",e.target.value)}
+              disabled={!setConfigSemanal}>
+              <option value="">— Sin asignar —</option>
+              {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+            </select>
+            {!setConfigSemanal&&<div style={{fontSize:11,color:"#f59e0b",marginTop:10}}>⚠️ No se pudo conectar la configuración semanal — recarga la página.</div>}
+          </div>
+
+          {/* ── Altura de corte objetivo (HOC) ── */}
+          <div style={{...S.card,padding:16}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4,flexWrap:"wrap",gap:8}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#34d399"}}>✂️ Altura de corte objetivo (HOC) por superficie</div>
+              <span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.1)",border:"1px solid rgba(251,191,36,0.25)",borderRadius:8,padding:"2px 10px"}}>
+                Estación actual: {rango.label}
+              </span>
+            </div>
+            <div style={{fontSize:11,color:"#5a9a7a",marginBottom:14}}>Define a qué altura (mm) se corta cada superficie en cada estación del año. Se usa para calcular la urgencia de corte y sugerir la altura al programar tareas.</div>
+            <div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                <thead>
+                  <tr style={{background:"rgba(52,211,153,0.08)"}}>
+                    <th style={{padding:"6px 10px",textAlign:"left",color:"#34d399",fontSize:10,textTransform:"uppercase"}}>Superficie</th>
+                    {Object.entries(RANGOS_ALTURA).map(([k,v])=>(
+                      <th key={k} style={{padding:"6px 8px",textAlign:"center",color:k===estacion?"#fbbf24":"#5a9a7a",fontSize:10,fontWeight:k===estacion?700:400}}>
+                        {v.label.split(" ")[0]}{k===estacion&&" ←"}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {HOC_SUPERFICIES.map(sup=>(
+                    <tr key={sup.id} style={{borderTop:"1px solid rgba(255,255,255,0.05)"}}>
+                      <td style={{padding:"7px 10px",fontWeight:600,color:"#c0dac0"}}>{sup.label}</td>
+                      {Object.keys(RANGOS_ALTURA).map(est=>(
+                        <td key={est} style={{padding:"5px 6px",textAlign:"center",background:est===estacion?"rgba(251,191,36,0.05)":"transparent"}}>
+                          <input type="number" step="0.1" min="1" max="80"
+                            style={{...S.input,width:64,padding:"4px 6px",textAlign:"center",fontSize:12}}
+                            value={golfData.hocConfig?.[sup.id]?.[est] ?? HOC_DEFAULT[sup.id][est]}
+                            onChange={e=>setHoc(sup.id,est,e.target.value)}/>
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{fontSize:10,color:"#4a7a5a",marginTop:10}}>Valores en mm. Los cambios se guardan automáticamente.</div>
+          </div>
         </div>
-      )}
+          );
+        })()}
 
       {subTab==="humedad"&&(
           <SeccionHumedad S={S} golfData={golfData} setG={setG} listaPersonal={listaPersonal}
@@ -11386,7 +11506,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               <button style={{...S.btn,background:"rgba(52,211,153,0.15)",color:"#34d399",border:"1px solid rgba(52,211,153,0.3)"}} onClick={()=>{setSubTab("mediciones");setShowMedForm(true);}}>📏 Nueva medición</button>
               
               <button style={{...S.btn,background:"rgba(52,211,153,0.12)",color:"#6ee7b7",border:"1px solid rgba(52,211,153,0.2)"}} onClick={()=>{setSubTab("greens");setShowDiariaForm(true);}}>✅ Registro diario jefa</button>
-              <button style={{...S.btn,background:"rgba(52,211,153,0.12)",color:"#6ee7b7",border:"1px solid rgba(52,211,153,0.2)"}} onClick={()=>{setSubTab("greens");setShowTareaForm("green");}}>📋 Nueva tarea greens</button>
+              <button style={{...S.btn,background:"rgba(52,211,153,0.12)",color:"#6ee7b7",border:"1px solid rgba(52,211,153,0.2)"}} onClick={()=>{setSubTab("greens");setTareaForm(p=>({...p,responsable:p.responsable||configSemanal?.corte_golf||""}));setShowTareaForm("green");}}>📋 Nueva tarea greens</button>
               {esJefa&&<button style={{...S.btn,background:"rgba(251,191,36,0.12)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.25)"}} onClick={()=>{setSubTab("eventos");setShowEventoForm(true);}}>🏆 Cargar evento</button>}
             </div>
           </div>
@@ -11412,7 +11532,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                 return pgM?Number(pgM[1]):null;
               };
               const altCorteReal = extraerAlturaCorte(infoCorte);
-              const altObjetivo=infoCorte?.alturaObjetivo?Number(infoCorte.alturaObjetivo):(rango.min*1.5);
+              const altObjetivo=infoCorte?.alturaObjetivo?Number(infoCorte.alturaObjetivo):getHocObjetivo(golfData,"greens",estacion);
               const histG=[...mediciones].filter(m=>m.alturas?.[g.id]&&m.fecha).sort((a,b)=>b.fecha.localeCompare(a.fecha));
               const histPost=infoCorte?.fecha?histG.filter(m=>m.fecha>=infoCorte.fecha):histG;
               let tasa=null;
@@ -11574,7 +11694,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       {subTab==="greens"&&rolLogueado!=="trabajador"&&(
         <div className="ein">
           <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
-            {esJefa&&<button className="btn-p" style={S.btn} onClick={()=>setShowTareaForm("green")}>📋 Nueva tarea</button>}
+            {esJefa&&<button className="btn-p" style={S.btn} onClick={()=>{setTareaForm(p=>({...p,responsable:p.responsable||configSemanal?.corte_golf||""}));setShowTareaForm("green");}}>📋 Nueva tarea</button>}
             <button style={{...S.btn,background:"rgba(52,211,153,0.12)",color:"#34d399",border:"1px solid rgba(52,211,153,0.25)"}} onClick={()=>setShowDiariaForm(true)}>✅ Registro diario</button>
             <button style={{...S.btn,background:"rgba(59,130,246,0.12)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.25)"}} onClick={()=>{setSubTab("mediciones");setShowMedForm(true);}}>📏 Medición alturas</button>
           </div>
@@ -11843,7 +11963,13 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                         </select>
                       </div>
                       <div><label style={labelSt}>Tarea</label>
-                        <select style={S.input} value={tareaForm.tipo} onChange={e=>setTareaForm(p=>({...p,tipo:e.target.value}))}>
+                        <select style={S.input} value={tareaForm.tipo} onChange={e=>{
+                          const nuevoTipo=e.target.value;
+                          const esCorte=nuevoTipo.toLowerCase().includes("corte");
+                          setTareaForm(p=>({...p,tipo:nuevoTipo,
+                            alturaObjetivo: esCorte&&!p.alturaObjetivo ? String(getHocObjetivo(golfData,"greens",estacion)) : p.alturaObjetivo,
+                          }));
+                        }}>
                           <option value="">Seleccionar tipo...</option>
                           <option value="Corte de greens">✂️ Corte de greens</option>
                           <option value="Corte ante-greens">✂️ Corte ante-greens</option>
@@ -12391,7 +12517,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               {/* Info de rango solo para jefa */}
               {(esJefa||rolLogueado==="supervisor")&&(
                 <div style={{fontSize:11,color:"#34d399",marginBottom:10,fontWeight:600}}>
-                  Greens — Rango {rango.label}: {rango.min}–{rango.max}mm · Altura corte objetivo: {rango.corte}mm
+                  Greens — Rango {rango.label}: {rango.min}–{rango.max}mm · Altura corte objetivo: {getHocObjetivo(golfData,"greens",estacion)}mm
                 </div>
               )}
 
@@ -12415,7 +12541,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                         const esTareaCorte=t=>t.zona==="Golf"&&(t.tarea?.toLowerCase().includes("corte")||t.tipo?.toLowerCase().includes("corte"))&&(t.elemento?.includes(pgG.nombre)||t.tarea?.includes(pgG.nombre)||t.elemento?.toLowerCase().includes("todos")||t.tarea?.toLowerCase().includes("todos"));
                         const cortesG=Object.values(tareasProg).flat().filter(t=>esTareaCorte(t)&&["hecha","completada"].includes(t.estado)).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
                         infoCorte=cortesG[0]||null;
-                        alturaMaxCorte=infoCorte?.alturaObjetivo||(rango.corte*1.1)||(rango.min*1.5);
+                        alturaMaxCorte=infoCorte?.alturaObjetivo||getHocObjetivo(golfData,"greens",estacion)||(rango.min*1.5);
                         const histG=[...mediciones].filter(m=>m.alturas?.[g.id]&&m.fecha).sort((a,b)=>b.fecha.localeCompare(a.fecha));
                         if(diasCrecimiento&&Number(diasCrecimiento)>0&&Number(alt)>0){tasaCalculada=Number(alt)/Number(diasCrecimiento);tasaFuente="manual";}
                         else if(infoCorte?.alturaCorte&&histG[0]){const dDiasG=Math.round((new Date(histG[0].fecha+"T12:00:00")-new Date(infoCorte.fecha+"T12:00:00"))/86400000);const a1=Number(histG[0].alturas?.[g.id]);const altC=Number(infoCorte.alturaCorte);if(dDiasG>0&&a1>altC){tasaCalculada=(a1-altC)/dDiasG;tasaFuente="auto";}}
@@ -14575,8 +14701,11 @@ function PanelFrecuenciasZona({ S, zonas, getAllElems, getZD, setElemFrecs, esJe
           <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Macrozona</label>
           <select style={S.input} value={zonaSelFrec} onChange={e=>{setZonaSelFrec(e.target.value);setElemSelFrec("");}}>
             <option value="">— Seleccionar zona —</option>
-            {[...zonas].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(z=>(
-              <option key={z.id} value={String(z.id)}>{z.icono} {z.nombre}</option>
+            {[...zonas].map(z=>{
+              const zd=getZD(String(z.id))||{};
+              return {z, nombre:zd.nombreCustom||z.nombre, icono:zd.iconoCustom||z.icono};
+            }).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(({z,nombre,icono})=>(
+              <option key={z.id} value={String(z.id)}>{icono} {nombre}</option>
             ))}
           </select>
         </div>
@@ -16338,6 +16467,16 @@ export default function App() {
     return [...base,...custom].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
   };
 
+  // Estado automático de la zona = peor estado entre sus elementos reales (igual para todas las zonas, incl. Golf).
+  // "mantenimiento" es la única excepción: es un estado operativo manual (zona cerrada), no se infiere de los elementos.
+  const estadoZonaAuto = (zid) => {
+    if (getZD(zid).estadoGeneral==="mantenimiento") return "mantenimiento";
+    const elems = getAllElems(zid);
+    if (elems.some(e=>e.edData.estado==="critico")) return "critico";
+    if (elems.some(e=>e.edData.estado==="regular")) return "regular";
+    return "bueno";
+  };
+
   const todasLasZonas = (() => {
     const base = MACROZONAS_BASE.map(z=>{
       const zd = getZD(z.id);
@@ -16351,7 +16490,7 @@ export default function App() {
   })();
   const filteredZonas = todasLasZonas.filter(z=>{
     const matchC=filtroCat==="Todas"||z.categoria===filtroCat;
-    const matchE=filtroEst==="Todos"||getZD(z.id).estadoGeneral===filtroEst;
+    const matchE=filtroEst==="Todos"||estadoZonaAuto(z.id)===filtroEst;
     const filtQ=(busq||"").trim().toLowerCase();
     const matchB=!filtQ||
       z.nombre.toLowerCase().includes(filtQ)||
@@ -16362,10 +16501,10 @@ export default function App() {
 
   const stats = {
     total: todasLasZonas.length,
-    bueno: todasLasZonas.filter(z=>getZD(z.id).estadoGeneral==="bueno").length,
-    regular: MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral==="regular").length,
-    critico: MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral==="critico").length,
-    mantenimiento: MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral==="mantenimiento").length,
+    bueno: todasLasZonas.filter(z=>estadoZonaAuto(z.id)==="bueno").length,
+    regular: MACROZONAS_BASE.filter(z=>estadoZonaAuto(z.id)==="regular").length,
+    critico: MACROZONAS_BASE.filter(z=>estadoZonaAuto(z.id)==="critico").length,
+    mantenimiento: MACROZONAS_BASE.filter(z=>estadoZonaAuto(z.id)==="mantenimiento").length,
   };
   const totalElems = MACROZONAS_BASE.reduce((a,z)=>a+getAllElems(z.id).length,0);
   const elemsOk = MACROZONAS_BASE.reduce((a,z)=>a+getAllElems(z.id).filter(e=>e.edData.estado==="bueno").length,0);
@@ -16502,13 +16641,18 @@ export default function App() {
 
   const getSugerenciaAI = async () => {
     if(!zona) return;
+    // ⏸️ Función temporalmente deshabilitada: requiere plan Blaze de Firebase para
+    // desplegar la Cloud Function proxy (ver /functions/LEEME.md). Actívala cuando
+    // decidas pasar a Blaze — no tiene costo mientras no se despliegue.
+    setAiText("🤖 El asistente IA está temporalmente desactivado mientras se activa el plan Blaze de Firebase (necesario para la Cloud Function que lo hace funcionar de forma segura). El resto de la app funciona con normalidad.");
+    return;
+    /* eslint-disable no-unreachable */
     setAiLoading(true); setAiText("");
     const elems=getAllElems(zona.id).map(e=>`${e.nombre} (${ESTADOS_ELEM[e.edData.estado]?.label||"Bueno"})`).join(", ");
-    const prompt=`Eres experto en mantenimiento de parques y jardines de un club español en Chile. Analiza la macrozona "${zona.nombre}" con estos elementos: ${elems}. Estado general: ${ESTADOS_ZONA[zd?.estadoGeneral]?.label}. Notas: ${zd?.notas||"Ninguna"}. Da recomendaciones específicas de mantenimiento para cada elemento en estado regular o crítico, y un plan de acción priorizado. Responde en español con viñetas y secciones claras.`;
+    const prompt=`Eres experto en mantenimiento de parques y jardines de un club español en Chile. Analiza la macrozona "${zona.nombre}" con estos elementos: ${elems}. Estado general: ${ESTADOS_ZONA[estadoZonaAuto(zona.id)]?.label}. Notas: ${zd?.notas||"Ninguna"}. Da recomendaciones específicas de mantenimiento para cada elemento en estado regular o crítico, y un plan de acción priorizado. Responde en español con viñetas y secciones claras.`;
     try {
-      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":"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","anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:prompt}]})});
-      const json=await res.json();
-      setAiText(json.content?.[0]?.text||"Sin respuesta.");
+      const res = await sugerenciaIACloud({ prompt });
+      setAiText(res.data?.text||"Sin respuesta.");
     } catch { setAiText("Error al conectar con el asistente IA."); }
     setAiLoading(false);
   };
@@ -16573,12 +16717,7 @@ export default function App() {
               <div style={{display:"flex",gap:4,marginTop:4,flexWrap:"wrap"}}>
                 {tareasActivas.slice(0,3).map(f=>(
                   <span key={f.tarea||f.id} style={{fontSize:10,color:"#4a8a6a",background:"rgba(61,122,82,0.1)",padding:"1px 6px",borderRadius:6,border:"1px solid rgba(61,122,82,0.18)"}}>
-                    {f.tarea}: {(()=>{
-                      const v=f[estacion];
-                      if(!v) return "—";
-                      if(typeof v==="object") return v.tipo==="noaplica"?"No aplica":v.tipo==="segunecesidad"?"Según necesidad":`Cada ${v.cadaDias}d`;
-                      return v;
-                    })()}
+                    {f.tarea}: {formatFrecEstacion(f[estacion])}
                   </span>
                 ))}
               </div>
@@ -17030,8 +17169,7 @@ export default function App() {
             </div>
             {/* ── Tag Golf ── */}
             {(()=>{
-              const zdGolf = getZD("31");
-              const estadoGolf = zdGolf.estadoGeneral||"bueno";
+              const estadoGolf = estadoZonaAuto("31");
               const colGolf = estadoGolf==="bueno"?"#22c55e":estadoGolf==="regular"?"#f59e0b":estadoGolf==="critico"?"#ef4444":"#3b82f6";
               const labelGolf = estadoGolf==="bueno"?"✅ Buen estado":estadoGolf==="regular"?"⚠️ Estado regular":estadoGolf==="critico"?"🔴 Estado crítico":"🔧 En mantenimiento";
               const tareasGolfHoy=(()=>{
@@ -17066,7 +17204,7 @@ export default function App() {
               <div style={{background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:12,padding:16,marginBottom:22}}>
                 <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:10,color:"#fca5a5"}}>🚨 Zonas en Estado Crítico</div>
                 <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-                  {MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral==="critico").map(z=>(
+                  {MACROZONAS_BASE.filter(z=>estadoZonaAuto(z.id)==="critico").map(z=>(
                     <span key={z.id} onClick={()=>{setZonaId(String(z.id));setVista("zonas");setTab("elementos");}} style={{...S.chip,background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)",cursor:"pointer"}}>{z.icono} {z.nombre}</span>
                   ))}
                 </div>
@@ -17124,7 +17262,7 @@ export default function App() {
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(210px,1fr))",gap:12}}>
               {[...new Set(todasLasZonas.map(z=>z.categoria).filter(Boolean))].sort().map(cat=>{
                 const zc=todasLasZonas.filter(z=>z.categoria===cat).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
-                const ok=zc.filter(z=>getZD(String(z.id)).estadoGeneral!=="critico"&&getZD(String(z.id)).estadoGeneral!=="regular").length;
+                const ok=zc.filter(z=>estadoZonaAuto(String(z.id))!=="critico"&&estadoZonaAuto(String(z.id))!=="regular").length;
                 const pct=Math.round((ok/zc.length)*100);
                 return (
                   <div key={cat} style={{...S.card,padding:16,cursor:"pointer"}} className="hov" onClick={()=>{setFiltroCat(cat);setVista("zonas");}}>
@@ -17231,7 +17369,7 @@ export default function App() {
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(230px,1fr))",gap:14}}>
               {filteredZonas.map(z=>{
-                const dzd=getZD(z.id); const est=ESTADOS_ZONA[dzd.estadoGeneral||"bueno"];
+                const dzd=getZD(z.id); const est=ESTADOS_ZONA[estadoZonaAuto(z.id)];
                 const allElems=getAllElems(z.id);
                 const criticos=allElems.filter(e=>e.edData.estado==="critico").length;
                 const pendTareas=(dzd.tareas||[]).filter(t=>!t.completada).length;
@@ -17276,10 +17414,10 @@ export default function App() {
           <div className="ein">
             <button style={{...S.btn,background:"transparent",color:"#a0c8a0",border:"1px solid rgba(160,200,140,0.22)",marginBottom:20}} onClick={()=>{setZonaId(null);setAiText("");}}>← Volver</button>
             {(()=>{
-              const estZona = ESTADOS_ZONA[zd.estadoGeneral||"bueno"]||{color:"#22c55e",bg:"rgba(34,197,94,0.1)",label:"Bueno"};
+              const estZona = ESTADOS_ZONA[estadoZonaAuto(zonaId)]||{color:"#22c55e",bg:"rgba(34,197,94,0.1)",label:"Bueno"};
               const elemsZona = getAllElems(zonaId);
-              const criticosZona = elemsZona.filter(e=>e.estado==="critico").length;
-              const regularesZona = elemsZona.filter(e=>e.estado==="regular").length;
+              const criticosZona = elemsZona.filter(e=>e.edData.estado==="critico").length;
+              const regularesZona = elemsZona.filter(e=>e.edData.estado==="regular").length;
               return (
                 <div style={{...S.card,padding:0,marginBottom:18,overflow:"hidden"}}>
                   {/* Banda de color superior según estado */}
@@ -17319,17 +17457,23 @@ export default function App() {
                       </div>
                       {/* Derecha: estado + IA */}
                       <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-                        <div style={{display:"flex",alignItems:"center",gap:6,background:estZona.bg,border:`1px solid ${estZona.color}40`,borderRadius:8,padding:"4px 6px 4px 10px"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:6,background:estZona.bg,border:`1px solid ${estZona.color}40`,borderRadius:8,padding:"4px 10px"}}>
                           <span style={{fontSize:12,color:estZona.color,fontWeight:600}}>{estZona.label}</span>
-                          <select value={zd.estadoGeneral||"bueno"}
-                            onChange={e=>{updateZona(zonaId,{estadoGeneral:e.target.value});addHistorial(zonaId,`Estado zona → ${ESTADOS_ZONA[e.target.value].label}`);}}
-                            style={{background:"transparent",border:"none",color:estZona.color,fontSize:11,cursor:"pointer",padding:"2px 0"}}>
-                            {Object.entries(ESTADOS_ZONA).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
-                          </select>
                         </div>
-                        <button style={{...S.btn,background:"rgba(61,122,82,0.2)",color:"#a0d8b0",border:"1px solid rgba(61,122,82,0.35)",fontSize:12}}
+                        {esJefa&&(
+                          <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:zd.estadoGeneral==="mantenimiento"?"rgba(59,130,246,0.18)":"rgba(255,255,255,0.05)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}}
+                            onClick={()=>{
+                              const nuevo = zd.estadoGeneral==="mantenimiento" ? "bueno" : "mantenimiento";
+                              updateZona(zonaId,{estadoGeneral:nuevo});
+                              addHistorial(zonaId,`Estado zona → ${ESTADOS_ZONA[nuevo].label}`);
+                            }}>
+                            {zd.estadoGeneral==="mantenimiento" ? "✓ Quitar mantenimiento" : "🔧 Marcar en mantenimiento"}
+                          </button>
+                        )}
+                        <button title="Temporalmente desactivado — requiere activar plan Blaze de Firebase"
+                          style={{...S.btn,background:"rgba(148,163,184,0.12)",color:"#94a3b8",border:"1px solid rgba(148,163,184,0.25)",fontSize:12}}
                           onClick={getSugerenciaAI} disabled={aiLoading}>
-                          {aiLoading?<><span className="spin"/> Analizando...</>:"🤖 Sugerencia IA"}
+                          {aiLoading?<><span className="spin"/> Analizando...</>:"🤖 Sugerencia IA (pausada)"}
                         </button>
                       </div>
                     </div>
@@ -17761,7 +17905,7 @@ export default function App() {
                     return "<tr>"
                       +"<td>"+z.icono+" "+z.nombre+"</td>"
                       +"<td>"+z.categoria+"</td>"
-                      +"<td style='color:"+COLORES[dzd2.estadoGeneral||"bueno"]+";font-weight:600'>"+LABELS[dzd2.estadoGeneral||"bueno"]+"</td>"
+                      +"<td style='color:"+COLORES[estadoZonaAuto(z.id)]+";font-weight:600'>"+LABELS[estadoZonaAuto(z.id)]+"</td>"
                       +"<td style='text-align:center'>"+allE.length+"</td>"
                       +"<td style='text-align:center;color:"+(crit>0?"#991b1b":"#166534")+"'>"+(crit>0?"🔴 "+crit:"—")+"</td>"
                       +"<td>"+(dzd2.ultimoMant||"—")+"</td>"
@@ -17770,7 +17914,7 @@ export default function App() {
                       +"</tr>";
                   }).join("");
                   const estadoStats = Object.entries({bueno:{label:"Bueno",color:"#166534"},regular:{label:"Regular",color:"#92400e"},critico:{label:"Crítico",color:"#991b1b"},mantenimiento:{label:"En Mant.",color:"#1e40af"}}).map(([k,v])=>{
-                    const statC=MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral===k).length;
+                    const statC=MACROZONAS_BASE.filter(z=>estadoZonaAuto(z.id)===k).length;
                     return "<span style='color:"+v.color+";font-weight:700'>"+v.label+": "+statC+"</span>";
                   }).join(" &nbsp;·&nbsp; ");
                   const html = "<!DOCTYPE html><html lang='es'><head><meta charset='UTF-8'>"
@@ -17810,7 +17954,7 @@ export default function App() {
               <div style={{...S.card,padding:20}}>
                 <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,marginBottom:14}}>📊 Zonas por Estado</div>
                 {Object.entries(ESTADOS_ZONA).map(([k,v])=>{
-                  const statC2=MACROZONAS_BASE.filter(z=>getZD(z.id).estadoGeneral===k).length;
+                  const statC2=MACROZONAS_BASE.filter(z=>estadoZonaAuto(z.id)===k).length;
                   const pct=Math.round((statC2/MACROZONAS_BASE.length)*100);
                   return (
                     <div key={k} style={{marginBottom:10}}>
@@ -18111,7 +18255,7 @@ export default function App() {
 
         {/* GOLF */}
         {vista==="golf"&&(
-          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial} setVista={setVista} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} onCierreSectorial={()=>setShowCierreSectorial(true)} onNuevaAlerta={()=>{setAutoOpenAlerta(true);setVista("notificaciones");}} configSemanal={configSemanal}
+          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial} setVista={setVista} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} onCierreSectorial={()=>setShowCierreSectorial(true)} onNuevaAlerta={()=>{setAutoOpenAlerta(true);setVista("notificaciones");}} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal}
             crearNotificacion={crearNotificacion}
             initialSubTab={golfInitTab}
             onRegistroGuardado={(tipo)=>{
