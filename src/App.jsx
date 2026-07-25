@@ -16545,6 +16545,12 @@ export default function App() {
 
   const getSugerenciaAI = async () => {
     if(!zona) return;
+    // ⏸️ Función temporalmente deshabilitada: requiere plan Blaze de Firebase para
+    // desplegar la Cloud Function proxy (ver /functions/LEEME.md). Actívala cuando
+    // decidas pasar a Blaze — no tiene costo mientras no se despliegue.
+    setAiText("🤖 El asistente IA está temporalmente desactivado mientras se activa el plan Blaze de Firebase (necesario para la Cloud Function que lo hace funcionar de forma segura). El resto de la app funciona con normalidad.");
+    return;
+    /* eslint-disable no-unreachable */
     setAiLoading(true); setAiText("");
     const elems=getAllElems(zona.id).map(e=>`${e.nombre} (${ESTADOS_ELEM[e.edData.estado]?.label||"Bueno"})`).join(", ");
     const prompt=`Eres experto en mantenimiento de parques y jardines de un club español en Chile. Analiza la macrozona "${zona.nombre}" con estos elementos: ${elems}. Estado general: ${ESTADOS_ZONA[estadoZonaAuto(zona.id)]?.label}. Notas: ${zd?.notas||"Ninguna"}. Da recomendaciones específicas de mantenimiento para cada elemento en estado regular o crítico, y un plan de acción priorizado. Responde en español con viñetas y secciones claras.`;
@@ -17368,9 +17374,10 @@ export default function App() {
                             {zd.estadoGeneral==="mantenimiento" ? "✓ Quitar mantenimiento" : "🔧 Marcar en mantenimiento"}
                           </button>
                         )}
-                        <button style={{...S.btn,background:"rgba(61,122,82,0.2)",color:"#a0d8b0",border:"1px solid rgba(61,122,82,0.35)",fontSize:12}}
+                        <button title="Temporalmente desactivado — requiere activar plan Blaze de Firebase"
+                          style={{...S.btn,background:"rgba(148,163,184,0.12)",color:"#94a3b8",border:"1px solid rgba(148,163,184,0.25)",fontSize:12}}
                           onClick={getSugerenciaAI} disabled={aiLoading}>
-                          {aiLoading?<><span className="spin"/> Analizando...</>:"🤖 Sugerencia IA"}
+                          {aiLoading?<><span className="spin"/> Analizando...</>:"🤖 Sugerencia IA (pausada)"}
                         </button>
                       </div>
                     </div>
