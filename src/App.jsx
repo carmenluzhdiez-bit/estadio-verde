@@ -3200,27 +3200,18 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
              SECCIÓN 3 — OTRAS TAREAS DEL DÍA
              ══════════════════════════════════════════════════════════ */}
         {misTareasOtras.length>0&&(()=>{
-          const GRUPOS=[
-            {key:"corte",   icon:"✂️", label:"Cortes",       match:t=>(t.tarea||"").toLowerCase().includes("corte")||(t.tarea||"").toLowerCase().includes("cortad")},
-            {key:"medicion",icon:"📏", label:"Mediciones",   match:t=>(t.tarea||"").toLowerCase().includes("medic")||(t.tarea||"").toLowerCase().includes("altura")},
-            {key:"riego",   icon:"💧", label:"Riego",         match:t=>(t.tarea||"").toLowerCase().includes("riego")||(t.tarea||"").toLowerCase().includes("regar")},
-            {key:"fitosan", icon:"🔬", label:"Fitosanitario", match:t=>(t.tarea||"").toLowerCase().includes("fungicida")||(t.tarea||"").toLowerCase().includes("plagas")||(t.tarea||"").toLowerCase().includes("fitosan")},
-            {key:"limpieza",icon:"🧹", label:"Limpieza",      match:t=>(t.tarea||"").toLowerCase().includes("limpie")||(t.tarea||"").toLowerCase().includes("sopla")||(t.tarea||"").toLowerCase().includes("barrid")},
-            {key:"poda",    icon:"✂️", label:"Poda/Fertilización", match:t=>(t.tarea||"").toLowerCase().includes("poda")||(t.tarea||"").toLowerCase().includes("fertili")},
-            {key:"otros",   icon:"🌿", label:"Otras tareas",  match:t=>true},
-          ];
-          const grupos=[];
-          const asignadas=new Set();
-          GRUPOS.forEach(g=>{
-            const ts=misTareasOtras.filter(t=>!asignadas.has(t.id)&&g.match(t));
-            if(ts.length>0){ ts.forEach(t=>asignadas.add(t.id)); grupos.push({...g,tareas:ts}); }
-          });
+          // Agrupar por el nombre exacto de la tarea (el mismo texto elegido al crearla), sin categorías inventadas
+          const nombresUnicos=[...new Set(misTareasOtras.map(t=>t.tarea||"Sin nombre"))];
+          const grupos=nombresUnicos.map(nombre=>({
+            key:nombre, icon:"📌", label:nombre,
+            tareas: misTareasOtras.filter(t=>(t.tarea||"Sin nombre")===nombre),
+          }));
           return (
             <div style={{marginBottom:14}}>
               <div style={{fontSize:12,fontWeight:600,color:"#34d399",marginBottom:8,paddingLeft:2}}>🌿 Otras tareas del día</div>
               {grupos.map(g=>{
                 const hechas=g.tareas.filter(t=>t.estado==="hecha").length;
-                const open=gruposAbiertos[g.key]!==false;
+                const open=gruposAbiertos[g.key]===true;
                 const col=hechas===g.tareas.length?"#22c55e":"#34d399";
                 return (
                   <div key={g.key} style={{marginBottom:8,border:`1px solid rgba(255,255,255,${hechas===g.tareas.length?0.1:0.07})`,borderRadius:10,overflow:"hidden"}}>
