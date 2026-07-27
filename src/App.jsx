@@ -2714,7 +2714,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   const [showNuevaTareaEmerg, setShowNuevaTareaEmerg] = React.useState(false);
   const [nuevaTareaEmerg, setNuevaTareaEmerg] = React.useState({ zona:"", tarea:"", notas:"" });
   // Estado de grupos colapsables — objeto {key: bool}
-  const [gruposAbiertos, setGruposAbiertos] = React.useState({diarias:true,corte:true,medicion:true,riego:true,fitosan:true,limpieza:true,otros:true});
+  const [gruposAbiertos, setGruposAbiertos] = React.useState({diarias:true,corte:false,medicion:false,riego:false,fitosan:false,limpieza:false,poda:false,otros:false});
   const [alturaInputs, setAlturaInputs] = React.useState({});
   const [tareasAbiertas, setTareasAbiertas] = React.useState({}); // {taskId: true/false} — retraídas por defecto
   const toggleTareaAbierta = (tid) => setTareasAbiertas(p=>({...p,[tid]:!p[tid]}));
