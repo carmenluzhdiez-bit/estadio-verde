@@ -3014,26 +3014,24 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                     const abiertaT=!!tareasAbiertas[t.id];
                     return (
                       <div key={t.id} style={{padding:"10px 14px",background:i%2===0?"rgba(255,255,255,0.02)":"rgba(255,255,255,0.04)",borderBottom:i<misTareasDiarias.length-1?"1px solid rgba(255,255,255,0.05)":"none"}}>
-                        <div onClick={()=>toggleTareaAbierta(t.id)} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:t.metodoLimpieza||t.notas?4:0,cursor:"pointer"}}>
+                        <div onClick={()=>toggleTareaAbierta(t.id)} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,cursor:"pointer"}}>
                           <div style={{flex:1,display:"flex",gap:6,alignItems:"flex-start"}}>
                             <span style={{fontSize:11,color:"#5a9a7a",marginTop:2,transform:abiertaT?"rotate(90deg)":"none",transition:"transform .15s",display:"inline-block",flexShrink:0}}>▶</span>
-                            <div>
-                              <span style={{fontSize:13,fontWeight:600}}>{t.tarea?.replace("⛳ ","")}</span>
-                              {t.metodoLimpieza&&(
-                                <div style={{marginTop:3}}>
-                                  <span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.08)",padding:"2px 8px",borderRadius:8,border:"1px solid rgba(251,191,36,0.2)"}}>
-                                    {t.metodoLimpieza==="sopladora"?"🌬️ Sopladora":t.metodoLimpieza==="barrido"?"🧹 Barrido con vara":"🌬️+🧹 Sopladora + Barrido"}
-                                  </span>
-                                </div>
-                              )}
-                              {t.notas&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:2,fontStyle:"italic"}}>💡 {t.notas}</div>}
-                              {t.indicacion&&<div style={{fontSize:11,color:"#f59e0b",marginTop:2}}>📋 {t.indicacion}</div>}
-                              {(t.alturaCorteObj||t.alturaCorte)&&<div style={{fontSize:11,color:"#fbbf24",marginTop:2,fontWeight:600}}>✂️ Altura de corte indicada: {t.alturaCorteObj||t.alturaCorte}mm</div>}
-                            </div>
+                            <span style={{fontSize:13,fontWeight:600}}>{t.tarea?.replace("⛳ ","")}</span>
                           </div>
                           <span style={{fontSize:11,fontWeight:600,color:est.color,background:`${est.color}15`,padding:"2px 8px",borderRadius:8,border:`1px solid ${est.color}30`,whiteSpace:"nowrap",flexShrink:0}}>{est.icon} {est.label}</span>
                         </div>
                         {abiertaT&&(<>
+                        {t.metodoLimpieza&&(
+                          <div style={{marginTop:6,marginLeft:17}}>
+                            <span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.08)",padding:"2px 8px",borderRadius:8,border:"1px solid rgba(251,191,36,0.2)"}}>
+                              {t.metodoLimpieza==="sopladora"?"🌬️ Sopladora":t.metodoLimpieza==="barrido"?"🧹 Barrido con vara":"🌬️+🧹 Sopladora + Barrido"}
+                            </span>
+                          </div>
+                        )}
+                        {t.notas&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:6,marginLeft:17,fontStyle:"italic"}}>💡 {t.notas}</div>}
+                        {t.indicacion&&<div style={{fontSize:11,color:"#f59e0b",marginTop:2,marginLeft:17}}>📋 {t.indicacion}</div>}
+                        {(t.alturaCorteObj||t.alturaCorte)&&<div style={{fontSize:11,color:"#fbbf24",marginTop:2,marginLeft:17,fontWeight:600}}>✂️ Altura de corte indicada: {t.alturaCorteObj||t.alturaCorte}mm</div>}
                         {puedeEditar ? (
                           <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                             {Object.entries(ESTADOS_TAREA).map(([k,v])=>(
@@ -3244,16 +3242,14 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                               <div onClick={()=>toggleTareaAbierta(t.id)} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:5,cursor:"pointer"}}>
                                 <div style={{flex:1,display:"flex",gap:6,alignItems:"flex-start"}}>
                                   <span style={{fontSize:10,color:"#5a9a7a",marginTop:2,transform:abiertaT?"rotate(90deg)":"none",transition:"transform .15s",display:"inline-block",flexShrink:0}}>▶</span>
-                                  <div>
-                                    <div style={{fontSize:13,fontWeight:600}}>{t.tarea?.replace("⛳ ","")}</div>
-                                    {t.zona&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:1}}>📍 {t.zona}{t.elemento?` · ${t.elemento}`:""}</div>}
-                                    {t.metodoLimpieza&&<span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.08)",padding:"1px 8px",borderRadius:8,border:"1px solid rgba(251,191,36,0.2)",display:"inline-block",marginTop:3}}>{t.metodoLimpieza==="sopladora"?"🌬️ Sopladora":t.metodoLimpieza==="barrido"?"🧹 Barrido":"🌬️+🧹 Sopladora + Barrido"}</span>}
-                                    {t.notas&&<div style={{fontSize:11,color:"#5a8a6a",marginTop:2,fontStyle:"italic"}}>💡 {t.notas}</div>}
-                                  </div>
+                                  <div style={{fontSize:13,fontWeight:600}}>{t.tarea?.replace("⛳ ","")}</div>
                                 </div>
                                 <span style={{fontSize:10,fontWeight:600,color:est.color,background:`${est.color}12`,padding:"2px 7px",borderRadius:8,border:`1px solid ${est.color}25`,whiteSpace:"nowrap",flexShrink:0}}>{est.icon} {est.label}</span>
                               </div>
                               {abiertaT&&(<>
+                              {t.zona&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:1,marginLeft:16,marginBottom:4}}>📍 {t.zona}{t.elemento?` · ${t.elemento}`:""}</div>}
+                              {t.metodoLimpieza&&<span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.08)",padding:"1px 8px",borderRadius:8,border:"1px solid rgba(251,191,36,0.2)",display:"inline-block",marginLeft:16,marginBottom:4}}>{t.metodoLimpieza==="sopladora"?"🌬️ Sopladora":t.metodoLimpieza==="barrido"?"🧹 Barrido":"🌬️+🧹 Sopladora + Barrido"}</span>}
+                              {t.notas&&<div style={{fontSize:11,color:"#5a8a6a",marginTop:2,marginLeft:16,marginBottom:4,fontStyle:"italic"}}>💡 {t.notas}</div>}
                               {puedeEditar ? (
                                 <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                                   {Object.entries(ESTADOS_TAREA).map(([k,v])=>(
@@ -11343,6 +11339,29 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             fontFamily:"'Georgia',serif",marginBottom:14,display:"block"}}>
           ← Volver a Mi Turno
         </button>
+        {/* Tus registros de hoy — visibles todo el día para quien midió */}
+        {subTab==="mediciones"&&(()=>{
+          const medsHoy = mediciones.filter(m=>m.fecha===hoy);
+          if(!medsHoy.length) return null;
+          return (
+            <div style={{...S.card,padding:14,marginBottom:14,borderLeft:"3px solid #34d399"}}>
+              <div style={{fontSize:12,fontWeight:700,color:"#34d399",marginBottom:8}}>📏 Tus alturas registradas hoy</div>
+              {medsHoy.map(m=>(
+                <div key={m.id} style={{marginBottom:8}}>
+                  <div style={{fontSize:11,color:"#5a9a7a",marginBottom:4}}>{m.hora||""} · {m.tipo||"medición"}</div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                    {[...GREENS_DEF,{id:"vivero",nombre:"Vivero",hoyos:""}].map(g=>{
+                      const val=m.alturas?.[g.id];
+                      if(!val) return null;
+                      const color=colorAltura(val);
+                      return <span key={g.id} style={{fontSize:11,color,background:`${color}12`,border:`1px solid ${color}30`,borderRadius:6,padding:"2px 8px"}}>{g.nombre.replace("Green ","G")}: {val}mm</span>;
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
         {/* Alturas */}
         {subTab==="mediciones"&&showMedForm&&(
           <div style={{...S.card,padding:20,background:"rgba(52,211,153,0.03)"}}>
