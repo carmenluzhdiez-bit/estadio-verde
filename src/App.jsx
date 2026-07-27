@@ -1753,7 +1753,7 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
 }
 
 
-function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, puedeCrear=false, cierresTurno={}, onReabrirTurno }) {
+function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa=false, puedeCrear=false, cierresTurno={}, onReabrirTurno }) {
   const [filtroDia,    setFiltroDia]    = React.useState("");
   const [filtroEstado, setFiltroEstado] = React.useState("todos");
   const [filtroTarea,  setFiltroTarea]  = React.useState("");
@@ -1841,7 +1841,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
         ${hpTdArr.map(hpTask => {
           const estCls = ["hecha","completada"].includes(hpTask.estado)?"est-ok":hpTask.estado==="no_pudo"?"est-bad":["haciendose","en_curso"].includes(hpTask.estado)?"est-blue":["pendiente"].includes(hpTask.estado)?"est-pend":"est-gray";
           const estLabel = EC[hpTask.estado]?.label || hpTask.estado;
-          const icono = MACROZONAS_BASE.find(z=>z.nombre===hpTask.zona)?.icono||""
+          const icono = (zonas.find(z=>z.nombre===hpTask.zona)||MACROZONAS_BASE.find(z=>z.nombre===hpTask.zona))?.icono||""
           return '<tr>'+'<td class="'+estCls+'">'+( EC[hpTask.estado]?.icon||"-")+" "+estLabel+"</td>"+'<td><b>'+hpTask.tarea+'</b></td>'+'<td>'+(hpTask.elemento||"-")+"</td>"+'<td>'+icono+" "+(hpTask.zona||"-")+"</td>"+'<td>'+(hpTask.responsable||"<i>Sin asignar</i>")+"</td>"+'<td>'+(hpTask.notaWorker?"⚠️ "+hpTask.notaWorker:"-")+"</td>"+'</tr>';
         }).join("")}
       </tbody>
@@ -2066,7 +2066,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
             <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>ZONA</label>
             <select style={{...S.input,fontSize:13}} value={filtroZona} onChange={e=>setFiltroZona(e.target.value)}>
               <option value="todas">Todas las zonas</option>
-              {todasZonas.map(z=>{const icono=MACROZONAS_BASE.find(x=>x.nombre===z)?.icono||"📍";return <option key={z} value={z}>{icono} {z}</option>;})}
+              {todasZonas.map(z=>{const icono=(zonas.find(x=>x.nombre===z)||MACROZONAS_BASE.find(x=>x.nombre===z))?.icono||"📍";return <option key={z} value={z}>{icono} {z}</option>;})}
             </select>
           </div>
         </div>
@@ -2144,7 +2144,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, S, esJefa=false, pu
                         })()}
                       </div>
                       <div style={{display:"flex",gap:8,marginTop:2,flexWrap:"wrap"}}>
-                        <span style={{fontSize:11,color:"#5a7a7a"}}>{MACROZONAS_BASE.find(z=>z.nombre===hpTask.zona)?.icono||""} {hpTask.zona}</span>
+                        <span style={{fontSize:11,color:"#5a7a7a"}}>{(zonas.find(z=>z.nombre===hpTask.zona)||MACROZONAS_BASE.find(z=>z.nombre===hpTask.zona))?.icono||""} {hpTask.zona}</span>
                         {hpTask.responsable&&<span style={{fontSize:11,color:"#7a9a8a"}}>👤 {hpTask.responsable}</span>}
                       </div>
                       {hpTask.notaWorker&&<div style={{fontSize:11,color:hpTask.estado==="no_pudo"?"#f87171":"#a0c8a0",marginTop:3,fontStyle:"italic"}}>💬 {hpTask.notaWorker}</div>}
@@ -3419,10 +3419,10 @@ Una vez cerrado no podrás modificar las tareas. Solo la jefa puede reabrir el t
 }
 
 // Componente auxiliar para cada fila de zona en Programa
-function ZonaRow({ zona, tz, zonasColapsadas, toggleZonaColapso, MACROZONAS_BASE, ESTADOS_TAREA, EC, updateTarea, deleteTarea, puedeCrear, personal=[], S }) {
+function ZonaRow({ zona, tz, zonasColapsadas, toggleZonaColapso, MACROZONAS_BASE, zonas=[], ESTADOS_TAREA, EC, updateTarea, deleteTarea, puedeCrear, personal=[], S }) {
   const zonaColapso = zonasColapsadas.__init ? true : zonasColapsadas[zona]!==false;
   const hechasZona = tz.filter(t=>["hecha","completada"].includes(t.estado)).length;
-  const icono = (MACROZONAS_BASE.find(z=>z.nombre===zona)||{icono:"📍"}).icono;
+  const icono = (zonas.find(z=>z.nombre===zona)||MACROZONAS_BASE.find(z=>z.nombre===zona)||{icono:"📍"}).icono;
   const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
   const listaPersonalZR = [...personalArr].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
 
@@ -3527,6 +3527,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
       : TAREAS_PRESET;
   const [filtroEstado, setFiltroEstado] = React.useState("todos");
   const [filtroZona, setFiltroZona] = React.useState("todas");
+  const [filtroCategoria, setFiltroCategoria] = React.useState("todas");
   const [vistaSemanal, setVistaSemanal] = React.useState(false);
   const [filtroTrabajador, setFiltroTrabajador] = React.useState("todos");
   const [aviso, setAviso] = React.useState(null);
@@ -3602,7 +3603,8 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
   const filtradas = tareasHoy.filter(pdTask => {
     const mE = filtroEstado==="todos" || pdTask.estado===filtroEstado;
     const mZ = filtroZona==="todas" || pdTask.zona===filtroZona;
-    return mE && mZ;
+    const mC = filtroCategoria==="todas" || pdTask.tarea===filtroCategoria;
+    return mE && mZ && mC;
   });
   const stats = {
     total: tareasHoy.length,
@@ -3612,6 +3614,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
   };
   const pct = stats.total > 0 ? Math.round((stats.completadas/stats.total)*100) : 0;
   const zonasEnProg = [...new Set(tareasHoy.map(t=>t.zona))].sort();
+  const tareasUnicasHoy = [...new Set(tareasHoy.map(t=>t.tarea).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
   const porZona = {};
   filtradas.forEach(t => { if(!porZona[t.zona]) porZona[t.zona]=[]; porZona[t.zona].push(t); });
 
@@ -3790,7 +3793,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
       )}
 
       {tabProg==="historial" && (
-        <HistorialProg tareas={tareas} setTareas={setTareas} MACROZONAS_BASE={MACROZONAS_BASE} S={S} esJefa={esJefa} puedeCrear={puedeCrear} cierresTurno={cierresTurno} onReabrirTurno={onReabrirTurno}/>
+        <HistorialProg tareas={tareas} setTareas={setTareas} MACROZONAS_BASE={MACROZONAS_BASE} zonas={zonas} S={S} esJefa={esJefa} puedeCrear={puedeCrear} cierresTurno={cierresTurno} onReabrirTurno={onReabrirTurno}/>
       )}
 
       {/* ── PROGRAMAR ── */}
@@ -3850,11 +3853,16 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                 {Object.entries(ESTADOS_TAREA).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
               </select>
               <select value={filtroZona} onChange={e=>setFiltroZona(e.target.value)} style={{...S.input,flex:"1 1 160px",maxWidth:220,fontSize:13}}>
-                <option value="todas">📋 Todas las tareas del día</option>
-                {zonasEnProg.length>0&&<option disabled>── Filtrar por zona ──</option>}
+                <option value="todas">📋 Todas las macrozonas</option>
+                {zonasEnProg.length>0&&<option disabled>── Filtrar por macrozona ──</option>}
                 {zonasEnProg.map(z=><option key={z} value={z}>{z==="Golf"?"⛳ "+z:z}</option>)}</select>
-              {(filtroEstado!=="todos"||filtroZona!=="todas"||filtroTrabajador!=="todos")&&(
-                <button onClick={()=>{setFiltroEstado("todos");setFiltroZona("todas");setFiltroTrabajador("todos");}} style={{...S.btn,background:"transparent",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)",fontSize:12}}>✕ Limpiar</button>
+              <select value={filtroCategoria} onChange={e=>setFiltroCategoria(e.target.value)} style={{...S.input,flex:"1 1 180px",maxWidth:220,fontSize:13}}>
+                <option value="todas">🏷️ Todas las tareas</option>
+                {tareasUnicasHoy.length>0&&<option disabled>── Filtrar por tarea ──</option>}
+                {tareasUnicasHoy.map(t=><option key={t} value={t}>{t}</option>)}
+              </select>
+              {(filtroEstado!=="todos"||filtroZona!=="todas"||filtroCategoria!=="todas"||filtroTrabajador!=="todos")&&(
+                <button onClick={()=>{setFiltroEstado("todos");setFiltroZona("todas");setFiltroCategoria("todas");setFiltroTrabajador("todos");}} style={{...S.btn,background:"transparent",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)",fontSize:12}}>✕ Limpiar</button>
               )}
               {/* Filtro por trabajador */}
               <select value={filtroTrabajador} onChange={e=>setFiltroTrabajador(e.target.value)} style={{...S.input,fontSize:11,maxWidth:180}}>
@@ -3999,7 +4007,10 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                 <div style={{gridColumn:"1/-1"}}>
                   <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>TAREA</label>
                   <select style={{...S.input,fontSize:13}} value={nuevaTarea.tarea}
-                    onChange={e=>setNuevaTarea(p=>({...p,tarea:e.target.value==="__otro__"?"":e.target.value,responsable:p.responsable||(getResponsablePorTipo(e.target.value==="__otro__"?"":e.target.value,configSemanal)||"")}))}>
+                    onChange={e=>setNuevaTarea(p=>{
+                      const nuevoResp=p.responsable||(getResponsablePorTipo(e.target.value==="__otro__"?"":e.target.value,configSemanal)||"");
+                      return {...p,tarea:e.target.value==="__otro__"?"":e.target.value,responsable:nuevoResp,estado:nuevoResp?"pendiente":p.estado};
+                    })}>
                     <option value="">Seleccionar tarea...</option>
                     {_tareasDisp.map(t=><option key={t} value={t}>{t}</option>)}
                     <option value="__otro__">✏️ Escribir otra...</option>
@@ -4008,7 +4019,10 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                     <input style={{...S.input,fontSize:13,marginTop:6}} autoFocus
                       placeholder="Describir tarea..."
                       value={nuevaTarea.tarea==="__otro__"?"":nuevaTarea.tarea}
-                      onChange={e=>{const v=e.target.value;setNuevaTarea(p=>({...p,tarea:v||"__otro__",responsable:p.responsable||(getResponsablePorTipo(v,configSemanal)||"")}));}}/>
+                      onChange={e=>{const v=e.target.value;setNuevaTarea(p=>{
+                        const nuevoResp=p.responsable||(getResponsablePorTipo(v,configSemanal)||"");
+                        return {...p,tarea:v||"__otro__",responsable:nuevoResp,estado:nuevoResp?"pendiente":p.estado};
+                      });}}/>
                   )}
                   {nuevaTarea.tarea==="Plantar desde Vivero"&&(
                     <div style={{marginTop:8,padding:"10px 12px",background:"rgba(74,222,128,0.08)",border:"1px solid rgba(74,222,128,0.25)",borderRadius:8,fontSize:12,color:"#4ade80"}}>
@@ -4063,6 +4077,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
               zonasColapsadas={zonasColapsadas}
               toggleZonaColapso={toggleZonaColapso}
               MACROZONAS_BASE={MACROZONAS_BASE}
+              zonas={zonas}
               ESTADOS_TAREA={ESTADOS_TAREA}
               EC={EC}
               updateTarea={updateTarea}
@@ -4138,7 +4153,7 @@ function PinConfig({ getPines, setPinRol, S }) {
 }
 
 // ─── VISTA DESIGNACIÓN (SUPERVISOR) ─────────────────────────────────────────
-function VistaDesignacion({ S, tareasProg, setTareasProg, personal, MACROZONAS_BASE, onSalir }) {
+function VistaDesignacion({ S, tareasProg, setTareasProg, personal, MACROZONAS_BASE, zonas=[], onSalir }) {
   const hoy = fechaLocal();
   const [fecha, setFecha] = React.useState(hoy);
   const [showAgregar, setShowAgregar] = React.useState(false);
@@ -4201,7 +4216,7 @@ function VistaDesignacion({ S, tareasProg, setTareasProg, personal, MACROZONAS_B
   const EICO={hecha:"✅",completada:"✅",no_pudo:"🔴",haciendose:"🔵",en_curso:"🔵",pendiente:"🟡",por_designar:"⬜",cancelada:"❌"};
 
   const renderTarea = (t, resaltada=false) => {
-    const icono=MACROZONAS_BASE.find(z=>z.nombre===t.zona)?.icono||"📍";
+    const icono=(zonas.find(z=>z.nombre===t.zona)||MACROZONAS_BASE.find(z=>z.nombre===t.zona))?.icono||"📍";
     const yaFinalizada = ["hecha","completada","no_pudo"].includes(t.estado);
     const cancelada = t.estado==="cancelada";
     const esCancelando = cancelando===t.id;
@@ -18158,6 +18173,7 @@ export default function App() {
                 setTareasProg={setTareasProg}
                 personal={personal}
                 MACROZONAS_BASE={MACROZONAS_BASE}
+                zonas={zonasConCust}
                 onSalir={()=>{setWorkerPinInput("");setWorkerLogueado(null);setVistaWorker(false);}}
               />
             )}
