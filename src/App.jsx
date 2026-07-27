@@ -2716,6 +2716,8 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   // Estado de grupos colapsables — objeto {key: bool}
   const [gruposAbiertos, setGruposAbiertos] = React.useState({diarias:true,corte:true,medicion:true,riego:true,fitosan:true,limpieza:true,otros:true});
   const [alturaInputs, setAlturaInputs] = React.useState({});
+  const [tareasAbiertas, setTareasAbiertas] = React.useState({}); // {taskId: true/false} — retraídas por defecto
+  const toggleTareaAbierta = (tid) => setTareasAbiertas(p=>({...p,[tid]:!p[tid]}));
   const [rutinasGolfState, setRutinasGolfState] = React.useState({});
   const toggleGrupo = (key) => setGruposAbiertos(p=>({...p,[key]:!p[key]}));
   const [showRegistroDiarioWorker, setShowRegistroDiarioWorker] = React.useState(true);
@@ -3009,24 +3011,29 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                 <div>
                   {misTareasDiarias.map((t,i)=>{
                     const est=ESTADOS_TAREA[normalizarEstado(t.estado)]||ESTADOS_TAREA.pendiente;
+                    const abiertaT=!!tareasAbiertas[t.id];
                     return (
                       <div key={t.id} style={{padding:"10px 14px",background:i%2===0?"rgba(255,255,255,0.02)":"rgba(255,255,255,0.04)",borderBottom:i<misTareasDiarias.length-1?"1px solid rgba(255,255,255,0.05)":"none"}}>
-                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:t.metodoLimpieza||t.notas?4:0}}>
-                          <div style={{flex:1}}>
-                            <span style={{fontSize:13,fontWeight:600}}>{t.tarea?.replace("⛳ ","")}</span>
-                            {t.metodoLimpieza&&(
-                              <div style={{marginTop:3}}>
-                                <span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.08)",padding:"2px 8px",borderRadius:8,border:"1px solid rgba(251,191,36,0.2)"}}>
-                                  {t.metodoLimpieza==="sopladora"?"🌬️ Sopladora":t.metodoLimpieza==="barrido"?"🧹 Barrido con vara":"🌬️+🧹 Sopladora + Barrido"}
-                                </span>
-                              </div>
-                            )}
-                            {t.notas&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:2,fontStyle:"italic"}}>💡 {t.notas}</div>}
-                            {t.indicacion&&<div style={{fontSize:11,color:"#f59e0b",marginTop:2}}>📋 {t.indicacion}</div>}
-                            {(t.alturaCorteObj||t.alturaCorte)&&<div style={{fontSize:11,color:"#fbbf24",marginTop:2,fontWeight:600}}>✂️ Altura de corte indicada: {t.alturaCorteObj||t.alturaCorte}mm</div>}
+                        <div onClick={()=>toggleTareaAbierta(t.id)} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:t.metodoLimpieza||t.notas?4:0,cursor:"pointer"}}>
+                          <div style={{flex:1,display:"flex",gap:6,alignItems:"flex-start"}}>
+                            <span style={{fontSize:11,color:"#5a9a7a",marginTop:2,transform:abiertaT?"rotate(90deg)":"none",transition:"transform .15s",display:"inline-block",flexShrink:0}}>▶</span>
+                            <div>
+                              <span style={{fontSize:13,fontWeight:600}}>{t.tarea?.replace("⛳ ","")}</span>
+                              {t.metodoLimpieza&&(
+                                <div style={{marginTop:3}}>
+                                  <span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.08)",padding:"2px 8px",borderRadius:8,border:"1px solid rgba(251,191,36,0.2)"}}>
+                                    {t.metodoLimpieza==="sopladora"?"🌬️ Sopladora":t.metodoLimpieza==="barrido"?"🧹 Barrido con vara":"🌬️+🧹 Sopladora + Barrido"}
+                                  </span>
+                                </div>
+                              )}
+                              {t.notas&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:2,fontStyle:"italic"}}>💡 {t.notas}</div>}
+                              {t.indicacion&&<div style={{fontSize:11,color:"#f59e0b",marginTop:2}}>📋 {t.indicacion}</div>}
+                              {(t.alturaCorteObj||t.alturaCorte)&&<div style={{fontSize:11,color:"#fbbf24",marginTop:2,fontWeight:600}}>✂️ Altura de corte indicada: {t.alturaCorteObj||t.alturaCorte}mm</div>}
+                            </div>
                           </div>
                           <span style={{fontSize:11,fontWeight:600,color:est.color,background:`${est.color}15`,padding:"2px 8px",borderRadius:8,border:`1px solid ${est.color}30`,whiteSpace:"nowrap",flexShrink:0}}>{est.icon} {est.label}</span>
                         </div>
+                        {abiertaT&&(<>
                         {puedeEditar ? (
                           <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                             {Object.entries(ESTADOS_TAREA).map(([k,v])=>(
@@ -3124,6 +3131,7 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                           </div>
                         )}
                         {t.notaWorker&&t.estado!=="no_pudo"&&<div style={{fontSize:11,color:"#f59e0b",marginTop:4,fontStyle:"italic"}}>💬 {t.notaWorker}</div>}
+                        </>)}
                       </div>
                     );
                   })}
@@ -3230,17 +3238,22 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                       <div>
                         {g.tareas.map((t,i)=>{
                           const est=ESTADOS_TAREA[normalizarEstado(t.estado)]||ESTADOS_TAREA.pendiente;
+                          const abiertaT=!!tareasAbiertas[t.id];
                           return (
                             <div key={t.id} style={{padding:"9px 12px",background:i%2===0?"transparent":"rgba(255,255,255,0.02)",borderTop:"1px solid rgba(255,255,255,0.04)"}}>
-                              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:5}}>
-                                <div style={{flex:1}}>
-                                  <div style={{fontSize:13,fontWeight:600}}>{t.tarea?.replace("⛳ ","")}</div>
-                                  {t.zona&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:1}}>📍 {t.zona}{t.elemento?` · ${t.elemento}`:""}</div>}
-                                  {t.metodoLimpieza&&<span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.08)",padding:"1px 8px",borderRadius:8,border:"1px solid rgba(251,191,36,0.2)",display:"inline-block",marginTop:3}}>{t.metodoLimpieza==="sopladora"?"🌬️ Sopladora":t.metodoLimpieza==="barrido"?"🧹 Barrido":"🌬️+🧹 Sopladora + Barrido"}</span>}
-                                  {t.notas&&<div style={{fontSize:11,color:"#5a8a6a",marginTop:2,fontStyle:"italic"}}>💡 {t.notas}</div>}
+                              <div onClick={()=>toggleTareaAbierta(t.id)} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:5,cursor:"pointer"}}>
+                                <div style={{flex:1,display:"flex",gap:6,alignItems:"flex-start"}}>
+                                  <span style={{fontSize:10,color:"#5a9a7a",marginTop:2,transform:abiertaT?"rotate(90deg)":"none",transition:"transform .15s",display:"inline-block",flexShrink:0}}>▶</span>
+                                  <div>
+                                    <div style={{fontSize:13,fontWeight:600}}>{t.tarea?.replace("⛳ ","")}</div>
+                                    {t.zona&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:1}}>📍 {t.zona}{t.elemento?` · ${t.elemento}`:""}</div>}
+                                    {t.metodoLimpieza&&<span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.08)",padding:"1px 8px",borderRadius:8,border:"1px solid rgba(251,191,36,0.2)",display:"inline-block",marginTop:3}}>{t.metodoLimpieza==="sopladora"?"🌬️ Sopladora":t.metodoLimpieza==="barrido"?"🧹 Barrido":"🌬️+🧹 Sopladora + Barrido"}</span>}
+                                    {t.notas&&<div style={{fontSize:11,color:"#5a8a6a",marginTop:2,fontStyle:"italic"}}>💡 {t.notas}</div>}
+                                  </div>
                                 </div>
                                 <span style={{fontSize:10,fontWeight:600,color:est.color,background:`${est.color}12`,padding:"2px 7px",borderRadius:8,border:`1px solid ${est.color}25`,whiteSpace:"nowrap",flexShrink:0}}>{est.icon} {est.label}</span>
                               </div>
+                              {abiertaT&&(<>
                               {puedeEditar ? (
                                 <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                                   {Object.entries(ESTADOS_TAREA).map(([k,v])=>(
@@ -3262,6 +3275,7 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                                 </div>
                               )}
                               {t.notaWorker&&t.estado!=="no_pudo"&&<div style={{fontSize:11,color:"#f59e0b",marginTop:3,fontStyle:"italic"}}>💬 {t.notaWorker}</div>}
+                              </>)}
                             </div>
                           );
                         })}
@@ -3409,10 +3423,12 @@ Una vez cerrado no podrás modificar las tareas. Solo la jefa puede reabrir el t
 }
 
 // Componente auxiliar para cada fila de zona en Programa
-function ZonaRow({ zona, tz, zonasColapsadas, toggleZonaColapso, MACROZONAS_BASE, ESTADOS_TAREA, EC, updateTarea, deleteTarea, puedeCrear, S }) {
+function ZonaRow({ zona, tz, zonasColapsadas, toggleZonaColapso, MACROZONAS_BASE, ESTADOS_TAREA, EC, updateTarea, deleteTarea, puedeCrear, personal=[], S }) {
   const zonaColapso = zonasColapsadas.__init ? true : zonasColapsadas[zona]!==false;
   const hechasZona = tz.filter(t=>["hecha","completada"].includes(t.estado)).length;
   const icono = (MACROZONAS_BASE.find(z=>z.nombre===zona)||{icono:"📍"}).icono;
+  const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
+  const listaPersonalZR = [...personalArr].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
 
   // Calcular grupos de tareas ANTES del return
   const TIPOS_PD = [
@@ -3457,7 +3473,14 @@ function ZonaRow({ zona, tz, zonasColapsadas, toggleZonaColapso, MACROZONAS_BASE
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{fontWeight:600,fontSize:13,color:"#c0dac0",marginBottom:2}}>{t.tarea}</div>
                         {t.elemento && <div style={{fontSize:11,color:"#5a8a6a"}}>{t.elemento}</div>}
-                        {t.responsable && <div style={{fontSize:11,color:"#7aaaba"}}>👤 {t.responsable}</div>}
+                        <div style={{marginTop:4,display:"flex",alignItems:"center",gap:6}}>
+                          <span style={{fontSize:11,color:"#7aaaba"}}>👤</span>
+                          <select value={t.responsable||""} onChange={e=>updateTarea(t.id,{responsable:e.target.value,estado:e.target.value?(t.estado==="por_designar"?"pendiente":t.estado):"por_designar"})}
+                            style={{background:t.responsable?"rgba(255,255,255,0.05)":"rgba(245,158,11,0.1)",border:`1px solid ${t.responsable?"rgba(255,255,255,0.12)":"rgba(245,158,11,0.35)"}`,borderRadius:6,color:t.responsable?"#c0dac0":"#fbbf24",padding:"3px 7px",fontFamily:"'Georgia',serif",fontSize:11,outline:"none",cursor:"pointer",maxWidth:180}}>
+                            <option value="">⬜ Por designar...</option>
+                            {listaPersonalZR.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                          </select>
+                        </div>
                         {t.notas && <div style={{fontSize:11,color:"#5a8a6a",marginTop:3,fontStyle:"italic"}}>{t.notas}</div>}
                         {t.notaWorker && <div style={{fontSize:11,color:t.estado==="no_pudo"?"#fca5a5":"#7aaa80",marginTop:2}}>💬 {t.notaWorker}</div>}
                       </div>
@@ -4049,6 +4072,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
               updateTarea={updateTarea}
               deleteTarea={deleteTarea}
               puedeCrear={puedeCrear}
+              personal={personal}
               S={S}
             />
           ))
@@ -10218,6 +10242,34 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
         {esJefa&&<button className="btn-p" style={S.btn} onClick={()=>setShowHumForm(true)}>💧 Nueva medición</button>}
       </div>
 
+      {/* Tus registros de hoy — visibles todo el día para quien midió */}
+      {!esJefa&&(()=>{
+        const humHoy = humedades.filter(m=>m.fecha===hoy);
+        if(!humHoy.length) return null;
+        return (
+          <div style={{...S.card,padding:14,marginBottom:14,borderLeft:"3px solid #60a5fa"}}>
+            <div style={{fontSize:12,fontWeight:700,color:"#60a5fa",marginBottom:8}}>💧 Tu humedad registrada hoy</div>
+            {humHoy.map(m=>(
+              <div key={m.id} style={{marginBottom:8}}>
+                <div style={{fontSize:11,color:"#5a9a7a",marginBottom:4}}>{m.hora||""} · {MOTIVOS_HUM.find(x=>x.value===m.motivo)?.label||m.motivo}</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                  {GREENS_DEF.map(g=>{
+                    const val=m.valores?.[g.id]?.valor;
+                    if(!val) return null;
+                    const info=ESCALA_HUM_GOLF[Math.min(Math.max(Number(val),1),8)];
+                    return <span key={g.id} style={{fontSize:11,color:info?.color,background:`${info?.color}12`,border:`1px solid ${info?.color}30`,borderRadius:6,padding:"2px 8px"}}>{g.nombre.replace("Green ","G")}: {val}</span>;
+                  })}
+                  {m.valorVivero&&(()=>{
+                    const info=ESCALA_HUM_GOLF[Math.min(Math.max(Number(m.valorVivero),1),8)];
+                    return <span style={{fontSize:11,color:info?.color,background:`${info?.color}12`,border:`1px solid ${info?.color}30`,borderRadius:6,padding:"2px 8px"}}>🌱 Vivero: {m.valorVivero}</span>;
+                  })()}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
       {/* Escala — solo jefa */}
       {esJefa&&(
         <div style={{...S.card,padding:"10px 14px",marginBottom:14,display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
@@ -11070,10 +11122,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   const [showDiariaForm, setShowDiariaForm] = React.useState(false);
   // ── Estado sección Humedad ──
   const [showHumForm,    setShowHumForm]    = React.useState(false);
-  // Abrir formulario de humedad automáticamente cuando jefa navega a ese tab
-  React.useEffect(()=>{
-    if(subTab==="humedad" && esJefa) setShowHumForm(true);
-  },[subTab, esJefa]);
+  // Nota: para la jefa la vista queda retraída por defecto (la expande con el botón "💧 Nueva medición").
+  // Para trabajadores sí se abre directo (ver useEffect en SeccionHumedad más abajo).
   const emptyHumForm = {fecha:hoy,hora:new Date().toTimeString().slice(0,5),motivo:"rutina",responsable:"",valores:{},valorVivero:"",decision:"sin-cambio",obs:"",generarTarea:false};
   const [humForm,        setHumForm]        = React.useState(emptyHumForm);
   const [selectedGreen,  setSelectedGreen]  = React.useState("g1");
@@ -12488,6 +12538,29 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               ← Volver a Mi Turno
             </button>
           )}
+          {/* Tus registros de hoy — visibles todo el día para quien midió, sin depender de tener el formulario abierto */}
+          {rolLogueado==="trabajador"&&(()=>{
+            const medsHoy = mediciones.filter(m=>m.fecha===hoy);
+            if(!medsHoy.length) return null;
+            return (
+              <div style={{...S.card,padding:14,marginBottom:14,borderLeft:"3px solid #34d399"}}>
+                <div style={{fontSize:12,fontWeight:700,color:"#34d399",marginBottom:8}}>📏 Tus alturas registradas hoy</div>
+                {medsHoy.map(m=>(
+                  <div key={m.id} style={{marginBottom:8}}>
+                    <div style={{fontSize:11,color:"#5a9a7a",marginBottom:4}}>{m.hora||""} · {m.tipo||"medición"}</div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                      {[...GREENS_DEF,{id:"vivero",nombre:"Vivero",hoyos:""}].map(g=>{
+                        const val=m.alturas?.[g.id];
+                        if(!val) return null;
+                        const color=colorAltura(val);
+                        return <span key={g.id} style={{fontSize:11,color,background:`${color}12`,border:`1px solid ${color}30`,borderRadius:6,padding:"2px 8px"}}>{g.nombre.replace("Green ","G")}: {val}mm</span>;
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
           {/* Botón nueva medición — solo jefa/supervisor */}
           {(esJefa||rolLogueado==="supervisor")&&(
             <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
