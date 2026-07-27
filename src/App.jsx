@@ -3538,15 +3538,16 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     const propuestas = [];
     const vencidas = [];
     const existentes = getTareasDelDia(fecha).map(t => t.zona+"_"+t.elemento+"_"+t.tarea);
-    MACROZONAS_BASE.forEach(z => {
+    zonas.forEach(z => {
       const zdat = getZD(z.id);
+      const nombreZona = zdat.nombreCustom || z.nombre;
       const elems = getAllElems(z.id);
       elems.forEach(e => {
         const zdatElem = zdat.elementos?.[e.id] || (zdat.elementosCustom||[]).find(x=>x.id===e.id);
         const frecs = zdatElem?.frecuencias || [];
         if(frecs.length===0) return; // solo proponer si hay frecuencias — incluye Golf
         frecs.forEach(f => {
-          const key = z.nombre+"_"+e.nombre+"_"+f.tarea;
+          const key = nombreZona+"_"+e.nombre+"_"+f.tarea;
           if(existentes.includes(key)) return;
           const prox = calcProximaFrecGlobal(f, fecha);
           if(!prox) return; // sin frecuencia activa, sin última realización registrada, o "según necesidad"/"una vez"
@@ -3554,14 +3555,14 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           if(prox.diff > 0) return;
           const esVencida = prox.diff < 0;
           // Asignar responsable por defecto según zona y tipo de tarea
-          const esZonaGolf = z.id===31||(z.nombre||"").toLowerCase().includes("golf");
+          const esZonaGolf = z.id===31||(nombreZona||"").toLowerCase().includes("golf");
           const respDefault = esZonaGolf
             ? "Osmar Bhalú Armijo Zúñiga"  // Golf → Bhalú por defecto
-            : getResponsablePorTipo(f.tarea, configSemanal, z.nombre)||"";
+            : getResponsablePorTipo(f.tarea, configSemanal, nombreZona)||"";
           if(esZonaGolf) console.log("Golf tarea:", f.tarea, "→ resp:", respDefault);
-          const item = { id: Date.now()+Math.random(), fecha, zona:z.nombre, elemento:e.nombre, tarea:f.tarea, responsable:respDefault, estado:respDefault?"pendiente":"por_designar", notas:f.obs||"", frecuencia:f.modo==="diasSemana"?`cada ${f.diasMinimos||"?"} días`:f[estProp], estacion:estProp, auto:true, fechaCorrespondiente:prox.fecha, origenZid:String(z.id), origenEid:e.id, origenFrecId:f.id, origenEsCustom:!!e.isCustom };
+          const item = { id: Date.now()+Math.random(), fecha, zona:nombreZona, elemento:e.nombre, tarea:f.tarea, responsable:respDefault, estado:respDefault?"pendiente":"por_designar", notas:f.obs||"", frecuencia:f.modo==="diasSemana"?`cada ${f.diasMinimos||"?"} días`:f[estProp], estacion:estProp, auto:true, fechaCorrespondiente:prox.fecha, origenZid:String(z.id), origenEid:e.id, origenFrecId:f.id, origenEsCustom:!!e.isCustom };
           propuestas.push(item);
-          if(esVencida) { const vKey=`${z.nombre} — ${f.tarea}`; if(!vencidas.includes(vKey)) vencidas.push(vKey); }
+          if(esVencida) { const vKey=`${nombreZona} — ${f.tarea}`; if(!vencidas.includes(vKey)) vencidas.push(vKey); }
         });
       });
     });
@@ -5371,7 +5372,7 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
                         style={inputSt}/>
                       {(f.tareaEnlazada||"").length>=2&&(()=>{
                         const busq=(f.tareaEnlazada||"").toLowerCase();
-                        const sugs=CATALOGO_TAREAS.filter(c=>c.tarea.toLowerCase().includes(busq)&&c.tarea!==f.tarea).slice(0,6);
+                        const sugs=CATALOGO_TAREAS.filter(c=>c.tarea.toLowerCase().includes(busq)&&c.tarea.toLowerCase()!==busq).slice(0,6);
                         if(!sugs.length) return null;
                         return (
                           <div style={{position:"absolute",zIndex:999,top:"100%",left:0,right:0,background:"#1a2e1a",border:"1px solid rgba(167,139,250,0.3)",borderRadius:"0 0 8px 8px",maxHeight:140,overflowY:"auto"}}>
