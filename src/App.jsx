@@ -10368,7 +10368,7 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
           </div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(88px,1fr))",gap:6}}>
             {[...GREENS_DEF,{id:"vivero",nombre:"Vivero",hoyos:"Vivero"}].map(g=>{
-              const humV=ultimaHum.valores?.[g.id]?.valor;
+              const humV=g.id==="vivero" ? ultimaHum.valorVivero : ultimaHum.valores?.[g.id]?.valor;
               const info=humV?ESCALA_HUM_GOLF[Math.min(Math.max(Number(humV),1),8)]:null;
               return (
                 <div key={g.id} style={{background:info?info.bg:"rgba(255,255,255,0.03)",borderRadius:8,padding:"8px 10px",border:`1px solid ${info?info.color+"40":"rgba(255,255,255,0.08)"}`}}>
@@ -10394,7 +10394,7 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
         {[...humedades].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")).map(m=>{
           const dec=DECISIONES_HUM.find(d=>d.value===m.decision);
           const colDec=m.decision==="cerrar-cancha"?"#ef4444":m.decision==="abrir-cancha"?"#22c55e":"#60a5fa";
-          const vals=Object.values(m.valores||{}).map(v=>Number(v.valor||0)).filter(v=>v>0);
+          const vals=[...Object.values(m.valores||{}).map(v=>Number(v.valor||0)), Number(m.valorVivero||0)].filter(v=>v>0);
           const extremo=vals.length?(esSecaEstacion?Math.min(...vals):Math.max(...vals)):null;
           const infoExtremo=extremo?ESCALA_HUM_GOLF[Math.min(Math.max(extremo,1),8)]:null;
           return (
@@ -10414,6 +10414,11 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
                       if(!info) return null;
                        return <span key={g.id} style={{fontSize:10,color:info.color,background:info.bg,border:`1px solid ${info.color}40`,borderRadius:6,padding:"1px 6px"}}>{g.nombre.replace("Green ","G")}: {humV2}</span>;
                     })}
+                    {m.valorVivero&&(()=>{
+                      const info=ESCALA_HUM_GOLF[Math.min(Math.max(Number(m.valorVivero),1),8)];
+                      if(!info) return null;
+                      return <span style={{fontSize:10,color:info.color,background:info.bg,border:`1px solid ${info.color}40`,borderRadius:6,padding:"1px 6px"}}>🌱 Vivero: {m.valorVivero}</span>;
+                    })()}
                   </div>
                   {infoExtremo&&<div style={{fontSize:11,color:infoExtremo.color}}>{esSecaEstacion?"Mín":"Máx"}: {infoExtremo.label}</div>}
                   {m.obs&&<div style={{fontSize:11,color:"#5a9a7a",fontStyle:"italic",marginTop:4}}>{m.obs}</div>}
@@ -16083,8 +16088,6 @@ export default function App() {
   const [tab, setTab] = useState("elementos");
   const [filtroCat, setFiltroCat] = useState("Todas");
   const [macrozonasCust, setMacrozonasCust, macCustReady] = useFirebaseState("macrozonasCust", []);
-  // Combinar zonas base con personalizadas — debe ir después de ambos estados
-  const zonasConCust = React.useMemo(()=>[...zonas,...macrozonasCust],[zonas,macrozonasCust]);
   const [showNuevaMacrozona, setShowNuevaMacrozona] = useState(false);
   const [nuevaMacrozona, setNuevaMacrozona] = useState(()=>({nombre:"",categoria:"Calles y Accesos",icono:"🌿",descripcion:""}));
   const [filtroEst, setFiltroEst] = useState("Todos");
@@ -16169,6 +16172,19 @@ export default function App() {
   const handleLogout = () => signOut(auth);
   const CUENTAS_DEFAULT = ["Rama Golf","Mantenimiento Jardines","Obras","Insumos Generales","Maquinaria y Equipos","Fitosanitarios","Semillas y Plantas","Uniformes y EPP"];
   const [data,           setData,           dataReady, setDataLocal]     = useFirebaseState("data",           initData());
+  // zonasConCust: zonas base + personalizadas, con nombre/ícono/categoría YA actualizados según lo editado
+  // en la ficha de zona. Todo lo que consuma esta lista (Programación Diaria, Frecuencias, addTareaZona, etc.)
+  // debe ver siempre el nombre vigente, no el de fábrica.
+  const zonasConCust = React.useMemo(()=>{
+    const base = zonas.map(z=>{
+      const zdCust = data[String(z.id)];
+      if(!zdCust) return z;
+      return (zdCust.nombreCustom||zdCust.categoriaCustom||zdCust.iconoCustom)
+        ? {...z, nombre:zdCust.nombreCustom||z.nombre, categoria:zdCust.categoriaCustom||z.categoria, icono:zdCust.iconoCustom||z.icono}
+        : z;
+    });
+    return [...base, ...macrozonasCust];
+  },[zonas,macrozonasCust,data]);
   const [personal, setPersonal, personalReady] = useFirebaseState("personal", PERSONAL_INICIAL);
   const [tareasProg,     setTareasProg,     progReady]     = useFirebaseState("prog",           {});
   const [stockFito, setStockFito]  = useFirebaseState("fung-stock", {});
