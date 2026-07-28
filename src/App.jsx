@@ -3201,9 +3201,20 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
              ══════════════════════════════════════════════════════════ */}
         {misTareasOtras.length>0&&(()=>{
           // Agrupar por el nombre exacto de la tarea (el mismo texto elegido al crearla), sin categorías inventadas
+          const iconoPorNombre = (nombre) => {
+            const n=(nombre||"").toLowerCase();
+            if(n.includes("corte")||n.includes("cortad")) return "✂️";
+            if(n.includes("riego")||n.includes("regar")) return "💧";
+            if(n.includes("poda")) return "🌿";
+            if(n.includes("fertil")) return "🌱";
+            if(n.includes("fungicida")||n.includes("plaga")||n.includes("fitosan")) return "🔬";
+            if(n.includes("limpi")||n.includes("sopla")||n.includes("barrid")) return "🧹";
+            if(n.includes("medic")||n.includes("altura")) return "📏";
+            return "📋";
+          };
           const nombresUnicos=[...new Set(misTareasOtras.map(t=>t.tarea||"Sin nombre"))];
           const grupos=nombresUnicos.map(nombre=>({
-            key:nombre, icon:"📌", label:nombre,
+            key:nombre, icon:iconoPorNombre(nombre), label:nombre,
             tareas: misTareasOtras.filter(t=>(t.tarea||"Sin nombre")===nombre),
           }));
           return (
@@ -3227,20 +3238,15 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                       <div>
                         {g.tareas.map((t,i)=>{
                           const est=ESTADOS_TAREA[normalizarEstado(t.estado)]||ESTADOS_TAREA.pendiente;
-                          const abiertaT=!!tareasAbiertas[t.id];
                           return (
                             <div key={t.id} style={{padding:"9px 12px",background:i%2===0?"transparent":"rgba(255,255,255,0.02)",borderTop:"1px solid rgba(255,255,255,0.04)"}}>
-                              <div onClick={()=>toggleTareaAbierta(t.id)} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:5,cursor:"pointer"}}>
-                                <div style={{flex:1,display:"flex",gap:6,alignItems:"flex-start"}}>
-                                  <span style={{fontSize:10,color:"#5a9a7a",marginTop:2,transform:abiertaT?"rotate(90deg)":"none",transition:"transform .15s",display:"inline-block",flexShrink:0}}>▶</span>
-                                  <div style={{fontSize:13,fontWeight:600}}>{t.tarea?.replace("⛳ ","")}</div>
-                                </div>
+                              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:5}}>
+                                <div style={{fontSize:13,fontWeight:600}}>{t.tarea?.replace("⛳ ","")}</div>
                                 <span style={{fontSize:10,fontWeight:600,color:est.color,background:`${est.color}12`,padding:"2px 7px",borderRadius:8,border:`1px solid ${est.color}25`,whiteSpace:"nowrap",flexShrink:0}}>{est.icon} {est.label}</span>
                               </div>
-                              {abiertaT&&(<>
-                              {t.zona&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:1,marginLeft:16,marginBottom:4}}>📍 {t.zona}{t.elemento?` · ${t.elemento}`:""}</div>}
-                              {t.metodoLimpieza&&<span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.08)",padding:"1px 8px",borderRadius:8,border:"1px solid rgba(251,191,36,0.2)",display:"inline-block",marginLeft:16,marginBottom:4}}>{t.metodoLimpieza==="sopladora"?"🌬️ Sopladora":t.metodoLimpieza==="barrido"?"🧹 Barrido":"🌬️+🧹 Sopladora + Barrido"}</span>}
-                              {t.notas&&<div style={{fontSize:11,color:"#5a8a6a",marginTop:2,marginLeft:16,marginBottom:4,fontStyle:"italic"}}>💡 {t.notas}</div>}
+                              {t.zona&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:1,marginBottom:4}}>📍 {t.zona}{t.elemento?` · ${t.elemento}`:""}</div>}
+                              {t.metodoLimpieza&&<span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.08)",padding:"1px 8px",borderRadius:8,border:"1px solid rgba(251,191,36,0.2)",display:"inline-block",marginBottom:4}}>{t.metodoLimpieza==="sopladora"?"🌬️ Sopladora":t.metodoLimpieza==="barrido"?"🧹 Barrido":"🌬️+🧹 Sopladora + Barrido"}</span>}
+                              {t.notas&&<div style={{fontSize:11,color:"#5a8a6a",marginTop:2,marginBottom:4,fontStyle:"italic"}}>💡 {t.notas}</div>}
                               {puedeEditar ? (
                                 <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                                   {Object.entries(ESTADOS_TAREA).map(([k,v])=>(
@@ -3262,7 +3268,6 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                                 </div>
                               )}
                               {t.notaWorker&&t.estado!=="no_pudo"&&<div style={{fontSize:11,color:"#f59e0b",marginTop:3,fontStyle:"italic"}}>💬 {t.notaWorker}</div>}
-                              </>)}
                             </div>
                           );
                         })}
@@ -3465,6 +3470,9 @@ function ZonaRow({ zona, tz, zonasColapsadas, toggleZonaColapso, MACROZONAS_BASE
                           <select value={t.responsable||""} onChange={e=>updateTarea(t.id,{responsable:e.target.value,estado:e.target.value?(t.estado==="por_designar"?"pendiente":t.estado):"por_designar"})}
                             style={{background:t.responsable?"rgba(255,255,255,0.05)":"rgba(245,158,11,0.1)",border:`1px solid ${t.responsable?"rgba(255,255,255,0.12)":"rgba(245,158,11,0.35)"}`,borderRadius:6,color:t.responsable?"#c0dac0":"#fbbf24",padding:"3px 7px",fontFamily:"'Georgia',serif",fontSize:11,outline:"none",cursor:"pointer",maxWidth:180}}>
                             <option value="">⬜ Por designar...</option>
+                            {t.responsable&&!listaPersonalZR.some(p=>p.nombre===t.responsable)&&(
+                              <option value={t.responsable}>⚠️ {t.responsable}</option>
+                            )}
                             {listaPersonalZR.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
                           </select>
                         </div>
