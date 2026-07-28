@@ -11882,7 +11882,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                               background:todasV?"rgba(239,68,68,0.15)":"rgba(74,222,128,0.15)",
                               color:todasV?"#f87171":"#4ade80",
                               border:`1px solid ${todasV?"rgba(239,68,68,0.3)":"rgba(74,222,128,0.3)"}`}}
-                              onClick={()=>{const pgNN={};tareasViv.forEach(t=>{pgNN[t]=!todasV;});setDiariaForm(p=>({...p,tareas:{...p.tareas,...n}}));}}>
+                              onClick={()=>{const pgNN={};tareasViv.forEach(t=>{pgNN[t]=!todasV;});setDiariaForm(p=>({...p,tareas:{...p.tareas,...pgNN}}));}}>
                               {todasV?"✗ Desmarcar todas":"✓ Marcar todas"}
                             </button>
                           </div>
@@ -12475,7 +12475,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             {TIPOS_ARBOL.map(tipo=>{
               const pgNA=arboles.filter(a=>a.tipo===tipo).length;
               if(!pgNA) return null;
-              return <div key={tipo} style={{...S.card,padding:"8px 14px",fontSize:12,color:"#4ade80"}}><strong>{n}</strong> {tipo}</div>;
+              return <div key={tipo} style={{...S.card,padding:"8px 14px",fontSize:12,color:"#4ade80"}}><strong>{pgNA}</strong> {tipo}</div>;
             })}
             <div style={{...S.card,padding:"8px 14px",fontSize:12,color:"#34d399"}}><strong>{arboles.length}</strong> total individuos/grupos</div>
           </div>
