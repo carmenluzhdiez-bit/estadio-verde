@@ -3579,7 +3579,8 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
             ? "Osmar Bhalú Armijo Zúñiga"  // Golf → Bhalú por defecto
             : getResponsablePorTipo(f.tarea, configSemanal, nombreZona)||"";
           if(esZonaGolf) console.log("Golf tarea:", f.tarea, "→ resp:", respDefault);
-          const item = { id: Date.now()+Math.random(), fecha, zona:nombreZona, elemento:e.nombre, tarea:f.tarea, responsable:respDefault, estado:respDefault?"pendiente":"por_designar", notas:f.obs||"", frecuencia:f.modo==="diasSemana"?`cada ${f.diasMinimos||"?"} días`:f[estProp], estacion:estProp, auto:true, fechaCorrespondiente:prox.fecha, origenZid:String(z.id), origenEid:e.id, origenFrecId:f.id, origenEsCustom:!!e.isCustom };
+          const notaAltura = f.alturaCorte ? `Cortar a: ${f.alturaCorte} ${f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="mm"?"milímetros":"pulgadas"}.` : "";
+          const item = { id: Date.now()+Math.random(), fecha, zona:nombreZona, elemento:e.nombre, tarea:f.tarea, responsable:respDefault, estado:respDefault?"pendiente":"por_designar", notas:[notaAltura,f.obs].filter(Boolean).join(" "), alturaCorte:f.alturaCorte||"", unidadAlturaCorte:f.unidadAlturaCorte||"", frecuencia:f.modo==="diasSemana"?`cada ${f.diasMinimos||"?"} días`:f[estProp], estacion:estProp, auto:true, fechaCorrespondiente:prox.fecha, origenZid:String(z.id), origenEid:e.id, origenFrecId:f.id, origenEsCustom:!!e.isCustom };
           propuestas.push(item);
           if(esVencida) { const vKey=`${nombreZona} — ${f.tarea}`; if(!vencidas.includes(vKey)) vencidas.push(vKey); }
         });
@@ -5326,7 +5327,25 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
                     </div>
                   </div>
 
-                  {/* Configuración POR ESTACIÓN */}
+                  {/* Altura de corte — solo para tareas de corte de césped */}
+                  {(f.tarea||"").toLowerCase().includes("corte")&&(
+                    <div style={{marginBottom:10,background:"rgba(52,211,153,0.06)",border:"1px solid rgba(52,211,153,0.15)",borderRadius:8,padding:"8px 10px"}}>
+                      <label style={labelSt}>✂️ Altura de corte</label>
+                      <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                        <span style={{fontSize:12,color:"#6aaa7a"}}>Cortar a:</span>
+                        <input type="number" step="0.1" min="0" value={f.alturaCorte||""}
+                          onChange={e=>updateFila(i,"alturaCorte",e.target.value)}
+                          placeholder="ej: 4,5" style={{...inputSt,width:80}}/>
+                        <select value={f.unidadAlturaCorte||"pulgadas"} onChange={e=>updateFila(i,"unidadAlturaCorte",e.target.value)}
+                          style={{...inputSt,width:110}}>
+                          <option value="pulgadas">pulgadas</option>
+                          <option value="cm">centímetros</option>
+                          <option value="mm">milímetros</option>
+                        </select>
+                      </div>
+                      {f.alturaCorte&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:4}}>Se anotará en la tarea: "Corte a: {f.alturaCorte} {f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="mm"?"milímetros":"pulgadas"}"</div>}
+                    </div>
+                  )}
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
                     {ESTACIONES_LIST.map(est=>{
                       const cfg = getDiasConfig(f, est);
