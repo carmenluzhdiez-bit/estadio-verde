@@ -11114,7 +11114,7 @@ function TareasGolfPanel({ tareasGolfHoy, hoy, esJefa, setTareasProg, tareasProg
 }
 
 
-function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito, onCierreSectorial, onNuevaAlerta, configSemanal={}, setConfigSemanal }) {
+function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito, onCierreSectorial, onNuevaAlerta, configSemanal={}, setConfigSemanal, getAllElems, getZD, setElemFrecs }) {
   const GOLF_ZONA_ID = 31; // ID macrozona Golf
   const sincronizarMacrozona = (tipo, detalle) => {
     if(!updateZona) return;
@@ -11550,6 +11550,16 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             </div>
             <div style={{fontSize:10,color:"#4a7a5a",marginTop:10}}>Valores en mm. Los cambios se guardan automáticamente.</div>
           </div>
+
+          {/* ── Frecuencias de mantención de Golf — mismo sistema que las demás macrozonas ── */}
+          {getAllElems&&getZD&&setElemFrecs&&(()=>{
+            const golfZonaObj = MACROZONAS_BASE.find(z=>z.id===31);
+            return golfZonaObj ? (
+              <div style={{marginTop:18}}>
+                <PanelFrecuenciasZona S={S} zonas={[golfZonaObj]} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} esJefa={esJefa}/>
+              </div>
+            ) : null;
+          })()}
         </div>
           );
         })()}
@@ -14820,7 +14830,7 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
 }
 
 function PanelFrecuenciasZona({ S, zonas, getAllElems, getZD, setElemFrecs, esJefa }) {
-  const [zonaSelFrec, setZonaSelFrec] = React.useState("");
+  const [zonaSelFrec, setZonaSelFrec] = React.useState(()=>zonas.length===1?String(zonas[0].id):"");
   const [elemSelFrec, setElemSelFrec] = React.useState("");
   const zonaActFrec = zonaSelFrec ? zonas.find(z=>String(z.id)===zonaSelFrec) : null;
   const elemsActFrec = zonaActFrec ? getAllElems(String(zonaActFrec.id)) : [];
@@ -18409,7 +18419,7 @@ export default function App() {
 
         {/* GOLF */}
         {vista==="golf"&&(
-          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial} setVista={setVista} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} onCierreSectorial={()=>setShowCierreSectorial(true)} onNuevaAlerta={()=>{setAutoOpenAlerta(true);setVista("notificaciones");}} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal}
+          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial} setVista={setVista} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} onCierreSectorial={()=>setShowCierreSectorial(true)} onNuevaAlerta={()=>{setAutoOpenAlerta(true);setVista("notificaciones");}} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs}
             crearNotificacion={crearNotificacion}
             initialSubTab={golfInitTab}
             onRegistroGuardado={(tipo)=>{
