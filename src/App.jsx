@@ -2300,14 +2300,15 @@ function ConfiguradorSemanal({ S, personal, configSemanal, setConfigSemanal, esJ
   const [open, setOpen] = React.useState(false);
 
   const TIPOS_TAREA = [
-    { id:"corte_tractor",  label:"🚜 Corte con tractor",      restriccion:"capacitación tractor",  fijo:null },
-    { id:"orillado",       label:"✂️ Orillado",                restriccion:null,                    fijo:null },
-    { id:"riego",          label:"💧 Riego general",           restriccion:null,                    fijo:null },
-    { id:"pesticidas",     label:"🧪 Aplicación pesticidas",   restriccion:"capacitación RILES",    fijo:null },
-    { id:"poda",           label:"🌿 Poda y arbusto",          restriccion:null,                    fijo:null },
-    { id:"siembra",        label:"🌱 Siembra / trasplante",    restriccion:null,                    fijo:null },
-    { id:"limpieza",       label:"🧹 Limpieza general",        restriccion:null,                    fijo:null },
-    { id:"arboles",        label:"🌳 Faenas en árboles",       restriccion:"capacitación arborista",fijo:null },
+    { id:"corte_tractor",  label:"🚜 Corte de césped",                       restriccion:"capacitación tractor",  fijo:null },
+    { id:"orillado",       label:"✂️ Orillado / Corte de bordes",            restriccion:null,                    fijo:null },
+    { id:"riego",          label:"💧 Riego manual / por aspersión",          restriccion:null,                    fijo:null },
+    { id:"pesticidas",     label:"🧪 Control fitosanitario / Fumigación",    restriccion:"capacitación RILES",    fijo:null },
+    { id:"plagas",         label:"🔬 Revisión de plagas y enfermedades",     restriccion:"capacitación RILES",    fijo:null },
+    { id:"poda",           label:"🌿 Poda (formación/mantenimiento/sanitaria)",restriccion:null,                    fijo:null },
+    { id:"siembra",        label:"🌱 Siembra / Plantación / Trasplante",     restriccion:null,                    fijo:null },
+    { id:"limpieza",       label:"🧹 Limpieza general",                     restriccion:null,                    fijo:null },
+    { id:"arboles",        label:"🌳 Poda en altura / Tala",                restriccion:"capacitación arborista",fijo:null },
   ];
 
   const personalArr = Array.isArray(personal)
@@ -2396,6 +2397,7 @@ const getResponsablePorTipo = (tarea, configSemanal, zona) => {
   if(t.includes("corte")) return configSemanal?.corte_tractor||"";
   if(t.includes("orill")) return configSemanal?.orillado||"";
   if(t.includes("riego")||t.includes("regar")||t.includes("syringing")||t.includes("fertirriego")) return configSemanal?.riego||"";
+  if(t.includes("plaga")) return configSemanal?.plagas||"";
   if(t.includes("pesticida")||t.includes("fungicida")||t.includes("fumigac")||t.includes("herbicida")||t.includes("fitosanit")) return configSemanal?.pesticidas||"";
   if(t.includes("poda")||t.includes("arbust")||t.includes("árbol")||t.includes("arbol")) return configSemanal?.poda||"";
   if(t.includes("siembra")||t.includes("trasplante")||t.includes("plantar")||t.includes("vivero")) return configSemanal?.siembra||"";
@@ -3245,6 +3247,7 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                                 <span style={{fontSize:10,fontWeight:600,color:est.color,background:`${est.color}12`,padding:"2px 7px",borderRadius:8,border:`1px solid ${est.color}25`,whiteSpace:"nowrap",flexShrink:0}}>{est.icon} {est.label}</span>
                               </div>
                               {t.zona&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:1,marginBottom:4}}>📍 {t.zona}{t.elemento?` · ${t.elemento}`:""}</div>}
+                              {t.alturaCorte&&<div style={{fontSize:12,color:"#fbbf24",fontWeight:600,marginBottom:4,background:"rgba(251,191,36,0.08)",border:"1px solid rgba(251,191,36,0.2)",borderRadius:6,padding:"3px 8px",display:"inline-block"}}>✂️ Cortar a: {t.alturaCorte} {t.unidadAlturaCorte==="cm"?"cm":t.unidadAlturaCorte==="mm"?"mm":"pulgadas"}</div>}
                               {t.metodoLimpieza&&<span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.08)",padding:"1px 8px",borderRadius:8,border:"1px solid rgba(251,191,36,0.2)",display:"inline-block",marginBottom:4}}>{t.metodoLimpieza==="sopladora"?"🌬️ Sopladora":t.metodoLimpieza==="barrido"?"🧹 Barrido":"🌬️+🧹 Sopladora + Barrido"}</span>}
                               {t.notas&&<div style={{fontSize:11,color:"#5a8a6a",marginTop:2,marginBottom:4,fontStyle:"italic"}}>💡 {t.notas}</div>}
                               {puedeEditar ? (
@@ -3476,6 +3479,7 @@ function ZonaRow({ zona, tz, zonasColapsadas, toggleZonaColapso, MACROZONAS_BASE
                             {listaPersonalZR.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
                           </select>
                         </div>
+                        {t.alturaCorte&&<div style={{fontSize:11,color:"#fbbf24",fontWeight:600,marginTop:3}}>✂️ Cortar a: {t.alturaCorte} {t.unidadAlturaCorte==="cm"?"cm":t.unidadAlturaCorte==="mm"?"mm":"pulgadas"}</div>}
                         {t.notas && <div style={{fontSize:11,color:"#5a8a6a",marginTop:3,fontStyle:"italic"}}>{t.notas}</div>}
                         {t.notaWorker && <div style={{fontSize:11,color:t.estado==="no_pudo"?"#fca5a5":"#7aaa80",marginTop:2}}>💬 {t.notaWorker}</div>}
                       </div>
@@ -9170,7 +9174,13 @@ const GREENS_DEF = [
   {id:"g8", nombre:"Green 08", hoyos:"Hoyo 08 - 17"},
   {id:"g9", nombre:"Green 09", hoyos:"Hoyo 09 - 18"},
 ];
-const TEES_DEF = Array.from({length:18},(_,i)=>({id:`t${i+1}`,nombre:`Tee ${String(i+1).padStart(2,"0")}`,hoyo:`Hoyo ${i+1}`}));
+const TEES_DEF = Array.from({length:9},(_,i)=>{
+  const hoyo=String(i+1).padStart(2,"0");
+  return [
+    {id:`tee_${hoyo}a`, nombre:`Tee ${hoyo}A`, hoyo:`Hoyo ${hoyo}`, posicion:"A"},
+    {id:`tee_${hoyo}b`, nombre:`Tee ${hoyo}B`, hoyo:`Hoyo ${hoyo}`, posicion:"B"},
+  ];
+}).flat();
 const BUNKERS_DEF = [
   {id:"bk1", nombre:"Búnker Hoyo 01"},
   {id:"bk2", nombre:"Búnker Hoyo 02"},
@@ -11156,7 +11166,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   const emptyHumForm = {fecha:hoy,hora:new Date().toTimeString().slice(0,5),motivo:"rutina",responsable:"",valores:{},valorVivero:"",decision:"sin-cambio",obs:"",generarTarea:false};
   const [humForm,        setHumForm]        = React.useState(emptyHumForm);
   const [selectedGreen,  setSelectedGreen]  = React.useState("g1");
-  const [selectedTee,    setSelectedTee]    = React.useState("t1");
+  const [selectedTee,    setSelectedTee]    = React.useState("tee_01a");
 
   // Formulario medición semanal
   // Pre-llenar responsable: si es trabajador usar BHALÚ, si no dejar vacío
