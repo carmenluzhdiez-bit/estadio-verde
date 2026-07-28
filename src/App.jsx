@@ -2138,7 +2138,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                         {hpTask.elemento&&<span style={{fontSize:11,color:"#5a8a6a",background:"rgba(255,255,255,0.05)",padding:"1px 6px",borderRadius:6}}>{hpTask.elemento}</span>}
                         {(()=>{
                           const resp=hpTask.responsable||"";
-                          const key=`${d}_${resp.split(" ")[0]?.toLowerCase()||""}`;
+                          const key=`${dia}_${resp.split(" ")[0]?.toLowerCase()||""}`;
                           const cerrado=cierresTurno?.[key];
                           return cerrado?(<span style={{fontSize:9,color:"#22c55e",background:"rgba(34,197,94,0.1)",padding:"1px 6px",borderRadius:8,border:"1px solid rgba(34,197,94,0.25)"}}>✅ Turno cerrado {cerrado.hora}</span>):null;
                         })()}
@@ -6959,7 +6959,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                         onKeyDown={e=>{
                           if(e.key==="Enter"&&e.target.value.trim()){
                             const prodS=e.target.value.trim();
-                            setIncidForm(p=>({...p,sectoresCerrados:[...p.sectoresCerrados,s]}));
+                            setIncidForm(p=>({...p,sectoresCerrados:[...p.sectoresCerrados,prodS]}));
                             e.target.value="";
                           }
                         }}/>
@@ -12255,7 +12255,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                         sincronizarMacrozona("Tarea programada", `${tareaForm.tipo} — ${zonas.length} zonas`);
                         setTareaForm(emptyTarea);
                         setShowTareaForm(null);
-                      }}>✓ Guardar {(()=>{const pgNT=tareaForm.target==="todos"?9:tareaForm.target==="todos_vivero"?10:tareaForm.target==="vivero"?1:tareaForm.target==="seleccion"?(tareaForm.greensSeleccionados||[]).length:1;return n>1?`(${n} tareas)`:"";})()} y enviar al programa</button>
+                      }}>✓ Guardar {(()=>{const pgNT=tareaForm.target==="todos"?9:tareaForm.target==="todos_vivero"?10:tareaForm.target==="vivero"?1:tareaForm.target==="seleccion"?(tareaForm.greensSeleccionados||[]).length:1;return pgNT>1?`(${pgNT} tareas)`:"";})()} y enviar al programa</button>
                       <button className="btn-g" style={S.btn} onClick={()=>setShowTareaForm(null)}>Cancelar</button>
                     </div>
                   </div>
