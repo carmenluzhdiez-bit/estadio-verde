@@ -154,7 +154,7 @@ const calcProximaFrecGlobal = (f, refFecha) => {
   if(typeof estValRaw === "object" && estValRaw !== null) {
     // Formato nuevo: {tipo:"cadaXdias", cadaDias:"7"}
     if(estValRaw.tipo==="noaplica"||estValRaw.tipo==="segunecesidad") return null;
-    const diasMap = {diario:1,cada2dias:2,cada3dias:3,cada5dias:5,semanal:7,quincenal:15,mensual:30,bimestral:60,trimestral:90};
+    const diasMap = {diario:1,cada2dias:2,cada3dias:3,cada4dias:4,cada5dias:5,semanal:7,quincenal:15,mensual:30,bimestral:60,trimestral:90};
     dias = Number(estValRaw.cadaDias) || diasMap[estValRaw.cadaDias] || null;
     frecVal = String(dias||"");
   } else {
@@ -166,9 +166,24 @@ const calcProximaFrecGlobal = (f, refFecha) => {
   if(!f.ultimaVez) return null;
   if(!dias) return null;
   const ultima = new Date(f.ultimaVez+"T12:00:00");
-  const proxima = new Date(ultima.getTime() + dias*24*60*60*1000);
-  const diff = Math.round((proxima-ref)/(24*60*60*1000));
-  return { fecha: proxima.toISOString().slice(0,10), diff };
+  const base = new Date(ultima.getTime() + dias*24*60*60*1000);
+  const diasEspecificosEst = (typeof estValRaw==="object"&&estValRaw!==null) ? (estValRaw.diasEspecificos||[]).map(Number) : [];
+  const diasProhibidosEst = (typeof estValRaw==="object"&&estValRaw!==null) ? (estValRaw.diasProhibidos||[]).map(Number) : [];
+  if(diasEspecificosEst.length===0 && diasProhibidosEst.length===0) {
+    const diff = Math.round((base-ref)/(24*60*60*1000));
+    return { fecha: base.toISOString().slice(0,10), diff };
+  }
+  // Buscar el día válido más cercano (respeta días específicos y evita días prohibidos)
+  for(let i=0;i<30;i++){
+    const candidato = new Date(base.getTime() + i*24*60*60*1000);
+    const dow = candidato.getDay();
+    if(diasProhibidosEst.includes(dow)) continue;
+    if(diasEspecificosEst.length>0 && !diasEspecificosEst.includes(dow)) continue;
+    const diff = Math.round((candidato-ref)/(24*60*60*1000));
+    return { fecha: candidato.toISOString().slice(0,10), diff };
+  }
+  const diff = Math.round((base-ref)/(24*60*60*1000));
+  return { fecha: base.toISOString().slice(0,10), diff };
 };
 
 // ─── FRECUENCIAS DISPONIBLES ─────────────────────────────────────────────────
@@ -5195,7 +5210,7 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
   ];
   const FRECUENCIAS_OPTS = [
     {v:"diario",l:"Diario (1d)"},{v:"cada2dias",l:"Cada 2 días"},{v:"cada3dias",l:"Cada 3 días"},
-    {v:"cada5dias",l:"Cada 5 días"},{v:"semanal",l:"Semanal (7d)"},{v:"quincenal",l:"Quincenal (15d)"},
+    {v:"cada4dias",l:"Cada 4 días"},{v:"cada5dias",l:"Cada 5 días"},{v:"semanal",l:"Semanal (7d)"},{v:"quincenal",l:"Quincenal (15d)"},
     {v:"mensual",l:"Mensual (30d)"},{v:"bimestral",l:"Bimestral (60d)"},{v:"trimestral",l:"Trimestral (90d)"},
     {v:"noaplica",l:"No aplica"},{v:"segunecesidad",l:"Según necesidad"},
   ];
@@ -5234,7 +5249,7 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
     if(typeof estObj === "object" && estObj !== null) return estObj;
     // Formato viejo — string como "semanal","quincenal",etc. → convertir a objeto nuevo
     const frecVal = typeof estObj === "string" ? estObj : (f[est]||"noaplica");
-    const diasMap = {diario:"1",cada2dias:"2",cada3dias:"3",cada5dias:"5",semanal:"7",
+    const diasMap = {diario:"1",cada2dias:"2",cada3dias:"3",cada4dias:"4",cada5dias:"5",semanal:"7",
       quincenal:"15",mensual:"30",bimestral:"60",trimestral:"90"};
     const cadaDias = diasMap[frecVal]||"7";
     return {
@@ -5381,7 +5396,7 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
                                 {FRECUENCIAS_OPTS.filter(o=>!["noaplica","segunecesidad"].includes(o.v)).map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
                                 <option value="segunecesidad">Según necesidad</option>
                               </select>
-                              <label style={{...labelSt,marginTop:4}}>Días específicos (opcional)</label>
+                              <label style={{...labelSt,marginTop:4}}>Días específicos (opcional — solo si debe ser justo ese día)</label>
                               <div style={{display:"flex",gap:2,flexWrap:"wrap"}}>
                                 {DIAS_SEMANA.map(d=>{
                                   const sel=(cfg.diasEspecificos||[]).includes(d.v);
@@ -5390,6 +5405,17 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
                                       border:`1px solid ${sel?"rgba(96,165,250,0.5)":"rgba(255,255,255,0.08)"}`,
                                       background:sel?"rgba(96,165,250,0.1)":"transparent",
                                       color:sel?"#60a5fa":"#6aaa7a"}}>{d.l}</button>;
+                                })}
+                              </div>
+                              <label style={{...labelSt,marginTop:6}}>Días que NUNCA debe hacerse (opcional)</label>
+                              <div style={{display:"flex",gap:2,flexWrap:"wrap"}}>
+                                {DIAS_SEMANA.map(d=>{
+                                  const sel=(cfg.diasProhibidos||[]).includes(d.v);
+                                  return <button key={d.v} onClick={()=>updateEstacion(i,est,"diasProhibidos",sel?(cfg.diasProhibidos||[]).filter(x=>x!==d.v):[...(cfg.diasProhibidos||[]),d.v])}
+                                    style={{fontSize:9,padding:"2px 5px",borderRadius:4,cursor:"pointer",
+                                      border:`1px solid ${sel?"rgba(239,68,68,0.5)":"rgba(255,255,255,0.08)"}`,
+                                      background:sel?"rgba(239,68,68,0.1)":"transparent",
+                                      color:sel?"#f87171":"#6aaa7a"}}>{d.l}</button>;
                                 })}
                               </div>
                             </div>
@@ -5413,6 +5439,17 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
                               <input type="number" min="1" max="60" value={cfg.cadaDias||"7"}
                                 onChange={e=>updateEstacion(i,est,"cadaDias",e.target.value)}
                                 style={{...inputSt,width:60}} placeholder="7"/>
+                              <label style={{...labelSt,marginTop:6}}>Días que NUNCA debe hacerse (opcional)</label>
+                              <div style={{display:"flex",gap:2,flexWrap:"wrap"}}>
+                                {DIAS_SEMANA.map(d=>{
+                                  const sel=(cfg.diasProhibidos||[]).includes(d.v);
+                                  return <button key={d.v} onClick={()=>updateEstacion(i,est,"diasProhibidos",sel?(cfg.diasProhibidos||[]).filter(x=>x!==d.v):[...(cfg.diasProhibidos||[]),d.v])}
+                                    style={{fontSize:9,padding:"2px 5px",borderRadius:4,cursor:"pointer",
+                                      border:`1px solid ${sel?"rgba(239,68,68,0.5)":"rgba(255,255,255,0.08)"}`,
+                                      background:sel?"rgba(239,68,68,0.1)":"transparent",
+                                      color:sel?"#f87171":"#6aaa7a"}}>{d.l}</button>;
+                                })}
+                              </div>
                             </div>
                           )}
                         </div>
@@ -12826,9 +12863,43 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           if(!setConfigSemanal) return;
           setConfigSemanal(prev=>({...(prev||{}),[tipoId]:nombre}));
         };
+        const proponerTareasGolf = () => {
+          if(!getAllElems||!getZD||!setTareasProg) return;
+          const golfZonaObj = MACROZONAS_BASE.find(z=>z.id===31);
+          if(!golfZonaObj) return;
+          const zdat = getZD(31);
+          const nombreZona = zdat.nombreCustom || golfZonaObj.nombre;
+          const elems = getAllElems(31);
+          const tareasHoyArr = Array.isArray(tareasProg[hoy]) ? tareasProg[hoy] : Object.values(tareasProg[hoy]||{});
+          const existentes = tareasHoyArr.map(t=>t.zona+"_"+t.elemento+"_"+t.tarea);
+          const estProp = estacionDeFecha(hoy);
+          const propuestas = [];
+          const vencidas = [];
+          elems.forEach(e=>{
+            const zdatElem = zdat.elementos?.[e.id] || (zdat.elementosCustom||[]).find(x=>x.id===e.id);
+            const frecs = zdatElem?.frecuencias || [];
+            frecs.forEach(f=>{
+              const key = nombreZona+"_"+e.nombre+"_"+f.tarea;
+              if(existentes.includes(key)) return;
+              const prox = calcProximaFrecGlobal(f, hoy);
+              if(!prox || prox.diff>0) return;
+              const esVencida = prox.diff<0;
+              const respDefault = configSemanal?.corte_golf || "";
+              const notaAltura = f.alturaCorte ? `Cortar a: ${f.alturaCorte} ${f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="mm"?"milímetros":"pulgadas"}.` : "";
+              propuestas.push({ id: Date.now()+Math.random(), fecha:hoy, zona:nombreZona, elemento:e.nombre, tarea:f.tarea, responsable:respDefault, estado:respDefault?"pendiente":"por_designar", notas:[notaAltura,f.obs].filter(Boolean).join(" "), alturaCorte:f.alturaCorte||"", unidadAlturaCorte:f.unidadAlturaCorte||"", estacion:estProp, auto:true, fechaCorrespondiente:prox.fecha, origenZid:"31", origenEid:e.id, origenFrecId:f.id, origenEsCustom:!!e.isCustom });
+              if(esVencida){ const vKey=`${e.nombre} — ${f.tarea}`; if(!vencidas.includes(vKey)) vencidas.push(vKey); }
+            });
+          });
+          if(propuestas.length===0){ alert("No hay tareas de Golf pendientes según las frecuencias definidas para hoy."); return; }
+          setTareasProg(prev=>({...prev, [hoy]: [...tareasHoyArr, ...propuestas]}));
+          alert(`✅ ${propuestas.length} tarea(s) de Golf propuestas para hoy.${vencidas.length>0?` ${vencidas.length} estaban vencidas.`:""}`);
+        };
         return (
         <div className="ein">
-          <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,color:"#fbbf24",marginBottom:4}}>⚙️ Programación de Golf</div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:4}}>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,color:"#fbbf24"}}>⚙️ Programación de Golf</div>
+            <button className="btn-p" style={S.btn} onClick={proponerTareasGolf}>✨ Proponer del día</button>
+          </div>
           <div style={{fontSize:12,color:"#5a9a7a",marginBottom:18}}>Responsables fijos de la semana y altura de corte objetivo por superficie. Esto alimenta las sugerencias de 📅 Semana Golf y las tareas de corte.</div>
 
           {/* ── Responsable único de la semana para toda el área Golf ── */}
@@ -16626,7 +16697,14 @@ export default function App() {
     const zidS = String(zid);
     const zonaZ = zonas.find(x=>String(x.id)===zidS);
     const zdat = getZD(zidS);
-    const base = (zonaZ?.elementos||[]).map(e=>({...e,isCustom:false,edData:{estado:"bueno",notas:"",...(zdat.elementos?.[e.id]||{})}}));
+    const base = (zonaZ?.elementos||[]).filter(e=>!zdat.elementos?.[e.id]?.eliminado).map(e=>{
+      const override = zdat.elementos?.[e.id];
+      return {...e,
+        nombre: override?.nombreCustom || e.nombre,
+        tipo: override?.tipoCustom || e.tipo,
+        isCustom:false,
+        edData:{estado:"bueno",notas:"",...(override||{})}};
+    });
     const custom = (zdat.elementosCustom||[]).map(e=>({...e,isCustom:true,edData:{estado:e.estado||"bueno",notas:e.notas||""}}));
     return [...base,...custom].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
   };
@@ -16794,7 +16872,7 @@ export default function App() {
       updateZona(zidStr,{elementosCustom:arr});
     });
   };
-  const removeBaseElem = (zid,eid) => { setZonas(prev=>prev.map(z=>String(z.id)===String(zid)?{...z,elementos:z.elementos.filter(e=>e.id!==eid)}:z)); const elems={...data[String(zid)]?.elementos}; delete elems[eid]; updateZona(zid,{elementos:elems}); addHistorial(zid,`Elemento eliminado`); };
+  const removeBaseElem = (zid,eid) => { updateZona(zid,{elementos:{...data[String(zid)]?.elementos,[eid]:{...data[String(zid)]?.elementos?.[eid],eliminado:true}}}); addHistorial(zid,`Elemento eliminado`); };
 
   const addTrabajador = (t) => { const id=Date.now(); setPersonal(p=>[...(Array.isArray(p)?p:Object.values(p||{})),{...t,id,eventos:[]}]); };
   const updateTrabajador = (id,patch) => setPersonal(p=>(Array.isArray(p)?p:Object.values(p||{})).map(t=>t.id===id?{...t,...patch}:t));
@@ -16934,7 +17012,7 @@ export default function App() {
                 const nn=editElem.nombreEdit!==undefined?editElem.nombreEdit:e.nombre;
                 const nt=editElem.tipoEdit!==undefined?editElem.tipoEdit:e.tipo;
                 if(e.isCustom){const arr=[...(data[zonaId].elementosCustom||[])];const i=arr.findIndex(x=>x.id===e.id);if(i>=0){arr[i]={...arr[i],nombre:nn,tipo:nt};updateZona(zonaId,{elementosCustom:arr});}}
-                else{setZonas(prev=>prev.map(z=>String(z.id)===String(zonaId)?{...z,elementos:z.elementos.map(x=>x.id===e.id?{...x,nombre:nn,tipo:nt}:x)}:z));}
+                else{updateZona(zonaId,{elementos:{...data[zonaId]?.elementos,[e.id]:{...data[zonaId]?.elementos?.[e.id],nombreCustom:nn,tipoCustom:nt}}});}
                 addHistorial(zonaId,`Elemento: "${e.nombre}" → "${nn}"`);
                 setEditElem(p=>({...p,nombreEdit:undefined,tipoEdit:undefined}));
               }}>✓ Guardar nombre/categoría</button>
