@@ -2300,6 +2300,7 @@ function ConfiguradorSemanal({ S, personal, configSemanal, setConfigSemanal, esJ
   const [open, setOpen] = React.useState(false);
 
   const TIPOS_TAREA = [
+    { id:"corte_golf",     label:"⛳ Golf (todas las tareas de la semana)",   restriccion:"se asigna a todas las tareas de Golf por defecto — también editable en Golf → Programación de Golf", fijo:null },
     { id:"corte_tractor",  label:"🚜 Corte de césped",                       restriccion:"capacitación tractor",  fijo:null },
     { id:"orillado",       label:"✂️ Orillado / Corte de bordes",            restriccion:null,                    fijo:null },
     { id:"riego",          label:"💧 Riego manual / por aspersión",          restriccion:null,                    fijo:null },
@@ -3783,7 +3784,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
 
       {/* ── FRECUENCIAS POR MACROZONA ── */}
       {tabProg==="frecuencias"&&(
-        <PanelFrecuenciasZona S={S} zonas={zonas} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} esJefa={esJefa}/>
+        <PanelFrecuenciasZona S={S} zonas={zonas.filter(z=>String(z.id)!=="31"&&!(z.nombre||"").toLowerCase().includes("golf"))} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} esJefa={esJefa}/>
       )}
 
       {/* ── HISTORIAL ── */}
@@ -12679,7 +12680,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                       // Cálculo tasa y proyección — solo necesario para jefa
                       let proyeccion=null,alturaMaxCorte=null,tasaCalculada=null,tasaFuente=null,infoCorte=null;
                       if((esJefa||rolLogueado==="supervisor")&&alt){
-                        const esTareaCorte=t=>t.zona==="Golf"&&(t.tarea?.toLowerCase().includes("corte")||t.tipo?.toLowerCase().includes("corte"))&&(t.elemento?.includes(pgG.nombre)||t.tarea?.includes(pgG.nombre)||t.elemento?.toLowerCase().includes("todos")||t.tarea?.toLowerCase().includes("todos"));
+                        const esTareaCorte=t=>t.zona==="Golf"&&(t.tarea?.toLowerCase().includes("corte")||t.tipo?.toLowerCase().includes("corte"))&&(t.elemento?.includes(g.nombre)||t.tarea?.includes(g.nombre)||t.elemento?.toLowerCase().includes("todos")||t.tarea?.toLowerCase().includes("todos"));
                         const cortesG=Object.values(tareasProg).flat().filter(t=>esTareaCorte(t)&&["hecha","completada"].includes(t.estado)).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
                         infoCorte=cortesG[0]||null;
                         alturaMaxCorte=infoCorte?.alturaObjetivo||getHocObjetivo(golfData,"greens",estacion)||(rango.min*1.5);
@@ -12693,8 +12694,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                       return (
                         <tr key={g.id} style={{borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
                           <td style={{padding:"5px 10px"}}>
-                            <div style={{fontWeight:600,color:"#34d399"}}>{pgG.nombre}</div>
-                            <div style={{fontSize:10,color:"#5a9a7a"}}>{pgG.hoyos}</div>
+                            <div style={{fontWeight:600,color:"#34d399"}}>{g.nombre}</div>
+                            <div style={{fontSize:10,color:"#5a9a7a"}}>{g.hoyos}</div>
                           </td>
                           <td style={{padding:"5px 6px"}}>
                             <div style={{display:"flex",gap:4,alignItems:"center",justifyContent:"center"}}>
