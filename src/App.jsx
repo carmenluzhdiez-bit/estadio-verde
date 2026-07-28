@@ -11161,6 +11161,13 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   };
   const hoy = fechaLocal();
   const estacion = getMesEstacion();
+  // ── Nombres en vivo: si el nombre de un elemento fue editado en Macrozonas → Golf → Elementos,
+  // se refleja aquí. Los IDs no cambian (mediciones/humedad históricas siguen funcionando).
+  const zdatGolfNombres = getZD ? getZD(31) : {};
+  const GREENS_DEF_LIVE = GREENS_DEF.map(g=>({...g, nombre: zdatGolfNombres.elementos?.["green_"+g.id]?.nombreCustom || g.nombre}));
+  const TEES_DEF_LIVE = TEES_DEF.map(t=>({...t, nombre: zdatGolfNombres.elementos?.[t.id]?.nombreCustom || t.nombre}));
+  const FAIRWAYS_DEF_LIVE = FAIRWAYS_DEF.map(f=>({...f, nombre: zdatGolfNombres.elementos?.["fw_"+f.id.slice(2).padStart(2,"0")]?.nombreCustom || f.nombre}));
+  const BUNKERS_DEF_LIVE = BUNKERS_DEF.map((b,i)=>({...b, nombre: zdatGolfNombres.elementos?.["bk_"+String(i+1).padStart(2,"0")]?.nombreCustom || b.nombre}));
   const rango = RANGOS_ALTURA[estacion];
   const labelSt = {fontSize:10,color:"#34d399",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
   const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
@@ -11376,8 +11383,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   // ── Guardar tarea Golf → Programa ────────────────────────────────────────
   const guardarTareaGolf = () => {
     if(!tareaForm.tipo||!tareaForm.fecha) return;
-    const target = tareaForm.target==="green" ? GREENS_DEF.find(g=>g.id===tareaForm.targetId)?.nombre :
-                   tareaForm.target==="tee"   ? TEES_DEF.find(t=>t.id===tareaForm.targetId)?.nombre :
+    const target = tareaForm.target==="green" ? GREENS_DEF_LIVE.find(g=>g.id===tareaForm.targetId)?.nombre :
+                   tareaForm.target==="tee"   ? TEES_DEF_LIVE.find(t=>t.id===tareaForm.targetId)?.nombre :
                    tareaForm.target==="arbol" ? (arboles.find(a=>String(a.id)===tareaForm.targetId)?.nombre||"Árbol") : "Todos";
     const textoTarea = `⛳ Golf — ${tareaForm.tipo}${target&&target!=="Todos"?" ("+target+")":""}${tareaForm.descripcion?" — "+tareaForm.descripcion:""}`;
     if(tareaForm.responsable&&tareaForm.fecha) {
@@ -11431,7 +11438,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                 <div key={m.id} style={{marginBottom:8}}>
                   <div style={{fontSize:11,color:"#5a9a7a",marginBottom:4}}>{m.hora||""} · {m.tipo||"medición"}</div>
                   <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
-                    {[...GREENS_DEF,{id:"vivero",nombre:"Vivero",hoyos:""}].map(g=>{
+                    {[...GREENS_DEF_LIVE,{id:"vivero",nombre:"Vivero",hoyos:""}].map(g=>{
                       const val=m.alturas?.[g.id];
                       if(!val) return null;
                       const color=colorAltura(val);
@@ -11467,7 +11474,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                   <th style={{padding:"6px 10px",textAlign:"left",color:"#34d399",fontSize:10}}>OBS</th>
                 </tr></thead>
                 <tbody>
-                  {GREENS_DEF.map(g=>{
+                  {GREENS_DEF_LIVE.map(g=>{
                     const alt=medForm.alturas?.[g.id]||"";
                     const color=colorAltura(alt);
                     return (
@@ -11599,7 +11606,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             const ESCALA_URG={1:"#ef4444",2:"#ef4444",3:"#f97316",4:"#f59e0b",5:"#f59e0b",6:"#22c55e",7:"#22c55e",8:"#3b82f6"};
             const colorUrg={cortar:"#ef4444",urgente:"#f97316",pronto:"#f59e0b",normal:"#22c55e",ok:"#4ade80","sin-tasa":"#5a9a7a","sin-datos":"#3a6a5a"};
             const labelUrg={cortar:"✂️ Cortar ya",urgente:"⏰ Urgente",pronto:"📅 Pronto",normal:"✅ Normal",ok:"✅ OK","sin-tasa":"📏 Sin tasa","sin-datos":"— Sin datos"};
-            const urgencias=[...GREENS_DEF,{id:"vivero",nombre:"Vivero",hoyos:"Vivero"}].map(g=>{
+            const urgencias=[...GREENS_DEF_LIVE,{id:"vivero",nombre:"Vivero",hoyos:"Vivero"}].map(g=>{
               const alt=ultimaMed?.alturas?.[g.id];
               if(!alt) return {g,diasRestantes:null,urgencia:"sin-datos",alt:null,tasa:null,altObjetivo:null,infoCorte:null};
               const esTareaCorteG = t => t.zona==="Golf" &&
@@ -11754,7 +11761,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           <div style={{...S.card,padding:16}}>
             <div style={{fontSize:13,fontWeight:700,color:"#34d399",marginBottom:10}}>⛳ Estado Greens — última medición{ultimaMed?` (${ultimaMed.fecha})`:""}</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(100px,1fr))",gap:8}}>
-              {[...GREENS_DEF,{id:"vivero",nombre:"Vivero",hoyos:"Vivero"}].map(g=>{
+              {[...GREENS_DEF_LIVE,{id:"vivero",nombre:"Vivero",hoyos:"Vivero"}].map(g=>{
                 const alt = ultimaMed?.alturas?.[g.id];
                 const color = colorAltura(alt);
                 return (
@@ -11785,7 +11792,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
 
           {/* Selector green + vivero */}
           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
-            {GREENS_DEF.map(g=>{
+            {GREENS_DEF_LIVE.map(g=>{
               const alt=ultimaMed?.alturas?.[g.id];
               const color=colorAltura(alt);
               return (
@@ -11886,7 +11893,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               </div>
             );
           })():(()=>{
-            const pgG = GREENS_DEF.find(x=>x.id===selectedGreen);
+            const pgG = GREENS_DEF_LIVE.find(x=>x.id===selectedGreen);
             const alt = ultimaMed?.alturas?.[selectedGreen];
             const color = colorAltura(alt);
             const tareasG = (golfData.tareasGreen||[]).filter(t=>t.greenId===selectedGreen);
@@ -12063,7 +12070,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                         </select>
                       </div>
                       <div><label style={labelSt}>Aplicar a</label>
-                        <select style={S.input} value={tareaForm.target} onChange={e=>setTareaForm(p=>({...p,target:e.target.value,greensSeleccionados:e.target.value==="todos"?GREENS_DEF.map(g=>g.id):e.target.value==="green"?[selectedGreen]:e.target.value==="vivero"?["vivero"]:e.target.value==="todos_vivero"?[...GREENS_DEF.map(g=>g.id),"vivero"]:[selectedGreen]}))}>
+                        <select style={S.input} value={tareaForm.target} onChange={e=>setTareaForm(p=>({...p,target:e.target.value,greensSeleccionados:e.target.value==="todos"?GREENS_DEF_LIVE.map(g=>g.id):e.target.value==="green"?[selectedGreen]:e.target.value==="vivero"?["vivero"]:e.target.value==="todos_vivero"?[...GREENS_DEF_LIVE.map(g=>g.id),"vivero"]:[selectedGreen]}))}>
                           <option value="green">Este green ({pgG.nombre})</option>
                           <option value="seleccion">Greens seleccionados...</option>
                           <option value="todos">Todos los greens (9)</option>
@@ -12078,7 +12085,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                       <div style={{marginBottom:10}}>
                         <label style={labelSt}>Selecciona los greens</label>
                         <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:4}}>
-                          {GREENS_DEF.map(gr=>{
+                          {GREENS_DEF_LIVE.map(gr=>{
                             const sel=(tareaForm.greensSeleccionados||[]).includes(gr.id);
                             return (
                               <div key={gr.id} style={{display:"flex",alignItems:"center",gap:5,padding:"5px 10px",borderRadius:8,background:sel?"rgba(52,211,153,0.15)":"rgba(255,255,255,0.04)",border:`1px solid ${sel?"rgba(52,211,153,0.4)":"rgba(255,255,255,0.1)"}`,cursor:"pointer",fontSize:12}}
@@ -12116,9 +12123,9 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                       const zonas = tareaForm.target==="seleccion"
                         ? (tareaForm.greensSeleccionados||[])
                         : tareaForm.target==="todos"
-                        ? GREENS_DEF.map(g=>g.id)
+                        ? GREENS_DEF_LIVE.map(g=>g.id)
                         : tareaForm.target==="todos_vivero"
-                        ? [...GREENS_DEF.map(g=>g.id),"vivero"]
+                        ? [...GREENS_DEF_LIVE.map(g=>g.id),"vivero"]
                         : tareaForm.target==="vivero"
                         ? ["vivero"]
                         : [selectedGreen];
@@ -12129,7 +12136,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                             📋 Se generarán {zonas.length} tarea{zonas.length!==1?"s":""}: <strong>{tareaForm.tipo}</strong>
                           </div>
                           <div style={{fontSize:11,color:"#5a9a7a"}}>
-                            {zonas.map(id=>id==="vivero"?"🌱 Vivero":GREENS_DEF.find(g=>g.id===id)?.nombre||id).join(" · ")}
+                            {zonas.map(id=>id==="vivero"?"🌱 Vivero":GREENS_DEF_LIVE.find(g=>g.id===id)?.nombre||id).join(" · ")}
                           </div>
                         </div>
                       );
@@ -12184,17 +12191,17 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                         const zonas = tareaForm.target==="seleccion"
                           ? (tareaForm.greensSeleccionados||[])
                           : tareaForm.target==="todos"
-                          ? GREENS_DEF.map(g=>g.id)
+                          ? GREENS_DEF_LIVE.map(g=>g.id)
                           : tareaForm.target==="todos_vivero"
-                          ? [...GREENS_DEF.map(g=>g.id),"vivero"]
+                          ? [...GREENS_DEF_LIVE.map(g=>g.id),"vivero"]
                           : tareaForm.target==="vivero"
                           ? ["vivero"]
                           : [selectedGreen];
                         if(!zonas.length||!tareaForm.tipo) return;
                         // Generar una tarea por cada zona
                         const nuevasTareas = zonas.map(id=>{
-                          const nombreZona = id==="vivero"?"Vivero":GREENS_DEF.find(g=>g.id===id)?.nombre||id;
-                          const hoyosZona = id==="vivero"?"":GREENS_DEF.find(g=>g.id===id)?.hoyos||"";
+                          const nombreZona = id==="vivero"?"Vivero":GREENS_DEF_LIVE.find(g=>g.id===id)?.nombre||id;
+                          const hoyosZona = id==="vivero"?"":GREENS_DEF_LIVE.find(g=>g.id===id)?.hoyos||"";
                           return {
                             id:Date.now()+Math.random(),
                             fecha:tareaForm.fecha,
@@ -12260,7 +12267,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             {esJefa&&<button className="btn-p" style={S.btn} onClick={()=>setShowTareaForm("tee")}>📋 Nueva tarea tees</button>}
           </div>
           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
-            {TEES_DEF.map(t=>(
+            {TEES_DEF_LIVE.map(t=>(
               <button key={t.id} onClick={()=>setSelectedTee(t.id)}
                 style={{background:selectedTee===t.id?"rgba(52,211,153,0.15)":"rgba(255,255,255,0.04)",border:`1px solid ${selectedTee===t.id?"rgba(52,211,153,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"5px 10px",color:selectedTee===t.id?"#34d399":"#5a9a7a",fontSize:11,cursor:"pointer"}}>
                 {t.nombre}<br/><span style={{fontSize:9}}>{t.hoyo}</span>
@@ -12268,7 +12275,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             ))}
           </div>
           {(()=>{
-            const tee=TEES_DEF.find(x=>x.id===selectedTee);
+            const tee=TEES_DEF_LIVE.find(x=>x.id===selectedTee);
             const tareasT=(golfData.tareasTee||[]).filter(t=>t.teeId===selectedTee);
             return (
               <div>
@@ -12317,7 +12324,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
 
       {/* ── BÚNKERS ── */}
       {subTab==="bunkers"&&rolLogueado!=="trabajador"&&(
-        <ZonaGolfSimple S={S} labelSt={labelSt} zonas={BUNKERS_DEF} tareas={TAREAS_BUNKERS}
+        <ZonaGolfSimple S={S} labelSt={labelSt} zonas={BUNKERS_DEF_LIVE} tareas={TAREAS_BUNKERS}
           titulo="🏖️ Búnkers" colorAcento="#fde68a"
           golfData={golfData} setG={setG} listaPersonal={listaPersonal}
           setTareasProg={setTareasProg} sincronizarMacrozona={sincronizarMacrozona}/>
@@ -12325,7 +12332,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
 
       {/* ── FAIRWAYS ── */}
       {subTab==="fairways"&&rolLogueado!=="trabajador"&&(
-        <ZonaGolfSimple S={S} labelSt={labelSt} zonas={FAIRWAYS_DEF} tareas={TAREAS_FAIRWAYS}
+        <ZonaGolfSimple S={S} labelSt={labelSt} zonas={FAIRWAYS_DEF_LIVE} tareas={TAREAS_FAIRWAYS}
           titulo="🌾 Fairways" colorAcento="#a3e635"
           golfData={golfData} setG={setG} listaPersonal={listaPersonal}
           setTareasProg={setTareasProg} sincronizarMacrozona={sincronizarMacrozona}/>
@@ -12577,7 +12584,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                   <div key={m.id} style={{marginBottom:8}}>
                     <div style={{fontSize:11,color:"#5a9a7a",marginBottom:4}}>{m.hora||""} · {m.tipo||"medición"}</div>
                     <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
-                      {[...GREENS_DEF,{id:"vivero",nombre:"Vivero",hoyos:""}].map(g=>{
+                      {[...GREENS_DEF_LIVE,{id:"vivero",nombre:"Vivero",hoyos:""}].map(g=>{
                         const val=m.alturas?.[g.id];
                         if(!val) return null;
                         const color=colorAltura(val);
@@ -12638,7 +12645,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                     <th style={{padding:"6px 10px",textAlign:"left",color:"#34d399",fontSize:10}}>OBS</th>
                   </tr></thead>
                   <tbody>
-                    {GREENS_DEF.map(g=>{
+                    {GREENS_DEF_LIVE.map(g=>{
                       const alt=medForm.alturas?.[g.id]||"";
                       const diasCrecimiento=medForm.diasDesdeCorte?.[g.id]||"";
                       const color=colorAltura(alt);
@@ -12724,7 +12731,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           {/* Historial mediciones + Gráfico — solo jefa/supervisor */}
           {(esJefa||rolLogueado==="supervisor")&&(
             <MedicionesAnalisis
-              mediciones={mediciones} GREENS_DEF={GREENS_DEF} rango={rango}
+              mediciones={mediciones} GREENS_DEF_LIVE={GREENS_DEF_LIVE} rango={rango}
               colorAltura={colorAltura} S={S} esJefa={esJefa}
               tareasProg={tareasProg}
               onBorrar={(id)=>setG({mediciones:mediciones.filter(m=>m.id!==id)})}
