@@ -11482,88 +11482,6 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           </div>
         )}
         {/* Humedad */}
-        {subTab==="config_golf"&&rolLogueado!=="trabajador"&&(()=>{
-          const setHoc = (superficie, est, valor) => {
-            const actual = golfData.hocConfig || {};
-            setG({hocConfig:{...actual,[superficie]:{...(actual[superficie]||{}),[est]:valor}}});
-          };
-          const setRespSemanal = (tipoId, nombre) => {
-            if(!setConfigSemanal) return;
-            setConfigSemanal(prev=>({...(prev||{}),[tipoId]:nombre}));
-          };
-          return (
-        <div className="ein">
-          <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,color:"#fbbf24",marginBottom:4}}>⚙️ Programación de Golf</div>
-          <div style={{fontSize:12,color:"#5a9a7a",marginBottom:18}}>Responsables fijos de la semana y altura de corte objetivo por superficie. Esto alimenta las sugerencias de 📅 Semana Golf y las tareas de corte.</div>
-
-          {/* ── Responsable único de la semana para toda el área Golf ── */}
-          <div style={{...S.card,padding:16,marginBottom:18}}>
-            <div style={{fontSize:13,fontWeight:700,color:"#34d399",marginBottom:4}}>👷 Responsable de Golf esta semana</div>
-            <div style={{fontSize:11,color:"#5a9a7a",marginBottom:12}}>Todas las tareas de Golf de la semana (corte, riego, fertilización, fitosanitario, búnkers, árboles, etc.) se asignarán por defecto a esta persona.</div>
-            <select style={{...S.input,maxWidth:320,fontSize:13}}
-              value={configSemanal?.corte_golf||""}
-              onChange={e=>setRespSemanal("corte_golf",e.target.value)}
-              disabled={!setConfigSemanal}>
-              <option value="">— Sin asignar —</option>
-              {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
-            </select>
-            {!setConfigSemanal&&<div style={{fontSize:11,color:"#f59e0b",marginTop:10}}>⚠️ No se pudo conectar la configuración semanal — recarga la página.</div>}
-          </div>
-
-          {/* ── Altura de corte objetivo (HOC) ── */}
-          <div style={{...S.card,padding:16}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4,flexWrap:"wrap",gap:8}}>
-              <div style={{fontSize:13,fontWeight:700,color:"#34d399"}}>✂️ Altura de corte objetivo (HOC) por superficie</div>
-              <span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.1)",border:"1px solid rgba(251,191,36,0.25)",borderRadius:8,padding:"2px 10px"}}>
-                Estación actual: {rango.label}
-              </span>
-            </div>
-            <div style={{fontSize:11,color:"#5a9a7a",marginBottom:14}}>Define a qué altura (mm) se corta cada superficie en cada estación del año. Se usa para calcular la urgencia de corte y sugerir la altura al programar tareas.</div>
-            <div style={{overflowX:"auto"}}>
-              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-                <thead>
-                  <tr style={{background:"rgba(52,211,153,0.08)"}}>
-                    <th style={{padding:"6px 10px",textAlign:"left",color:"#34d399",fontSize:10,textTransform:"uppercase"}}>Superficie</th>
-                    {Object.entries(RANGOS_ALTURA).map(([k,v])=>(
-                      <th key={k} style={{padding:"6px 8px",textAlign:"center",color:k===estacion?"#fbbf24":"#5a9a7a",fontSize:10,fontWeight:k===estacion?700:400}}>
-                        {v.label.split(" ")[0]}{k===estacion&&" ←"}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {HOC_SUPERFICIES.map(sup=>(
-                    <tr key={sup.id} style={{borderTop:"1px solid rgba(255,255,255,0.05)"}}>
-                      <td style={{padding:"7px 10px",fontWeight:600,color:"#c0dac0"}}>{sup.label}</td>
-                      {Object.keys(RANGOS_ALTURA).map(est=>(
-                        <td key={est} style={{padding:"5px 6px",textAlign:"center",background:est===estacion?"rgba(251,191,36,0.05)":"transparent"}}>
-                          <input type="number" step="0.1" min="1" max="80"
-                            style={{...S.input,width:64,padding:"4px 6px",textAlign:"center",fontSize:12}}
-                            value={golfData.hocConfig?.[sup.id]?.[est] ?? HOC_DEFAULT[sup.id][est]}
-                            onChange={e=>setHoc(sup.id,est,e.target.value)}/>
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div style={{fontSize:10,color:"#4a7a5a",marginTop:10}}>Valores en mm. Los cambios se guardan automáticamente.</div>
-          </div>
-
-          {/* ── Frecuencias de mantención de Golf — mismo sistema que las demás macrozonas ── */}
-          {getAllElems&&getZD&&setElemFrecs&&(()=>{
-            const golfZonaObj = MACROZONAS_BASE.find(z=>z.id===31);
-            return golfZonaObj ? (
-              <div style={{marginTop:18}}>
-                <PanelFrecuenciasZona S={S} zonas={[golfZonaObj]} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} esJefa={esJefa}/>
-              </div>
-            ) : null;
-          })()}
-        </div>
-          );
-        })()}
-
       {subTab==="humedad"&&(
           <SeccionHumedad S={S} golfData={golfData} setG={setG} listaPersonal={listaPersonal}
             hoy={hoy} esJefa={false} tareasProg={tareasProg} setTareasProg={setTareasProg}
@@ -12897,6 +12815,89 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           })()}
         </div>
       )}
+
+      {/* ── PROGRAMACIÓN DE GOLF (responsable semanal, HOC, Frecuencias) ── */}
+      {subTab==="config_golf"&&rolLogueado!=="trabajador"&&(()=>{
+        const setHoc = (superficie, est, valor) => {
+          const actual = golfData.hocConfig || {};
+          setG({hocConfig:{...actual,[superficie]:{...(actual[superficie]||{}),[est]:valor}}});
+        };
+        const setRespSemanal = (tipoId, nombre) => {
+          if(!setConfigSemanal) return;
+          setConfigSemanal(prev=>({...(prev||{}),[tipoId]:nombre}));
+        };
+        return (
+        <div className="ein">
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,color:"#fbbf24",marginBottom:4}}>⚙️ Programación de Golf</div>
+          <div style={{fontSize:12,color:"#5a9a7a",marginBottom:18}}>Responsables fijos de la semana y altura de corte objetivo por superficie. Esto alimenta las sugerencias de 📅 Semana Golf y las tareas de corte.</div>
+
+          {/* ── Responsable único de la semana para toda el área Golf ── */}
+          <div style={{...S.card,padding:16,marginBottom:18}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#34d399",marginBottom:4}}>👷 Responsable de Golf esta semana</div>
+            <div style={{fontSize:11,color:"#5a9a7a",marginBottom:12}}>Todas las tareas de Golf de la semana (corte, riego, fertilización, fitosanitario, búnkers, árboles, etc.) se asignarán por defecto a esta persona.</div>
+            <select style={{...S.input,maxWidth:320,fontSize:13}}
+              value={configSemanal?.corte_golf||""}
+              onChange={e=>setRespSemanal("corte_golf",e.target.value)}
+              disabled={!setConfigSemanal}>
+              <option value="">— Sin asignar —</option>
+              {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+            </select>
+            {!setConfigSemanal&&<div style={{fontSize:11,color:"#f59e0b",marginTop:10}}>⚠️ No se pudo conectar la configuración semanal — recarga la página.</div>}
+          </div>
+
+          {/* ── Altura de corte objetivo (HOC) ── */}
+          <div style={{...S.card,padding:16}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4,flexWrap:"wrap",gap:8}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#34d399"}}>✂️ Altura de corte objetivo (HOC) por superficie</div>
+              <span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.1)",border:"1px solid rgba(251,191,36,0.25)",borderRadius:8,padding:"2px 10px"}}>
+                Estación actual: {rango.label}
+              </span>
+            </div>
+            <div style={{fontSize:11,color:"#5a9a7a",marginBottom:14}}>Define a qué altura (mm) se corta cada superficie en cada estación del año. Se usa para calcular la urgencia de corte y sugerir la altura al programar tareas.</div>
+            <div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                <thead>
+                  <tr style={{background:"rgba(52,211,153,0.08)"}}>
+                    <th style={{padding:"6px 10px",textAlign:"left",color:"#34d399",fontSize:10,textTransform:"uppercase"}}>Superficie</th>
+                    {Object.entries(RANGOS_ALTURA).map(([k,v])=>(
+                      <th key={k} style={{padding:"6px 8px",textAlign:"center",color:k===estacion?"#fbbf24":"#5a9a7a",fontSize:10,fontWeight:k===estacion?700:400}}>
+                        {v.label.split(" ")[0]}{k===estacion&&" ←"}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {HOC_SUPERFICIES.map(sup=>(
+                    <tr key={sup.id} style={{borderTop:"1px solid rgba(255,255,255,0.05)"}}>
+                      <td style={{padding:"7px 10px",fontWeight:600,color:"#c0dac0"}}>{sup.label}</td>
+                      {Object.keys(RANGOS_ALTURA).map(est=>(
+                        <td key={est} style={{padding:"5px 6px",textAlign:"center",background:est===estacion?"rgba(251,191,36,0.05)":"transparent"}}>
+                          <input type="number" step="0.1" min="1" max="80"
+                            style={{...S.input,width:64,padding:"4px 6px",textAlign:"center",fontSize:12}}
+                            value={golfData.hocConfig?.[sup.id]?.[est] ?? HOC_DEFAULT[sup.id][est]}
+                            onChange={e=>setHoc(sup.id,est,e.target.value)}/>
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{fontSize:10,color:"#4a7a5a",marginTop:10}}>Valores en mm. Los cambios se guardan automáticamente.</div>
+          </div>
+
+          {/* ── Frecuencias de mantención de Golf — mismo sistema que las demás macrozonas ── */}
+          {getAllElems&&getZD&&setElemFrecs&&(()=>{
+            const golfZonaObj = MACROZONAS_BASE.find(z=>z.id===31);
+            return golfZonaObj ? (
+              <div style={{marginTop:18}}>
+                <PanelFrecuenciasZona S={S} zonas={[golfZonaObj]} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} esJefa={esJefa}/>
+              </div>
+            ) : null;
+          })()}
+        </div>
+        );
+      })()}
 
       {subTab==="eventos"&&rolLogueado!=="trabajador"&&(
         <div className="ein">
