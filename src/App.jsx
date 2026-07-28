@@ -12731,7 +12731,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           {/* Historial mediciones + Gráfico — solo jefa/supervisor */}
           {(esJefa||rolLogueado==="supervisor")&&(
             <MedicionesAnalisis
-              mediciones={mediciones} GREENS_DEF_LIVE={GREENS_DEF_LIVE} rango={rango}
+              mediciones={mediciones} GREENS_DEF={GREENS_DEF_LIVE} rango={rango}
               colorAltura={colorAltura} S={S} esJefa={esJefa}
               tareasProg={tareasProg}
               onBorrar={(id)=>setG({mediciones:mediciones.filter(m=>m.id!==id)})}
