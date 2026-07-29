@@ -154,7 +154,7 @@ const calcProximaFrecGlobal = (f, refFecha) => {
   if(typeof estValRaw === "object" && estValRaw !== null) {
     // Formato nuevo: {tipo:"cadaXdias", cadaDias:"7"}
     if(estValRaw.tipo==="noaplica"||estValRaw.tipo==="segunecesidad") return null;
-    const diasMap = {diario:1,cada2dias:2,cada3dias:3,cada4dias:4,cada5dias:5,cada6dias:6,semanal:7,quincenal:15,cada21dias:21,mensual:30,bimestral:60,trimestral:90};
+    const diasMap = {diario:1,cada2dias:2,cada3dias:3,cada5dias:5,semanal:7,quincenal:15,mensual:30,bimestral:60,trimestral:90};
     dias = Number(estValRaw.cadaDias) || diasMap[estValRaw.cadaDias] || null;
     frecVal = String(dias||"");
   } else {
@@ -166,24 +166,9 @@ const calcProximaFrecGlobal = (f, refFecha) => {
   if(!f.ultimaVez) return null;
   if(!dias) return null;
   const ultima = new Date(f.ultimaVez+"T12:00:00");
-  const base = new Date(ultima.getTime() + dias*24*60*60*1000);
-  const diasEspecificosEst = (typeof estValRaw==="object"&&estValRaw!==null) ? (estValRaw.diasEspecificos||[]).map(Number) : [];
-  const diasProhibidosEst = (typeof estValRaw==="object"&&estValRaw!==null) ? (estValRaw.diasProhibidos||[]).map(Number) : [];
-  if(diasEspecificosEst.length===0 && diasProhibidosEst.length===0) {
-    const diff = Math.round((base-ref)/(24*60*60*1000));
-    return { fecha: base.toISOString().slice(0,10), diff };
-  }
-  // Buscar el día válido más cercano (respeta días específicos y evita días prohibidos)
-  for(let i=0;i<30;i++){
-    const candidato = new Date(base.getTime() + i*24*60*60*1000);
-    const dow = candidato.getDay();
-    if(diasProhibidosEst.includes(dow)) continue;
-    if(diasEspecificosEst.length>0 && !diasEspecificosEst.includes(dow)) continue;
-    const diff = Math.round((candidato-ref)/(24*60*60*1000));
-    return { fecha: candidato.toISOString().slice(0,10), diff };
-  }
-  const diff = Math.round((base-ref)/(24*60*60*1000));
-  return { fecha: base.toISOString().slice(0,10), diff };
+  const proxima = new Date(ultima.getTime() + dias*24*60*60*1000);
+  const diff = Math.round((proxima-ref)/(24*60*60*1000));
+  return { fecha: proxima.toISOString().slice(0,10), diff };
 };
 
 // ─── FRECUENCIAS DISPONIBLES ─────────────────────────────────────────────────
@@ -2153,7 +2138,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                         {hpTask.elemento&&<span style={{fontSize:11,color:"#5a8a6a",background:"rgba(255,255,255,0.05)",padding:"1px 6px",borderRadius:6}}>{hpTask.elemento}</span>}
                         {(()=>{
                           const resp=hpTask.responsable||"";
-                          const key=`${dia}_${resp.split(" ")[0]?.toLowerCase()||""}`;
+                          const key=`${d}_${resp.split(" ")[0]?.toLowerCase()||""}`;
                           const cerrado=cierresTurno?.[key];
                           return cerrado?(<span style={{fontSize:9,color:"#22c55e",background:"rgba(34,197,94,0.1)",padding:"1px 6px",borderRadius:8,border:"1px solid rgba(34,197,94,0.25)"}}>✅ Turno cerrado {cerrado.hora}</span>):null;
                         })()}
@@ -3263,7 +3248,7 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                                 <span style={{fontSize:10,fontWeight:600,color:est.color,background:`${est.color}12`,padding:"2px 7px",borderRadius:8,border:`1px solid ${est.color}25`,whiteSpace:"nowrap",flexShrink:0}}>{est.icon} {est.label}</span>
                               </div>
                               {t.zona&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:1,marginBottom:4}}>📍 {t.zona}{t.elemento?` · ${t.elemento}`:""}</div>}
-                              {t.alturaCorte&&<div style={{fontSize:12,color:"#fbbf24",fontWeight:600,marginBottom:4,background:"rgba(251,191,36,0.08)",border:"1px solid rgba(251,191,36,0.2)",borderRadius:6,padding:"3px 8px",display:"inline-block"}}>✂️ Cortar a: {t.alturaCorte} {t.unidadAlturaCorte==="cm"?"cm":t.unidadAlturaCorte==="pulgadas"?"pulgadas":"mm"}</div>}
+                              {t.alturaCorte&&<div style={{fontSize:12,color:"#fbbf24",fontWeight:600,marginBottom:4,background:"rgba(251,191,36,0.08)",border:"1px solid rgba(251,191,36,0.2)",borderRadius:6,padding:"3px 8px",display:"inline-block"}}>✂️ Cortar a: {t.alturaCorte} {t.unidadAlturaCorte==="cm"?"cm":t.unidadAlturaCorte==="mm"?"mm":"pulgadas"}</div>}
                               {t.metodoLimpieza&&<span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.08)",padding:"1px 8px",borderRadius:8,border:"1px solid rgba(251,191,36,0.2)",display:"inline-block",marginBottom:4}}>{t.metodoLimpieza==="sopladora"?"🌬️ Sopladora":t.metodoLimpieza==="barrido"?"🧹 Barrido":"🌬️+🧹 Sopladora + Barrido"}</span>}
                               {t.notas&&<div style={{fontSize:11,color:"#5a8a6a",marginTop:2,marginBottom:4,fontStyle:"italic"}}>💡 {t.notas}</div>}
                               {puedeEditar ? (
@@ -3495,7 +3480,7 @@ function ZonaRow({ zona, tz, zonasColapsadas, toggleZonaColapso, MACROZONAS_BASE
                             {listaPersonalZR.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
                           </select>
                         </div>
-                        {t.alturaCorte&&<div style={{fontSize:11,color:"#fbbf24",fontWeight:600,marginTop:3}}>✂️ Cortar a: {t.alturaCorte} {t.unidadAlturaCorte==="cm"?"cm":t.unidadAlturaCorte==="pulgadas"?"pulgadas":"mm"}</div>}
+                        {t.alturaCorte&&<div style={{fontSize:11,color:"#fbbf24",fontWeight:600,marginTop:3}}>✂️ Cortar a: {t.alturaCorte} {t.unidadAlturaCorte==="cm"?"cm":t.unidadAlturaCorte==="mm"?"mm":"pulgadas"}</div>}
                         {t.notas && <div style={{fontSize:11,color:"#5a8a6a",marginTop:3,fontStyle:"italic"}}>{t.notas}</div>}
                         {t.notaWorker && <div style={{fontSize:11,color:t.estado==="no_pudo"?"#fca5a5":"#7aaa80",marginTop:2}}>💬 {t.notaWorker}</div>}
                       </div>
@@ -3599,7 +3584,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
             ? "Osmar Bhalú Armijo Zúñiga"  // Golf → Bhalú por defecto
             : getResponsablePorTipo(f.tarea, configSemanal, nombreZona)||"";
           if(esZonaGolf) console.log("Golf tarea:", f.tarea, "→ resp:", respDefault);
-          const notaAltura = f.alturaCorte ? `Cortar a: ${f.alturaCorte} ${f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="pulgadas"?"pulgadas":"milímetros"}.` : "";
+          const notaAltura = f.alturaCorte ? `Cortar a: ${f.alturaCorte} ${f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="mm"?"milímetros":"pulgadas"}.` : "";
           const item = { id: Date.now()+Math.random(), fecha, zona:nombreZona, elemento:e.nombre, tarea:f.tarea, responsable:respDefault, estado:respDefault?"pendiente":"por_designar", notas:[notaAltura,f.obs].filter(Boolean).join(" "), alturaCorte:f.alturaCorte||"", unidadAlturaCorte:f.unidadAlturaCorte||"", frecuencia:f.modo==="diasSemana"?`cada ${f.diasMinimos||"?"} días`:f[estProp], estacion:estProp, auto:true, fechaCorrespondiente:prox.fecha, origenZid:String(z.id), origenEid:e.id, origenFrecId:f.id, origenEsCustom:!!e.isCustom };
           propuestas.push(item);
           if(esVencida) { const vKey=`${nombreZona} — ${f.tarea}`; if(!vencidas.includes(vKey)) vencidas.push(vKey); }
@@ -5210,8 +5195,7 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
   ];
   const FRECUENCIAS_OPTS = [
     {v:"diario",l:"Diario (1d)"},{v:"cada2dias",l:"Cada 2 días"},{v:"cada3dias",l:"Cada 3 días"},
-    {v:"cada4dias",l:"Cada 4 días"},{v:"cada5dias",l:"Cada 5 días"},{v:"cada6dias",l:"Cada 6 días"},
-    {v:"semanal",l:"Semanal (7d)"},{v:"quincenal",l:"Quincenal (15d)"},{v:"cada21dias",l:"Cada 21 días"},
+    {v:"cada5dias",l:"Cada 5 días"},{v:"semanal",l:"Semanal (7d)"},{v:"quincenal",l:"Quincenal (15d)"},
     {v:"mensual",l:"Mensual (30d)"},{v:"bimestral",l:"Bimestral (60d)"},{v:"trimestral",l:"Trimestral (90d)"},
     {v:"noaplica",l:"No aplica"},{v:"segunecesidad",l:"Según necesidad"},
   ];
@@ -5250,8 +5234,8 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
     if(typeof estObj === "object" && estObj !== null) return estObj;
     // Formato viejo — string como "semanal","quincenal",etc. → convertir a objeto nuevo
     const frecVal = typeof estObj === "string" ? estObj : (f[est]||"noaplica");
-    const diasMap = {diario:"1",cada2dias:"2",cada3dias:"3",cada4dias:"4",cada5dias:"5",cada6dias:"6",semanal:"7",
-      quincenal:"15",cada21dias:"21",mensual:"30",bimestral:"60",trimestral:"90"};
+    const diasMap = {diario:"1",cada2dias:"2",cada3dias:"3",cada5dias:"5",semanal:"7",
+      quincenal:"15",mensual:"30",bimestral:"60",trimestral:"90"};
     const cadaDias = diasMap[frecVal]||"7";
     return {
       tipo: frecVal==="noaplica"?"noaplica":frecVal==="segunecesidad"?"segunecesidad":"cadaXdias",
@@ -5357,14 +5341,14 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
                         <input type="number" step="0.1" min="0" value={f.alturaCorte||""}
                           onChange={e=>updateFila(i,"alturaCorte",e.target.value)}
                           placeholder="ej: 4,5" style={{...inputSt,width:80}}/>
-                        <select value={f.unidadAlturaCorte||"mm"} onChange={e=>updateFila(i,"unidadAlturaCorte",e.target.value)}
+                        <select value={f.unidadAlturaCorte||"pulgadas"} onChange={e=>updateFila(i,"unidadAlturaCorte",e.target.value)}
                           style={{...inputSt,width:110}}>
-                          <option value="mm">milímetros</option>
-                          <option value="cm">centímetros</option>
                           <option value="pulgadas">pulgadas</option>
+                          <option value="cm">centímetros</option>
+                          <option value="mm">milímetros</option>
                         </select>
                       </div>
-                      {f.alturaCorte&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:4}}>Se anotará en la tarea: "Corte a: {f.alturaCorte} {f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="pulgadas"?"pulgadas":"milímetros"}"</div>}
+                      {f.alturaCorte&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:4}}>Se anotará en la tarea: "Corte a: {f.alturaCorte} {f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="mm"?"milímetros":"pulgadas"}"</div>}
                     </div>
                   )}
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
@@ -5397,7 +5381,7 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
                                 {FRECUENCIAS_OPTS.filter(o=>!["noaplica","segunecesidad"].includes(o.v)).map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
                                 <option value="segunecesidad">Según necesidad</option>
                               </select>
-                              <label style={{...labelSt,marginTop:4}}>Días específicos (opcional — solo si debe ser justo ese día)</label>
+                              <label style={{...labelSt,marginTop:4}}>Días específicos (opcional)</label>
                               <div style={{display:"flex",gap:2,flexWrap:"wrap"}}>
                                 {DIAS_SEMANA.map(d=>{
                                   const sel=(cfg.diasEspecificos||[]).includes(d.v);
@@ -5406,17 +5390,6 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
                                       border:`1px solid ${sel?"rgba(96,165,250,0.5)":"rgba(255,255,255,0.08)"}`,
                                       background:sel?"rgba(96,165,250,0.1)":"transparent",
                                       color:sel?"#60a5fa":"#6aaa7a"}}>{d.l}</button>;
-                                })}
-                              </div>
-                              <label style={{...labelSt,marginTop:6}}>Días que NUNCA debe hacerse (opcional)</label>
-                              <div style={{display:"flex",gap:2,flexWrap:"wrap"}}>
-                                {DIAS_SEMANA.map(d=>{
-                                  const sel=(cfg.diasProhibidos||[]).includes(d.v);
-                                  return <button key={d.v} onClick={()=>updateEstacion(i,est,"diasProhibidos",sel?(cfg.diasProhibidos||[]).filter(x=>x!==d.v):[...(cfg.diasProhibidos||[]),d.v])}
-                                    style={{fontSize:9,padding:"2px 5px",borderRadius:4,cursor:"pointer",
-                                      border:`1px solid ${sel?"rgba(239,68,68,0.5)":"rgba(255,255,255,0.08)"}`,
-                                      background:sel?"rgba(239,68,68,0.1)":"transparent",
-                                      color:sel?"#f87171":"#6aaa7a"}}>{d.l}</button>;
                                 })}
                               </div>
                             </div>
@@ -5440,17 +5413,6 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
                               <input type="number" min="1" max="60" value={cfg.cadaDias||"7"}
                                 onChange={e=>updateEstacion(i,est,"cadaDias",e.target.value)}
                                 style={{...inputSt,width:60}} placeholder="7"/>
-                              <label style={{...labelSt,marginTop:6}}>Días que NUNCA debe hacerse (opcional)</label>
-                              <div style={{display:"flex",gap:2,flexWrap:"wrap"}}>
-                                {DIAS_SEMANA.map(d=>{
-                                  const sel=(cfg.diasProhibidos||[]).includes(d.v);
-                                  return <button key={d.v} onClick={()=>updateEstacion(i,est,"diasProhibidos",sel?(cfg.diasProhibidos||[]).filter(x=>x!==d.v):[...(cfg.diasProhibidos||[]),d.v])}
-                                    style={{fontSize:9,padding:"2px 5px",borderRadius:4,cursor:"pointer",
-                                      border:`1px solid ${sel?"rgba(239,68,68,0.5)":"rgba(255,255,255,0.08)"}`,
-                                      background:sel?"rgba(239,68,68,0.1)":"transparent",
-                                      color:sel?"#f87171":"#6aaa7a"}}>{d.l}</button>;
-                                })}
-                              </div>
                             </div>
                           )}
                         </div>
@@ -5484,14 +5446,6 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
                         );
                       })()}
                     </div>
-                  </div>
-
-                  {/* Descripción adicional */}
-                  <div>
-                    <label style={labelSt}>Descripción adicional (instrucciones al jardinero, condiciones, notas)</label>
-                    <input value={f.obs||""} onChange={e=>updateFila(i,"obs",e.target.value)}
-                      placeholder="Ej: Usar helicoidal, cortar cuando esté seco, revisar antes de cortar..."
-                      style={{...inputSt,width:"100%"}}/>
                   </div>
 
                   {/* Última vez */}
@@ -7005,7 +6959,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                         onKeyDown={e=>{
                           if(e.key==="Enter"&&e.target.value.trim()){
                             const prodS=e.target.value.trim();
-                            setIncidForm(p=>({...p,sectoresCerrados:[...p.sectoresCerrados,prodS]}));
+                            setIncidForm(p=>({...p,sectoresCerrados:[...p.sectoresCerrados,s]}));
                             e.target.value="";
                           }
                         }}/>
@@ -9360,14 +9314,10 @@ const PLANTILLA_PRE_TORNEO = {
 function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisisTasas, colorCategoria, S }) {
   const hoyProjStr = fechaLocal();
   const diasSemana = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
-  // Semana calendario actual: lunes a domingo (no "hoy + 6 días")
-  const hoyProjDate = new Date(hoyProjStr+"T12:00:00");
-  const offsetLunes = (hoyProjDate.getDay()+6)%7; // 0=lunes...6=domingo
-  const lunesSemana = new Date(hoyProjDate); lunesSemana.setDate(lunesSemana.getDate()-offsetLunes);
   const diasProx = Array.from({length:7},(_,i)=>{
-    const d = new Date(lunesSemana); d.setDate(d.getDate()+i);
+    const d = new Date(hoyProjStr+"T12:00:00"); d.setDate(d.getDate()+i);
     const ds = d.toISOString().slice(0,10);
-    return {fecha:ds, label:ds===hoyProjStr?"Hoy":diasSemana[i]+" "+d.getDate(), esPasado: ds<hoyProjStr};
+    return {fecha:ds, label:i===0?"Hoy":i===1?"Mañana":diasSemana[(d.getDay()+6)%7]+" "+d.getDate()};
   });
 
   const todosLosCortes = Object.entries(tareasProg||{}).flatMap(([fecha,ts])=>{
@@ -9416,18 +9366,18 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
       fechaBase = corteRecZ.fecha;
       baseOrigen = "corte";
     } else if(ultMed) {
-      // Solo hay medición histórica — se muestra igual, marcada como poco confiable si es muy vieja
+      // Solo hay medición histórica
+      const diasDesdeUltMed = Math.round((new Date(hoyProjStr+"T12:00:00")-new Date(ultMed.fecha+"T12:00:00"))/(1000*60*60*24));
+      if(diasDesdeUltMed > 7) return null;
       altBase = Number(ultMed.alturas[z.id]);
       fechaBase = ultMed.fecha;
       baseOrigen = "medicion_antigua";
     } else return null;
-    const diasDesdeBase = Math.round((new Date(hoyProjStr+"T12:00:00")-new Date(fechaBase+"T12:00:00"))/(1000*60*60*24));
-    const datoPocoConfiable = diasDesdeBase > 10;
 
     const tasaGlobal = anal ? anal.tasaGlobal : null;
     const tasasCalc = calcTasa(z.id);
     const ultimaTasaReal = tasasCalc && tasasCalc.length > 0 ? tasasCalc[tasasCalc.length-1] : null;
-    const tasaReal = (ultimaTasaReal && (!corteRecZ || ultimaTasaReal.fecha >= corteRecZ.fecha)) ? ultimaTasaReal.tasa : null;
+    const tasaReal = (ultimaTasaReal && (!corteRecZ || ultimaTasaReal.fecha > corteRecZ.fecha)) ? ultimaTasaReal.tasa : null;
     const diasUltimoIntervalo = tasaReal !== null ? ultimaTasaReal.dias : null;
     const deltaUltimo = tasaReal !== null ? ultimaTasaReal.delta : null;
     const tasaUsar = tasaReal !== null ? tasaReal : (tasaGlobal || 0.4);
@@ -9435,10 +9385,10 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
 
     const proj = diasProx.map(d=>{
       const diasDesde = Math.round((new Date(d.fecha+"T12:00:00")-new Date(fechaBase+"T12:00:00"))/(1000*60*60*24));
-      const altProj = Math.round((altBase + tasaUsar*diasDesde)*10)/10;
+      const altProj = Math.round((altBase + tasaUsar*Math.max(0,diasDesde))*10)/10;
       return {...d, altProj, diasDesde};
     });
-    return {zona:z, tasaGlobal, tasaReal, diasUltimoIntervalo, deltaUltimo, altBase, fechaBase, baseOrigen, proj, categoria, datoPocoConfiable, diasDesdeBase};
+    return {zona:z, tasaGlobal, tasaReal, diasUltimoIntervalo, deltaUltimo, altBase, fechaBase, baseOrigen, proj, categoria};
   }).filter(Boolean);
 
   if(!zonasDatos.length) return null;
@@ -9463,7 +9413,7 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
             </tr>
           </thead>
           <tbody>
-            {zonasDatos.map(({zona,tasaGlobal,tasaReal,diasUltimoIntervalo,deltaUltimo,altBase,fechaBase,baseOrigen,proj,categoria,datoPocoConfiable,diasDesdeBase})=>(
+            {zonasDatos.map(({zona,tasaGlobal,tasaReal,diasUltimoIntervalo,deltaUltimo,altBase,fechaBase,baseOrigen,proj,categoria})=>(
               <tr key={zona.id} style={{borderTop:"1px solid rgba(255,255,255,0.05)"}}>
                 <td style={{padding:"7px 10px",fontWeight:600,fontSize:12}}>
                   {zona.nombre}
@@ -9471,7 +9421,6 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
                     {baseOrigen==="corte"?"✂️":baseOrigen==="medicion"?"📏":"📏?"}
                   </span>
                   <span style={{fontSize:9,display:"block",color:"#4a7a5a"}}>{altBase}mm · {fechaBase}</span>
-                  {datoPocoConfiable&&<span style={{fontSize:9,display:"block",color:"#f59e0b",fontWeight:700}}>⚠️ Dato de hace {diasDesdeBase} días — poco confiable</span>}
                 </td>
                 <td style={{padding:"7px 8px",textAlign:"center",fontSize:12,fontWeight:700}}>
                   {tasaReal!==null
@@ -9484,16 +9433,14 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
                 </td>
                 <td style={{padding:"7px 8px",textAlign:"center",color:colorCategoria(categoria),fontSize:11}}>{tasaGlobal?`${tasaGlobal>0?"+":""}${tasaGlobal}`:"—"}</td>
                 {proj.map((prD2,i)=>{
-                  const esPasado = prD2.esPasado;
-                  const sobreCorte = !esPasado && prD2.altProj > altCorte;
-                  const muyAlto = !esPasado && prD2.altProj > altCorte * 1.3;
+                  const sobreCorte = prD2.altProj > altCorte;
+                  const muyAlto = prD2.altProj > altCorte * 1.3;
                   return (
                     <td key={prD2.fecha} style={{
-                      padding:"7px 8px",textAlign:"center",fontSize:12,fontWeight:esPasado?400:600,
-                      color:esPasado?"#4a7a5a":muyAlto?"#ef4444":sobreCorte?"#f59e0b":"#22c55e",
-                      background:prD2.fecha===hoyProjStr?"rgba(96,165,250,0.06)":"transparent",
-                      borderLeft:prD2.fecha===hoyProjStr?"1px solid rgba(96,165,250,0.2)":"none",
-                      opacity:esPasado?0.65:1,
+                      padding:"7px 8px",textAlign:"center",fontSize:12,fontWeight:600,
+                      color:muyAlto?"#ef4444":sobreCorte?"#f59e0b":"#22c55e",
+                      background:i===0?"rgba(96,165,250,0.06)":"transparent",
+                      borderLeft:i===0?"1px solid rgba(96,165,250,0.2)":"none",
                     }}>
                       {prD2.altProj.toFixed(1)}
                       {muyAlto&&<span style={{fontSize:8,marginLeft:2}}>⚠️</span>}
@@ -9623,14 +9570,10 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
             delta = svgP.alt - altBase;
             diasRef = diasEfectivos;
             metodo = "corte_detectado";
-          } else {
-            // Corte detectado pero sin altura registrada: no descartar el intervalo —
-            // usar el delta directo entre mediciones como estimación (mejor que nada)
-            delta = svgP.alt - pPrev.alt;
-            diasRef = diasTotal;
-            metodo = "directo_con_corte_sin_altura";
-            if(delta <= 0) continue; // igual sin sentido una tasa negativa
-          }
+          } else if(diasDesdeCorte > 0) {
+            // Corte sin altura registrada: omitir este intervalo (dato no confiable)
+            continue;
+          } else { continue; }
         } else {
           // Sin corte entre mediciones
           delta = svgP.alt - pPrev.alt;
@@ -11171,7 +11114,7 @@ function TareasGolfPanel({ tareasGolfHoy, hoy, esJefa, setTareasProg, tareasProg
 }
 
 
-function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito, onCierreSectorial, onNuevaAlerta, configSemanal={}, setConfigSemanal, getAllElems, getZD, setElemFrecs }) {
+function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito, onCierreSectorial, onNuevaAlerta, configSemanal={}, setConfigSemanal }) {
   const GOLF_ZONA_ID = 31; // ID macrozona Golf
   const sincronizarMacrozona = (tipo, detalle) => {
     if(!updateZona) return;
@@ -11181,13 +11124,6 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   };
   const hoy = fechaLocal();
   const estacion = getMesEstacion();
-  // ── Nombres en vivo: si el nombre de un elemento fue editado en Macrozonas → Golf → Elementos,
-  // se refleja aquí. Los IDs no cambian (mediciones/humedad históricas siguen funcionando).
-  const zdatGolfNombres = getZD ? getZD(31) : {};
-  const GREENS_DEF_LIVE = GREENS_DEF.map(g=>({...g, nombre: zdatGolfNombres.elementos?.["green_"+g.id]?.nombreCustom || g.nombre}));
-  const TEES_DEF_LIVE = TEES_DEF.map(t=>({...t, nombre: zdatGolfNombres.elementos?.[t.id]?.nombreCustom || t.nombre}));
-  const FAIRWAYS_DEF_LIVE = FAIRWAYS_DEF.map(f=>({...f, nombre: zdatGolfNombres.elementos?.["fw_"+f.id.slice(2).padStart(2,"0")]?.nombreCustom || f.nombre}));
-  const BUNKERS_DEF_LIVE = BUNKERS_DEF.map((b,i)=>({...b, nombre: zdatGolfNombres.elementos?.["bk_"+String(i+1).padStart(2,"0")]?.nombreCustom || b.nombre}));
   const rango = RANGOS_ALTURA[estacion];
   const labelSt = {fontSize:10,color:"#34d399",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
   const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
@@ -11223,7 +11159,6 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   const [showEventoForm, setShowEventoForm] = React.useState(false);
   const [showArbolForm,  setShowArbolForm]  = React.useState(false);
   const [showTareaForm,  setShowTareaForm]  = React.useState(null); // "green"|"tee"|"arbol"
-  const [previewGolfProp, setPreviewGolfProp] = React.useState(null); // tareas propuestas pendientes de confirmar
   const [showDiariaForm, setShowDiariaForm] = React.useState(false);
   // ── Estado sección Humedad ──
   const [showHumForm,    setShowHumForm]    = React.useState(false);
@@ -11404,8 +11339,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   // ── Guardar tarea Golf → Programa ────────────────────────────────────────
   const guardarTareaGolf = () => {
     if(!tareaForm.tipo||!tareaForm.fecha) return;
-    const target = tareaForm.target==="green" ? GREENS_DEF_LIVE.find(g=>g.id===tareaForm.targetId)?.nombre :
-                   tareaForm.target==="tee"   ? TEES_DEF_LIVE.find(t=>t.id===tareaForm.targetId)?.nombre :
+    const target = tareaForm.target==="green" ? GREENS_DEF.find(g=>g.id===tareaForm.targetId)?.nombre :
+                   tareaForm.target==="tee"   ? TEES_DEF.find(t=>t.id===tareaForm.targetId)?.nombre :
                    tareaForm.target==="arbol" ? (arboles.find(a=>String(a.id)===tareaForm.targetId)?.nombre||"Árbol") : "Todos";
     const textoTarea = `⛳ Golf — ${tareaForm.tipo}${target&&target!=="Todos"?" ("+target+")":""}${tareaForm.descripcion?" — "+tareaForm.descripcion:""}`;
     if(tareaForm.responsable&&tareaForm.fecha) {
@@ -11459,7 +11394,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                 <div key={m.id} style={{marginBottom:8}}>
                   <div style={{fontSize:11,color:"#5a9a7a",marginBottom:4}}>{m.hora||""} · {m.tipo||"medición"}</div>
                   <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
-                    {[...GREENS_DEF_LIVE,{id:"vivero",nombre:"Vivero",hoyos:""}].map(g=>{
+                    {[...GREENS_DEF,{id:"vivero",nombre:"Vivero",hoyos:""}].map(g=>{
                       const val=m.alturas?.[g.id];
                       if(!val) return null;
                       const color=colorAltura(val);
@@ -11495,7 +11430,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                   <th style={{padding:"6px 10px",textAlign:"left",color:"#34d399",fontSize:10}}>OBS</th>
                 </tr></thead>
                 <tbody>
-                  {GREENS_DEF_LIVE.map(g=>{
+                  {GREENS_DEF.map(g=>{
                     const alt=medForm.alturas?.[g.id]||"";
                     const color=colorAltura(alt);
                     return (
@@ -11547,6 +11482,78 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           </div>
         )}
         {/* Humedad */}
+        {subTab==="config_golf"&&rolLogueado!=="trabajador"&&(()=>{
+          const setHoc = (superficie, est, valor) => {
+            const actual = golfData.hocConfig || {};
+            setG({hocConfig:{...actual,[superficie]:{...(actual[superficie]||{}),[est]:valor}}});
+          };
+          const setRespSemanal = (tipoId, nombre) => {
+            if(!setConfigSemanal) return;
+            setConfigSemanal(prev=>({...(prev||{}),[tipoId]:nombre}));
+          };
+          return (
+        <div className="ein">
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,color:"#fbbf24",marginBottom:4}}>⚙️ Programación de Golf</div>
+          <div style={{fontSize:12,color:"#5a9a7a",marginBottom:18}}>Responsables fijos de la semana y altura de corte objetivo por superficie. Esto alimenta las sugerencias de 📅 Semana Golf y las tareas de corte.</div>
+
+          {/* ── Responsable único de la semana para toda el área Golf ── */}
+          <div style={{...S.card,padding:16,marginBottom:18}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#34d399",marginBottom:4}}>👷 Responsable de Golf esta semana</div>
+            <div style={{fontSize:11,color:"#5a9a7a",marginBottom:12}}>Todas las tareas de Golf de la semana (corte, riego, fertilización, fitosanitario, búnkers, árboles, etc.) se asignarán por defecto a esta persona.</div>
+            <select style={{...S.input,maxWidth:320,fontSize:13}}
+              value={configSemanal?.corte_golf||""}
+              onChange={e=>setRespSemanal("corte_golf",e.target.value)}
+              disabled={!setConfigSemanal}>
+              <option value="">— Sin asignar —</option>
+              {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+            </select>
+            {!setConfigSemanal&&<div style={{fontSize:11,color:"#f59e0b",marginTop:10}}>⚠️ No se pudo conectar la configuración semanal — recarga la página.</div>}
+          </div>
+
+          {/* ── Altura de corte objetivo (HOC) ── */}
+          <div style={{...S.card,padding:16}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4,flexWrap:"wrap",gap:8}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#34d399"}}>✂️ Altura de corte objetivo (HOC) por superficie</div>
+              <span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.1)",border:"1px solid rgba(251,191,36,0.25)",borderRadius:8,padding:"2px 10px"}}>
+                Estación actual: {rango.label}
+              </span>
+            </div>
+            <div style={{fontSize:11,color:"#5a9a7a",marginBottom:14}}>Define a qué altura (mm) se corta cada superficie en cada estación del año. Se usa para calcular la urgencia de corte y sugerir la altura al programar tareas.</div>
+            <div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                <thead>
+                  <tr style={{background:"rgba(52,211,153,0.08)"}}>
+                    <th style={{padding:"6px 10px",textAlign:"left",color:"#34d399",fontSize:10,textTransform:"uppercase"}}>Superficie</th>
+                    {Object.entries(RANGOS_ALTURA).map(([k,v])=>(
+                      <th key={k} style={{padding:"6px 8px",textAlign:"center",color:k===estacion?"#fbbf24":"#5a9a7a",fontSize:10,fontWeight:k===estacion?700:400}}>
+                        {v.label.split(" ")[0]}{k===estacion&&" ←"}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {HOC_SUPERFICIES.map(sup=>(
+                    <tr key={sup.id} style={{borderTop:"1px solid rgba(255,255,255,0.05)"}}>
+                      <td style={{padding:"7px 10px",fontWeight:600,color:"#c0dac0"}}>{sup.label}</td>
+                      {Object.keys(RANGOS_ALTURA).map(est=>(
+                        <td key={est} style={{padding:"5px 6px",textAlign:"center",background:est===estacion?"rgba(251,191,36,0.05)":"transparent"}}>
+                          <input type="number" step="0.1" min="1" max="80"
+                            style={{...S.input,width:64,padding:"4px 6px",textAlign:"center",fontSize:12}}
+                            value={golfData.hocConfig?.[sup.id]?.[est] ?? HOC_DEFAULT[sup.id][est]}
+                            onChange={e=>setHoc(sup.id,est,e.target.value)}/>
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{fontSize:10,color:"#4a7a5a",marginTop:10}}>Valores en mm. Los cambios se guardan automáticamente.</div>
+          </div>
+        </div>
+          );
+        })()}
+
       {subTab==="humedad"&&(
           <SeccionHumedad S={S} golfData={golfData} setG={setG} listaPersonal={listaPersonal}
             hoy={hoy} esJefa={false} tareasProg={tareasProg} setTareasProg={setTareasProg}
@@ -11627,7 +11634,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             const ESCALA_URG={1:"#ef4444",2:"#ef4444",3:"#f97316",4:"#f59e0b",5:"#f59e0b",6:"#22c55e",7:"#22c55e",8:"#3b82f6"};
             const colorUrg={cortar:"#ef4444",urgente:"#f97316",pronto:"#f59e0b",normal:"#22c55e",ok:"#4ade80","sin-tasa":"#5a9a7a","sin-datos":"#3a6a5a"};
             const labelUrg={cortar:"✂️ Cortar ya",urgente:"⏰ Urgente",pronto:"📅 Pronto",normal:"✅ Normal",ok:"✅ OK","sin-tasa":"📏 Sin tasa","sin-datos":"— Sin datos"};
-            const urgencias=[...GREENS_DEF_LIVE,{id:"vivero",nombre:"Vivero",hoyos:"Vivero"}].map(g=>{
+            const urgencias=[...GREENS_DEF,{id:"vivero",nombre:"Vivero",hoyos:"Vivero"}].map(g=>{
               const alt=ultimaMed?.alturas?.[g.id];
               if(!alt) return {g,diasRestantes:null,urgencia:"sin-datos",alt:null,tasa:null,altObjetivo:null,infoCorte:null};
               const esTareaCorteG = t => t.zona==="Golf" &&
@@ -11782,7 +11789,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           <div style={{...S.card,padding:16}}>
             <div style={{fontSize:13,fontWeight:700,color:"#34d399",marginBottom:10}}>⛳ Estado Greens — última medición{ultimaMed?` (${ultimaMed.fecha})`:""}</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(100px,1fr))",gap:8}}>
-              {[...GREENS_DEF_LIVE,{id:"vivero",nombre:"Vivero",hoyos:"Vivero"}].map(g=>{
+              {[...GREENS_DEF,{id:"vivero",nombre:"Vivero",hoyos:"Vivero"}].map(g=>{
                 const alt = ultimaMed?.alturas?.[g.id];
                 const color = colorAltura(alt);
                 return (
@@ -11806,19 +11813,14 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       {subTab==="greens"&&rolLogueado!=="trabajador"&&(
         <div className="ein">
           <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
-            {esJefa&&<button className="btn-p" style={S.btn} onClick={()=>{
-              const eraVivero = selectedGreen==="vivero";
-              if(eraVivero) setSelectedGreen(GREENS_DEF_LIVE[0]?.id||"g1");
-              setTareaForm(p=>({...p,responsable:p.responsable||configSemanal?.corte_golf||"",target:eraVivero?"vivero":p.target,greensSeleccionados:eraVivero?["vivero"]:p.greensSeleccionados}));
-              setShowTareaForm("green");
-            }}>📋 Nueva tarea{selectedGreen==="vivero"?" (Vivero)":""}</button>}
+            {esJefa&&<button className="btn-p" style={S.btn} onClick={()=>{setTareaForm(p=>({...p,responsable:p.responsable||configSemanal?.corte_golf||""}));setShowTareaForm("green");}}>📋 Nueva tarea</button>}
             <button style={{...S.btn,background:"rgba(52,211,153,0.12)",color:"#34d399",border:"1px solid rgba(52,211,153,0.25)"}} onClick={()=>setShowDiariaForm(true)}>✅ Registro diario</button>
             <button style={{...S.btn,background:"rgba(59,130,246,0.12)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.25)"}} onClick={()=>{setSubTab("mediciones");setShowMedForm(true);}}>📏 Medición alturas</button>
           </div>
 
           {/* Selector green + vivero */}
           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
-            {GREENS_DEF_LIVE.map(g=>{
+            {GREENS_DEF.map(g=>{
               const alt=ultimaMed?.alturas?.[g.id];
               const color=colorAltura(alt);
               return (
@@ -11915,11 +11917,69 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                     {r.obs&&<div style={{fontSize:11,color:"#5a9a7a",fontStyle:"italic"}}>{r.obs}</div>}
                   </div>
                 ))}
+                {/* Formulario nueva tarea — también disponible desde Vivero */}
+                {showTareaForm==="green"&&(
+                  <div style={{...S.card,padding:16,marginBottom:12}} className="ein">
+                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#4ade80",marginBottom:12}}>📋 Nueva tarea — Vivero</div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                      <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={tareaForm.fecha} onChange={e=>setTareaForm(p=>({...p,fecha:e.target.value}))}/></div>
+                      <div><label style={labelSt}>Responsable</label>
+                        <select style={S.input} value={tareaForm.responsable} onChange={e=>setTareaForm(p=>({...p,responsable:e.target.value}))}>
+                          <option value="">Seleccionar...</option>
+                          {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                        </select>
+                      </div>
+                      <div><label style={labelSt}>Tarea</label>
+                        <select style={S.input} value={tareaForm.tipo} onChange={e=>{
+                          const nuevoTipo=e.target.value;
+                          const esCorte=nuevoTipo.toLowerCase().includes("corte");
+                          setTareaForm(p=>({...p,tipo:nuevoTipo,
+                            alturaObjetivo: esCorte&&!p.alturaObjetivo ? String(getHocObjetivo(golfData,"greens",estacion)) : p.alturaObjetivo,
+                          }));
+                        }}>
+                          <option value="">Seleccionar tipo...</option>
+                          <option value="Corte de greens">✂️ Corte de greens</option>
+                          {TAREAS_GREENS_PERIODICAS.map(t=><option key={t}>{t}</option>)}
+                          <option value="Otra">Otra...</option>
+                        </select>
+                      </div>
+                      <div><label style={labelSt}>Aplicar a</label>
+                        <select style={S.input} value={tareaForm.target} onChange={e=>setTareaForm(p=>({...p,target:e.target.value,greensSeleccionados:e.target.value==="vivero"?["vivero"]:e.target.value==="todos_vivero"?[...GREENS_DEF.map(g=>g.id),"vivero"]:["vivero"]}))}>
+                          <option value="vivero">Solo Vivero</option>
+                          <option value="todos_vivero">Todos los greens + Vivero (10)</option>
+                        </select>
+                      </div>
+                      {(tareaForm.tipo||"").toLowerCase().includes("corte")&&(
+                        <div style={{gridColumn:"1/-1",display:"flex",gap:8,alignItems:"center",background:"rgba(74,222,128,0.06)",border:"1px solid rgba(74,222,128,0.2)",borderRadius:8,padding:"8px 12px"}}>
+                          <label style={labelSt}>✂️ Altura de corte:</label>
+                          <input type="number" step="0.1" min="0" value={tareaForm.alturaObjetivo||""} onChange={e=>setTareaForm(p=>({...p,alturaObjetivo:e.target.value}))} style={{...S.input,width:80}} placeholder="mm"/>
+                          <span style={{fontSize:11,color:"#6aaa7a"}}>mm</span>
+                        </div>
+                      )}
+                      <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Descripción adicional</label><input style={S.input} value={tareaForm.descripcion||""} onChange={e=>setTareaForm(p=>({...p,descripcion:e.target.value}))} placeholder="Condiciones del día..."/></div>
+                      <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observaciones</label><input style={S.input} value={tareaForm.obs||""} onChange={e=>setTareaForm(p=>({...p,obs:e.target.value}))}/></div>
+                    </div>
+                    <div style={{display:"flex",gap:8}}>
+                      <button className="btn-p" style={S.btn} onClick={()=>{
+                        if(!tareaForm.tipo){ alert("⚠️ Falta elegir el tipo de tarea."); return; }
+                        const zonas = tareaForm.greensSeleccionados||["vivero"];
+                        const nombreTarea = tareaForm.tipo==="Otra"?tareaForm.tipoCustom||"Tarea":tareaForm.tipo;
+                        const notaAltura = tareaForm.alturaObjetivo ? `Cortar a: ${tareaForm.alturaObjetivo}mm.` : "";
+                        const notas = [notaAltura,tareaForm.descripcion,tareaForm.obs].filter(Boolean).join(" ");
+                        const nuevas = zonas.map(gid=>({ id:Date.now()+Math.random(), fecha:tareaForm.fecha, zona:"Golf", elemento:gid==="vivero"?"Vivero Golf":(GREENS_DEF.find(g=>g.id===gid)?.nombre||gid), tarea:nombreTarea, responsable:tareaForm.responsable, estado:tareaForm.responsable?"pendiente":"por_designar", notas, alturaCorte:tareaForm.alturaObjetivo||"", unidadAlturaCorte:"mm" }));
+                        setTareasProg(prev=>{ const arr=Array.isArray(prev[tareaForm.fecha])?prev[tareaForm.fecha]:Object.values(prev[tareaForm.fecha]||{}); return {...prev,[tareaForm.fecha]:[...arr,...nuevas]}; });
+                        setTareaForm(emptyTarea);
+                        setShowTareaForm(null);
+                      }}>✓ Guardar y enviar al programa</button>
+                      <button className="btn-g" style={S.btn} onClick={()=>setShowTareaForm(null)}>Cancelar</button>
+                    </div>
+                  </div>
+                )}
                 {!(golfData.registrosDiarios||[]).some(r=>r.esVivero)&&<div style={{...S.card,padding:24,textAlign:"center",color:"#3a7a5a"}}>Sin registros de vivero aún</div>}
               </div>
             );
           })():(()=>{
-            const pgG = GREENS_DEF_LIVE.find(x=>x.id===selectedGreen);
+            const pgG = GREENS_DEF.find(x=>x.id===selectedGreen);
             const alt = ultimaMed?.alturas?.[selectedGreen];
             const color = colorAltura(alt);
             const tareasG = (golfData.tareasGreen||[]).filter(t=>t.greenId===selectedGreen);
@@ -12096,7 +12156,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                         </select>
                       </div>
                       <div><label style={labelSt}>Aplicar a</label>
-                        <select style={S.input} value={tareaForm.target} onChange={e=>setTareaForm(p=>({...p,target:e.target.value,greensSeleccionados:e.target.value==="todos"?GREENS_DEF_LIVE.map(g=>g.id):e.target.value==="green"?[selectedGreen]:e.target.value==="vivero"?["vivero"]:e.target.value==="todos_vivero"?[...GREENS_DEF_LIVE.map(g=>g.id),"vivero"]:[selectedGreen]}))}>
+                        <select style={S.input} value={tareaForm.target} onChange={e=>setTareaForm(p=>({...p,target:e.target.value,greensSeleccionados:e.target.value==="todos"?GREENS_DEF.map(g=>g.id):e.target.value==="green"?[selectedGreen]:e.target.value==="vivero"?["vivero"]:e.target.value==="todos_vivero"?[...GREENS_DEF.map(g=>g.id),"vivero"]:[selectedGreen]}))}>
                           <option value="green">Este green ({pgG.nombre})</option>
                           <option value="seleccion">Greens seleccionados...</option>
                           <option value="todos">Todos los greens (9)</option>
@@ -12111,7 +12171,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                       <div style={{marginBottom:10}}>
                         <label style={labelSt}>Selecciona los greens</label>
                         <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:4}}>
-                          {GREENS_DEF_LIVE.map(gr=>{
+                          {GREENS_DEF.map(gr=>{
                             const sel=(tareaForm.greensSeleccionados||[]).includes(gr.id);
                             return (
                               <div key={gr.id} style={{display:"flex",alignItems:"center",gap:5,padding:"5px 10px",borderRadius:8,background:sel?"rgba(52,211,153,0.15)":"rgba(255,255,255,0.04)",border:`1px solid ${sel?"rgba(52,211,153,0.4)":"rgba(255,255,255,0.1)"}`,cursor:"pointer",fontSize:12}}
@@ -12149,9 +12209,9 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                       const zonas = tareaForm.target==="seleccion"
                         ? (tareaForm.greensSeleccionados||[])
                         : tareaForm.target==="todos"
-                        ? GREENS_DEF_LIVE.map(g=>g.id)
+                        ? GREENS_DEF.map(g=>g.id)
                         : tareaForm.target==="todos_vivero"
-                        ? [...GREENS_DEF_LIVE.map(g=>g.id),"vivero"]
+                        ? [...GREENS_DEF.map(g=>g.id),"vivero"]
                         : tareaForm.target==="vivero"
                         ? ["vivero"]
                         : [selectedGreen];
@@ -12162,7 +12222,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                             📋 Se generarán {zonas.length} tarea{zonas.length!==1?"s":""}: <strong>{tareaForm.tipo}</strong>
                           </div>
                           <div style={{fontSize:11,color:"#5a9a7a"}}>
-                            {zonas.map(id=>id==="vivero"?"🌱 Vivero":GREENS_DEF_LIVE.find(g=>g.id===id)?.nombre||id).join(" · ")}
+                            {zonas.map(id=>id==="vivero"?"🌱 Vivero":GREENS_DEF.find(g=>g.id===id)?.nombre||id).join(" · ")}
                           </div>
                         </div>
                       );
@@ -12217,18 +12277,17 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                         const zonas = tareaForm.target==="seleccion"
                           ? (tareaForm.greensSeleccionados||[])
                           : tareaForm.target==="todos"
-                          ? GREENS_DEF_LIVE.map(g=>g.id)
+                          ? GREENS_DEF.map(g=>g.id)
                           : tareaForm.target==="todos_vivero"
-                          ? [...GREENS_DEF_LIVE.map(g=>g.id),"vivero"]
+                          ? [...GREENS_DEF.map(g=>g.id),"vivero"]
                           : tareaForm.target==="vivero"
                           ? ["vivero"]
                           : [selectedGreen];
-                        if(!tareaForm.tipo){ alert("⚠️ Falta elegir el tipo de tarea (ej. Corte de greens) antes de guardar."); return; }
-                        if(!zonas.length){ alert("⚠️ No hay ninguna zona/green seleccionado para aplicar la tarea."); return; }
+                        if(!zonas.length||!tareaForm.tipo) return;
                         // Generar una tarea por cada zona
                         const nuevasTareas = zonas.map(id=>{
-                          const nombreZona = id==="vivero"?"Vivero":GREENS_DEF_LIVE.find(g=>g.id===id)?.nombre||id;
-                          const hoyosZona = id==="vivero"?"":GREENS_DEF_LIVE.find(g=>g.id===id)?.hoyos||"";
+                          const nombreZona = id==="vivero"?"Vivero":GREENS_DEF.find(g=>g.id===id)?.nombre||id;
+                          const hoyosZona = id==="vivero"?"":GREENS_DEF.find(g=>g.id===id)?.hoyos||"";
                           return {
                             id:Date.now()+Math.random(),
                             fecha:tareaForm.fecha,
@@ -12294,7 +12353,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             {esJefa&&<button className="btn-p" style={S.btn} onClick={()=>setShowTareaForm("tee")}>📋 Nueva tarea tees</button>}
           </div>
           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
-            {TEES_DEF_LIVE.map(t=>(
+            {TEES_DEF.map(t=>(
               <button key={t.id} onClick={()=>setSelectedTee(t.id)}
                 style={{background:selectedTee===t.id?"rgba(52,211,153,0.15)":"rgba(255,255,255,0.04)",border:`1px solid ${selectedTee===t.id?"rgba(52,211,153,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"5px 10px",color:selectedTee===t.id?"#34d399":"#5a9a7a",fontSize:11,cursor:"pointer"}}>
                 {t.nombre}<br/><span style={{fontSize:9}}>{t.hoyo}</span>
@@ -12302,7 +12361,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             ))}
           </div>
           {(()=>{
-            const tee=TEES_DEF_LIVE.find(x=>x.id===selectedTee);
+            const tee=TEES_DEF.find(x=>x.id===selectedTee);
             const tareasT=(golfData.tareasTee||[]).filter(t=>t.teeId===selectedTee);
             return (
               <div>
@@ -12351,7 +12410,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
 
       {/* ── BÚNKERS ── */}
       {subTab==="bunkers"&&rolLogueado!=="trabajador"&&(
-        <ZonaGolfSimple S={S} labelSt={labelSt} zonas={BUNKERS_DEF_LIVE} tareas={TAREAS_BUNKERS}
+        <ZonaGolfSimple S={S} labelSt={labelSt} zonas={BUNKERS_DEF} tareas={TAREAS_BUNKERS}
           titulo="🏖️ Búnkers" colorAcento="#fde68a"
           golfData={golfData} setG={setG} listaPersonal={listaPersonal}
           setTareasProg={setTareasProg} sincronizarMacrozona={sincronizarMacrozona}/>
@@ -12359,7 +12418,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
 
       {/* ── FAIRWAYS ── */}
       {subTab==="fairways"&&rolLogueado!=="trabajador"&&(
-        <ZonaGolfSimple S={S} labelSt={labelSt} zonas={FAIRWAYS_DEF_LIVE} tareas={TAREAS_FAIRWAYS}
+        <ZonaGolfSimple S={S} labelSt={labelSt} zonas={FAIRWAYS_DEF} tareas={TAREAS_FAIRWAYS}
           titulo="🌾 Fairways" colorAcento="#a3e635"
           golfData={golfData} setG={setG} listaPersonal={listaPersonal}
           setTareasProg={setTareasProg} sincronizarMacrozona={sincronizarMacrozona}/>
@@ -12611,7 +12670,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                   <div key={m.id} style={{marginBottom:8}}>
                     <div style={{fontSize:11,color:"#5a9a7a",marginBottom:4}}>{m.hora||""} · {m.tipo||"medición"}</div>
                     <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
-                      {[...GREENS_DEF_LIVE,{id:"vivero",nombre:"Vivero",hoyos:""}].map(g=>{
+                      {[...GREENS_DEF,{id:"vivero",nombre:"Vivero",hoyos:""}].map(g=>{
                         const val=m.alturas?.[g.id];
                         if(!val) return null;
                         const color=colorAltura(val);
@@ -12672,7 +12731,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                     <th style={{padding:"6px 10px",textAlign:"left",color:"#34d399",fontSize:10}}>OBS</th>
                   </tr></thead>
                   <tbody>
-                    {GREENS_DEF_LIVE.map(g=>{
+                    {GREENS_DEF.map(g=>{
                       const alt=medForm.alturas?.[g.id]||"";
                       const diasCrecimiento=medForm.diasDesdeCorte?.[g.id]||"";
                       const color=colorAltura(alt);
@@ -12758,7 +12817,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           {/* Historial mediciones + Gráfico — solo jefa/supervisor */}
           {(esJefa||rolLogueado==="supervisor")&&(
             <MedicionesAnalisis
-              mediciones={mediciones} GREENS_DEF={GREENS_DEF_LIVE} rango={rango}
+              mediciones={mediciones} GREENS_DEF={GREENS_DEF} rango={rango}
               colorAltura={colorAltura} S={S} esJefa={esJefa}
               tareasProg={tareasProg}
               onBorrar={(id)=>setG({mediciones:mediciones.filter(m=>m.id!==id)})}
@@ -12886,161 +12945,6 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           })()}
         </div>
       )}
-
-      {/* ── PROGRAMACIÓN DE GOLF (responsable semanal, HOC, Frecuencias) ── */}
-      {subTab==="config_golf"&&rolLogueado!=="trabajador"&&(()=>{
-        const setHoc = (superficie, est, valor) => {
-          const actual = golfData.hocConfig || {};
-          setG({hocConfig:{...actual,[superficie]:{...(actual[superficie]||{}),[est]:valor}}});
-        };
-        const setRespSemanal = (tipoId, nombre) => {
-          if(!setConfigSemanal) return;
-          setConfigSemanal(prev=>({...(prev||{}),[tipoId]:nombre}));
-        };
-        const proponerTareasGolf = () => {
-          if(!getAllElems||!getZD||!setTareasProg) return;
-          const golfZonaObj = MACROZONAS_BASE.find(z=>z.id===31);
-          if(!golfZonaObj) return;
-          const zdat = getZD(31);
-          const nombreZona = zdat.nombreCustom || golfZonaObj.nombre;
-          const elems = getAllElems(31);
-          const tareasHoyArr = Array.isArray(tareasProg[hoy]) ? tareasProg[hoy] : Object.values(tareasProg[hoy]||{});
-          const existentes = tareasHoyArr.map(t=>t.zona+"_"+t.elemento+"_"+t.tarea);
-          const estProp = estacionDeFecha(hoy);
-          const propuestas = [];
-          const vencidas = [];
-          elems.forEach(e=>{
-            const zdatElem = zdat.elementos?.[e.id] || (zdat.elementosCustom||[]).find(x=>x.id===e.id);
-            const frecs = zdatElem?.frecuencias || [];
-            frecs.forEach(f=>{
-              const key = nombreZona+"_"+e.nombre+"_"+f.tarea;
-              if(existentes.includes(key)) return;
-              const prox = calcProximaFrecGlobal(f, hoy);
-              if(!prox || prox.diff>0) return;
-              const esVencida = prox.diff<0;
-              const respDefault = configSemanal?.corte_golf || "";
-              const notaAltura = f.alturaCorte ? `Cortar a: ${f.alturaCorte} ${f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="pulgadas"?"pulgadas":"milímetros"}.` : "";
-              propuestas.push({ id: Date.now()+Math.random(), fecha:hoy, zona:nombreZona, elemento:e.nombre, tarea:f.tarea, responsable:respDefault, estado:respDefault?"pendiente":"por_designar", notas:[notaAltura,f.obs].filter(Boolean).join(" "), alturaCorte:f.alturaCorte||"", unidadAlturaCorte:f.unidadAlturaCorte||"", estacion:estProp, auto:true, fechaCorrespondiente:prox.fecha, origenZid:"31", origenEid:e.id, origenFrecId:f.id, origenEsCustom:!!e.isCustom });
-              if(esVencida){ const vKey=`${e.nombre} — ${f.tarea}`; if(!vencidas.includes(vKey)) vencidas.push(vKey); }
-            });
-          });
-          if(propuestas.length===0){ alert("No hay tareas de Golf pendientes según las frecuencias definidas para hoy."); return; }
-          setPreviewGolfProp(propuestas.map(p=>({...p,incluir:true})));
-        };
-        const confirmarEnvioGolf = () => {
-          const aEnviar = (previewGolfProp||[]).filter(p=>p.incluir).map(({incluir,...t})=>t);
-          if(aEnviar.length===0){ setPreviewGolfProp(null); return; }
-          const tareasHoyArr = Array.isArray(tareasProg[hoy]) ? tareasProg[hoy] : Object.values(tareasProg[hoy]||{});
-          setTareasProg(prev=>({...prev, [hoy]: [...tareasHoyArr, ...aEnviar]}));
-          setPreviewGolfProp(null);
-          alert(`✅ ${aEnviar.length} tarea(s) de Golf enviadas al jardinero.`);
-        };
-        return (
-        <div className="ein">
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:4}}>
-            <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,color:"#fbbf24"}}>⚙️ Programación de Golf</div>
-            <button className="btn-p" style={S.btn} onClick={proponerTareasGolf}>✨ Proponer del día</button>
-          </div>
-          <div style={{fontSize:12,color:"#5a9a7a",marginBottom:18}}>Responsables fijos de la semana y altura de corte objetivo por superficie. Esto alimenta las sugerencias de 📅 Semana Golf y las tareas de corte.</div>
-
-          {/* ── Vista previa de tareas propuestas — editar/quitar antes de enviar al jardinero ── */}
-          {previewGolfProp&&(
-            <div style={{...S.card,padding:16,marginBottom:18,border:"1px solid rgba(96,165,250,0.3)"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-                <div style={{fontSize:13,fontWeight:700,color:"#60a5fa"}}>👁️ Vista previa — revisa antes de enviar</div>
-                <span style={{fontSize:11,color:"#5a9a7a"}}>{previewGolfProp.filter(p=>p.incluir).length} de {previewGolfProp.length} seleccionadas</span>
-              </div>
-              <div style={{fontSize:11,color:"#5a9a7a",marginBottom:12}}>Desmarca las que no quieras enviar hoy, o ajusta el responsable de cada una.</div>
-              <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
-                {previewGolfProp.map((p,i)=>(
-                  <div key={p.id} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:p.incluir?"rgba(255,255,255,0.03)":"rgba(255,255,255,0.01)",borderRadius:8,border:"1px solid rgba(255,255,255,0.06)",opacity:p.incluir?1:0.5}}>
-                    <input type="checkbox" checked={p.incluir} onChange={()=>setPreviewGolfProp(prev=>prev.map((x,xi)=>xi===i?{...x,incluir:!x.incluir}:x))}/>
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:12,fontWeight:600}}>{p.tarea} <span style={{color:"#5a9a7a",fontWeight:400}}>· {p.elemento}</span></div>
-                      {p.notas&&<div style={{fontSize:10,color:"#fbbf24"}}>{p.notas}</div>}
-                    </div>
-                    <select value={p.responsable||""} onChange={e=>setPreviewGolfProp(prev=>prev.map((x,xi)=>xi===i?{...x,responsable:e.target.value,estado:e.target.value?"pendiente":"por_designar"}:x))}
-                      style={{...S.input,fontSize:11,padding:"3px 7px",maxWidth:160}}>
-                      <option value="">— Por designar —</option>
-                      {listaPersonal.map(pp=><option key={pp.id} value={pp.nombre}>{pp.nombre}</option>)}
-                    </select>
-                  </div>
-                ))}
-              </div>
-              <div style={{display:"flex",gap:8}}>
-                <button className="btn-p" style={S.btn} onClick={confirmarEnvioGolf}>✅ Confirmar y enviar al jardinero</button>
-                <button style={{...S.btn,background:"transparent",border:"1px solid rgba(255,255,255,0.15)",color:"#7aaa80"}} onClick={()=>setPreviewGolfProp(null)}>Cancelar</button>
-              </div>
-            </div>
-          )}
-
-          {/* ── Responsable único de la semana para toda el área Golf ── */}
-          <div style={{...S.card,padding:16,marginBottom:18}}>
-            <div style={{fontSize:13,fontWeight:700,color:"#34d399",marginBottom:4}}>👷 Responsable de Golf esta semana</div>
-            <div style={{fontSize:11,color:"#5a9a7a",marginBottom:12}}>Todas las tareas de Golf de la semana (corte, riego, fertilización, fitosanitario, búnkers, árboles, etc.) se asignarán por defecto a esta persona.</div>
-            <select style={{...S.input,maxWidth:320,fontSize:13}}
-              value={configSemanal?.corte_golf||""}
-              onChange={e=>setRespSemanal("corte_golf",e.target.value)}
-              disabled={!setConfigSemanal}>
-              <option value="">— Sin asignar —</option>
-              {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
-            </select>
-            {!setConfigSemanal&&<div style={{fontSize:11,color:"#f59e0b",marginTop:10}}>⚠️ No se pudo conectar la configuración semanal — recarga la página.</div>}
-          </div>
-
-          {/* ── Altura de corte objetivo (HOC) ── */}
-          <div style={{...S.card,padding:16}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4,flexWrap:"wrap",gap:8}}>
-              <div style={{fontSize:13,fontWeight:700,color:"#34d399"}}>✂️ Altura de corte objetivo (HOC) por superficie</div>
-              <span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.1)",border:"1px solid rgba(251,191,36,0.25)",borderRadius:8,padding:"2px 10px"}}>
-                Estación actual: {rango.label}
-              </span>
-            </div>
-            <div style={{fontSize:11,color:"#5a9a7a",marginBottom:14}}>Define a qué altura (mm) se corta cada superficie en cada estación del año. Se usa para calcular la urgencia de corte y sugerir la altura al programar tareas.</div>
-            <div style={{overflowX:"auto"}}>
-              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-                <thead>
-                  <tr style={{background:"rgba(52,211,153,0.08)"}}>
-                    <th style={{padding:"6px 10px",textAlign:"left",color:"#34d399",fontSize:10,textTransform:"uppercase"}}>Superficie</th>
-                    {Object.entries(RANGOS_ALTURA).map(([k,v])=>(
-                      <th key={k} style={{padding:"6px 8px",textAlign:"center",color:k===estacion?"#fbbf24":"#5a9a7a",fontSize:10,fontWeight:k===estacion?700:400}}>
-                        {v.label.split(" ")[0]}{k===estacion&&" ←"}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {HOC_SUPERFICIES.map(sup=>(
-                    <tr key={sup.id} style={{borderTop:"1px solid rgba(255,255,255,0.05)"}}>
-                      <td style={{padding:"7px 10px",fontWeight:600,color:"#c0dac0"}}>{sup.label}</td>
-                      {Object.keys(RANGOS_ALTURA).map(est=>(
-                        <td key={est} style={{padding:"5px 6px",textAlign:"center",background:est===estacion?"rgba(251,191,36,0.05)":"transparent"}}>
-                          <input type="number" step="0.1" min="1" max="80"
-                            style={{...S.input,width:64,padding:"4px 6px",textAlign:"center",fontSize:12}}
-                            value={golfData.hocConfig?.[sup.id]?.[est] ?? HOC_DEFAULT[sup.id][est]}
-                            onChange={e=>setHoc(sup.id,est,e.target.value)}/>
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div style={{fontSize:10,color:"#4a7a5a",marginTop:10}}>Valores en mm. Los cambios se guardan automáticamente.</div>
-          </div>
-
-          {/* ── Frecuencias de mantención de Golf — mismo sistema que las demás macrozonas ── */}
-          {getAllElems&&getZD&&setElemFrecs&&(()=>{
-            const golfZonaObj = MACROZONAS_BASE.find(z=>z.id===31);
-            return golfZonaObj ? (
-              <div style={{marginTop:18}}>
-                <PanelFrecuenciasZona S={S} zonas={[golfZonaObj]} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} esJefa={esJefa}/>
-              </div>
-            ) : null;
-          })()}
-        </div>
-        );
-      })()}
 
       {subTab==="eventos"&&rolLogueado!=="trabajador"&&(
         <div className="ein">
@@ -14974,7 +14878,7 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
 }
 
 function PanelFrecuenciasZona({ S, zonas, getAllElems, getZD, setElemFrecs, esJefa }) {
-  const [zonaSelFrec, setZonaSelFrec] = React.useState(()=>zonas.length===1?String(zonas[0].id):"");
+  const [zonaSelFrec, setZonaSelFrec] = React.useState("");
   const [elemSelFrec, setElemSelFrec] = React.useState("");
   const zonaActFrec = zonaSelFrec ? zonas.find(z=>String(z.id)===zonaSelFrec) : null;
   const elemsActFrec = zonaActFrec ? getAllElems(String(zonaActFrec.id)) : [];
@@ -16769,14 +16673,7 @@ export default function App() {
     const zidS = String(zid);
     const zonaZ = zonas.find(x=>String(x.id)===zidS);
     const zdat = getZD(zidS);
-    const base = (zonaZ?.elementos||[]).filter(e=>!zdat.elementos?.[e.id]?.eliminado).map(e=>{
-      const override = zdat.elementos?.[e.id];
-      return {...e,
-        nombre: override?.nombreCustom || e.nombre,
-        tipo: override?.tipoCustom || e.tipo,
-        isCustom:false,
-        edData:{estado:"bueno",notas:"",...(override||{})}};
-    });
+    const base = (zonaZ?.elementos||[]).map(e=>({...e,isCustom:false,edData:{estado:"bueno",notas:"",...(zdat.elementos?.[e.id]||{})}}));
     const custom = (zdat.elementosCustom||[]).map(e=>({...e,isCustom:true,edData:{estado:e.estado||"bueno",notas:e.notas||""}}));
     return [...base,...custom].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
   };
@@ -16944,7 +16841,7 @@ export default function App() {
       updateZona(zidStr,{elementosCustom:arr});
     });
   };
-  const removeBaseElem = (zid,eid) => { updateZona(zid,{elementos:{...data[String(zid)]?.elementos,[eid]:{...data[String(zid)]?.elementos?.[eid],eliminado:true}}}); addHistorial(zid,`Elemento eliminado`); };
+  const removeBaseElem = (zid,eid) => { setZonas(prev=>prev.map(z=>String(z.id)===String(zid)?{...z,elementos:z.elementos.filter(e=>e.id!==eid)}:z)); const elems={...data[String(zid)]?.elementos}; delete elems[eid]; updateZona(zid,{elementos:elems}); addHistorial(zid,`Elemento eliminado`); };
 
   const addTrabajador = (t) => { const id=Date.now(); setPersonal(p=>[...(Array.isArray(p)?p:Object.values(p||{})),{...t,id,eventos:[]}]); };
   const updateTrabajador = (id,patch) => setPersonal(p=>(Array.isArray(p)?p:Object.values(p||{})).map(t=>t.id===id?{...t,...patch}:t));
@@ -17084,7 +16981,7 @@ export default function App() {
                 const nn=editElem.nombreEdit!==undefined?editElem.nombreEdit:e.nombre;
                 const nt=editElem.tipoEdit!==undefined?editElem.tipoEdit:e.tipo;
                 if(e.isCustom){const arr=[...(data[zonaId].elementosCustom||[])];const i=arr.findIndex(x=>x.id===e.id);if(i>=0){arr[i]={...arr[i],nombre:nn,tipo:nt};updateZona(zonaId,{elementosCustom:arr});}}
-                else{updateZona(zonaId,{elementos:{...data[zonaId]?.elementos,[e.id]:{...data[zonaId]?.elementos?.[e.id],nombreCustom:nn,tipoCustom:nt}}});}
+                else{setZonas(prev=>prev.map(z=>String(z.id)===String(zonaId)?{...z,elementos:z.elementos.map(x=>x.id===e.id?{...x,nombre:nn,tipo:nt}:x)}:z));}
                 addHistorial(zonaId,`Elemento: "${e.nombre}" → "${nn}"`);
                 setEditElem(p=>({...p,nombreEdit:undefined,tipoEdit:undefined}));
               }}>✓ Guardar nombre/categoría</button>
@@ -18570,7 +18467,7 @@ export default function App() {
 
         {/* GOLF */}
         {vista==="golf"&&(
-          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial} setVista={setVista} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} onCierreSectorial={()=>setShowCierreSectorial(true)} onNuevaAlerta={()=>{setAutoOpenAlerta(true);setVista("notificaciones");}} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs}
+          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial} setVista={setVista} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} onCierreSectorial={()=>setShowCierreSectorial(true)} onNuevaAlerta={()=>{setAutoOpenAlerta(true);setVista("notificaciones");}} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal}
             crearNotificacion={crearNotificacion}
             initialSubTab={golfInitTab}
             onRegistroGuardado={(tipo)=>{
