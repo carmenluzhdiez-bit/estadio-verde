@@ -11114,7 +11114,7 @@ function TareasGolfPanel({ tareasGolfHoy, hoy, esJefa, setTareasProg, tareasProg
 }
 
 
-function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito, onCierreSectorial, onNuevaAlerta, configSemanal={}, setConfigSemanal }) {
+function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito, onCierreSectorial, onNuevaAlerta, configSemanal={}, setConfigSemanal, getAllElems, getZD, setElemFrecs }) {
   const GOLF_ZONA_ID = 31; // ID macrozona Golf
   const sincronizarMacrozona = (tipo, detalle) => {
     if(!updateZona) return;
@@ -18558,7 +18558,7 @@ export default function App() {
 
         {/* GOLF */}
         {vista==="golf"&&(
-          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial} setVista={setVista} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} onCierreSectorial={()=>setShowCierreSectorial(true)} onNuevaAlerta={()=>{setAutoOpenAlerta(true);setVista("notificaciones");}} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal}
+          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial} setVista={setVista} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} onCierreSectorial={()=>setShowCierreSectorial(true)} onNuevaAlerta={()=>{setAutoOpenAlerta(true);setVista("notificaciones");}} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs}
             crearNotificacion={crearNotificacion}
             initialSubTab={golfInitTab}
             onRegistroGuardado={(tipo)=>{
