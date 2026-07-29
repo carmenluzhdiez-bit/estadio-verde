@@ -3263,7 +3263,7 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                                 <span style={{fontSize:10,fontWeight:600,color:est.color,background:`${est.color}12`,padding:"2px 7px",borderRadius:8,border:`1px solid ${est.color}25`,whiteSpace:"nowrap",flexShrink:0}}>{est.icon} {est.label}</span>
                               </div>
                               {t.zona&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:1,marginBottom:4}}>📍 {t.zona}{t.elemento?` · ${t.elemento}`:""}</div>}
-                              {t.alturaCorte&&<div style={{fontSize:12,color:"#fbbf24",fontWeight:600,marginBottom:4,background:"rgba(251,191,36,0.08)",border:"1px solid rgba(251,191,36,0.2)",borderRadius:6,padding:"3px 8px",display:"inline-block"}}>✂️ Cortar a: {t.alturaCorte} {t.unidadAlturaCorte==="cm"?"cm":t.unidadAlturaCorte==="mm"?"mm":"pulgadas"}</div>}
+                              {t.alturaCorte&&<div style={{fontSize:12,color:"#fbbf24",fontWeight:600,marginBottom:4,background:"rgba(251,191,36,0.08)",border:"1px solid rgba(251,191,36,0.2)",borderRadius:6,padding:"3px 8px",display:"inline-block"}}>✂️ Cortar a: {t.alturaCorte} {t.unidadAlturaCorte==="cm"?"cm":t.unidadAlturaCorte==="pulgadas"?"pulgadas":"mm"}</div>}
                               {t.metodoLimpieza&&<span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.08)",padding:"1px 8px",borderRadius:8,border:"1px solid rgba(251,191,36,0.2)",display:"inline-block",marginBottom:4}}>{t.metodoLimpieza==="sopladora"?"🌬️ Sopladora":t.metodoLimpieza==="barrido"?"🧹 Barrido":"🌬️+🧹 Sopladora + Barrido"}</span>}
                               {t.notas&&<div style={{fontSize:11,color:"#5a8a6a",marginTop:2,marginBottom:4,fontStyle:"italic"}}>💡 {t.notas}</div>}
                               {puedeEditar ? (
@@ -3495,7 +3495,7 @@ function ZonaRow({ zona, tz, zonasColapsadas, toggleZonaColapso, MACROZONAS_BASE
                             {listaPersonalZR.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
                           </select>
                         </div>
-                        {t.alturaCorte&&<div style={{fontSize:11,color:"#fbbf24",fontWeight:600,marginTop:3}}>✂️ Cortar a: {t.alturaCorte} {t.unidadAlturaCorte==="cm"?"cm":t.unidadAlturaCorte==="mm"?"mm":"pulgadas"}</div>}
+                        {t.alturaCorte&&<div style={{fontSize:11,color:"#fbbf24",fontWeight:600,marginTop:3}}>✂️ Cortar a: {t.alturaCorte} {t.unidadAlturaCorte==="cm"?"cm":t.unidadAlturaCorte==="pulgadas"?"pulgadas":"mm"}</div>}
                         {t.notas && <div style={{fontSize:11,color:"#5a8a6a",marginTop:3,fontStyle:"italic"}}>{t.notas}</div>}
                         {t.notaWorker && <div style={{fontSize:11,color:t.estado==="no_pudo"?"#fca5a5":"#7aaa80",marginTop:2}}>💬 {t.notaWorker}</div>}
                       </div>
@@ -3599,7 +3599,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
             ? "Osmar Bhalú Armijo Zúñiga"  // Golf → Bhalú por defecto
             : getResponsablePorTipo(f.tarea, configSemanal, nombreZona)||"";
           if(esZonaGolf) console.log("Golf tarea:", f.tarea, "→ resp:", respDefault);
-          const notaAltura = f.alturaCorte ? `Cortar a: ${f.alturaCorte} ${f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="mm"?"milímetros":"pulgadas"}.` : "";
+          const notaAltura = f.alturaCorte ? `Cortar a: ${f.alturaCorte} ${f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="pulgadas"?"pulgadas":"milímetros"}.` : "";
           const item = { id: Date.now()+Math.random(), fecha, zona:nombreZona, elemento:e.nombre, tarea:f.tarea, responsable:respDefault, estado:respDefault?"pendiente":"por_designar", notas:[notaAltura,f.obs].filter(Boolean).join(" "), alturaCorte:f.alturaCorte||"", unidadAlturaCorte:f.unidadAlturaCorte||"", frecuencia:f.modo==="diasSemana"?`cada ${f.diasMinimos||"?"} días`:f[estProp], estacion:estProp, auto:true, fechaCorrespondiente:prox.fecha, origenZid:String(z.id), origenEid:e.id, origenFrecId:f.id, origenEsCustom:!!e.isCustom };
           propuestas.push(item);
           if(esVencida) { const vKey=`${nombreZona} — ${f.tarea}`; if(!vencidas.includes(vKey)) vencidas.push(vKey); }
@@ -5356,14 +5356,14 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
                         <input type="number" step="0.1" min="0" value={f.alturaCorte||""}
                           onChange={e=>updateFila(i,"alturaCorte",e.target.value)}
                           placeholder="ej: 4,5" style={{...inputSt,width:80}}/>
-                        <select value={f.unidadAlturaCorte||"pulgadas"} onChange={e=>updateFila(i,"unidadAlturaCorte",e.target.value)}
+                        <select value={f.unidadAlturaCorte||"mm"} onChange={e=>updateFila(i,"unidadAlturaCorte",e.target.value)}
                           style={{...inputSt,width:110}}>
-                          <option value="pulgadas">pulgadas</option>
-                          <option value="cm">centímetros</option>
                           <option value="mm">milímetros</option>
+                          <option value="cm">centímetros</option>
+                          <option value="pulgadas">pulgadas</option>
                         </select>
                       </div>
-                      {f.alturaCorte&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:4}}>Se anotará en la tarea: "Corte a: {f.alturaCorte} {f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="mm"?"milímetros":"pulgadas"}"</div>}
+                      {f.alturaCorte&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:4}}>Se anotará en la tarea: "Corte a: {f.alturaCorte} {f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="pulgadas"?"pulgadas":"milímetros"}"</div>}
                     </div>
                   )}
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
@@ -11207,6 +11207,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   const [showEventoForm, setShowEventoForm] = React.useState(false);
   const [showArbolForm,  setShowArbolForm]  = React.useState(false);
   const [showTareaForm,  setShowTareaForm]  = React.useState(null); // "green"|"tee"|"arbol"
+  const [previewGolfProp, setPreviewGolfProp] = React.useState(null); // tareas propuestas pendientes de confirmar
   const [showDiariaForm, setShowDiariaForm] = React.useState(false);
   // ── Estado sección Humedad ──
   const [showHumForm,    setShowHumForm]    = React.useState(false);
@@ -12896,14 +12897,21 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               if(!prox || prox.diff>0) return;
               const esVencida = prox.diff<0;
               const respDefault = configSemanal?.corte_golf || "";
-              const notaAltura = f.alturaCorte ? `Cortar a: ${f.alturaCorte} ${f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="mm"?"milímetros":"pulgadas"}.` : "";
+              const notaAltura = f.alturaCorte ? `Cortar a: ${f.alturaCorte} ${f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="pulgadas"?"pulgadas":"milímetros"}.` : "";
               propuestas.push({ id: Date.now()+Math.random(), fecha:hoy, zona:nombreZona, elemento:e.nombre, tarea:f.tarea, responsable:respDefault, estado:respDefault?"pendiente":"por_designar", notas:[notaAltura,f.obs].filter(Boolean).join(" "), alturaCorte:f.alturaCorte||"", unidadAlturaCorte:f.unidadAlturaCorte||"", estacion:estProp, auto:true, fechaCorrespondiente:prox.fecha, origenZid:"31", origenEid:e.id, origenFrecId:f.id, origenEsCustom:!!e.isCustom });
               if(esVencida){ const vKey=`${e.nombre} — ${f.tarea}`; if(!vencidas.includes(vKey)) vencidas.push(vKey); }
             });
           });
           if(propuestas.length===0){ alert("No hay tareas de Golf pendientes según las frecuencias definidas para hoy."); return; }
-          setTareasProg(prev=>({...prev, [hoy]: [...tareasHoyArr, ...propuestas]}));
-          alert(`✅ ${propuestas.length} tarea(s) de Golf propuestas para hoy.${vencidas.length>0?` ${vencidas.length} estaban vencidas.`:""}`);
+          setPreviewGolfProp(propuestas.map(p=>({...p,incluir:true})));
+        };
+        const confirmarEnvioGolf = () => {
+          const aEnviar = (previewGolfProp||[]).filter(p=>p.incluir).map(({incluir,...t})=>t);
+          if(aEnviar.length===0){ setPreviewGolfProp(null); return; }
+          const tareasHoyArr = Array.isArray(tareasProg[hoy]) ? tareasProg[hoy] : Object.values(tareasProg[hoy]||{});
+          setTareasProg(prev=>({...prev, [hoy]: [...tareasHoyArr, ...aEnviar]}));
+          setPreviewGolfProp(null);
+          alert(`✅ ${aEnviar.length} tarea(s) de Golf enviadas al jardinero.`);
         };
         return (
         <div className="ein">
@@ -12912,6 +12920,37 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             <button className="btn-p" style={S.btn} onClick={proponerTareasGolf}>✨ Proponer del día</button>
           </div>
           <div style={{fontSize:12,color:"#5a9a7a",marginBottom:18}}>Responsables fijos de la semana y altura de corte objetivo por superficie. Esto alimenta las sugerencias de 📅 Semana Golf y las tareas de corte.</div>
+
+          {/* ── Vista previa de tareas propuestas — editar/quitar antes de enviar al jardinero ── */}
+          {previewGolfProp&&(
+            <div style={{...S.card,padding:16,marginBottom:18,border:"1px solid rgba(96,165,250,0.3)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                <div style={{fontSize:13,fontWeight:700,color:"#60a5fa"}}>👁️ Vista previa — revisa antes de enviar</div>
+                <span style={{fontSize:11,color:"#5a9a7a"}}>{previewGolfProp.filter(p=>p.incluir).length} de {previewGolfProp.length} seleccionadas</span>
+              </div>
+              <div style={{fontSize:11,color:"#5a9a7a",marginBottom:12}}>Desmarca las que no quieras enviar hoy, o ajusta el responsable de cada una.</div>
+              <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
+                {previewGolfProp.map((p,i)=>(
+                  <div key={p.id} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:p.incluir?"rgba(255,255,255,0.03)":"rgba(255,255,255,0.01)",borderRadius:8,border:"1px solid rgba(255,255,255,0.06)",opacity:p.incluir?1:0.5}}>
+                    <input type="checkbox" checked={p.incluir} onChange={()=>setPreviewGolfProp(prev=>prev.map((x,xi)=>xi===i?{...x,incluir:!x.incluir}:x))}/>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:12,fontWeight:600}}>{p.tarea} <span style={{color:"#5a9a7a",fontWeight:400}}>· {p.elemento}</span></div>
+                      {p.notas&&<div style={{fontSize:10,color:"#fbbf24"}}>{p.notas}</div>}
+                    </div>
+                    <select value={p.responsable||""} onChange={e=>setPreviewGolfProp(prev=>prev.map((x,xi)=>xi===i?{...x,responsable:e.target.value,estado:e.target.value?"pendiente":"por_designar"}:x))}
+                      style={{...S.input,fontSize:11,padding:"3px 7px",maxWidth:160}}>
+                      <option value="">— Por designar —</option>
+                      {listaPersonal.map(pp=><option key={pp.id} value={pp.nombre}>{pp.nombre}</option>)}
+                    </select>
+                  </div>
+                ))}
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button className="btn-p" style={S.btn} onClick={confirmarEnvioGolf}>✅ Confirmar y enviar al jardinero</button>
+                <button style={{...S.btn,background:"transparent",border:"1px solid rgba(255,255,255,0.15)",color:"#7aaa80"}} onClick={()=>setPreviewGolfProp(null)}>Cancelar</button>
+              </div>
+            </div>
+          )}
 
           {/* ── Responsable único de la semana para toda el área Golf ── */}
           <div style={{...S.card,padding:16,marginBottom:18}}>
