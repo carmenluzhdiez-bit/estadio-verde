@@ -5485,6 +5485,14 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
                     </div>
                   </div>
 
+                  {/* Descripción adicional */}
+                  <div>
+                    <label style={labelSt}>Descripción adicional (instrucciones al jardinero, condiciones, notas)</label>
+                    <input value={f.obs||""} onChange={e=>updateFila(i,"obs",e.target.value)}
+                      placeholder="Ej: Usar helicoidal, cortar cuando esté seco, revisar antes de cortar..."
+                      style={{...inputSt,width:"100%"}}/>
+                  </div>
+
                   {/* Última vez */}
                   <div>
                     <label style={labelSt}>Última vez realizada</label>
