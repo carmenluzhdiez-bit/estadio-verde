@@ -9426,7 +9426,7 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
 
     const proj = diasProx.map(d=>{
       const diasDesde = Math.round((new Date(d.fecha+"T12:00:00")-new Date(fechaBase+"T12:00:00"))/(1000*60*60*24));
-      const altProj = Math.round((altBase + tasaUsar*Math.max(0,diasDesde))*10)/10;
+      const altProj = Math.round((altBase + tasaUsar*diasDesde)*10)/10;
       return {...d, altProj, diasDesde};
     });
     return {zona:z, tasaGlobal, tasaReal, diasUltimoIntervalo, deltaUltimo, altBase, fechaBase, baseOrigen, proj, categoria, datoPocoConfiable, diasDesdeBase};
@@ -9475,14 +9475,16 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
                 </td>
                 <td style={{padding:"7px 8px",textAlign:"center",color:colorCategoria(categoria),fontSize:11}}>{tasaGlobal?`${tasaGlobal>0?"+":""}${tasaGlobal}`:"—"}</td>
                 {proj.map((prD2,i)=>{
-                  const sobreCorte = prD2.altProj > altCorte;
-                  const muyAlto = prD2.altProj > altCorte * 1.3;
+                  const esPasado = prD2.esPasado;
+                  const sobreCorte = !esPasado && prD2.altProj > altCorte;
+                  const muyAlto = !esPasado && prD2.altProj > altCorte * 1.3;
                   return (
                     <td key={prD2.fecha} style={{
-                      padding:"7px 8px",textAlign:"center",fontSize:12,fontWeight:600,
-                      color:muyAlto?"#ef4444":sobreCorte?"#f59e0b":"#22c55e",
-                      background:i===0?"rgba(96,165,250,0.06)":"transparent",
-                      borderLeft:i===0?"1px solid rgba(96,165,250,0.2)":"none",
+                      padding:"7px 8px",textAlign:"center",fontSize:12,fontWeight:esPasado?400:600,
+                      color:esPasado?"#4a7a5a":muyAlto?"#ef4444":sobreCorte?"#f59e0b":"#22c55e",
+                      background:prD2.fecha===hoyProjStr?"rgba(96,165,250,0.06)":"transparent",
+                      borderLeft:prD2.fecha===hoyProjStr?"1px solid rgba(96,165,250,0.2)":"none",
+                      opacity:esPasado?0.65:1,
                     }}>
                       {prD2.altProj.toFixed(1)}
                       {muyAlto&&<span style={{fontSize:8,marginLeft:2}}>⚠️</span>}
@@ -11795,7 +11797,12 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       {subTab==="greens"&&rolLogueado!=="trabajador"&&(
         <div className="ein">
           <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
-            {esJefa&&<button className="btn-p" style={S.btn} onClick={()=>{setTareaForm(p=>({...p,responsable:p.responsable||configSemanal?.corte_golf||""}));setShowTareaForm("green");}}>📋 Nueva tarea</button>}
+            {esJefa&&<button className="btn-p" style={S.btn} onClick={()=>{
+              const eraVivero = selectedGreen==="vivero";
+              if(eraVivero) setSelectedGreen(GREENS_DEF_LIVE[0]?.id||"g1");
+              setTareaForm(p=>({...p,responsable:p.responsable||configSemanal?.corte_golf||"",target:eraVivero?"vivero":p.target,greensSeleccionados:eraVivero?["vivero"]:p.greensSeleccionados}));
+              setShowTareaForm("green");
+            }}>📋 Nueva tarea{selectedGreen==="vivero"?" (Vivero)":""}</button>}
             <button style={{...S.btn,background:"rgba(52,211,153,0.12)",color:"#34d399",border:"1px solid rgba(52,211,153,0.25)"}} onClick={()=>setShowDiariaForm(true)}>✅ Registro diario</button>
             <button style={{...S.btn,background:"rgba(59,130,246,0.12)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.25)"}} onClick={()=>{setSubTab("mediciones");setShowMedForm(true);}}>📏 Medición alturas</button>
           </div>
