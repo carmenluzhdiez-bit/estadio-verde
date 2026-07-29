@@ -9351,10 +9351,14 @@ const PLANTILLA_PRE_TORNEO = {
 function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisisTasas, colorCategoria, S }) {
   const hoyProjStr = fechaLocal();
   const diasSemana = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
+  // Semana calendario actual: lunes a domingo (no "hoy + 6 días")
+  const hoyProjDate = new Date(hoyProjStr+"T12:00:00");
+  const offsetLunes = (hoyProjDate.getDay()+6)%7; // 0=lunes...6=domingo
+  const lunesSemana = new Date(hoyProjDate); lunesSemana.setDate(lunesSemana.getDate()-offsetLunes);
   const diasProx = Array.from({length:7},(_,i)=>{
-    const d = new Date(hoyProjStr+"T12:00:00"); d.setDate(d.getDate()+i);
+    const d = new Date(lunesSemana); d.setDate(d.getDate()+i);
     const ds = d.toISOString().slice(0,10);
-    return {fecha:ds, label:i===0?"Hoy":i===1?"Mañana":diasSemana[(d.getDay()+6)%7]+" "+d.getDate()};
+    return {fecha:ds, label:ds===hoyProjStr?"Hoy":diasSemana[i]+" "+d.getDate(), esPasado: ds<hoyProjStr};
   });
 
   const todosLosCortes = Object.entries(tareasProg||{}).flatMap(([fecha,ts])=>{
@@ -9405,7 +9409,7 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
     } else if(ultMed) {
       // Solo hay medición histórica
       const diasDesdeUltMed = Math.round((new Date(hoyProjStr+"T12:00:00")-new Date(ultMed.fecha+"T12:00:00"))/(1000*60*60*24));
-      if(diasDesdeUltMed > 7) return null;
+      if(diasDesdeUltMed > 10) return null;
       altBase = Number(ultMed.alturas[z.id]);
       fechaBase = ultMed.fecha;
       baseOrigen = "medicion_antigua";
