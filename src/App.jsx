@@ -9407,13 +9407,13 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
       fechaBase = corteRecZ.fecha;
       baseOrigen = "corte";
     } else if(ultMed) {
-      // Solo hay medición histórica
-      const diasDesdeUltMed = Math.round((new Date(hoyProjStr+"T12:00:00")-new Date(ultMed.fecha+"T12:00:00"))/(1000*60*60*24));
-      if(diasDesdeUltMed > 10) return null;
+      // Solo hay medición histórica — se muestra igual, marcada como poco confiable si es muy vieja
       altBase = Number(ultMed.alturas[z.id]);
       fechaBase = ultMed.fecha;
       baseOrigen = "medicion_antigua";
     } else return null;
+    const diasDesdeBase = Math.round((new Date(hoyProjStr+"T12:00:00")-new Date(fechaBase+"T12:00:00"))/(1000*60*60*24));
+    const datoPocoConfiable = diasDesdeBase > 10;
 
     const tasaGlobal = anal ? anal.tasaGlobal : null;
     const tasasCalc = calcTasa(z.id);
@@ -9429,7 +9429,7 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
       const altProj = Math.round((altBase + tasaUsar*Math.max(0,diasDesde))*10)/10;
       return {...d, altProj, diasDesde};
     });
-    return {zona:z, tasaGlobal, tasaReal, diasUltimoIntervalo, deltaUltimo, altBase, fechaBase, baseOrigen, proj, categoria};
+    return {zona:z, tasaGlobal, tasaReal, diasUltimoIntervalo, deltaUltimo, altBase, fechaBase, baseOrigen, proj, categoria, datoPocoConfiable, diasDesdeBase};
   }).filter(Boolean);
 
   if(!zonasDatos.length) return null;
@@ -9454,7 +9454,7 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
             </tr>
           </thead>
           <tbody>
-            {zonasDatos.map(({zona,tasaGlobal,tasaReal,diasUltimoIntervalo,deltaUltimo,altBase,fechaBase,baseOrigen,proj,categoria})=>(
+            {zonasDatos.map(({zona,tasaGlobal,tasaReal,diasUltimoIntervalo,deltaUltimo,altBase,fechaBase,baseOrigen,proj,categoria,datoPocoConfiable,diasDesdeBase})=>(
               <tr key={zona.id} style={{borderTop:"1px solid rgba(255,255,255,0.05)"}}>
                 <td style={{padding:"7px 10px",fontWeight:600,fontSize:12}}>
                   {zona.nombre}
@@ -9462,6 +9462,7 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
                     {baseOrigen==="corte"?"✂️":baseOrigen==="medicion"?"📏":"📏?"}
                   </span>
                   <span style={{fontSize:9,display:"block",color:"#4a7a5a"}}>{altBase}mm · {fechaBase}</span>
+                  {datoPocoConfiable&&<span style={{fontSize:9,display:"block",color:"#f59e0b",fontWeight:700}}>⚠️ Dato de hace {diasDesdeBase} días — poco confiable</span>}
                 </td>
                 <td style={{padding:"7px 8px",textAlign:"center",fontSize:12,fontWeight:700}}>
                   {tasaReal!==null
@@ -12202,7 +12203,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                           : tareaForm.target==="vivero"
                           ? ["vivero"]
                           : [selectedGreen];
-                        if(!zonas.length||!tareaForm.tipo) return;
+                        if(!tareaForm.tipo){ alert("⚠️ Falta elegir el tipo de tarea (ej. Corte de greens) antes de guardar."); return; }
+                        if(!zonas.length){ alert("⚠️ No hay ninguna zona/green seleccionado para aplicar la tarea."); return; }
                         // Generar una tarea por cada zona
                         const nuevasTareas = zonas.map(id=>{
                           const nombreZona = id==="vivero"?"Vivero":GREENS_DEF_LIVE.find(g=>g.id===id)?.nombre||id;
