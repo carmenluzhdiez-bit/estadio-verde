@@ -9418,7 +9418,7 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
     const tasaGlobal = anal ? anal.tasaGlobal : null;
     const tasasCalc = calcTasa(z.id);
     const ultimaTasaReal = tasasCalc && tasasCalc.length > 0 ? tasasCalc[tasasCalc.length-1] : null;
-    const tasaReal = (ultimaTasaReal && (!corteRecZ || ultimaTasaReal.fecha > corteRecZ.fecha)) ? ultimaTasaReal.tasa : null;
+    const tasaReal = (ultimaTasaReal && (!corteRecZ || ultimaTasaReal.fecha >= corteRecZ.fecha)) ? ultimaTasaReal.tasa : null;
     const diasUltimoIntervalo = tasaReal !== null ? ultimaTasaReal.dias : null;
     const deltaUltimo = tasaReal !== null ? ultimaTasaReal.delta : null;
     const tasaUsar = tasaReal !== null ? tasaReal : (tasaGlobal || 0.4);
@@ -9612,10 +9612,14 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
             delta = svgP.alt - altBase;
             diasRef = diasEfectivos;
             metodo = "corte_detectado";
-          } else if(diasDesdeCorte > 0) {
-            // Corte sin altura registrada: omitir este intervalo (dato no confiable)
-            continue;
-          } else { continue; }
+          } else {
+            // Corte detectado pero sin altura registrada: no descartar el intervalo —
+            // usar el delta directo entre mediciones como estimación (mejor que nada)
+            delta = svgP.alt - pPrev.alt;
+            diasRef = diasTotal;
+            metodo = "directo_con_corte_sin_altura";
+            if(delta <= 0) continue; // igual sin sentido una tasa negativa
+          }
         } else {
           // Sin corte entre mediciones
           delta = svgP.alt - pPrev.alt;
