@@ -8018,7 +8018,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
       porCuentaRend[c.cuenta].total += Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
       porCuentaRend[c.cuenta].n++;
     });
-    const filas = itemsRend.map(optC=>{
+    const filas = itemsRend.map(c=>{
       const items = c.items||[{descripcion:c.descripcion,cantidad:c.cantidad||1,unidad:c.unidad||"unidad",totalNeto:c.totalNeto||0,iva:c.iva||0,totalBruto:c.totalBruto||0}];
       const totalDoc = Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
       const notasVinc = compras.filter(np=>np.facturaId===c.id);
