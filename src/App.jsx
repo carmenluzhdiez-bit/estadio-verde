@@ -7981,7 +7981,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   const crearRendicion = () => {
     if(!seleccionadas.length) return;
     const items = compras.filter(c=>seleccionadas.includes(c.id));
-    const total = items.reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
+    const total = items.reduce((a,c)=>a+(c.tipoDoc==="Nota de Crédito"?-1:1)*Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
     const nueva = {id:Date.now(),fecha:rendForm.fecha,obs:rendForm.obs,items:seleccionadas,total,estado:"presentada",reembolso:false,montoReembolso:0,fechaReembolso:"",nTransReembolso:""};
     set({compras:compras.map(compraC=>seleccionadas.includes(compraC.id)?{...compraC,estado:"en_rendicion"}:compraC),rendiciones:[nueva,...rendiciones]});
     setSeleccionadas([]); setRendForm({fecha:hoy.toISOString().slice(0,10),obs:""}); setShowRendForm(false);
@@ -8015,22 +8015,26 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     const porCuentaRend = {};
     itemsRend.forEach(c=>{
       if(!porCuentaRend[c.cuenta]) porCuentaRend[c.cuenta]={total:0,n:0};
-      porCuentaRend[c.cuenta].total += Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
+      const esNC = c.tipoDoc==="Nota de Crédito";
+      porCuentaRend[c.cuenta].total += (esNC?-1:1)*Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
       porCuentaRend[c.cuenta].n++;
     });
     const filas = itemsRend.map(c=>{
+      const esNC = c.tipoDoc==="Nota de Crédito";
+      const signo = esNC ? -1 : 1;
       const items = c.items||[{descripcion:c.descripcion,cantidad:c.cantidad||1,unidad:c.unidad||"unidad",totalNeto:c.totalNeto||0,iva:c.iva||0,totalBruto:c.totalBruto||0}];
-      const totalDoc = Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
+      const totalDoc = signo * Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
       const notasVinc = compras.filter(np=>np.facturaId===c.id);
       const notasHtml = notasVinc.length>0?`<tr><td colspan="8" style="padding:3px 8px 3px 24px;font-size:10px;color:#777;background:#fffde7;border:1px solid #e0e0e0"><em>NP vinculadas: ${notasVinc.map(np=>"NP "+np.nDocumento+" ("+np.fecha+")").join(", ")}</em></td></tr>`:"";
-      return `<tr>
-        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.fecha}</td>
-        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.tipoDoc} N°${c.nDocumento||"—"}</td>
+      const colorFila = esNC?"#c62828":"";
+      return `<tr style="${esNC?"background:#fff3f3;":""}">
+        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;color:${colorFila}">${c.fecha}${esNC?' <em style="color:#c62828;font-size:9px">(NC)</em>':""}</td>
+        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;color:${colorFila}">${c.tipoDoc} N°${c.nDocumento||"—"}</td>
         <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.proveedor||"—"}</td>
         <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${items.map(it=>it.descripcion+(it.categoria?" ("+it.categoria+")":"")).join("<br>")}</td>
-        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right">$${items.reduce((a,it)=>a+Number(it.totalNeto||0),0).toLocaleString("es-CL")}</td>
-        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right">$${items.reduce((a,it)=>a+Number(it.iva||0),0).toLocaleString("es-CL")}</td>
-        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right;font-weight:bold">$${totalDoc.toLocaleString("es-CL")}</td>
+        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right;color:${colorFila}">${esNC?"-":""}$${items.reduce((a,it)=>a+Number(it.totalNeto||0),0).toLocaleString("es-CL")}</td>
+        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right">${esNC?"-":""}$${items.reduce((a,it)=>a+Number(it.iva||0),0).toLocaleString("es-CL")}</td>
+        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right;font-weight:bold;color:${colorFila}">${esNC?"-":""}$${Math.abs(totalDoc).toLocaleString("es-CL")}</td>
         <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.cuenta||"—"}</td>
       </tr>${notasHtml}`;
     }).join("");
