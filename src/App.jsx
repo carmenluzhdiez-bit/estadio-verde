@@ -5342,11 +5342,11 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
                         <input type="number" step="0.1" min="0" value={f.alturaCorte||""}
                           onChange={e=>updateFila(i,"alturaCorte",e.target.value)}
                           placeholder="ej: 4,5" style={{...inputSt,width:80}}/>
-                        <select value={f.unidadAlturaCorte||"pulgadas"} onChange={e=>updateFila(i,"unidadAlturaCorte",e.target.value)}
+                        <select value={f.unidadAlturaCorte||"mm"} onChange={e=>updateFila(i,"unidadAlturaCorte",e.target.value)}
                           style={{...inputSt,width:110}}>
-                          <option value="pulgadas">pulgadas</option>
-                          <option value="cm">centímetros</option>
                           <option value="mm">milímetros</option>
+                          <option value="cm">centímetros</option>
+                          <option value="pulgadas">pulgadas</option>
                         </select>
                       </div>
                       {f.alturaCorte&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:4}}>Se anotará en la tarea: "Corte a: {f.alturaCorte} {f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="mm"?"milímetros":"pulgadas"}"</div>}
@@ -5382,7 +5382,7 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
                                 {FRECUENCIAS_OPTS.filter(o=>!["noaplica","segunecesidad"].includes(o.v)).map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
                                 <option value="segunecesidad">Según necesidad</option>
                               </select>
-                              <label style={{...labelSt,marginTop:4}}>Días específicos (opcional)</label>
+                              <label style={{...labelSt,marginTop:4}}>Días específicos (opcional — solo si debe ser justo ese día)</label>
                               <div style={{display:"flex",gap:2,flexWrap:"wrap"}}>
                                 {DIAS_SEMANA.map(d=>{
                                   const sel=(cfg.diasEspecificos||[]).includes(d.v);
@@ -5391,6 +5391,17 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
                                       border:`1px solid ${sel?"rgba(96,165,250,0.5)":"rgba(255,255,255,0.08)"}`,
                                       background:sel?"rgba(96,165,250,0.1)":"transparent",
                                       color:sel?"#60a5fa":"#6aaa7a"}}>{d.l}</button>;
+                                })}
+                              </div>
+                              <label style={{...labelSt,marginTop:6}}>Días que NUNCA debe hacerse (opcional)</label>
+                              <div style={{display:"flex",gap:2,flexWrap:"wrap"}}>
+                                {DIAS_SEMANA.map(d=>{
+                                  const sel=(cfg.diasProhibidos||[]).includes(d.v);
+                                  return <button key={d.v} onClick={()=>updateEstacion(i,est,"diasProhibidos",sel?(cfg.diasProhibidos||[]).filter(x=>x!==d.v):[...(cfg.diasProhibidos||[]),d.v])}
+                                    style={{fontSize:9,padding:"2px 5px",borderRadius:4,cursor:"pointer",
+                                      border:`1px solid ${sel?"rgba(239,68,68,0.5)":"rgba(255,255,255,0.08)"}`,
+                                      background:sel?"rgba(239,68,68,0.1)":"transparent",
+                                      color:sel?"#f87171":"#6aaa7a"}}>{d.l}</button>;
                                 })}
                               </div>
                             </div>
@@ -5414,6 +5425,17 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
                               <input type="number" min="1" max="60" value={cfg.cadaDias||"7"}
                                 onChange={e=>updateEstacion(i,est,"cadaDias",e.target.value)}
                                 style={{...inputSt,width:60}} placeholder="7"/>
+                              <label style={{...labelSt,marginTop:6}}>Días que NUNCA debe hacerse (opcional)</label>
+                              <div style={{display:"flex",gap:2,flexWrap:"wrap"}}>
+                                {DIAS_SEMANA.map(d=>{
+                                  const sel=(cfg.diasProhibidos||[]).includes(d.v);
+                                  return <button key={d.v} onClick={()=>updateEstacion(i,est,"diasProhibidos",sel?(cfg.diasProhibidos||[]).filter(x=>x!==d.v):[...(cfg.diasProhibidos||[]),d.v])}
+                                    style={{fontSize:9,padding:"2px 5px",borderRadius:4,cursor:"pointer",
+                                      border:`1px solid ${sel?"rgba(239,68,68,0.5)":"rgba(255,255,255,0.08)"}`,
+                                      background:sel?"rgba(239,68,68,0.1)":"transparent",
+                                      color:sel?"#f87171":"#6aaa7a"}}>{d.l}</button>;
+                                })}
+                              </div>
                             </div>
                           )}
                         </div>
@@ -5447,6 +5469,14 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
                         );
                       })()}
                     </div>
+                  </div>
+
+                  {/* Descripción adicional */}
+                  <div>
+                    <label style={labelSt}>Descripción adicional (instrucciones al jardinero, condiciones, notas)</label>
+                    <input value={f.obs||""} onChange={e=>updateFila(i,"obs",e.target.value)}
+                      placeholder="Ej: Usar helicoidal, cortar cuando esté seco, revisar antes de cortar..."
+                      style={{...inputSt,width:"100%"}}/>
                   </div>
 
                   {/* Última vez */}
