@@ -154,7 +154,7 @@ const calcProximaFrecGlobal = (f, refFecha) => {
   if(typeof estValRaw === "object" && estValRaw !== null) {
     // Formato nuevo: {tipo:"cadaXdias", cadaDias:"7"}
     if(estValRaw.tipo==="noaplica"||estValRaw.tipo==="segunecesidad") return null;
-    const diasMap = {diario:1,cada2dias:2,cada3dias:3,cada5dias:5,semanal:7,quincenal:15,mensual:30,bimestral:60,trimestral:90};
+    const diasMap = {diario:1,cada2dias:2,cada3dias:3,cada4dias:4,cada5dias:5,cada6dias:6,semanal:7,quincenal:15,cada21dias:21,mensual:30,bimestral:60,trimestral:90};
     dias = Number(estValRaw.cadaDias) || diasMap[estValRaw.cadaDias] || null;
     frecVal = String(dias||"");
   } else {
@@ -5195,7 +5195,8 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
   ];
   const FRECUENCIAS_OPTS = [
     {v:"diario",l:"Diario (1d)"},{v:"cada2dias",l:"Cada 2 días"},{v:"cada3dias",l:"Cada 3 días"},
-    {v:"cada5dias",l:"Cada 5 días"},{v:"semanal",l:"Semanal (7d)"},{v:"quincenal",l:"Quincenal (15d)"},
+    {v:"cada4dias",l:"Cada 4 días"},{v:"cada5dias",l:"Cada 5 días"},{v:"cada6dias",l:"Cada 6 días"},
+    {v:"semanal",l:"Semanal (7d)"},{v:"quincenal",l:"Quincenal (15d)"},{v:"cada21dias",l:"Cada 21 días"},
     {v:"mensual",l:"Mensual (30d)"},{v:"bimestral",l:"Bimestral (60d)"},{v:"trimestral",l:"Trimestral (90d)"},
     {v:"noaplica",l:"No aplica"},{v:"segunecesidad",l:"Según necesidad"},
   ];
@@ -5234,8 +5235,8 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
     if(typeof estObj === "object" && estObj !== null) return estObj;
     // Formato viejo — string como "semanal","quincenal",etc. → convertir a objeto nuevo
     const frecVal = typeof estObj === "string" ? estObj : (f[est]||"noaplica");
-    const diasMap = {diario:"1",cada2dias:"2",cada3dias:"3",cada5dias:"5",semanal:"7",
-      quincenal:"15",mensual:"30",bimestral:"60",trimestral:"90"};
+    const diasMap = {diario:"1",cada2dias:"2",cada3dias:"3",cada4dias:"4",cada5dias:"5",cada6dias:"6",semanal:"7",
+      quincenal:"15",cada21dias:"21",mensual:"30",bimestral:"60",trimestral:"90"};
     const cadaDias = diasMap[frecVal]||"7";
     return {
       tipo: frecVal==="noaplica"?"noaplica":frecVal==="segunecesidad"?"segunecesidad":"cadaXdias",
@@ -7892,7 +7893,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     const pu   = Number(item.precioUnitario)||0;
     const neto = Math.round(cant*pu);
     const esNC = form.tipoDoc==="Nota de Crédito";
-    const iva  = (form.tipoDoc==="Boleta"||esNC)?0:Math.round(neto*0.19);
+    const iva  = (form.tipoDoc==="Boleta"||form.tipoDoc==="Boleta de Honorarios"||esNC)?0:Math.round(neto*0.19);
     return {...item, totalNeto:neto||"", iva:iva||"", totalBruto:(neto+iva)||""};
   };
 
@@ -8644,7 +8645,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                 <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={form.fecha} onChange={e=>setForm(p=>({...p,fecha:e.target.value}))}/></div>
                 <div><label style={labelSt}>Tipo documento</label>
                   <select style={S.input} value={form.tipoDoc} onChange={e=>setForm(p=>({...p,tipoDoc:e.target.value}))}>
-                    {["Factura","Boleta","Nota de Crédito","Nota de Pedido","Cotización","Orden de Compra","Otro"].map(t=><option key={t}>{t}</option>)}
+                    {["Factura","Boleta","Boleta de Honorarios","Nota de Crédito","Nota de Pedido","Cotización","Orden de Compra","Otro"].map(t=><option key={t}>{t}</option>)}
                   </select>
                 </div>
                 <div><label style={labelSt}>Proveedor</label><input style={S.input} placeholder="Nombre empresa / persona" value={form.proveedor} onChange={e=>setForm(p=>({...p,proveedor:e.target.value}))}/></div>
