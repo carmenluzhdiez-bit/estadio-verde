@@ -7892,7 +7892,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     const pu   = Number(item.precioUnitario)||0;
     const neto = Math.round(cant*pu);
     const esNC = form.tipoDoc==="Nota de Crédito";
-    const iva  = (form.tipoDoc==="Boleta"||form.tipoDoc==="Boleta de Honorarios"||esNC)?0:Math.round(neto*0.19);
+    const iva  = (form.tipoDoc==="Boleta"||esNC)?0:Math.round(neto*0.19);
     return {...item, totalNeto:neto||"", iva:iva||"", totalBruto:(neto+iva)||""};
   };
 
@@ -7981,7 +7981,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   const crearRendicion = () => {
     if(!seleccionadas.length) return;
     const items = compras.filter(c=>seleccionadas.includes(c.id));
-    const total = items.reduce((a,c)=>a+(c.tipoDoc==="Nota de Crédito"?-1:1)*Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
+    const total = items.reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
     const nueva = {id:Date.now(),fecha:rendForm.fecha,obs:rendForm.obs,items:seleccionadas,total,estado:"presentada",reembolso:false,montoReembolso:0,fechaReembolso:"",nTransReembolso:""};
     set({compras:compras.map(compraC=>seleccionadas.includes(compraC.id)?{...compraC,estado:"en_rendicion"}:compraC),rendiciones:[nueva,...rendiciones]});
     setSeleccionadas([]); setRendForm({fecha:hoy.toISOString().slice(0,10),obs:""}); setShowRendForm(false);
@@ -8015,26 +8015,22 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     const porCuentaRend = {};
     itemsRend.forEach(c=>{
       if(!porCuentaRend[c.cuenta]) porCuentaRend[c.cuenta]={total:0,n:0};
-      const esNC = c.tipoDoc==="Nota de Crédito";
-      porCuentaRend[c.cuenta].total += (esNC?-1:1)*Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
+      porCuentaRend[c.cuenta].total += Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
       porCuentaRend[c.cuenta].n++;
     });
-    const filas = itemsRend.map(c=>{
-      const esNC = c.tipoDoc==="Nota de Crédito";
-      const signo = esNC ? -1 : 1;
+    const filas = itemsRend.map(optC=>{
       const items = c.items||[{descripcion:c.descripcion,cantidad:c.cantidad||1,unidad:c.unidad||"unidad",totalNeto:c.totalNeto||0,iva:c.iva||0,totalBruto:c.totalBruto||0}];
-      const totalDoc = signo * Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
+      const totalDoc = Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
       const notasVinc = compras.filter(np=>np.facturaId===c.id);
       const notasHtml = notasVinc.length>0?`<tr><td colspan="8" style="padding:3px 8px 3px 24px;font-size:10px;color:#777;background:#fffde7;border:1px solid #e0e0e0"><em>NP vinculadas: ${notasVinc.map(np=>"NP "+np.nDocumento+" ("+np.fecha+")").join(", ")}</em></td></tr>`:"";
-      const colorFila = esNC?"#c62828":"";
-      return `<tr style="${esNC?"background:#fff3f3;":""}">
-        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;color:${colorFila}">${c.fecha}${esNC?' <em style="color:#c62828;font-size:9px">(NC)</em>':""}</td>
-        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;color:${colorFila}">${c.tipoDoc} N°${c.nDocumento||"—"}</td>
+      return `<tr>
+        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.fecha}</td>
+        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.tipoDoc} N°${c.nDocumento||"—"}</td>
         <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.proveedor||"—"}</td>
         <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${items.map(it=>it.descripcion+(it.categoria?" ("+it.categoria+")":"")).join("<br>")}</td>
-        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right;color:${colorFila}">${esNC?"-":""}$${items.reduce((a,it)=>a+Number(it.totalNeto||0),0).toLocaleString("es-CL")}</td>
-        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right">${esNC?"-":""}$${items.reduce((a,it)=>a+Number(it.iva||0),0).toLocaleString("es-CL")}</td>
-        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right;font-weight:bold;color:${colorFila}">${esNC?"-":""}$${Math.abs(totalDoc).toLocaleString("es-CL")}</td>
+        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right">$${items.reduce((a,it)=>a+Number(it.totalNeto||0),0).toLocaleString("es-CL")}</td>
+        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right">$${items.reduce((a,it)=>a+Number(it.iva||0),0).toLocaleString("es-CL")}</td>
+        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right;font-weight:bold">$${totalDoc.toLocaleString("es-CL")}</td>
         <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.cuenta||"—"}</td>
       </tr>${notasHtml}`;
     }).join("");
@@ -8648,7 +8644,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                 <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={form.fecha} onChange={e=>setForm(p=>({...p,fecha:e.target.value}))}/></div>
                 <div><label style={labelSt}>Tipo documento</label>
                   <select style={S.input} value={form.tipoDoc} onChange={e=>setForm(p=>({...p,tipoDoc:e.target.value}))}>
-                    {["Factura","Boleta","Boleta de Honorarios","Nota de Crédito","Nota de Pedido","Cotización","Orden de Compra","Otro"].map(t=><option key={t}>{t}</option>)}
+                    {["Factura","Boleta","Nota de Crédito","Nota de Pedido","Cotización","Orden de Compra","Otro"].map(t=><option key={t}>{t}</option>)}
                   </select>
                 </div>
                 <div><label style={labelSt}>Proveedor</label><input style={S.input} placeholder="Nombre empresa / persona" value={form.proveedor} onChange={e=>setForm(p=>({...p,proveedor:e.target.value}))}/></div>
@@ -8723,11 +8719,10 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                   <div><label style={labelSt}>Forma de pago</label>
                     <select style={S.input} value={form.formaPago} onChange={e=>{
                       const fp=e.target.value;
-                      // Sincroniza el estado automáticamente según la forma de pago elegida
-                      const estadoAuto = fp==="transferencia"?"pagada":fp==="efectivo"?"pagada_efectivo":fp==="debito"?"pagada_efectivo":fp==="pendiente"?"pendiente":form.estado;
+                      const estadoAuto=fp==="transferencia"?"pagada":fp==="efectivo"||fp==="debito"?"pagada_efectivo":fp==="nota_credito"?"nota_credito":form.estado;
                       setForm(p=>({...p,formaPago:fp,estado:estadoAuto}));
                     }}>
-                      <option value="pendiente">⏳ Sin pagar / Pendiente</option>
+                      <option value="">⏳ Sin pagar / Pendiente</option>
                       <option value="transferencia">Transferencia bancaria</option>
                       <option value="efectivo">Efectivo</option>
                       <option value="debito">Tarjeta de débito</option>
@@ -8739,12 +8734,6 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                     <div><label style={labelSt}>Banco origen</label><input style={S.input} placeholder="ej: BancoEstado" value={form.bancoPago} onChange={e=>setForm(p=>({...p,bancoPago:e.target.value}))}/></div>
                     <div><label style={labelSt}>N° Transferencia</label><input style={S.input} placeholder="ej: 000123456" value={form.nTransferencia} onChange={e=>setForm(p=>({...p,nTransferencia:e.target.value}))}/></div>
                   </>}
-                </div>
-                {/* Estado resultante — solo lectura, para confirmar */}
-                <div style={{marginTop:8,fontSize:11,color:"#5a9a7a"}}>
-                  Estado: <span style={{fontWeight:700,color:form.estado==="pendiente"?"#f59e0b":form.estado==="pagada"?"#60a5fa":form.estado==="pagada_efectivo"?"#8b5cf6":"#22c55e"}}>
-                    {form.estado==="pendiente"?"⏳ Pendiente de pago":form.estado==="pagada"?"💳 Pagada por transferencia":form.estado==="pagada_efectivo"?"💵 Pagada en efectivo/débito":form.estado==="rendida"?"✅ Rendida":form.estado}
-                  </span>
                 </div>
               </div>
 
@@ -11130,7 +11119,7 @@ function TareasGolfPanel({ tareasGolfHoy, hoy, esJefa, setTareasProg, tareasProg
 }
 
 
-function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito, onCierreSectorial, onNuevaAlerta, configSemanal={}, setConfigSemanal, getAllElems, getZD, setElemFrecs }) {
+function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito, onCierreSectorial, onNuevaAlerta, configSemanal={}, setConfigSemanal }) {
   const GOLF_ZONA_ID = 31; // ID macrozona Golf
   const sincronizarMacrozona = (tipo, detalle) => {
     if(!updateZona) return;
@@ -11174,8 +11163,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   const [showMedForm,    setShowMedForm]    = React.useState(false);
   const [showEventoForm, setShowEventoForm] = React.useState(false);
   const [showArbolForm,  setShowArbolForm]  = React.useState(false);
-  const [showTareaForm,  setShowTareaForm]  = React.useState(null);
-  const [previewGolfProp, setPreviewGolfProp] = React.useState(null); // "green"|"tee"|"arbol"
+  const [showTareaForm,  setShowTareaForm]  = React.useState(null); // "green"|"tee"|"arbol"
   const [showDiariaForm, setShowDiariaForm] = React.useState(false);
   // ── Estado sección Humedad ──
   const [showHumForm,    setShowHumForm]    = React.useState(false);
@@ -11499,6 +11487,78 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           </div>
         )}
         {/* Humedad */}
+        {subTab==="config_golf"&&rolLogueado!=="trabajador"&&(()=>{
+          const setHoc = (superficie, est, valor) => {
+            const actual = golfData.hocConfig || {};
+            setG({hocConfig:{...actual,[superficie]:{...(actual[superficie]||{}),[est]:valor}}});
+          };
+          const setRespSemanal = (tipoId, nombre) => {
+            if(!setConfigSemanal) return;
+            setConfigSemanal(prev=>({...(prev||{}),[tipoId]:nombre}));
+          };
+          return (
+        <div className="ein">
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,color:"#fbbf24",marginBottom:4}}>⚙️ Programación de Golf</div>
+          <div style={{fontSize:12,color:"#5a9a7a",marginBottom:18}}>Responsables fijos de la semana y altura de corte objetivo por superficie. Esto alimenta las sugerencias de 📅 Semana Golf y las tareas de corte.</div>
+
+          {/* ── Responsable único de la semana para toda el área Golf ── */}
+          <div style={{...S.card,padding:16,marginBottom:18}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#34d399",marginBottom:4}}>👷 Responsable de Golf esta semana</div>
+            <div style={{fontSize:11,color:"#5a9a7a",marginBottom:12}}>Todas las tareas de Golf de la semana (corte, riego, fertilización, fitosanitario, búnkers, árboles, etc.) se asignarán por defecto a esta persona.</div>
+            <select style={{...S.input,maxWidth:320,fontSize:13}}
+              value={configSemanal?.corte_golf||""}
+              onChange={e=>setRespSemanal("corte_golf",e.target.value)}
+              disabled={!setConfigSemanal}>
+              <option value="">— Sin asignar —</option>
+              {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+            </select>
+            {!setConfigSemanal&&<div style={{fontSize:11,color:"#f59e0b",marginTop:10}}>⚠️ No se pudo conectar la configuración semanal — recarga la página.</div>}
+          </div>
+
+          {/* ── Altura de corte objetivo (HOC) ── */}
+          <div style={{...S.card,padding:16}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4,flexWrap:"wrap",gap:8}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#34d399"}}>✂️ Altura de corte objetivo (HOC) por superficie</div>
+              <span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.1)",border:"1px solid rgba(251,191,36,0.25)",borderRadius:8,padding:"2px 10px"}}>
+                Estación actual: {rango.label}
+              </span>
+            </div>
+            <div style={{fontSize:11,color:"#5a9a7a",marginBottom:14}}>Define a qué altura (mm) se corta cada superficie en cada estación del año. Se usa para calcular la urgencia de corte y sugerir la altura al programar tareas.</div>
+            <div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                <thead>
+                  <tr style={{background:"rgba(52,211,153,0.08)"}}>
+                    <th style={{padding:"6px 10px",textAlign:"left",color:"#34d399",fontSize:10,textTransform:"uppercase"}}>Superficie</th>
+                    {Object.entries(RANGOS_ALTURA).map(([k,v])=>(
+                      <th key={k} style={{padding:"6px 8px",textAlign:"center",color:k===estacion?"#fbbf24":"#5a9a7a",fontSize:10,fontWeight:k===estacion?700:400}}>
+                        {v.label.split(" ")[0]}{k===estacion&&" ←"}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {HOC_SUPERFICIES.map(sup=>(
+                    <tr key={sup.id} style={{borderTop:"1px solid rgba(255,255,255,0.05)"}}>
+                      <td style={{padding:"7px 10px",fontWeight:600,color:"#c0dac0"}}>{sup.label}</td>
+                      {Object.keys(RANGOS_ALTURA).map(est=>(
+                        <td key={est} style={{padding:"5px 6px",textAlign:"center",background:est===estacion?"rgba(251,191,36,0.05)":"transparent"}}>
+                          <input type="number" step="0.1" min="1" max="80"
+                            style={{...S.input,width:64,padding:"4px 6px",textAlign:"center",fontSize:12}}
+                            value={golfData.hocConfig?.[sup.id]?.[est] ?? HOC_DEFAULT[sup.id][est]}
+                            onChange={e=>setHoc(sup.id,est,e.target.value)}/>
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{fontSize:10,color:"#4a7a5a",marginTop:10}}>Valores en mm. Los cambios se guardan automáticamente.</div>
+          </div>
+        </div>
+          );
+        })()}
+
       {subTab==="humedad"&&(
           <SeccionHumedad S={S} golfData={golfData} setG={setG} listaPersonal={listaPersonal}
             hoy={hoy} esJefa={false} tareasProg={tareasProg} setTareasProg={setTareasProg}
@@ -11862,64 +11922,6 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                     {r.obs&&<div style={{fontSize:11,color:"#5a9a7a",fontStyle:"italic"}}>{r.obs}</div>}
                   </div>
                 ))}
-                {/* Formulario nueva tarea — también disponible desde Vivero */}
-                {showTareaForm==="green"&&(
-                  <div style={{...S.card,padding:16,marginBottom:12}} className="ein">
-                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#4ade80",marginBottom:12}}>📋 Nueva tarea — Vivero</div>
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-                      <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={tareaForm.fecha} onChange={e=>setTareaForm(p=>({...p,fecha:e.target.value}))}/></div>
-                      <div><label style={labelSt}>Responsable</label>
-                        <select style={S.input} value={tareaForm.responsable} onChange={e=>setTareaForm(p=>({...p,responsable:e.target.value}))}>
-                          <option value="">Seleccionar...</option>
-                          {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
-                        </select>
-                      </div>
-                      <div><label style={labelSt}>Tarea</label>
-                        <select style={S.input} value={tareaForm.tipo} onChange={e=>{
-                          const nuevoTipo=e.target.value;
-                          const esCorte=nuevoTipo.toLowerCase().includes("corte");
-                          setTareaForm(p=>({...p,tipo:nuevoTipo,
-                            alturaObjetivo: esCorte&&!p.alturaObjetivo ? String(getHocObjetivo(golfData,"greens",estacion)) : p.alturaObjetivo,
-                          }));
-                        }}>
-                          <option value="">Seleccionar tipo...</option>
-                          <option value="Corte de greens">✂️ Corte de greens</option>
-                          {TAREAS_GREENS_PERIODICAS.map(t=><option key={t}>{t}</option>)}
-                          <option value="Otra">Otra...</option>
-                        </select>
-                      </div>
-                      <div><label style={labelSt}>Aplicar a</label>
-                        <select style={S.input} value={tareaForm.target} onChange={e=>setTareaForm(p=>({...p,target:e.target.value,greensSeleccionados:e.target.value==="vivero"?["vivero"]:e.target.value==="todos_vivero"?[...GREENS_DEF.map(g=>g.id),"vivero"]:["vivero"]}))}>
-                          <option value="vivero">Solo Vivero</option>
-                          <option value="todos_vivero">Todos los greens + Vivero (10)</option>
-                        </select>
-                      </div>
-                      {(tareaForm.tipo||"").toLowerCase().includes("corte")&&(
-                        <div style={{gridColumn:"1/-1",display:"flex",gap:8,alignItems:"center",background:"rgba(74,222,128,0.06)",border:"1px solid rgba(74,222,128,0.2)",borderRadius:8,padding:"8px 12px"}}>
-                          <label style={labelSt}>✂️ Altura de corte:</label>
-                          <input type="number" step="0.1" min="0" value={tareaForm.alturaObjetivo||""} onChange={e=>setTareaForm(p=>({...p,alturaObjetivo:e.target.value}))} style={{...S.input,width:80}} placeholder="mm"/>
-                          <span style={{fontSize:11,color:"#6aaa7a"}}>mm</span>
-                        </div>
-                      )}
-                      <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Descripción adicional</label><input style={S.input} value={tareaForm.descripcion||""} onChange={e=>setTareaForm(p=>({...p,descripcion:e.target.value}))} placeholder="Condiciones del día..."/></div>
-                      <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observaciones</label><input style={S.input} value={tareaForm.obs||""} onChange={e=>setTareaForm(p=>({...p,obs:e.target.value}))}/></div>
-                    </div>
-                    <div style={{display:"flex",gap:8}}>
-                      <button className="btn-p" style={S.btn} onClick={()=>{
-                        if(!tareaForm.tipo){ alert("⚠️ Falta elegir el tipo de tarea."); return; }
-                        const zonas = tareaForm.greensSeleccionados||["vivero"];
-                        const nombreTarea = tareaForm.tipo==="Otra"?tareaForm.tipoCustom||"Tarea":tareaForm.tipo;
-                        const notaAltura = tareaForm.alturaObjetivo ? `Cortar a: ${tareaForm.alturaObjetivo}mm.` : "";
-                        const notas = [notaAltura,tareaForm.descripcion,tareaForm.obs].filter(Boolean).join(" ");
-                        const nuevas = zonas.map(gid=>({ id:Date.now()+Math.random(), fecha:tareaForm.fecha, zona:"Golf", elemento:gid==="vivero"?"Vivero Golf":(GREENS_DEF.find(g=>g.id===gid)?.nombre||gid), tarea:nombreTarea, responsable:tareaForm.responsable, estado:tareaForm.responsable?"pendiente":"por_designar", notas, alturaCorte:tareaForm.alturaObjetivo||"", unidadAlturaCorte:"mm" }));
-                        setTareasProg(prev=>{ const arr=Array.isArray(prev[tareaForm.fecha])?prev[tareaForm.fecha]:Object.values(prev[tareaForm.fecha]||{}); return {...prev,[tareaForm.fecha]:[...arr,...nuevas]}; });
-                        setTareaForm(emptyTarea);
-                        setShowTareaForm(null);
-                      }}>✓ Guardar y enviar al programa</button>
-                      <button className="btn-g" style={S.btn} onClick={()=>setShowTareaForm(null)}>Cancelar</button>
-                    </div>
-                  </div>
-                )}
                 {!(golfData.registrosDiarios||[]).some(r=>r.esVivero)&&<div style={{...S.card,padding:24,textAlign:"center",color:"#3a7a5a"}}>Sin registros de vivero aún</div>}
               </div>
             );
@@ -12891,168 +12893,6 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
         </div>
       )}
 
-      {/* ── PROGRAMACIÓN DE GOLF ── */}
-      {subTab==="config_golf"&&rolLogueado!=="trabajador"&&(()=>{
-        const setHoc = (superficie, est, valor) => {
-          const actual = golfData.hocConfig || {};
-          setG({hocConfig:{...actual,[superficie]:{...(actual[superficie]||{}),[est]:valor}}});
-        };
-        const setRespSemanal = (tipoId, nombre) => {
-          if(!setConfigSemanal) return;
-          setConfigSemanal(prev=>({...(prev||{}),[tipoId]:nombre}));
-        };
-        const proponerTareasGolf = () => {
-          if(!getAllElems||!getZD||!setTareasProg) return;
-          const golfZonaObj = MACROZONAS_BASE.find(z=>z.id===31);
-          if(!golfZonaObj) return;
-          const zdatG = getZD(31);
-          const nombreZona = zdatG.nombreCustom || golfZonaObj.nombre;
-          const elems = getAllElems(31);
-          const tareasHoyArr = Array.isArray(tareasProg[hoy]) ? tareasProg[hoy] : Object.values(tareasProg[hoy]||{});
-          const existentes = tareasHoyArr.map(t=>t.zona+"_"+t.elemento+"_"+t.tarea);
-          const estProp = estacionDeFecha(hoy);
-          const propuestas = [];
-          const vencidas = [];
-          elems.forEach(e=>{
-            const zdatElem = zdatG.elementos?.[e.id] || (zdatG.elementosCustom||[]).find(x=>x.id===e.id);
-            const frecs = zdatElem?.frecuencias || [];
-            frecs.forEach(f=>{
-              const key = nombreZona+"_"+e.nombre+"_"+f.tarea;
-              if(existentes.includes(key)) return;
-              const prox = calcProximaFrecGlobal(f, hoy);
-              if(!prox || prox.diff>0) return;
-              const esVencida = prox.diff<0;
-              const diasVencida = Math.abs(prox.diff);
-              const respDefault = configSemanal?.corte_golf || "";
-              const notaAltura = f.alturaCorte ? `Cortar a: ${f.alturaCorte} ${f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="pulgadas"?"pulgadas":"milímetros"}.` : "";
-              propuestas.push({ id: Date.now()+Math.random(), fecha:hoy, zona:nombreZona, elemento:e.nombre, tarea:f.tarea, responsable:respDefault, estado:respDefault?"pendiente":"por_designar", notas:[notaAltura,f.obs].filter(Boolean).join(" "), alturaCorte:f.alturaCorte||"", unidadAlturaCorte:f.unidadAlturaCorte||"mm", estacion:estProp, auto:true, fechaCorrespondiente:prox.fecha, origenZid:"31", origenEid:e.id, origenFrecId:f.id, origenEsCustom:!!e.isCustom, diasVencida: esVencida?diasVencida:0 });
-              if(esVencida) vencidas.push(e.nombre+" — "+f.tarea+" ("+diasVencida+"d vencida)");
-            });
-          });
-          if(propuestas.length===0){ alert("No hay tareas de Golf pendientes según las frecuencias definidas para hoy."); return; }
-          const propOrdenadas = [...propuestas].sort((a,b)=>a.tarea.localeCompare(b.tarea,"es",{sensitivity:"base"}));
-          setPreviewGolfProp(propOrdenadas.map(p=>({...p,incluir:true,abierta:false})));
-        };
-        const confirmarEnvioGolf = () => {
-          const aEnviar = (previewGolfProp||[]).filter(p=>p.incluir).map(({incluir,abierta,...t})=>t);
-          if(aEnviar.length===0){ setPreviewGolfProp(null); return; }
-          const tareasHoyArr = Array.isArray(tareasProg[hoy]) ? tareasProg[hoy] : Object.values(tareasProg[hoy]||{});
-          setTareasProg(prev=>({...prev, [hoy]: [...tareasHoyArr, ...aEnviar]}));
-          setPreviewGolfProp(null);
-          alert(`✅ ${aEnviar.length} tarea(s) de Golf enviadas al jardinero.`);
-        };
-        return (
-        <div className="ein">
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:4}}>
-            <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,color:"#fbbf24"}}>⚙️ Programación de Golf</div>
-            <div style={{fontSize:11,color:"#7aaa80"}}>{hoy}</div>
-            <button className="btn-p" style={S.btn} onClick={proponerTareasGolf}>✨ Proponer del día</button>
-          </div>
-          <div style={{fontSize:12,color:"#5a9a7a",marginBottom:18}}>Responsables fijos de la semana y altura de corte objetivo por superficie.</div>
-
-          {/* Vista previa */}
-          {previewGolfProp&&(
-            <div style={{...S.card,padding:16,marginBottom:18,border:"1px solid rgba(96,165,250,0.3)"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-                <div style={{fontSize:13,fontWeight:700,color:"#60a5fa"}}>👁️ Vista previa — tareas para {hoy}</div>
-                <span style={{fontSize:11,color:"#5a9a7a"}}>{previewGolfProp.filter(p=>p.incluir).length}/{previewGolfProp.length} seleccionadas</span>
-              </div>
-              <div style={{fontSize:11,color:"#5a9a7a",marginBottom:12}}>Desmarca las que no quieras enviar hoy. Las desmarcadas quedarán como vencidas para el próximo Proponer del día.</div>
-              <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:12}}>
-                {previewGolfProp.map((p,i)=>(
-                  <div key={p.id} style={{borderRadius:8,border:`1px solid ${p.incluir?"rgba(255,255,255,0.08)":"rgba(255,255,255,0.03)"}`,overflow:"hidden",opacity:p.incluir?1:0.5}}>
-                    <div onClick={()=>setPreviewGolfProp(prev=>prev.map((x,xi)=>xi===i?{...x,abierta:!x.abierta}:x))}
-                      style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",cursor:"pointer",background:p.incluir?"rgba(255,255,255,0.03)":"transparent"}}>
-                      <input type="checkbox" checked={p.incluir} onClick={e=>e.stopPropagation()} onChange={()=>setPreviewGolfProp(prev=>prev.map((x,xi)=>xi===i?{...x,incluir:!x.incluir}:x))}/>
-                      <span style={{fontSize:10,color:"#5a9a7a",transform:p.abierta?"rotate(90deg)":"none",transition:"transform .15s",display:"inline-block"}}>▶</span>
-                      <div style={{flex:1}}>
-                        <span style={{fontSize:12,fontWeight:600}}>{p.tarea}</span>
-                        <span style={{fontSize:11,color:"#5a9a7a",marginLeft:6}}>· {p.elemento}</span>
-                        {p.diasVencida>0&&<span style={{fontSize:10,color:"#f87171",marginLeft:6,background:"rgba(248,113,113,0.1)",padding:"1px 6px",borderRadius:8}}>⚠️ {p.diasVencida}d vencida</span>}
-                      </div>
-                      <select value={p.responsable||""} onClick={e=>e.stopPropagation()} onChange={e=>setPreviewGolfProp(prev=>prev.map((x,xi)=>xi===i?{...x,responsable:e.target.value,estado:e.target.value?"pendiente":"por_designar"}:x))}
-                        style={{...S.input,fontSize:11,padding:"3px 7px",maxWidth:150}}>
-                        <option value="">— Por designar —</option>
-                        {listaPersonal.map(pp=><option key={pp.id} value={pp.nombre}>{pp.nombre}</option>)}
-                      </select>
-                    </div>
-                    {p.abierta&&(
-                      <div style={{padding:"6px 14px 10px 14px",background:"rgba(0,0,0,0.1)",fontSize:11,color:"#5a9a7a"}}>
-                        {p.notas&&<div>📋 {p.notas}</div>}
-                        {p.alturaCorte&&<div style={{color:"#fbbf24",fontWeight:600}}>✂️ Cortar a: {p.alturaCorte}{p.unidadAlturaCorte||"mm"}</div>}
-                        <div>📍 {p.zona} · {p.elemento}</div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-              <div style={{display:"flex",gap:8}}>
-                <button className="btn-p" style={S.btn} onClick={confirmarEnvioGolf}>✅ Confirmar y enviar al jardinero</button>
-                <button style={{...S.btn,background:"transparent",border:"1px solid rgba(255,255,255,0.15)",color:"#7aaa80"}} onClick={()=>setPreviewGolfProp(null)}>Cancelar</button>
-              </div>
-            </div>
-          )}
-
-          {/* Responsable semanal */}
-          <div style={{...S.card,padding:16,marginBottom:18}}>
-            <div style={{fontSize:13,fontWeight:700,color:"#34d399",marginBottom:4}}>👷 Responsable de Golf esta semana</div>
-            <div style={{fontSize:11,color:"#5a9a7a",marginBottom:12}}>Todas las tareas de Golf (corte, riego, fertilización, búnkers, etc.) se asignan por defecto a esta persona.</div>
-            <select style={{...S.input,maxWidth:320,fontSize:13}}
-              value={configSemanal?.corte_golf||""}
-              onChange={e=>setRespSemanal("corte_golf",e.target.value)}
-              disabled={!setConfigSemanal}>
-              <option value="">— Sin asignar —</option>
-              {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
-            </select>
-          </div>
-
-          {/* HOC */}
-          <div style={{...S.card,padding:16,marginBottom:18}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4,flexWrap:"wrap",gap:8}}>
-              <div style={{fontSize:13,fontWeight:700,color:"#34d399"}}>✂️ Altura de corte objetivo (HOC) por superficie</div>
-              <span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.1)",border:"1px solid rgba(251,191,36,0.25)",borderRadius:8,padding:"2px 10px"}}>Estación actual: {rango.label}</span>
-            </div>
-            <div style={{overflowX:"auto"}}>
-              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-                <thead><tr style={{background:"rgba(52,211,153,0.08)"}}>
-                  <th style={{padding:"6px 10px",textAlign:"left",color:"#34d399",fontSize:10,textTransform:"uppercase"}}>Superficie</th>
-                  {Object.entries(RANGOS_ALTURA).map(([k,v])=>(
-                    <th key={k} style={{padding:"6px 8px",textAlign:"center",color:k===estacion?"#fbbf24":"#5a9a7a",fontSize:10,fontWeight:k===estacion?700:400}}>
-                      {v.label.split(" ")[0]}{k===estacion&&" ←"}
-                    </th>
-                  ))}
-                </tr></thead>
-                <tbody>{HOC_SUPERFICIES.map(sup=>(
-                  <tr key={sup.id} style={{borderTop:"1px solid rgba(255,255,255,0.05)"}}>
-                    <td style={{padding:"7px 10px",fontWeight:600,color:"#c0dac0"}}>{sup.label}</td>
-                    {Object.keys(RANGOS_ALTURA).map(est=>(
-                      <td key={est} style={{padding:"5px 6px",textAlign:"center",background:est===estacion?"rgba(251,191,36,0.05)":"transparent"}}>
-                        <input type="number" step="0.1" min="1" max="80"
-                          style={{...S.input,width:64,padding:"4px 6px",textAlign:"center",fontSize:12}}
-                          value={golfData.hocConfig?.[sup.id]?.[est] ?? HOC_DEFAULT[sup.id][est]}
-                          onChange={e=>setHoc(sup.id,est,e.target.value)}/>
-                      </td>
-                    ))}
-                  </tr>
-                ))}</tbody>
-              </table>
-            </div>
-            <div style={{fontSize:10,color:"#4a7a5a",marginTop:10}}>Valores en mm. Los cambios se guardan automáticamente.</div>
-          </div>
-
-          {/* Frecuencias Golf */}
-          {getAllElems&&getZD&&setElemFrecs&&(()=>{
-            const golfZonaObj2 = MACROZONAS_BASE.find(z=>z.id===31);
-            return golfZonaObj2 ? (
-              <div style={{marginTop:4}}>
-                <PanelFrecuenciasZona S={S} zonas={[golfZonaObj2]} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} esJefa={esJefa}/>
-              </div>
-            ) : null;
-          })()}
-        </div>
-        );
-      })()}
-
       {subTab==="eventos"&&rolLogueado!=="trabajador"&&(
         <div className="ein">
           {rolLogueado==="jefa"&&(
@@ -13558,193 +13398,173 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
             </div>
           ):(
             <div>
-              {/* ── Botón imprimir informe (materiales y maquinaria) ── */}
-              {(bodegaActiva==="b02"||bodegaActiva==="b04")&&(
-                <div style={{display:"flex",justifyContent:"flex-end",marginBottom:10,gap:8}}>
-                  <button style={{...S.btn,background:"rgba(59,130,246,0.12)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.25)",fontSize:12}}
-                    onClick={()=>{
-                      const items = bd.items||[];
-                      const movs = bd.movimientos||[];
-                      const esMaq = bodegaActiva==="b04";
-                      const hoyStr = new Date().toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"});
-                      // Gasto bencina por mes (solo maquinaria)
-                      const bencinaRows = !esMaq?"":(() => {
-                        const movsBenc = movs.filter(m=>m.tipo==="salida"&&(m.motivo||"").toLowerCase().includes("bencin"));
-                        const porMes = {};
-                        movsBenc.forEach(m=>{
-                          const mes = (m.fecha||"").slice(0,7);
-                          if(!porMes[mes]) porMes[mes]={litros:0,monto:0,n:0};
-                          porMes[mes].litros += Number(m.litros||0);
-                          porMes[mes].monto += Number(m.costoUnitario||0)*Number(m.cantidad||0)||Number(m.monto||0)||0;
-                          porMes[mes].n++;
-                        });
-                        const meses = Object.keys(porMes).sort();
-                        if(!meses.length) return "<p style='color:#888;font-size:11px'>Sin registros de bencina.</p>";
-                        const totalLts = meses.reduce((a,m)=>a+porMes[m].litros,0);
-                        const totalMonto = meses.reduce((a,m)=>a+porMes[m].monto,0);
-                        return `<h3 style="margin:18px 0 8px;font-size:13px;color:#c07a00;border-left:3px solid #c07a00;padding-left:8px">⛽ Seguimiento de Bencina</h3>
-                          <table style="width:100%;border-collapse:collapse;margin-bottom:12px">
-                            <thead><tr style="background:#fef3c7">
-                              <th style="padding:6px 10px;text-align:left;font-size:11px;border:1px solid #e0e0e0">Mes</th>
-                              <th style="padding:6px 10px;text-align:right;font-size:11px;border:1px solid #e0e0e0">Litros</th>
-                              <th style="padding:6px 10px;text-align:right;font-size:11px;border:1px solid #e0e0e0">Gasto</th>
-                              <th style="padding:6px 10px;text-align:right;font-size:11px;border:1px solid #e0e0e0">Cargas</th>
-                            </tr></thead>
-                            <tbody>${meses.map(m=>{
-                              const [yr,mo] = m.split("-");
-                              const label = new Date(Number(yr),Number(mo)-1,1).toLocaleDateString("es-CL",{month:"long",year:"numeric"});
-                              return `<tr><td style="padding:5px 10px;border:1px solid #e0e0e0;font-size:11px">${label}</td>
-                                <td style="padding:5px 10px;border:1px solid #e0e0e0;font-size:11px;text-align:right">${porMes[m].litros>0?porMes[m].litros.toFixed(1)+" L":"—"}</td>
-                                <td style="padding:5px 10px;border:1px solid #e0e0e0;font-size:11px;text-align:right">${porMes[m].monto>0?"$"+porMes[m].monto.toLocaleString("es-CL"):"—"}</td>
-                                <td style="padding:5px 10px;border:1px solid #e0e0e0;font-size:11px;text-align:right">${porMes[m].n}</td></tr>`;
-                            }).join("")}
-                            <tr style="background:#fef3c7;font-weight:700">
-                              <td style="padding:5px 10px;border:1px solid #e0e0e0;font-size:11px">TOTAL ACUMULADO</td>
-                              <td style="padding:5px 10px;border:1px solid #e0e0e0;font-size:11px;text-align:right">${totalLts>0?totalLts.toFixed(1)+" L":"—"}</td>
-                              <td style="padding:5px 10px;border:1px solid #e0e0e0;font-size:11px;text-align:right">${totalMonto>0?"$"+totalMonto.toLocaleString("es-CL"):"—"}</td>
-                              <td style="padding:5px 10px;border:1px solid #e0e0e0;font-size:11px;text-align:right">${movsBenc.length}</td>
-                            </tr></tbody>
-                          </table>`;
-                      })();
-                      // Items agrupados por categoría
-                      const cats = [...new Set(items.map(i=>i.categoria||"Sin categoría"))].sort();
-                      const itemsHTML = cats.map(cat=>{
-                        const its = items.filter(i=>(i.categoria||"Sin categoría")===cat);
-                        return `<h3 style="margin:14px 0 6px;font-size:12px;color:#1a5c2a;border-left:3px solid #1a5c2a;padding-left:8px">${cat}</h3>
-                        <table style="width:100%;border-collapse:collapse;margin-bottom:10px">
-                          <thead><tr style="background:#e8f5e9">
-                            <th style="padding:5px 8px;text-align:left;font-size:10px;border:1px solid #e0e0e0">Nombre</th>
-                            ${esMaq?`<th style="padding:5px 8px;font-size:10px;border:1px solid #e0e0e0">Marca/Modelo</th><th style="padding:5px 8px;font-size:10px;border:1px solid #e0e0e0">Horas</th>`:`<th style="padding:5px 8px;font-size:10px;border:1px solid #e0e0e0">Ubicación</th>`}
-                            <th style="padding:5px 8px;text-align:right;font-size:10px;border:1px solid #e0e0e0">Stock</th>
-                            <th style="padding:5px 8px;font-size:10px;border:1px solid #e0e0e0">Estado</th>
-                          </tr></thead>
-                          <tbody>${its.map((it,idx)=>{
-                            const bajo=Number(it.stockActual||0)<=Number(it.stockMinimo||0)&&Number(it.stockMinimo||0)>0;
-                            const agotado=Number(it.stockActual||0)===0;
-                            const est=agotado?"⛔ Sin stock":bajo?"⚠️ Bajo":"✅ OK";
-                            return `<tr style="background:${idx%2?"#fafafa":"#fff"}">
-                              <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${it.nombre}${it.obs?`<br><em style="font-size:9px;color:#888">${it.obs}</em>`:""}</td>
-                              ${esMaq?`<td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${it.marca||""} ${it.modelo||""}</td><td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:center">${it.horasUso||"—"}</td>`:`<td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${it.ubicacion||"—"}</td>`}
-                              <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right;font-weight:600">${it.stockActual} ${it.unidad||""}</td>
-                              <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${est}</td>
-                            </tr>`;
-                          }).join("")}</tbody>
-                        </table>`;
-                      }).join("");
-                      const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Informe ${bodega?.nombre}</title>
-                        <style>body{font-family:Arial,sans-serif;margin:24px;color:#1a1a1a;font-size:12px}h1{font-size:16px;color:#1a5c2a;margin:0 0 4px}h2{font-size:11px;color:#555;margin:0 0 14px}@media print{.noprint{display:none}}</style></head><body>
-                        <h1>Informe de Bodega — ${bodega?.nombre}</h1>
-                        <h2>Departamento de Áreas Verdes · Estadio Español · ${hoyStr}</h2>
-                        ${bencinaRows}
-                        <h3 style="margin:14px 0 6px;font-size:13px;color:#1a5c2a;border-bottom:2px solid #1a5c2a;padding-bottom:4px">📦 Inventario por Categoría</h3>
-                        ${itemsHTML}
-                        </body></html>`;
-                      const url=URL.createObjectURL(new Blob([html],{type:"text/html"}));
-                      const a=document.createElement("a");a.href=url;a.target="_blank";a.click();
-                      setTimeout(()=>URL.revokeObjectURL(url),5000);
-                    }}>🖨️ Imprimir informe</button>
-                </div>
-              )}
-
-              {/* ── Resumen bencina mes actual (solo Maquinaria) ── */}
+              {/* Bencina: panel de seguimiento (solo Maquinaria, desde Compras) */}
               {bodegaActiva==="b04"&&(()=>{
                 const mesActual = hoy.slice(0,7);
-                const movsBenc = (bd.movimientos||[]).filter(m=>m.tipo==="salida"&&(m.motivo||"").toLowerCase().includes("bencin"));
-                const estesMes = movsBenc.filter(m=>(m.fecha||"").startsWith(mesActual));
-                const totalLtsMes = estesMes.reduce((a,m)=>a+Number(m.litros||0),0);
-                const totalMontoMes = estesMes.reduce((a,m)=>a+Number(m.monto||0)||Number(m.costoUnitario||0)*Number(m.cantidad||0),0);
-                const totalLtsAcum = movsBenc.reduce((a,m)=>a+Number(m.litros||0),0);
-                const totalMontoAcum = movsBenc.reduce((a,m)=>a+Number(m.monto||0)||Number(m.costoUnitario||0)*Number(m.cantidad||0),0);
-                const mesLabel = new Date(mesActual+"-15").toLocaleDateString("es-CL",{month:"long",year:"numeric"});
-                if(!movsBenc.length) return null;
+                const comprasBenc = compras.filter(c=>{
+                  const desc = ((c.descripcion||"")+(c.items||[]).map(i=>i.descripcion||"").join(" ")).toLowerCase();
+                  return desc.includes("bencin")||desc.includes("combustib")||desc.includes("gasolina");
+                });
+                const porMes = {};
+                comprasBenc.forEach(c=>{
+                  const mes=(c.fecha||"").slice(0,7);
+                  if(!mes)return;
+                  if(!porMes[mes])porMes[mes]={monto:0,n:0};
+                  porMes[mes].monto+=Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
+                  porMes[mes].n++;
+                });
+                const estesMes=comprasBenc.filter(c=>(c.fecha||"").startsWith(mesActual));
+                const totalMontoMes=estesMes.reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
+                const totalMontoAcum=comprasBenc.reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
+                const mesLabel=new Date(mesActual+"-15").toLocaleDateString("es-CL",{month:"long",year:"numeric"});
+                if(!comprasBenc.length) return (
+                  <div style={{...S.card,padding:12,marginBottom:14,borderLeft:"3px solid #f97316",fontSize:11,color:"#7aaa80"}}>
+                    ⛽ <strong style={{color:"#f97316"}}>Seguimiento de Bencina</strong> — Registra las facturas de bencina en <em>Compras</em> y aparecerán aquí automáticamente.
+                  </div>
+                );
                 return (
                   <div style={{...S.card,padding:14,marginBottom:14,borderLeft:"3px solid #f97316",background:"rgba(249,115,22,0.04)"}}>
-                    <div style={{fontSize:12,fontWeight:700,color:"#f97316",marginBottom:8}}>⛽ Seguimiento de Bencina</div>
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                    <div style={{fontSize:12,fontWeight:700,color:"#f97316",marginBottom:8}}>⛽ Gasto en Bencina (desde Compras)</div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
                       <div style={{background:"rgba(255,255,255,0.04)",borderRadius:8,padding:"8px 12px"}}>
                         <div style={{fontSize:10,color:"#7aaa80",textTransform:"uppercase",marginBottom:2}}>Este mes ({mesLabel})</div>
-                        <div style={{fontSize:16,fontWeight:700,color:"#fbbf24"}}>{totalLtsMes>0?totalLtsMes.toFixed(1)+" L":"-"}</div>
-                        {totalMontoMes>0&&<div style={{fontSize:11,color:"#7aaa80"}}>${totalMontoMes.toLocaleString("es-CL")}</div>}
-                        <div style={{fontSize:10,color:"#5a7a5a"}}>{estesMes.length} carga{estesMes.length!==1?"s":""}</div>
+                        <div style={{fontSize:16,fontWeight:700,color:"#fbbf24"}}>${totalMontoMes.toLocaleString("es-CL")}</div>
+                        <div style={{fontSize:10,color:"#5a7a5a"}}>{estesMes.length} compra{estesMes.length!==1?"s":""}</div>
                       </div>
                       <div style={{background:"rgba(255,255,255,0.04)",borderRadius:8,padding:"8px 12px"}}>
                         <div style={{fontSize:10,color:"#7aaa80",textTransform:"uppercase",marginBottom:2}}>Acumulado total</div>
-                        <div style={{fontSize:16,fontWeight:700,color:"#f97316"}}>{totalLtsAcum>0?totalLtsAcum.toFixed(1)+" L":"-"}</div>
-                        {totalMontoAcum>0&&<div style={{fontSize:11,color:"#7aaa80"}}>${totalMontoAcum.toLocaleString("es-CL")}</div>}
-                        <div style={{fontSize:10,color:"#5a7a5a"}}>{movsBenc.length} carga{movsBenc.length!==1?"s":""}</div>
+                        <div style={{fontSize:16,fontWeight:700,color:"#f97316"}}>${totalMontoAcum.toLocaleString("es-CL")}</div>
+                        <div style={{fontSize:10,color:"#5a7a5a"}}>{comprasBenc.length} compra{comprasBenc.length!==1?"s":""}</div>
                       </div>
                     </div>
+                    {Object.keys(porMes).sort().reverse().slice(0,6).map(mes=>{
+                      const lbl=new Date(mes+"-15").toLocaleDateString("es-CL",{month:"long",year:"numeric"});
+                      return <div key={mes} style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#7aaa80",borderTop:"1px solid rgba(255,255,255,0.05)",paddingTop:4,marginTop:4}}>
+                        <span>{lbl}</span>
+                        <span style={{fontWeight:600,color:"#fbbf24"}}>${porMes[mes].monto.toLocaleString("es-CL")} <span style={{fontWeight:400,color:"#5a7a5a"}}>({porMes[mes].n})</span></span>
+                      </div>;
+                    })}
                   </div>
                 );
               })()}
-
-              {/* ── Lista de ítems agrupados por categoría ── */}
+              {/* Items agrupados por categoría (colapsables, orden alfabético) */}
               {(()=>{
-                const cats = [...new Set((bd.items||[]).map(i=>i.categoria||"Sin categoría"))].sort();
-                const [catsAbiertas,setCatsAbiertas] = React.useState(()=>Object.fromEntries(cats.map(c=>[c,true])));
-                return cats.map(cat=>{
-                  const its = (bd.items||[]).filter(i=>(i.categoria||"Sin categoría")===cat);
-                  const abierta = catsAbiertas[cat]!==false;
-                  return (
-                    <div key={cat} style={{marginBottom:10}}>
-                      <div onClick={()=>setCatsAbiertas(p=>({...p,[cat]:!abierta}))}
-                        style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",
-                          background:"rgba(255,255,255,0.04)",borderRadius:8,border:"1px solid rgba(255,255,255,0.08)",
-                          cursor:"pointer",marginBottom:abierta?6:0}}>
-                        <span style={{fontSize:12,fontWeight:700,color:bodega?.color||"#34d399"}}>{bodega?.icono||"📦"} {cat} <span style={{fontSize:11,fontWeight:400,color:"#5a9a7a"}}>({its.length})</span></span>
-                        <span style={{fontSize:10,color:"#5a9a7a",transform:abierta?"rotate(90deg)":"none",transition:"transform .15s"}}>▶</span>
-                      </div>
-                      {abierta&&(
-                        <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                          {its.map(item=>{
-                            const bajo=Number(item.stockActual||0)<=Number(item.stockMinimo||0)&&Number(item.stockMinimo||0)>0;
-                            const agotado=Number(item.stockActual||0)===0;
-                            const color=agotado?"#ef4444":bajo?"#f59e0b":"#22c55e";
-                            return (
-                              <div key={item.id} style={{...S.card,padding:14,borderLeft:`3px solid ${color}`}}>
-                                <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:8}}>
-                                  <div style={{flex:1}}>
-                                    <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:4}}>
-                                      <span style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700}}>{item.nombre}</span>
-                                      <span style={{...S.chip,background:agotado?"rgba(239,68,68,0.12)":bajo?"rgba(245,158,11,0.12)":"rgba(34,197,94,0.08)",color,fontSize:10}}>
-                                        {agotado?"⛔ Sin stock":bajo?"⚠️ Bajo":"✅ OK"}
-                                      </span>
-                                    </div>
-                                    <div style={{display:"flex",gap:14,flexWrap:"wrap",fontSize:12,color:"#7aaa80"}}>
-                                      {item.ubicacion&&<span>📍 {item.ubicacion}</span>}
-                                      <span style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color}}>{item.stockActual} <span style={{fontSize:12,fontWeight:400}}>{item.unidad}</span></span>
-                                      {Number(item.stockMinimo)>0&&<span style={{fontSize:11,color:"#5a8a6a"}}>mín: {item.stockMinimo}</span>}
-                                    </div>
-                                    {bodegaActiva==="b04"&&(item.marca||item.horasUso)&&(
-                                      <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:11,color:"#7aaa80",marginTop:4}}>
-                                        {item.marca&&<span>🏷️ {item.marca} {item.modelo}</span>}
-                                        {item.patente&&<span>🔢 {item.patente}</span>}
-                                        {item.horasUso&&<span>⏱️ {item.horasUso}h</span>}
-                                        {item.nivelAceite&&<span style={{color:item.nivelAceite==="OK"||item.nivelAceite==="Recién cambiado"?"#22c55e":"#ef4444"}}>🛢️ {item.nivelAceite}</span>}
-                                        {item.nivelCombustible&&<span style={{color:["Lleno","3/4"].includes(item.nivelCombustible)?"#22c55e":item.nivelCombustible==="1/2"?"#f59e0b":"#ef4444"}}>⛽ {item.nivelCombustible}</span>}
-                                        {item.proxMantención&&<span style={{color:"#f59e0b"}}>🔧 Próx: {item.proxMantención}h</span>}
-                                      </div>
-                                    )}
-                                    {item.obs&&<div style={{fontSize:11,color:"#5a8a6a",fontStyle:"italic",marginTop:3}}>{item.obs}</div>}
-                                  </div>
-                                  {esJefa&&(
-                                    <div style={{display:"flex",gap:6,flexShrink:0}}>
-                                      <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(34,197,94,0.12)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)"}}
-                                        onClick={()=>{setMovForm({...emptyMov,itemId:String(item.id),unidad:item.unidad||"unidad"});setShowMovForm(true);}}>± Mov.</button>
-                                      <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}}
-                                        onClick={()=>{setItemForm({nombre:item.nombre,categoria:item.categoria||"",descripcion:item.descripcion||"",unidad:item.unidad||"unidad",stockActual:item.stockActual||0,stockMinimo:item.stockMinimo||0,ubicacion:item.ubicacion||"",obs:item.obs||""});setMaqForm({marca:item.marca||"",modelo:item.modelo||"",patente:item.patente||"",horasUso:item.horasUso||0,nivelAceite:item.nivelAceite||"OK",nivelCombustible:item.nivelCombustible||"OK",proxMantención:item.proxMantención||""});setEditItemId(item.id);setShowItemForm(true);}}>✏️</button>
-                                      <button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>eliminarItem(item.id)}>🗑</button>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
+                const esMaq=bodegaActiva==="b04";
+                const cats=[...new Set((bd.items||[]).map(i=>i.categoria||"Sin categoría"))].sort();
+                const [catsAb,setCatsAb]=React.useState(()=>Object.fromEntries(cats.map(c=>[c,false])));
+                const [selMaq,setSelMaq]=React.useState([]);
+                return (<>
+                  {esMaq&&(bd.items||[]).length>0&&(
+                    <div style={{fontSize:11,color:"#7aaa80",marginBottom:8,display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                      <span>Selecciona equipos para el informe:</span>
+                      <button style={{...S.btn,fontSize:10,padding:"2px 8px",background:selMaq.length===(bd.items||[]).length?"rgba(249,115,22,0.15)":"transparent",border:"1px solid rgba(249,115,22,0.3)",color:"#f97316"}}
+                        onClick={()=>setSelMaq(selMaq.length===(bd.items||[]).length?[]:(bd.items||[]).map(i=>i.id))}>
+                        {selMaq.length===(bd.items||[]).length?"Deseleccionar todos":"Seleccionar todos"}
+                      </button>
+                      {selMaq.length>0&&<span style={{color:"#f97316"}}>{selMaq.length} seleccionado{selMaq.length!==1?"s":""}</span>}
                     </div>
-                  );
-                });
+                  )}
+                  {/* Botón imprimir informe */}
+                  {(bodegaActiva==="b02"||bodegaActiva==="b04")&&(
+                    <div style={{display:"flex",justifyContent:"flex-end",marginBottom:10}}>
+                      <button style={{...S.btn,background:"rgba(59,130,246,0.12)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.25)",fontSize:12}}
+                        onClick={()=>{
+                          const itemsParaInf = esMaq&&selMaq.length>0 ? (bd.items||[]).filter(i=>selMaq.includes(i.id)) : (bd.items||[]);
+                          const catsInf=[...new Set(itemsParaInf.map(i=>i.categoria||"Sin categoría"))].sort();
+                          const hoyStr=new Date().toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"});
+                          const bencHTML=esMaq&&compras?(()=>{
+                            const comprasBenc=compras.filter(c=>{const d=((c.descripcion||"")+(c.items||[]).map(i=>i.descripcion||"").join(" ")).toLowerCase();return d.includes("bencin")||d.includes("combustib");});
+                            if(!comprasBenc.length)return"";
+                            const pm={};comprasBenc.forEach(c=>{const mes=(c.fecha||"").slice(0,7);if(!mes)return;if(!pm[mes])pm[mes]={monto:0,n:0};pm[mes].monto+=Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);pm[mes].n++;});
+                            const total=comprasBenc.reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
+                            return `<h3 style="margin:18px 0 8px;font-size:13px;color:#c07a00;border-left:3px solid #c07a00;padding-left:8px">⛽ Gasto en Bencina</h3>
+                              <table style="width:65%;border-collapse:collapse;margin-bottom:12px"><thead><tr style="background:#fef3c7">
+                                <th style="padding:5px 10px;text-align:left;font-size:11px;border:1px solid #e0e0e0">Mes</th>
+                                <th style="padding:5px 10px;text-align:right;font-size:11px;border:1px solid #e0e0e0">Gasto</th>
+                                <th style="padding:5px 10px;text-align:right;font-size:11px;border:1px solid #e0e0e0">Compras</th>
+                              </tr></thead><tbody>
+                              ${Object.keys(pm).sort().map(mes=>{const lbl=new Date(mes+"-15").toLocaleDateString("es-CL",{month:"long",year:"numeric"});return`<tr><td style="padding:4px 10px;border:1px solid #e0e0e0;font-size:11px">${lbl}</td><td style="padding:4px 10px;border:1px solid #e0e0e0;font-size:11px;text-align:right;font-weight:600">$${pm[mes].monto.toLocaleString("es-CL")}</td><td style="padding:4px 10px;border:1px solid #e0e0e0;font-size:11px;text-align:right">${pm[mes].n}</td></tr>`;}).join("")}
+                              <tr style="background:#fef3c7;font-weight:700"><td style="padding:5px 10px;border:1px solid #e0e0e0;font-size:11px">TOTAL</td><td style="padding:5px 10px;border:1px solid #e0e0e0;font-size:11px;text-align:right">$${total.toLocaleString("es-CL")}</td><td style="padding:5px 10px;border:1px solid #e0e0e0;font-size:11px;text-align:right">${comprasBenc.length}</td></tr>
+                              </tbody></table>`;
+                          })():"";
+                          const itemsHTML=catsInf.map(cat=>{
+                            const its=itemsParaInf.filter(i=>(i.categoria||"Sin categoría")===cat).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+                            return `<h3 style="margin:14px 0 6px;font-size:12px;color:#1a5c2a;border-left:3px solid #1a5c2a;padding-left:8px">${cat}</h3>
+                            <table style="width:100%;border-collapse:collapse;margin-bottom:10px"><thead><tr style="background:#e8f5e9">
+                              <th style="padding:5px 8px;text-align:left;font-size:10px;border:1px solid #e0e0e0">Nombre</th>
+                              ${esMaq?'<th style="padding:5px 8px;font-size:10px;border:1px solid #e0e0e0">Marca/Modelo</th><th style="padding:5px 8px;font-size:10px;border:1px solid #e0e0e0">Horas</th>':'<th style="padding:5px 8px;font-size:10px;border:1px solid #e0e0e0">Ubicación</th>'}
+                              <th style="padding:5px 8px;text-align:right;font-size:10px;border:1px solid #e0e0e0">Stock</th>
+                              <th style="padding:5px 8px;font-size:10px;border:1px solid #e0e0e0">Estado</th>
+                            </tr></thead><tbody>
+                            ${its.map((it,idx)=>{const bajo=Number(it.stockActual||0)<=Number(it.stockMinimo||0)&&Number(it.stockMinimo||0)>0;const agotado=Number(it.stockActual||0)===0;const est=agotado?"⛔ Sin stock":bajo?"⚠️ Bajo":"✅ OK";return`<tr style="background:${idx%2?"#fafafa":"#fff"}"><td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${it.nombre}${it.obs?`<br><em style="font-size:9px;color:#888">${it.obs}</em>`:""}</td>${esMaq?`<td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${it.marca||""} ${it.modelo||""}</td><td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:center">${it.horasUso||"—"}</td>`:`<td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${it.ubicacion||"—"}</td>`}<td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right;font-weight:600">${it.stockActual} ${it.unidad||""}</td><td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${est}</td></tr>`;}).join("")}
+                            </tbody></table>`;
+                          }).join("");
+                          const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Informe ${bodega?.nombre}</title><style>body{font-family:Arial,sans-serif;margin:24px;color:#1a1a1a;font-size:12px}h1{font-size:16px;color:#1a5c2a;margin:0 0 4px}h2{font-size:11px;color:#555;margin:0 0 14px}</style></head><body><h1>Informe de Bodega — ${bodega?.nombre}</h1><h2>Departamento de Áreas Verdes · Estadio Español · ${hoyStr}</h2>${bencHTML}<h3 style="margin:14px 0 6px;font-size:13px;color:#1a5c2a;border-bottom:2px solid #1a5c2a;padding-bottom:4px">📦 Inventario por Categoría${esMaq&&selMaq.length>0?" (selección)":""}</h3>${itemsHTML}</body></html>`;
+                          const url=URL.createObjectURL(new Blob([html],{type:"text/html"}));const a=document.createElement("a");a.href=url;a.target="_blank";a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);
+                        }}>🖨️ Imprimir informe{esMaq&&selMaq.length>0?` (${selMaq.length} equipo${selMaq.length!==1?"s":""})`:""}</button>
+                    </div>
+                  )}
+                  {cats.map(cat=>{
+                    const its=(bd.items||[]).filter(i=>(i.categoria||"Sin categoría")===cat).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+                    const abierta=catsAb[cat]===true;
+                    return (
+                      <div key={cat} style={{marginBottom:10}}>
+                        <div onClick={()=>setCatsAb(p=>({...p,[cat]:!abierta}))}
+                          style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",background:"rgba(255,255,255,0.04)",borderRadius:8,border:"1px solid rgba(255,255,255,0.08)",cursor:"pointer",marginBottom:abierta?6:0}}>
+                          <span style={{fontSize:12,fontWeight:700,color:bodega?.color||"#34d399"}}>{bodega?.icono||"📦"} {cat} <span style={{fontSize:11,fontWeight:400,color:"#5a9a7a"}}>({its.length})</span></span>
+                          <span style={{fontSize:10,color:"#5a9a7a",transform:abierta?"rotate(90deg)":"none",transition:"transform .15s"}}>▶</span>
+                        </div>
+                        {abierta&&(
+                          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                            {its.map(item=>{
+                              const bajo=Number(item.stockActual||0)<=Number(item.stockMinimo||0)&&Number(item.stockMinimo||0)>0;
+                              const agotado=Number(item.stockActual||0)===0;
+                              const color=agotado?"#ef4444":bajo?"#f59e0b":"#22c55e";
+                              return (
+                                <div key={item.id} style={{...S.card,padding:14,borderLeft:`3px solid ${color}`,display:"flex",gap:10,alignItems:"start"}}>
+                                  {esMaq&&<input type="checkbox" checked={selMaq.includes(item.id)} onChange={()=>setSelMaq(p=>p.includes(item.id)?p.filter(x=>x!==item.id):[...p,item.id])} style={{marginTop:3,flexShrink:0}}/>}
+                                  <div style={{flex:1}}>
+                                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:8}}>
+                                      <div style={{flex:1}}>
+                                        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:4}}>
+                                          <span style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700}}>{item.nombre}</span>
+                                          <span style={{...S.chip,background:agotado?"rgba(239,68,68,0.12)":bajo?"rgba(245,158,11,0.12)":"rgba(34,197,94,0.08)",color,fontSize:10}}>{agotado?"⛔ Sin stock":bajo?"⚠️ Bajo":"✅ OK"}</span>
+                                        </div>
+                                        <div style={{display:"flex",gap:14,flexWrap:"wrap",fontSize:12,color:"#7aaa80"}}>
+                                          {item.ubicacion&&<span>📍 {item.ubicacion}</span>}
+                                          <span style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color}}>{item.stockActual} <span style={{fontSize:12,fontWeight:400}}>{item.unidad}</span></span>
+                                          {Number(item.stockMinimo)>0&&<span style={{fontSize:11,color:"#5a8a6a"}}>mín: {item.stockMinimo}</span>}
+                                        </div>
+                                        {bodegaActiva==="b04"&&(item.marca||item.horasUso)&&(
+                                          <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:11,color:"#7aaa80",marginTop:4}}>
+                                            {item.marca&&<span>🏷️ {item.marca} {item.modelo}</span>}
+                                            {item.patente&&<span>🔢 {item.patente}</span>}
+                                            {item.horasUso&&<span>⏱️ {item.horasUso}h</span>}
+                                            {item.nivelAceite&&<span style={{color:item.nivelAceite==="OK"||item.nivelAceite==="Recién cambiado"?"#22c55e":"#ef4444"}}>🛢️ {item.nivelAceite}</span>}
+                                            {item.nivelCombustible&&<span style={{color:["Lleno","3/4"].includes(item.nivelCombustible)?"#22c55e":item.nivelCombustible==="1/2"?"#f59e0b":"#ef4444"}}>⛽ {item.nivelCombustible}</span>}
+                                            {item.proxMantención&&<span style={{color:"#f59e0b"}}>🔧 Próx: {item.proxMantención}h</span>}
+                                          </div>
+                                        )}
+                                        {item.obs&&<div style={{fontSize:11,color:"#5a8a6a",fontStyle:"italic",marginTop:3}}>{item.obs}</div>}
+                                      </div>
+                                      {esJefa&&(
+                                        <div style={{display:"flex",gap:6,flexShrink:0}}>
+                                          <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(34,197,94,0.12)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)"}} onClick={()=>{setMovForm({...emptyMov,itemId:String(item.id),unidad:item.unidad||"unidad"});setShowMovForm(true);}}>± Mov.</button>
+                                          <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>{setItemForm({nombre:item.nombre,categoria:item.categoria||"",descripcion:item.descripcion||"",unidad:item.unidad||"unidad",stockActual:item.stockActual||0,stockMinimo:item.stockMinimo||0,ubicacion:item.ubicacion||"",obs:item.obs||""});setMaqForm({marca:item.marca||"",modelo:item.modelo||"",patente:item.patente||"",horasUso:item.horasUso||0,nivelAceite:item.nivelAceite||"OK",nivelCombustible:item.nivelCombustible||"OK",proxMantención:item.proxMantención||""});setEditItemId(item.id);setShowItemForm(true);}}>✏️</button>
+                                          <button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>eliminarItem(item.id)}>🗑</button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </>);
               })()}
             </div>
           )}
@@ -18717,7 +18537,7 @@ export default function App() {
 
         {/* GOLF */}
         {vista==="golf"&&(
-          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial} setVista={setVista} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} onCierreSectorial={()=>setShowCierreSectorial(true)} onNuevaAlerta={()=>{setAutoOpenAlerta(true);setVista("notificaciones");}} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs}
+          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial} setVista={setVista} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} onCierreSectorial={()=>setShowCierreSectorial(true)} onNuevaAlerta={()=>{setAutoOpenAlerta(true);setVista("notificaciones");}} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal}
             crearNotificacion={crearNotificacion}
             initialSubTab={golfInitTab}
             onRegistroGuardado={(tipo)=>{
