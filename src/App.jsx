@@ -13545,52 +13545,195 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
               <div style={{fontSize:12,marginTop:4}}>Usa "Inventario inicial" para cargar el stock actual</div>
             </div>
           ):(
-            <div style={{display:"flex",flexDirection:"column",gap:10}}>
-              {(bd.items||[]).map(item=>{
-                const bajo=Number(item.stockActual||0)<=Number(item.stockMinimo||0)&&Number(item.stockMinimo||0)>0;
-                const agotado=Number(item.stockActual||0)===0;
-                const color=agotado?"#ef4444":bajo?"#f59e0b":"#22c55e";
+            <div>
+              {/* ── Botón imprimir informe (materiales y maquinaria) ── */}
+              {(bodegaActiva==="b02"||bodegaActiva==="b04")&&(
+                <div style={{display:"flex",justifyContent:"flex-end",marginBottom:10,gap:8}}>
+                  <button style={{...S.btn,background:"rgba(59,130,246,0.12)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.25)",fontSize:12}}
+                    onClick={()=>{
+                      const items = bd.items||[];
+                      const movs = bd.movimientos||[];
+                      const esMaq = bodegaActiva==="b04";
+                      const hoyStr = new Date().toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"});
+                      // Gasto bencina por mes (solo maquinaria)
+                      const bencinaRows = !esMaq?"":(() => {
+                        const movsBenc = movs.filter(m=>m.tipo==="salida"&&(m.motivo||"").toLowerCase().includes("bencin"));
+                        const porMes = {};
+                        movsBenc.forEach(m=>{
+                          const mes = (m.fecha||"").slice(0,7);
+                          if(!porMes[mes]) porMes[mes]={litros:0,monto:0,n:0};
+                          porMes[mes].litros += Number(m.litros||0);
+                          porMes[mes].monto += Number(m.costoUnitario||0)*Number(m.cantidad||0)||Number(m.monto||0)||0;
+                          porMes[mes].n++;
+                        });
+                        const meses = Object.keys(porMes).sort();
+                        if(!meses.length) return "<p style='color:#888;font-size:11px'>Sin registros de bencina.</p>";
+                        const totalLts = meses.reduce((a,m)=>a+porMes[m].litros,0);
+                        const totalMonto = meses.reduce((a,m)=>a+porMes[m].monto,0);
+                        return `<h3 style="margin:18px 0 8px;font-size:13px;color:#c07a00;border-left:3px solid #c07a00;padding-left:8px">⛽ Seguimiento de Bencina</h3>
+                          <table style="width:100%;border-collapse:collapse;margin-bottom:12px">
+                            <thead><tr style="background:#fef3c7">
+                              <th style="padding:6px 10px;text-align:left;font-size:11px;border:1px solid #e0e0e0">Mes</th>
+                              <th style="padding:6px 10px;text-align:right;font-size:11px;border:1px solid #e0e0e0">Litros</th>
+                              <th style="padding:6px 10px;text-align:right;font-size:11px;border:1px solid #e0e0e0">Gasto</th>
+                              <th style="padding:6px 10px;text-align:right;font-size:11px;border:1px solid #e0e0e0">Cargas</th>
+                            </tr></thead>
+                            <tbody>${meses.map(m=>{
+                              const [yr,mo] = m.split("-");
+                              const label = new Date(Number(yr),Number(mo)-1,1).toLocaleDateString("es-CL",{month:"long",year:"numeric"});
+                              return `<tr><td style="padding:5px 10px;border:1px solid #e0e0e0;font-size:11px">${label}</td>
+                                <td style="padding:5px 10px;border:1px solid #e0e0e0;font-size:11px;text-align:right">${porMes[m].litros>0?porMes[m].litros.toFixed(1)+" L":"—"}</td>
+                                <td style="padding:5px 10px;border:1px solid #e0e0e0;font-size:11px;text-align:right">${porMes[m].monto>0?"$"+porMes[m].monto.toLocaleString("es-CL"):"—"}</td>
+                                <td style="padding:5px 10px;border:1px solid #e0e0e0;font-size:11px;text-align:right">${porMes[m].n}</td></tr>`;
+                            }).join("")}
+                            <tr style="background:#fef3c7;font-weight:700">
+                              <td style="padding:5px 10px;border:1px solid #e0e0e0;font-size:11px">TOTAL ACUMULADO</td>
+                              <td style="padding:5px 10px;border:1px solid #e0e0e0;font-size:11px;text-align:right">${totalLts>0?totalLts.toFixed(1)+" L":"—"}</td>
+                              <td style="padding:5px 10px;border:1px solid #e0e0e0;font-size:11px;text-align:right">${totalMonto>0?"$"+totalMonto.toLocaleString("es-CL"):"—"}</td>
+                              <td style="padding:5px 10px;border:1px solid #e0e0e0;font-size:11px;text-align:right">${movsBenc.length}</td>
+                            </tr></tbody>
+                          </table>`;
+                      })();
+                      // Items agrupados por categoría
+                      const cats = [...new Set(items.map(i=>i.categoria||"Sin categoría"))].sort();
+                      const itemsHTML = cats.map(cat=>{
+                        const its = items.filter(i=>(i.categoria||"Sin categoría")===cat);
+                        return `<h3 style="margin:14px 0 6px;font-size:12px;color:#1a5c2a;border-left:3px solid #1a5c2a;padding-left:8px">${cat}</h3>
+                        <table style="width:100%;border-collapse:collapse;margin-bottom:10px">
+                          <thead><tr style="background:#e8f5e9">
+                            <th style="padding:5px 8px;text-align:left;font-size:10px;border:1px solid #e0e0e0">Nombre</th>
+                            ${esMaq?`<th style="padding:5px 8px;font-size:10px;border:1px solid #e0e0e0">Marca/Modelo</th><th style="padding:5px 8px;font-size:10px;border:1px solid #e0e0e0">Horas</th>`:`<th style="padding:5px 8px;font-size:10px;border:1px solid #e0e0e0">Ubicación</th>`}
+                            <th style="padding:5px 8px;text-align:right;font-size:10px;border:1px solid #e0e0e0">Stock</th>
+                            <th style="padding:5px 8px;font-size:10px;border:1px solid #e0e0e0">Estado</th>
+                          </tr></thead>
+                          <tbody>${its.map((it,idx)=>{
+                            const bajo=Number(it.stockActual||0)<=Number(it.stockMinimo||0)&&Number(it.stockMinimo||0)>0;
+                            const agotado=Number(it.stockActual||0)===0;
+                            const est=agotado?"⛔ Sin stock":bajo?"⚠️ Bajo":"✅ OK";
+                            return `<tr style="background:${idx%2?"#fafafa":"#fff"}">
+                              <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${it.nombre}${it.obs?`<br><em style="font-size:9px;color:#888">${it.obs}</em>`:""}</td>
+                              ${esMaq?`<td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${it.marca||""} ${it.modelo||""}</td><td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:center">${it.horasUso||"—"}</td>`:`<td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${it.ubicacion||"—"}</td>`}
+                              <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right;font-weight:600">${it.stockActual} ${it.unidad||""}</td>
+                              <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${est}</td>
+                            </tr>`;
+                          }).join("")}</tbody>
+                        </table>`;
+                      }).join("");
+                      const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Informe ${bodega?.nombre}</title>
+                        <style>body{font-family:Arial,sans-serif;margin:24px;color:#1a1a1a;font-size:12px}h1{font-size:16px;color:#1a5c2a;margin:0 0 4px}h2{font-size:11px;color:#555;margin:0 0 14px}@media print{.noprint{display:none}}</style></head><body>
+                        <h1>Informe de Bodega — ${bodega?.nombre}</h1>
+                        <h2>Departamento de Áreas Verdes · Estadio Español · ${hoyStr}</h2>
+                        ${bencinaRows}
+                        <h3 style="margin:14px 0 6px;font-size:13px;color:#1a5c2a;border-bottom:2px solid #1a5c2a;padding-bottom:4px">📦 Inventario por Categoría</h3>
+                        ${itemsHTML}
+                        </body></html>`;
+                      const url=URL.createObjectURL(new Blob([html],{type:"text/html"}));
+                      const a=document.createElement("a");a.href=url;a.target="_blank";a.click();
+                      setTimeout(()=>URL.revokeObjectURL(url),5000);
+                    }}>🖨️ Imprimir informe</button>
+                </div>
+              )}
+
+              {/* ── Resumen bencina mes actual (solo Maquinaria) ── */}
+              {bodegaActiva==="b04"&&(()=>{
+                const mesActual = hoy.slice(0,7);
+                const movsBenc = (bd.movimientos||[]).filter(m=>m.tipo==="salida"&&(m.motivo||"").toLowerCase().includes("bencin"));
+                const estesMes = movsBenc.filter(m=>(m.fecha||"").startsWith(mesActual));
+                const totalLtsMes = estesMes.reduce((a,m)=>a+Number(m.litros||0),0);
+                const totalMontoMes = estesMes.reduce((a,m)=>a+Number(m.monto||0)||Number(m.costoUnitario||0)*Number(m.cantidad||0),0);
+                const totalLtsAcum = movsBenc.reduce((a,m)=>a+Number(m.litros||0),0);
+                const totalMontoAcum = movsBenc.reduce((a,m)=>a+Number(m.monto||0)||Number(m.costoUnitario||0)*Number(m.cantidad||0),0);
+                const mesLabel = new Date(mesActual+"-15").toLocaleDateString("es-CL",{month:"long",year:"numeric"});
+                if(!movsBenc.length) return null;
                 return (
-                  <div key={item.id} style={{...S.card,padding:14,borderLeft:`3px solid ${color}`}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:8}}>
-                      <div style={{flex:1}}>
-                        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:4}}>
-                          <span style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700}}>{item.nombre}</span>
-                          {item.categoria&&<span style={{...S.chip,fontSize:10,background:"rgba(255,255,255,0.06)",color:"#7aaa80"}}>{item.categoria}</span>}
-                          <span style={{...S.chip,background:agotado?"rgba(239,68,68,0.12)":bajo?"rgba(245,158,11,0.12)":"rgba(34,197,94,0.08)",color,fontSize:10}}>
-                            {agotado?"⛔ Sin stock":bajo?"⚠️ Bajo":"✅ OK"}
-                          </span>
-                        </div>
-                        <div style={{display:"flex",gap:14,flexWrap:"wrap",fontSize:12,color:"#7aaa80"}}>
-                          {item.ubicacion&&<span>📍 {item.ubicacion}</span>}
-                          <span style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color}}>{item.stockActual} <span style={{fontSize:12,fontWeight:400}}>{item.unidad}</span></span>
-                          {Number(item.stockMinimo)>0&&<span style={{fontSize:11,color:"#5a8a6a"}}>mín: {item.stockMinimo}</span>}
-                        </div>
-                        {bodegaActiva==="b04"&&(item.marca||item.horasUso)&&(
-                          <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:11,color:"#7aaa80",marginTop:4}}>
-                            {item.marca&&<span>🏷️ {item.marca} {item.modelo}</span>}
-                            {item.patente&&<span>🔢 {item.patente}</span>}
-                            {item.horasUso&&<span>⏱️ {item.horasUso}h</span>}
-                            {item.nivelAceite&&<span style={{color:item.nivelAceite==="OK"||item.nivelAceite==="Recién cambiado"?"#22c55e":"#ef4444"}}>🛢️ {item.nivelAceite}</span>}
-                            {item.nivelCombustible&&<span style={{color:["Lleno","3/4"].includes(item.nivelCombustible)?"#22c55e":item.nivelCombustible==="1/2"?"#f59e0b":"#ef4444"}}>⛽ {item.nivelCombustible}</span>}
-                            {item.proxMantención&&<span style={{color:"#f59e0b"}}>🔧 Próx: {item.proxMantención}h</span>}
-                          </div>
-                        )}
-                        {item.obs&&<div style={{fontSize:11,color:"#5a8a6a",fontStyle:"italic",marginTop:3}}>{item.obs}</div>}
+                  <div style={{...S.card,padding:14,marginBottom:14,borderLeft:"3px solid #f97316",background:"rgba(249,115,22,0.04)"}}>
+                    <div style={{fontSize:12,fontWeight:700,color:"#f97316",marginBottom:8}}>⛽ Seguimiento de Bencina</div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                      <div style={{background:"rgba(255,255,255,0.04)",borderRadius:8,padding:"8px 12px"}}>
+                        <div style={{fontSize:10,color:"#7aaa80",textTransform:"uppercase",marginBottom:2}}>Este mes ({mesLabel})</div>
+                        <div style={{fontSize:16,fontWeight:700,color:"#fbbf24"}}>{totalLtsMes>0?totalLtsMes.toFixed(1)+" L":"-"}</div>
+                        {totalMontoMes>0&&<div style={{fontSize:11,color:"#7aaa80"}}>${totalMontoMes.toLocaleString("es-CL")}</div>}
+                        <div style={{fontSize:10,color:"#5a7a5a"}}>{estesMes.length} carga{estesMes.length!==1?"s":""}</div>
                       </div>
-                      {esJefa&&(
-                        <div style={{display:"flex",gap:6,flexShrink:0}}>
-                          <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(34,197,94,0.12)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)"}}
-                            onClick={()=>{setMovForm({...emptyMov,itemId:String(item.id),unidad:item.unidad||"unidad"});setShowMovForm(true);}}>± Mov.</button>
-                          <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}}
-                            onClick={()=>{setItemForm({nombre:item.nombre,categoria:item.categoria||"",descripcion:item.descripcion||"",unidad:item.unidad||"unidad",stockActual:item.stockActual||0,stockMinimo:item.stockMinimo||0,ubicacion:item.ubicacion||"",obs:item.obs||""});setMaqForm({marca:item.marca||"",modelo:item.modelo||"",patente:item.patente||"",horasUso:item.horasUso||0,nivelAceite:item.nivelAceite||"OK",nivelCombustible:item.nivelCombustible||"OK",proxMantención:item.proxMantención||""});setEditItemId(item.id);setShowItemForm(true);}}>✏️</button>
-                          <button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>eliminarItem(item.id)}>🗑</button>
-                        </div>
-                      )}
+                      <div style={{background:"rgba(255,255,255,0.04)",borderRadius:8,padding:"8px 12px"}}>
+                        <div style={{fontSize:10,color:"#7aaa80",textTransform:"uppercase",marginBottom:2}}>Acumulado total</div>
+                        <div style={{fontSize:16,fontWeight:700,color:"#f97316"}}>{totalLtsAcum>0?totalLtsAcum.toFixed(1)+" L":"-"}</div>
+                        {totalMontoAcum>0&&<div style={{fontSize:11,color:"#7aaa80"}}>${totalMontoAcum.toLocaleString("es-CL")}</div>}
+                        <div style={{fontSize:10,color:"#5a7a5a"}}>{movsBenc.length} carga{movsBenc.length!==1?"s":""}</div>
+                      </div>
                     </div>
                   </div>
                 );
-              })}
+              })()}
+
+              {/* ── Lista de ítems agrupados por categoría ── */}
+              {(()=>{
+                const cats = [...new Set((bd.items||[]).map(i=>i.categoria||"Sin categoría"))].sort();
+                const [catsAbiertas,setCatsAbiertas] = React.useState(()=>Object.fromEntries(cats.map(c=>[c,true])));
+                return cats.map(cat=>{
+                  const its = (bd.items||[]).filter(i=>(i.categoria||"Sin categoría")===cat);
+                  const abierta = catsAbiertas[cat]!==false;
+                  return (
+                    <div key={cat} style={{marginBottom:10}}>
+                      <div onClick={()=>setCatsAbiertas(p=>({...p,[cat]:!abierta}))}
+                        style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",
+                          background:"rgba(255,255,255,0.04)",borderRadius:8,border:"1px solid rgba(255,255,255,0.08)",
+                          cursor:"pointer",marginBottom:abierta?6:0}}>
+                        <span style={{fontSize:12,fontWeight:700,color:bodega?.color||"#34d399"}}>{bodega?.icono||"📦"} {cat} <span style={{fontSize:11,fontWeight:400,color:"#5a9a7a"}}>({its.length})</span></span>
+                        <span style={{fontSize:10,color:"#5a9a7a",transform:abierta?"rotate(90deg)":"none",transition:"transform .15s"}}>▶</span>
+                      </div>
+                      {abierta&&(
+                        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                          {its.map(item=>{
+                            const bajo=Number(item.stockActual||0)<=Number(item.stockMinimo||0)&&Number(item.stockMinimo||0)>0;
+                            const agotado=Number(item.stockActual||0)===0;
+                            const color=agotado?"#ef4444":bajo?"#f59e0b":"#22c55e";
+                            return (
+                              <div key={item.id} style={{...S.card,padding:14,borderLeft:`3px solid ${color}`}}>
+                                <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:8}}>
+                                  <div style={{flex:1}}>
+                                    <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:4}}>
+                                      <span style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700}}>{item.nombre}</span>
+                                      <span style={{...S.chip,background:agotado?"rgba(239,68,68,0.12)":bajo?"rgba(245,158,11,0.12)":"rgba(34,197,94,0.08)",color,fontSize:10}}>
+                                        {agotado?"⛔ Sin stock":bajo?"⚠️ Bajo":"✅ OK"}
+                                      </span>
+                                    </div>
+                                    <div style={{display:"flex",gap:14,flexWrap:"wrap",fontSize:12,color:"#7aaa80"}}>
+                                      {item.ubicacion&&<span>📍 {item.ubicacion}</span>}
+                                      <span style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color}}>{item.stockActual} <span style={{fontSize:12,fontWeight:400}}>{item.unidad}</span></span>
+                                      {Number(item.stockMinimo)>0&&<span style={{fontSize:11,color:"#5a8a6a"}}>mín: {item.stockMinimo}</span>}
+                                    </div>
+                                    {bodegaActiva==="b04"&&(item.marca||item.horasUso)&&(
+                                      <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:11,color:"#7aaa80",marginTop:4}}>
+                                        {item.marca&&<span>🏷️ {item.marca} {item.modelo}</span>}
+                                        {item.patente&&<span>🔢 {item.patente}</span>}
+                                        {item.horasUso&&<span>⏱️ {item.horasUso}h</span>}
+                                        {item.nivelAceite&&<span style={{color:item.nivelAceite==="OK"||item.nivelAceite==="Recién cambiado"?"#22c55e":"#ef4444"}}>🛢️ {item.nivelAceite}</span>}
+                                        {item.nivelCombustible&&<span style={{color:["Lleno","3/4"].includes(item.nivelCombustible)?"#22c55e":item.nivelCombustible==="1/2"?"#f59e0b":"#ef4444"}}>⛽ {item.nivelCombustible}</span>}
+                                        {item.proxMantención&&<span style={{color:"#f59e0b"}}>🔧 Próx: {item.proxMantención}h</span>}
+                                      </div>
+                                    )}
+                                    {item.obs&&<div style={{fontSize:11,color:"#5a8a6a",fontStyle:"italic",marginTop:3}}>{item.obs}</div>}
+                                  </div>
+                                  {esJefa&&(
+                                    <div style={{display:"flex",gap:6,flexShrink:0}}>
+                                      <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(34,197,94,0.12)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)"}}
+                                        onClick={()=>{setMovForm({...emptyMov,itemId:String(item.id),unidad:item.unidad||"unidad"});setShowMovForm(true);}}>± Mov.</button>
+                                      <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}}
+                                        onClick={()=>{setItemForm({nombre:item.nombre,categoria:item.categoria||"",descripcion:item.descripcion||"",unidad:item.unidad||"unidad",stockActual:item.stockActual||0,stockMinimo:item.stockMinimo||0,ubicacion:item.ubicacion||"",obs:item.obs||""});setMaqForm({marca:item.marca||"",modelo:item.modelo||"",patente:item.patente||"",horasUso:item.horasUso||0,nivelAceite:item.nivelAceite||"OK",nivelCombustible:item.nivelCombustible||"OK",proxMantención:item.proxMantención||""});setEditItemId(item.id);setShowItemForm(true);}}>✏️</button>
+                                      <button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>eliminarItem(item.id)}>🗑</button>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
             </div>
           )}
         </div>
