@@ -11131,7 +11131,7 @@ function TareasGolfPanel({ tareasGolfHoy, hoy, esJefa, setTareasProg, tareasProg
 }
 
 
-function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito, onCierreSectorial, onNuevaAlerta, configSemanal={}, setConfigSemanal }) {
+function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito, onCierreSectorial, onNuevaAlerta, configSemanal={}, setConfigSemanal, getAllElems, getZD, setElemFrecs }) {
   const GOLF_ZONA_ID = 31; // ID macrozona Golf
   const sincronizarMacrozona = (tipo, detalle) => {
     if(!updateZona) return;
@@ -11176,6 +11176,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   const [showEventoForm, setShowEventoForm] = React.useState(false);
   const [showArbolForm,  setShowArbolForm]  = React.useState(false);
   const [showTareaForm,  setShowTareaForm]  = React.useState(null); // "green"|"tee"|"arbol"
+  const [previewGolfProp, setPreviewGolfProp] = React.useState(null);
   const [showDiariaForm, setShowDiariaForm] = React.useState(false);
   // ── Estado sección Humedad ──
   const [showHumForm,    setShowHumForm]    = React.useState(false);
@@ -11499,85 +11500,6 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           </div>
         )}
         {/* Humedad */}
-        {subTab==="config_golf"&&rolLogueado!=="trabajador"&&(()=>{
-          const setHoc = (superficie, est, valor) => {
-            const actual = golfData.hocConfig || {};
-            setG({hocConfig:{...actual,[superficie]:{...(actual[superficie]||{}),[est]:valor}}});
-          };
-          const setRespSemanal = (tipoId, nombre) => {
-            if(!setConfigSemanal) return;
-            setConfigSemanal(prev=>({...(prev||{}),[tipoId]:nombre}));
-          };
-          return (
-        <div className="ein">
-          <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,color:"#fbbf24",marginBottom:4}}>⚙️ Programación de Golf</div>
-          <div style={{fontSize:12,color:"#5a9a7a",marginBottom:18}}>Responsables fijos de la semana y altura de corte objetivo por superficie. Esto alimenta las sugerencias de 📅 Semana Golf y las tareas de corte.</div>
-
-          {/* ── Responsable único de la semana para toda el área Golf ── */}
-          <div style={{...S.card,padding:16,marginBottom:18}}>
-            <div style={{fontSize:13,fontWeight:700,color:"#34d399",marginBottom:4}}>👷 Responsable de Golf esta semana</div>
-            <div style={{fontSize:11,color:"#5a9a7a",marginBottom:12}}>Todas las tareas de Golf de la semana (corte, riego, fertilización, fitosanitario, búnkers, árboles, etc.) se asignarán por defecto a esta persona.</div>
-            <select style={{...S.input,maxWidth:320,fontSize:13}}
-              value={configSemanal?.corte_golf||""}
-              onChange={e=>setRespSemanal("corte_golf",e.target.value)}
-              disabled={!setConfigSemanal}>
-              <option value="">— Sin asignar —</option>
-              {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
-            </select>
-            {!setConfigSemanal&&<div style={{fontSize:11,color:"#f59e0b",marginTop:10}}>⚠️ No se pudo conectar la configuración semanal — recarga la página.</div>}
-          </div>
-
-          {/* ── Altura de corte objetivo (HOC) ── */}
-          <div style={{...S.card,padding:16}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4,flexWrap:"wrap",gap:8}}>
-              <div style={{fontSize:13,fontWeight:700,color:"#34d399"}}>✂️ Altura de corte objetivo (HOC) por superficie</div>
-              <span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.1)",border:"1px solid rgba(251,191,36,0.25)",borderRadius:8,padding:"2px 10px"}}>
-                Estación actual: {rango.label}
-              </span>
-            </div>
-            <div style={{fontSize:11,color:"#5a9a7a",marginBottom:14}}>Define a qué altura (mm) se corta cada superficie en cada estación del año. Se usa para calcular la urgencia de corte y sugerir la altura al programar tareas.</div>
-            <div style={{overflowX:"auto"}}>
-              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-                <thead>
-                  <tr style={{background:"rgba(52,211,153,0.08)"}}>
-                    <th style={{padding:"6px 10px",textAlign:"left",color:"#34d399",fontSize:10,textTransform:"uppercase"}}>Superficie</th>
-                    {Object.entries(RANGOS_ALTURA).map(([k,v])=>(
-                      <th key={k} style={{padding:"6px 8px",textAlign:"center",color:k===estacion?"#fbbf24":"#5a9a7a",fontSize:10,fontWeight:k===estacion?700:400}}>
-                        {v.label.split(" ")[0]}{k===estacion&&" ←"}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {HOC_SUPERFICIES.map(sup=>(
-                    <tr key={sup.id} style={{borderTop:"1px solid rgba(255,255,255,0.05)"}}>
-                      <td style={{padding:"7px 10px",fontWeight:600,color:"#c0dac0"}}>{sup.label}</td>
-                      {Object.keys(RANGOS_ALTURA).map(est=>(
-                        <td key={est} style={{padding:"5px 6px",textAlign:"center",background:est===estacion?"rgba(251,191,36,0.05)":"transparent"}}>
-                          <input type="number" step="0.1" min="1" max="80"
-                            style={{...S.input,width:64,padding:"4px 6px",textAlign:"center",fontSize:12}}
-                            value={golfData.hocConfig?.[sup.id]?.[est] ?? HOC_DEFAULT[sup.id][est]}
-                            onChange={e=>setHoc(sup.id,est,e.target.value)}/>
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div style={{fontSize:10,color:"#4a7a5a",marginTop:10}}>Valores en mm. Los cambios se guardan automáticamente.</div>
-          </div>
-        </div>
-          );
-        })()}
-
-      {subTab==="humedad"&&(
-          <SeccionHumedad S={S} golfData={golfData} setG={setG} listaPersonal={listaPersonal}
-            hoy={hoy} esJefa={false} tareasProg={tareasProg} setTareasProg={setTareasProg}
-            showHumForm={showHumForm} setShowHumForm={setShowHumForm}
-            humForm={humForm} setHumForm={setHumForm} emptyHumForm={emptyHumForm}
-            onRegistroGuardado={onRegistroGuardado} crearNotificacion={crearNotificacion}/>
-        )}
       </div>
     );
   }
@@ -12904,6 +12826,135 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           })()}
         </div>
       )}
+
+      {/* ── PROGRAMACIÓN DE GOLF ── */}
+      {subTab==="config_golf"&&rolLogueado!=="trabajador"&&(()=>{
+        const setHoc=(superficie,est,valor)=>{const actual=golfData.hocConfig||{};setG({hocConfig:{...actual,[superficie]:{...(actual[superficie]||{}),[est]:valor}}});};
+        const setRespSemanal=(tipoId,nombre)=>{if(!setConfigSemanal)return;setConfigSemanal(prev=>({...(prev||{}),[tipoId]:nombre}));};
+        const proponerTareasGolf=()=>{
+          if(!getAllElems||!getZD||!setTareasProg)return;
+          const golfZonaObj=MACROZONAS_BASE.find(z=>z.id===31);if(!golfZonaObj)return;
+          const zdatG=getZD(31);const nombreZona=zdatG.nombreCustom||golfZonaObj.nombre;
+          const elems=getAllElems(31);
+          const tareasHoyArr=Array.isArray(tareasProg[hoy])?tareasProg[hoy]:Object.values(tareasProg[hoy]||{});
+          const existentes=tareasHoyArr.map(t=>t.zona+"_"+t.elemento+"_"+t.tarea);
+          const estProp=estacionDeFecha(hoy);const propuestas=[];const vencidas=[];
+          elems.forEach(e=>{
+            const zdatElem=zdatG.elementos?.[e.id]||(zdatG.elementosCustom||[]).find(x=>x.id===e.id);
+            const frecs=zdatElem?.frecuencias||[];
+            frecs.forEach(f=>{
+              const key=nombreZona+"_"+e.nombre+"_"+f.tarea;
+              if(existentes.includes(key))return;
+              const prox=calcProximaFrecGlobal(f,hoy);
+              if(!prox||prox.diff>0)return;
+              const esVencida=prox.diff<0;const diasVencida=Math.abs(prox.diff);
+              const respDefault=configSemanal?.corte_golf||"";
+              const notaAltura=f.alturaCorte?`Cortar a: ${f.alturaCorte} ${f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="pulgadas"?"pulgadas":"milímetros"}.`:"";
+              propuestas.push({id:Date.now()+Math.random(),fecha:hoy,zona:nombreZona,elemento:e.nombre,tarea:f.tarea,responsable:respDefault,estado:respDefault?"pendiente":"por_designar",notas:[notaAltura,f.obs].filter(Boolean).join(" "),alturaCorte:f.alturaCorte||"",unidadAlturaCorte:f.unidadAlturaCorte||"mm",estacion:estProp,auto:true,fechaCorrespondiente:prox.fecha,origenZid:"31",origenEid:e.id,origenFrecId:f.id,origenEsCustom:!!e.isCustom,diasVencida:esVencida?diasVencida:0});
+              if(esVencida)vencidas.push(e.nombre+" — "+f.tarea+" ("+diasVencida+"d vencida)");
+            });
+          });
+          if(propuestas.length===0){alert("No hay tareas de Golf pendientes según las frecuencias definidas para hoy.");return;}
+          const propOrdenadas=[...propuestas].sort((a,b)=>a.tarea.localeCompare(b.tarea,"es",{sensitivity:"base"}));
+          setPreviewGolfProp(propOrdenadas.map(p=>({...p,incluir:true,abierta:false})));
+        };
+        const confirmarEnvioGolf=()=>{
+          const aEnviar=(previewGolfProp||[]).filter(p=>p.incluir).map(({incluir,abierta,...t})=>t);
+          if(aEnviar.length===0){setPreviewGolfProp(null);return;}
+          const tareasHoyArr=Array.isArray(tareasProg[hoy])?tareasProg[hoy]:Object.values(tareasProg[hoy]||{});
+          setTareasProg(prev=>({...prev,[hoy]:[...tareasHoyArr,...aEnviar]}));
+          setPreviewGolfProp(null);
+          alert(`✅ ${aEnviar.length} tarea(s) de Golf enviadas al jardinero.`);
+        };
+        return (
+        <div className="ein">
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:4}}>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,color:"#fbbf24"}}>⚙️ Programación de Golf</div>
+            <div style={{fontSize:11,color:"#7aaa80"}}>{hoy}</div>
+            <button className="btn-p" style={S.btn} onClick={proponerTareasGolf}>✨ Proponer del día</button>
+          </div>
+          <div style={{fontSize:12,color:"#5a9a7a",marginBottom:18}}>Responsables fijos de la semana y altura de corte objetivo por superficie.</div>
+
+          {previewGolfProp&&(
+            <div style={{...S.card,padding:16,marginBottom:18,border:"1px solid rgba(96,165,250,0.3)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                <div style={{fontSize:13,fontWeight:700,color:"#60a5fa"}}>👁️ Vista previa — tareas para {hoy}</div>
+                <span style={{fontSize:11,color:"#5a9a7a"}}>{previewGolfProp.filter(p=>p.incluir).length}/{previewGolfProp.length} seleccionadas</span>
+              </div>
+              <div style={{fontSize:11,color:"#5a9a7a",marginBottom:12}}>Desmarca las que no quieras enviar hoy. Quedarán como vencidas para el próximo Proponer del día.</div>
+              <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:12}}>
+                {previewGolfProp.map((p,i)=>(
+                  <div key={p.id} style={{borderRadius:8,border:`1px solid ${p.incluir?"rgba(255,255,255,0.08)":"rgba(255,255,255,0.03)"}`,overflow:"hidden",opacity:p.incluir?1:0.5}}>
+                    <div onClick={()=>setPreviewGolfProp(prev=>prev.map((x,xi)=>xi===i?{...x,abierta:!x.abierta}:x))}
+                      style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",cursor:"pointer",background:p.incluir?"rgba(255,255,255,0.03)":"transparent"}}>
+                      <input type="checkbox" checked={p.incluir} onClick={e=>e.stopPropagation()} onChange={()=>setPreviewGolfProp(prev=>prev.map((x,xi)=>xi===i?{...x,incluir:!x.incluir}:x))}/>
+                      <span style={{fontSize:10,color:"#5a9a7a",transform:p.abierta?"rotate(90deg)":"none",transition:"transform .15s",display:"inline-block"}}>▶</span>
+                      <div style={{flex:1}}>
+                        <span style={{fontSize:12,fontWeight:600}}>{p.tarea}</span>
+                        <span style={{fontSize:11,color:"#5a9a7a",marginLeft:6}}>· {p.elemento}</span>
+                        {p.diasVencida>0&&<span style={{fontSize:10,color:"#f87171",marginLeft:6,background:"rgba(248,113,113,0.1)",padding:"1px 6px",borderRadius:8}}>⚠️ {p.diasVencida}d vencida</span>}
+                      </div>
+                      <select value={p.responsable||""} onClick={e=>e.stopPropagation()} onChange={e=>setPreviewGolfProp(prev=>prev.map((x,xi)=>xi===i?{...x,responsable:e.target.value,estado:e.target.value?"pendiente":"por_designar"}:x))}
+                        style={{...S.input,fontSize:11,padding:"3px 7px",maxWidth:150}}>
+                        <option value="">— Por designar —</option>
+                        {listaPersonal.map(pp=><option key={pp.id} value={pp.nombre}>{pp.nombre}</option>)}
+                      </select>
+                    </div>
+                    {p.abierta&&(
+                      <div style={{padding:"6px 14px 10px 14px",background:"rgba(0,0,0,0.1)",fontSize:11,color:"#5a9a7a"}}>
+                        {p.notas&&<div>📋 {p.notas}</div>}
+                        {p.alturaCorte&&<div style={{color:"#fbbf24",fontWeight:600}}>✂️ Cortar a: {p.alturaCorte}{p.unidadAlturaCorte||"mm"}</div>}
+                        <div>📍 {p.zona} · {p.elemento}</div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button className="btn-p" style={S.btn} onClick={confirmarEnvioGolf}>✅ Confirmar y enviar al jardinero</button>
+                <button style={{...S.btn,background:"transparent",border:"1px solid rgba(255,255,255,0.15)",color:"#7aaa80"}} onClick={()=>setPreviewGolfProp(null)}>Cancelar</button>
+              </div>
+            </div>
+          )}
+
+          <div style={{...S.card,padding:16,marginBottom:18}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#34d399",marginBottom:4}}>👷 Responsable de Golf esta semana</div>
+            <div style={{fontSize:11,color:"#5a9a7a",marginBottom:12}}>Todas las tareas de Golf se asignan por defecto a esta persona.</div>
+            <select style={{...S.input,maxWidth:320,fontSize:13}} value={configSemanal?.corte_golf||""} onChange={e=>setRespSemanal("corte_golf",e.target.value)} disabled={!setConfigSemanal}>
+              <option value="">— Sin asignar —</option>
+              {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+            </select>
+          </div>
+
+          <div style={{...S.card,padding:16,marginBottom:18}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4,flexWrap:"wrap",gap:8}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#34d399"}}>✂️ Altura de corte objetivo (HOC) por superficie</div>
+              <span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.1)",border:"1px solid rgba(251,191,36,0.25)",borderRadius:8,padding:"2px 10px"}}>Estación actual: {rango.label}</span>
+            </div>
+            <div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                <thead><tr style={{background:"rgba(52,211,153,0.08)"}}>
+                  <th style={{padding:"6px 10px",textAlign:"left",color:"#34d399",fontSize:10,textTransform:"uppercase"}}>Superficie</th>
+                  {Object.entries(RANGOS_ALTURA).map(([k,v])=>(<th key={k} style={{padding:"6px 8px",textAlign:"center",color:k===estacion?"#fbbf24":"#5a9a7a",fontSize:10,fontWeight:k===estacion?700:400}}>{v.label.split(" ")[0]}{k===estacion&&" ←"}</th>))}
+                </tr></thead>
+                <tbody>{HOC_SUPERFICIES.map(sup=>(<tr key={sup.id} style={{borderTop:"1px solid rgba(255,255,255,0.05)"}}>
+                  <td style={{padding:"7px 10px",fontWeight:600,color:"#c0dac0"}}>{sup.label}</td>
+                  {Object.keys(RANGOS_ALTURA).map(est=>(<td key={est} style={{padding:"5px 6px",textAlign:"center",background:est===estacion?"rgba(251,191,36,0.05)":"transparent"}}>
+                    <input type="number" step="0.1" min="1" max="80" style={{...S.input,width:64,padding:"4px 6px",textAlign:"center",fontSize:12}} value={golfData.hocConfig?.[sup.id]?.[est]??HOC_DEFAULT[sup.id][est]} onChange={e=>setHoc(sup.id,est,e.target.value)}/>
+                  </td>))}
+                </tr>))}</tbody>
+              </table>
+            </div>
+            <div style={{fontSize:10,color:"#4a7a5a",marginTop:10}}>Valores en mm. Los cambios se guardan automáticamente.</div>
+          </div>
+
+          {getAllElems&&getZD&&setElemFrecs&&(()=>{
+            const golfZonaObj2=MACROZONAS_BASE.find(z=>z.id===31);
+            return golfZonaObj2?(<div style={{marginTop:4}}><PanelFrecuenciasZona S={S} zonas={[golfZonaObj2]} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} esJefa={esJefa}/></div>):null;
+          })()}
+        </div>
+        );
+      })()}
 
       {subTab==="eventos"&&rolLogueado!=="trabajador"&&(
         <div className="ein">
@@ -18587,7 +18638,7 @@ export default function App() {
 
         {/* GOLF */}
         {vista==="golf"&&(
-          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial} setVista={setVista} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} onCierreSectorial={()=>setShowCierreSectorial(true)} onNuevaAlerta={()=>{setAutoOpenAlerta(true);setVista("notificaciones");}} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal}
+          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial} setVista={setVista} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} onCierreSectorial={()=>setShowCierreSectorial(true)} onNuevaAlerta={()=>{setAutoOpenAlerta(true);setVista("notificaciones");}} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs}
             crearNotificacion={crearNotificacion}
             initialSubTab={golfInitTab}
             onRegistroGuardado={(tipo)=>{
