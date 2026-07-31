@@ -13484,19 +13484,47 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
                           const catsInf=[...new Set(itemsParaInf.map(i=>i.categoria||"Sin categoría"))].sort();
                           const hoyStr=new Date().toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"});
                           const bencHTML=esMaq&&compras?(()=>{
-                            const comprasBenc=compras.filter(c=>{const d=((c.descripcion||"")+(c.items||[]).map(i=>i.descripcion||"").join(" ")).toLowerCase();return d.includes("bencin")||d.includes("combustib");});
+                            const comprasBenc=compras.filter(c=>{const d=((c.descripcion||"")+(c.items||[]).map(i=>i.descripcion||"").join(" ")).toLowerCase();const cat=(c.items||[]).some(i=>(i.categoria||"").toLowerCase().includes("combustib"));return d.includes("bencin")||d.includes("combustib")||d.includes("gasolina")||cat;});
                             if(!comprasBenc.length)return"";
-                            const pm={};comprasBenc.forEach(c=>{const mes=(c.fecha||"").slice(0,7);if(!mes)return;if(!pm[mes])pm[mes]={monto:0,n:0};pm[mes].monto+=Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);pm[mes].n++;});
-                            const total=comprasBenc.reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
-                            return `<h3 style="margin:18px 0 8px;font-size:13px;color:#c07a00;border-left:3px solid #c07a00;padding-left:8px">⛽ Gasto en Bencina</h3>
-                              <table style="width:65%;border-collapse:collapse;margin-bottom:12px"><thead><tr style="background:#fef3c7">
-                                <th style="padding:5px 10px;text-align:left;font-size:11px;border:1px solid #e0e0e0">Mes</th>
-                                <th style="padding:5px 10px;text-align:right;font-size:11px;border:1px solid #e0e0e0">Gasto</th>
-                                <th style="padding:5px 10px;text-align:right;font-size:11px;border:1px solid #e0e0e0">Compras</th>
-                              </tr></thead><tbody>
-                              ${Object.keys(pm).sort().map(mes=>{const lbl=new Date(mes+"-15").toLocaleDateString("es-CL",{month:"long",year:"numeric"});return`<tr><td style="padding:4px 10px;border:1px solid #e0e0e0;font-size:11px">${lbl}</td><td style="padding:4px 10px;border:1px solid #e0e0e0;font-size:11px;text-align:right;font-weight:600">$${pm[mes].monto.toLocaleString("es-CL")}</td><td style="padding:4px 10px;border:1px solid #e0e0e0;font-size:11px;text-align:right">${pm[mes].n}</td></tr>`;}).join("")}
-                              <tr style="background:#fef3c7;font-weight:700"><td style="padding:5px 10px;border:1px solid #e0e0e0;font-size:11px">TOTAL</td><td style="padding:5px 10px;border:1px solid #e0e0e0;font-size:11px;text-align:right">$${total.toLocaleString("es-CL")}</td><td style="padding:5px 10px;border:1px solid #e0e0e0;font-size:11px;text-align:right">${comprasBenc.length}</td></tr>
-                              </tbody></table>`;
+                            const getLts=c=>(c.items||[]).filter(i=>{const u=(i.unidad||"").toLowerCase();const ct=(i.categoria||"").toLowerCase();return(u==="l"||u==="litros"||u==="litro")&&ct.includes("combustib");}).reduce((a,i)=>a+Number(i.cantidad||0),0);
+                            const getMto=c=>Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
+                            const pm={};comprasBenc.forEach(c=>{const mes=(c.fecha||"").slice(0,7);if(!mes)return;if(!pm[mes])pm[mes]={monto:0,litros:0,n:0};pm[mes].monto+=getMto(c);pm[mes].litros+=getLts(c);pm[mes].n++;});
+                            const totalMonto=comprasBenc.reduce((a,c)=>a+getMto(c),0);
+                            const totalLts=comprasBenc.reduce((a,c)=>a+getLts(c),0);
+                            const mesActualStr=new Date().toISOString().slice(0,7);
+                            const estesMes=comprasBenc.filter(c=>(c.fecha||"").startsWith(mesActualStr));
+                            const mesMonto=estesMes.reduce((a,c)=>a+getMto(c),0);
+                            const mesLts=estesMes.reduce((a,c)=>a+getLts(c),0);
+                            const mesLabel=new Date(mesActualStr+"-15").toLocaleDateString("es-CL",{month:"long",year:"numeric"});
+                            return `<h3 style="margin:18px 0 10px;font-size:13px;color:#c07a00;border-left:3px solid #c07a00;padding-left:8px">⛽ Gasto en Bencina (desde Compras)</h3>
+                              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+                                <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;padding:10px 14px">
+                                  <div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:4px">Este mes (${mesLabel})</div>
+                                  ${mesLts>0?`<div style="font-size:15px;font-weight:700;color:#d97706">${mesLts.toFixed(1)} L</div>`:""}
+                                  <div style="font-size:14px;font-weight:700;color:#92400e">$${mesMonto.toLocaleString("es-CL")}</div>
+                                  ${mesLts>0?`<div style="font-size:9px;color:#888">$${Math.round(mesMonto/mesLts).toLocaleString("es-CL")}/L promedio</div>`:""}
+                                  <div style="font-size:9px;color:#888">${estesMes.length} compra${estesMes.length!==1?"s":""}</div>
+                                </div>
+                                <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;padding:10px 14px">
+                                  <div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:4px">Acumulado total</div>
+                                  ${totalLts>0?`<div style="font-size:15px;font-weight:700;color:#d97706">${totalLts.toFixed(1)} L</div>`:""}
+                                  <div style="font-size:14px;font-weight:700;color:#92400e">$${totalMonto.toLocaleString("es-CL")}</div>
+                                  ${totalLts>0?`<div style="font-size:9px;color:#888">$${Math.round(totalMonto/totalLts).toLocaleString("es-CL")}/L promedio</div>`:""}
+                                  <div style="font-size:9px;color:#888">${comprasBenc.length} compra${comprasBenc.length!==1?"s":""}</div>
+                                </div>
+                              </div>
+                              <div style="font-size:9px;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Historial mensual</div>
+                              <table style="width:75%;border-collapse:collapse;margin-bottom:14px">
+                                <thead><tr style="background:#fef3c7">
+                                  <th style="padding:5px 10px;text-align:left;font-size:11px;border:1px solid #e0e0e0">Mes</th>
+                                  <th style="padding:5px 10px;text-align:right;font-size:11px;border:1px solid #e0e0e0">Litros</th>
+                                  <th style="padding:5px 10px;text-align:right;font-size:11px;border:1px solid #e0e0e0">Gasto</th>
+                                  <th style="padding:5px 10px;text-align:right;font-size:11px;border:1px solid #e0e0e0">$/L</th>
+                                  <th style="padding:5px 10px;text-align:right;font-size:11px;border:1px solid #e0e0e0">Compras</th>
+                                </tr></thead>
+                                <tbody>${Object.keys(pm).sort().reverse().map(mes=>{const lbl=new Date(mes+"-15").toLocaleDateString("es-CL",{month:"long",year:"numeric"});const pxL=pm[mes].litros>0?Math.round(pm[mes].monto/pm[mes].litros):null;return`<tr><td style="padding:4px 10px;border:1px solid #e0e0e0;font-size:11px">${lbl}</td><td style="padding:4px 10px;border:1px solid #e0e0e0;font-size:11px;text-align:right">${pm[mes].litros>0?pm[mes].litros.toFixed(1)+" L":"—"}</td><td style="padding:4px 10px;border:1px solid #e0e0e0;font-size:11px;text-align:right;font-weight:600">$${pm[mes].monto.toLocaleString("es-CL")}</td><td style="padding:4px 10px;border:1px solid #e0e0e0;font-size:11px;text-align:right">${pxL?"$"+pxL.toLocaleString("es-CL"):"—"}</td><td style="padding:4px 10px;border:1px solid #e0e0e0;font-size:11px;text-align:right">${pm[mes].n}</td></tr>`;}).join("")}
+                                <tr style="background:#fef3c7;font-weight:700"><td style="padding:5px 10px;border:1px solid #e0e0e0;font-size:11px">TOTAL</td><td style="padding:5px 10px;border:1px solid #e0e0e0;font-size:11px;text-align:right">${totalLts>0?totalLts.toFixed(1)+" L":"—"}</td><td style="padding:5px 10px;border:1px solid #e0e0e0;font-size:11px;text-align:right">$${totalMonto.toLocaleString("es-CL")}</td><td style="padding:5px 10px;border:1px solid #e0e0e0;font-size:11px;text-align:right">${totalLts>0?"$"+Math.round(totalMonto/totalLts).toLocaleString("es-CL"):"—"}</td><td style="padding:5px 10px;border:1px solid #e0e0e0;font-size:11px;text-align:right">${comprasBenc.length}</td></tr>
+                                </tbody></table>`;
                           })():"";
                           const itemsHTML=catsInf.map(cat=>{
                             const its=itemsParaInf.filter(i=>(i.categoria||"Sin categoría")===cat).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
