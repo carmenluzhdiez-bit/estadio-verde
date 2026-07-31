@@ -8018,7 +8018,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
       porCuentaRend[c.cuenta].total += Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
       porCuentaRend[c.cuenta].n++;
     });
-    const filas = itemsRend.map(optC=>{
+    const filas = itemsRend.map(c=>{
       const items = c.items||[{descripcion:c.descripcion,cantidad:c.cantidad||1,unidad:c.unidad||"unidad",totalNeto:c.totalNeto||0,iva:c.iva||0,totalBruto:c.totalBruto||0}];
       const totalDoc = Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
       const notasVinc = compras.filter(np=>np.facturaId===c.id);
@@ -13402,46 +13402,56 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
               {bodegaActiva==="b04"&&(()=>{
                 const mesActual = hoy.slice(0,7);
                 const comprasBenc = compras.filter(c=>{
-                  const desc = ((c.descripcion||"")+(c.items||[]).map(i=>i.descripcion||"").join(" ")).toLowerCase();
-                  return desc.includes("bencin")||desc.includes("combustib")||desc.includes("gasolina");
+                  const desc=((c.descripcion||"")+(c.items||[]).map(i=>i.descripcion||"").join(" ")).toLowerCase();
+                  const catMatch=(c.items||[]).some(i=>(i.categoria||"").toLowerCase().includes("combustib"));
+                  return desc.includes("bencin")||desc.includes("combustib")||desc.includes("gasolina")||catMatch;
                 });
-                const porMes = {};
-                comprasBenc.forEach(c=>{
-                  const mes=(c.fecha||"").slice(0,7);
-                  if(!mes)return;
-                  if(!porMes[mes])porMes[mes]={monto:0,n:0};
-                  porMes[mes].monto+=Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
-                  porMes[mes].n++;
-                });
-                const estesMes=comprasBenc.filter(c=>(c.fecha||"").startsWith(mesActual));
-                const totalMontoMes=estesMes.reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
-                const totalMontoAcum=comprasBenc.reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
-                const mesLabel=new Date(mesActual+"-15").toLocaleDateString("es-CL",{month:"long",year:"numeric"});
                 if(!comprasBenc.length) return (
                   <div style={{...S.card,padding:12,marginBottom:14,borderLeft:"3px solid #f97316",fontSize:11,color:"#7aaa80"}}>
-                    ⛽ <strong style={{color:"#f97316"}}>Seguimiento de Bencina</strong> — Registra las facturas de bencina en <em>Compras</em> y aparecerán aquí automáticamente.
+                    ⛽ <strong style={{color:"#f97316"}}>Seguimiento de Bencina</strong> — Registra las facturas en <em>Compras</em> con categoría "Combustible" y unidad "L" para verlas aquí.
                   </div>
                 );
+                const getLitros=(c)=>(c.items||[]).filter(i=>{const u=(i.unidad||"").toLowerCase();const cat=(i.categoria||"").toLowerCase();return(u==="l"||u==="litros"||u==="litro")&&cat.includes("combustib");}).reduce((a,i)=>a+Number(i.cantidad||0),0);
+                const getMonto=(c)=>Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
+                const porMes={};
+                comprasBenc.forEach(c=>{const mes=(c.fecha||"").slice(0,7);if(!mes)return;if(!porMes[mes])porMes[mes]={monto:0,litros:0,n:0};porMes[mes].monto+=getMonto(c);porMes[mes].litros+=getLitros(c);porMes[mes].n++;});
+                const estesMes=comprasBenc.filter(c=>(c.fecha||"").startsWith(mesActual));
+                const totalMontoMes=estesMes.reduce((a,c)=>a+getMonto(c),0);
+                const totalLtsMes=estesMes.reduce((a,c)=>a+getLitros(c),0);
+                const totalMontoAcum=comprasBenc.reduce((a,c)=>a+getMonto(c),0);
+                const totalLtsAcum=comprasBenc.reduce((a,c)=>a+getLitros(c),0);
+                const mesLabel=new Date(mesActual+"-15").toLocaleDateString("es-CL",{month:"long",year:"numeric"});
                 return (
                   <div style={{...S.card,padding:14,marginBottom:14,borderLeft:"3px solid #f97316",background:"rgba(249,115,22,0.04)"}}>
                     <div style={{fontSize:12,fontWeight:700,color:"#f97316",marginBottom:8}}>⛽ Gasto en Bencina (desde Compras)</div>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
                       <div style={{background:"rgba(255,255,255,0.04)",borderRadius:8,padding:"8px 12px"}}>
                         <div style={{fontSize:10,color:"#7aaa80",textTransform:"uppercase",marginBottom:2}}>Este mes ({mesLabel})</div>
-                        <div style={{fontSize:16,fontWeight:700,color:"#fbbf24"}}>${totalMontoMes.toLocaleString("es-CL")}</div>
+                        {totalLtsMes>0&&<div style={{fontSize:15,fontWeight:700,color:"#fbbf24"}}>{totalLtsMes.toFixed(1)} L</div>}
+                        <div style={{fontSize:13,fontWeight:700,color:"#f97316"}}>${totalMontoMes.toLocaleString("es-CL")}</div>
+                        {totalLtsMes>0&&<div style={{fontSize:10,color:"#5a7a5a"}}>${Math.round(totalMontoMes/totalLtsMes).toLocaleString("es-CL")}/L promedio</div>}
                         <div style={{fontSize:10,color:"#5a7a5a"}}>{estesMes.length} compra{estesMes.length!==1?"s":""}</div>
                       </div>
                       <div style={{background:"rgba(255,255,255,0.04)",borderRadius:8,padding:"8px 12px"}}>
                         <div style={{fontSize:10,color:"#7aaa80",textTransform:"uppercase",marginBottom:2}}>Acumulado total</div>
-                        <div style={{fontSize:16,fontWeight:700,color:"#f97316"}}>${totalMontoAcum.toLocaleString("es-CL")}</div>
+                        {totalLtsAcum>0&&<div style={{fontSize:15,fontWeight:700,color:"#fbbf24"}}>{totalLtsAcum.toFixed(1)} L</div>}
+                        <div style={{fontSize:13,fontWeight:700,color:"#f97316"}}>${totalMontoAcum.toLocaleString("es-CL")}</div>
+                        {totalLtsAcum>0&&<div style={{fontSize:10,color:"#5a7a5a"}}>${Math.round(totalMontoAcum/totalLtsAcum).toLocaleString("es-CL")}/L promedio</div>}
                         <div style={{fontSize:10,color:"#5a7a5a"}}>{comprasBenc.length} compra{comprasBenc.length!==1?"s":""}</div>
                       </div>
                     </div>
-                    {Object.keys(porMes).sort().reverse().slice(0,6).map(mes=>{
+                    <div style={{fontSize:10,color:"#5a7a5a",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.5px"}}>Historial mensual</div>
+                    {Object.keys(porMes).sort().reverse().map(mes=>{
                       const lbl=new Date(mes+"-15").toLocaleDateString("es-CL",{month:"long",year:"numeric"});
-                      return <div key={mes} style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#7aaa80",borderTop:"1px solid rgba(255,255,255,0.05)",paddingTop:4,marginTop:4}}>
-                        <span>{lbl}</span>
-                        <span style={{fontWeight:600,color:"#fbbf24"}}>${porMes[mes].monto.toLocaleString("es-CL")} <span style={{fontWeight:400,color:"#5a7a5a"}}>({porMes[mes].n})</span></span>
+                      const pxL=porMes[mes].litros>0?Math.round(porMes[mes].monto/porMes[mes].litros):null;
+                      return <div key={mes} style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,color:"#7aaa80",borderTop:"1px solid rgba(255,255,255,0.05)",paddingTop:4,marginTop:4,flexWrap:"wrap",gap:4}}>
+                        <span style={{minWidth:120}}>{lbl}</span>
+                        <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                          {porMes[mes].litros>0&&<span style={{color:"#fbbf24"}}>{porMes[mes].litros.toFixed(1)} L</span>}
+                          <span style={{fontWeight:600,color:"#f97316"}}>${porMes[mes].monto.toLocaleString("es-CL")}</span>
+                          {pxL&&<span style={{color:"#5a7a5a",fontSize:10}}>${pxL.toLocaleString("es-CL")}/L</span>}
+                          <span style={{color:"#4a6a5a",fontSize:10}}>({porMes[mes].n})</span>
+                        </div>
                       </div>;
                     })}
                   </div>
