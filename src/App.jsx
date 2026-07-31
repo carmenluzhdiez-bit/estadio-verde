@@ -7892,7 +7892,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     const pu   = Number(item.precioUnitario)||0;
     const neto = Math.round(cant*pu);
     const esNC = form.tipoDoc==="Nota de Crédito";
-    const iva  = (form.tipoDoc==="Boleta"||esNC)?0:Math.round(neto*0.19);
+    const iva  = (form.tipoDoc==="Boleta"||form.tipoDoc==="Boleta de Honorarios"||esNC)?0:Math.round(neto*0.19);
     return {...item, totalNeto:neto||"", iva:iva||"", totalBruto:(neto+iva)||""};
   };
 
@@ -8648,7 +8648,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                 <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={form.fecha} onChange={e=>setForm(p=>({...p,fecha:e.target.value}))}/></div>
                 <div><label style={labelSt}>Tipo documento</label>
                   <select style={S.input} value={form.tipoDoc} onChange={e=>setForm(p=>({...p,tipoDoc:e.target.value}))}>
-                    {["Factura","Boleta","Nota de Crédito","Nota de Pedido","Cotización","Orden de Compra","Otro"].map(t=><option key={t}>{t}</option>)}
+                    {["Factura","Boleta","Boleta de Honorarios","Nota de Crédito","Nota de Pedido","Cotización","Orden de Compra","Otro"].map(t=><option key={t}>{t}</option>)}
                   </select>
                 </div>
                 <div><label style={labelSt}>Proveedor</label><input style={S.input} placeholder="Nombre empresa / persona" value={form.proveedor} onChange={e=>setForm(p=>({...p,proveedor:e.target.value}))}/></div>
@@ -8721,7 +8721,13 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                 <div style={{fontSize:11,color:"#86efac",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.5px"}}>💳 Pago</div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                   <div><label style={labelSt}>Forma de pago</label>
-                    <select style={S.input} value={form.formaPago} onChange={e=>setForm(p=>({...p,formaPago:e.target.value}))}>
+                    <select style={S.input} value={form.formaPago} onChange={e=>{
+                      const fp=e.target.value;
+                      // Sincroniza el estado automáticamente según la forma de pago elegida
+                      const estadoAuto = fp==="transferencia"?"pagada":fp==="efectivo"?"pagada_efectivo":fp==="debito"?"pagada_efectivo":fp==="pendiente"?"pendiente":form.estado;
+                      setForm(p=>({...p,formaPago:fp,estado:estadoAuto}));
+                    }}>
+                      <option value="pendiente">⏳ Sin pagar / Pendiente</option>
                       <option value="transferencia">Transferencia bancaria</option>
                       <option value="efectivo">Efectivo</option>
                       <option value="debito">Tarjeta de débito</option>
@@ -8733,6 +8739,12 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                     <div><label style={labelSt}>Banco origen</label><input style={S.input} placeholder="ej: BancoEstado" value={form.bancoPago} onChange={e=>setForm(p=>({...p,bancoPago:e.target.value}))}/></div>
                     <div><label style={labelSt}>N° Transferencia</label><input style={S.input} placeholder="ej: 000123456" value={form.nTransferencia} onChange={e=>setForm(p=>({...p,nTransferencia:e.target.value}))}/></div>
                   </>}
+                </div>
+                {/* Estado resultante — solo lectura, para confirmar */}
+                <div style={{marginTop:8,fontSize:11,color:"#5a9a7a"}}>
+                  Estado: <span style={{fontWeight:700,color:form.estado==="pendiente"?"#f59e0b":form.estado==="pagada"?"#60a5fa":form.estado==="pagada_efectivo"?"#8b5cf6":"#22c55e"}}>
+                    {form.estado==="pendiente"?"⏳ Pendiente de pago":form.estado==="pagada"?"💳 Pagada por transferencia":form.estado==="pagada_efectivo"?"💵 Pagada en efectivo/débito":form.estado==="rendida"?"✅ Rendida":form.estado}
+                  </span>
                 </div>
               </div>
 
