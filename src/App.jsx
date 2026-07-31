@@ -9320,10 +9320,14 @@ const PLANTILLA_PRE_TORNEO = {
 function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisisTasas, colorCategoria, S }) {
   const hoyProjStr = fechaLocal();
   const diasSemana = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
+  // Semana calendario: lunes a domingo de la semana actual
+  const hoyProjDate = new Date(hoyProjStr+"T12:00:00");
+  const offsetLunes = (hoyProjDate.getDay()+6)%7;
+  const lunesSemana = new Date(hoyProjDate); lunesSemana.setDate(lunesSemana.getDate()-offsetLunes);
   const diasProx = Array.from({length:7},(_,i)=>{
-    const d = new Date(hoyProjStr+"T12:00:00"); d.setDate(d.getDate()+i);
+    const d = new Date(lunesSemana); d.setDate(d.getDate()+i);
     const ds = d.toISOString().slice(0,10);
-    return {fecha:ds, label:i===0?"Hoy":i===1?"Mañana":diasSemana[(d.getDay()+6)%7]+" "+d.getDate()};
+    return {fecha:ds, label:ds===hoyProjStr?"Hoy":diasSemana[i]+" "+d.getDate(), esPasado: ds<hoyProjStr};
   });
 
   const todosLosCortes = Object.entries(tareasProg||{}).flatMap(([fecha,ts])=>{
@@ -9372,18 +9376,19 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
       fechaBase = corteRecZ.fecha;
       baseOrigen = "corte";
     } else if(ultMed) {
-      // Solo hay medición histórica
-      const diasDesdeUltMed = Math.round((new Date(hoyProjStr+"T12:00:00")-new Date(ultMed.fecha+"T12:00:00"))/(1000*60*60*24));
-      if(diasDesdeUltMed > 7) return null;
+      // Solo hay medición histórica — mostrar igual pero marcada como poco confiable si es muy vieja
       altBase = Number(ultMed.alturas[z.id]);
       fechaBase = ultMed.fecha;
       baseOrigen = "medicion_antigua";
     } else return null;
 
+    const diasDesdeBase = Math.round((new Date(hoyProjStr+"T12:00:00")-new Date(fechaBase+"T12:00:00"))/(1000*60*60*24));
+    const datoPocoConfiable = diasDesdeBase > 10;
+
     const tasaGlobal = anal ? anal.tasaGlobal : null;
     const tasasCalc = calcTasa(z.id);
     const ultimaTasaReal = tasasCalc && tasasCalc.length > 0 ? tasasCalc[tasasCalc.length-1] : null;
-    const tasaReal = (ultimaTasaReal && (!corteRecZ || ultimaTasaReal.fecha > corteRecZ.fecha)) ? ultimaTasaReal.tasa : null;
+    const tasaReal = (ultimaTasaReal && (!corteRecZ || ultimaTasaReal.fecha >= corteRecZ.fecha)) ? ultimaTasaReal.tasa : null;
     const diasUltimoIntervalo = tasaReal !== null ? ultimaTasaReal.dias : null;
     const deltaUltimo = tasaReal !== null ? ultimaTasaReal.delta : null;
     const tasaUsar = tasaReal !== null ? tasaReal : (tasaGlobal || 0.4);
@@ -9391,10 +9396,10 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
 
     const proj = diasProx.map(d=>{
       const diasDesde = Math.round((new Date(d.fecha+"T12:00:00")-new Date(fechaBase+"T12:00:00"))/(1000*60*60*24));
-      const altProj = Math.round((altBase + tasaUsar*Math.max(0,diasDesde))*10)/10;
+      const altProj = Math.round((altBase + tasaUsar*diasDesde)*10)/10;
       return {...d, altProj, diasDesde};
     });
-    return {zona:z, tasaGlobal, tasaReal, diasUltimoIntervalo, deltaUltimo, altBase, fechaBase, baseOrigen, proj, categoria};
+    return {zona:z, tasaGlobal, tasaReal, diasUltimoIntervalo, deltaUltimo, altBase, fechaBase, baseOrigen, proj, categoria, datoPocoConfiable, diasDesdeBase};
   }).filter(Boolean);
 
   if(!zonasDatos.length) return null;
@@ -9419,7 +9424,7 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
             </tr>
           </thead>
           <tbody>
-            {zonasDatos.map(({zona,tasaGlobal,tasaReal,diasUltimoIntervalo,deltaUltimo,altBase,fechaBase,baseOrigen,proj,categoria})=>(
+            {zonasDatos.map(({zona,tasaGlobal,tasaReal,diasUltimoIntervalo,deltaUltimo,altBase,fechaBase,baseOrigen,proj,categoria,datoPocoConfiable,diasDesdeBase})=>(
               <tr key={zona.id} style={{borderTop:"1px solid rgba(255,255,255,0.05)"}}>
                 <td style={{padding:"7px 10px",fontWeight:600,fontSize:12}}>
                   {zona.nombre}
@@ -9427,6 +9432,7 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
                     {baseOrigen==="corte"?"✂️":baseOrigen==="medicion"?"📏":"📏?"}
                   </span>
                   <span style={{fontSize:9,display:"block",color:"#4a7a5a"}}>{altBase}mm · {fechaBase}</span>
+                  {datoPocoConfiable&&<span style={{fontSize:9,display:"block",color:"#f59e0b",fontWeight:700}}>⚠️ Dato de hace {diasDesdeBase} días — poco confiable</span>}
                 </td>
                 <td style={{padding:"7px 8px",textAlign:"center",fontSize:12,fontWeight:700}}>
                   {tasaReal!==null
@@ -9438,15 +9444,17 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
                   }
                 </td>
                 <td style={{padding:"7px 8px",textAlign:"center",color:colorCategoria(categoria),fontSize:11}}>{tasaGlobal?`${tasaGlobal>0?"+":""}${tasaGlobal}`:"—"}</td>
-                {proj.map((prD2,i)=>{
-                  const sobreCorte = prD2.altProj > altCorte;
-                  const muyAlto = prD2.altProj > altCorte * 1.3;
+                {proj.map((prD2)=>{
+                  const esPasado = prD2.esPasado;
+                  const sobreCorte = !esPasado && prD2.altProj > altCorte;
+                  const muyAlto = !esPasado && prD2.altProj > altCorte * 1.3;
                   return (
                     <td key={prD2.fecha} style={{
-                      padding:"7px 8px",textAlign:"center",fontSize:12,fontWeight:600,
-                      color:muyAlto?"#ef4444":sobreCorte?"#f59e0b":"#22c55e",
-                      background:i===0?"rgba(96,165,250,0.06)":"transparent",
-                      borderLeft:i===0?"1px solid rgba(96,165,250,0.2)":"none",
+                      padding:"7px 8px",textAlign:"center",fontSize:12,fontWeight:esPasado?400:600,
+                      color:esPasado?"#4a7a5a":muyAlto?"#ef4444":sobreCorte?"#f59e0b":"#22c55e",
+                      background:prD2.fecha===hoyProjStr?"rgba(96,165,250,0.06)":"transparent",
+                      borderLeft:prD2.fecha===hoyProjStr?"1px solid rgba(96,165,250,0.2)":"none",
+                      opacity:esPasado?0.65:1,
                     }}>
                       {prD2.altProj.toFixed(1)}
                       {muyAlto&&<span style={{fontSize:8,marginLeft:2}}>⚠️</span>}
@@ -9576,10 +9584,13 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
             delta = svgP.alt - altBase;
             diasRef = diasEfectivos;
             metodo = "corte_detectado";
-          } else if(diasDesdeCorte > 0) {
-            // Corte sin altura registrada: omitir este intervalo (dato no confiable)
-            continue;
-          } else { continue; }
+          } else {
+            // Corte sin altura registrada: usar delta directo entre mediciones como estimación
+            delta = svgP.alt - pPrev.alt;
+            diasRef = diasTotal;
+            metodo = "directo_con_corte_sin_altura";
+            if(delta <= 0) continue;
+          }
         } else {
           // Sin corte entre mediciones
           delta = svgP.alt - pPrev.alt;
