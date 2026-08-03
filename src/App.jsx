@@ -13220,6 +13220,18 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
   const [inventFecha, setInventFecha] = React.useState(hoy);
   const [inventItems, setInventItems] = React.useState([{id:1,nombre:"",categoria:"",unidad:"unidad",stockActual:0,stockMinimo:0,ubicacion:""}]);
 
+  // ── Hojas de Seguridad (solo Pesticidas b05) ──
+  const [hojasSeguridad, setHojasSeguridad] = useFirebaseState(`${ROOT}/hojas_seguridad_pesticidas`, []);
+  const emptyHoja = {nombre:"",fabricante:"",link:"",fecha:hoy};
+  const [hojaForm, setHojaForm] = React.useState(emptyHoja);
+  const [showHojaForm, setShowHojaForm] = React.useState(false);
+  const guardarHoja = () => {
+    if(!hojaForm.nombre.trim()||!hojaForm.link.trim()){alert("Falta nombre y/o link.");return;}
+    const arr = Array.isArray(hojasSeguridad)?hojasSeguridad:[];
+    setHojasSeguridad([{...hojaForm,id:Date.now(),fechaSubida:hoy},...arr]);
+    setHojaForm(emptyHoja);setShowHojaForm(false);
+  };
+
   const bodega = BODEGAS_DEF.find(b=>b.id===bodegaActiva);
   const bd = bodegasData[bodegaActiva]||{items:[],movimientos:[],tareas:[],traslados:[]};
   const setbd = (patch) => setBodegasData(p=>({...p,[bodegaActiva]:{...bd,...patch}}));
@@ -13349,7 +13361,9 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
 
       {/* Sub-tabs */}
       <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
-        {[["stock","📦 Stock"],["movimientos","🔄 Movimientos"],["traslados","🚛 Traslados"],["tareas","✅ Tareas"],["historial","📜 Historial"]].map(([t,l])=>(
+        {[["stock","📦 Stock"],["movimientos","🔄 Movimientos"],["traslados","🚛 Traslados"],["tareas","✅ Tareas"],["historial","📜 Historial"],
+          ...(bodegaActiva==="b05"?[["hojas_seguridad","🛡️ Hojas de Seguridad"]]:[])
+        ].map(([t,l])=>(
           <button key={t} className={`tab${subTab===t?" on":""}`} onClick={()=>setSubTab(t)}>{l}</button>
         ))}
       </div>
@@ -13953,6 +13967,58 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
           })}
           {[...(bd.movimientos||[]),...(bd.traslados||[]),...(bd.tareas||[])].length===0&&(
             <div style={{...S.card,padding:36,textAlign:"center",color:"#4a8a5a"}}><div style={{fontSize:32,marginBottom:8}}>📜</div><div>Sin actividad</div></div>
+          )}
+        </div>
+      )}
+
+      {/* ── HOJAS DE SEGURIDAD (solo Pesticidas b05) ── */}
+      {subTab==="hojas_seguridad"&&bodegaActiva==="b05"&&(
+        <div className="ein">
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,marginBottom:4}}>🛡️ Hojas de Seguridad — Pesticidas</div>
+          <div style={{fontSize:11,color:"#5a9a7a",marginBottom:14}}>Fichas de datos de seguridad (SDS/MSDS) de cada producto. Visibles para todos los usuarios.</div>
+          {esJefa&&!showHojaForm&&<button className="btn-p" style={{...S.btn,marginBottom:14}} onClick={()=>setShowHojaForm(true)}>➕ Agregar hoja de seguridad</button>}
+          {esJefa&&showHojaForm&&(
+            <div style={{...S.card,padding:16,marginBottom:14}} className="ein">
+              <div style={{fontSize:13,fontWeight:700,color:"#a78bfa",marginBottom:12}}>🛡️ Nueva hoja de seguridad</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                <div style={{gridColumn:"1/-1"}}><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:4}}>Nombre del producto *</label>
+                  <input style={S.input} value={hojaForm.nombre} onChange={e=>setHojaForm(p=>({...p,nombre:e.target.value}))} placeholder="Ej: Score 250 EC (Difenoconazol)"/></div>
+                <div><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:4}}>Fabricante / Marca</label>
+                  <input style={S.input} value={hojaForm.fabricante} onChange={e=>setHojaForm(p=>({...p,fabricante:e.target.value}))} placeholder="Ej: Syngenta"/></div>
+                <div><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:4}}>Fecha</label>
+                  <input type="date" style={S.input} value={hojaForm.fecha} onChange={e=>setHojaForm(p=>({...p,fecha:e.target.value}))}/></div>
+                <div style={{gridColumn:"1/-1"}}><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:4}}>Link de Google Drive *</label>
+                  <input style={S.input} value={hojaForm.link} onChange={e=>setHojaForm(p=>({...p,link:e.target.value}))} placeholder="https://drive.google.com/file/d/..."/>
+                  <div style={{fontSize:10,color:"#4a7a5a",marginTop:4}}>💡 Drive: clic derecho → Compartir → "Cualquiera con el enlace puede ver" → copiar link</div></div>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button className="btn-p" style={S.btn} onClick={guardarHoja}>✓ Guardar</button>
+                <button className="btn-g" style={S.btn} onClick={()=>setShowHojaForm(false)}>Cancelar</button>
+              </div>
+            </div>
+          )}
+          {(Array.isArray(hojasSeguridad)?hojasSeguridad:[]).length===0?(
+            <div style={{...S.card,padding:36,textAlign:"center",color:"#4a7a5a"}}><div style={{fontSize:32,marginBottom:8}}>🛡️</div><div style={{fontSize:13}}>No hay hojas de seguridad cargadas aún</div></div>
+          ):(
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {(Array.isArray(hojasSeguridad)?hojasSeguridad:[]).map(h=>(
+                <div key={h.id} style={{...S.card,padding:14,display:"flex",gap:12,alignItems:"center"}}>
+                  <div style={{fontSize:28,flexShrink:0}}>🧪</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:2}}>{h.nombre}</div>
+                    {h.fabricante&&<div style={{fontSize:11,color:"#7aaa80",marginBottom:1}}>🏭 {h.fabricante}</div>}
+                    <div style={{fontSize:10,color:"#4a7a5a"}}>Subida: {h.fechaSubida||h.fecha}</div>
+                  </div>
+                  <div style={{display:"flex",gap:6,flexShrink:0}}>
+                    <a href={h.link} target="_blank" rel="noopener noreferrer"
+                      style={{...S.btn,background:"rgba(167,139,250,0.12)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.25)",fontSize:12,padding:"6px 12px",textDecoration:"none",borderRadius:8,fontFamily:"'Georgia',serif"}}>
+                      👁️ Ver
+                    </a>
+                    {esJefa&&<button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>{if(window.confirm("¿Eliminar?"))setHojasSeguridad((Array.isArray(hojasSeguridad)?hojasSeguridad:[]).filter(x=>x.id!==h.id));}}>🗑</button>}
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}
