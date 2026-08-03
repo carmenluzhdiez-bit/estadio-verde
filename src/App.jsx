@@ -15837,20 +15837,142 @@ class ErrorBoundary extends React.Component {
 
 // ─── PANEL PROTOCOLOS ─────────────────────────────────────────────────────────
 function PanelProtocolos({ S, personal, esJefa, crearNotificacion }) {
-  const [tabProt, setTabProt] = React.useState("poda");
+  const [tabProt, setTabProt] = React.useState("docs_seguridad");
+
+  // ── Documentos de protocolos guardados en Firebase ──
+  const [docsSeguridad, setDocsSeguridad] = useFirebaseState(`${ROOT}/protocolos_docs/seguridad`, []);
+  const [docsCheckin,   setDocsCheckin]   = useFirebaseState(`${ROOT}/protocolos_docs/checkin`, []);
+  const [showFormDoc, setShowFormDoc] = React.useState(false);
+  const [tipoForm, setTipoForm] = React.useState("seguridad");
+  const emptyDoc = {nombre:"",descripcion:"",link:"",categoria:"",fecha:fechaLocal()};
+  const [docForm, setDocForm] = React.useState(emptyDoc);
+
+  const guardarDoc = () => {
+    if(!docForm.nombre.trim()||!docForm.link.trim()) { alert("Falta nombre y/o link del documento."); return; }
+    const nuevo = {...docForm, id:Date.now(), fechaSubida:fechaLocal()};
+    if(tipoForm==="seguridad") {
+      const arr = Array.isArray(docsSeguridad)?docsSeguridad:[];
+      setDocsSeguridad([nuevo,...arr]);
+    } else {
+      const arr = Array.isArray(docsCheckin)?docsCheckin:[];
+      setDocsCheckin([nuevo,...arr]);
+    }
+    setDocForm(emptyDoc); setShowFormDoc(false);
+  };
+
+  const eliminarDoc = (tipo, id) => {
+    if(!window.confirm("¿Eliminar este protocolo?")) return;
+    if(tipo==="seguridad") setDocsSeguridad((Array.isArray(docsSeguridad)?docsSeguridad:[]).filter(d=>d.id!==id));
+    else setDocsCheckin((Array.isArray(docsCheckin)?docsCheckin:[]).filter(d=>d.id!==id));
+  };
+
+  const renderDocs = (docs, tipo) => {
+    const lista = Array.isArray(docs)?docs:[];
+    return (
+      <div>
+        {esJefa&&(
+          <div style={{marginBottom:14}}>
+            {!showFormDoc||tipoForm!==tipo?(
+              <button className="btn-p" style={S.btn} onClick={()=>{setTipoForm(tipo);setDocForm(emptyDoc);setShowFormDoc(true);}}>
+                ➕ Agregar protocolo
+              </button>
+            ):(
+              <div style={{...S.card,padding:16,marginBottom:12}} className="ein">
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:"#34d399",marginBottom:12}}>
+                  ➕ Nuevo protocolo — {tipo==="seguridad"?"Seguridad":"Check-In"}
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                  <div style={{gridColumn:"1/-1"}}><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:4}}>Nombre del protocolo *</label>
+                    <input style={S.input} value={docForm.nombre} onChange={e=>setDocForm(p=>({...p,nombre:e.target.value}))} placeholder="Ej: Protocolo corte de césped con tractor"/></div>
+                  <div><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:4}}>Categoría</label>
+                    <input style={S.input} value={docForm.categoria} onChange={e=>setDocForm(p=>({...p,categoria:e.target.value}))} placeholder="Ej: Maquinaria, Química, Altura..."/></div>
+                  <div><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:4}}>Fecha</label>
+                    <input type="date" style={S.input} value={docForm.fecha} onChange={e=>setDocForm(p=>({...p,fecha:e.target.value}))}/></div>
+                  <div style={{gridColumn:"1/-1"}}><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:4}}>Link de Google Drive *</label>
+                    <input style={S.input} value={docForm.link} onChange={e=>setDocForm(p=>({...p,link:e.target.value}))} placeholder="https://drive.google.com/file/d/..."/>
+                    <div style={{fontSize:10,color:"#4a7a5a",marginTop:4}}>💡 En Drive: clic derecho en el archivo → Compartir → "Cualquiera con el enlace puede ver" → copiar link</div>
+                  </div>
+                  <div style={{gridColumn:"1/-1"}}><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:4}}>Descripción</label>
+                    <input style={S.input} value={docForm.descripcion} onChange={e=>setDocForm(p=>({...p,descripcion:e.target.value}))} placeholder="Breve descripción del contenido"/></div>
+                </div>
+                <div style={{display:"flex",gap:8}}>
+                  <button className="btn-p" style={S.btn} onClick={guardarDoc}>✓ Guardar</button>
+                  <button className="btn-g" style={S.btn} onClick={()=>setShowFormDoc(false)}>Cancelar</button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        {lista.length===0?(
+          <div style={{...S.card,padding:24,textAlign:"center",color:"#3a7a5a"}}>
+            <div style={{fontSize:28,marginBottom:8}}>📂</div>
+            <div style={{fontSize:13}}>No hay protocolos cargados aún</div>
+            {esJefa&&<div style={{fontSize:11,color:"#4a7a5a",marginTop:4}}>Usa "Agregar protocolo" para subir el primero</div>}
+          </div>
+        ):(
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {lista.map(doc=>(
+              <div key={doc.id} style={{...S.card,padding:14,display:"flex",gap:12,alignItems:"center"}}>
+                <div style={{fontSize:28,flexShrink:0}}>📄</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:2}}>
+                    <span style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700}}>{doc.nombre}</span>
+                    {doc.categoria&&<span style={{...S.chip,fontSize:10,background:"rgba(52,211,153,0.08)",color:"#5a9a7a"}}>{doc.categoria}</span>}
+                  </div>
+                  {doc.descripcion&&<div style={{fontSize:11,color:"#5a9a7a",marginBottom:2}}>{doc.descripcion}</div>}
+                  <div style={{fontSize:10,color:"#4a7a5a"}}>Subido: {doc.fechaSubida||doc.fecha}</div>
+                </div>
+                <div style={{display:"flex",gap:6,flexShrink:0}}>
+                  <a href={doc.link} target="_blank" rel="noopener noreferrer"
+                    style={{...S.btn,background:"rgba(96,165,250,0.12)",color:"#93c5fd",border:"1px solid rgba(96,165,250,0.25)",fontSize:12,padding:"6px 12px",textDecoration:"none",borderRadius:8,fontFamily:"'Georgia',serif"}}>
+                    👁️ Ver
+                  </a>
+                  {esJefa&&<button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>eliminarDoc(tipo,doc.id)}>🗑</button>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="ein">
-      <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:700,marginBottom:4}}>📋 Protocolos de Seguridad</div>
-      <div style={{fontSize:12,color:"#5a9a7a",marginBottom:16}}>Registros de autorización para trabajos de riesgo</div>
-      <div style={{display:"flex",gap:6,marginBottom:16}}>
-        {[["poda","🌿 Poda en altura"]].map(([t,l])=>(
-          <button key={t} className={`tab${tabProt===t?" on":""}`} onClick={()=>setTabProt(t)}
+      <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:700,marginBottom:4}}>📋 Protocolos</div>
+      <div style={{fontSize:12,color:"#5a9a7a",marginBottom:16}}>Documentos de seguridad, check-in y registros de autorización para trabajos de riesgo</div>
+
+      {/* Tabs */}
+      <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
+        {[
+          ["docs_seguridad","📂 Protocolos de Seguridad"],
+          ["docs_checkin","✅ Check-In / Autorización"],
+          ["poda","🌿 Poda en Altura"],
+        ].map(([t,l])=>(
+          <button key={t} onClick={()=>{setTabProt(t);setShowFormDoc(false);}}
             style={{cursor:"pointer",border:`1px solid ${tabProt===t?"#34d399":"rgba(255,255,255,0.12)"}`,borderRadius:8,padding:"5px 14px",fontSize:12,background:tabProt===t?"rgba(52,211,153,0.12)":"transparent",color:tabProt===t?"#34d399":"#6aaa7a"}}>
             {l}
           </button>
         ))}
       </div>
+
+      {/* Contenido */}
+      {tabProt==="docs_seguridad"&&(
+        <div>
+          <div style={{fontSize:12,color:"#5a9a7a",marginBottom:14}}>
+            Documentos de protocolos operativos de seguridad para distintas actividades (corte de césped, manejo de combustibles, productos químicos, etc.).
+          </div>
+          {renderDocs(docsSeguridad,"seguridad")}
+        </div>
+      )}
+      {tabProt==="docs_checkin"&&(
+        <div>
+          <div style={{fontSize:12,color:"#5a9a7a",marginBottom:14}}>
+            Protocolos de check-in y autorización para trabajos de riesgo. El formulario activo de Poda en Altura está en su propia pestaña.
+          </div>
+          {renderDocs(docsCheckin,"checkin")}
+        </div>
+      )}
       {tabProt==="poda"&&<ProtocoloPodaAltura S={S} personal={personal} esJefa={esJefa} crearNotificacion={crearNotificacion}/>}
     </div>
   );
