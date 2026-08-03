@@ -11827,7 +11827,78 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                     </div>
                   </div>
                 </div>
-                {/* Registro diario para vivero */}
+                {/* Botones de acción para Vivero */}
+                {esJefa&&(
+                  <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
+                    <button className="btn-p" style={S.btn} onClick={()=>{
+                      setTareaForm(p=>({...p,responsable:p.responsable||configSemanal?.corte_golf||"",target:"vivero",greensSeleccionados:["vivero"]}));
+                      setShowTareaForm("green");
+                    }}>📋 Nueva tarea Vivero</button>
+                    <button style={{...S.btn,background:"rgba(52,211,153,0.12)",color:"#34d399",border:"1px solid rgba(52,211,153,0.25)"}} onClick={()=>setShowDiariaForm(true)}>✅ Registro diario</button>
+                  </div>
+                )}
+
+                {/* Formulario nueva tarea — visible cuando showTareaForm==="green" con target vivero */}
+                {showTareaForm==="green"&&tareaForm.target==="vivero"&&(
+                  <div style={{...S.card,padding:16,marginBottom:12}} className="ein">
+                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#4ade80",marginBottom:12}}>📋 Nueva tarea — Vivero</div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                      <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={tareaForm.fecha} onChange={e=>setTareaForm(p=>({...p,fecha:e.target.value}))}/></div>
+                      <div><label style={labelSt}>Responsable</label>
+                        <select style={S.input} value={tareaForm.responsable} onChange={e=>setTareaForm(p=>({...p,responsable:e.target.value}))}>
+                          <option value="">Seleccionar...</option>
+                          {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                        </select>
+                      </div>
+                      <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Tarea</label>
+                        <select style={S.input} value={tareaForm.tipo} onChange={e=>setTareaForm(p=>({...p,tipo:e.target.value}))}>
+                          <option value="">Seleccionar tipo...</option>
+                          {TAREAS_GREENS_PERIODICAS.map(t=><option key={t}>{t}</option>)}
+                          <option value="Siembra">🌱 Siembra</option>
+                          <option value="Resiembra">🌱 Resiembra</option>
+                          <option value="Corte Vivero">✂️ Corte Vivero</option>
+                          <option value="Fertilización Vivero">🌿 Fertilización Vivero</option>
+                          <option value="Otra">Otra...</option>
+                        </select>
+                      </div>
+                      {(tareaForm.tipo||"").toLowerCase().includes("corte")&&(
+                        <div style={{gridColumn:"1/-1",display:"flex",gap:8,alignItems:"center",background:"rgba(52,211,153,0.06)",border:"1px solid rgba(52,211,153,0.15)",borderRadius:8,padding:"8px 12px"}}>
+                          <label style={labelSt}>✂️ Altura de corte:</label>
+                          <input type="number" step="0.1" min="0" value={tareaForm.alturaObjetivo||""} onChange={e=>setTareaForm(p=>({...p,alturaObjetivo:e.target.value}))} style={{...S.input,width:80}} placeholder="mm"/>
+                          <span style={{fontSize:11,color:"#6aaa7a"}}>mm</span>
+                        </div>
+                      )}
+                      <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Descripción / Notas</label><input style={S.input} value={tareaForm.descripcion||""} onChange={e=>setTareaForm(p=>({...p,descripcion:e.target.value}))} placeholder="Condiciones del día, instrucciones..."/></div>
+                    </div>
+                    <div style={{display:"flex",gap:8}}>
+                      <button className="btn-p" style={S.btn} onClick={()=>{
+                        if(!tareaForm.tipo){alert("⚠️ Falta elegir el tipo de tarea.");return;}
+                        const nombreTarea=tareaForm.tipo==="Otra"?tareaForm.tipoCustom||"Tarea":tareaForm.tipo;
+                        const notaAltura=tareaForm.alturaObjetivo?`Cortar a: ${tareaForm.alturaObjetivo}mm.`:"";
+                        const notas=[notaAltura,tareaForm.descripcion].filter(Boolean).join(" ");
+                        const nueva={id:Date.now()+Math.random(),fecha:tareaForm.fecha,zona:"Golf",elemento:"Vivero Golf",tarea:nombreTarea,responsable:tareaForm.responsable,estado:tareaForm.responsable?"pendiente":"por_designar",notas,alturaCorte:tareaForm.alturaObjetivo||"",unidadAlturaCorte:"mm"};
+                        setTareasProg(prev=>{const arr=Array.isArray(prev[tareaForm.fecha])?prev[tareaForm.fecha]:Object.values(prev[tareaForm.fecha]||{});return {...prev,[tareaForm.fecha]:[...arr,nueva]};});
+                        setTareaForm(emptyTarea);setShowTareaForm(null);
+                      }}>✓ Guardar y enviar al programa</button>
+                      <button className="btn-g" style={S.btn} onClick={()=>setShowTareaForm(null)}>Cancelar</button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Historial de tareas Vivero */}
+                {(()=>{
+                  const tareasViv=(Array.isArray(tareasProg[hoy])?tareasProg[hoy]:Object.values(tareasProg[hoy]||{})).filter(t=>t.elemento==="Vivero Golf"||(t.zona==="Golf"&&(t.elemento||"").toLowerCase().includes("vivero")));
+                  if(!tareasViv.length) return null;
+                  return (
+                    <div style={{...S.card,padding:12,marginBottom:12,borderLeft:"2px solid rgba(74,222,128,0.3)"}}>
+                      <div style={{fontSize:12,fontWeight:700,color:"#4ade80",marginBottom:6}}>📋 Tareas Vivero hoy</div>
+                      {tareasViv.map(t=>{
+                        const est=["hecha","completada"].includes(t.estado)?"✅":t.estado==="no_pudo"?"❌":"⏳";
+                        return <div key={t.id} style={{fontSize:11,color:"#5a9a7a",padding:"3px 0",borderTop:"1px solid rgba(255,255,255,0.05)"}}>{est} {t.tarea} {t.notas&&<span style={{color:"#7a8a7a"}}>— {t.notas}</span>}</div>;
+                      })}
+                    </div>
+                  );
+                })()} 
                 {showDiariaForm&&(
                   <div style={{...S.card,padding:16,marginBottom:12,background:"rgba(74,222,128,0.04)",borderColor:"rgba(74,222,128,0.2)"}} className="ein">
                     <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#4ade80",marginBottom:12}}>✅ Registro diario — Vivero</div>
@@ -16874,7 +16945,16 @@ export default function App() {
     const zidS = String(zid);
     const zonaZ = zonas.find(x=>String(x.id)===zidS);
     const zdat = getZD(zidS);
-    const base = (zonaZ?.elementos||[]).map(e=>({...e,isCustom:false,edData:{estado:"bueno",notas:"",...(zdat.elementos?.[e.id]||{})}}));
+    const base = (zonaZ?.elementos||[])
+      .filter(e=>!zdat.elementos?.[e.id]?.eliminado)
+      .map(e=>{
+        const override = zdat.elementos?.[e.id];
+        return {...e,
+          nombre: override?.nombreCustom || e.nombre,
+          tipo: override?.tipoCustom || e.tipo,
+          isCustom:false,
+          edData:{estado:"bueno",notas:"",...(override||{})}};
+      });
     const custom = (zdat.elementosCustom||[]).map(e=>({...e,isCustom:true,edData:{estado:e.estado||"bueno",notas:e.notas||""}}));
     return [...base,...custom].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
   };
@@ -17042,7 +17122,7 @@ export default function App() {
       updateZona(zidStr,{elementosCustom:arr});
     });
   };
-  const removeBaseElem = (zid,eid) => { setZonas(prev=>prev.map(z=>String(z.id)===String(zid)?{...z,elementos:z.elementos.filter(e=>e.id!==eid)}:z)); const elems={...data[String(zid)]?.elementos}; delete elems[eid]; updateZona(zid,{elementos:elems}); addHistorial(zid,`Elemento eliminado`); };
+  const removeBaseElem = (zid,eid) => { updateZona(zid,{elementos:{...data[String(zid)]?.elementos,[eid]:{...data[String(zid)]?.elementos?.[eid],eliminado:true}}}); addHistorial(zid,`Elemento eliminado`); };
 
   const addTrabajador = (t) => { const id=Date.now(); setPersonal(p=>[...(Array.isArray(p)?p:Object.values(p||{})),{...t,id,eventos:[]}]); };
   const updateTrabajador = (id,patch) => setPersonal(p=>(Array.isArray(p)?p:Object.values(p||{})).map(t=>t.id===id?{...t,...patch}:t));
@@ -17182,7 +17262,7 @@ export default function App() {
                 const nn=editElem.nombreEdit!==undefined?editElem.nombreEdit:e.nombre;
                 const nt=editElem.tipoEdit!==undefined?editElem.tipoEdit:e.tipo;
                 if(e.isCustom){const arr=[...(data[zonaId].elementosCustom||[])];const i=arr.findIndex(x=>x.id===e.id);if(i>=0){arr[i]={...arr[i],nombre:nn,tipo:nt};updateZona(zonaId,{elementosCustom:arr});}}
-                else{setZonas(prev=>prev.map(z=>String(z.id)===String(zonaId)?{...z,elementos:z.elementos.map(x=>x.id===e.id?{...x,nombre:nn,tipo:nt}:x)}:z));}
+                else{updateZona(zonaId,{elementos:{...data[zonaId]?.elementos,[e.id]:{...data[zonaId]?.elementos?.[e.id],nombreCustom:nn,tipoCustom:nt}}});}
                 addHistorial(zonaId,`Elemento: "${e.nombre}" → "${nn}"`);
                 setEditElem(p=>({...p,nombreEdit:undefined,tipoEdit:undefined}));
               }}>✓ Guardar nombre/categoría</button>
