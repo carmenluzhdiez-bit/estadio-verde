@@ -7010,7 +7010,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                   </div>
                   {(()=>{
                     const reapert2 = calcReapertura(incidForm.productoAplicar, incidForm.fechaAplicacion, incidForm.horaAplicacion);
-                    if(!reapert1.label) return null;
+                    if(!reapert2.label) return null;
                     return (
                       <div style={{...S.card,padding:14,marginBottom:12,background:"rgba(34,197,94,0.08)",borderColor:"rgba(34,197,94,0.25)"}}>
                         <div style={{fontSize:12,color:"#86efac",fontWeight:600,marginBottom:3}}>✅ Reapertura estimada</div>
@@ -11209,7 +11209,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   const [previewGolfProp, setPreviewGolfProp] = React.useState(null);
   const [showDiariaForm, setShowDiariaForm] = React.useState(false);
   // ── Estado sección Humedad ──
-  const [showHumForm,    setShowHumForm]    = React.useState(false);
+  const [showHumForm,    setShowHumForm]    = React.useState(()=>rolLogueado==="trabajador"&&initialSubTab==="humedad");
   // Nota: para la jefa la vista queda retraída por defecto (la expande con el botón "💧 Nueva medición").
   // Para trabajadores sí se abre directo (ver useEffect en SeccionHumedad más abajo).
   const emptyHumForm = {fecha:hoy,hora:new Date().toTimeString().slice(0,5),motivo:"rutina",responsable:"",valores:{},valorVivero:"",decision:"sin-cambio",obs:"",generarTarea:false};
