@@ -7014,8 +7014,8 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                     return (
                       <div style={{...S.card,padding:14,marginBottom:12,background:"rgba(34,197,94,0.08)",borderColor:"rgba(34,197,94,0.25)"}}>
                         <div style={{fontSize:12,color:"#86efac",fontWeight:600,marginBottom:3}}>✅ Reapertura estimada</div>
-                        <div style={{fontSize:16,color:"#4ade80",fontWeight:700}}>{r.label}</div>
-                        <div style={{fontSize:11,color:"#5a9a7a",marginTop:4,fontStyle:"italic"}}>{r.nota}</div>
+                        <div style={{fontSize:16,color:"#4ade80",fontWeight:700}}>{reapert2.label}</div>
+                        <div style={{fontSize:11,color:"#5a9a7a",marginTop:4,fontStyle:"italic"}}>{reapert2.nota}</div>
                       </div>
                     );
                   })()}
@@ -7072,8 +7072,8 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                           {inc.sectoresCerrados.map(s=><span key={s} style={{...S.chip,background:"rgba(239,68,68,0.12)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.25)",fontSize:10}}>🚫 {s}</span>)}
                         </div>
                       )}
-                      {r.label&&<div style={{fontSize:12,color:"#4ade80",marginBottom:2}}>📅 Reapertura estimada: <strong>{r.label}</strong></div>}
-                      {r.nota&&<div style={{fontSize:11,color:"#5a9a7a",fontStyle:"italic",marginBottom:4}}>{r.nota}</div>}
+                      {reapert3.label&&<div style={{fontSize:12,color:"#4ade80",marginBottom:2}}>📅 Reapertura estimada: <strong>{reapert3.label}</strong></div>}
+                      {reapert3.nota&&<div style={{fontSize:11,color:"#5a9a7a",fontStyle:"italic",marginBottom:4}}>{reapert3.nota}</div>}
                       {inc.productoAplicar&&<div style={{fontSize:12,color:"#a0c8a0"}}>🧪 {inc.productoAplicar}</div>}
                     </div>
                     <div style={{display:"flex",flexDirection:"column",gap:6,alignItems:"flex-end",flexShrink:0}}>
