@@ -16013,7 +16013,6 @@ function PanelProtocolos({ S, personal, esJefa, crearNotificacion }) {
         {[
           ["docs_seguridad","📂 Protocolos de Seguridad"],
           ["docs_checkin","✅ Check-In / Autorización"],
-          ["poda","🌿 Poda en Altura"],
         ].map(([t,l])=>(
           <button key={t} onClick={()=>{setTabProt(t);setShowFormDoc(false);}}
             style={{cursor:"pointer",border:`1px solid ${tabProt===t?"#34d399":"rgba(255,255,255,0.12)"}`,borderRadius:8,padding:"5px 14px",fontSize:12,background:tabProt===t?"rgba(52,211,153,0.12)":"transparent",color:tabProt===t?"#34d399":"#6aaa7a"}}>
@@ -16034,12 +16033,19 @@ function PanelProtocolos({ S, personal, esJefa, crearNotificacion }) {
       {tabProt==="docs_checkin"&&(
         <div>
           <div style={{fontSize:12,color:"#5a9a7a",marginBottom:14}}>
-            Protocolos de check-in y autorización para trabajos de riesgo. El formulario activo de Poda en Altura está en su propia pestaña.
+            Protocolos de check-in y autorización previa para trabajos de riesgo. Incluye documentos de referencia y el formulario activo de Poda en Altura.
           </div>
           {renderDocs(docsCheckin,"checkin")}
+
+          {/* Separador */}
+          <div style={{borderTop:"1px solid rgba(255,255,255,0.08)",margin:"24px 0 20px",display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:11,color:"#4a7a5a",whiteSpace:"nowrap"}}>📝 Formulario activo</span>
+            <div style={{flex:1,height:1,background:"rgba(255,255,255,0.06)"}}/>
+          </div>
+          <div style={{fontSize:12,fontWeight:700,color:"#34d399",marginBottom:12}}>🌿 Poda en Altura — Protocolo de subida</div>
+          <ProtocoloPodaAltura S={S} personal={personal} esJefa={esJefa} crearNotificacion={crearNotificacion}/>
         </div>
       )}
-      {tabProt==="poda"&&<ProtocoloPodaAltura S={S} personal={personal} esJefa={esJefa} crearNotificacion={crearNotificacion}/>}
     </div>
   );
 }
