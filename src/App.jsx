@@ -7049,7 +7049,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
               };
               const TIPO_INC = {fitosanitario:"🦠",mantenimiento:"🔧",clima:"🌧️"};
               const est = ESTADO_INC[inc.estado]||ESTADO_INC.observacion;
-              const reapert3 = calcReapertura(inc.productoAplicar, inc.fechaAplicacion, inc.horaAplicacion);
+              const reapert3 = calcReapertura(inc.productoAplicar, inc.fechaAplicacion, inc.horaAplicacion) || {};
               return (
                 <div key={inc.id} style={{...S.card,padding:16,borderLeft:`3px solid ${est.color}`}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:10}}>
@@ -12773,7 +12773,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             const tareasGolfSem = dias7.flatMap(d=>(Array.isArray(tareasProg[d])?tareasProg[d]:Object.values(tareasProg[d]||{})).filter(t=>t&&(t.zona==="Golf"||(t.zona||"").includes("Golf"))).map(t=>({...t,fechaDia:d})));
             // Agrupar por responsable
             const porResp = {};
-            tareasGolfSem.forEach(t=>{ const r=t.responsable||"Sin asignar"; if(!porResp[r]) porResp[r]=[]; porResp[r].push(t); });
+            tareasGolfSem.forEach(t=>{ const r=t.responsable||configSemanal?.corte_golf||"Sin asignar"; if(!porResp[r]) porResp[r]=[]; porResp[r].push(t); });
             
             if(tareasGolfSem.length===0) return (
               <div style={{...S.card,padding:32,textAlign:"center",color:"#4a7a5a"}}>
@@ -17631,10 +17631,24 @@ export default function App() {
               // Incluir también trabajadores con tareas de Golf (golfData)
               const tdTareasGolf=(()=>{
                 const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-                return normArr(golfData?.tareasProg?.[tdHoy]||[]);
+                const deGolfData=normArr(golfData?.tareasProg?.[tdHoy]||[]);
+                const deProg=normArr(tareasProg[tdHoy]||[]).filter(t=>(t.zona||"").toLowerCase().includes("golf"));
+                const ids=new Set(deGolfData.map(t=>String(t.id)));
+                return [...deGolfData,...deProg.filter(t=>!ids.has(String(t.id)))];
               })();
               const tdTareasAll=[...tdTareas,...tdTareasGolf];
-              const tdTrabs=tdPersonal.filter(w=>tdTareasAll.some(x=>x.responsable===w.nombre));
+              const normaliz = s=>(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
+              const tdTrabs=tdPersonal.filter(w=>{
+                const wN=normaliz(w.nombre);
+                return tdTareasAll.some(x=>{
+                  const rN=normaliz(x.responsable);
+                  if(rN===wN) return true;
+                  if(wN.includes("bhalu")&&rN.includes("bhalu")) return true;
+                  if(wN.includes("bhalu")&&rN.includes("osmar")) return true;
+                  if(rN.includes("bhalu")&&wN.includes("osmar")) return true;
+                  return false;
+                });
+              });
               if(tdTrabs.length===0) return null;
               return (
                 <div style={{marginBottom:22}}>
