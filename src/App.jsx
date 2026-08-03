@@ -13217,6 +13217,8 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
   const [showTraslForm, setShowTraslForm] = React.useState(false);
   const [showInventForm, setShowInventForm] = React.useState(false);
   const [editItemId, setEditItemId] = React.useState(null);
+  const [catsAb, setCatsAb] = React.useState({});
+  const [selMaq, setSelMaq] = React.useState([]);
   const [inventFecha, setInventFecha] = React.useState(hoy);
   const [inventItems, setInventItems] = React.useState([{id:1,nombre:"",categoria:"",unidad:"unidad",stockActual:0,stockMinimo:0,ubicacion:""}]);
 
@@ -13639,8 +13641,6 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
               {(()=>{
                 const esMaq=bodegaActiva==="b04";
                 const cats=[...new Set((bd.items||[]).map(i=>i.categoria||"Sin categoría"))].sort();
-                const [catsAb,setCatsAb]=React.useState(()=>Object.fromEntries(cats.map(c=>[c,false])));
-                const [selMaq,setSelMaq]=React.useState([]);
                 return (<>
                   {esMaq&&(bd.items||[]).length>0&&(
                     <div style={{fontSize:11,color:"#7aaa80",marginBottom:8,display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
