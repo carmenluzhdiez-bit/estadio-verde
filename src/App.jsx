@@ -2789,7 +2789,6 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
       if(normResp.includes("bhalu")&&nombreTrab.includes("osmar")) return true;
       return false;
     });
-    console.log("VistaWorker filtro:", trabajador?.nombre, "tareas total:", combinadas.length, "mis tareas:", resultado.length, combinadas.map(t=>t.responsable+"|"+t.tarea).join(", "));
     return resultado;
   }, [tareas, fechaVer, trabajador]
   );
@@ -2807,7 +2806,7 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
   const TAREAS_AGUA = ["riego","corte","corte de césped","corte cesped","orillado","orillad"];
   const esRiegoOCorte = (nombreTarea) => {
     const vtN = (nombreTarea||"").toLowerCase();
-    return TAREAS_AGUA.some(k => n.includes(k));
+    return TAREAS_AGUA.some(k => vtN.includes(k));
   };
 
   const handleHumedad = (t) => {
@@ -3563,6 +3562,8 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     const vencidas = [];
     const existentes = getTareasDelDia(fecha).map(t => t.zona+"_"+t.elemento+"_"+t.tarea);
     zonas.forEach(z => {
+      // Golf tiene su propio módulo de programación — excluir aquí
+      if(z.id===31||(z.nombre||"").toLowerCase().includes("golf")) return;
       const zdat = getZD(z.id);
       const nombreZona = zdat.nombreCustom || z.nombre;
       const elems = getAllElems(z.id);
@@ -3581,9 +3582,8 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           // Asignar responsable por defecto según zona y tipo de tarea
           const esZonaGolf = z.id===31||(nombreZona||"").toLowerCase().includes("golf");
           const respDefault = esZonaGolf
-            ? "Osmar Bhalú Armijo Zúñiga"  // Golf → Bhalú por defecto
+            ? configSemanal?.corte_golf||"Osmar Bhalú Armijo Zúñiga"
             : getResponsablePorTipo(f.tarea, configSemanal, nombreZona)||"";
-          if(esZonaGolf) console.log("Golf tarea:", f.tarea, "→ resp:", respDefault);
           const notaAltura = f.alturaCorte ? `Cortar a: ${f.alturaCorte} ${f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="mm"?"milímetros":"pulgadas"}.` : "";
           const item = { id: Date.now()+Math.random(), fecha, zona:nombreZona, elemento:e.nombre, tarea:f.tarea, responsable:respDefault, estado:respDefault?"pendiente":"por_designar", notas:[notaAltura,f.obs].filter(Boolean).join(" "), alturaCorte:f.alturaCorte||"", unidadAlturaCorte:f.unidadAlturaCorte||"", frecuencia:f.modo==="diasSemana"?`cada ${f.diasMinimos||"?"} días`:f[estProp], estacion:estProp, auto:true, fechaCorrespondiente:prox.fecha, origenZid:String(z.id), origenEid:e.id, origenFrecId:f.id, origenEsCustom:!!e.isCustom };
           propuestas.push(item);
