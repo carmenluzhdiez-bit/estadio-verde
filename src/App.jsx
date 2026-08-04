@@ -10222,8 +10222,8 @@ const DECISIONES_HUM=[
 ];
 
 function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasProg, setTareasProg, showHumForm, setShowHumForm, humForm, setHumForm, emptyHumForm, onRegistroGuardado, crearNotificacion }) {
-  // Auto-abrir formulario para trabajador
-  React.useEffect(()=>{ if(!esJefa && !showHumForm) setShowHumForm(true); },[esJefa]);
+  // Auto-abrir formulario para trabajador — solo una vez al montar
+  React.useEffect(()=>{ if(!esJefa) setShowHumForm(true); },[]);
   const humedades = Array.isArray(golfData.humedades)?golfData.humedades:Object.values(golfData.humedades||{});
   const setHumedades = (arr) => setG({humedades:arr});
   const labelSt = {fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
