@@ -10222,8 +10222,6 @@ const DECISIONES_HUM=[
 ];
 
 function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasProg, setTareasProg, showHumForm, setShowHumForm, humForm, setHumForm, emptyHumForm, onRegistroGuardado, crearNotificacion }) {
-  // Auto-abrir formulario para trabajador — solo una vez al montar
-  React.useEffect(()=>{ if(!esJefa) setShowHumForm(true); },[]);
   const humedades = Array.isArray(golfData.humedades)?golfData.humedades:Object.values(golfData.humedades||{});
   const setHumedades = (arr) => setG({humedades:arr});
   const labelSt = {fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
@@ -11209,7 +11207,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   const [previewGolfProp, setPreviewGolfProp] = React.useState(null);
   const [showDiariaForm, setShowDiariaForm] = React.useState(false);
   // ── Estado sección Humedad ──
-  const [showHumForm,    setShowHumForm]    = React.useState(()=>rolLogueado==="trabajador"&&initialSubTab==="humedad");
+  const [showHumForm,    setShowHumForm]    = React.useState(false);
   // Nota: para la jefa la vista queda retraída por defecto (la expande con el botón "💧 Nueva medición").
   // Para trabajadores sí se abre directo (ver useEffect en SeccionHumedad más abajo).
   const emptyHumForm = {fecha:hoy,hora:new Date().toTimeString().slice(0,5),motivo:"rutina",responsable:"",valores:{},valorVivero:"",decision:"sin-cambio",obs:"",generarTarea:false};
@@ -11530,6 +11528,13 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           </div>
         )}
         {/* Humedad */}
+        {subTab==="humedad"&&(
+          <SeccionHumedad S={S} golfData={golfData} setG={setG} listaPersonal={listaPersonal}
+            hoy={hoy} esJefa={false} tareasProg={tareasProg} setTareasProg={setTareasProg}
+            showHumForm={true} setShowHumForm={()=>{}}
+            humForm={humForm} setHumForm={setHumForm} emptyHumForm={emptyHumForm}
+            onRegistroGuardado={onRegistroGuardado} crearNotificacion={crearNotificacion}/>
+        )}
       </div>
     );
   }
