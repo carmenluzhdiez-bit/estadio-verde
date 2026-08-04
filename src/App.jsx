@@ -13229,7 +13229,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
 
   // ── Hojas de Seguridad (solo Pesticidas b05) ──
   const [hojasSeguridad, setHojasSeguridad] = useFirebaseState(`${ROOT}/hojas_seguridad_pesticidas`, []);
-  const emptyHoja = {nombre:"",fabricante:"",link:"",fecha:hoy};
+  const emptyHoja = {nombre:"",fabricante:"",tipo:"",link:"",fecha:hoy};
   const [hojaForm, setHojaForm] = React.useState(emptyHoja);
   const [showHojaForm, setShowHojaForm] = React.useState(false);
   const guardarHoja = () => {
@@ -13988,6 +13988,17 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
                 <div style={{gridColumn:"1/-1"}}><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:4}}>Nombre del producto *</label>
                   <input style={S.input} value={hojaForm.nombre} onChange={e=>setHojaForm(p=>({...p,nombre:e.target.value}))} placeholder="Ej: Score 250 EC (Difenoconazol)"/></div>
+                <div><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:4}}>Tipo de pesticida</label>
+                  <select style={S.input} value={hojaForm.tipo||""} onChange={e=>setHojaForm(p=>({...p,tipo:e.target.value}))}>
+                    <option value="">— Seleccionar —</option>
+                    <option value="Bactericida">Bactericida</option>
+                    <option value="Fungicida">Fungicida</option>
+                    <option value="Herbicida">Herbicida</option>
+                    <option value="Insecticida">Insecticida</option>
+                    <option value="Moluscocida">Moluscocida</option>
+                    <option value="Otro">Otro</option>
+                  </select>
+                </div>
                 <div><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:4}}>Fabricante / Marca</label>
                   <input style={S.input} value={hojaForm.fabricante} onChange={e=>setHojaForm(p=>({...p,fabricante:e.target.value}))} placeholder="Ej: Syngenta"/></div>
                 <div><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:4}}>Fecha</label>
@@ -14006,11 +14017,17 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
             <div style={{...S.card,padding:36,textAlign:"center",color:"#4a7a5a"}}><div style={{fontSize:32,marginBottom:8}}>🛡️</div><div style={{fontSize:13}}>No hay hojas de seguridad cargadas aún</div></div>
           ):(
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              {(Array.isArray(hojasSeguridad)?hojasSeguridad:[]).map(h=>(
+              {[...(Array.isArray(hojasSeguridad)?hojasSeguridad:[])].sort((a,b)=>{
+                const ta=a.tipo||"Otro"; const tb=b.tipo||"Otro";
+                return ta.localeCompare(tb,"es",{sensitivity:"base"})||a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"});
+              }).map(h=>(
                 <div key={h.id} style={{...S.card,padding:14,display:"flex",gap:12,alignItems:"center"}}>
                   <div style={{fontSize:28,flexShrink:0}}>🧪</div>
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:2}}>{h.nombre}</div>
+                    <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:2}}>
+                      <span style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700}}>{h.nombre}</span>
+                      {h.tipo&&<span style={{...S.chip,fontSize:10,background:"rgba(167,139,250,0.1)",color:"#c4b5fd"}}>{h.tipo}</span>}
+                    </div>
                     {h.fabricante&&<div style={{fontSize:11,color:"#7aaa80",marginBottom:1}}>🏭 {h.fabricante}</div>}
                     <div style={{fontSize:10,color:"#4a7a5a"}}>Subida: {h.fechaSubida||h.fecha}</div>
                   </div>
