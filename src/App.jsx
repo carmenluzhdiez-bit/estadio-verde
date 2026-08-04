@@ -11298,7 +11298,7 @@ function TareasGolfPanel({ tareasGolfHoy, hoy, esJefa, setTareasProg, tareasProg
 }
 
 
-function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito, onCierreSectorial, onNuevaAlerta, configSemanal={}, setConfigSemanal, getAllElems, getZD, setElemFrecs }) {
+function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito, onCierreSectorial, onNuevaAlerta, configSemanal={}, setConfigSemanal, getAllElems, getZD, setElemFrecs, bodegasData, setBodegasData }) {
   const GOLF_ZONA_ID = 31; // ID macrozona Golf
   const sincronizarMacrozona = (tipo, detalle) => {
     if(!updateZona) return;
@@ -13344,6 +13344,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           setIncidenciasFito={setIncidenciasFito}
           crearNotificacion={crearNotificacion}
           zonasFito={["Golf/Greens","Golf/Tees","Golf/Fairways","Golf/Búnkers","Golf/Vivero"]}
+          bodegasData={bodegasData}
+          setBodegasData={setBodegasData}
         />
       )}
     </div>
@@ -16226,6 +16228,12 @@ function PanelProtocolos({ S, personal, esJefa, crearNotificacion }) {
           </div>
           <div style={{fontSize:12,fontWeight:700,color:"#34d399",marginBottom:12}}>🌿 Poda en Altura — Protocolo de subida</div>
           <ProtocoloPodaAltura S={S} personal={personal} esJefa={esJefa} crearNotificacion={crearNotificacion}/>
+
+          <div style={{borderTop:"1px solid rgba(255,255,255,0.08)",margin:"28px 0 20px",display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:11,color:"#4a7a5a",whiteSpace:"nowrap"}}>📝 Formulario activo</span>
+            <div style={{flex:1,height:1,background:"rgba(255,255,255,0.06)"}}/>
+          </div>
+          <ChecklistEsmeril S={S} personal={personal} esJefa={esJefa}/>
         </div>
       )}
     </div>
@@ -16281,6 +16289,186 @@ function ProtItem({ children, value, onChange, invert }) {
       background:flagged?"rgba(245,158,11,0.06)":"rgba(255,255,255,0.02)",marginBottom:6}}>
       <div style={{fontSize:12,color:"#c0dac0",marginBottom:6}}>{children}</div>
       <ProtToggle value={value} onChange={onChange}/>
+    </div>
+  );
+}
+
+// ─── CHECKLIST ESMERIL ANGULAR ───────────────────────────────────────────────
+const ESMERIL_PATH = "estadio-verde-data/protocolos/checklist_esmeril";
+const ESMERIL_ITEMS = [
+  { seccion:"Área de Trabajo", items:[
+    "¿El área está libre de combustibles, aceites o maleza seca?",
+    "¿La iluminación del lugar es adecuada para el trabajo?",
+    "¿El extintor de incendios está disponible y vigente?",
+  ]},
+  { seccion:"Elementos de Protección Personal (EPP)", items:[
+    "¿La pantalla facial y las gafas están limpias y sin rayas?",
+    "¿Los guantes de cuero están secos y libres de roturas?",
+    "¿El operador cuenta con ropa de algodón y pechera de cuero?",
+  ]},
+  { seccion:"Esmeril Angular y Disco", items:[
+    "¿El cable eléctrico y el enchufe están en buen estado?",
+    "¿La carcasa protectora está bien ajustada en el ángulo correcto?",
+    "¿El mango auxiliar está instalado y firme?",
+    "¿El disco es de desbaste (grueso) y está vigente?",
+    "¿El disco está libre de fisuras, grietas o golpes?",
+  ]},
+  { seccion:"Sujeción de Herramientas", items:[
+    "¿El tornillo de banco o prensa funciona y aprieta firmemente?",
+  ]},
+];
+const esmerilEmpty = () => ({
+  fecha: new Date().toISOString().slice(0,10),
+  hora: new Date().toTimeString().slice(0,5),
+  operador:"",
+  items: Object.fromEntries(
+    ESMERIL_ITEMS.flatMap(s=>s.items).map((_,i)=>[i,""])
+  ),
+  observaciones:"",
+});
+
+function ChecklistEsmeril({ S, personal, esJefa }) {
+  const [form, setForm] = React.useState(esmerilEmpty());
+  const [history, setHistory] = React.useState([]);
+  const [showHistory, setShowHistory] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const [saved, setSaved] = React.useState(false);
+
+  React.useEffect(()=>{
+    const r = firebase.database().ref(ESMERIL_PATH);
+    r.limitToLast(20).once("value",snap=>{
+      const v=snap.val()||{};
+      setHistory(Object.values(v).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")));
+    });
+  },[saved]);
+
+  const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
+  const allItemsFlat = ESMERIL_ITEMS.flatMap(s=>s.items);
+  const totalItems = allItemsFlat.length;
+  const respondidos = Object.values(form.items).filter(v=>v!=="").length;
+  const hayIncorrectos = Object.values(form.items).some(v=>v==="no");
+  const completo = respondidos===totalItems && form.operador;
+
+  const setItemVal = (idx,val) => setForm(p=>({...p,items:{...p.items,[idx]:val}}));
+
+  const guardar = async () => {
+    if(!completo) return;
+    setSaving(true);
+    const registro = {...form, savedAt:new Date().toISOString(), resultado:hayIncorrectos?"OBSERVACIONES":"APROBADO"};
+    const r = firebase.database().ref(ESMERIL_PATH);
+    await r.push(registro);
+    setSaved(p=>!p);
+    setForm(esmerilEmpty());
+    setSaving(false);
+  };
+
+  const labelSt={fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
+
+  return (
+    <div>
+      <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#fbbf24",marginBottom:2}}>⚙️ Checklist Pre-Uso — Esmeril Angular (Galletera)</div>
+      <div style={{fontSize:11,color:"#5a9a7a",marginBottom:16}}>Debe completarse y firmarse antes de iniciar cada jornada de afilado. Palas · Chuzos · Podadoras</div>
+
+      <div style={{...S.card,padding:16,marginBottom:14}}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}}>
+          <div><label style={labelSt}>Fecha</label>
+            <input type="date" style={S.input} value={form.fecha} onChange={e=>setForm(p=>({...p,fecha:e.target.value}))}/></div>
+          <div><label style={labelSt}>Hora</label>
+            <input type="time" style={S.input} value={form.hora} onChange={e=>setForm(p=>({...p,hora:e.target.value}))}/></div>
+          <div><label style={labelSt}>Operador</label>
+            <select style={S.input} value={form.operador} onChange={e=>setForm(p=>({...p,operador:e.target.value}))}>
+              <option value="">Seleccionar...</option>
+              {personalArr.map(p=><option key={p.id||p.nombre} value={p.nombre}>{p.nombre}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* Ítems por sección */}
+        {(()=>{
+          let idx=0;
+          return ESMERIL_ITEMS.map(sec=>(
+            <div key={sec.seccion} style={{marginBottom:16}}>
+              <div style={{fontSize:12,fontWeight:700,color:"#86efac",marginBottom:8,paddingBottom:4,borderBottom:"1px solid rgba(255,255,255,0.08)"}}>
+                {sec.seccion}
+              </div>
+              {sec.items.map(pregunta=>{
+                const i=idx++;
+                const val=form.items[i]||"";
+                return (
+                  <div key={i} style={{padding:"10px 12px",borderRadius:10,marginBottom:6,
+                    border:`1px solid ${val==="no"?"rgba(245,158,11,0.4)":val==="si"?"rgba(34,197,94,0.2)":"rgba(255,255,255,0.08)"}`,
+                    background:val==="no"?"rgba(245,158,11,0.05)":val==="si"?"rgba(34,197,94,0.03)":"rgba(255,255,255,0.02)"}}>
+                    <div style={{fontSize:12,color:"#c0dac0",marginBottom:6}}>{pregunta}</div>
+                    <div style={{display:"flex",gap:6}}>
+                      {[["si","✓ Correcto","#22c55e"],["no","✗ Incorrecto","#f59e0b"],["na","N/A","#6aaa7a"]].map(([v,l,c])=>(
+                        <button key={v} type="button" onClick={()=>setItemVal(i,v)}
+                          style={{flex:1,padding:"6px 0",borderRadius:8,fontSize:11,fontWeight:600,cursor:"pointer",
+                            border:`1px solid ${val===v?c+"99":"rgba(255,255,255,0.1)"}`,
+                            background:val===v?c+"22":"transparent",
+                            color:val===v?c:"#6aaa7a"}}>
+                          {l}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ));
+        })()}
+
+        <div style={{marginBottom:12}}>
+          <label style={labelSt}>Observaciones adicionales</label>
+          <textarea style={{...S.input,resize:"vertical",minHeight:56}} value={form.observaciones}
+            onChange={e=>setForm(p=>({...p,observaciones:e.target.value}))}
+            placeholder="Condiciones especiales, fallas detectadas, otros..."/>
+        </div>
+
+        {hayIncorrectos&&(
+          <div style={{...S.card,padding:12,marginBottom:12,background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.3)"}}>
+            <div style={{fontSize:12,color:"#f59e0b",fontWeight:700}}>⚠️ Hay ítems marcados como Incorrectos</div>
+            <div style={{fontSize:11,color:"#b08a3a",marginTop:4}}>Corrija los problemas identificados antes de usar el esmeril. Registre las observaciones arriba.</div>
+          </div>
+        )}
+
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <button className="btn-p" style={{...S.btn,opacity:completo?1:0.5}} onClick={guardar} disabled={!completo||saving}>
+            {saving?"Guardando...":"✅ Firmar y guardar checklist"}
+          </button>
+          <span style={{fontSize:11,color:"#5a7a5a"}}>{respondidos}/{totalItems} ítems respondidos</span>
+        </div>
+      </div>
+
+      {/* Historial */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+        <div style={{fontSize:12,fontWeight:700,color:"#86efac"}}>📜 Registros anteriores</div>
+        <button style={{...S.btn,fontSize:11,background:"transparent",border:"1px solid rgba(255,255,255,0.1)",color:"#7aaa80"}}
+          onClick={()=>setShowHistory(p=>!p)}>{showHistory?"Ocultar":"Ver historial"}</button>
+      </div>
+      {showHistory&&(
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {history.length===0&&<div style={{...S.card,padding:24,textAlign:"center",color:"#4a7a5a"}}>Sin registros aún</div>}
+          {history.map((r,i)=>{
+            const incorrectos=Object.values(r.items||{}).filter(v=>v==="no").length;
+            return (
+              <div key={i} style={{...S.card,padding:12,borderLeft:`3px solid ${r.resultado==="APROBADO"?"#22c55e":"#f59e0b"}`}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:6}}>
+                  <div>
+                    <span style={{fontSize:12,fontWeight:700}}>{r.fecha} {r.hora}</span>
+                    <span style={{fontSize:11,color:"#7aaa80",marginLeft:8}}>👤 {r.operador}</span>
+                  </div>
+                  <span style={{fontSize:11,padding:"2px 10px",borderRadius:8,fontWeight:700,
+                    background:r.resultado==="APROBADO"?"rgba(34,197,94,0.1)":"rgba(245,158,11,0.1)",
+                    color:r.resultado==="APROBADO"?"#22c55e":"#f59e0b"}}>
+                    {r.resultado==="APROBADO"?"✅ Aprobado":`⚠️ ${incorrectos} observación(es)`}
+                  </span>
+                </div>
+                {r.observaciones&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:4,fontStyle:"italic"}}>{r.observaciones}</div>}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -19159,7 +19347,7 @@ export default function App() {
 
         {/* GOLF */}
         {vista==="golf"&&(
-          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial} setVista={setVista} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} onCierreSectorial={()=>setShowCierreSectorial(true)} onNuevaAlerta={()=>{setAutoOpenAlerta(true);setVista("notificaciones");}} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs}
+          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial} setVista={setVista} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} onCierreSectorial={()=>setShowCierreSectorial(true)} onNuevaAlerta={()=>{setAutoOpenAlerta(true);setVista("notificaciones");}} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} bodegasData={bodegasData} setBodegasData={setBodegasData}
             crearNotificacion={crearNotificacion}
             initialSubTab={golfInitTab}
             onRegistroGuardado={(tipo)=>{
