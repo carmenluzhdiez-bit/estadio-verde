@@ -2707,7 +2707,7 @@ const getNombreRef = (nombreCompleto) => {
   return nombreCompleto.trim().split(" ")[0]||nombreCompleto;
 };
 
-function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE, onAccesoRapido, onCambiarMetodo, cierresTurno={}, onCerrarTurno, onReabrirTurno, crearNotificacion, esJefaApp=false, onGuardarRutinas, onGuardarAlertaFito }) {
+function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE, onAccesoRapido, onCambiarMetodo, cierresTurno={}, onCerrarTurno, onReabrirTurno, crearNotificacion, esJefaApp=false, onGuardarRutinas, onGuardarAlertaFito, hojasSeguridad=[] }) {
   const hoy = fechaLocal();
   const [fechaVer, setFechaVer] = React.useState(fecha || hoy);
   // Cierre de turno
@@ -3221,6 +3221,33 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
           }));
           return (
             <div style={{marginBottom:14}}>
+              {/* ── Hojas de Seguridad — visible para todos ── */}
+              {Array.isArray(hojasSeguridad)&&hojasSeguridad.length>0&&(
+                <div style={{marginBottom:14}}>
+                  <div style={{fontSize:12,fontWeight:600,color:"#a78bfa",marginBottom:8,paddingLeft:2}}>🛡️ Hojas de Seguridad</div>
+                  <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                    {[...hojasSeguridad].sort((a,b)=>{
+                      const ta=a.tipo||"Otro"; const tb=b.tipo||"Otro";
+                      return ta.localeCompare(tb,"es",{sensitivity:"base"})||a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"});
+                    }).map(h=>(
+                      <div key={h.id} style={{...S.card,padding:"10px 14px",display:"flex",gap:10,alignItems:"center"}}>
+                        <span style={{fontSize:20,flexShrink:0}}>🧪</span>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:13,fontWeight:600}}>{h.nombre}</div>
+                          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:2}}>
+                            {h.tipo&&<span style={{fontSize:10,color:"#c4b5fd",background:"rgba(167,139,250,0.1)",padding:"1px 7px",borderRadius:8}}>{h.tipo}</span>}
+                            {h.fabricante&&<span style={{fontSize:10,color:"#7aaa80"}}>🏭 {h.fabricante}</span>}
+                          </div>
+                        </div>
+                        <a href={h.link} target="_blank" rel="noopener noreferrer"
+                          style={{...S.btn,background:"rgba(167,139,250,0.12)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.25)",fontSize:11,padding:"5px 10px",textDecoration:"none",borderRadius:8,fontFamily:"'Georgia',serif",flexShrink:0}}>
+                          👁️ Ver
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div style={{fontSize:12,fontWeight:600,color:"#34d399",marginBottom:8,paddingLeft:2}}>🌿 Otras tareas del día</div>
               {grupos.map(g=>{
                 const hechas=g.tareas.filter(t=>t.estado==="hecha").length;
@@ -13256,10 +13283,16 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
   const emptyHoja = {nombre:"",fabricante:"",tipo:"",link:"",fecha:hoy};
   const [hojaForm, setHojaForm] = React.useState(emptyHoja);
   const [showHojaForm, setShowHojaForm] = React.useState(false);
+  const [editHojaId, setEditHojaId] = React.useState(null);
   const guardarHoja = () => {
     if(!hojaForm.nombre.trim()||!hojaForm.link.trim()){alert("Falta nombre y/o link.");return;}
     const arr = Array.isArray(hojasSeguridad)?hojasSeguridad:[];
-    setHojasSeguridad([{...hojaForm,id:Date.now(),fechaSubida:hoy},...arr]);
+    if(editHojaId) {
+      setHojasSeguridad(arr.map(h=>h.id===editHojaId?{...h,...hojaForm}:h));
+    } else {
+      setHojasSeguridad([{...hojaForm,id:Date.now(),fechaSubida:hoy},...arr]);
+    }
+    setHojaForm(emptyHoja); setShowHojaForm(false); setEditHojaId(null);
     setHojaForm(emptyHoja);setShowHojaForm(false);
   };
 
@@ -14005,10 +14038,12 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
         <div className="ein">
           <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,marginBottom:4}}>🛡️ Hojas de Seguridad — Pesticidas</div>
           <div style={{fontSize:11,color:"#5a9a7a",marginBottom:14}}>Fichas de datos de seguridad (SDS/MSDS) de cada producto. Visibles para todos los usuarios.</div>
-          {esJefa&&!showHojaForm&&<button className="btn-p" style={{...S.btn,marginBottom:14}} onClick={()=>setShowHojaForm(true)}>➕ Agregar hoja de seguridad</button>}
+          {esJefa&&!showHojaForm&&<button className="btn-p" style={{...S.btn,marginBottom:14}} onClick={()=>{setEditHojaId(null);setHojaForm(emptyHoja);setShowHojaForm(true);}}>➕ Agregar hoja de seguridad</button>}
           {esJefa&&showHojaForm&&(
             <div style={{...S.card,padding:16,marginBottom:14}} className="ein">
-              <div style={{fontSize:13,fontWeight:700,color:"#a78bfa",marginBottom:12}}>🛡️ Nueva hoja de seguridad</div>
+              <div style={{fontSize:13,fontWeight:700,color:"#a78bfa",marginBottom:12}}>
+                {editHojaId?"✏️ Editar hoja de seguridad":"🛡️ Nueva hoja de seguridad"}
+              </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
                 <div style={{gridColumn:"1/-1"}}><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:4}}>Nombre del producto *</label>
                   <input style={S.input} value={hojaForm.nombre} onChange={e=>setHojaForm(p=>({...p,nombre:e.target.value}))} placeholder="Ej: Score 250 EC (Difenoconazol)"/></div>
@@ -14033,7 +14068,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
               </div>
               <div style={{display:"flex",gap:8}}>
                 <button className="btn-p" style={S.btn} onClick={guardarHoja}>✓ Guardar</button>
-                <button className="btn-g" style={S.btn} onClick={()=>setShowHojaForm(false)}>Cancelar</button>
+                <button className="btn-g" style={S.btn} onClick={()=>{setShowHojaForm(false);setEditHojaId(null);setHojaForm(emptyHoja);}}>Cancelar</button>
               </div>
             </div>
           )}
@@ -14060,6 +14095,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
                       style={{...S.btn,background:"rgba(167,139,250,0.12)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.25)",fontSize:12,padding:"6px 12px",textDecoration:"none",borderRadius:8,fontFamily:"'Georgia',serif"}}>
                       👁️ Ver
                     </a>
+                    {esJefa&&<button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>{setHojaForm({nombre:h.nombre,fabricante:h.fabricante||"",tipo:h.tipo||"",link:h.link,fecha:h.fecha||hoy});setEditHojaId(h.id);setShowHojaForm(true);window.scrollTo({top:0,behavior:"smooth"});}}>✏️</button>}
                     {esJefa&&<button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>{if(window.confirm("¿Eliminar?"))setHojasSeguridad((Array.isArray(hojasSeguridad)?hojasSeguridad:[]).filter(x=>x.id!==h.id));}}>🗑</button>}
                   </div>
                 </div>
@@ -17801,6 +17837,7 @@ export default function App() {
                   });
                 }}
                 cierresTurno={cierresTurno}
+                hojasSeguridad={Array.isArray(hojasSeguridad)?hojasSeguridad:[]}
                 onUpdateTarea={(fecha,tid,patch)=>{
                   const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
                   setTareasProg(prev=>{
