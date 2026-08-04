@@ -15616,9 +15616,9 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
           <div key={inc.id} style={{...S.card,marginBottom:10,padding:"14px 16px",border:`1px solid ${URGENCIA_COLORS[inc.urgencia]||"#f59e0b"}30`,background:`${URGENCIA_COLORS[inc.urgencia]||"#f59e0b"}06`}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
               <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                <span style={{fontSize:20}}>{inc.tipoIcon}</span>
+                <span style={{fontSize:20}}>{inc.tipoIcon||"🚨"}</span>
                 <div>
-                  <div style={{fontWeight:700,fontSize:14}}>{inc.tipoLabel}</div>
+                  <div style={{fontWeight:700,fontSize:14}}>{inc.tipoLabel||inc.tipo||"Alerta"}</div>
                   <div style={{fontSize:11,color:"#5a9a7a"}}>{inc.zonas?.join(", ")} · {inc.fecha} {inc.hora}</div>
                 </div>
               </div>
@@ -17732,17 +17732,31 @@ export default function App() {
                   const nueva = {
                     id:"fito_"+Date.now(),
                     tipo:"enfermedad",
-                    descripcion:"🦠 Alerta fitosanitaria: "+obs,
+                    tipoIcon:"🦠",
+                    tipoLabel:"Fitosanitario",
+                    descripcion:"🦠 Alerta fitosanitaria Golf: "+obs,
                     zonas:["Golf"],
                     responsable:trab||"Bhalú",
                     fecha:fec||fechaLocal(),
+                    hora:new Date().toTimeString().slice(0,5),
                     estado:"activa",
+                    urgencia:"alta",
                     origen:"trabajador",
                     creadoEn:new Date().toISOString(),
+                    tareas:[],
+                    historial:[{accion:"Alerta generada por jardinero",fecha:fec||fechaLocal(),responsable:trab||"Bhalú"}],
                   };
                   setIncidencias(prev=>{
                     const arr=Array.isArray(prev)?prev:Object.values(prev||{});
                     return [nueva,...arr];
+                  });
+                  // Crear notificación para que aparezca en la campanilla de la jefa
+                  crearNotificacion&&crearNotificacion("alerta_fito_golf",{
+                    titulo:"🦠 Alerta Fitosanitaria Golf",
+                    mensaje:obs+" · Reportado por "+(trab||"Bhalú")+" · "+(fec||fechaLocal()),
+                    fecha:fec||fechaLocal(),
+                    tipo:"alerta_fito",
+                    urgente:true,
                   });
                 }}
                 cierresTurno={cierresTurno}
