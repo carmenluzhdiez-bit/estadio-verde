@@ -16335,12 +16335,29 @@ function ChecklistEsmeril({ S, personal, esJefa }) {
   const [saved, setSaved] = React.useState(false);
 
   React.useEffect(()=>{
-    const r = firebase.database().ref(ESMERIL_PATH);
-    r.limitToLast(20).once("value",snap=>{
-      const v=snap.val()||{};
-      setHistory(Object.values(v).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")));
+    const fbRef = ref(db, ESMERIL_PATH);
+    const unsub = onValue(fbRef, snap=>{
+      if(snap.val()){
+        const arr = Object.entries(snap.val()).map(([k,v])=>({id:k,...v}))
+          .sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")||(b.hora||"").localeCompare(a.hora||""));
+        setHistory(arr);
+      } else setHistory([]);
     });
-  },[saved]);
+    return ()=>unsub();
+  },[]);
+
+  const guardar = async () => {
+    if(!completo) return;
+    setSaving(true);
+    const id = "esmeril_"+Date.now();
+    const registro = {...form, savedAt:new Date().toISOString(), resultado:hayIncorrectos?"OBSERVACIONES":"APROBADO"};
+    try {
+      await fbUpdate(ref(db, ESMERIL_PATH+"/"+id), registro);
+      setForm(esmerilEmpty());
+      setSaved(p=>!p);
+    } catch(e){ console.error(e); }
+    finally { setSaving(false); }
+  };
 
   const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
   const allItemsFlat = ESMERIL_ITEMS.flatMap(s=>s.items);
@@ -16348,19 +16365,7 @@ function ChecklistEsmeril({ S, personal, esJefa }) {
   const respondidos = Object.values(form.items).filter(v=>v!=="").length;
   const hayIncorrectos = Object.values(form.items).some(v=>v==="no");
   const completo = respondidos===totalItems && form.operador;
-
   const setItemVal = (idx,val) => setForm(p=>({...p,items:{...p.items,[idx]:val}}));
-
-  const guardar = async () => {
-    if(!completo) return;
-    setSaving(true);
-    const registro = {...form, savedAt:new Date().toISOString(), resultado:hayIncorrectos?"OBSERVACIONES":"APROBADO"};
-    const r = firebase.database().ref(ESMERIL_PATH);
-    await r.push(registro);
-    setSaved(p=>!p);
-    setForm(esmerilEmpty());
-    setSaving(false);
-  };
 
   const labelSt={fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
 
