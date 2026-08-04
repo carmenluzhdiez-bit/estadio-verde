@@ -16317,22 +16317,29 @@ const ESMERIL_ITEMS = [
     "¿El tornillo de banco o prensa funciona y aprieta firmemente?",
   ]},
 ];
+const ESMERIL_HERRAMIENTAS = [
+  { id:"cuchillas_rociador", label:"Cuchillas Cortacésped — Rociadores" },
+  { id:"cuchillas_tractor",  label:"Cuchillas Cortacésped — Tractores" },
+  { id:"tijeras_podadoras",  label:"Tijeras de Podar y Podadoras" },
+  { id:"palas_azadones",     label:"Palas, Azadones y Machetes" },
+];
+
 const esmerilEmpty = () => ({
   fecha: new Date().toISOString().slice(0,10),
   hora: new Date().toTimeString().slice(0,5),
   operador:"",
-  items: Object.fromEntries(
-    ESMERIL_ITEMS.flatMap(s=>s.items).map((_,i)=>[i,""])
-  ),
+  herramientas:{},   // { id: { cantidad, maquinaria, obs } }
+  items: {},
   observaciones:"",
 });
 
 const ESMERIL_STEPS = [
-  {id:1,label:"Área"},
-  {id:2,label:"EPP"},
-  {id:3,label:"Esmeril"},
-  {id:4,label:"Sujeción"},
-  {id:5,label:"Firma"},
+  {id:1,label:"Herramientas"},
+  {id:2,label:"Área"},
+  {id:3,label:"EPP"},
+  {id:4,label:"Esmeril"},
+  {id:5,label:"Sujeción"},
+  {id:6,label:"Firma"},
 ];
 
 function ChecklistEsmeril({ S, personal, esJefa }) {
@@ -16360,18 +16367,20 @@ function ChecklistEsmeril({ S, personal, esJefa }) {
   const setItem = (k,v) => setForm(p=>({...p,items:{...p.items,[k]:v}}));
 
   const STEP_KEYS = {
-    1:["area1","area2","area3"],
-    2:["epp1","epp2","epp3"],
-    3:["esm1","esm2","esm3","esm4","esm5"],
-    4:["suj1"],
+    2:["area1","area2","area3"],
+    3:["epp1","epp2","epp3"],
+    4:["esm1","esm2","esm3","esm4","esm5"],
+    5:["suj1"],
   };
   const ALL_KEYS = Object.values(STEP_KEYS).flat();
   const hayIncorrectos = ALL_KEYS.some(k=>form.items[k]==="no");
+  const herramientasSeleccionadas = ESMERIL_HERRAMIENTAS.filter(h=>form.herramientas[h.id]?.seleccionada);
   const stepOk = (n) => {
-    if(n===5) return !!form.operador;
+    if(n===1) return herramientasSeleccionadas.length>0 && herramientasSeleccionadas.every(h=>Number(form.herramientas[h.id]?.cantidad||0)>0);
+    if(n===6) return !!form.operador;
     return (STEP_KEYS[n]||[]).every(k=>form.items[k]!==""&&form.items[k]!==undefined);
   };
-  const allDone = [1,2,3,4,5].every(stepOk);
+  const allDone = [1,2,3,4,5,6].every(stepOk);
 
   const ITEM_LABELS = {
     area1:"¿El área está libre de combustibles, aceites o maleza seca?",
@@ -16420,6 +16429,13 @@ function ChecklistEsmeril({ S, personal, esJefa }) {
       <div style="font-size:13px;color:#065f46;font-weight:600;margin-bottom:2px">Lista de Verificación Pre-Uso — Esmeril Angular (Galletera)</div>
       <div style="font-size:11px;color:#6b7280;margin-bottom:2px">Afilado de herramientas: Palas · Chuzos · Podadoras</div>
       <div class="meta"><b>Fecha:</b> ${r.fecha} &nbsp;·&nbsp; <b>Hora:</b> ${r.hora||"—"} &nbsp;·&nbsp; <b>Operador:</b> ${r.operador||"—"}</div>
+      <h2>Herramientas a Afilar</h2>
+      <table><thead><tr><th>Herramienta</th><th>Cantidad</th><th>Maquinaria / Detalle</th></tr></thead><tbody>
+      ${[...ESMERIL_HERRAMIENTAS,{id:"otro",label:"Otro"}].filter(h=>r.herramientas?.[h.id]?.seleccionada).map(h=>{
+        const hd=r.herramientas[h.id];
+        return `<tr><td>${h.label}</td><td style="text-align:center">${hd.cantidad||"—"}</td><td>${hd.maquinaria||hd.obs||"—"}</td></tr>`;
+      }).join("")||"<tr><td colspan='3' style='color:#888'>Sin herramientas registradas</td></tr>"}
+      </tbody></table>
       ${[
         ["Área de Trabajo",["area1","area2","area3"]],
         ["Elementos de Protección Personal (EPP)",["epp1","epp2","epp3"]],
@@ -16505,28 +16521,111 @@ function ChecklistEsmeril({ S, personal, esJefa }) {
 
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
         {step===1&&(<>
+          <div style={{fontSize:13,fontWeight:600,color:"#c0dac0",marginBottom:4}}>🔧 Herramientas a Afilar</div>
+          <div style={{...S.card,padding:14}}>
+            <div style={{fontSize:11,color:"#5a9a7a",marginBottom:12}}>Selecciona las herramientas que vas a afilar e indica la cantidad de cada una.</div>
+            {ESMERIL_HERRAMIENTAS.map(h=>{
+              const hd = form.herramientas[h.id]||{};
+              const sel = !!hd.seleccionada;
+              const esCuchilla = h.id==="cuchillas_rociador"||h.id==="cuchillas_tractor";
+              return (
+                <div key={h.id} style={{marginBottom:10,padding:"10px 12px",borderRadius:10,
+                  border:`1px solid ${sel?"rgba(52,211,153,0.4)":"rgba(255,255,255,0.08)"}`,
+                  background:sel?"rgba(52,211,153,0.04)":"rgba(255,255,255,0.02)"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:sel?10:0}}>
+                    <input type="checkbox" checked={sel} onChange={e=>{
+                      setForm(p=>({...p,herramientas:{...p.herramientas,[h.id]:{...hd,seleccionada:e.target.checked,cantidad:hd.cantidad||"",maquinaria:hd.maquinaria||"",obs:hd.obs||""}}}));
+                    }} style={{width:16,height:16,accentColor:"#34d399",flexShrink:0}}/>
+                    <span style={{fontSize:13,fontWeight:sel?700:400,color:sel?"#34d399":"#c0dac0"}}>{h.label}</span>
+                  </div>
+                  {sel&&(
+                    <div style={{display:"flex",flexDirection:"column",gap:8,paddingLeft:26}}>
+                      <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                        <div style={{flex:1}}>
+                          <div style={{fontSize:10,color:"#6aaa7a",marginBottom:3,textTransform:"uppercase",letterSpacing:".5px"}}>Cantidad a afilar</div>
+                          <input type="number" min="1" max="50" style={{...S.input,width:"100%"}}
+                            placeholder="ej: 4" value={hd.cantidad||""}
+                            onChange={e=>setForm(p=>({...p,herramientas:{...p.herramientas,[h.id]:{...hd,cantidad:e.target.value}}}))}/>
+                        </div>
+                        {esCuchilla&&(
+                          <div style={{flex:2}}>
+                            <div style={{fontSize:10,color:"#6aaa7a",marginBottom:3,textTransform:"uppercase",letterSpacing:".5px"}}>Maquinaria</div>
+                            <input style={{...S.input,width:"100%"}}
+                              placeholder={h.id==="cuchillas_rociador"?"ej: Rociador Jacobsen 1":"ej: Tractor Ransome"}
+                              value={hd.maquinaria||""}
+                              onChange={e=>setForm(p=>({...p,herramientas:{...p.herramientas,[h.id]:{...hd,maquinaria:e.target.value}}}))}/>
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <div style={{fontSize:10,color:"#6aaa7a",marginBottom:3,textTransform:"uppercase",letterSpacing:".5px"}}>Observaciones (opcional)</div>
+                        <input style={{...S.input,width:"100%"}} placeholder="Estado, condición especial..."
+                          value={hd.obs||""}
+                          onChange={e=>setForm(p=>({...p,herramientas:{...p.herramientas,[h.id]:{...hd,obs:e.target.value}}}))}/>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {/* Herramienta Otro */}
+            {(()=>{
+              const hd = form.herramientas["otro"]||{};
+              const sel = !!hd.seleccionada;
+              return (
+                <div style={{marginBottom:10,padding:"10px 12px",borderRadius:10,
+                  border:`1px solid ${sel?"rgba(52,211,153,0.4)":"rgba(255,255,255,0.08)"}`,
+                  background:sel?"rgba(52,211,153,0.04)":"rgba(255,255,255,0.02)"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:sel?10:0}}>
+                    <input type="checkbox" checked={sel} onChange={e=>{
+                      setForm(p=>({...p,herramientas:{...p.herramientas,otro:{...hd,seleccionada:e.target.checked}}}));
+                    }} style={{width:16,height:16,accentColor:"#34d399",flexShrink:0}}/>
+                    <span style={{fontSize:13,fontWeight:sel?700:400,color:sel?"#34d399":"#c0dac0"}}>Otro</span>
+                  </div>
+                  {sel&&(
+                    <div style={{display:"flex",gap:10,alignItems:"center",paddingLeft:26}}>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:10,color:"#6aaa7a",marginBottom:3,textTransform:"uppercase",letterSpacing:".5px"}}>Cantidad</div>
+                        <input type="number" min="1" style={{...S.input}} value={hd.cantidad||""}
+                          onChange={e=>setForm(p=>({...p,herramientas:{...p.herramientas,otro:{...hd,cantidad:e.target.value}}}))}/>
+                      </div>
+                      <div style={{flex:3}}>
+                        <div style={{fontSize:10,color:"#6aaa7a",marginBottom:3,textTransform:"uppercase",letterSpacing:".5px"}}>Descripción / Observaciones</div>
+                        <input style={{...S.input}} placeholder="Especifica qué herramienta y condición..."
+                          value={hd.obs||""}
+                          onChange={e=>setForm(p=>({...p,herramientas:{...p.herramientas,otro:{...hd,obs:e.target.value}}}))}/>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+            {herramientasSeleccionadas.length===0&&<div style={{fontSize:11,color:"#f59e0b",marginTop:4}}>⚠️ Selecciona al menos una herramienta para continuar</div>}
+          </div>
+        </>)}
+        {step===2&&(<>
           <div style={{fontSize:13,fontWeight:600,color:"#c0dac0",marginBottom:4}}>🏗️ Área de Trabajo</div>
           {[["area1"],["area2"],["area3"]].map(([k])=>(
             <ProtItem key={k} value={form.items[k]??""} onChange={v=>setItem(k,v)}>{ITEM_LABELS[k]}</ProtItem>
           ))}
         </>)}
-        {step===2&&(<>
+        {step===3&&(<>
           <div style={{fontSize:13,fontWeight:600,color:"#c0dac0",marginBottom:4}}>🦺 Elementos de Protección Personal</div>
           {["epp1","epp2","epp3"].map(k=>(
             <ProtItem key={k} value={form.items[k]??""} onChange={v=>setItem(k,v)}>{ITEM_LABELS[k]}</ProtItem>
           ))}
         </>)}
-        {step===3&&(<>
+        {step===4&&(<>
           <div style={{fontSize:13,fontWeight:600,color:"#c0dac0",marginBottom:4}}>⚙️ Esmeril Angular y Disco</div>
           {["esm1","esm2","esm3","esm4","esm5"].map(k=>(
             <ProtItem key={k} value={form.items[k]??""} onChange={v=>setItem(k,v)}>{ITEM_LABELS[k]}</ProtItem>
           ))}
         </>)}
-        {step===4&&(<>
+        {step===5&&(<>
           <div style={{fontSize:13,fontWeight:600,color:"#c0dac0",marginBottom:4}}>🔩 Sujeción de Herramientas</div>
           <ProtItem value={form.items.suj1??""} onChange={v=>setItem("suj1",v)}>{ITEM_LABELS.suj1}</ProtItem>
         </>)}
-        {step===5&&(<>
+        {step===6&&(<>
           <div style={{fontSize:13,fontWeight:600,color:"#c0dac0",marginBottom:4}}>✅ Firma del Operador</div>
           <div style={{...S.card,padding:14}}>
             <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:6,textTransform:"uppercase"}}>Operador que realiza el afilado</label>
@@ -16552,8 +16651,8 @@ function ChecklistEsmeril({ S, personal, esJefa }) {
       <div style={{display:"flex",gap:8,marginTop:16,justifyContent:"space-between"}}>
         <button onClick={()=>setStep(p=>Math.max(1,p-1))} disabled={step===1}
           style={{...S.btn,opacity:step===1?0.3:1}}>← Anterior</button>
-        {step<5?(
-          <button className="btn-p" style={S.btn} onClick={()=>setStep(p=>Math.min(5,p+1))}>Siguiente →</button>
+        {step<6?(
+          <button className="btn-p" style={S.btn} onClick={()=>setStep(p=>Math.min(6,p+1))}>Siguiente →</button>
         ):(
           <button className="btn-p" style={{...S.btn,opacity:allDone?1:0.5}}
             disabled={!allDone||saving}
