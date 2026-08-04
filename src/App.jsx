@@ -16327,8 +16327,17 @@ const esmerilEmpty = () => ({
   observaciones:"",
 });
 
+const ESMERIL_STEPS = [
+  {id:1,label:"Área"},
+  {id:2,label:"EPP"},
+  {id:3,label:"Esmeril"},
+  {id:4,label:"Sujeción"},
+  {id:5,label:"Firma"},
+];
+
 function ChecklistEsmeril({ S, personal, esJefa }) {
   const [form, setForm] = React.useState(esmerilEmpty());
+  const [step, setStep] = React.useState(1);
   const [history, setHistory] = React.useState([]);
   const [showHistory, setShowHistory] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
@@ -16346,134 +16355,221 @@ function ChecklistEsmeril({ S, personal, esJefa }) {
     return ()=>unsub();
   },[]);
 
-  const guardar = async () => {
-    if(!completo) return;
-    setSaving(true);
-    const id = "esmeril_"+Date.now();
-    const registro = {...form, savedAt:new Date().toISOString(), resultado:hayIncorrectos?"OBSERVACIONES":"APROBADO"};
-    try {
-      await fbUpdate(ref(db, ESMERIL_PATH+"/"+id), registro);
-      setForm(esmerilEmpty());
-      setSaved(p=>!p);
-    } catch(e){ console.error(e); }
-    finally { setSaving(false); }
+  const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
+  const set = (k,v) => setForm(p=>({...p,[k]:v}));
+  const setItem = (k,v) => setForm(p=>({...p,items:{...p.items,[k]:v}}));
+
+  const STEP_KEYS = {
+    1:["area1","area2","area3"],
+    2:["epp1","epp2","epp3"],
+    3:["esm1","esm2","esm3","esm4","esm5"],
+    4:["suj1"],
+  };
+  const ALL_KEYS = Object.values(STEP_KEYS).flat();
+  const hayIncorrectos = ALL_KEYS.some(k=>form.items[k]==="no");
+  const stepOk = (n) => {
+    if(n===5) return !!form.operador;
+    return (STEP_KEYS[n]||[]).every(k=>form.items[k]!==""&&form.items[k]!==undefined);
+  };
+  const allDone = [1,2,3,4,5].every(stepOk);
+
+  const ITEM_LABELS = {
+    area1:"¿El área está libre de combustibles, aceites o maleza seca?",
+    area2:"¿La iluminación del lugar es adecuada para el trabajo?",
+    area3:"¿El extintor de incendios está disponible y vigente?",
+    epp1:"¿La pantalla facial y las gafas están limpias y sin rayas?",
+    epp2:"¿Los guantes de cuero están secos y libres de roturas?",
+    epp3:"¿El operador cuenta con ropa de algodón y pechera de cuero?",
+    esm1:"¿El cable eléctrico y el enchufe están en buen estado?",
+    esm2:"¿La carcasa protectora está bien ajustada en el ángulo correcto?",
+    esm3:"¿El mango auxiliar está instalado y firme?",
+    esm4:"¿El disco es de desbaste (grueso) y está vigente?",
+    esm5:"¿El disco está libre de fisuras, grietas o golpes?",
+    suj1:"¿El tornillo de banco o prensa funciona y aprieta firmemente?",
   };
 
-  const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
-  const allItemsFlat = ESMERIL_ITEMS.flatMap(s=>s.items);
-  const totalItems = allItemsFlat.length;
-  const respondidos = Object.values(form.items).filter(v=>v!=="").length;
-  const hayIncorrectos = Object.values(form.items).some(v=>v==="no");
-  const completo = respondidos===totalItems && form.operador;
-  const setItemVal = (idx,val) => setForm(p=>({...p,items:{...p.items,[idx]:val}}));
+  const nodeColor = (n) => step===n?"#34d399":stepOk(n)?"#22c55e":"#4a7a5a";
 
-  const labelSt={fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
+  const imprimirChecklist = (r) => {
+    const win = window.open("","_blank");
+    const allK = Object.values(STEP_KEYS).flat();
+    const IL = ITEM_LABELS;
+    const val = (k) => r.items?.[k]==="si"?"✓ Correcto":r.items?.[k]==="no"?"✗ Incorrecto":r.items?.[k]==="na"?"N/A":"—";
+    const cls = (k) => r.items?.[k]==="si"?"ok":r.items?.[k]==="no"?"warn":"";
+    win.document.write(`<!DOCTYPE html><html lang="es"><head>
+      <meta charset="UTF-8"/>
+      <title>Checklist Esmeril — ${r.fecha}</title>
+      <style>
+        body{font-family:'Segoe UI',sans-serif;color:#1a1a2e;padding:32px;max-width:800px;margin:0 auto}
+        h1{font-size:22px;color:#065f46;margin:0 0 4px}
+        h2{font-size:14px;color:#374151;border-bottom:2px solid #d1fae5;padding-bottom:4px;margin:20px 0 10px}
+        .meta{font-size:12px;color:#6b7280;margin-bottom:20px}
+        table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:12px}
+        th{background:#f0fdf4;padding:6px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#065f46}
+        td{padding:6px 10px;border-bottom:1px solid #e5e7eb}
+        .ok{color:#065f46;font-weight:600} .warn{color:#b45309;font-weight:600}
+        .obs-box{background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:12px;margin:12px 0}
+        .ok-box{background:#f0fdf4;border:1px solid #6ee7b7;border-radius:8px;padding:14px;margin-top:16px}
+        .firma{margin-top:32px;border-top:1px solid #e5e7eb;padding-top:16px;font-size:12px}
+        .footer{margin-top:24px;font-size:10px;color:#9ca3af;text-align:center;border-top:1px solid #e5e7eb;padding-top:12px}
+        @media print{body{padding:16px}.no-print{display:none}}
+      </style>
+    </head><body>
+      <button onclick="window.print()" class="no-print" style="float:right;padding:8px 16px;background:#065f46;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">🖨️ Imprimir / Guardar PDF</button>
+      <h1>Estadio Español · DAV</h1>
+      <div style="font-size:13px;color:#065f46;font-weight:600;margin-bottom:2px">Lista de Verificación Pre-Uso — Esmeril Angular (Galletera)</div>
+      <div style="font-size:11px;color:#6b7280;margin-bottom:2px">Afilado de herramientas: Palas · Chuzos · Podadoras</div>
+      <div class="meta"><b>Fecha:</b> ${r.fecha} &nbsp;·&nbsp; <b>Hora:</b> ${r.hora||"—"} &nbsp;·&nbsp; <b>Operador:</b> ${r.operador||"—"}</div>
+      ${[
+        ["Área de Trabajo",["area1","area2","area3"]],
+        ["Elementos de Protección Personal (EPP)",["epp1","epp2","epp3"]],
+        ["Esmeril Angular y Disco",["esm1","esm2","esm3","esm4","esm5"]],
+        ["Sujeción de Herramientas",["suj1"]],
+      ].map(([sec,keys])=>`
+        <h2>${sec}</h2>
+        <table><thead><tr><th>Ítem</th><th style="width:120px;text-align:center">Resultado</th></tr></thead>
+        <tbody>${keys.map(k=>`<tr><td>${IL[k]}</td><td style="text-align:center" class="${cls(k)}">${val(k)}</td></tr>`).join("")}</tbody>
+        </table>`).join("")}
+      ${hayIncorrectos||r.resultado==="OBSERVACIONES"?`
+        <div class="obs-box"><b style="color:#92400e">⚠️ Ítems con observaciones detectados</b>
+        ${r.observaciones?`<p style="margin:6px 0;font-size:12px;color:#92400e">${r.observaciones}</p>`:""}
+        </div>`:`<div class="ok-box"><b style="color:#065f46">✅ Todos los ítems correctos — Autorizado para iniciar</b></div>`}
+      <div class="firma">
+        <b>Firma del Operador:</b> ___________________________
+        &nbsp;&nbsp;&nbsp;&nbsp; <b>Fecha y Hora:</b> ${r.fecha} ${r.hora||"___:___"}
+      </div>
+      <div class="footer">Estadio Español de Las Condes · Departamento de Áreas Verdes · Generado desde Estadio Verde</div>
+    </body></html>`);
+    win.document.close();
+  };
+
+  if(showHistory) return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <div style={{fontWeight:700,fontSize:14}}>📂 Registros guardados ({history.length})</div>
+        <button onClick={()=>setShowHistory(false)} style={{...S.btn,fontSize:11}}>← Nuevo checklist</button>
+      </div>
+      {history.length===0&&<div style={{textAlign:"center",color:"#5a9a7a",padding:30}}>Aún no hay registros guardados.</div>}
+      {history.map((r,i)=>(
+        <div key={i} style={{...S.card,padding:12,marginBottom:8}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",marginBottom:4}}>
+            <div>
+              <div style={{fontSize:13,fontWeight:600,color:"#c0dac0"}}>{r.operador||"—"}</div>
+              <div style={{fontSize:11,color:"#5a9a7a"}}>{r.fecha} {r.hora&&"· "+r.hora}</div>
+            </div>
+            <div style={{display:"flex",gap:6,alignItems:"center"}}>
+              <span style={{fontSize:10,padding:"2px 8px",borderRadius:8,
+                background:r.resultado==="OBSERVACIONES"?"rgba(245,158,11,0.12)":"rgba(34,197,94,0.1)",
+                color:r.resultado==="OBSERVACIONES"?"#f59e0b":"#22c55e",
+                border:`1px solid ${r.resultado==="OBSERVACIONES"?"rgba(245,158,11,0.3)":"rgba(34,197,94,0.3)"}`}}>
+                {r.resultado==="OBSERVACIONES"?"⚠️ Con observaciones":"✅ Aprobado"}
+              </span>
+              <button onClick={()=>imprimirChecklist(r)}
+                style={{fontSize:10,padding:"2px 8px",borderRadius:6,border:"1px solid rgba(96,165,250,0.3)",background:"rgba(96,165,250,0.08)",color:"#60a5fa",cursor:"pointer"}}>
+                🖨️ PDF
+              </button>
+            </div>
+          </div>
+          {r.observaciones&&<div style={{fontSize:11,color:"#7aaa80",marginTop:4,fontStyle:"italic"}}>"{r.observaciones}"</div>}
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div>
-      <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#fbbf24",marginBottom:2}}>⚙️ Checklist Pre-Uso — Esmeril Angular (Galletera)</div>
-      <div style={{fontSize:11,color:"#5a9a7a",marginBottom:16}}>Debe completarse y firmarse antes de iniciar cada jornada de afilado. Palas · Chuzos · Podadoras</div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        <div>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700}}>⚙️ Checklist Pre-Uso — Esmeril Angular</div>
+          <div style={{fontSize:11,color:"#5a9a7a"}}>Completar antes de iniciar cada jornada de afilado · Palas · Chuzos · Podadoras</div>
+        </div>
+        <button onClick={()=>setShowHistory(true)} style={{...S.btn,fontSize:11,color:"#60a5fa"}}>
+          📂 Ver registros ({history.length})
+        </button>
+      </div>
 
-      <div style={{...S.card,padding:16,marginBottom:14}}>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}}>
-          <div><label style={labelSt}>Fecha</label>
-            <input type="date" style={S.input} value={form.fecha} onChange={e=>setForm(p=>({...p,fecha:e.target.value}))}/></div>
-          <div><label style={labelSt}>Hora</label>
-            <input type="time" style={S.input} value={form.hora} onChange={e=>setForm(p=>({...p,hora:e.target.value}))}/></div>
-          <div><label style={labelSt}>Operador</label>
-            <select style={S.input} value={form.operador} onChange={e=>setForm(p=>({...p,operador:e.target.value}))}>
-              <option value="">Seleccionar...</option>
+      {/* Stepper */}
+      <div style={{...S.card,padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+        {ESMERIL_STEPS.map((s,idx)=>(
+          <React.Fragment key={s.id}>
+            <button onClick={()=>setStep(s.id)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,background:"none",border:"none",cursor:"pointer"}}>
+              <div style={{width:26,height:26,borderRadius:"50%",background:nodeColor(s.id)+"22",border:`2px solid ${nodeColor(s.id)}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:nodeColor(s.id)}}>
+                {step>s.id&&stepOk(s.id)?"✓":s.id}
+              </div>
+              <span style={{fontSize:9,color:step===s.id?"#34d399":"#4a7a5a",textTransform:"uppercase",letterSpacing:"0.3px"}}>{s.label}</span>
+            </button>
+            {idx<ESMERIL_STEPS.length-1&&<div style={{flex:1,height:1,background:"rgba(255,255,255,0.08)",margin:"0 4px"}}/>}
+          </React.Fragment>
+        ))}
+      </div>
+
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {step===1&&(<>
+          <div style={{fontSize:13,fontWeight:600,color:"#c0dac0",marginBottom:4}}>🏗️ Área de Trabajo</div>
+          {[["area1"],["area2"],["area3"]].map(([k])=>(
+            <ProtItem key={k} value={form.items[k]??""} onChange={v=>setItem(k,v)}>{ITEM_LABELS[k]}</ProtItem>
+          ))}
+        </>)}
+        {step===2&&(<>
+          <div style={{fontSize:13,fontWeight:600,color:"#c0dac0",marginBottom:4}}>🦺 Elementos de Protección Personal</div>
+          {["epp1","epp2","epp3"].map(k=>(
+            <ProtItem key={k} value={form.items[k]??""} onChange={v=>setItem(k,v)}>{ITEM_LABELS[k]}</ProtItem>
+          ))}
+        </>)}
+        {step===3&&(<>
+          <div style={{fontSize:13,fontWeight:600,color:"#c0dac0",marginBottom:4}}>⚙️ Esmeril Angular y Disco</div>
+          {["esm1","esm2","esm3","esm4","esm5"].map(k=>(
+            <ProtItem key={k} value={form.items[k]??""} onChange={v=>setItem(k,v)}>{ITEM_LABELS[k]}</ProtItem>
+          ))}
+        </>)}
+        {step===4&&(<>
+          <div style={{fontSize:13,fontWeight:600,color:"#c0dac0",marginBottom:4}}>🔩 Sujeción de Herramientas</div>
+          <ProtItem value={form.items.suj1??""} onChange={v=>setItem("suj1",v)}>{ITEM_LABELS.suj1}</ProtItem>
+        </>)}
+        {step===5&&(<>
+          <div style={{fontSize:13,fontWeight:600,color:"#c0dac0",marginBottom:4}}>✅ Firma del Operador</div>
+          <div style={{...S.card,padding:14}}>
+            <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:6,textTransform:"uppercase"}}>Operador que realiza el afilado</label>
+            <select style={{...S.input,marginBottom:10}} value={form.operador} onChange={e=>set("operador",e.target.value)}>
+              <option value="">Seleccionar operador...</option>
               {personalArr.map(p=><option key={p.id||p.nombre} value={p.nombre}>{p.nombre}</option>)}
             </select>
+            <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:6,textTransform:"uppercase"}}>Observaciones adicionales</label>
+            <textarea style={{...S.input,resize:"vertical",minHeight:56}} value={form.observaciones}
+              onChange={e=>set("observaciones",e.target.value)}
+              placeholder="Fallas detectadas, condiciones especiales, otros..."/>
           </div>
-        </div>
-
-        {/* Ítems por sección */}
-        {(()=>{
-          let idx=0;
-          return ESMERIL_ITEMS.map(sec=>(
-            <div key={sec.seccion} style={{marginBottom:16}}>
-              <div style={{fontSize:12,fontWeight:700,color:"#86efac",marginBottom:8,paddingBottom:4,borderBottom:"1px solid rgba(255,255,255,0.08)"}}>
-                {sec.seccion}
-              </div>
-              {sec.items.map(pregunta=>{
-                const i=idx++;
-                const val=form.items[i]||"";
-                return (
-                  <div key={i} style={{padding:"10px 12px",borderRadius:10,marginBottom:6,
-                    border:`1px solid ${val==="no"?"rgba(245,158,11,0.4)":val==="si"?"rgba(34,197,94,0.2)":"rgba(255,255,255,0.08)"}`,
-                    background:val==="no"?"rgba(245,158,11,0.05)":val==="si"?"rgba(34,197,94,0.03)":"rgba(255,255,255,0.02)"}}>
-                    <div style={{fontSize:12,color:"#c0dac0",marginBottom:6}}>{pregunta}</div>
-                    <div style={{display:"flex",gap:6}}>
-                      {[["si","✓ Correcto","#22c55e"],["no","✗ Incorrecto","#f59e0b"],["na","N/A","#6aaa7a"]].map(([v,l,c])=>(
-                        <button key={v} type="button" onClick={()=>setItemVal(i,v)}
-                          style={{flex:1,padding:"6px 0",borderRadius:8,fontSize:11,fontWeight:600,cursor:"pointer",
-                            border:`1px solid ${val===v?c+"99":"rgba(255,255,255,0.1)"}`,
-                            background:val===v?c+"22":"transparent",
-                            color:val===v?c:"#6aaa7a"}}>
-                          {l}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
+          {hayIncorrectos&&(
+            <div style={{...S.card,padding:12,background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.3)"}}>
+              <div style={{fontSize:12,color:"#f59e0b",fontWeight:700}}>⚠️ Hay ítems marcados como Incorrectos</div>
+              <div style={{fontSize:11,color:"#b08a3a",marginTop:4}}>Corrija los problemas antes de iniciar. Registre las observaciones arriba.</div>
             </div>
-          ));
-        })()}
+          )}
+        </>)}
+      </div>
 
-        <div style={{marginBottom:12}}>
-          <label style={labelSt}>Observaciones adicionales</label>
-          <textarea style={{...S.input,resize:"vertical",minHeight:56}} value={form.observaciones}
-            onChange={e=>setForm(p=>({...p,observaciones:e.target.value}))}
-            placeholder="Condiciones especiales, fallas detectadas, otros..."/>
-        </div>
-
-        {hayIncorrectos&&(
-          <div style={{...S.card,padding:12,marginBottom:12,background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.3)"}}>
-            <div style={{fontSize:12,color:"#f59e0b",fontWeight:700}}>⚠️ Hay ítems marcados como Incorrectos</div>
-            <div style={{fontSize:11,color:"#b08a3a",marginTop:4}}>Corrija los problemas identificados antes de usar el esmeril. Registre las observaciones arriba.</div>
-          </div>
-        )}
-
-        <div style={{display:"flex",gap:8,alignItems:"center"}}>
-          <button className="btn-p" style={{...S.btn,opacity:completo?1:0.5}} onClick={guardar} disabled={!completo||saving}>
+      {/* Navegación */}
+      <div style={{display:"flex",gap:8,marginTop:16,justifyContent:"space-between"}}>
+        <button onClick={()=>setStep(p=>Math.max(1,p-1))} disabled={step===1}
+          style={{...S.btn,opacity:step===1?0.3:1}}>← Anterior</button>
+        {step<5?(
+          <button className="btn-p" style={S.btn} onClick={()=>setStep(p=>Math.min(5,p+1))}>Siguiente →</button>
+        ):(
+          <button className="btn-p" style={{...S.btn,opacity:allDone?1:0.5}}
+            disabled={!allDone||saving}
+            onClick={async()=>{
+              if(!allDone)return;
+              setSaving(true);
+              const id="esmeril_"+Date.now();
+              const registro={...form,savedAt:new Date().toISOString(),resultado:hayIncorrectos?"OBSERVACIONES":"APROBADO"};
+              try{ await fbUpdate(ref(db,ESMERIL_PATH+"/"+id),registro); setForm(esmerilEmpty()); setStep(1); setSaved(p=>!p); }
+              catch(e){ console.error(e); }
+              finally{ setSaving(false); }
+            }}>
             {saving?"Guardando...":"✅ Firmar y guardar checklist"}
           </button>
-          <span style={{fontSize:11,color:"#5a7a5a"}}>{respondidos}/{totalItems} ítems respondidos</span>
-        </div>
+        )}
       </div>
-
-      {/* Historial */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-        <div style={{fontSize:12,fontWeight:700,color:"#86efac"}}>📜 Registros anteriores</div>
-        <button style={{...S.btn,fontSize:11,background:"transparent",border:"1px solid rgba(255,255,255,0.1)",color:"#7aaa80"}}
-          onClick={()=>setShowHistory(p=>!p)}>{showHistory?"Ocultar":"Ver historial"}</button>
-      </div>
-      {showHistory&&(
-        <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {history.length===0&&<div style={{...S.card,padding:24,textAlign:"center",color:"#4a7a5a"}}>Sin registros aún</div>}
-          {history.map((r,i)=>{
-            const incorrectos=Object.values(r.items||{}).filter(v=>v==="no").length;
-            return (
-              <div key={i} style={{...S.card,padding:12,borderLeft:`3px solid ${r.resultado==="APROBADO"?"#22c55e":"#f59e0b"}`}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:6}}>
-                  <div>
-                    <span style={{fontSize:12,fontWeight:700}}>{r.fecha} {r.hora}</span>
-                    <span style={{fontSize:11,color:"#7aaa80",marginLeft:8}}>👤 {r.operador}</span>
-                  </div>
-                  <span style={{fontSize:11,padding:"2px 10px",borderRadius:8,fontWeight:700,
-                    background:r.resultado==="APROBADO"?"rgba(34,197,94,0.1)":"rgba(245,158,11,0.1)",
-                    color:r.resultado==="APROBADO"?"#22c55e":"#f59e0b"}}>
-                    {r.resultado==="APROBADO"?"✅ Aprobado":`⚠️ ${incorrectos} observación(es)`}
-                  </span>
-                </div>
-                {r.observaciones&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:4,fontStyle:"italic"}}>{r.observaciones}</div>}
-              </div>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }
