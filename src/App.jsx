@@ -14122,34 +14122,40 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
           )}
           {(Array.isArray(hojasSeguridad)?hojasSeguridad:[]).length===0?(
             <div style={{...S.card,padding:36,textAlign:"center",color:"#4a7a5a"}}><div style={{fontSize:32,marginBottom:8}}>🛡️</div><div style={{fontSize:13}}>No hay hojas de seguridad cargadas aún</div></div>
-          ):(
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              {[...(Array.isArray(hojasSeguridad)?hojasSeguridad:[])].sort((a,b)=>{
-                const ta=a.tipo||"Otro"; const tb=b.tipo||"Otro";
-                return ta.localeCompare(tb,"es",{sensitivity:"base"})||a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"});
-              }).map(h=>(
-                <div key={h.id} style={{...S.card,padding:14,display:"flex",gap:12,alignItems:"center"}}>
-                  <div style={{fontSize:28,flexShrink:0}}>🧪</div>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:2}}>
-                      <span style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700}}>{h.nombre}</span>
-                      {h.tipo&&<span style={{...S.chip,fontSize:10,background:"rgba(167,139,250,0.1)",color:"#c4b5fd"}}>{h.tipo}</span>}
-                    </div>
-                    {h.fabricante&&<div style={{fontSize:11,color:"#7aaa80",marginBottom:1}}>🏭 {h.fabricante}</div>}
-                    <div style={{fontSize:10,color:"#4a7a5a"}}>Subida: {h.fechaSubida||h.fecha}</div>
+          ):(()=>{
+            const lista=Array.isArray(hojasSeguridad)?hojasSeguridad:[];
+            const tipos=[...new Set(lista.map(h=>h.tipo||"Sin clasificar"))].sort();
+            return tipos.map(tipo=>{
+              const fichas=lista.filter(h=>(h.tipo||"Sin clasificar")===tipo).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+              return (
+                <div key={tipo} style={{marginBottom:14}}>
+                  <div style={{fontSize:11,fontWeight:700,color:"#c4b5fd",textTransform:"uppercase",letterSpacing:".8px",marginBottom:8,paddingLeft:2,borderBottom:"1px solid rgba(167,139,250,0.15)",paddingBottom:6}}>
+                    🧪 {tipo} <span style={{fontWeight:400,color:"#7a6a9a"}}>({fichas.length})</span>
                   </div>
-                  <div style={{display:"flex",gap:6,flexShrink:0}}>
-                    <a href={h.link} target="_blank" rel="noopener noreferrer"
-                      style={{...S.btn,background:"rgba(167,139,250,0.12)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.25)",fontSize:12,padding:"6px 12px",textDecoration:"none",borderRadius:8,fontFamily:"'Georgia',serif"}}>
-                      👁️ Ver
-                    </a>
-                    {esJefa&&<button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>{setHojaForm({nombre:h.nombre,fabricante:h.fabricante||"",tipo:h.tipo||"",link:h.link,fecha:h.fecha||hoy});setEditHojaId(h.id);setShowHojaForm(true);window.scrollTo({top:0,behavior:"smooth"});}}>✏️</button>}
-                    {esJefa&&<button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>{if(window.confirm("¿Eliminar?"))setHojasSeguridad((Array.isArray(hojasSeguridad)?hojasSeguridad:[]).filter(x=>x.id!==h.id));}}>🗑</button>}
+                  <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                    {fichas.map(h=>(
+                      <div key={h.id} style={{...S.card,padding:14,display:"flex",gap:12,alignItems:"center"}}>
+                        <div style={{fontSize:24,flexShrink:0}}>📄</div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:2}}>{h.nombre}</div>
+                          {h.fabricante&&<div style={{fontSize:11,color:"#7aaa80"}}>🏭 {h.fabricante}</div>}
+                          <div style={{fontSize:10,color:"#4a7a5a"}}>Subida: {h.fechaSubida||h.fecha}</div>
+                        </div>
+                        <div style={{display:"flex",gap:6,flexShrink:0}}>
+                          <a href={h.link} target="_blank" rel="noopener noreferrer"
+                            style={{...S.btn,background:"rgba(167,139,250,0.12)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.25)",fontSize:12,padding:"6px 12px",textDecoration:"none",borderRadius:8,fontFamily:"'Georgia',serif"}}>
+                            👁️ Ver
+                          </a>
+                          {esJefa&&<button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>{setHojaForm({nombre:h.nombre,fabricante:h.fabricante||"",tipo:h.tipo||"",link:h.link,fecha:h.fecha||hoy});setEditHojaId(h.id);setShowHojaForm(true);window.scrollTo({top:0,behavior:"smooth"});}}>✏️</button>}
+                          {esJefa&&<button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>{if(window.confirm("¿Eliminar?"))setHojasSeguridad((Array.isArray(hojasSeguridad)?hojasSeguridad:[]).filter(x=>x.id!==h.id));}}>🗑</button>}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
+              );
+            });
+          })()}
         </div>
       )}
     </div>
