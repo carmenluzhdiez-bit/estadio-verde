@@ -13323,6 +13323,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
   const [editItemId, setEditItemId] = React.useState(null);
   const [catsAb, setCatsAb] = React.useState({});
   const [selMaq, setSelMaq] = React.useState([]);
+  const [hojaCatsAb, setHojaCatsAb] = React.useState({});
   const [inventFecha, setInventFecha] = React.useState(hoy);
   const [inventItems, setInventItems] = React.useState([{id:1,nombre:"",categoria:"",unidad:"unidad",stockActual:0,stockMinimo:0,ubicacion:""}]);
 
@@ -14127,11 +14128,15 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
             const tipos=[...new Set(lista.map(h=>h.tipo||"Sin clasificar"))].sort();
             return tipos.map(tipo=>{
               const fichas=lista.filter(h=>(h.tipo||"Sin clasificar")===tipo).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+              const abierta = hojaCatsAb[tipo]===true;
               return (
-                <div key={tipo} style={{marginBottom:14}}>
-                  <div style={{fontSize:11,fontWeight:700,color:"#c4b5fd",textTransform:"uppercase",letterSpacing:".8px",marginBottom:8,paddingLeft:2,borderBottom:"1px solid rgba(167,139,250,0.15)",paddingBottom:6}}>
-                    🧪 {tipo} <span style={{fontWeight:400,color:"#7a6a9a"}}>({fichas.length})</span>
+                <div key={tipo} style={{marginBottom:10}}>
+                  <div onClick={()=>setHojaCatsAb(p=>({...p,[tipo]:!abierta}))}
+                    style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",background:"rgba(167,139,250,0.06)",borderRadius:8,border:"1px solid rgba(167,139,250,0.15)",cursor:"pointer",marginBottom:abierta?6:0}}>
+                    <span style={{fontSize:12,fontWeight:700,color:"#c4b5fd"}}>🧪 {tipo} <span style={{fontSize:11,fontWeight:400,color:"#7a6a9a"}}>({fichas.length})</span></span>
+                    <span style={{fontSize:10,color:"#7a6a9a",transform:abierta?"rotate(90deg)":"none",transition:"transform .15s"}}>▶</span>
                   </div>
+                  {abierta&&(
                   <div style={{display:"flex",flexDirection:"column",gap:8}}>
                     {fichas.map(h=>(
                       <div key={h.id} style={{...S.card,padding:14,display:"flex",gap:12,alignItems:"center"}}>
@@ -14152,6 +14157,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
                       </div>
                     ))}
                   </div>
+                  )}
                 </div>
               );
             });
