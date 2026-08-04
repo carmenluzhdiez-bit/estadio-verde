@@ -7810,7 +7810,7 @@ const BODEGAS_DEF = [
   },
   { id:"b05", nombre:"Pesticidas", icono:"🧪", color:"#a78bfa",
     descripcion:"Fungicidas, herbicidas, insecticidas, reguladores",
-    categorias:["Fungicida","Herbicida","Insecticida","Acaricida","Regulador crecimiento","Adherente","Otro"],
+    categorias:["Bactericida","Fungicida","Herbicida","Insecticida","Moluscocida","Acaricida","Regulador crecimiento","Adherente","Otro"],
     tareasTipo:["Inventario","Orden y limpieza","Revisión vencimientos","Recepción","Baja/Destrucción"],
   },
   { id:"b06", nombre:"Golf", icono:"⛳", color:"#34d399",
