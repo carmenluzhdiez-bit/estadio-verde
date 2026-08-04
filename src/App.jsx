@@ -16969,6 +16969,7 @@ export default function App() {
   const [stockFito, setStockFito]  = useFirebaseState("fung-stock", {});
   const [aplicaciones,   setAplicaciones,   aplReady]      = useFirebaseState("fungicidas",     []);
   const [incidenciasFito,setIncidenciasFito,incidReady]    = useFirebaseState("fung-incid",     []);
+  const [hojasSeguridad, setHojasSeguridad]               = useFirebaseState(`${ROOT}/hojas_seguridad_pesticidas`, []);
   const [comprasData,    setComprasData,    comprasReady]  = useFirebaseState("compras",  {compras:[],cuentas:CUENTAS_DEFAULT});
   const [bodegasData,    setBodegasData,    bodegasReady]  = useFirebaseState("bodegas",  {});
   const [golfData,       setGolfData,       golfReady]     = useFirebaseState("golf", {greens:{},tees:{},arboles:[],eventos:[],mediciones:[]});
