@@ -6566,7 +6566,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
   const progAll = [...PROGRAMA_FUNGICIDAS].sort((a,b)=>a.mes-b.mes);
   const listaPersonal = [...personal].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
 
-  const sectorFinal = form.sectorDetalle==="Otro" ? form.sectorCustom : form.sectorDetalle;
+  const sectorFinal = (form.sectoresSeleccionados||[]).length>0 ? (form.sectoresSeleccionados||[]).join(", ") : (form.sectorDetalle==="Otro" ? form.sectorCustom : form.sectorDetalle);
 
   const guardarAplicacion = () => {
     if(!form.producto.trim()||!form.fecha) return;
@@ -7104,6 +7104,27 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                       {inc.productoAplicar&&<div style={{fontSize:12,color:"#a0c8a0"}}>🧪 {inc.productoAplicar}</div>}
                     </div>
                     <div style={{display:"flex",flexDirection:"column",gap:6,alignItems:"flex-end",flexShrink:0}}>
+                      {/* Botón para seguir el proceso — ir a Registrar con datos pre-cargados */}
+                      {esJefa&&inc.tipoCierre==="fitosanitario"&&inc.estado!=="reabierta"&&(
+                        <button style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(96,165,250,0.15)",color:"#93c5fd",border:"1px solid rgba(96,165,250,0.3)"}}
+                          onClick={()=>{
+                            setSubTab("registro");
+                            // Pre-cargar el formulario con los datos de la incidencia
+                            setTimeout(()=>{
+                              const sects=[...(inc.sectoresCerrados||[]),(inc.sectorCustom||"")].filter(Boolean);
+                              setForm(p=>({...p,
+                                sectorGrupo:"",sectorDetalle:"",sectorCustom:"",
+                                sectoresSeleccionados:sects,
+                                superficie:sects[0]||"",
+                                responsable:inc.observador||"",
+                                fecha:new Date().toISOString().slice(0,10),
+                                obs:"Tratamiento: "+(inc.agenteCausal||inc.diagnostico||""),
+                              }));
+                            },100);
+                          }}>
+                          📝 Ir a Registrar
+                        </button>
+                      )}
                       {inc.estado==="cerrada"&&(
                         <button style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(34,197,94,0.15)",color:"#86efac",border:"1px solid rgba(34,197,94,0.3)"}}
                           onClick={()=>setIncidencias(prev=>prev.map(x=>x.id===inc.id?{...x,estado:"reabierta"}:x))}>
@@ -7249,10 +7270,10 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                   </select>
                 </div>
 
-                {/* ── SECTOR DE APLICACIÓN ── */}
+                {/* ── SECTOR DE APLICACIÓN — multiselección ── */}
                 <div style={{gridColumn:"1/-1",background:"rgba(61,122,82,0.08)",border:"1px solid rgba(61,122,82,0.2)",borderRadius:10,padding:"12px 14px"}}>
-                  <div style={{fontSize:11,color:"#6aaa7a",letterSpacing:"0.6px",marginBottom:8,textTransform:"uppercase"}}>📍 Sector de aplicación</div>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                  <div style={{fontSize:11,color:"#6aaa7a",letterSpacing:"0.6px",marginBottom:8,textTransform:"uppercase"}}>📍 Sectores de aplicación <span style={{fontSize:10,fontWeight:400,color:"#4a7a5a"}}>(puedes seleccionar varios)</span></div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
                     <div>
                       <label style={labelSt}>Grupo</label>
                       <select style={S.input} value={form.sectorGrupo} onChange={e=>setForm(p=>({...p,sectorGrupo:e.target.value,sectorDetalle:""}))}>
@@ -7261,22 +7282,38 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                       </select>
                     </div>
                     <div>
-                      <label style={labelSt}>Sector específico</label>
-                      <select style={S.input} value={form.sectorDetalle} onChange={e=>setForm(p=>({...p,sectorDetalle:e.target.value}))} disabled={!form.sectorGrupo}>
-                        <option value="">{form.sectorGrupo?"Seleccionar...":"— elige grupo primero —"}</option>
+                      <label style={labelSt}>Agregar sector</label>
+                      <select style={S.input} value={form.sectorDetalle} onChange={e=>{
+                        const val=e.target.value;
+                        if(!val) return;
+                        const sectActuales=Array.isArray(form.sectoresSeleccionados)?form.sectoresSeleccionados:[];
+                        if(!sectActuales.includes(val)) setForm(p=>({...p,sectoresSeleccionados:[...sectActuales,val],sectorDetalle:""}));
+                        else setForm(p=>({...p,sectorDetalle:""}));
+                      }} disabled={!form.sectorGrupo}>
+                        <option value="">{form.sectorGrupo?"Elegir y agregar...":"— elige grupo primero —"}</option>
                         {(SECTORES_APLICACION[form.sectorGrupo]||[]).map(s=><option key={s} value={s}>{s}</option>)}
                       </select>
                     </div>
-                    {form.sectorDetalle==="Otro"&&(
-                      <div style={{gridColumn:"1/-1"}}>
-                        <label style={labelSt}>Especificar sector</label>
-                        <input style={S.input} placeholder="Nombre del sector..." value={form.sectorCustom} onChange={e=>setForm(p=>({...p,sectorCustom:e.target.value}))}/>
-                      </div>
-                    )}
                   </div>
-                  {sectorFinal&&(
-                    <div style={{marginTop:8,fontSize:12,color:"#86efac"}}>✅ Sector seleccionado: <strong>{sectorFinal}</strong></div>
+                  {/* Chips de sectores seleccionados */}
+                  {(form.sectoresSeleccionados||[]).length>0&&(
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
+                      {(form.sectoresSeleccionados||[]).map(s=>(
+                        <span key={s} style={{fontSize:11,padding:"3px 10px",borderRadius:20,background:"rgba(52,211,153,0.12)",color:"#34d399",border:"1px solid rgba(52,211,153,0.3)",display:"flex",gap:6,alignItems:"center"}}>
+                          {s}
+                          <button onClick={()=>setForm(p=>({...p,sectoresSeleccionados:(p.sectoresSeleccionados||[]).filter(x=>x!==s)}))}
+                            style={{background:"none",border:"none",color:"#f87171",cursor:"pointer",fontSize:13,lineHeight:1,padding:0}}>×</button>
+                        </span>
+                      ))}
+                    </div>
                   )}
+                  {/* Sector custom adicional */}
+                  <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                    <input style={{...S.input,flex:1}} placeholder="O escribe un sector específico y presiona +" value={form.sectorCustom||""} onChange={e=>setForm(p=>({...p,sectorCustom:e.target.value}))}
+                      onKeyDown={e=>{if(e.key==="Enter"&&form.sectorCustom?.trim()){const v=form.sectorCustom.trim();const a=form.sectoresSeleccionados||[];if(!a.includes(v))setForm(p=>({...p,sectoresSeleccionados:[...a,v],sectorCustom:""}));}}}/>
+                    <button style={{...S.btn,padding:"6px 12px",background:"rgba(52,211,153,0.12)",color:"#34d399",border:"1px solid rgba(52,211,153,0.3)",flexShrink:0}} onClick={()=>{const v=(form.sectorCustom||"").trim();if(v){const a=form.sectoresSeleccionados||[];if(!a.includes(v))setForm(p=>({...p,sectoresSeleccionados:[...a,v],sectorCustom:""}));}}}>+</button>
+                  </div>
+                  {(form.sectoresSeleccionados||[]).length===0&&<div style={{fontSize:11,color:"#4a7a5a",marginTop:6}}>Selecciona al menos un sector de aplicación</div>}
                 </div>
 
                 {/* ── COSTO Y RENDICIÓN ── */}
