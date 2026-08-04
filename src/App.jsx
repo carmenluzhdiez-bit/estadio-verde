@@ -2718,6 +2718,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   const [nuevaTareaEmerg, setNuevaTareaEmerg] = React.useState({ zona:"", tarea:"", notas:"" });
   // Estado de grupos colapsables — objeto {key: bool}
   const [gruposAbiertos, setGruposAbiertos] = React.useState({diarias:true,corte:false,medicion:false,riego:false,fitosan:false,limpieza:false,poda:false,otros:false});
+  const [showHojas, setShowHojas] = React.useState(false);
   const [alturaInputs, setAlturaInputs] = React.useState({});
   const [tareasAbiertas, setTareasAbiertas] = React.useState({}); // {taskId: true/false} — retraídas por defecto
   const toggleTareaAbierta = (tid) => setTareasAbiertas(p=>({...p,[tid]:!p[tid]}));
@@ -3198,6 +3199,43 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
           </div>
         )}
 
+        {/* ── Hojas de Seguridad — módulo independiente ── */}
+        {Array.isArray(hojasSeguridad)&&hojasSeguridad.length>0&&(
+          <div style={{marginBottom:14,border:"1px solid rgba(167,139,250,0.2)",borderRadius:12,overflow:"hidden"}}>
+            <div onClick={()=>setShowHojas(p=>!p)}
+                style={{padding:"12px 14px",background:"rgba(167,139,250,0.05)",borderBottom:showHojas?"1px solid rgba(167,139,250,0.15)":"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div>
+                <div style={{fontSize:14,fontWeight:700,color:"#c4b5fd",marginBottom:2}}>🛡️ Hojas de Seguridad</div>
+                <div style={{fontSize:11,color:"#7a6a9a"}}>Fichas de seguridad de productos ({hojasSeguridad.length})</div>
+              </div>
+              <span style={{color:"#7a6a9a",fontSize:14,transform:showHojas?"rotate(180deg)":"none",transition:"transform .2s"}}>▼</span>
+            </div>
+            {showHojas&&(
+              <div style={{padding:"10px 14px",display:"flex",flexDirection:"column",gap:8}}>
+                {[...hojasSeguridad].sort((a,b)=>{
+                  const ta=a.tipo||"Otro"; const tb=b.tipo||"Otro";
+                  return ta.localeCompare(tb,"es",{sensitivity:"base"})||a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"});
+                }).map(h=>(
+                  <div key={h.id} style={{display:"flex",gap:10,alignItems:"center",padding:"8px 10px",background:"rgba(255,255,255,0.03)",borderRadius:8,border:"1px solid rgba(167,139,250,0.1)"}}>
+                    <span style={{fontSize:18,flexShrink:0}}>🧪</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:600}}>{h.nombre}</div>
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:2}}>
+                        {h.tipo&&<span style={{fontSize:10,color:"#c4b5fd",background:"rgba(167,139,250,0.1)",padding:"1px 6px",borderRadius:8}}>{h.tipo}</span>}
+                        {h.fabricante&&<span style={{fontSize:10,color:"#7aaa80"}}>🏭 {h.fabricante}</span>}
+                      </div>
+                    </div>
+                    <a href={h.link} target="_blank" rel="noopener noreferrer"
+                      style={{...S.btn,background:"rgba(167,139,250,0.12)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.25)",fontSize:11,padding:"5px 10px",textDecoration:"none",borderRadius:8,flexShrink:0}}>
+                      👁️ Ver
+                    </a>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ══════════════════════════════════════════════════════════
              SECCIÓN 3 — OTRAS TAREAS DEL DÍA
              ══════════════════════════════════════════════════════════ */}
@@ -3221,33 +3259,6 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
           }));
           return (
             <div style={{marginBottom:14}}>
-              {/* ── Hojas de Seguridad — visible para todos ── */}
-              {Array.isArray(hojasSeguridad)&&hojasSeguridad.length>0&&(
-                <div style={{marginBottom:14}}>
-                  <div style={{fontSize:12,fontWeight:600,color:"#a78bfa",marginBottom:8,paddingLeft:2}}>🛡️ Hojas de Seguridad</div>
-                  <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                    {[...hojasSeguridad].sort((a,b)=>{
-                      const ta=a.tipo||"Otro"; const tb=b.tipo||"Otro";
-                      return ta.localeCompare(tb,"es",{sensitivity:"base"})||a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"});
-                    }).map(h=>(
-                      <div key={h.id} style={{...S.card,padding:"10px 14px",display:"flex",gap:10,alignItems:"center"}}>
-                        <span style={{fontSize:20,flexShrink:0}}>🧪</span>
-                        <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontSize:13,fontWeight:600}}>{h.nombre}</div>
-                          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:2}}>
-                            {h.tipo&&<span style={{fontSize:10,color:"#c4b5fd",background:"rgba(167,139,250,0.1)",padding:"1px 7px",borderRadius:8}}>{h.tipo}</span>}
-                            {h.fabricante&&<span style={{fontSize:10,color:"#7aaa80"}}>🏭 {h.fabricante}</span>}
-                          </div>
-                        </div>
-                        <a href={h.link} target="_blank" rel="noopener noreferrer"
-                          style={{...S.btn,background:"rgba(167,139,250,0.12)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.25)",fontSize:11,padding:"5px 10px",textDecoration:"none",borderRadius:8,fontFamily:"'Georgia',serif",flexShrink:0}}>
-                          👁️ Ver
-                        </a>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
               <div style={{fontSize:12,fontWeight:600,color:"#34d399",marginBottom:8,paddingLeft:2}}>🌿 Otras tareas del día</div>
               {grupos.map(g=>{
                 const hechas=g.tareas.filter(t=>t.estado==="hecha").length;
