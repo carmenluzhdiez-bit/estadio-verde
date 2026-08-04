@@ -7340,7 +7340,31 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
       {/* ── HISTORIAL ── */}
       {subTab==="historial"&&(
         <div className="ein">
-          {aplicaciones.length===0?(
+          {/* Incidencias fitosanitarias registradas */}
+          {incidenciasFito.length>0&&(
+            <div style={{marginBottom:18}}>
+              <div style={{fontSize:12,fontWeight:700,color:"#f87171",marginBottom:8,textTransform:"uppercase",letterSpacing:".5px"}}>🦠 Incidencias fitosanitarias</div>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {[...incidenciasFito].sort((a,b)=>(b.fechaAplicacion||b.fecha||"").localeCompare(a.fechaAplicacion||a.fecha||"")).map(inc=>(
+                  <div key={inc.id} style={{...S.card,padding:14,borderLeft:"3px solid rgba(248,113,113,0.4)"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",gap:8,marginBottom:4}}>
+                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700}}>{inc.agenteCausal||inc.diagnostico||"Incidencia fitosanitaria"}</div>
+                      <span style={{fontSize:10,padding:"2px 8px",borderRadius:8,background:"rgba(248,113,113,0.1)",color:"#f87171",border:"1px solid rgba(248,113,113,0.3)",whiteSpace:"nowrap"}}>{inc.estadoTratamiento||inc.estado||"registrada"}</span>
+                    </div>
+                    <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:11,color:"#7aaa80",marginBottom:4}}>
+                      <span>📅 {inc.fechaAplicacion||inc.fecha||"—"}</span>
+                      {inc.responsable&&<span>👤 {inc.responsable}</span>}
+                      {inc.productoAplicar&&<span>🧪 {inc.productoAplicar}</span>}
+                    </div>
+                    {inc.sectoresCerrados?.length>0&&<div style={{fontSize:11,color:"#86efac"}}>📍 {inc.sectoresCerrados.join(", ")}</div>}
+                    {inc.observacion&&<div style={{fontSize:11,color:"#6aaa7a",fontStyle:"italic",marginTop:3}}>{inc.observacion}</div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* Aplicaciones registradas */}
+          {aplicaciones.length===0&&incidenciasFito.length===0?(
             <div style={{...S.card,padding:40,textAlign:"center",color:"#4a8a5a"}}>
               <div style={{fontSize:36,marginBottom:10}}>🗂️</div>
               <div style={{fontFamily:"'Playfair Display',serif",fontSize:16}}>Sin registros aún</div>
@@ -17752,7 +17776,7 @@ export default function App() {
                     tipoIcon:"🦠",
                     tipoLabel:"Fitosanitario",
                     descripcion:"🦠 Alerta fitosanitaria Golf: "+obs,
-                    zonas:["Golf"],
+                    zonas:[MACROZONAS_BASE.find(z=>z.id===31)?.nombre||"Golf - Pitch & Putt"],
                     responsable:trab||"Bhalú",
                     fecha:fec||fechaLocal(),
                     hora:new Date().toTimeString().slice(0,5),
@@ -17910,6 +17934,11 @@ export default function App() {
                   <div style={{flex:1}}>
                     <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,color:"#fbbf24"}}>Golf — Estadio Español</div>
                     <div style={{fontSize:12,color:colGolf,marginTop:2}}>{labelGolf}</div>
+                    {incidenciasFito.filter(i=>(i.estadoTratamiento||i.estado||"")!=="cerrada"&&(i.estadoTratamiento||i.estado||"")!=="resuelta").length>0&&(
+                      <div style={{fontSize:11,color:"#f87171",marginTop:3}}>
+                        🦠 {incidenciasFito.filter(i=>(i.estadoTratamiento||i.estado||"")!=="cerrada").length} incidencia(s) fitosanitaria(s) activa(s)
+                      </div>
+                    )}
                   </div>
                   {tareasGolfHoy.length>0&&(
                     <div style={{textAlign:"center"}}>
