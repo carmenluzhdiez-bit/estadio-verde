@@ -6420,7 +6420,7 @@ const REINGRESO_DIAS = {
 // Estado inicial vacío — se inicializa desde localStorage
 const INCIDENCIAS_INICIAL = [];
 
-function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, tareasProg, setTareasProg, incidenciasFito, setIncidenciasFito, crearNotificacion, zonasFito, stockFito, setStockFito }) {
+function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, tareasProg, setTareasProg, incidenciasFito, setIncidenciasFito, crearNotificacion, zonasFito, stockFito, setStockFito, bodegasData, setBodegasData }) {
   const hoy = new Date();
   const mesActual = hoy.getMonth() + 1;
   const [subTab, setSubTab] = React.useState("historial");
@@ -6580,24 +6580,34 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
   const sectorFinal = (form.sectoresSeleccionados||[]).length>0 ? (form.sectoresSeleccionados||[]).join(", ") : (form.sectorDetalle==="Otro" ? form.sectorCustom : form.sectorDetalle);
 
   const guardarAplicacion = () => {
-    if(!form.producto.trim()||!form.fecha) return;
-    const nueva = { ...form, id:Date.now(), mes:mesActual, sectorFinal };
+    const productoFinal = form.producto==="Otro (escribir abajo)"?(form.productoCustom||"Otro"):form.producto;
+    if(!productoFinal.trim()||!form.fecha) return;
+    const nueva = { ...form, producto:productoFinal, id:Date.now(), mes:mesActual, sectorFinal };
     setAplicaciones(prev=>[nueva, ...prev].slice(0,200));
-    // Descontar stock si hay producto y cantidad usada
-    if(form.producto && form.cantidadUsada) {
+    // Descontar stock en bodegas reales si hay producto y cantidad usada
+    if(form.producto && form.cantidadUsada && setBodegasData) {
       const cant = Number(form.cantidadUsada);
       if(cant > 0) {
-        setStock(prev => {
-          const key = form.producto.trim().toLowerCase();
-          // Buscar el producto en stock (match parcial)
-          const stockKey = Object.keys(prev).find(k => k.toLowerCase().includes(key) || key.includes(k.toLowerCase()));
-          if(!stockKey) return prev;
-          const actual = Number(prev[stockKey]?.cantidad || prev[stockKey] || 0);
-          const nuevo = Math.max(0, actual - cant);
-          if(typeof prev[stockKey] === "object") {
-            return {...prev, [stockKey]: {...prev[stockKey], cantidad: nuevo}};
-          }
-          return {...prev, [stockKey]: nuevo};
+        const productoNorm = productoFinal.trim().toLowerCase();
+        setBodegasData(prev => {
+          const nuevo = {...prev};
+          // Buscar en todas las bodegas
+          Object.keys(nuevo).forEach(bid => {
+            const bd = nuevo[bid];
+            const items = Array.isArray(bd.items) ? [...bd.items] : [];
+            const idx = items.findIndex(it =>
+              it.nombre.toLowerCase().includes(productoNorm.split(" ")[0]) ||
+              productoNorm.includes(it.nombre.toLowerCase().split(" ")[0])
+            );
+            if(idx >= 0) {
+              items[idx] = {
+                ...items[idx],
+                stockActual: Math.max(0, Number(items[idx].stockActual||0) - cant),
+              };
+              nuevo[bid] = {...bd, items};
+            }
+          });
+          return nuevo;
         });
       }
     }
@@ -6609,7 +6619,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
         fecha: form.fecha,
         zona: sectorFinal || form.superficie || "Fungicidas",
         elemento: "",
-        tarea: `🧪 Aplicación fungicida: ${form.producto}${form.dosis ? " · "+form.dosis : ""}${sectorFinal ? " → "+sectorFinal : ""}`,
+        tarea: `🧪 Aplicación fungicida: ${productoFinal}${form.dosis ? " · "+form.dosis : ""}${sectorFinal ? " → "+sectorFinal : ""}`,
         responsable: form.responsable || (sectorFinal==="Golf"||(sectorFinal||"").toLowerCase().includes("golf")?"Osmar Bhalú Armijo Zúñiga":""),
         estado: form.responsable ? "pendiente" : "por_designar",
         notas: form.obs || "",
@@ -6622,7 +6632,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
       }));
     }
 
-    setForm({ fecha:hoy.toISOString().slice(0,10), producto:"", dosis:"", cantidadUsada:"", unidadUsada:"L", superficie:"", sectorGrupo:"", sectorDetalle:"", sectorCustom:"", responsable:"", obs:"", clima:"", volAgua:"", costoUnitario:"", costoTotal:"", cuentaImputar:"", enviarProg:true });
+    setForm({ fecha:hoy.toISOString().slice(0,10), producto:"", productoCustom:"", dosis:"", cantidadUsada:"", unidadUsada:"L", superficie:"", sectorGrupo:"", sectorDetalle:"", sectorCustom:"", sectoresSeleccionados:[], responsable:"", obs:"", clima:"", volAgua:"", costoUnitario:"", costoTotal:"", cuentaImputar:"", enviarProg:true });
     setShowForm(false);
   };
 
@@ -7238,13 +7248,43 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                 {/* Producto */}
                 <div style={{gridColumn:"1/-1"}}>
                   <label style={labelSt}>Producto aplicado</label>
-                  <select style={S.input} value={form.producto} onChange={e=>{
-                    const pu = stock.find(s=>s.producto.toLowerCase().includes(e.target.value.split(" ")[0].toLowerCase()))?.precioUnitario||"";
-                    setForm(p=>({...p,producto:e.target.value,costoUnitario:pu?String(pu):""}));
-                  }}>
-                    <option value="">Seleccionar producto...</option>
-                    {["Amistar TOP (Azoxistrobina + Difenoconazol)","Score 250 EC (Difenoconazol)","Apolo 25 EW (Tebuconazol)","Fungizeb 800 WP (Mancozeb)","Benomil 50% WP","Poliben (Carbendazim)","Benomil + Mancozeb (mezcla)","Mancozeb + Apolo 25 EW (mezcla)","Otro"].map(p=><option key={p} value={p}>{p}</option>)}
-                  </select>
+                  {(()=>{
+                    // Construir lista de productos desde todas las bodegas
+                    const productosEnBodegas = [];
+                    if(bodegasData) {
+                      Object.entries(bodegasData).forEach(([bid,bd])=>{
+                        (bd.items||[]).forEach(it=>{
+                          if(it.nombre) productosEnBodegas.push({
+                            nombre:it.nombre, stockActual:it.stockActual||0, unidad:it.unidad||"", bodega:bd.nombre||bid, id:it.id
+                          });
+                        });
+                      });
+                    }
+                    const productoSelInfo = productosEnBodegas.find(p=>p.nombre===form.producto);
+                    return (<>
+                      <select style={S.input} value={form.producto} onChange={e=>{
+                        setForm(p=>({...p,producto:e.target.value}));
+                      }}>
+                        <option value="">Seleccionar producto...</option>
+                        {productosEnBodegas.length>0&&<optgroup label="── Desde bodega ──">
+                          {productosEnBodegas.sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(p=>(
+                            <option key={p.id||p.nombre} value={p.nombre}>{p.nombre} ({p.stockActual} {p.unidad} en {p.bodega})</option>
+                          ))}
+                        </optgroup>}
+                        <optgroup label="── Otro ──">
+                          <option value="Otro (escribir abajo)">Otro (escribir abajo)</option>
+                        </optgroup>
+                      </select>
+                      {productoSelInfo&&(
+                        <div style={{fontSize:11,marginTop:4,color:productoSelInfo.stockActual>0?"#34d399":"#ef4444"}}>
+                          📦 Stock disponible: <strong>{productoSelInfo.stockActual} {productoSelInfo.unidad}</strong> en {productoSelInfo.bodega}
+                        </div>
+                      )}
+                      {form.producto==="Otro (escribir abajo)"&&(
+                        <input style={{...S.input,marginTop:6}} placeholder="Nombre del producto..." value={form.productoCustom||""} onChange={e=>setForm(p=>({...p,productoCustom:e.target.value}))}/>
+                      )}
+                    </>);
+                  })()}
                 </div>
 
                 {/* Dosis y cantidad */}
@@ -19109,7 +19149,7 @@ export default function App() {
 
         {/* FUNGICIDAS */}
         {vista==="fungicidas"&&(
-          <PanelFungicidas S={S} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} stockFito={stockFito} setStockFito={setStockFito} crearNotificacion={crearNotificacion}/>
+          <PanelFungicidas S={S} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} stockFito={stockFito} setStockFito={setStockFito} crearNotificacion={crearNotificacion} bodegasData={bodegasData} setBodegasData={setBodegasData}/>
         )}
 
         {/* COMPRAS */}
