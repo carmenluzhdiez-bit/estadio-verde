@@ -13803,6 +13803,36 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
                   </div>
                 );
               })()}
+              {/* Alerta: pesticidas sin Hoja de Seguridad */}
+              {bodegaActiva==="b05"&&(()=>{
+                const hojasArr = Array.isArray(hojasSeguridad)?hojasSeguridad:[];
+                const sinHoja = (bd.items||[]).filter(item=>{
+                  const nombreNorm = item.nombre.toLowerCase().trim();
+                  return !hojasArr.some(h=>{
+                    const hn = h.nombre.toLowerCase().trim();
+                    return hn.includes(nombreNorm.split(" ")[0]) || nombreNorm.includes(hn.split(" ")[0]);
+                  });
+                });
+                if(!sinHoja.length) return null;
+                return (
+                  <div style={{...S.card,padding:14,marginBottom:14,borderLeft:"3px solid #f59e0b",background:"rgba(245,158,11,0.04)"}}>
+                    <div style={{fontSize:12,fontWeight:700,color:"#f59e0b",marginBottom:6}}>
+                      ⚠️ {sinHoja.length} pesticida{sinHoja.length!==1?"s":""} sin Hoja de Seguridad
+                    </div>
+                    <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:8}}>
+                      {sinHoja.map(it=>(
+                        <div key={it.id} style={{fontSize:11,color:"#b08a3a",display:"flex",alignItems:"center",gap:6}}>
+                          <span style={{color:"#f59e0b"}}>•</span> {it.nombre}
+                        </div>
+                      ))}
+                    </div>
+                    <button onClick={()=>setSubTab("hojas_seguridad")}
+                      style={{...S.btn,fontSize:11,padding:"4px 12px",background:"rgba(245,158,11,0.12)",color:"#f59e0b",border:"1px solid rgba(245,158,11,0.3)"}}>
+                      🛡️ Ir a Hojas de Seguridad
+                    </button>
+                  </div>
+                );
+              })()}
               {/* Items agrupados por categoría (colapsables, orden alfabético) */}
               {(()=>{
                 const esMaq=bodegaActiva==="b04";
