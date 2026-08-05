@@ -13554,6 +13554,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
                     <th style={{padding:"6px 8px",textAlign:"center",color:"#c4b5fd",fontSize:10}}>STOCK</th>
                     <th style={{padding:"6px 8px",textAlign:"center",color:"#c4b5fd",fontSize:10}}>MÍN.</th>
                     <th style={{padding:"6px 8px",textAlign:"left",color:"#c4b5fd",fontSize:10}}>UBICACIÓN</th>
+                    {bodegaActiva==="b05"&&<th style={{padding:"6px 8px",textAlign:"left",color:"#c4b5fd",fontSize:10}}>VENCIMIENTO</th>}
                     <th style={{width:30}}></th>
                   </tr></thead>
                   <tbody>
@@ -13564,9 +13565,10 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
                           <option value="">—</option>{bodega.categorias.map(optC=><option key={optC}>{optC}</option>)}</select></td>
                         <td style={{padding:"4px 6px"}}><select style={{...S.input,fontSize:12,padding:"5px 8px"}} value={item.unidad} onChange={e=>setInventItems(p=>p.map((x,i)=>i===idx?{...x,unidad:e.target.value}:x))}>
                           {["unidad","kg","L","m","m²","saco","caja","bolsa","par","set"].map(u=><option key={u}>{u}</option>)}</select></td>
-                        <td style={{padding:"4px 6px"}}><input type="number" min={0} style={{...S.input,fontSize:12,padding:"5px 8px",textAlign:"center"}} value={item.stockActual} onChange={e=>setInventItems(p=>p.map((x,i)=>i===idx?{...x,stockActual:Number(e.target.value)}:x))}/></td>
-                        <td style={{padding:"4px 6px"}}><input type="number" min={0} style={{...S.input,fontSize:12,padding:"5px 8px",textAlign:"center"}} value={item.stockMinimo} onChange={e=>setInventItems(p=>p.map((x,i)=>i===idx?{...x,stockMinimo:Number(e.target.value)}:x))}/></td>
+                        <td style={{padding:"4px 6px"}}><input type="text" inputMode="decimal" style={{...S.input,fontSize:12,padding:"5px 8px",textAlign:"center"}} placeholder="ej: 1.3" value={item.stockActual} onChange={e=>setInventItems(p=>p.map((x,i)=>i===idx?{...x,stockActual:e.target.value}:x))}/></td>
+                        <td style={{padding:"4px 6px"}}><input type="text" inputMode="decimal" style={{...S.input,fontSize:12,padding:"5px 8px",textAlign:"center"}} placeholder="ej: 0.5" value={item.stockMinimo} onChange={e=>setInventItems(p=>p.map((x,i)=>i===idx?{...x,stockMinimo:e.target.value}:x))}/></td>
                         <td style={{padding:"4px 6px"}}><input style={{...S.input,fontSize:12,padding:"5px 8px"}} placeholder="ej: Estante A" value={item.ubicacion} onChange={e=>setInventItems(p=>p.map((x,i)=>i===idx?{...x,ubicacion:e.target.value}:x))}/></td>
+                        {bodegaActiva==="b05"&&<td style={{padding:"4px 6px"}}><input type="date" style={{...S.input,fontSize:12,padding:"5px 8px"}} value={item.vencimiento||""} onChange={e=>setInventItems(p=>p.map((x,i)=>i===idx?{...x,vencimiento:e.target.value}:x))}/></td>}
                         <td style={{padding:"4px 6px"}}>{inventItems.length>1&&<button className="btn-d" style={{...S.btn,fontSize:10,padding:"3px 6px"}} onClick={()=>setInventItems(p=>p.filter((_,i)=>i!==idx))}>✕</button>}</td>
                       </tr>
                     ))}
@@ -13596,10 +13598,21 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
                     {["unidad","kg","L","m","m²","saco","caja","bolsa","par","set"].map(u=><option key={u}>{u}</option>)}
                   </select>
                 </div>
-                <div><label style={labelSt}>Stock actual</label><input type="number" min={0} style={S.input} value={itemForm.stockActual} onChange={e=>setItemForm(p=>({...p,stockActual:Number(e.target.value)}))}/></div>
-                <div><label style={labelSt}>Stock mínimo</label><input type="number" min={0} style={S.input} value={itemForm.stockMinimo} onChange={e=>setItemForm(p=>({...p,stockMinimo:Number(e.target.value)}))}/></div>
+                <div><label style={labelSt}>Stock actual</label><input type="text" inputMode="decimal" style={S.input} value={itemForm.stockActual} placeholder="ej: 1.3" onChange={e=>setItemForm(p=>({...p,stockActual:e.target.value}))}/></div>
+                <div><label style={labelSt}>Stock mínimo</label><input type="text" inputMode="decimal" style={S.input} value={itemForm.stockMinimo} placeholder="ej: 0.5" onChange={e=>setItemForm(p=>({...p,stockMinimo:e.target.value}))}/></div>
                 <div><label style={labelSt}>Ubicación</label><input style={S.input} value={itemForm.ubicacion} onChange={e=>setItemForm(p=>({...p,ubicacion:e.target.value}))} placeholder="ej: Estante A"/></div>
                 <div><label style={labelSt}>Observaciones</label><input style={S.input} value={itemForm.obs} onChange={e=>setItemForm(p=>({...p,obs:e.target.value}))}/></div>
+                {bodegaActiva==="b05"&&(
+                  <div><label style={labelSt}>Fecha de vencimiento</label>
+                    <input type="date" style={S.input} value={itemForm.vencimiento||""}
+                      onChange={e=>setItemForm(p=>({...p,vencimiento:e.target.value}))}/>
+                    {itemForm.vencimiento&&(()=>{
+                      const dias=Math.ceil((new Date(itemForm.vencimiento)-new Date())/(1000*60*60*24));
+                      const color=dias<0?"#ef4444":dias<90?"#f59e0b":"#34d399";
+                      return <div style={{fontSize:11,color,marginTop:4}}>{dias<0?`⛔ Vencido hace ${Math.abs(dias)} días`:dias<90?`⚠️ Vence en ${dias} días`:`✅ Vigente (${dias} días)`}</div>;
+                    })()}
+                  </div>
+                )}
                 {bodegaActiva==="b04"&&(
                   <div style={{gridColumn:"1/-1",background:"rgba(249,115,22,0.06)",border:"1px solid rgba(249,115,22,0.2)",borderRadius:8,padding:"12px 14px"}}>
                     <div style={{fontSize:11,color:"#fb923c",marginBottom:8,textTransform:"uppercase"}}>🚜 Datos del equipo</div>
@@ -13915,11 +13928,19 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
                                           </div>
                                         )}
                                         {item.obs&&<div style={{fontSize:11,color:"#5a8a6a",fontStyle:"italic",marginTop:3}}>{item.obs}</div>}
+                                        {bodegaActiva==="b05"&&item.vencimiento&&(()=>{
+                                          const dias=Math.ceil((new Date(item.vencimiento)-new Date())/(1000*60*60*24));
+                                          const color=dias<0?"#ef4444":dias<90?"#f59e0b":"#34d399";
+                                          return <div style={{fontSize:11,color,marginTop:4}}>
+                                            📅 Vence: {new Date(item.vencimiento+"T12:00:00").toLocaleDateString("es-CL")}
+                                            &nbsp;·&nbsp;{dias<0?`⛔ Vencido hace ${Math.abs(dias)} días`:dias<90?`⚠️ ${dias} días`:` ✅ ${dias} días`}
+                                          </div>;
+                                        })()}
                                       </div>
                                       {esJefa&&(
                                         <div style={{display:"flex",gap:6,flexShrink:0}}>
                                           <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(34,197,94,0.12)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)"}} onClick={()=>{setMovForm({...emptyMov,itemId:String(item.id),unidad:item.unidad||"unidad"});setShowMovForm(true);}}>± Mov.</button>
-                                          <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>{setItemForm({nombre:item.nombre,categoria:item.categoria||"",descripcion:item.descripcion||"",unidad:item.unidad||"unidad",stockActual:item.stockActual||0,stockMinimo:item.stockMinimo||0,ubicacion:item.ubicacion||"",obs:item.obs||""});setMaqForm({marca:item.marca||"",modelo:item.modelo||"",patente:item.patente||"",horasUso:item.horasUso||0,nivelAceite:item.nivelAceite||"OK",nivelCombustible:item.nivelCombustible||"OK",proxMantención:item.proxMantención||""});setEditItemId(item.id);setShowItemForm(true);}}>✏️</button>
+                                          <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>{setItemForm({nombre:item.nombre,categoria:item.categoria||"",descripcion:item.descripcion||"",unidad:item.unidad||"unidad",stockActual:item.stockActual||0,stockMinimo:item.stockMinimo||0,ubicacion:item.ubicacion||"",obs:item.obs||"",vencimiento:item.vencimiento||""});setMaqForm({marca:item.marca||"",modelo:item.modelo||"",patente:item.patente||"",horasUso:item.horasUso||0,nivelAceite:item.nivelAceite||"OK",nivelCombustible:item.nivelCombustible||"OK",proxMantención:item.proxMantención||""});setEditItemId(item.id);setShowItemForm(true);}}>✏️</button>
                                           <button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>eliminarItem(item.id)}>🗑</button>
                                         </div>
                                       )}
