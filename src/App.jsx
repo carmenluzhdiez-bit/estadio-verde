@@ -13819,10 +13819,11 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
                     </div>
                   )}
                   {/* Botón imprimir informe */}
-                  {(bodegaActiva==="b02"||bodegaActiva==="b04")&&(
+                  {(
                     <div style={{display:"flex",justifyContent:"flex-end",marginBottom:10}}>
                       <button style={{...S.btn,background:"rgba(59,130,246,0.12)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.25)",fontSize:12}}
                         onClick={()=>{
+                          const esPest = bodegaActiva==="b05";
                           const itemsParaInf = esMaq&&selMaq.length>0 ? (bd.items||[]).filter(i=>selMaq.includes(i.id)) : (bd.items||[]);
                           const catsInf=[...new Set(itemsParaInf.map(i=>i.categoria||"Sin categoría"))].sort();
                           const hoyStr=new Date().toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"});
@@ -13871,14 +13872,27 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
                           })():"";
                           const itemsHTML=catsInf.map(cat=>{
                             const its=itemsParaInf.filter(i=>(i.categoria||"Sin categoría")===cat).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+                            const extraTh = esMaq?'<th style="padding:5px 8px;font-size:10px;border:1px solid #e0e0e0">Marca/Modelo</th><th style="padding:5px 8px;font-size:10px;border:1px solid #e0e0e0">Horas</th>':esPest?'<th style="padding:5px 8px;font-size:10px;border:1px solid #e0e0e0">Vencimiento</th>':'<th style="padding:5px 8px;font-size:10px;border:1px solid #e0e0e0">Ubicación</th>';
                             return `<h3 style="margin:14px 0 6px;font-size:12px;color:#1a5c2a;border-left:3px solid #1a5c2a;padding-left:8px">${cat}</h3>
                             <table style="width:100%;border-collapse:collapse;margin-bottom:10px"><thead><tr style="background:#e8f5e9">
                               <th style="padding:5px 8px;text-align:left;font-size:10px;border:1px solid #e0e0e0">Nombre</th>
-                              ${esMaq?'<th style="padding:5px 8px;font-size:10px;border:1px solid #e0e0e0">Marca/Modelo</th><th style="padding:5px 8px;font-size:10px;border:1px solid #e0e0e0">Horas</th>':'<th style="padding:5px 8px;font-size:10px;border:1px solid #e0e0e0">Ubicación</th>'}
+                              ${extraTh}
                               <th style="padding:5px 8px;text-align:right;font-size:10px;border:1px solid #e0e0e0">Stock</th>
                               <th style="padding:5px 8px;font-size:10px;border:1px solid #e0e0e0">Estado</th>
                             </tr></thead><tbody>
-                            ${its.map((it,idx)=>{const bajo=Number(it.stockActual||0)<=Number(it.stockMinimo||0)&&Number(it.stockMinimo||0)>0;const agotado=Number(it.stockActual||0)===0;const est=agotado?"⛔ Sin stock":bajo?"⚠️ Bajo":"✅ OK";return`<tr style="background:${idx%2?"#fafafa":"#fff"}"><td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${it.nombre}${it.obs?`<br><em style="font-size:9px;color:#888">${it.obs}</em>`:""}</td>${esMaq?`<td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${it.marca||""} ${it.modelo||""}</td><td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:center">${it.horasUso||"—"}</td>`:`<td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${it.ubicacion||"—"}</td>`}<td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right;font-weight:600">${it.stockActual} ${it.unidad||""}</td><td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${est}</td></tr>`;}).join("")}
+                            ${its.map((it,idx)=>{
+                              const bajo=Number(it.stockActual||0)<=Number(it.stockMinimo||0)&&Number(it.stockMinimo||0)>0;
+                              const agotado=Number(it.stockActual||0)===0;
+                              const est=agotado?"⛔ Sin stock":bajo?"⚠️ Bajo":"✅ OK";
+                              let extraTd="";
+                              if(esMaq) extraTd=`<td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${it.marca||""} ${it.modelo||""}</td><td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:center">${it.horasUso||"—"}</td>`;
+                              else if(esPest){
+                                let vencTxt="—";let vencColor="#333";
+                                if(it.vencimiento){const dias=Math.ceil((new Date(it.vencimiento)-new Date())/(1000*60*60*24));vencTxt=new Date(it.vencimiento+"T12:00:00").toLocaleDateString("es-CL")+(dias<0?" ⛔ VENCIDO":dias<90?" ⚠️ "+dias+"d":"");vencColor=dias<0?"#c62828":dias<90?"#e65100":"#1a5c2a";}
+                                extraTd=`<td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;color:${vencColor};font-weight:${it.vencimiento&&Math.ceil((new Date(it.vencimiento)-new Date())/(1000*60*60*24))<90?700:400}">${vencTxt}</td>`;
+                              } else extraTd=`<td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${it.ubicacion||"—"}</td>`;
+                              return`<tr style="background:${idx%2?"#fafafa":"#fff"}"><td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${it.nombre}${it.obs?`<br><em style="font-size:9px;color:#888">${it.obs}</em>`:""}</td>${extraTd}<td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right;font-weight:600">${it.stockActual} ${it.unidad||""}</td><td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${est}</td></tr>`;
+                            }).join("")}
                             </tbody></table>`;
                           }).join("");
                           const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Informe ${bodega?.nombre}</title><style>body{font-family:Arial,sans-serif;margin:24px;color:#1a1a1a;font-size:12px}h1{font-size:16px;color:#1a5c2a;margin:0 0 4px}h2{font-size:11px;color:#555;margin:0 0 14px}</style></head><body><h1>Informe de Bodega — ${bodega?.nombre}</h1><h2>Departamento de Áreas Verdes · Estadio Español · ${hoyStr}</h2>${bencHTML}<h3 style="margin:14px 0 6px;font-size:13px;color:#1a5c2a;border-bottom:2px solid #1a5c2a;padding-bottom:4px">📦 Inventario por Categoría${esMaq&&selMaq.length>0?" (selección)":""}</h3>${itemsHTML}</body></html>`;
