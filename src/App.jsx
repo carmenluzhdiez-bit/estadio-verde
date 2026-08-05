@@ -13806,11 +13806,19 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
               {/* Alerta: pesticidas sin Hoja de Seguridad */}
               {bodegaActiva==="b05"&&(()=>{
                 const hojasArr = Array.isArray(hojasSeguridad)?hojasSeguridad:[];
+                const PREFIJOS = ["fungicida","insecticida","herbicida","bactericida","molusquicida","acaricida","regulador","adherente","pesticida"];
+                const limpiarNombre = n => {
+                  const lower = n.toLowerCase().trim();
+                  for(const p of PREFIJOS){ if(lower.startsWith(p)) return lower.slice(p.length).trim(); }
+                  return lower;
+                };
                 const sinHoja = (bd.items||[]).filter(item=>{
-                  const nombreNorm = item.nombre.toLowerCase().trim();
+                  const itemLimpio = limpiarNombre(item.nombre);
+                  const palabrasItem = itemLimpio.split(/\s+/).filter(w=>w.length>2);
                   return !hojasArr.some(h=>{
-                    const hn = h.nombre.toLowerCase().trim();
-                    return hn.includes(nombreNorm.split(" ")[0]) || nombreNorm.includes(hn.split(" ")[0]);
+                    const hojaLimpia = limpiarNombre(h.nombre);
+                    // Coincide si comparten al menos una palabra clave (>2 chars)
+                    return palabrasItem.some(w=>hojaLimpia.includes(w)) || hojaLimpia.split(/\s+/).filter(w=>w.length>2).some(w=>itemLimpio.includes(w));
                   });
                 });
                 if(!sinHoja.length) return null;
