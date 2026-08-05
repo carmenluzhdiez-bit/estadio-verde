@@ -7835,7 +7835,7 @@ const BODEGAS_DEF = [
   },
   { id:"b02", nombre:"Materiales de Riego", icono:"💧", color:"#60a5fa",
     descripcion:"Tuberías, aspersores, goteros, accesorios riego",
-    categorias:["Tubería","Aspersor/Gotero","Válvula","Accesorio","Controlador","Cable/Sensor","Otro"],
+    categorias:["Accesorio","Aspersor/Gotero","Cable/Sensor","Controlador","Mulch","Otro","Tubería","Válvula"],
     tareasTipo:["Inventario","Orden y limpieza","Revisión stock","Recepción material"],
   },
   { id:"b03", nombre:"Materiales y Herramientas", icono:"🔧", color:"#f59e0b",
@@ -13872,30 +13872,69 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
                           })():"";
                           const itemsHTML=catsInf.map(cat=>{
                             const its=itemsParaInf.filter(i=>(i.categoria||"Sin categoría")===cat).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
-                            const extraTh = esMaq?'<th style="padding:5px 8px;font-size:10px;border:1px solid #e0e0e0">Marca/Modelo</th><th style="padding:5px 8px;font-size:10px;border:1px solid #e0e0e0">Horas</th>':esPest?'<th style="padding:5px 8px;font-size:10px;border:1px solid #e0e0e0">Vencimiento</th>':'<th style="padding:5px 8px;font-size:10px;border:1px solid #e0e0e0">Ubicación</th>';
-                            return `<h3 style="margin:14px 0 6px;font-size:12px;color:#1a5c2a;border-left:3px solid #1a5c2a;padding-left:8px">${cat}</h3>
-                            <table style="width:100%;border-collapse:collapse;margin-bottom:10px"><thead><tr style="background:#e8f5e9">
-                              <th style="padding:5px 8px;text-align:left;font-size:10px;border:1px solid #e0e0e0">Nombre</th>
-                              ${extraTh}
-                              <th style="padding:5px 8px;text-align:right;font-size:10px;border:1px solid #e0e0e0">Stock</th>
-                              <th style="padding:5px 8px;font-size:10px;border:1px solid #e0e0e0">Estado</th>
-                            </tr></thead><tbody>
-                            ${its.map((it,idx)=>{
-                              const bajo=Number(it.stockActual||0)<=Number(it.stockMinimo||0)&&Number(it.stockMinimo||0)>0;
-                              const agotado=Number(it.stockActual||0)===0;
-                              const est=agotado?"⛔ Sin stock":bajo?"⚠️ Bajo":"✅ OK";
-                              let extraTd="";
-                              if(esMaq) extraTd=`<td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${it.marca||""} ${it.modelo||""}</td><td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:center">${it.horasUso||"—"}</td>`;
-                              else if(esPest){
-                                let vencTxt="—";let vencColor="#333";
-                                if(it.vencimiento){const dias=Math.ceil((new Date(it.vencimiento)-new Date())/(1000*60*60*24));vencTxt=new Date(it.vencimiento+"T12:00:00").toLocaleDateString("es-CL")+(dias<0?" ⛔ VENCIDO":dias<90?" ⚠️ "+dias+"d":"");vencColor=dias<0?"#c62828":dias<90?"#e65100":"#1a5c2a";}
-                                extraTd=`<td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;color:${vencColor};font-weight:${it.vencimiento&&Math.ceil((new Date(it.vencimiento)-new Date())/(1000*60*60*24))<90?700:400}">${vencTxt}</td>`;
-                              } else extraTd=`<td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${it.ubicacion||"—"}</td>`;
-                              return`<tr style="background:${idx%2?"#fafafa":"#fff"}"><td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${it.nombre}${it.obs?`<br><em style="font-size:9px;color:#888">${it.obs}</em>`:""}</td>${extraTd}<td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right;font-weight:600">${it.stockActual} ${it.unidad||""}</td><td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${est}</td></tr>`;
-                            }).join("")}
-                            </tbody></table>`;
+                            let cols="";
+                            if(esMaq)      cols=`<col style="width:40%"><col style="width:20%"><col style="width:10%"><col style="width:15%"><col style="width:15%">`;
+                            else if(esPest) cols=`<col style="width:40%"><col style="width:18%"><col style="width:15%"><col style="width:12%"><col style="width:15%">`;
+                            else            cols=`<col style="width:42%"><col style="width:23%"><col style="width:15%"><col style="width:20%">`;
+                            const extraTh = esMaq
+                              ? '<th style="padding:6px 10px;font-size:10px;border:1px solid #c8e6c9;text-align:left">Marca / Modelo</th><th style="padding:6px 10px;font-size:10px;border:1px solid #c8e6c9;text-align:center">Horas</th>'
+                              : esPest
+                              ? '<th style="padding:6px 10px;font-size:10px;border:1px solid #c8e6c9;text-align:left">Fabricante</th><th style="padding:6px 10px;font-size:10px;border:1px solid #c8e6c9;text-align:center">Vencimiento</th>'
+                              : '<th style="padding:6px 10px;font-size:10px;border:1px solid #c8e6c9;text-align:left">Ubicación</th>';
+                            return `<h3 style="margin:18px 0 6px;font-size:12px;color:#1a5c2a;border-left:4px solid #1a5c2a;padding-left:8px;text-transform:uppercase;letter-spacing:.5px">${cat}</h3>
+                            <table style="width:100%;border-collapse:collapse;margin-bottom:16px;table-layout:fixed">
+                              ${cols}
+                              <thead><tr style="background:#e8f5e9">
+                                <th style="padding:6px 10px;font-size:10px;border:1px solid #c8e6c9;text-align:left;text-transform:uppercase;letter-spacing:.4px;color:#2e7d32">Nombre</th>
+                                ${extraTh}
+                                <th style="padding:6px 10px;font-size:10px;border:1px solid #c8e6c9;text-align:right;text-transform:uppercase;letter-spacing:.4px;color:#2e7d32">Stock</th>
+                                <th style="padding:6px 10px;font-size:10px;border:1px solid #c8e6c9;text-align:center;text-transform:uppercase;letter-spacing:.4px;color:#2e7d32">Estado</th>
+                              </tr></thead><tbody>
+                              ${its.map((it,idx)=>{
+                                const bajo=Number(it.stockActual||0)<=Number(it.stockMinimo||0)&&Number(it.stockMinimo||0)>0;
+                                const agotado=Number(it.stockActual||0)===0;
+                                const estColor=agotado?"#c62828":bajo?"#e65100":"#2e7d32";
+                                const estTxt=agotado?"⛔ Sin stock":bajo?"⚠️ Bajo":"✅ OK";
+                                let extraTd="";
+                                if(esMaq){
+                                  extraTd=`<td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px;overflow:hidden;text-overflow:ellipsis">${[it.marca,it.modelo].filter(Boolean).join(" ")||"—"}</td><td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px;text-align:center">${it.horasUso||"—"}</td>`;
+                                } else if(esPest){
+                                  let vencTxt="—"; let vencColor="#333"; let vencBold=400;
+                                  if(it.vencimiento){const dias=Math.ceil((new Date(it.vencimiento)-new Date())/(1000*60*60*24));vencTxt=new Date(it.vencimiento+"T12:00:00").toLocaleDateString("es-CL")+(dias<0?" ⛔":dias<90?" ⚠️":"");vencColor=dias<0?"#c62828":dias<90?"#e65100":"#2e7d32";vencBold=dias<90?700:400;}
+                                  extraTd=`<td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px;overflow:hidden;text-overflow:ellipsis">${it.fabricante||"—"}</td><td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px;text-align:center;color:${vencColor};font-weight:${vencBold}">${vencTxt}</td>`;
+                                } else {
+                                  extraTd=`<td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px;overflow:hidden;text-overflow:ellipsis">${it.ubicacion||"—"}</td>`;
+                                }
+                                return`<tr style="background:${idx%2?"#fafafa":"#fff"}">
+                                  <td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px;overflow:hidden;text-overflow:ellipsis"><b>${it.nombre}</b>${it.obs?`<br><span style="font-size:9px;color:#888;font-style:italic">${it.obs}</span>`:""}</td>
+                                  ${extraTd}
+                                  <td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:12px;text-align:right;font-weight:700;color:#1a5c2a">${it.stockActual} <span style="font-size:10px;font-weight:400;color:#666">${it.unidad||""}</span></td>
+                                  <td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px;text-align:center;color:${estColor};font-weight:600">${estTxt}</td>
+                                </tr>`;
+                              }).join("")}
+                              </tbody></table>`;
                           }).join("");
-                          const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Informe ${bodega?.nombre}</title><style>body{font-family:Arial,sans-serif;margin:24px;color:#1a1a1a;font-size:12px}h1{font-size:16px;color:#1a5c2a;margin:0 0 4px}h2{font-size:11px;color:#555;margin:0 0 14px}</style></head><body><h1>Informe de Bodega — ${bodega?.nombre}</h1><h2>Departamento de Áreas Verdes · Estadio Español · ${hoyStr}</h2>${bencHTML}<h3 style="margin:14px 0 6px;font-size:13px;color:#1a5c2a;border-bottom:2px solid #1a5c2a;padding-bottom:4px">📦 Inventario por Categoría${esMaq&&selMaq.length>0?" (selección)":""}</h3>${itemsHTML}</body></html>`;
+                          const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Informe ${bodega?.nombre}</title><style>
+                            *{box-sizing:border-box}
+                            body{font-family:'Segoe UI',Arial,sans-serif;margin:0;padding:28px 32px;color:#1a1a1a;font-size:12px;max-width:1000px}
+                            h1{font-size:18px;color:#1a5c2a;margin:0 0 3px;font-weight:700}
+                            .subtitulo{font-size:11px;color:#666;margin:0 0 20px;border-bottom:2px solid #e8f5e9;padding-bottom:10px}
+                            h3{font-size:12px;color:#1a5c2a;border-left:4px solid #1a5c2a;padding-left:8px;margin:18px 0 6px;text-transform:uppercase;letter-spacing:.5px}
+                            table{width:100%;border-collapse:collapse;margin-bottom:16px;table-layout:fixed}
+                            th{background:#e8f5e9;padding:7px 10px;font-size:10px;border:1px solid #c8e6c9;text-transform:uppercase;letter-spacing:.4px;color:#2e7d32;font-weight:600}
+                            td{padding:6px 10px;border:1px solid #e8f5e9;font-size:11px;overflow:hidden;text-overflow:ellipsis;vertical-align:top}
+                            tr:nth-child(even) td{background:#fafafa}
+                            .ok{color:#2e7d32;font-weight:600} .warn{color:#e65100;font-weight:600} .err{color:#c62828;font-weight:600}
+                            .stock-val{font-size:12px;font-weight:700;color:#1a5c2a}
+                            .stock-unit{font-size:10px;font-weight:400;color:#666}
+                            @media print{body{padding:16px}.no-print{display:none}@page{margin:1.5cm}}
+                          </style></head><body>
+                          <button onclick="window.print()" class="no-print" style="float:right;padding:7px 16px;background:#1a5c2a;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;margin-top:4px">🖨️ Imprimir / PDF</button>
+                          <h1>Informe de Bodega — ${bodega?.nombre}</h1>
+                          <div class="subtitulo">Departamento de Áreas Verdes · Estadio Español · ${hoyStr}</div>
+                          ${bencHTML}
+                          <h3>📦 Inventario por Categoría${esMaq&&selMaq.length>0?" ("+selMaq.length+" equipo"+(selMaq.length!==1?"s":"")+" seleccionados)":""}</h3>
+                          ${itemsHTML}</body></html>`;
                           const url=URL.createObjectURL(new Blob([html],{type:"text/html"}));const a=document.createElement("a");a.href=url;a.target="_blank";a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);
                         }}>🖨️ Imprimir informe{esMaq&&selMaq.length>0?` (${selMaq.length} equipo${selMaq.length!==1?"s":""})`:""}</button>
                     </div>
