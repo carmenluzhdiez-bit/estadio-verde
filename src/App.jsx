@@ -15901,17 +15901,29 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
               <div style={{display:"flex",gap:8,alignItems:"center"}}>
                 <span style={{fontSize:20}}>{inc.tipoIcon||"🚨"}</span>
                 <div>
-                  <div style={{fontWeight:700,fontSize:14}}>{inc.tipoLabel||inc.tipo||"Alerta"}</div>
-                  <div style={{fontSize:11,color:"#5a9a7a"}}>{inc.zonas?.join(", ")} · {inc.fecha} {inc.hora}</div>
+                  <div style={{fontWeight:700,fontSize:14,color:"#e8dfc8"}}>{inc.tipoLabel||inc.tipo||"Alerta"}</div>
+                  <div style={{fontSize:11,color:"#5a9a7a"}}>
+                    {inc.zonas?.length>0&&<span>📍 {inc.zonas.join(", ")} · </span>}
+                    {inc.responsable&&<span>👤 {inc.responsable} · </span>}
+                    <span>📅 {inc.fecha}{inc.hora?" "+inc.hora:""}</span>
+                  </div>
                 </div>
               </div>
               <span style={{fontSize:10,padding:"2px 8px",borderRadius:10,background:`${URGENCIA_COLORS[inc.urgencia]||"#f59e0b"}20`,color:URGENCIA_COLORS[inc.urgencia]||"#f59e0b",border:`1px solid ${URGENCIA_COLORS[inc.urgencia]||"#f59e0b"}40`,fontWeight:700}}>{(inc.urgencia||"").toUpperCase()}</span>
             </div>
-            <div style={{fontSize:12,color:"#ede9e0",marginBottom:8}}>{inc.descripcion}</div>
+            {/* Descripción desglosada */}
+            {(()=>{
+              // Extraer la observación real quitando el prefijo "Alerta fitosanitaria Golf: "
+              const desc = (inc.descripcion||"").replace(/^🦠\s*/,"").replace(/^Alerta fitosanitaria\s*(Golf)?:\s*/i,"");
+              return desc ? <div style={{fontSize:12,color:"#c8e0c8",marginBottom:8,padding:"6px 10px",background:"rgba(255,255,255,0.03)",borderRadius:6,borderLeft:"2px solid rgba(52,211,153,0.2)"}}>
+                💬 <em>{desc}</em>
+              </div> : null;
+            })()}
             <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
               <button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(34,197,94,0.1)",color:"#22c55e",border:"1px solid rgba(34,197,94,0.3)"}} onClick={()=>resolverAlerta(inc)}>✅ Resolver</button>
               <button style={{...S.btn,fontSize:11,padding:"3px 10px"}} onClick={()=>setAlertaSelId(alertaSelId===inc.id?null:inc.id)}>{alertaSelId===inc.id?"▲ Ocultar":"▼ Detalle"}</button>
               <button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(96,165,250,0.1)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.3)"}} onClick={()=>generarReporteAlerta(inc)}>📋 Imprimir ficha</button>
+              {esJefa&&<button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(239,68,68,0.08)",color:"#f87171",border:"1px solid rgba(239,68,68,0.25)"}} onClick={()=>{if(window.confirm("¿Eliminar esta alerta? Esta acción no se puede deshacer."))setIncidencias(prev=>(Array.isArray(prev)?prev:Object.values(prev||{})).filter(x=>x.id!==inc.id));}}>🗑 Eliminar</button>}
             </div>
             {alertaSelId===inc.id&&(
               <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
@@ -15922,6 +15934,7 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
                     <span style={{color:t.estado==="hecha"?"#22c55e":"#f59e0b",fontSize:10}}>{t.estado==="hecha"?"✅":"⏳"} {t.responsable||""}</span>
                   </div>
                 ))}
+                {(!inc.tareas||inc.tareas.length===0)&&<div style={{fontSize:11,color:"#4a7a5a",fontStyle:"italic"}}>Sin tareas generadas</div>}
               </div>
             )}
           </div>
@@ -17536,6 +17549,26 @@ export default function App() {
   const [notificaciones, setNotificaciones]   = useFirebaseState("notificaciones", []);
   const [incidencias, setIncidencias]         = useFirebaseState("incidencias", []);
   const [autoOpenAlerta, setAutoOpenAlerta]   = React.useState(false);
+  const [toastAlerta, setToastAlerta] = React.useState(null); // {msg, tipo, icon}
+  const prevIncLen = React.useRef(0);
+  React.useEffect(()=>{
+    if(!esJefa) return;
+    const incArr = Array.isArray(incidencias)?incidencias:Object.values(incidencias||{});
+    const activas = incArr.filter(i=>i.estado==="activa"||i.estado==="en_gestion");
+    if(activas.length > prevIncLen.current && prevIncLen.current >= 0){
+      const nueva = activas[0];
+      if(nueva){
+        setToastAlerta({
+          msg: nueva.tipoLabel||(nueva.tipoIcon||"🚨")+" Alerta",
+          sub: (nueva.zonas||[]).join(", ")+" · "+(nueva.responsable||""),
+          icon: nueva.tipoIcon||"🚨",
+          urgencia: nueva.urgencia||"alta",
+        });
+        setTimeout(()=>setToastAlerta(null), 6000);
+      }
+    }
+    prevIncLen.current = activas.length;
+  },[incidencias]);
   const [cierresTurno,  setCierresTurno]     = useFirebaseState("cierresTurno",   {});
 
   const [configSemanal, setConfigSemanal] = useFirebaseState("config-semanal", {});
@@ -18339,26 +18372,61 @@ export default function App() {
         </div>
         <div style={S.headerNav} className="headerNav">
           {(fbRol==="jefa"
-            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["compras","🛒","Compras"],["bodegas","🏪","Bodegas"],["golf","🏌️","Golf"],["personal","👷","Personal"],["protocolos","📋","Protocolos"],["notificaciones","🔔","Alertas"]]
+            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["compras","🛒","Compras"],["bodegas","🏪","Bodegas"],["golf","🏌️","Golf"],["personal","👷","Personal"],["protocolos","📋","Protocolos"]]
             : fbRol==="supervisor"
             ? [["dashboard","📊","Panel"],["programacion","📆","Programa"],["reporte","📋","Reporte"],["golf","🏌️","Golf"],["protocolos","📋","Protocolos"],["miturno","🌿","Mi Turno"]]
             : [["miturno","🌿","Mi Turno"]]
           ).map(([v,ico,lbl])=>(
             <button key={v} onClick={()=>{setVista(v);setZonaId(null);setAiText("");if(v==="notificaciones")marcarTodasLeidas();}} style={{cursor:"pointer",border:"none",background:"transparent",color:vista===v?"#fff":"#7aaa80",fontFamily:"'Georgia',serif",fontSize:12,padding:"10px 14px",borderBottom:vista===v?"2px solid #4a9a64":"2px solid transparent",transition:"all .15s",whiteSpace:"nowrap",display:"flex",flexDirection:"column",alignItems:"center",gap:2,flexShrink:0,position:"relative"}}>
-              <span style={{fontSize:16,position:"relative"}}>
-                {ico}
-                {v==="notificaciones"&&notifNoLeidas.length>0&&(
-                  <span style={{position:"absolute",top:-6,right:-8,background:"#ef4444",color:"#fff",
-                    borderRadius:"50%",width:15,height:15,fontSize:9,fontWeight:700,
-                    display:"flex",alignItems:"center",justifyContent:"center"}}>
-                    {notifNoLeidas.length>9?"9+":notifNoLeidas.length}
-                  </span>
-                )}
-              </span>
+              <span style={{fontSize:16}}>{ico}</span>
               <span>{lbl}</span>
             </button>
           ))}
         </div>
+
+        {/* ── CAMPANILLA FLOTANTE — siempre visible y llamativa ── */}
+        {fbRol==="jefa"&&(()=>{
+          const incActAhora=(Array.isArray(incidencias)?incidencias:Object.values(incidencias||{})).filter(i=>i.estado==="activa"||i.estado==="en_gestion");
+          const hayAlertas = notifNoLeidas.length>0||incActAhora.length>0;
+          const totalBadge = notifNoLeidas.length + incActAhora.length;
+          // Tipo prioritario para mostrar en el badge
+          const tipoLabel = incActAhora.length>0
+            ? (incActAhora.find(i=>i.urgencia==="inmediata")||incActAhora.find(i=>i.urgencia==="alta")||incActAhora[0])?.tipoLabel||"Alerta"
+            : "Aviso";
+          return (
+            <button onClick={()=>{setVista("notificaciones");marcarTodasLeidas();}}
+              style={{
+                flexShrink:0, cursor:"pointer", border:"none", background:"transparent",
+                padding:"4px 8px", display:"flex", flexDirection:"column", alignItems:"center",
+                position:"relative",
+              }}>
+              <style>{`
+                @keyframes pulse-bell { 0%,100%{transform:scale(1)} 50%{transform:scale(1.2)} }
+                @keyframes shake-bell { 0%,100%{transform:rotate(0)} 20%{transform:rotate(-15deg)} 40%{transform:rotate(15deg)} 60%{transform:rotate(-10deg)} 80%{transform:rotate(10deg)} }
+                .bell-pulse { animation: pulse-bell 1.2s ease-in-out infinite, shake-bell 1.2s ease-in-out infinite; }
+              `}</style>
+              <span style={{fontSize:22,position:"relative",display:"inline-block"}}
+                className={hayAlertas?"bell-pulse":""}>
+                {hayAlertas?"🔔":"🔕"}
+                {totalBadge>0&&(
+                  <span style={{position:"absolute",top:-6,right:-10,
+                    background:"#ef4444",color:"#fff",borderRadius:10,
+                    minWidth:18,height:18,fontSize:10,fontWeight:800,
+                    display:"flex",alignItems:"center",justifyContent:"center",
+                    padding:"0 4px",boxShadow:"0 0 0 2px #0f1f15",
+                    border:"2px solid #0f1f15"}}>
+                    {totalBadge>9?"9+":totalBadge}
+                  </span>
+                )}
+              </span>
+              <span style={{fontFamily:"'Georgia',serif",fontSize:10,
+                color:hayAlertas?"#ef4444":"#7aaa80",fontWeight:hayAlertas?700:400,
+                marginTop:1,borderBottom:vista==="notificaciones"?"2px solid #4a9a64":"2px solid transparent"}}>
+                {hayAlertas?tipoLabel:"Alertas"}
+              </span>
+            </button>
+          );
+        })()}
         {/* Botón activar push */}
         {esJefa&&<div style={{padding:"4px 8px",flexShrink:0}}>
           <button onClick={pushActivo?null:activarPush} title={pushActivo?"Notificaciones push activas en este dispositivo":"Activar notificaciones push"} style={{background:pushActivo?"rgba(52,211,153,0.15)":"rgba(251,191,36,0.1)",color:pushActivo?"#34d399":"#fbbf24",border:`1px solid ${pushActivo?"rgba(52,211,153,0.3)":"rgba(251,191,36,0.3)"}`,borderRadius:6,padding:"6px 10px",fontSize:10,cursor:pushActivo?"default":"pointer",whiteSpace:"nowrap"}}>
@@ -18368,6 +18436,29 @@ export default function App() {
       </div>
 
       <div style={S.main}>
+        {/* TOAST DE ALERTA — aparece cuando llega alerta nueva */}
+        {toastAlerta&&(
+          <div onClick={()=>{setVista("notificaciones");marcarTodasLeidas();setToastAlerta(null);}}
+            style={{position:"fixed",top:70,right:16,zIndex:9999,
+              background:toastAlerta.urgencia==="inmediata"?"#7f1d1d":toastAlerta.urgencia==="alta"?"#78350f":"#1e3a5f",
+              border:`2px solid ${toastAlerta.urgencia==="inmediata"?"#ef4444":toastAlerta.urgencia==="alta"?"#f59e0b":"#60a5fa"}`,
+              borderRadius:12,padding:"12px 16px",maxWidth:300,cursor:"pointer",
+              boxShadow:"0 8px 32px rgba(0,0,0,0.5)",
+              animation:"slideInRight .3s ease"}}>
+            <style>{`@keyframes slideInRight{from{transform:translateX(120%);opacity:0}to{transform:translateX(0);opacity:1}}`}</style>
+            <div style={{display:"flex",gap:10,alignItems:"center"}}>
+              <span style={{fontSize:24}}>{toastAlerta.icon}</span>
+              <div style={{flex:1}}>
+                <div style={{fontSize:13,fontWeight:700,color:"#fff",marginBottom:2}}>⚠️ {toastAlerta.msg}</div>
+                <div style={{fontSize:11,color:"rgba(255,255,255,0.7)"}}>{toastAlerta.sub}</div>
+                <div style={{fontSize:10,color:"rgba(255,255,255,0.5)",marginTop:3}}>Toca para ver detalles</div>
+              </div>
+              <button onClick={e=>{e.stopPropagation();setToastAlerta(null);}}
+                style={{background:"rgba(255,255,255,0.1)",border:"none",color:"#fff",
+                  borderRadius:6,padding:"2px 6px",cursor:"pointer",fontSize:14,alignSelf:"flex-start"}}>✕</button>
+            </div>
+          </div>
+        )}
         {/* DASHBOARD */}
         {/* ── JEFA REVISA TURNO DE UN TRABAJADOR ── */}
         {workerARevisar&&rolLogueado==="jefa"&&(()=>{
@@ -18404,7 +18495,7 @@ export default function App() {
                     tipo:"enfermedad",
                     tipoIcon:"🦠",
                     tipoLabel:"Fitosanitario",
-                    descripcion:"🦠 Alerta fitosanitaria Golf: "+obs,
+                    descripcion:"Observación: "+obs,
                     zonas:[MACROZONAS_BASE.find(z=>z.id===31)?.nombre||"Golf - Pitch & Putt"],
                     responsable:trab||"Bhalú",
                     fecha:fec||fechaLocal(),
