@@ -13874,12 +13874,12 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
                             const its=itemsParaInf.filter(i=>(i.categoria||"Sin categoría")===cat).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
                             let cols="";
                             if(esMaq)      cols=`<col style="width:40%"><col style="width:20%"><col style="width:10%"><col style="width:15%"><col style="width:15%">`;
-                            else if(esPest) cols=`<col style="width:40%"><col style="width:18%"><col style="width:15%"><col style="width:12%"><col style="width:15%">`;
+                            else if(esPest) cols=`<col style="width:40%"><col style="width:20%"><col style="width:15%"><col style="width:25%">`;
                             else            cols=`<col style="width:42%"><col style="width:23%"><col style="width:15%"><col style="width:20%">`;
                             const extraTh = esMaq
                               ? '<th style="padding:6px 10px;font-size:10px;border:1px solid #c8e6c9;text-align:left">Marca / Modelo</th><th style="padding:6px 10px;font-size:10px;border:1px solid #c8e6c9;text-align:center">Horas</th>'
                               : esPest
-                              ? '<th style="padding:6px 10px;font-size:10px;border:1px solid #c8e6c9;text-align:left">Fabricante</th><th style="padding:6px 10px;font-size:10px;border:1px solid #c8e6c9;text-align:center">Vencimiento</th>'
+                              ? '<th style="padding:6px 10px;font-size:10px;border:1px solid #c8e6c9;text-align:center">Vencimiento</th>'
                               : '<th style="padding:6px 10px;font-size:10px;border:1px solid #c8e6c9;text-align:left">Ubicación</th>';
                             return `<h3 style="margin:18px 0 6px;font-size:12px;color:#1a5c2a;border-left:4px solid #1a5c2a;padding-left:8px;text-transform:uppercase;letter-spacing:.5px">${cat}</h3>
                             <table style="width:100%;border-collapse:collapse;margin-bottom:16px;table-layout:fixed">
@@ -13901,7 +13901,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
                                 } else if(esPest){
                                   let vencTxt="—"; let vencColor="#333"; let vencBold=400;
                                   if(it.vencimiento){const dias=Math.ceil((new Date(it.vencimiento)-new Date())/(1000*60*60*24));vencTxt=new Date(it.vencimiento+"T12:00:00").toLocaleDateString("es-CL")+(dias<0?" ⛔":dias<90?" ⚠️":"");vencColor=dias<0?"#c62828":dias<90?"#e65100":"#2e7d32";vencBold=dias<90?700:400;}
-                                  extraTd=`<td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px;overflow:hidden;text-overflow:ellipsis">${it.fabricante||"—"}</td><td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px;text-align:center;color:${vencColor};font-weight:${vencBold}">${vencTxt}</td>`;
+                                  extraTd=`<td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px;text-align:center;color:${vencColor};font-weight:${vencBold}">${vencTxt}</td>`;
                                 } else {
                                   extraTd=`<td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px;overflow:hidden;text-overflow:ellipsis">${it.ubicacion||"—"}</td>`;
                                 }
