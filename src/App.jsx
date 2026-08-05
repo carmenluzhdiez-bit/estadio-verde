@@ -7850,7 +7850,7 @@ const BODEGAS_DEF = [
   },
   { id:"b05", nombre:"Pesticidas", icono:"🧪", color:"#a78bfa",
     descripcion:"Fungicidas, herbicidas, insecticidas, reguladores",
-    categorias:["Bactericida","Fungicida","Herbicida","Insecticida","Moluscocida","Acaricida","Regulador crecimiento","Adherente","Otro"],
+    categorias:["Bactericida","Fungicida","Herbicida","Insecticida","Molusquicida","Acaricida","Regulador crecimiento","Adherente","Otro"],
     tareasTipo:["Inventario","Orden y limpieza","Revisión vencimientos","Recepción","Baja/Destrucción"],
   },
   { id:"b06", nombre:"Golf", icono:"⛳", color:"#34d399",
@@ -14166,7 +14166,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
                     <option value="Fungicida">Fungicida</option>
                     <option value="Herbicida">Herbicida</option>
                     <option value="Insecticida">Insecticida</option>
-                    <option value="Moluscocida">Moluscocida</option>
+                    <option value="Molusquicida">Molusquicida</option>
                     <option value="Otro">Otro</option>
                   </select>
                 </div>
