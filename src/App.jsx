@@ -13366,6 +13366,16 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
   const [catsAb, setCatsAb] = React.useState({});
   const [selMaq, setSelMaq] = React.useState([]);
   const [hojaCatsAb, setHojaCatsAb] = React.useState({});
+  // ── Horómetro (Maquinaria) ──
+  const [horometroData, setHorometroData] = useFirebaseState(`${ROOT}/horometro`, {});
+  const [showHoroForm, setShowHoroForm] = React.useState(false);
+  const [horoEquipoSel, setHoroEquipoSel] = React.useState("");
+  const [horoHoras, setHoroHoras] = React.useState("");
+  const [horoFecha, setHoroFecha] = React.useState(hoy);
+  const [horoObs, setHoroObs] = React.useState("");
+  const [showMantForm, setShowMantForm] = React.useState(false);
+  const [mantEquipoSel, setMantEquipoSel] = React.useState("");
+  const [mantForm, setMantForm] = React.useState({fecha:hoy,tipo:"",obs:"",responsable:""});
   const [inventFecha, setInventFecha] = React.useState(hoy);
   const [inventItems, setInventItems] = React.useState([{id:1,nombre:"",categoria:"",unidad:"unidad",stockActual:0,stockMinimo:0,ubicacion:""}]);
 
@@ -13517,7 +13527,8 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
       {/* Sub-tabs */}
       <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
         {[["stock","📦 Stock"],["movimientos","🔄 Movimientos"],["traslados","🚛 Traslados"],["tareas","✅ Tareas"],["historial","📜 Historial"],
-          ...(bodegaActiva==="b05"?[["hojas_seguridad","🛡️ Hojas de Seguridad"]]:[])
+          ...(bodegaActiva==="b05"?[["hojas_seguridad","🛡️ Hojas de Seguridad"]]:[]),
+          ...(bodegaActiva==="b04"?[["horometro","⏱️ Horómetro"]]:[]),
         ].map(([t,l])=>(
           <button key={t} className={`tab${subTab===t?" on":""}`} onClick={()=>setSubTab(t)}>{l}</button>
         ))}
@@ -14235,6 +14246,300 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
           )}
         </div>
       )}
+
+      {/* ── HORÓMETRO ── */}
+      {subTab==="horometro"&&bodegaActiva==="b04"&&(()=>{
+        const equipos = (bd.items||[]);
+        const TIPOS_MANT = ["Cambio de aceite (con filtro)","Afilado de cuchillas","Engrasado","Revisión general","Limpieza filtro aire","Revisión correas","Otro"];
+
+        // Leer datos del horómetro
+        const getEquipoHoro = (id) => (horometroData?.[id]||{equipos:{},mantenimientos:[]});
+        const getHorasTotal = (id) => {
+          const registros = Object.values(getEquipoHoro(id).registros||{});
+          return registros.reduce((a,r)=>a+Number(r.horas||0),0);
+        };
+
+        // Plan de mantenimiento configurable por equipo
+        const PLAN_DEFAULT = [
+          {tarea:"Cambio de aceite (con filtro)", cadaHoras:200},
+          {tarea:"Afilado de cuchillas", cadaHoras:50},
+          {tarea:"Engrasado", cadaHoras:100},
+          {tarea:"Revisión general", cadaHoras:500},
+        ];
+        const getPlan = (id) => getEquipoHoro(id).plan || PLAN_DEFAULT;
+
+        // Calcular próximo mantenimiento
+        const getProxMant = (equipoId) => {
+          const total = getHorasTotal(equipoId);
+          const mants = Object.values(getEquipoHoro(equipoId).mantenimientos||{});
+          const plan = getPlan(equipoId);
+          return plan.map(p=>{
+            const ultimoMant = mants.filter(m=>m.tipo===p.tarea).sort((a,b)=>Number(b.horasAlMomento||0)-Number(a.horasAlMomento||0))[0];
+            const ultimoH = ultimoMant ? Number(ultimoMant.horasAlMomento||0) : 0;
+            const horasDesde = total - ultimoH;
+            const falta = p.cadaHoras - horasDesde;
+            return {...p, total, horasDesde, falta, ultimoMant};
+          });
+        };
+
+        const guardarHoras = () => {
+          if(!horoEquipoSel||!horoHoras) return;
+          const id = "h"+Date.now();
+          const eqData = getEquipoHoro(horoEquipoSel);
+          setHorometroData(prev=>({...prev,[horoEquipoSel]:{...eqData,registros:{...(eqData.registros||{}),
+            [id]:{id,fecha:horoFecha,horas:Number(horoHoras),obs:horoObs,creadoEn:new Date().toISOString()}
+          }}}));
+          setHoroHoras(""); setHoroObs(""); setShowHoroForm(false);
+        };
+
+        const guardarMant = () => {
+          if(!mantEquipoSel||!mantForm.tipo) return;
+          const id = "m"+Date.now();
+          const eqData = getEquipoHoro(mantEquipoSel);
+          const horasActual = getHorasTotal(mantEquipoSel);
+          setHorometroData(prev=>({...prev,[mantEquipoSel]:{...eqData,mantenimientos:{...(eqData.mantenimientos||{}),
+            [id]:{id,...mantForm,horasAlMomento:horasActual,creadoEn:new Date().toISOString()}
+          }}}));
+          setMantForm({fecha:hoy,tipo:"",obs:"",responsable:""}); setShowMantForm(false);
+        };
+
+        return (
+          <div className="ein">
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,color:"#f97316",marginBottom:4}}>⏱️ Horómetro — Maquinaria</div>
+            <div style={{fontSize:12,color:"#5a9a7a",marginBottom:16}}>Registro acumulativo de horas de uso y plan de mantenimiento por equipo.</div>
+
+            {/* Botones */}
+            {esJefa&&(
+              <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+                <button className="btn-p" style={S.btn} onClick={()=>{setShowHoroForm(p=>!p);setShowMantForm(false);}}>⏱️ Registrar horas</button>
+                <button style={{...S.btn,background:"rgba(52,211,153,0.12)",color:"#34d399",border:"1px solid rgba(52,211,153,0.25)"}} onClick={()=>{setShowMantForm(p=>!p);setShowHoroForm(false);}}>🔧 Registrar mantenimiento</button>
+              </div>
+            )}
+
+            {/* Formulario registrar horas */}
+            {showHoroForm&&esJefa&&(
+              <div style={{...S.card,padding:16,marginBottom:16}} className="ein">
+                <div style={{fontSize:13,fontWeight:700,color:"#f97316",marginBottom:10}}>⏱️ Registrar horas de uso</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                  <div><label style={labelSt}>Equipo</label>
+                    <select style={S.input} value={horoEquipoSel} onChange={e=>setHoroEquipoSel(e.target.value)}>
+                      <option value="">Seleccionar...</option>
+                      {equipos.map(eq=><option key={eq.id} value={eq.id}>{eq.nombre}</option>)}
+                    </select>
+                  </div>
+                  <div><label style={labelSt}>Horas a sumar</label>
+                    <input type="text" inputMode="decimal" style={S.input} value={horoHoras} onChange={e=>setHoroHoras(e.target.value)} placeholder="ej: 2.5"/>
+                  </div>
+                  <div><label style={labelSt}>Fecha</label>
+                    <input type="date" style={S.input} value={horoFecha} onChange={e=>setHoroFecha(e.target.value)}/>
+                  </div>
+                  <div><label style={labelSt}>Observación (opcional)</label>
+                    <input style={S.input} value={horoObs} onChange={e=>setHoroObs(e.target.value)} placeholder="ej: Corte de fairways"/>
+                  </div>
+                </div>
+                {horoEquipoSel&&<div style={{fontSize:11,color:"#f97316",marginBottom:8}}>⏱️ Total actual: <strong>{getHorasTotal(horoEquipoSel).toFixed(1)} h</strong> → después de sumar: <strong>{(getHorasTotal(horoEquipoSel)+Number(horoHoras||0)).toFixed(1)} h</strong></div>}
+                <div style={{display:"flex",gap:8}}>
+                  <button className="btn-p" style={S.btn} onClick={guardarHoras} disabled={!horoEquipoSel||!horoHoras}>✓ Guardar</button>
+                  <button className="btn-g" style={S.btn} onClick={()=>setShowHoroForm(false)}>Cancelar</button>
+                </div>
+              </div>
+            )}
+
+            {/* Formulario registrar mantenimiento */}
+            {showMantForm&&esJefa&&(
+              <div style={{...S.card,padding:16,marginBottom:16}} className="ein">
+                <div style={{fontSize:13,fontWeight:700,color:"#34d399",marginBottom:10}}>🔧 Registrar mantenimiento realizado</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                  <div><label style={labelSt}>Equipo</label>
+                    <select style={S.input} value={mantEquipoSel} onChange={e=>setMantEquipoSel(e.target.value)}>
+                      <option value="">Seleccionar...</option>
+                      {equipos.map(eq=><option key={eq.id} value={eq.id}>{eq.nombre}</option>)}
+                    </select>
+                  </div>
+                  <div><label style={labelSt}>Tipo de mantenimiento</label>
+                    <select style={S.input} value={mantForm.tipo} onChange={e=>setMantForm(p=>({...p,tipo:e.target.value}))}>
+                      <option value="">Seleccionar...</option>
+                      {TIPOS_MANT.map(t=><option key={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div><label style={labelSt}>Fecha</label>
+                    <input type="date" style={S.input} value={mantForm.fecha} onChange={e=>setMantForm(p=>({...p,fecha:e.target.value}))}/>
+                  </div>
+                  <div><label style={labelSt}>Responsable</label>
+                    <input style={S.input} value={mantForm.responsable} onChange={e=>setMantForm(p=>({...p,responsable:e.target.value}))} placeholder="Nombre técnico"/>
+                  </div>
+                  <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observaciones</label>
+                    <input style={S.input} value={mantForm.obs} onChange={e=>setMantForm(p=>({...p,obs:e.target.value}))} placeholder="Detalles del trabajo realizado..."/>
+                  </div>
+                </div>
+                {mantEquipoSel&&<div style={{fontSize:11,color:"#34d399",marginBottom:8}}>⏱️ Horas al momento del mantenimiento: <strong>{getHorasTotal(mantEquipoSel).toFixed(1)} h</strong></div>}
+                <div style={{display:"flex",gap:8}}>
+                  <button className="btn-p" style={S.btn} onClick={guardarMant} disabled={!mantEquipoSel||!mantForm.tipo}>✓ Guardar</button>
+                  <button className="btn-g" style={S.btn} onClick={()=>setShowMantForm(false)}>Cancelar</button>
+                </div>
+              </div>
+            )}
+
+            {/* Tarjetas por equipo */}
+            {equipos.length===0&&<div style={{...S.card,padding:24,textAlign:"center",color:"#4a7a5a"}}>No hay equipos en Maquinaria aún. Agrégalos en la pestaña Stock.</div>}
+            {equipos.map(eq=>{
+              const totalH = getHorasTotal(eq.id);
+              const proxMants = getProxMant(eq.id);
+              const alertas = proxMants.filter(p=>p.falta<=20);
+              const registros = Object.values(getEquipoHoro(eq.id).registros||{}).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+              const mantsHist = Object.values(getEquipoHoro(eq.id).mantenimientos||{}).sort((a,b)=>Number(b.horasAlMomento||0)-Number(a.horasAlMomento||0));
+              const [open,setOpen] = React.useState(false);
+              return (
+                <div key={eq.id} style={{...S.card,padding:16,marginBottom:12}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:8,marginBottom:10}}>
+                    <div>
+                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700}}>{eq.nombre}</div>
+                      {eq.marca&&<div style={{fontSize:11,color:"#5a9a7a"}}>🏷️ {eq.marca} {eq.modelo||""}</div>}
+                    </div>
+                    <div style={{textAlign:"right"}}>
+                      <div style={{fontSize:24,fontWeight:700,color:"#f97316"}}>{totalH.toFixed(1)}<span style={{fontSize:13,fontWeight:400,color:"#7aaa80"}}> h</span></div>
+                      <div style={{fontSize:10,color:"#5a9a7a"}}>horas acumuladas</div>
+                    </div>
+                  </div>
+
+                  {/* Alertas de mantenimiento próximo */}
+                  {alertas.length>0&&(
+                    <div style={{background:"rgba(245,158,11,0.06)",border:"1px solid rgba(245,158,11,0.25)",borderRadius:8,padding:"8px 12px",marginBottom:10}}>
+                      {alertas.map(a=>(
+                        <div key={a.tarea} style={{fontSize:11,color:a.falta<=0?"#ef4444":"#f59e0b",display:"flex",gap:6,marginBottom:3}}>
+                          <span>{a.falta<=0?"🔴":"🟡"}</span>
+                          <span><strong>{a.tarea}</strong> — {a.falta<=0?`VENCIDO hace ${Math.abs(a.falta).toFixed(0)}h`:`en ${a.falta.toFixed(0)}h`} · c/{a.cadaHoras}h</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Plan de mantenimiento */}
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:6,marginBottom:10}}>
+                    {proxMants.map(p=>{
+                      const pct = Math.min(100,Math.max(0,((p.cadaHoras-p.falta)/p.cadaHoras)*100));
+                      const col = p.falta<=0?"#ef4444":p.falta<=20?"#f59e0b":"#22c55e";
+                      return (
+                        <div key={p.tarea} style={{background:"rgba(255,255,255,0.03)",borderRadius:8,padding:"8px 10px",border:`1px solid ${col}22`}}>
+                          <div style={{fontSize:10,color:"#7aaa80",marginBottom:4,fontWeight:600}}>{p.tarea}</div>
+                          <div style={{height:4,background:"rgba(255,255,255,0.08)",borderRadius:2,marginBottom:4}}>
+                            <div style={{height:4,background:col,borderRadius:2,width:pct+"%",transition:"width .5s"}}/>
+                          </div>
+                          <div style={{fontSize:10,color:col,fontWeight:600}}>
+                            {p.falta<=0?`Vencido ${Math.abs(p.falta).toFixed(0)}h`:p.falta<=20?`⚠️ ${p.falta.toFixed(0)}h`:`${p.falta.toFixed(0)}h restantes`}
+                          </div>
+                          <div style={{fontSize:9,color:"#4a7a5a"}}>c/{p.cadaHoras}h · {p.ultimoMant?`últ: ${p.ultimoMant.fecha}`:"nunca realizado"}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Historial expandible + botones */}
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                    <button onClick={()=>setOpen(p=>!p)} style={{...S.btn,fontSize:11,background:"transparent",color:"#5a9a7a",border:"1px solid rgba(255,255,255,0.08)"}}>
+                      {open?"▲ Ocultar historial":"▼ Ver historial"}
+                    </button>
+                    {esJefa&&<button onClick={()=>{
+                      // Editor de plan inline
+                      const planActual = getPlan(eq.id);
+                      const nuevoPlan = planActual.map(p=>({...p}));
+                      const input = window.prompt(
+                        `Plan de mantenimiento para ${eq.nombre}\n\nFormato: Tarea|Horas (una por línea)\n\nActual:\n${planActual.map(p=>`${p.tarea}|${p.cadaHoras}`).join("\n")}`,
+                        planActual.map(p=>`${p.tarea}|${p.cadaHoras}`).join("\n")
+                      );
+                      if(input===null) return;
+                      const parsed = input.split("\n").map(l=>{
+                        const [tarea,...resto] = l.split("|");
+                        const cadaHoras = Number(resto.join("|").trim());
+                        return tarea&&cadaHoras?{tarea:tarea.trim(),cadaHoras}:null;
+                      }).filter(Boolean);
+                      if(parsed.length===0){alert("Formato incorrecto. Usa: Tarea|Horas");return;}
+                      const eqData = getEquipoHoro(eq.id);
+                      setHorometroData(prev=>({...prev,[eq.id]:{...eqData,plan:parsed}}));
+                    }} style={{...S.btn,fontSize:11,background:"rgba(251,191,36,0.1)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.25)"}}>
+                      ✏️ Editar plan
+                    </button>}
+                    <button onClick={()=>{
+                      const win = window.open("","_blank");
+                      const planActual = getPlan(eq.id);
+                      win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Horómetro ${eq.nombre}</title>
+                      <style>body{font-family:'Segoe UI',Arial,sans-serif;margin:0;padding:28px 32px;color:#1a1a1a;font-size:12px;max-width:900px}
+                      h1{font-size:18px;color:#1a5c2a;margin:0 0 3px;font-weight:700}.sub{font-size:11px;color:#666;margin:0 0 16px;border-bottom:2px solid #e8f5e9;padding-bottom:8px}
+                      h3{font-size:12px;color:#c07a00;border-left:4px solid #c07a00;padding-left:8px;margin:18px 0 6px;text-transform:uppercase;letter-spacing:.5px}
+                      table{width:100%;border-collapse:collapse;margin-bottom:16px;table-layout:fixed}
+                      th{background:#e8f5e9;padding:7px 10px;font-size:10px;border:1px solid #c8e6c9;text-transform:uppercase;letter-spacing:.4px;color:#2e7d32;font-weight:600}
+                      td{padding:6px 10px;border:1px solid #e8f5e9;font-size:11px;vertical-align:top}
+                      tr:nth-child(even) td{background:#fafafa}
+                      .ok{color:#2e7d32;font-weight:600}.warn{color:#e65100;font-weight:600}.venc{color:#c62828;font-weight:600}
+                      @media print{.noprint{display:none}@page{margin:1.5cm}}</style></head><body>
+                      <button onclick="window.print()" class="noprint" style="float:right;padding:7px 16px;background:#1a5c2a;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">🖨️ Imprimir / PDF</button>
+                      <h1>Horómetro — ${eq.nombre}</h1>
+                      <div class="sub">Maquinaria · Áreas Verdes Estadio Español · ${new Date().toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"})} · Total acumulado: <strong>${totalH.toFixed(1)} h</strong></div>
+                      <h3>Plan de Mantenimiento</h3>
+                      <table><col style="width:45%"><col style="width:15%"><col style="width:15%"><col style="width:15%"><col style="width:10%">
+                        <thead><tr><th>Tarea</th><th style="text-align:center">Cada (h)</th><th style="text-align:right">Desde último</th><th style="text-align:right">Faltan</th><th style="text-align:center">Estado</th></tr></thead>
+                        <tbody>${proxMants.map(p=>{
+                          const cls=p.falta<=0?"venc":p.falta<=20?"warn":"ok";
+                          const est=p.falta<=0?`⛔ Vencido`:`p.falta<=20`?`⚠️ Próximo`:"✅ OK";
+                          return`<tr><td><b>${p.tarea}</b>${p.ultimoMant?`<br><span style="font-size:9px;color:#888">Último: ${p.ultimoMant.fecha} · ${p.ultimoMant.horasAlMomento}h${p.ultimoMant.responsable?" · "+p.ultimoMant.responsable:""}</span>`:`<br><span style="font-size:9px;color:#888">Nunca realizado</span>`}</td>
+                          <td style="text-align:center">${p.cadaHoras}</td><td style="text-align:right">${p.horasDesde.toFixed(1)} h</td>
+                          <td style="text-align:right;font-weight:600" class="${cls}">${p.falta<=0?`+${Math.abs(p.falta).toFixed(1)}`:p.falta.toFixed(1)} h</td>
+                          <td style="text-align:center" class="${cls}">${p.falta<=0?"⛔":p.falta<=20?"⚠️":"✅"}</td></tr>`;
+                        }).join("")}</tbody>
+                      </table>
+                      <h3>Historial de Mantenimientos Realizados</h3>
+                      ${mantsHist.length===0?`<p style="color:#888;font-style:italic">Sin mantenimientos registrados aún.</p>`:`
+                      <table><col style="width:30%"><col style="width:15%"><col style="width:15%"><col style="width:20%"><col style="width:20%">
+                        <thead><tr><th>Tarea</th><th style="text-align:center">Horas</th><th>Fecha</th><th>Responsable</th><th>Observaciones</th></tr></thead>
+                        <tbody>${mantsHist.map((m,i)=>`<tr style="background:${i%2?"#fafafa":"#fff"}"><td><b>${m.tipo}</b></td><td style="text-align:center">${m.horasAlMomento} h</td><td>${m.fecha}</td><td>${m.responsable||"—"}</td><td style="font-style:italic;color:#555">${m.obs||"—"}</td></tr>`).join("")}</tbody>
+                      </table>`}
+                      <h3>Registro de Horas de Uso</h3>
+                      ${registros.length===0?`<p style="color:#888;font-style:italic">Sin registros de horas aún.</p>`:`
+                      <table><col style="width:20%"><col style="width:15%"><col style="width:65%">
+                        <thead><tr><th>Fecha</th><th style="text-align:right">Horas sumadas</th><th>Observación</th></tr></thead>
+                        <tbody>${registros.map((r,i)=>`<tr style="background:${i%2?"#fafafa":"#fff"}"><td>${r.fecha}</td><td style="text-align:right;font-weight:600;color:#c07a00">+${r.horas} h</td><td style="color:#555">${r.obs||"—"}</td></tr>`).join("")}
+                        <tr style="background:#fef3c7;font-weight:700"><td>TOTAL</td><td style="text-align:right;color:#c07a00">${totalH.toFixed(1)} h</td><td></td></tr>
+                        </tbody></table>`}
+                      </body></html>`);
+                      win.document.close();
+                    }} style={{...S.btn,fontSize:11,background:"rgba(59,130,246,0.1)",color:"#60a5fa",border:"1px solid rgba(59,130,246,0.25)"}}>
+                      🖨️ Imprimir historial
+                    </button>
+                  </div>
+                  {open&&(
+                    <div style={{marginTop:10,display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                      <div>
+                        <div style={{fontSize:11,fontWeight:700,color:"#f97316",marginBottom:6}}>⏱️ Registros de horas</div>
+                        {registros.length===0&&<div style={{fontSize:11,color:"#4a7a5a",fontStyle:"italic"}}>Sin registros aún</div>}
+                        {registros.slice(0,10).map(r=>(
+                          <div key={r.id} style={{fontSize:11,borderTop:"1px solid rgba(255,255,255,0.05)",paddingTop:4,marginTop:4,display:"flex",justifyContent:"space-between"}}>
+                            <span style={{color:"#7aaa80"}}>{r.fecha} {r.obs&&`· ${r.obs}`}</span>
+                            <span style={{color:"#f97316",fontWeight:600}}>+{r.horas}h</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div>
+                        <div style={{fontSize:11,fontWeight:700,color:"#34d399",marginBottom:6}}>🔧 Mantenimientos realizados</div>
+                        {mantsHist.length===0&&<div style={{fontSize:11,color:"#4a7a5a",fontStyle:"italic"}}>Sin mantenimientos registrados</div>}
+                        {mantsHist.slice(0,10).map(m=>(
+                          <div key={m.id} style={{fontSize:11,borderTop:"1px solid rgba(255,255,255,0.05)",paddingTop:4,marginTop:4}}>
+                            <div style={{display:"flex",justifyContent:"space-between"}}>
+                              <span style={{color:"#34d399",fontWeight:600}}>{m.tipo}</span>
+                              <span style={{color:"#5a9a7a"}}>{m.horasAlMomento}h</span>
+                            </div>
+                            <div style={{color:"#5a9a7a"}}>{m.fecha}{m.responsable&&` · ${m.responsable}`}</div>
+                            {m.obs&&<div style={{color:"#4a7a5a",fontStyle:"italic"}}>{m.obs}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       {/* ── HOJAS DE SEGURIDAD (solo Pesticidas b05) ── */}
       {subTab==="hojas_seguridad"&&bodegaActiva==="b05"&&(
@@ -16073,15 +16378,28 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
           {notifSorted.length===0?(
             <div style={{...S.card,padding:32,textAlign:"center",color:"#4a7a5a",fontSize:13}}>Sin registros del sistema aún</div>
           ):notifSorted.map((notifN,i)=>{
-            const col=notifN.tipo==="bono_cancha"?"#fbbf24":notifN.tipo==="medicion"?"#34d399":notifN.tipo==="alerta"?"#f87171":"#60a5fa";
+            const col=notifN.tipo==="bono_cancha"?"#fbbf24":notifN.tipo==="medicion"?"#34d399":notifN.tipo==="humedad"?"#60a5fa":notifN.tipo==="alerta"||notifN.tipo==="alerta_fito"||notifN.tipo==="alerta_fito_golf"?"#f87171":"#60a5fa";
+            const icon=notifN.tipo==="medicion"?"📏":notifN.tipo==="humedad"?"💧":notifN.tipo?.includes("fito")||notifN.tipo==="alerta"?"🚨":"🔔";
             return (
-              <div key={notifN.id||i} style={{...S.card,marginBottom:6,padding:"10px 14px",background:notifN.leida?"transparent":"rgba(52,211,153,0.02)",border:`1px solid ${notifN.leida?"rgba(255,255,255,0.05)":`${col}25`}`}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:13,fontWeight:notifN.leida?400:600,color:notifN.leida?"#5a9a7a":col}}>{notifN.titulo||"Sin título"}</div>
-                    {notifN.mensaje&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:2}}>{notifN.mensaje}</div>}
+              <div key={notifN.id||i} style={{...S.card,marginBottom:6,padding:"12px 14px",
+                background:notifN.leida?"transparent":"rgba(52,211,153,0.04)",
+                border:`1px solid ${notifN.leida?"rgba(255,255,255,0.05)":`${col}40`}`,
+                borderLeft:notifN.leida?"1px solid rgba(255,255,255,0.05)":`3px solid ${col}`}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+                  <div style={{display:"flex",gap:8,flex:1}}>
+                    {!notifN.leida&&<span style={{fontSize:16,flexShrink:0}}>{icon}</span>}
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,fontWeight:notifN.leida?400:700,color:notifN.leida?"#5a9a7a":col}}>
+                        {!notifN.leida&&<span style={{fontSize:9,background:col,color:"#fff",borderRadius:4,padding:"1px 5px",marginRight:6,verticalAlign:"middle"}}>NUEVO</span>}
+                        {notifN.titulo||"Sin título"}
+                      </div>
+                      {notifN.mensaje&&<div style={{fontSize:11,color:notifN.leida?"#4a7a5a":"#8aaa9a",marginTop:3,lineHeight:1.4}}>{notifN.mensaje}</div>}
+                    </div>
                   </div>
-                  <div style={{fontSize:10,color:"#4a7a5a",marginLeft:10,whiteSpace:"nowrap"}}>{notifN.fecha} {notifN.hora}</div>
+                  <div style={{fontSize:10,color:"#4a7a5a",flexShrink:0,textAlign:"right"}}>
+                    <div>{notifN.fecha}</div>
+                    {notifN.hora&&<div>{notifN.hora}</div>}
+                  </div>
                 </div>
               </div>
             );
@@ -18385,7 +18703,7 @@ export default function App() {
             ? [["dashboard","📊","Panel"],["programacion","📆","Programa"],["reporte","📋","Reporte"],["golf","🏌️","Golf"],["protocolos","📋","Protocolos"],["miturno","🌿","Mi Turno"]]
             : [["miturno","🌿","Mi Turno"]]
           ).map(([v,ico,lbl])=>(
-            <button key={v} onClick={()=>{setVista(v);setZonaId(null);setAiText("");if(v==="notificaciones")marcarTodasLeidas();}} style={{cursor:"pointer",border:"none",background:"transparent",color:vista===v?"#fff":"#7aaa80",fontFamily:"'Georgia',serif",fontSize:12,padding:"10px 14px",borderBottom:vista===v?"2px solid #4a9a64":"2px solid transparent",transition:"all .15s",whiteSpace:"nowrap",display:"flex",flexDirection:"column",alignItems:"center",gap:2,flexShrink:0,position:"relative"}}>
+            <button key={v} onClick={()=>{setVista(v);setZonaId(null);setAiText("");if(v==="notificaciones")setTimeout(marcarTodasLeidas,4000);}} style={{cursor:"pointer",border:"none",background:"transparent",color:vista===v?"#fff":"#7aaa80",fontFamily:"'Georgia',serif",fontSize:12,padding:"10px 14px",borderBottom:vista===v?"2px solid #4a9a64":"2px solid transparent",transition:"all .15s",whiteSpace:"nowrap",display:"flex",flexDirection:"column",alignItems:"center",gap:2,flexShrink:0,position:"relative"}}>
               <span style={{fontSize:16}}>{ico}</span>
               <span>{lbl}</span>
             </button>
@@ -18402,7 +18720,7 @@ export default function App() {
             ? (incActAhora.find(i=>i.urgencia==="inmediata")||incActAhora.find(i=>i.urgencia==="alta")||incActAhora[0])?.tipoLabel||"Alerta"
             : "Aviso";
           return (
-            <button onClick={()=>{setVista("notificaciones");marcarTodasLeidas();}}
+            <button onClick={()=>{setVista("notificaciones");setTimeout(marcarTodasLeidas,4000);}}
               style={{
                 flexShrink:0, cursor:"pointer", border:"none", background:"transparent",
                 padding:"4px 8px", display:"flex", flexDirection:"column", alignItems:"center",
@@ -18446,7 +18764,7 @@ export default function App() {
       <div style={S.main}>
         {/* TOAST DE ALERTA — aparece cuando llega alerta nueva */}
         {toastAlerta&&(
-          <div onClick={()=>{setVista("notificaciones");marcarTodasLeidas();setToastAlerta(null);}}
+          <div onClick={()=>{setVista("notificaciones");setTimeout(marcarTodasLeidas,4000);setToastAlerta(null);}}
             style={{position:"fixed",top:70,right:16,zIndex:9999,
               background:toastAlerta.urgencia==="inmediata"?"#7f1d1d":toastAlerta.urgencia==="alta"?"#78350f":"#1e3a5f",
               border:`2px solid ${toastAlerta.urgencia==="inmediata"?"#ef4444":toastAlerta.urgencia==="alta"?"#f59e0b":"#60a5fa"}`,
