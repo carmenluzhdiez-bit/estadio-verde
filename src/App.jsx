@@ -13712,6 +13712,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
                 <div><label style={labelSt}>Ubicación</label><input style={S.input} value={itemForm.ubicacion} onChange={e=>setItemForm(p=>({...p,ubicacion:e.target.value}))} placeholder="ej: Estante A"/></div>
                 <div><label style={labelSt}>Observaciones</label><input style={S.input} value={itemForm.obs} onChange={e=>setItemForm(p=>({...p,obs:e.target.value}))}/></div>
                 {bodegaActiva==="b05"&&(
+                  <>
                   <div><label style={labelSt}>Fecha de vencimiento</label>
                     <input type="date" style={S.input} value={itemForm.vencimiento||""}
                       onChange={e=>setItemForm(p=>({...p,vencimiento:e.target.value}))}/>
@@ -13721,6 +13722,22 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
                       return <div style={{fontSize:11,color,marginTop:4}}>{dias<0?`⛔ Vencido hace ${Math.abs(dias)} días`:dias<90?`⚠️ Vence en ${dias} días`:`✅ Vigente (${dias} días)`}</div>;
                     })()}
                   </div>
+                  <div>
+                    <label style={labelSt}>Tiempo de reingreso (según HDS)</label>
+                    <div style={{display:"flex",gap:6}}>
+                      <input type="text" inputMode="decimal" style={{...S.input,flex:1}}
+                        value={itemForm.tiempoReingreso||""}
+                        onChange={e=>setItemForm(p=>({...p,tiempoReingreso:e.target.value}))}
+                        placeholder="ej: 24"/>
+                      <select style={{...S.input,width:80}} value={itemForm.tiempoReingresoUnidad||"horas"}
+                        onChange={e=>setItemForm(p=>({...p,tiempoReingresoUnidad:e.target.value}))}>
+                        <option value="horas">horas</option>
+                        <option value="días">días</option>
+                      </select>
+                    </div>
+                    {itemForm.tiempoReingreso&&<div style={{fontSize:10,color:"#f59e0b",marginTop:3}}>⏱️ Reingreso: {itemForm.tiempoReingreso} {itemForm.tiempoReingresoUnidad||"horas"} desde la aplicación</div>}
+                  </div>
+                  </>
                 )}
                 {bodegaActiva==="b04"&&(()=>{
                   const cat=(itemForm.categoria||"").toLowerCase();
@@ -14157,11 +14174,14 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
                                             &nbsp;·&nbsp;{dias<0?`⛔ Vencido hace ${Math.abs(dias)} días`:dias<90?`⚠️ ${dias} días`:` ✅ ${dias} días`}
                                           </div>;
                                         })()}
+                                        {bodegaActiva==="b05"&&item.tiempoReingreso&&(
+                                          <div style={{fontSize:11,color:"#f59e0b",marginTop:2}}>⏱️ Reingreso: <strong>{item.tiempoReingreso} {item.tiempoReingresoUnidad||"horas"}</strong> post aplicación</div>
+                                        )}
                                       </div>
                                       {esJefa&&(
                                         <div style={{display:"flex",gap:6,flexShrink:0}}>
                                           <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(34,197,94,0.12)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)"}} onClick={()=>{setMovForm({...emptyMov,itemId:String(item.id),unidad:item.unidad||"unidad"});setShowMovForm(true);}}>± Mov.</button>
-                                          <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>{setItemForm({nombre:item.nombre,categoria:item.categoria||"",descripcion:item.descripcion||"",unidad:item.unidad||"unidad",stockActual:item.stockActual||0,stockMinimo:item.stockMinimo||0,ubicacion:item.ubicacion||"",obs:item.obs||"",vencimiento:item.vencimiento||""});setMaqForm({marca:item.marca||"",modelo:item.modelo||"",patente:item.patente||"",horasUso:item.horasUso||0,nivelAceite:item.nivelAceite||"OK",nivelCombustible:item.nivelCombustible||"OK",proxMantención:item.proxMantención||""});setEditItemId(item.id);setShowItemForm(true);}}>✏️</button>
+                                          <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>{setItemForm({nombre:item.nombre,categoria:item.categoria||"",descripcion:item.descripcion||"",unidad:item.unidad||"unidad",stockActual:item.stockActual||0,stockMinimo:item.stockMinimo||0,ubicacion:item.ubicacion||"",obs:item.obs||"",vencimiento:item.vencimiento||"",tiempoReingreso:item.tiempoReingreso||"",tiempoReingresoUnidad:item.tiempoReingresoUnidad||"horas",maquinaAsociada:item.maquinaAsociada||""});setMaqForm({marca:item.marca||"",modelo:item.modelo||"",patente:item.patente||"",horasUso:item.horasUso||0,nivelAceite:item.nivelAceite||"OK",nivelCombustible:item.nivelCombustible||"OK",proxMantención:item.proxMantención||""});setEditItemId(item.id);setShowItemForm(true);}}>✏️</button>
                                           <button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>eliminarItem(item.id)}>🗑</button>
                                         </div>
                                       )}
@@ -16129,10 +16149,13 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
   const productosBodega = [];
   const bodegaPest = bodegasData?.["b05"]||bodegasData?.b05||Object.values(bodegasData||{}).find(b=>b.nombre==="Pesticidas")||{};
   (bodegaPest.items||[]).forEach(it=>{
-    if(it.nombre && Number(it.stockActual||0)>0) productosBodega.push({nombre:it.nombre, stock:it.stockActual, unidad:it.unidad||"", tipo:it.categoria||""});
+    if(it.nombre && Number(it.stockActual||0)>0) productosBodega.push({
+      nombre:it.nombre, stock:it.stockActual, unidad:it.unidad||"",
+      tipo:it.categoria||"", tiempoReingreso:it.tiempoReingreso||"",
+      tiempoReingresoUnidad:it.tiempoReingresoUnidad||"horas"
+    });
   });
-  productosBodega.sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
-
+  productosBodega.sort((a,b)=>(a.tipo||"").localeCompare(b.tipo||"","es",{sensitivity:"base"})||a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
   const setFito = (k,v) => setFitoForm(p=>({...p,[k]:v}));
 
   const STEPS_FITO = [
@@ -16262,11 +16285,24 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
               <div style={{display:"flex",flexDirection:"column",gap:10}}>
                 <div style={{fontSize:13,fontWeight:600,color:"#fca5a5",marginBottom:4}}>🧪 Paso 2 — Decisión de tratamiento</div>
                 <div><label style={labelSt}>Producto a aplicar</label>
-                  <select style={S.input} value={fitoForm.productoSel} onChange={e=>setFito("productoSel",e.target.value)}>
+                  <select style={S.input} value={fitoForm.productoSel} onChange={e=>{
+                    setFito("productoSel",e.target.value);
+                    const prod=productosBodega.find(p=>p.nombre===e.target.value);
+                    if(prod?.tiempoReingreso){setFito("tiempoReingreso",prod.tiempoReingreso);setFito("tiempoReingresoUnidad",prod.tiempoReingresoUnidad||"horas");}
+                  }}>
                     <option value="">Seleccionar producto...</option>
-                    {productosBodega.length>0&&<optgroup label="── En bodega ──">
-                      {productosBodega.map(p=><option key={p.nombre} value={p.nombre}>{p.nombre} ({p.stock} {p.unidad} disponibles)</option>)}
-                    </optgroup>}
+                    {productosBodega.length>0?(()=>{
+                      const tipos=[...new Set(productosBodega.map(p=>p.tipo||"Sin tipo"))].sort();
+                      return tipos.map(tipo=>(
+                        <optgroup key={tipo} label={`── ${tipo} ──`}>
+                          {productosBodega.filter(p=>(p.tipo||"Sin tipo")===tipo).map(p=>(
+                            <option key={p.nombre} value={p.nombre}>
+                              {p.nombre} · {p.stock} {p.unidad}{p.tiempoReingreso?` · RI: ${p.tiempoReingreso} ${p.tiempoReingresoUnidad}`:""}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ));
+                    })():<option disabled>Sin pesticidas en stock</option>}
                     <option value="Por determinar">Por determinar</option>
                     <option value="Sin tratamiento químico">Sin tratamiento químico</option>
                   </select>
