@@ -16775,9 +16775,16 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
                       {notifN.mensaje&&<div style={{fontSize:11,color:notifN.leida?"#4a7a5a":"#8aaa9a",marginTop:3,lineHeight:1.4}}>{notifN.mensaje}</div>}
                     </div>
                   </div>
-                  <div style={{fontSize:10,color:"#4a7a5a",flexShrink:0,textAlign:"right"}}>
-                    <div>{notifN.fecha}</div>
-                    {notifN.hora&&<div>{notifN.hora}</div>}
+                  <div style={{display:"flex",gap:6,flexShrink:0,alignItems:"flex-start"}}>
+                    <div style={{fontSize:10,color:"#4a7a5a",textAlign:"right"}}>
+                      <div>{notifN.fecha}</div>
+                      {notifN.hora&&<div>{notifN.hora}</div>}
+                    </div>
+                    {esJefa&&<button style={{background:"transparent",border:"none",color:"#5a7a5a",cursor:"pointer",fontSize:13,padding:"0 2px",lineHeight:1}}
+                      onClick={()=>setNotificaciones(prev=>{
+                        const arr=Array.isArray(prev)?prev:Object.values(prev||{});
+                        return arr.filter((_,j)=>j!==i);
+                      })} title="Eliminar este registro">🗑</button>}
                   </div>
                 </div>
               </div>
