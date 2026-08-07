@@ -14250,7 +14250,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
 
       {/* ── HORÓMETRO ── */}
       {subTab==="horometro"&&bodegaActiva==="b04"&&(()=>{
-        const equipos = (bd.items||[]);
+        const equipos = (bd.items||[]).filter(i=>(i.categoria||"").toLowerCase()!=="combustible");
         const TIPOS_MANT = ["Cambio de aceite (con filtro)","Afilado de cuchillas","Engrasado","Revisión general","Limpieza filtro aire","Revisión correas","Otro"];
 
         // Leer datos del horómetro
