@@ -16034,7 +16034,9 @@ function PanelFrecuenciasZona({ S, zonas, getAllElems, getZD, setElemFrecs, esJe
   );
 }
 
-function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZONAS_BASE, personal, tareasEditables, setTareasEditables, onGuardar, onClose, bodegasData={} }) {
+function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZONAS_BASE, zonas=[], personal, tareasEditables, setTareasEditables, onGuardar, onClose, bodegasData={} }) {
+  // Usar zonas reales si están disponibles, si no usar MACROZONAS_BASE
+  const zonasLista = (zonas.length>0 ? zonas : MACROZONAS_BASE).slice().sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
   const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
   const esFito = alertaForm.tipo==="enfermedad";
   const [stepFito, setStepFito] = React.useState(1); // 1=Detección 2=Tratamiento 3=Seguridad 4=Tareas
@@ -16045,15 +16047,17 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
     productoSel:"", dosis:"", volAgua:"", responsableAplic:"",
     tiempoReingreso:"", tiempoReingresoUnidad:"horas",
     cercarZona:true, letrero:true, notificarGerencia:false,
+    linkFotoAntes:"", linkFotoDespues:"",
   });
 
   // Productos disponibles en bodegas (Pesticidas)
+  // Solo productos de la bodega de Pesticidas (b05)
   const productosBodega = [];
-  Object.values(bodegasData||{}).forEach(bd=>{
-    (bd.items||[]).forEach(it=>{
-      if(it.nombre && it.stockActual>0) productosBodega.push({nombre:it.nombre, stock:it.stockActual, unidad:it.unidad||""});
-    });
+  const bodegaPest = bodegasData?.["b05"]||bodegasData?.b05||Object.values(bodegasData||{}).find(b=>b.nombre==="Pesticidas")||{};
+  (bodegaPest.items||[]).forEach(it=>{
+    if(it.nombre && Number(it.stockActual||0)>0) productosBodega.push({nombre:it.nombre, stock:it.stockActual, unidad:it.unidad||"", tipo:it.categoria||""});
   });
+  productosBodega.sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
 
   const setFito = (k,v) => setFitoForm(p=>({...p,[k]:v}));
 
@@ -16113,7 +16117,7 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
         <div style={{marginBottom:12}}>
           <label style={labelSt}>Zona(s) afectada(s)</label>
           <div style={{display:"flex",flexWrap:"wrap",gap:4,maxHeight:100,overflowY:"auto",marginBottom:6}}>
-            {[...MACROZONAS_BASE].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(z=>(
+            {zonasLista.map(z=>(
               <button key={z.id} onClick={()=>setAlertaForm(p=>({...p,zonas:p.zonas.includes(z.nombre)?p.zonas.filter(x=>x!==z.nombre):[...p.zonas,z.nombre]}))}
                 style={{...S.btn,fontSize:10,padding:"2px 8px",
                   background:alertaForm.zonas.includes(z.nombre)?"rgba(239,68,68,0.15)":"rgba(255,255,255,0.03)",
@@ -16252,7 +16256,7 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
             {/* Paso 4 — Tareas generadas */}
             {stepFito===4&&(
               <div>
-                <div style={{fontSize:13,fontWeight:600,color:"#fca5a5",marginBottom:8}}>✅ Paso 4 — Tareas generadas</div>
+                <div style={{fontSize:13,fontWeight:600,color:"#fca5a5",marginBottom:8}}>✅ Paso 4 — Tareas y documentación</div>
                 <div style={{fontSize:11,color:"#5a9a7a",marginBottom:10}}>Revisa y edita las tareas. Asigna responsables. Puedes agregar más.</div>
                 {tareasEditables.map((t,i)=>(
                   <div key={t.id} style={{display:"flex",alignItems:"center",gap:6,marginBottom:6,padding:"6px 10px",background:"rgba(255,255,255,0.03)",borderRadius:8,border:"1px solid rgba(255,255,255,0.06)"}}>
@@ -16267,6 +16271,26 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
                 ))}
                 <button onClick={()=>setTareasEditables(p=>[...p,{id:Date.now(),texto:"",incluir:true,responsable:""}])}
                   style={{...S.btn,fontSize:11,color:"#34d399",background:"rgba(52,211,153,0.06)",border:"1px solid rgba(52,211,153,0.2)"}}>+ Agregar tarea</button>
+
+                {/* Links de fotos via Google Drive */}
+                <div style={{marginTop:14,padding:"12px 14px",background:"rgba(96,165,250,0.04)",border:"1px solid rgba(96,165,250,0.15)",borderRadius:8}}>
+                  <div style={{fontSize:11,fontWeight:700,color:"#60a5fa",marginBottom:8}}>📸 Documentación fotográfica</div>
+                  <div style={{fontSize:10,color:"#5a9a7a",marginBottom:8}}>
+                    Las fotos se guardan en Google Drive. Toma la foto → súbela a Drive → copia el link compartido → pégalo aquí.<br/>
+                    <span style={{color:"#3b82f6"}}>Drive: clic derecho → Compartir → "Cualquiera con el enlace puede ver" → Copiar link</span>
+                  </div>
+                  <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                    <div>
+                      <label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:3}}>📷 Foto ANTES del tratamiento (link Drive)</label>
+                      <input style={S.input} value={fitoForm.linkFotoAntes||""} onChange={e=>setFito("linkFotoAntes",e.target.value)} placeholder="https://drive.google.com/file/d/..."/>
+                    </div>
+                    <div>
+                      <label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:3}}>📷 Foto DESPUÉS del tratamiento (link Drive)</label>
+                      <input style={S.input} value={fitoForm.linkFotoDespues||""} onChange={e=>setFito("linkFotoDespues",e.target.value)} placeholder="https://drive.google.com/file/d/..."/>
+                      <div style={{fontSize:9,color:"#4a7a5a",marginTop:3}}>Puedes agregar la foto después — edita la alerta cuando la tengas disponible</div>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -16333,7 +16357,7 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
   );
 }
 
-function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotificaciones, marcarTodasLeidas, notifNoLeidas, MACROZONAS_BASE, personal, tareasProg, setTareasProg, crearNotificacion, onGuardarDirecto, esJefa, autoOpen, onAutoOpenDone, bodegasData={} }) {
+function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotificaciones, marcarTodasLeidas, notifNoLeidas, MACROZONAS_BASE, zonas=[], personal, tareasProg, setTareasProg, crearNotificacion, onGuardarDirecto, esJefa, autoOpen, onAutoOpenDone, bodegasData={} }) {
   const [tabAlerta, setTabAlerta] = React.useState("incidencias");
   React.useEffect(()=>{ window._alertaTab = setTabAlerta; return()=>{ delete window._alertaTab; }; },[]);
   const [showNuevaAlerta, setShowNuevaAlerta] = React.useState(false);
@@ -16517,7 +16541,7 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
       </div>
 
       {/* Modal nueva alerta */}
-      {showNuevaAlerta&&<ModalNuevaAlerta S={S} alertaForm={alertaForm} setAlertaForm={setAlertaForm} TIPOS_ALERTA={TIPOS_ALERTA} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} tareasEditables={tareasEditables} setTareasEditables={setTareasEditables} onGuardar={guardarAlerta} onClose={()=>setShowNuevaAlerta(false)} bodegasData={bodegasData}/>}
+      {showNuevaAlerta&&<ModalNuevaAlerta S={S} alertaForm={alertaForm} setAlertaForm={setAlertaForm} TIPOS_ALERTA={TIPOS_ALERTA} MACROZONAS_BASE={MACROZONAS_BASE} zonas={zonas.length>0?zonas:MACROZONAS_BASE} personal={personal} tareasEditables={tareasEditables} setTareasEditables={setTareasEditables} onGuardar={guardarAlerta} onClose={()=>setShowNuevaAlerta(false)} bodegasData={bodegasData}/>}
 
       {/* Tabs */}
       <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
@@ -20620,7 +20644,7 @@ export default function App() {
                   .then(()=>console.log("✅ Alerta guardada en Firebase:",id))
                   .catch(e=>console.error("❌ Error guardando alerta:",e));
               }}
-              autoOpen={autoOpenAlerta} onAutoOpenDone={()=>setAutoOpenAlerta(false)} notificaciones={notificaciones} setNotificaciones={setNotificaciones} marcarTodasLeidas={marcarTodasLeidas} notifNoLeidas={notifNoLeidas} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} tareasProg={tareasProg} setTareasProg={setTareasProg} crearNotificacion={crearNotificacion} esJefa={esJefa} bodegasData={bodegasData}/>
+              autoOpen={autoOpenAlerta} onAutoOpenDone={()=>setAutoOpenAlerta(false)} notificaciones={notificaciones} setNotificaciones={setNotificaciones} marcarTodasLeidas={marcarTodasLeidas} notifNoLeidas={notifNoLeidas} MACROZONAS_BASE={MACROZONAS_BASE} zonas={zonasConCust} personal={personal} tareasProg={tareasProg} setTareasProg={setTareasProg} crearNotificacion={crearNotificacion} esJefa={esJefa} bodegasData={bodegasData}/>
         </ErrorBoundary>)}
 
         {showCierreSectorial&&<ModalCierreSectorial S={S} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} onClose={()=>setShowCierreSectorial(false)}/>}
