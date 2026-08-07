@@ -7845,7 +7845,7 @@ const BODEGAS_DEF = [
   },
   { id:"b04", nombre:"Maquinaria", icono:"🚜", color:"#f97316",
     descripcion:"Tractores, cortadoras, equipos motorizados",
-    categorias:["Tractor","Cortadora césped","Motosierra","Bordeadora","Hidrolavadora","Compresor","Bomba","Otro equipo"],
+    categorias:["Tractor","Cortadora césped","Motosierra","Bordeadora","Hidrolavadora","Compresor","Bomba","Combustible","Repuesto","Otro equipo"],
     tareasTipo:["Revisión nivel aceite","Revisión combustible","Registro horas uso","Mantención preventiva","Mantención externa","Reparación interna","Limpieza","Traslado"],
   },
   { id:"b05", nombre:"Pesticidas", icono:"🧪", color:"#a78bfa",
@@ -7913,10 +7913,18 @@ function CuentaSelector({ value, onChange, S, CUENTAS_INTERNAS, CUENTAS_EXTERNAS
 }
 
 // ─── SELECTOR DE BODEGA POR ÍTEM ─────────────────────────────────────────────
-function BodegaSelector({ items, compra, onConfirm, onCancel, S }) {
+function BodegaSelector({ items, compra, onConfirm, onCancel, S, bodegasData={} }) {
   const [asignaciones, setAsignaciones] = React.useState(
     items.map(it=>it.bodegaDestino||"")
   );
+  const [maquinas, setMaquinas] = React.useState(
+    items.map(it=>it.maquinaAsociada||"")
+  );
+  // Equipos disponibles en Maquinaria (excluye combustible y repuestos)
+  const equiposMaq = ((bodegasData["b04"]?.items)||[]).filter(i=>{
+    const cat=(i.categoria||"").toLowerCase();
+    return cat!=="combustible"&&cat!=="repuesto";
+  });
   return (
     <div style={{marginTop:8,background:"rgba(61,122,82,0.08)",borderRadius:10,padding:"12px 14px",border:"1px solid rgba(61,122,82,0.25)"}}>
       <div style={{fontSize:12,color:"#86efac",fontWeight:600,marginBottom:10}}>
@@ -7924,21 +7932,35 @@ function BodegaSelector({ items, compra, onConfirm, onCancel, S }) {
       </div>
       <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
         {items.map((it,i)=>(
-          <div key={it.id||i} style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",background:"rgba(255,255,255,0.03)",borderRadius:7,padding:"7px 10px"}}>
-            <div style={{flex:1,minWidth:120}}>
-              <div style={{fontSize:12,fontWeight:600}}>{it.descripcion||"Sin descripción"}</div>
-              <div style={{fontSize:11,color:"#6aaa7a"}}>{it.cantidad} {it.unidad}</div>
+          <div key={it.id||i} style={{background:"rgba(255,255,255,0.03)",borderRadius:7,padding:"7px 10px"}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:asignaciones[i]==="b04"?6:0}}>
+              <div style={{flex:1,minWidth:120}}>
+                <div style={{fontSize:12,fontWeight:600}}>{it.descripcion||"Sin descripción"}</div>
+                <div style={{fontSize:11,color:"#6aaa7a"}}>{it.cantidad} {it.unidad}</div>
+              </div>
+              <select style={{...S.input,fontSize:11,padding:"5px 8px",minWidth:160,flex:1}}
+                value={asignaciones[i]} onChange={e=>setAsignaciones(p=>{const n=[...p];n[i]=e.target.value;return n;})}>
+                <option value="">🚫 No ingresar (servicio/mano de obra)</option>
+                {BODEGAS_DEF.map(b=><option key={b.id} value={b.id}>{b.icono} {b.nombre}</option>)}
+              </select>
             </div>
-            <select style={{...S.input,fontSize:11,padding:"5px 8px",minWidth:160,flex:1}}
-              value={asignaciones[i]} onChange={e=>setAsignaciones(p=>{const n=[...p];n[i]=e.target.value;return n;})}>
-              <option value="">🚫 No ingresar (servicio/mano de obra)</option>
-              {BODEGAS_DEF.map(b=><option key={b.id} value={b.id}>{b.icono} {b.nombre}</option>)}
-            </select>
+            {/* Si va a Maquinaria, pedir máquina asociada */}
+            {asignaciones[i]==="b04"&&(
+              <div style={{display:"flex",gap:8,alignItems:"center",marginTop:4}}>
+                <span style={{fontSize:10,color:"#f97316",whiteSpace:"nowrap"}}>🔩 Máquina:</span>
+                <select style={{...S.input,fontSize:11,padding:"4px 8px",flex:1}}
+                  value={maquinas[i]} onChange={e=>setMaquinas(p=>{const n=[...p];n[i]=e.target.value;return n;})}>
+                  <option value="">— Sin asignar (equipo nuevo) —</option>
+                  {equiposMaq.map(eq=><option key={eq.id} value={eq.nombre}>{eq.nombre}</option>)}
+                  <option value="General">General (sirve para varios)</option>
+                </select>
+              </div>
+            )}
           </div>
         ))}
       </div>
       <div style={{display:"flex",gap:8}}>
-        <button className="btn-p" style={S.btn} onClick={()=>onConfirm(asignaciones)}>✓ Confirmar</button>
+        <button className="btn-p" style={S.btn} onClick={()=>onConfirm(asignaciones, maquinas)}>✓ Confirmar</button>
         <button className="btn-g" style={S.btn} onClick={onCancel}>Cancelar</button>
       </div>
     </div>
@@ -7976,7 +7998,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
         if(idx>=0) {
           nuevosItems[idx] = {...nuevosItems[idx], stockActual:(Number(nuevosItems[idx].stockActual)||0)+cant};
         } else {
-          nuevosItems.push({id:Date.now()+Math.random(), nombre:it.descripcion, categoria:it.categoria||"", unidad:it.unidad||"unidad", stockActual:cant, stockMinimo:0, ubicacion:"", obs:`Ingresado desde ${docRef}`});
+          nuevosItems.push({id:Date.now()+Math.random(), nombre:it.descripcion, categoria:it.categoria||"", unidad:it.unidad||"unidad", stockActual:cant, stockMinimo:0, ubicacion:"", obs:`Ingresado desde ${docRef}`, maquinaAsociada:it.maquinaAsociada||""});
         }
         const itemId = idx>=0?nuevosItems[idx].id:nuevosItems[nuevosItems.length-1].id;
         nuevosMovs.unshift({id:Date.now()+Math.random(), fecha:docFecha, tipo:"entrada", cantidad:cant, unidad:it.unidad||"unidad", motivo:`Compra — ${docRef}`, responsable:"", itemId:String(itemId), docRef, itemNombre:it.descripcion.trim()});
@@ -8999,8 +9021,9 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                     return (
                       <BodegaSelector
                         key={c.id} items={items} compra={c}
-                        onConfirm={(asignaciones)=>{
-                          const itemsConBodega = items.map((it,i)=>({...it,bodegaDestino:asignaciones[i]||""}));
+                        bodegasData={bodegasData}
+                        onConfirm={(asignaciones, maquinas=[])=>{
+                          const itemsConBodega = items.map((it,i)=>({...it,bodegaDestino:asignaciones[i]||"",maquinaAsociada:maquinas[i]||""}));
                           ingresarItemsABodega(c.fecha,`${c.tipoDoc} ${c.nDocumento||""} ${c.proveedor||""}`,itemsConBodega,c.id);
                           setSelectBodegaId(null);
                         }}
@@ -13529,7 +13552,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
       <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
         {[["stock","📦 Stock"],["movimientos","🔄 Movimientos"],["traslados","🚛 Traslados"],["tareas","✅ Tareas"],["historial","📜 Historial"],
           ...(bodegaActiva==="b05"?[["hojas_seguridad","🛡️ Hojas de Seguridad"]]:[]),
-          ...(bodegaActiva==="b04"?[["horometro","⏱️ Horómetro"]]:[]),
+          ...(bodegaActiva==="b04"?[["horometro","⏱️ Horómetro"],["repuestos","🔩 Repuestos"]]:[]),
         ].map(([t,l])=>(
           <button key={t} className={`tab${subTab===t?" on":""}`} onClick={()=>setSubTab(t)}>{l}</button>
         ))}
@@ -13625,28 +13648,49 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
                     })()}
                   </div>
                 )}
-                {bodegaActiva==="b04"&&(
-                  <div style={{gridColumn:"1/-1",background:"rgba(249,115,22,0.06)",border:"1px solid rgba(249,115,22,0.2)",borderRadius:8,padding:"12px 14px"}}>
-                    <div style={{fontSize:11,color:"#fb923c",marginBottom:8,textTransform:"uppercase"}}>🚜 Datos del equipo</div>
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                      <div><label style={labelSt}>Marca</label><input style={S.input} value={maqForm.marca} onChange={e=>setMaqForm(p=>({...p,marca:e.target.value}))}/></div>
-                      <div><label style={labelSt}>Modelo</label><input style={S.input} value={maqForm.modelo} onChange={e=>setMaqForm(p=>({...p,modelo:e.target.value}))}/></div>
-                      <div><label style={labelSt}>Patente / N° Serie</label><input style={S.input} value={maqForm.patente} onChange={e=>setMaqForm(p=>({...p,patente:e.target.value}))}/></div>
-                      <div><label style={labelSt}>Horas de uso</label><input type="number" min={0} style={S.input} value={maqForm.horasUso} onChange={e=>setMaqForm(p=>({...p,horasUso:Number(e.target.value)}))}/></div>
-                      <div><label style={labelSt}>Nivel aceite</label>
-                        <select style={S.input} value={maqForm.nivelAceite} onChange={e=>setMaqForm(p=>({...p,nivelAceite:e.target.value}))}>
-                          {["OK","Bajo","Crítico","Recién cambiado"].map(v=><option key={v}>{v}</option>)}
+                {bodegaActiva==="b04"&&(()=>{
+                  const cat=(itemForm.categoria||"").toLowerCase();
+                  const esRepuesto=cat==="repuesto";
+                  const esCombustible=cat==="combustible";
+                  const esEquipo=!esRepuesto&&!esCombustible&&cat!=="";
+                  const equiposMaq=(bd.items||[]).filter(i=>{const c=(i.categoria||"").toLowerCase();return c!=="combustible"&&c!=="repuesto";});
+                  return (<>
+                    {/* Máquina asociada — solo para repuestos */}
+                    {esRepuesto&&(
+                      <div style={{gridColumn:"1/-1",background:"rgba(249,115,22,0.06)",border:"1px solid rgba(249,115,22,0.2)",borderRadius:8,padding:"12px 14px"}}>
+                        <div style={{fontSize:11,color:"#fb923c",marginBottom:8,textTransform:"uppercase"}}>🔩 Repuesto — Máquina asociada</div>
+                        <select style={S.input} value={itemForm.maquinaAsociada||""} onChange={e=>setItemForm(p=>({...p,maquinaAsociada:e.target.value}))}>
+                          <option value="">— Sin asignar —</option>
+                          {equiposMaq.map(eq=><option key={eq.id} value={eq.nombre}>{eq.nombre}</option>)}
+                          <option value="General">General (sirve para varios)</option>
                         </select>
                       </div>
-                      <div><label style={labelSt}>Nivel combustible</label>
-                        <select style={S.input} value={maqForm.nivelCombustible} onChange={e=>setMaqForm(p=>({...p,nivelCombustible:e.target.value}))}>
-                          {["Lleno","3/4","1/2","1/4","Vacío"].map(v=><option key={v}>{v}</option>)}
-                        </select>
+                    )}
+                    {/* Datos del equipo — solo para equipos reales */}
+                    {esEquipo&&(
+                      <div style={{gridColumn:"1/-1",background:"rgba(249,115,22,0.06)",border:"1px solid rgba(249,115,22,0.2)",borderRadius:8,padding:"12px 14px"}}>
+                        <div style={{fontSize:11,color:"#fb923c",marginBottom:8,textTransform:"uppercase"}}>🚜 Datos del equipo</div>
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                          <div><label style={labelSt}>Marca</label><input style={S.input} value={maqForm.marca} onChange={e=>setMaqForm(p=>({...p,marca:e.target.value}))}/></div>
+                          <div><label style={labelSt}>Modelo</label><input style={S.input} value={maqForm.modelo} onChange={e=>setMaqForm(p=>({...p,modelo:e.target.value}))}/></div>
+                          <div><label style={labelSt}>Patente / N° Serie</label><input style={S.input} value={maqForm.patente} onChange={e=>setMaqForm(p=>({...p,patente:e.target.value}))}/></div>
+                          <div><label style={labelSt}>Horas de uso</label><input type="number" min={0} style={S.input} value={maqForm.horasUso} onChange={e=>setMaqForm(p=>({...p,horasUso:Number(e.target.value)}))}/></div>
+                          <div><label style={labelSt}>Nivel aceite</label>
+                            <select style={S.input} value={maqForm.nivelAceite} onChange={e=>setMaqForm(p=>({...p,nivelAceite:e.target.value}))}>
+                              {["OK","Bajo","Crítico","Recién cambiado"].map(v=><option key={v}>{v}</option>)}
+                            </select>
+                          </div>
+                          <div><label style={labelSt}>Nivel combustible</label>
+                            <select style={S.input} value={maqForm.nivelCombustible} onChange={e=>setMaqForm(p=>({...p,nivelCombustible:e.target.value}))}>
+                              {["Lleno","3/4","1/2","1/4","Vacío"].map(v=><option key={v}>{v}</option>)}
+                            </select>
+                          </div>
+                          <div><label style={labelSt}>Próx. mantención (horas)</label><input type="number" min={0} style={S.input} value={maqForm.proxMantención} onChange={e=>setMaqForm(p=>({...p,proxMantención:e.target.value}))}/></div>
+                        </div>
                       </div>
-                      <div><label style={labelSt}>Próx. mantención (horas)</label><input type="number" min={0} style={S.input} value={maqForm.proxMantención} onChange={e=>setMaqForm(p=>({...p,proxMantención:e.target.value}))}/></div>
-                    </div>
-                  </div>
-                )}
+                    )}
+                  </>);
+                })()}
               </div>
               <div style={{display:"flex",gap:8}}>
                 <button className="btn-p" style={S.btn} onClick={guardarItem}>✓ Guardar</button>
@@ -14533,6 +14577,109 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
                           </div>
                         ))}
                       </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
+
+      {/* ── REPUESTOS (Maquinaria) ── */}
+      {subTab==="repuestos"&&bodegaActiva==="b04"&&(()=>{
+        const equipos = (bd.items||[]).filter(i=>(i.categoria||"").toLowerCase()!=="combustible"&&(i.categoria||"").toLowerCase()!=="repuesto");
+        const repuestos = (bd.items||[]).filter(i=>(i.categoria||"").toLowerCase()==="repuesto")
+          .sort((a,b)=>(a.maquinaAsociada||"").localeCompare(b.maquinaAsociada||"","es",{sensitivity:"base"})||a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+        // Repuestos por máquina
+        const porMaquina = {};
+        repuestos.forEach(r=>{ const m=r.maquinaAsociada||"Sin asignar"; if(!porMaquina[m]) porMaquina[m]=[]; porMaquina[m].push(r); });
+        const maquinas = Object.keys(porMaquina).sort();
+        const [repCatsAb,setRepCatsAb] = React.useState(Object.fromEntries(maquinas.map(m=>[m,true])));
+
+        return (
+          <div className="ein">
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,color:"#f97316",marginBottom:4}}>🔩 Repuestos — Maquinaria</div>
+            <div style={{fontSize:12,color:"#5a9a7a",marginBottom:14}}>Stock de repuestos organizados por equipo. Para agregar un repuesto, usa <strong>➕ Nuevo ítem</strong> en Stock y elige categoría "Repuesto".</div>
+
+            {esJefa&&(
+              <button className="btn-p" style={{...S.btn,marginBottom:14}} onClick={()=>{
+                setItemForm({nombre:"",categoria:"Repuesto",descripcion:"",unidad:"unidad",stockActual:0,stockMinimo:1,ubicacion:"",obs:"",maquinaAsociada:""});
+                setMaqForm({marca:"",modelo:"",patente:"",horasUso:0,nivelAceite:"OK",nivelCombustible:"OK",proxMantención:""});
+                setEditItemId(null); setShowItemForm(true); setShowInventForm(false);
+              }}>➕ Nuevo repuesto</button>
+            )}
+
+            {/* Formulario extra: maquina asociada si showItemForm y categoria=Repuesto */}
+            {showItemForm&&itemForm.categoria==="Repuesto"&&(
+              <div style={{...S.card,padding:"8px 14px",marginBottom:8,background:"rgba(249,115,22,0.04)",border:"1px solid rgba(249,115,22,0.2)"}}>
+                <label style={{fontSize:10,color:"#f97316",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:4}}>Máquina / Equipo asociado</label>
+                <select style={S.input} value={itemForm.maquinaAsociada||""} onChange={e=>setItemForm(p=>({...p,maquinaAsociada:e.target.value}))}>
+                  <option value="">— Sin asignar —</option>
+                  {equipos.map(eq=><option key={eq.id} value={eq.nombre}>{eq.nombre}</option>)}
+                  <option value="General">General (sirve para varios)</option>
+                </select>
+              </div>
+            )}
+
+            {repuestos.length===0&&(
+              <div style={{...S.card,padding:36,textAlign:"center",color:"#4a7a5a"}}>
+                <div style={{fontSize:28,marginBottom:8}}>🔩</div>
+                <div style={{fontSize:13}}>No hay repuestos registrados aún</div>
+                <div style={{fontSize:11,color:"#3a6a4a",marginTop:4}}>Agrega ítems con categoría "Repuesto" para verlos aquí</div>
+              </div>
+            )}
+
+            {maquinas.map(maq=>{
+              const its = porMaquina[maq];
+              const abierta = repCatsAb[maq]!==false;
+              const conStock = its.filter(r=>Number(r.stockActual||0)>0).length;
+              const sinStock = its.filter(r=>Number(r.stockActual||0)===0).length;
+              return (
+                <div key={maq} style={{marginBottom:10}}>
+                  <div onClick={()=>setRepCatsAb(p=>({...p,[maq]:!abierta}))}
+                    style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",
+                      background:"rgba(249,115,22,0.06)",borderRadius:8,border:"1px solid rgba(249,115,22,0.15)",
+                      cursor:"pointer",marginBottom:abierta?6:0}}>
+                    <span style={{fontSize:12,fontWeight:700,color:"#f97316"}}>
+                      🔩 {maq} <span style={{fontSize:11,fontWeight:400,color:"#7aaa80"}}>({its.length} repuestos)</span>
+                      {sinStock>0&&<span style={{fontSize:10,marginLeft:8,color:"#ef4444",background:"rgba(239,68,68,0.1)",padding:"1px 6px",borderRadius:8}}>⛔ {sinStock} sin stock</span>}
+                    </span>
+                    <span style={{fontSize:10,color:"#7aaa80",transform:abierta?"rotate(90deg)":"none",transition:"transform .15s"}}>▶</span>
+                  </div>
+                  {abierta&&(
+                    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                      {its.map(item=>{
+                        const agotado=Number(item.stockActual||0)===0;
+                        const bajo=Number(item.stockActual||0)<=Number(item.stockMinimo||0)&&Number(item.stockMinimo||0)>0;
+                        const color=agotado?"#ef4444":bajo?"#f59e0b":"#22c55e";
+                        return (
+                          <div key={item.id} style={{...S.card,padding:"10px 14px",borderLeft:`3px solid ${color}`,display:"flex",gap:10,alignItems:"center"}}>
+                            <div style={{flex:1}}>
+                              <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:2}}>
+                                <span style={{fontSize:13,fontWeight:600}}>{item.nombre}</span>
+                                <span style={{...S.chip,background:agotado?"rgba(239,68,68,0.12)":bajo?"rgba(245,158,11,0.12)":"rgba(34,197,94,0.08)",color,fontSize:10}}>
+                                  {agotado?"⛔ Sin stock":bajo?"⚠️ Bajo":"✅ OK"}
+                                </span>
+                              </div>
+                              <div style={{display:"flex",gap:12,fontSize:11,color:"#7aaa80",flexWrap:"wrap"}}>
+                                <span style={{fontWeight:700,color,fontSize:15}}>{item.stockActual} <span style={{fontSize:11,fontWeight:400}}>{item.unidad}</span></span>
+                                {Number(item.stockMinimo)>0&&<span>mín: {item.stockMinimo}</span>}
+                                {item.obs&&<span style={{fontStyle:"italic",color:"#5a8a6a"}}>{item.obs}</span>}
+                              </div>
+                            </div>
+                            {esJefa&&(
+                              <div style={{display:"flex",gap:6,flexShrink:0}}>
+                                <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(34,197,94,0.12)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)"}}
+                                  onClick={()=>{setMovForm({...emptyMov,itemId:String(item.id),unidad:item.unidad||"unidad"});setShowMovForm(true);}}>± Mov.</button>
+                                <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}}
+                                  onClick={()=>{setItemForm({nombre:item.nombre,categoria:"Repuesto",descripcion:item.descripcion||"",unidad:item.unidad||"unidad",stockActual:item.stockActual||0,stockMinimo:item.stockMinimo||0,ubicacion:item.ubicacion||"",obs:item.obs||"",maquinaAsociada:item.maquinaAsociada||""});setMaqForm({marca:"",modelo:"",patente:"",horasUso:0,nivelAceite:"OK",nivelCombustible:"OK",proxMantención:""});setEditItemId(item.id);setShowItemForm(true);}}>✏️</button>
+                                <button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>eliminarItem(item.id)}>🗑</button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
