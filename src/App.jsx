@@ -17019,7 +17019,12 @@ function PanelProtocolos({ S, personal, esJefa, crearNotificacion }) {
   return (
     <div className="ein">
       <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:700,marginBottom:4}}>📋 Protocolos</div>
-      <div style={{fontSize:12,color:"#5a9a7a",marginBottom:16}}>Documentos de seguridad, check-in y registros de autorización para trabajos de riesgo</div>
+
+      {/* Descripción general — sobre ambos botones */}
+      <div style={{fontSize:12,color:"#5a9a7a",marginBottom:16,padding:"10px 14px",background:"rgba(52,211,153,0.04)",border:"1px solid rgba(52,211,153,0.12)",borderRadius:8}}>
+        <strong style={{color:"#34d399"}}>📂 Protocolos de Seguridad</strong> — documentos operativos que regulan cómo realizar actividades de riesgo (corte con tractor, manejo de combustibles, productos químicos, trabajos en altura, etc.).<br/>
+        <strong style={{color:"#34d399"}}>✅ Check-In / Autorización</strong> — formularios que deben completarse y firmarse obligatoriamente antes de iniciar trabajos de riesgo específicos.
+      </div>
 
       {/* Tabs */}
       <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
@@ -17034,25 +17039,48 @@ function PanelProtocolos({ S, personal, esJefa, crearNotificacion }) {
         ))}
       </div>
 
-      {/* Contenido */}
+      {/* Tab: Protocolos de Seguridad */}
       {tabProt==="docs_seguridad"&&(
         <div>
-          <div style={{fontSize:12,color:"#5a9a7a",marginBottom:14}}>
-            Documentos de protocolos operativos de seguridad para distintas actividades (corte de césped, manejo de combustibles, productos químicos, etc.).
-          </div>
           {renderDocs(docsSeguridad,"seguridad")}
         </div>
       )}
+
+      {/* Tab: Check-In / Autorización */}
       {tabProt==="docs_checkin"&&(
         <div>
-          <div style={{fontSize:12,color:"#5a9a7a",marginBottom:14}}>
-            Protocolos de check-in y autorización previa para trabajos de riesgo. Incluye documentos de referencia y el formulario activo de Poda en Altura.
-          </div>
-          {renderDocs(docsCheckin,"checkin")}
+          {/* Documentos de referencia de check-in (sin botón agregar protocolo) */}
+          {(()=>{
+            const lista = Array.isArray(docsCheckin)?docsCheckin:[];
+            return lista.length>0&&(
+              <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:20}}>
+                {lista.map(doc=>(
+                  <div key={doc.id} style={{...S.card,padding:14,display:"flex",gap:12,alignItems:"center"}}>
+                    <div style={{fontSize:28,flexShrink:0}}>📄</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:2}}>
+                        <span style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700}}>{doc.nombre}</span>
+                        {doc.categoria&&<span style={{...S.chip,fontSize:10,background:"rgba(52,211,153,0.08)",color:"#5a9a7a"}}>{doc.categoria}</span>}
+                      </div>
+                      {doc.descripcion&&<div style={{fontSize:11,color:"#5a9a7a",marginBottom:2}}>{doc.descripcion}</div>}
+                      <div style={{fontSize:10,color:"#4a7a5a"}}>Subido: {doc.fechaSubida||doc.fecha}</div>
+                    </div>
+                    <div style={{display:"flex",gap:6,flexShrink:0}}>
+                      <a href={doc.link} target="_blank" rel="noopener noreferrer"
+                        style={{...S.btn,background:"rgba(96,165,250,0.12)",color:"#93c5fd",border:"1px solid rgba(96,165,250,0.25)",fontSize:12,padding:"6px 12px",textDecoration:"none",borderRadius:8,fontFamily:"'Georgia',serif"}}>
+                        👁️ Ver
+                      </a>
+                      {esJefa&&<button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>eliminarDoc("checkin",doc.id)}>🗑</button>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
 
-          {/* Separador */}
-          <div style={{borderTop:"1px solid rgba(255,255,255,0.08)",margin:"24px 0 20px",display:"flex",alignItems:"center",gap:10}}>
-            <span style={{fontSize:11,color:"#4a7a5a",whiteSpace:"nowrap"}}>📝 Formulario activo</span>
+          {/* Formularios activos de check-in */}
+          <div style={{borderTop:"1px solid rgba(255,255,255,0.08)",margin:"8px 0 20px",display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:11,color:"#4a7a5a",whiteSpace:"nowrap"}}>📝 Formularios activos</span>
             <div style={{flex:1,height:1,background:"rgba(255,255,255,0.06)"}}/>
           </div>
           <div style={{fontSize:12,fontWeight:700,color:"#34d399",marginBottom:12}}>🌿 Poda en Altura — Protocolo de subida</div>
