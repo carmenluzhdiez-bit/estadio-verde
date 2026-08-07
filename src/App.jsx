@@ -13366,6 +13366,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
   const [catsAb, setCatsAb] = React.useState({});
   const [selMaq, setSelMaq] = React.useState([]);
   const [hojaCatsAb, setHojaCatsAb] = React.useState({});
+  const [horoOpen, setHoroOpen] = React.useState({}); // {equipoId: bool}
   // ── Horómetro (Maquinaria) ──
   const [horometroData, setHorometroData] = useFirebaseState(`${ROOT}/horometro`, {});
   const [showHoroForm, setShowHoroForm] = React.useState(false);
@@ -14388,7 +14389,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
               const alertas = proxMants.filter(p=>p.falta<=20);
               const registros = Object.values(getEquipoHoro(eq.id).registros||{}).sort((a,b)=>b.fecha.localeCompare(a.fecha));
               const mantsHist = Object.values(getEquipoHoro(eq.id).mantenimientos||{}).sort((a,b)=>Number(b.horasAlMomento||0)-Number(a.horasAlMomento||0));
-              const [open,setOpen] = React.useState(false);
+              const open = horoOpen[eq.id]===true;
               return (
                 <div key={eq.id} style={{...S.card,padding:16,marginBottom:12}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:8,marginBottom:10}}>
@@ -14436,7 +14437,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
 
                   {/* Historial expandible + botones */}
                   <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                    <button onClick={()=>setOpen(p=>!p)} style={{...S.btn,fontSize:11,background:"transparent",color:"#5a9a7a",border:"1px solid rgba(255,255,255,0.08)"}}>
+                    <button onClick={()=>setHoroOpen(p=>({...p,[eq.id]:!p[eq.id]}))} style={{...S.btn,fontSize:11,background:"transparent",color:"#5a9a7a",border:"1px solid rgba(255,255,255,0.08)"}}>
                       {open?"▲ Ocultar historial":"▼ Ver historial"}
                     </button>
                     {esJefa&&<button onClick={()=>{
