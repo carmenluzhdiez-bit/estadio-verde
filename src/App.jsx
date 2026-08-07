@@ -3086,6 +3086,80 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                             </div>
                           </div>
                         )}
+                        {/* Registro de gasto de producto — aparece cuando tarea de aplicación está hecha */}
+                        {t.estado==="hecha"&&(
+                          (t.tarea||"").toLowerCase().includes("aplicac")||
+                          (t.tarea||"").toLowerCase().includes("fungicid")||
+                          (t.tarea||"").toLowerCase().includes("fumigac")||
+                          (t.tarea||"").toLowerCase().startsWith("🧪")
+                        )&&(()=>{
+                          const gastoGuardado = t.gastoProducto;
+                          const [showGasto,setShowGasto] = React.useState(false);
+                          const [cantGasto,setCantGasto] = React.useState(t.cantidadUsada||"");
+                          const [unidGasto,setUnidGasto] = React.useState(t.unidadUsada||"ml");
+                          const [obsGasto,setObsGasto] = React.useState(t.obsGasto||"");
+                          return (
+                            <div style={{marginTop:8,padding:"10px 12px",background:"rgba(52,211,153,0.04)",border:"1px solid rgba(52,211,153,0.2)",borderRadius:8}}>
+                              {gastoGuardado?(
+                                <div style={{fontSize:11,color:"#34d399"}}>
+                                  ✅ Gasto registrado: <strong>{t.cantidadUsada} {t.unidadUsada}</strong>
+                                  {t.productoAplicar&&<span> de <strong>{t.productoAplicar}</strong></span>}
+                                  {t.gastoConfirmado
+                                    ?<span style={{marginLeft:8,color:"#22c55e"}}>· ✓ Confirmado por jefa</span>
+                                    :<span style={{marginLeft:8,color:"#f59e0b",fontSize:10}}>· ⏳ Pendiente confirmación jefa</span>}
+                                </div>
+                              ):(
+                                <>
+                                  <div style={{fontSize:11,color:"#34d399",fontWeight:600,marginBottom:6}}>🧪 ¿Cuánto producto usaste?</div>
+                                  {!showGasto?(
+                                    <button onClick={()=>setShowGasto(true)} style={{fontSize:11,padding:"5px 12px",borderRadius:6,border:"1px solid rgba(52,211,153,0.3)",background:"rgba(52,211,153,0.08)",color:"#34d399",cursor:"pointer"}}>
+                                      🧪 Registrar gasto de producto
+                                    </button>
+                                  ):(
+                                    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                                      <div style={{display:"flex",gap:8,alignItems:"flex-end",flexWrap:"wrap"}}>
+                                        <div style={{flex:1,minWidth:80}}>
+                                          <div style={{fontSize:10,color:"#6aaa7a",marginBottom:3}}>Cantidad usada</div>
+                                          <input type="text" inputMode="decimal" value={cantGasto} onChange={e=>setCantGasto(e.target.value)}
+                                            placeholder="ej: 54" style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(52,211,153,0.3)",borderRadius:6,color:"#ede9e0",padding:"6px 8px",fontSize:16,fontWeight:700}}/>
+                                        </div>
+                                        <div>
+                                          <div style={{fontSize:10,color:"#6aaa7a",marginBottom:3}}>Unidad</div>
+                                          <select value={unidGasto} onChange={e=>setUnidGasto(e.target.value)}
+                                            style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(52,211,153,0.3)",borderRadius:6,color:"#ede9e0",padding:"6px 8px",fontSize:12}}>
+                                            {["ml","cc","L","g","kg"].map(u=><option key={u}>{u}</option>)}
+                                          </select>
+                                        </div>
+                                      </div>
+                                      <input value={obsGasto} onChange={e=>setObsGasto(e.target.value)}
+                                        placeholder="Observación (opcional)" style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(52,211,153,0.2)",borderRadius:6,color:"#ede9e0",padding:"5px 8px",fontSize:12,boxSizing:"border-box"}}/>
+                                      <div style={{display:"flex",gap:6}}>
+                                        <button disabled={!cantGasto} onClick={()=>{
+                                          if(!cantGasto) return;
+                                          onUpdateTarea(fechaVer,t.id,{
+                                            gastoProducto:true, cantidadUsada:cantGasto,
+                                            unidadUsada:unidGasto, obsGasto,
+                                            gastoConfirmado:false, gastoFecha:fechaVer,
+                                          });
+                                          crearNotificacion&&crearNotificacion("gasto_producto",{
+                                            titulo:"🧪 Gasto de producto registrado",
+                                            mensaje:`${trabajador?.nombre||"Aplicador"} usó ${cantGasto} ${unidGasto}${t.productoAplicar?" de "+t.productoAplicar:""}. Confirma y descuenta del stock.`,
+                                            fecha:fechaVer, hora:new Date().toTimeString().slice(0,5),
+                                            tipo:"gasto_producto", tareaId:t.id, tareaFecha:fechaVer,
+                                          });
+                                          setShowGasto(false);
+                                        }} style={{fontSize:11,padding:"5px 12px",borderRadius:6,border:"1px solid rgba(52,211,153,0.3)",background:"rgba(52,211,153,0.12)",color:"#34d399",cursor:"pointer",opacity:cantGasto?1:0.4}}>
+                                          💾 Guardar
+                                        </button>
+                                        <button onClick={()=>setShowGasto(false)} style={{fontSize:11,padding:"5px 10px",borderRadius:6,border:"1px solid rgba(255,255,255,0.1)",background:"transparent",color:"#5a9a7a",cursor:"pointer"}}>Cancelar</button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          );
+                        })()}
                         {t.estado==="no_pudo"&&(
                           <div style={{marginTop:6}}>
                             <textarea rows={2} placeholder="¿Por qué no se pudo? (obligatorio)" value={t.notaWorker||""} onChange={e=>onUpdateTarea(fechaVer,t.id,{notaWorker:e.target.value})} style={{width:"100%",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:8,color:"#ede9e0",padding:"6px 10px",fontFamily:"'Georgia',serif",fontSize:12,resize:"vertical"}}/>
@@ -16357,7 +16431,7 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
   );
 }
 
-function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotificaciones, marcarTodasLeidas, notifNoLeidas, MACROZONAS_BASE, zonas=[], personal, tareasProg, setTareasProg, crearNotificacion, onGuardarDirecto, esJefa, autoOpen, onAutoOpenDone, bodegasData={} }) {
+function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotificaciones, marcarTodasLeidas, notifNoLeidas, MACROZONAS_BASE, zonas=[], personal, tareasProg, setTareasProg, crearNotificacion, onGuardarDirecto, esJefa, autoOpen, onAutoOpenDone, bodegasData={}, setBodegasData }) {
   const [tabAlerta, setTabAlerta] = React.useState("incidencias");
   React.useEffect(()=>{ window._alertaTab = setTabAlerta; return()=>{ delete window._alertaTab; }; },[]);
   const [showNuevaAlerta, setShowNuevaAlerta] = React.useState(false);
@@ -16754,6 +16828,63 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
                 onClick={()=>{if(window.confirm(`¿Eliminar todos los registros (${notifSorted.length})? No se puede deshacer.`))setNotificaciones([]);}}>🗑 Eliminar todos</button>}
             </div>
           </div>
+
+          {/* Panel: gastos de producto pendientes de confirmar */}
+          {esJefa&&(()=>{
+            const gastosPend = notifSorted.filter(n=>n.tipo==="gasto_producto"&&!n.gastoConfirmado);
+            if(!gastosPend.length) return null;
+            return (
+              <div style={{...S.card,padding:14,marginBottom:14,borderLeft:"3px solid #34d399",background:"rgba(52,211,153,0.04)"}}>
+                <div style={{fontSize:12,fontWeight:700,color:"#34d399",marginBottom:8}}>🧪 {gastosPend.length} gasto{gastosPend.length!==1?"s":""} pendiente{gastosPend.length!==1?"s":""} de confirmar</div>
+                {gastosPend.map((n,ni)=>(
+                  <div key={ni} style={{padding:"8px 10px",background:"rgba(255,255,255,0.03)",borderRadius:8,marginBottom:6,display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:12,color:"#c0dac0"}}>{n.mensaje}</div>
+                      <div style={{fontSize:10,color:"#4a7a5a"}}>{n.fecha} {n.hora}</div>
+                    </div>
+                    <button onClick={()=>{
+                      if(!n.tareaId||!n.tareaFecha) return;
+                      setTareasProg(prev=>{
+                        const arr=Array.isArray(prev[n.tareaFecha])?[...prev[n.tareaFecha]]:Object.values(prev[n.tareaFecha]||{});
+                        const tarea=arr.find(t=>String(t.id)===String(n.tareaId));
+                        if(!tarea) return prev;
+                        const cant=Number(tarea.cantidadUsada||0);
+                        const unid=(tarea.unidadUsada||"ml").toLowerCase();
+                        if(cant>0&&setBodegasData){
+                          setBodegasData(prev2=>{
+                            const nuevo={...prev2};
+                            Object.keys(nuevo).forEach(bid=>{
+                              const bdIt=nuevo[bid];
+                              const items=(bdIt.items||[]).map(it=>{
+                                const prod=(tarea.productoAplicar||"").toLowerCase().split(" ")[0];
+                                if(!prod||!it.nombre.toLowerCase().includes(prod)) return it;
+                                let descuento=cant;
+                                const su=(it.unidad||"").toLowerCase();
+                                if(su==="l"&&(unid==="ml"||unid==="cc")) descuento=cant/1000;
+                                else if((su==="ml"||su==="cc")&&unid==="l") descuento=cant*1000;
+                                else if(su==="kg"&&unid==="g") descuento=cant/1000;
+                                else if(su==="g"&&unid==="kg") descuento=cant*1000;
+                                return {...it,stockActual:Math.max(0,Number(it.stockActual||0)-descuento)};
+                              });
+                              nuevo[bid]={...bdIt,items};
+                            });
+                            return nuevo;
+                          });
+                        }
+                        return {...prev,[n.tareaFecha]:arr.map(t=>String(t.id)===String(n.tareaId)?{...t,gastoConfirmado:true}:t)};
+                      });
+                      setNotificaciones(prev=>{
+                        const arr=Array.isArray(prev)?prev:Object.values(prev||{});
+                        return arr.map(x=>x.tareaId===n.tareaId?{...x,gastoConfirmado:true}:x);
+                      });
+                    }} style={{fontSize:11,padding:"5px 12px",borderRadius:6,border:"1px solid rgba(52,211,153,0.3)",background:"rgba(52,211,153,0.1)",color:"#34d399",cursor:"pointer",flexShrink:0}}>
+                      ✅ Confirmar y descontar stock
+                    </button>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
           {notifSorted.length===0?(
             <div style={{...S.card,padding:32,textAlign:"center",color:"#4a7a5a",fontSize:13}}>Sin registros del sistema aún</div>
           ):notifSorted.map((notifN,i)=>{
@@ -20679,7 +20810,7 @@ export default function App() {
                   .then(()=>console.log("✅ Alerta guardada en Firebase:",id))
                   .catch(e=>console.error("❌ Error guardando alerta:",e));
               }}
-              autoOpen={autoOpenAlerta} onAutoOpenDone={()=>setAutoOpenAlerta(false)} notificaciones={notificaciones} setNotificaciones={setNotificaciones} marcarTodasLeidas={marcarTodasLeidas} notifNoLeidas={notifNoLeidas} MACROZONAS_BASE={MACROZONAS_BASE} zonas={zonasConCust} personal={personal} tareasProg={tareasProg} setTareasProg={setTareasProg} crearNotificacion={crearNotificacion} esJefa={esJefa} bodegasData={bodegasData}/>
+              autoOpen={autoOpenAlerta} onAutoOpenDone={()=>setAutoOpenAlerta(false)} notificaciones={notificaciones} setNotificaciones={setNotificaciones} marcarTodasLeidas={marcarTodasLeidas} notifNoLeidas={notifNoLeidas} MACROZONAS_BASE={MACROZONAS_BASE} zonas={zonasConCust} personal={personal} tareasProg={tareasProg} setTareasProg={setTareasProg} crearNotificacion={crearNotificacion} esJefa={esJefa} bodegasData={bodegasData} setBodegasData={setBodegasData}/>
         </ErrorBoundary>)}
 
         {showCierreSectorial&&<ModalCierreSectorial S={S} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} onClose={()=>setShowCierreSectorial(false)}/>}
