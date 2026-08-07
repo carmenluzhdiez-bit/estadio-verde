@@ -16034,22 +16034,71 @@ function PanelFrecuenciasZona({ S, zonas, getAllElems, getZD, setElemFrecs, esJe
   );
 }
 
-function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZONAS_BASE, personal, tareasEditables, setTareasEditables, onGuardar, onClose }) {
+function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZONAS_BASE, personal, tareasEditables, setTareasEditables, onGuardar, onClose, bodegasData={} }) {
   const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
+  const esFito = alertaForm.tipo==="enfermedad";
+  const [stepFito, setStepFito] = React.useState(1); // 1=Detección 2=Tratamiento 3=Seguridad 4=Tareas
+
+  // Campos extra fitosanitarios
+  const [fitoForm, setFitoForm] = React.useState({
+    agenteCausal:"", sintomas:"", extensionAfectada:"",
+    productoSel:"", dosis:"", volAgua:"", responsableAplic:"",
+    tiempoReingreso:"", tiempoReingresoUnidad:"horas",
+    cercarZona:true, letrero:true, notificarGerencia:false,
+  });
+
+  // Productos disponibles en bodegas (Pesticidas)
+  const productosBodega = [];
+  Object.values(bodegasData||{}).forEach(bd=>{
+    (bd.items||[]).forEach(it=>{
+      if(it.nombre && it.stockActual>0) productosBodega.push({nombre:it.nombre, stock:it.stockActual, unidad:it.unidad||""});
+    });
+  });
+
+  const setFito = (k,v) => setFitoForm(p=>({...p,[k]:v}));
+
+  const STEPS_FITO = [
+    {id:1, label:"Detección", icon:"🔍"},
+    {id:2, label:"Tratamiento", icon:"🧪"},
+    {id:3, label:"Seguridad", icon:"⚠️"},
+    {id:4, label:"Tareas", icon:"✅"},
+  ];
+
+  const nodeCol = (n) => stepFito===n?"#f87171":stepFito>n?"#22c55e":"#4a7a5a";
+
+  // Cuando cambia tipo no-fito, reset step
+  React.useEffect(()=>{ if(!esFito) setStepFito(1); },[esFito]);
+
+  // Auto-generar tareas fitosanitarias al llegar al paso 4
+  React.useEffect(()=>{
+    if(!esFito||stepFito!==4) return;
+    const tareas = [];
+    if(fitoForm.cercarZona) tareas.push({id:Date.now()+1,texto:"🚧 Cercar y encintear la zona afectada",incluir:true,responsable:alertaForm.responsable});
+    if(fitoForm.letrero) tareas.push({id:Date.now()+2,texto:"⚠️ Instalar letrero de peligro y tiempo de reingreso ("+fitoForm.tiempoReingreso+" "+fitoForm.tiempoReingresoUnidad+")",incluir:true,responsable:alertaForm.responsable});
+    if(fitoForm.productoSel) tareas.push({id:Date.now()+3,texto:`🧪 Aplicar ${fitoForm.productoSel}${fitoForm.dosis?" — dosis "+fitoForm.dosis:""}${fitoForm.volAgua?" — "+fitoForm.volAgua+" L/ha agua":""}`,incluir:true,responsable:fitoForm.responsableAplic||alertaForm.responsable});
+    tareas.push({id:Date.now()+4,texto:`🕐 Verificar reingreso a las ${fitoForm.tiempoReingreso||"?"} ${fitoForm.tiempoReingresoUnidad} — retirar letrero y cinta`,incluir:true,responsable:alertaForm.responsable});
+    tareas.push({id:Date.now()+5,texto:"📸 Documentar con fotografías antes y después del tratamiento",incluir:true,responsable:alertaForm.responsable});
+    tareas.push({id:Date.now()+6,texto:"📋 Monitoreo diario por 3 días post-aplicación",incluir:true,responsable:fitoForm.responsableAplic||alertaForm.responsable});
+    if(fitoForm.notificarGerencia) tareas.push({id:Date.now()+7,texto:"📧 Notificar a Gerencia / Administración del cierre sectorial",incluir:true,responsable:""});
+    setTareasEditables(tareas);
+  },[stepFito, esFito]);
+
+  const labelSt={fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:4,textTransform:"uppercase"};
+
   return (
-    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.8)",zIndex:2000,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,overflowY:"auto"}} onClick={onClose}>
-      <div style={{background:"#0f2417",border:"1px solid rgba(239,68,68,0.3)",borderRadius:14,padding:24,width:"100%",maxWidth:560,marginTop:20,marginBottom:20}} onClick={e=>e.stopPropagation()}>
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.85)",zIndex:2000,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,overflowY:"auto"}} onClick={onClose}>
+      <div style={{background:"#0f2417",border:"1px solid rgba(239,68,68,0.3)",borderRadius:14,padding:24,width:"100%",maxWidth:600,marginTop:20,marginBottom:20}} onClick={e=>e.stopPropagation()}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-          <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#fca5a5"}}>+ Nueva alerta / incidencia</div>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#fca5a5"}}>🚨 Nueva alerta / incidencia</div>
           <button onClick={onClose} style={{background:"transparent",border:"none",color:"#5a9a7a",fontSize:20,cursor:"pointer"}}>✕</button>
         </div>
 
         {/* Tipo */}
         <div style={{marginBottom:12}}>
-          <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.5px"}}>Tipo de alerta</label>
+          <label style={labelSt}>Tipo de alerta</label>
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
             {TIPOS_ALERTA.map(t=>(
-              <button key={t.id} onClick={()=>setAlertaForm(p=>({...p,tipo:t.id}))}
+              <button key={t.id} onClick={()=>{setAlertaForm(p=>({...p,tipo:t.id}));setStepFito(1);}}
                 style={{...S.btn,padding:"7px 10px",textAlign:"left",fontSize:12,
                   background:alertaForm.tipo===t.id?"rgba(239,68,68,0.12)":"rgba(255,255,255,0.03)",
                   border:`1px solid ${alertaForm.tipo===t.id?"rgba(239,68,68,0.4)":"rgba(255,255,255,0.08)"}`,
@@ -16060,10 +16109,10 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
           </div>
         </div>
 
-        {/* Zonas */}
+        {/* Zona + datos básicos siempre visibles */}
         <div style={{marginBottom:12}}>
-          <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.5px"}}>Zona(s) afectada(s)</label>
-          <div style={{display:"flex",flexWrap:"wrap",gap:4,maxHeight:110,overflowY:"auto"}}>
+          <label style={labelSt}>Zona(s) afectada(s)</label>
+          <div style={{display:"flex",flexWrap:"wrap",gap:4,maxHeight:100,overflowY:"auto",marginBottom:6}}>
             {[...MACROZONAS_BASE].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(z=>(
               <button key={z.id} onClick={()=>setAlertaForm(p=>({...p,zonas:p.zonas.includes(z.nombre)?p.zonas.filter(x=>x!==z.nombre):[...p.zonas,z.nombre]}))}
                 style={{...S.btn,fontSize:10,padding:"2px 8px",
@@ -16074,87 +16123,219 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
               </button>
             ))}
           </div>
-          {alertaForm.zonas.length>0&&(
-            <div style={{fontSize:11,marginTop:4}}>
-              <span style={{color:"#fca5a5"}}>{alertaForm.zonas.join(", ")}</span>
-              {alertaForm.zonas.some(z=>z==="Golf"||(z||"").toLowerCase().includes("golf"))&&(
-                <span style={{marginLeft:8,fontSize:10,color:"#fbbf24",background:"rgba(251,191,36,0.1)",padding:"2px 8px",borderRadius:8,border:"1px solid rgba(251,191,36,0.2)"}}>
-                  ⛳ Alerta Golf — se generarán avisos institucionales automáticamente
-                </span>
-              )}
-            </div>
-          )}
+          {alertaForm.zonas.length>0&&<div style={{fontSize:11,color:"#fca5a5"}}>📍 {alertaForm.zonas.join(", ")}</div>}
         </div>
 
-        {/* Datos básicos */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
-          <div>
-            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Origen</label>
-            <select style={S.input} value={alertaForm.origen} onChange={e=>setAlertaForm(p=>({...p,origen:e.target.value}))}>
-              <option value="interna">🔍 Observación interna</option>
-              <option value="externa">📡 Reporte externo</option>
-              <option value="meteorologica">🌧️ Servicio meteorológico</option>
-              <option value="gerencia">🏢 Gerencia / Administración</option>
-            </select>
-          </div>
-          <div>
-            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Urgencia</label>
+          <div><label style={labelSt}>Urgencia</label>
             <select style={S.input} value={alertaForm.urgencia} onChange={e=>setAlertaForm(p=>({...p,urgencia:e.target.value}))}>
               <option value="inmediata">🔴 Inmediata</option>
               <option value="alta">🟠 Alta</option>
               <option value="media">🟡 Media</option>
             </select>
           </div>
-          <div style={{gridColumn:"1/-1"}}>
-            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Descripción</label>
-            <input style={S.input} value={alertaForm.descripcion} onChange={e=>setAlertaForm(p=>({...p,descripcion:e.target.value}))} placeholder="Describe la situación..."/>
-          </div>
-          <div>
-            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Fecha</label>
-            <input type="date" style={S.input} value={alertaForm.fecha} onChange={e=>setAlertaForm(p=>({...p,fecha:e.target.value}))}/>
-          </div>
-          <div>
-            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>Responsable</label>
+          <div><label style={labelSt}>Responsable general</label>
             <select style={S.input} value={alertaForm.responsable} onChange={e=>setAlertaForm(p=>({...p,responsable:e.target.value}))}>
               <option value="">Sin asignar</option>
-              {personalArr.map(mnaP=><option key={mnaP.id} value={mnaP.nombre}>{mnaP.nombre}</option>)}
+              {personalArr.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
             </select>
+          </div>
+          <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Descripción inicial</label>
+            <input style={S.input} value={alertaForm.descripcion} onChange={e=>setAlertaForm(p=>({...p,descripcion:e.target.value}))} placeholder={esFito?"Ej: Manchas amarillas con halo oscuro en hojas de piscina norte":"Describe la situación..."}/>
           </div>
         </div>
 
-        {/* Tareas editables */}
-        <div style={{marginBottom:14}}>
-          <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.5px"}}>Tareas a generar (edita antes de confirmar)</label>
-          {tareasEditables.map((t,i)=>(
-            <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,padding:"6px 10px",background:"rgba(255,255,255,0.03)",borderRadius:8,border:"1px solid rgba(255,255,255,0.06)"}}>
-              <input type="checkbox" checked={t.incluir} onChange={()=>setTareasEditables(p=>p.map((x,j)=>j===i?{...x,incluir:!x.incluir}:x))} style={{cursor:"pointer"}}/>
-              <input style={{...S.input,flex:2,fontSize:12,padding:"3px 8px"}} value={t.texto} onChange={e=>setTareasEditables(p=>p.map((x,j)=>j===i?{...x,texto:e.target.value}:x))}/>
-              <select style={{...S.input,flex:1,fontSize:11,padding:"3px 6px"}} value={t.responsable} onChange={e=>setTareasEditables(p=>p.map((x,j)=>j===i?{...x,responsable:e.target.value}:x))}>
-                <option value="">Sin asignar</option>
-                {personalArr.map(mnaP=><option key={mnaP.id} value={mnaP.nombre}>{mnaP.nombre.split(" ")[0]}</option>)}
-              </select>
-              <button onClick={()=>setTareasEditables(p=>p.filter((_,j)=>j!==i))} style={{background:"transparent",border:"none",color:"#5a9a7a",cursor:"pointer",fontSize:14}}>✕</button>
+        {/* ══ FLUJO FITOSANITARIO ══ */}
+        {esFito&&(
+          <div>
+            {/* Stepper */}
+            <div style={{...S.card,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+              {STEPS_FITO.map((s,idx)=>(
+                <React.Fragment key={s.id}>
+                  <button onClick={()=>setStepFito(s.id)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,background:"none",border:"none",cursor:"pointer"}}>
+                    <div style={{width:28,height:28,borderRadius:"50%",background:nodeCol(s.id)+"22",border:`2px solid ${nodeCol(s.id)}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:nodeCol(s.id)}}>
+                      {stepFito>s.id?"✓":s.icon}
+                    </div>
+                    <span style={{fontSize:9,color:stepFito===s.id?"#f87171":"#4a7a5a",textTransform:"uppercase"}}>{s.label}</span>
+                  </button>
+                  {idx<STEPS_FITO.length-1&&<div style={{flex:1,height:1,background:"rgba(255,255,255,0.08)",margin:"0 4px"}}/>}
+                </React.Fragment>
+              ))}
             </div>
-          ))}
-          <button onClick={()=>setTareasEditables(p=>[...p,{id:Date.now(),texto:"",incluir:true,responsable:""}])}
-            style={{...S.btn,fontSize:11,color:"#34d399",background:"rgba(52,211,153,0.06)",border:"1px solid rgba(52,211,153,0.2)"}}>
-            + Agregar tarea
-          </button>
-        </div>
 
-        <div style={{display:"flex",gap:8}}>
-          <button className="btn-p" style={{...S.btn,flex:1,background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}}
-            disabled={!alertaForm.zonas.length||!alertaForm.descripcion.trim()}
-            onClick={onGuardar}>🚨 Registrar alerta y generar cierre</button>
-          <button className="btn-g" style={S.btn} onClick={onClose}>Cancelar</button>
-        </div>
+            {/* Paso 1 — Detección */}
+            {stepFito===1&&(
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                <div style={{fontSize:13,fontWeight:600,color:"#fca5a5",marginBottom:4}}>🔍 Paso 1 — Detección del problema</div>
+                <div><label style={labelSt}>Agente causal (qué observas)</label>
+                  <input style={S.input} value={fitoForm.agenteCausal} onChange={e=>setFito("agenteCausal",e.target.value)} placeholder="Ej: Hongos, mancha parda, pulgones, ácaros..."/>
+                </div>
+                <div><label style={labelSt}>Síntomas observados</label>
+                  <textarea style={{...S.input,resize:"vertical",minHeight:64}} value={fitoForm.sintomas} onChange={e=>setFito("sintomas",e.target.value)} placeholder="Ej: Manchas amarillas con halo oscuro en hojas, aspecto quemado, presencia de insectos..."/>
+                </div>
+                <div><label style={labelSt}>Extensión afectada</label>
+                  <input style={S.input} value={fitoForm.extensionAfectada} onChange={e=>setFito("extensionAfectada",e.target.value)} placeholder="Ej: 3 m², sector NE de la piscina, toda la hilera de arbustos..."/>
+                </div>
+              </div>
+            )}
+
+            {/* Paso 2 — Tratamiento */}
+            {stepFito===2&&(
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                <div style={{fontSize:13,fontWeight:600,color:"#fca5a5",marginBottom:4}}>🧪 Paso 2 — Decisión de tratamiento</div>
+                <div><label style={labelSt}>Producto a aplicar</label>
+                  <select style={S.input} value={fitoForm.productoSel} onChange={e=>setFito("productoSel",e.target.value)}>
+                    <option value="">Seleccionar producto...</option>
+                    {productosBodega.length>0&&<optgroup label="── En bodega ──">
+                      {productosBodega.map(p=><option key={p.nombre} value={p.nombre}>{p.nombre} ({p.stock} {p.unidad} disponibles)</option>)}
+                    </optgroup>}
+                    <option value="Por determinar">Por determinar</option>
+                    <option value="Sin tratamiento químico">Sin tratamiento químico</option>
+                  </select>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                  <div><label style={labelSt}>Dosis</label>
+                    <input style={S.input} value={fitoForm.dosis} onChange={e=>setFito("dosis",e.target.value)} placeholder="Ej: 1.5 ml/L, 50 g/100L..."/>
+                  </div>
+                  <div><label style={labelSt}>Volumen de agua (L/ha)</label>
+                    <input type="text" inputMode="decimal" style={S.input} value={fitoForm.volAgua} onChange={e=>setFito("volAgua",e.target.value)} placeholder="Ej: 400"/>
+                  </div>
+                </div>
+                <div><label style={labelSt}>Responsable de la aplicación</label>
+                  <select style={S.input} value={fitoForm.responsableAplic} onChange={e=>setFito("responsableAplic",e.target.value)}>
+                    <option value="">Sin asignar</option>
+                    {personalArr.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {/* Paso 3 — Seguridad */}
+            {stepFito===3&&(
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                <div style={{fontSize:13,fontWeight:600,color:"#fca5a5",marginBottom:4}}>⚠️ Paso 3 — Medidas de seguridad</div>
+                <div style={{...S.card,padding:12,background:"rgba(245,158,11,0.04)",border:"1px solid rgba(245,158,11,0.2)"}}>
+                  <div style={{fontSize:11,color:"#f59e0b",fontWeight:700,marginBottom:8}}>Acciones de seguridad obligatorias</div>
+                  {[
+                    ["cercarZona","🚧 Cercar y encintear la zona afectada"],
+                    ["letrero","⚠️ Instalar letrero de peligro con tiempo de reingreso"],
+                    ["notificarGerencia","📧 Notificar a Gerencia / Administración"],
+                  ].map(([k,lbl])=>(
+                    <label key={k} style={{display:"flex",alignItems:"center",gap:8,fontSize:12,color:"#c0dac0",marginBottom:6,cursor:"pointer"}}>
+                      <input type="checkbox" checked={fitoForm[k]} onChange={e=>setFito(k,e.target.checked)} style={{width:16,height:16,accentColor:"#f59e0b"}}/>
+                      {lbl}
+                    </label>
+                  ))}
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                  <div><label style={labelSt}>Tiempo de reingreso</label>
+                    <input type="text" inputMode="decimal" style={S.input} value={fitoForm.tiempoReingreso} onChange={e=>setFito("tiempoReingreso",e.target.value)} placeholder="Ej: 24"/>
+                  </div>
+                  <div><label style={labelSt}>Unidad</label>
+                    <select style={S.input} value={fitoForm.tiempoReingresoUnidad} onChange={e=>setFito("tiempoReingresoUnidad",e.target.value)}>
+                      <option value="horas">Horas</option>
+                      <option value="días">Días</option>
+                    </select>
+                  </div>
+                </div>
+                {fitoForm.tiempoReingreso&&(
+                  <div style={{fontSize:12,color:"#fbbf24",background:"rgba(251,191,36,0.08)",border:"1px solid rgba(251,191,36,0.2)",borderRadius:8,padding:"8px 12px"}}>
+                    🕐 Reingreso permitido: <strong>{fitoForm.tiempoReingreso} {fitoForm.tiempoReingresoUnidad}</strong> después de la aplicación
+                  </div>
+                )}
+                <div style={{fontSize:11,color:"#5a9a7a",fontStyle:"italic"}}>
+                  💡 El tiempo de reingreso está indicado en la Hoja de Seguridad (SDS) del producto. Revísala en Bodegas → Pesticidas → Hojas de Seguridad.
+                </div>
+              </div>
+            )}
+
+            {/* Paso 4 — Tareas generadas */}
+            {stepFito===4&&(
+              <div>
+                <div style={{fontSize:13,fontWeight:600,color:"#fca5a5",marginBottom:8}}>✅ Paso 4 — Tareas generadas</div>
+                <div style={{fontSize:11,color:"#5a9a7a",marginBottom:10}}>Revisa y edita las tareas. Asigna responsables. Puedes agregar más.</div>
+                {tareasEditables.map((t,i)=>(
+                  <div key={t.id} style={{display:"flex",alignItems:"center",gap:6,marginBottom:6,padding:"6px 10px",background:"rgba(255,255,255,0.03)",borderRadius:8,border:"1px solid rgba(255,255,255,0.06)"}}>
+                    <input type="checkbox" checked={t.incluir} onChange={()=>setTareasEditables(p=>p.map((x,j)=>j===i?{...x,incluir:!x.incluir}:x))} style={{cursor:"pointer",flexShrink:0}}/>
+                    <input style={{...S.input,flex:2,fontSize:11,padding:"3px 8px"}} value={t.texto} onChange={e=>setTareasEditables(p=>p.map((x,j)=>j===i?{...x,texto:e.target.value}:x))}/>
+                    <select style={{...S.input,flex:1,fontSize:10,padding:"3px 6px"}} value={t.responsable} onChange={e=>setTareasEditables(p=>p.map((x,j)=>j===i?{...x,responsable:e.target.value}:x))}>
+                      <option value="">Sin asignar</option>
+                      {personalArr.map(p=><option key={p.id} value={p.nombre}>{p.nombre.split(" ")[0]}</option>)}
+                    </select>
+                    <button onClick={()=>setTareasEditables(p=>p.filter((_,j)=>j!==i))} style={{background:"transparent",border:"none",color:"#5a9a7a",cursor:"pointer",fontSize:14}}>✕</button>
+                  </div>
+                ))}
+                <button onClick={()=>setTareasEditables(p=>[...p,{id:Date.now(),texto:"",incluir:true,responsable:""}])}
+                  style={{...S.btn,fontSize:11,color:"#34d399",background:"rgba(52,211,153,0.06)",border:"1px solid rgba(52,211,153,0.2)"}}>+ Agregar tarea</button>
+              </div>
+            )}
+
+            {/* Navegación stepper */}
+            <div style={{display:"flex",gap:8,marginTop:16,justifyContent:"space-between"}}>
+              <button onClick={()=>setStepFito(p=>Math.max(1,p-1))} disabled={stepFito===1}
+                style={{...S.btn,opacity:stepFito===1?0.3:1}}>← Anterior</button>
+              {stepFito<4
+                ? <button className="btn-p" style={{...S.btn,background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}}
+                    onClick={()=>setStepFito(p=>Math.min(4,p+1))}>Siguiente →</button>
+                : <button className="btn-p" style={{...S.btn,background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}}
+                    disabled={!alertaForm.zonas.length||!alertaForm.descripcion.trim()}
+                    onClick={()=>{
+                      // Enriquecer la alerta con datos fitosanitarios
+                      setAlertaForm(p=>({...p,
+                        tipoIcon:"🦠", tipoLabel:"Fitosanitario",
+                        agenteCausal:fitoForm.agenteCausal,
+                        sintomas:fitoForm.sintomas,
+                        extensionAfectada:fitoForm.extensionAfectada,
+                        productoAplicar:fitoForm.productoSel,
+                        dosis:fitoForm.dosis,
+                        volAgua:fitoForm.volAgua,
+                        responsableAplic:fitoForm.responsableAplic,
+                        tiempoReingreso:fitoForm.tiempoReingreso+" "+fitoForm.tiempoReingresoUnidad,
+                        cercarZona:fitoForm.cercarZona,
+                        letrero:fitoForm.letrero,
+                      }));
+                      onGuardar();
+                    }}>🚨 Registrar incidencia fitosanitaria</button>
+              }
+            </div>
+          </div>
+        )}
+
+        {/* Flujo normal (no fitosanitario) */}
+        {!esFito&&(
+          <>
+            <div style={{marginBottom:14}}>
+              <label style={labelSt}>Tareas a generar</label>
+              {tareasEditables.map((t,i)=>(
+                <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,padding:"6px 10px",background:"rgba(255,255,255,0.03)",borderRadius:8,border:"1px solid rgba(255,255,255,0.06)"}}>
+                  <input type="checkbox" checked={t.incluir} onChange={()=>setTareasEditables(p=>p.map((x,j)=>j===i?{...x,incluir:!x.incluir}:x))} style={{cursor:"pointer"}}/>
+                  <input style={{...S.input,flex:2,fontSize:12,padding:"3px 8px"}} value={t.texto} onChange={e=>setTareasEditables(p=>p.map((x,j)=>j===i?{...x,texto:e.target.value}:x))}/>
+                  <select style={{...S.input,flex:1,fontSize:11,padding:"3px 6px"}} value={t.responsable} onChange={e=>setTareasEditables(p=>p.map((x,j)=>j===i?{...x,responsable:e.target.value}:x))}>
+                    <option value="">Sin asignar</option>
+                    {personalArr.map(p=><option key={p.id} value={p.nombre}>{p.nombre.split(" ")[0]}</option>)}
+                  </select>
+                  <button onClick={()=>setTareasEditables(p=>p.filter((_,j)=>j!==i))} style={{background:"transparent",border:"none",color:"#5a9a7a",cursor:"pointer",fontSize:14}}>✕</button>
+                </div>
+              ))}
+              <button onClick={()=>setTareasEditables(p=>[...p,{id:Date.now(),texto:"",incluir:true,responsable:""}])}
+                style={{...S.btn,fontSize:11,color:"#34d399",background:"rgba(52,211,153,0.06)",border:"1px solid rgba(52,211,153,0.2)"}}>+ Agregar tarea</button>
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button className="btn-p" style={{...S.btn,flex:1,background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}}
+                disabled={!alertaForm.zonas.length||!alertaForm.descripcion.trim()}
+                onClick={onGuardar}>🚨 Registrar alerta</button>
+              <button className="btn-g" style={S.btn} onClick={onClose}>Cancelar</button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
 }
 
-function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotificaciones, marcarTodasLeidas, notifNoLeidas, MACROZONAS_BASE, personal, tareasProg, setTareasProg, crearNotificacion, onGuardarDirecto, esJefa, autoOpen, onAutoOpenDone }) {
+function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotificaciones, marcarTodasLeidas, notifNoLeidas, MACROZONAS_BASE, personal, tareasProg, setTareasProg, crearNotificacion, onGuardarDirecto, esJefa, autoOpen, onAutoOpenDone, bodegasData={} }) {
   const [tabAlerta, setTabAlerta] = React.useState("incidencias");
+  React.useEffect(()=>{ window._alertaTab = setTabAlerta; return()=>{ delete window._alertaTab; }; },[]);
   const [showNuevaAlerta, setShowNuevaAlerta] = React.useState(false);
   React.useEffect(()=>{
     if(autoOpen){ setShowNuevaAlerta(true); setTabAlerta("incidencias"); onAutoOpenDone?.(); }
@@ -16336,7 +16517,7 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
       </div>
 
       {/* Modal nueva alerta */}
-      {showNuevaAlerta&&<ModalNuevaAlerta S={S} alertaForm={alertaForm} setAlertaForm={setAlertaForm} TIPOS_ALERTA={TIPOS_ALERTA} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} tareasEditables={tareasEditables} setTareasEditables={setTareasEditables} onGuardar={guardarAlerta} onClose={()=>setShowNuevaAlerta(false)}/>}
+      {showNuevaAlerta&&<ModalNuevaAlerta S={S} alertaForm={alertaForm} setAlertaForm={setAlertaForm} TIPOS_ALERTA={TIPOS_ALERTA} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} tareasEditables={tareasEditables} setTareasEditables={setTareasEditables} onGuardar={guardarAlerta} onClose={()=>setShowNuevaAlerta(false)} bodegasData={bodegasData}/>}
 
       {/* Tabs */}
       <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
@@ -16350,7 +16531,16 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
 
       {/* TAB: INCIDENCIAS ACTIVAS */}
       {tabAlerta==="incidencias"&&(
-        incActivas.length===0?(
+        <div>
+          {incActivas.length>0&&esJefa&&(
+            <div style={{display:"flex",justifyContent:"flex-end",marginBottom:10}}>
+              <button style={{...S.btn,fontSize:11,color:"#f87171",background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.2)"}}
+                onClick={()=>{if(window.confirm(`¿Eliminar TODAS las alertas activas (${incActivas.length})? Esta acción no se puede deshacer.`))setIncidencias(prev=>(Array.isArray(prev)?prev:Object.values(prev||{})).filter(x=>x.estado!=="activa"&&x.estado!=="en_gestion"));}}>
+                🗑 Eliminar todas las activas
+              </button>
+            </div>
+          )}
+          {incActivas.length===0?(
           <div style={{...S.card,padding:36,textAlign:"center",color:"#4a7a5a"}}>
             <div style={{fontSize:32,marginBottom:8}}>✅</div>
             <div style={{fontFamily:"'Playfair Display',serif",fontSize:15}}>Sin alertas activas</div>
@@ -16399,7 +16589,8 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
               </div>
             )}
           </div>
-        ))
+        ))}
+        </div>
       )}
 
       {/* TAB: VIENTO */}
@@ -16494,23 +16685,37 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
 
       {/* TAB: RESUELTAS */}
       {tabAlerta==="resueltas"&&(
-        incResueltas.length===0?(
-          <div style={{...S.card,padding:32,textAlign:"center",color:"#4a7a5a",fontSize:13}}>Sin incidencias resueltas aún</div>
-        ):incResueltas.map(inc=>(
-          <div key={inc.id} style={{...S.card,marginBottom:8,padding:"12px 16px",opacity:0.85}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                <span style={{fontSize:16}}>{inc.tipoIcon}</span>
-                <div>
-                  <div style={{fontSize:13,fontWeight:600}}>{inc.tipoLabel} — {inc.zonas?.join(", ")}</div>
-                  <div style={{fontSize:11,color:"#5a9a7a"}}>{inc.fecha} → Resuelta: {inc.fechaResolucion||"—"}</div>
-                  <div style={{fontSize:11,color:"#4a7a5a",marginTop:2}}>{inc.descripcion}</div>
+        <div>
+          {incResueltas.length>0&&esJefa&&(
+            <div style={{display:"flex",justifyContent:"flex-end",marginBottom:10}}>
+              <button style={{...S.btn,fontSize:11,color:"#f87171",background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.2)"}}
+                onClick={()=>{if(window.confirm(`¿Eliminar todas las alertas resueltas (${incResueltas.length})? No se puede deshacer.`))setIncidencias(prev=>(Array.isArray(prev)?prev:Object.values(prev||{})).filter(x=>x.estado!=="resuelta"));}}>
+                🗑 Eliminar todas las resueltas
+              </button>
+            </div>
+          )}
+          {incResueltas.length===0?(
+            <div style={{...S.card,padding:32,textAlign:"center",color:"#4a7a5a",fontSize:13}}>Sin incidencias resueltas aún</div>
+          ):incResueltas.map(inc=>(
+            <div key={inc.id} style={{...S.card,marginBottom:8,padding:"12px 16px",opacity:0.85}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+                <div style={{display:"flex",gap:8,alignItems:"center",flex:1}}>
+                  <span style={{fontSize:16}}>{inc.tipoIcon||"🚨"}</span>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:600}}>{inc.tipoLabel||inc.tipo||"Alerta"} — {inc.zonas?.join(", ")}</div>
+                    <div style={{fontSize:11,color:"#5a9a7a"}}>{inc.fecha} → Resuelta: {inc.fechaResolucion||"—"}</div>
+                    <div style={{fontSize:11,color:"#4a7a5a",marginTop:2}}>{inc.descripcion}</div>
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:6,flexShrink:0}}>
+                  <button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(96,165,250,0.1)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.3)"}} onClick={()=>generarReporteAlerta(inc)}>📋 Ficha</button>
+                  {esJefa&&<button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(239,68,68,0.06)",color:"#f87171",border:"1px solid rgba(239,68,68,0.2)"}}
+                    onClick={()=>{if(window.confirm("¿Eliminar esta alerta resuelta?"))setIncidencias(prev=>(Array.isArray(prev)?prev:Object.values(prev||{})).filter(x=>x.id!==inc.id));}}>🗑</button>}
                 </div>
               </div>
-              <button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(96,165,250,0.1)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.3)"}} onClick={()=>generarReporteAlerta(inc)}>📋 Imprimir ficha</button>
             </div>
-          </div>
-        ))
+          ))}
+        </div>
       )}
 
       {/* TAB: REGISTROS */}
@@ -16521,6 +16726,8 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
             <div style={{display:"flex",gap:6}}>
               {notifSorted.length>0&&<button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(96,165,250,0.1)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.2)"}} onClick={generarReporteRegistros}>📋 Imprimir registros</button>}
               {notifArr.filter(n=>!n?.leida).length>0&&<button onClick={marcarTodasLeidas} style={{...S.btn,fontSize:11,color:"#6aaa7a",border:"1px solid rgba(255,255,255,0.1)"}}>✓ Marcar leídas</button>}
+              {notifSorted.length>0&&esJefa&&<button style={{...S.btn,fontSize:11,color:"#f87171",background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.2)"}}
+                onClick={()=>{if(window.confirm(`¿Eliminar todos los registros (${notifSorted.length})? No se puede deshacer.`))setNotificaciones([]);}}>🗑 Eliminar todos</button>}
             </div>
           </div>
           {notifSorted.length===0?(
@@ -18861,42 +19068,75 @@ export default function App() {
         {/* ── CAMPANILLA FLOTANTE — siempre visible y llamativa ── */}
         {fbRol==="jefa"&&(()=>{
           const incActAhora=(Array.isArray(incidencias)?incidencias:Object.values(incidencias||{})).filter(i=>i.estado==="activa"||i.estado==="en_gestion");
-          const hayAlertas = notifNoLeidas.length>0||incActAhora.length>0;
-          const totalBadge = notifNoLeidas.length + incActAhora.length;
-          // Tipo prioritario para mostrar en el badge
-          const tipoLabel = incActAhora.length>0
-            ? (incActAhora.find(i=>i.urgencia==="inmediata")||incActAhora.find(i=>i.urgencia==="alta")||incActAhora[0])?.tipoLabel||"Alerta"
-            : "Aviso";
+          const hayIncidencias = incActAhora.length>0;
+          const hayNotifs = notifNoLeidas.length>0;
+          const hayAlgo = hayIncidencias||hayNotifs;
+          const incMasUrgente = incActAhora.find(i=>i.urgencia==="inmediata")||incActAhora.find(i=>i.urgencia==="alta")||incActAhora[0];
           return (
-            <button onClick={()=>{setVista("notificaciones");setTimeout(marcarTodasLeidas,4000);}}
-              style={{
-                flexShrink:0, cursor:"pointer", border:"none", background:"transparent",
-                padding:"4px 8px", display:"flex", flexDirection:"column", alignItems:"center",
-                position:"relative",
-              }}>
+            <button onClick={()=>{
+              setVista("notificaciones");
+              setTimeout(marcarTodasLeidas,4000);
+              // Ir a la pestaña correcta según el tipo de aviso
+              if(hayIncidencias) setTimeout(()=>window._alertaTab?.("incidencias"),100);
+              else if(hayNotifs) setTimeout(()=>window._alertaTab?.("registros"),100);
+            }}
+              style={{flexShrink:0,cursor:"pointer",border:"none",background:"transparent",padding:"4px 8px",display:"flex",flexDirection:"column",alignItems:"center",position:"relative"}}>
               <style>{`
-                @keyframes pulse-bell { 0%,100%{transform:scale(1)} 50%{transform:scale(1.2)} }
-                @keyframes shake-bell { 0%,100%{transform:rotate(0)} 20%{transform:rotate(-15deg)} 40%{transform:rotate(15deg)} 60%{transform:rotate(-10deg)} 80%{transform:rotate(10deg)} }
-                .bell-pulse { animation: pulse-bell 1.2s ease-in-out infinite, shake-bell 1.2s ease-in-out infinite; }
+                @keyframes pulse-bell { 0%,100%{transform:scale(1)} 50%{transform:scale(1.18)} }
+                @keyframes shake-bell { 0%,100%{transform:rotate(0)} 15%{transform:rotate(-14deg)} 30%{transform:rotate(14deg)} 45%{transform:rotate(-9deg)} 60%{transform:rotate(9deg)} 75%{transform:rotate(-4deg)} }
+                .bell-pulse { animation: pulse-bell 1s ease-in-out infinite, shake-bell 1s ease-in-out infinite; }
               `}</style>
-              <span style={{fontSize:22,position:"relative",display:"inline-block"}}
-                className={hayAlertas?"bell-pulse":""}>
-                {hayAlertas?"🔔":"🔕"}
-                {totalBadge>0&&(
-                  <span style={{position:"absolute",top:-6,right:-10,
+
+              <span style={{fontSize:22,position:"relative",display:"inline-block"}} className={hayIncidencias?"bell-pulse":""}>
+                {hayAlgo?"🔔":"🔕"}
+
+                {/* Badge rojo — incidencias activas (problemas reales) */}
+                {hayIncidencias&&(
+                  <span style={{position:"absolute",top:-8,right:-14,
                     background:"#ef4444",color:"#fff",borderRadius:10,
                     minWidth:18,height:18,fontSize:10,fontWeight:800,
                     display:"flex",alignItems:"center",justifyContent:"center",
-                    padding:"0 4px",boxShadow:"0 0 0 2px #0f1f15",
-                    border:"2px solid #0f1f15"}}>
-                    {totalBadge>9?"9+":totalBadge}
+                    padding:"0 4px",boxShadow:"0 0 0 2px #0f1f15",border:"2px solid #0f1f15"}}>
+                    {incActAhora.length>9?"9+":incActAhora.length}
+                  </span>
+                )}
+
+                {/* Badge azul — notificaciones de registro (avisos, no problemas) */}
+                {hayNotifs&&!hayIncidencias&&(
+                  <span style={{position:"absolute",top:-8,right:-14,
+                    background:"#3b82f6",color:"#fff",borderRadius:10,
+                    minWidth:18,height:18,fontSize:10,fontWeight:800,
+                    display:"flex",alignItems:"center",justifyContent:"center",
+                    padding:"0 4px",boxShadow:"0 0 0 2px #0f1f15",border:"2px solid #0f1f15"}}>
+                    {notifNoLeidas.length>9?"9+":notifNoLeidas.length}
+                  </span>
+                )}
+
+                {/* Ambas — badge rojo arriba + indicador azul abajo */}
+                {hayNotifs&&hayIncidencias&&(
+                  <span style={{position:"absolute",bottom:-6,right:-12,
+                    background:"#3b82f6",color:"#fff",borderRadius:8,
+                    minWidth:14,height:14,fontSize:9,fontWeight:700,
+                    display:"flex",alignItems:"center",justifyContent:"center",
+                    padding:"0 3px",border:"1px solid #0f1f15"}}>
+                    +{notifNoLeidas.length}
                   </span>
                 )}
               </span>
-              <span style={{fontFamily:"'Georgia',serif",fontSize:10,
-                color:hayAlertas?"#ef4444":"#7aaa80",fontWeight:hayAlertas?700:400,
-                marginTop:1,borderBottom:vista==="notificaciones"?"2px solid #4a9a64":"2px solid transparent"}}>
-                {hayAlertas?tipoLabel:"Alertas"}
+
+              {/* Etiqueta descriptiva */}
+              <span style={{fontFamily:"'Georgia',serif",fontSize:10,marginTop:2,
+                color:hayIncidencias?"#ef4444":hayNotifs?"#60a5fa":"#7aaa80",
+                fontWeight:hayAlgo?700:400,
+                borderBottom:vista==="notificaciones"?"2px solid #4a9a64":"2px solid transparent",
+                maxWidth:54,textAlign:"center",lineHeight:1.2}}>
+                {hayIncidencias
+                  ? (incActAhora.length===1
+                      ? (incMasUrgente?.tipoLabel||"Alerta")
+                      : `${incActAhora.length} alertas`)
+                  : hayNotifs
+                  ? "Registros"
+                  : "Alertas"}
               </span>
             </button>
           );
@@ -20380,7 +20620,7 @@ export default function App() {
                   .then(()=>console.log("✅ Alerta guardada en Firebase:",id))
                   .catch(e=>console.error("❌ Error guardando alerta:",e));
               }}
-              autoOpen={autoOpenAlerta} onAutoOpenDone={()=>setAutoOpenAlerta(false)} notificaciones={notificaciones} setNotificaciones={setNotificaciones} marcarTodasLeidas={marcarTodasLeidas} notifNoLeidas={notifNoLeidas} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} tareasProg={tareasProg} setTareasProg={setTareasProg} crearNotificacion={crearNotificacion} esJefa={esJefa}/>
+              autoOpen={autoOpenAlerta} onAutoOpenDone={()=>setAutoOpenAlerta(false)} notificaciones={notificaciones} setNotificaciones={setNotificaciones} marcarTodasLeidas={marcarTodasLeidas} notifNoLeidas={notifNoLeidas} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} tareasProg={tareasProg} setTareasProg={setTareasProg} crearNotificacion={crearNotificacion} esJefa={esJefa} bodegasData={bodegasData}/>
         </ErrorBoundary>)}
 
         {showCierreSectorial&&<ModalCierreSectorial S={S} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} onClose={()=>setShowCierreSectorial(false)}/>}
