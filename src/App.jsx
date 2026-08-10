@@ -16192,9 +16192,10 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
     if(!esFito||stepFito!==4) return;
     const tareas = [];
     if(fitoForm.cercarZona) tareas.push({id:Date.now()+1,texto:"🚧 Cercar y encintear la zona afectada",incluir:true,responsable:alertaForm.responsable});
-    if(fitoForm.letrero) tareas.push({id:Date.now()+2,texto:"⚠️ Instalar letrero de peligro y tiempo de reingreso ("+fitoForm.tiempoReingreso+" "+fitoForm.tiempoReingresoUnidad+")",incluir:true,responsable:alertaForm.responsable});
+    const riTexto = fitoForm.tiempoReingreso ? `${fitoForm.tiempoReingreso} ${fitoForm.tiempoReingresoUnidad}` : "ver HDS del producto";
+    if(fitoForm.letrero) tareas.push({id:Date.now()+2,texto:`⚠️ Instalar letrero de peligro y tiempo de reingreso (${riTexto})`,incluir:true,responsable:alertaForm.responsable});
     if(fitoForm.productoSel) tareas.push({id:Date.now()+3,texto:`🧪 Aplicar ${fitoForm.productoSel}${fitoForm.dosis?" — dosis "+fitoForm.dosis:""}${fitoForm.volAgua?" — "+fitoForm.volAgua+" L/ha agua":""}`,incluir:true,responsable:fitoForm.responsableAplic||alertaForm.responsable});
-    tareas.push({id:Date.now()+4,texto:`🕐 Verificar reingreso a las ${fitoForm.tiempoReingreso||"?"} ${fitoForm.tiempoReingresoUnidad} — retirar letrero y cinta`,incluir:true,responsable:alertaForm.responsable});
+    tareas.push({id:Date.now()+4,texto:`🕐 Verificar reingreso a las ${riTexto} — retirar letrero y cinta`,incluir:true,responsable:alertaForm.responsable});
     tareas.push({id:Date.now()+5,texto:"📸 Documentar con fotografías antes y después del tratamiento",incluir:true,responsable:alertaForm.responsable});
     tareas.push({id:Date.now()+6,texto:"📋 Monitoreo diario por 3 días post-aplicación",incluir:true,responsable:fitoForm.responsableAplic||alertaForm.responsable});
     if(fitoForm.notificarGerencia) tareas.push({id:Date.now()+7,texto:"📧 Notificar a Gerencia / Administración del cierre sectorial",incluir:true,responsable:""});
@@ -16257,6 +16258,12 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
               <option value="">Sin asignar</option>
               {personalArr.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
             </select>
+          </div>
+          <div><label style={labelSt}>📅 Fecha del incidente</label>
+            <input type="date" style={S.input} value={alertaForm.fecha} onChange={e=>setAlertaForm(p=>({...p,fecha:e.target.value}))}/>
+          </div>
+          <div><label style={labelSt}>🕐 Hora del incidente</label>
+            <input type="time" style={S.input} value={alertaForm.hora} onChange={e=>setAlertaForm(p=>({...p,hora:e.target.value}))}/>
           </div>
           <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Descripción inicial</label>
             <input style={S.input} value={alertaForm.descripcion} onChange={e=>setAlertaForm(p=>({...p,descripcion:e.target.value}))} placeholder={esFito?"Ej: Manchas amarillas con halo oscuro en hojas de piscina norte":"Describe la situación..."}/>
