@@ -3097,14 +3097,10 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                           </div>
                         )}
                         {/* Registro de gasto de producto — aparece cuando tarea de aplicación está hecha */}
-                        {t.estado==="hecha"&&(
-                          (t.tarea||"").toLowerCase().includes("aplicac")||
-                          (t.tarea||"").toLowerCase().includes("aplicar")||
-                          (t.tarea||"").toLowerCase().includes("fungicid")||
-                          (t.tarea||"").toLowerCase().includes("fumigac")||
-                          (t.tarea||"").toLowerCase().startsWith("🧪")||
-                          (t.tarea||"").toLowerCase().startsWith("✏️ aplicar")
-                        )&&(()=>{
+                        {t.estado==="hecha"&&(()=>{
+                          const textoLimpio=(t.tarea||"").replace(/[\u{1F300}-\u{1FFFF}]|[\u2600-\u27FF]/gu,"").trim().toLowerCase();
+                          return textoLimpio.includes("aplicar")||textoLimpio.includes("aplicac")||textoLimpio.includes("fumigac")||textoLimpio.includes("fungicid");
+                        })()&&(()=>{
                           const tid = String(t.id);
                           const gastoGuardado = t.gastoProducto;
                           const showGasto = gastosShow[tid]||false;
@@ -16571,6 +16567,8 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
     const nuevaAlerta = limpiarUndef({id:nuevaId,estado:"activa",tipo:alertaForm.tipo,tipoLabel:tipoObj.label,tipoIcon:tipoObj.icon,zonas:alertaForm.zonas,origen:alertaForm.origen,urgencia:alertaForm.urgencia,descripcion:alertaForm.descripcion,responsable:alertaForm.responsable,fecha:alertaForm.fecha,hora:alertaForm.hora,fechaCreacion:new Date().toISOString(),tareas:tareasEditables.filter(t=>t.incluir).map(t=>({texto:t.texto,responsable:t.responsable,estado:"pendiente"})),historial:[{accion:"Alerta creada",fecha:alertaForm.fecha,hora:alertaForm.hora,responsable:alertaForm.responsable}]});
     setIncidencias(prev=>{
       const arr = Array.isArray(prev)?prev:Object.values(prev||{});
+      // Evitar duplicado si onGuardarDirecto ya guarda en Firebase
+      if(onGuardarDirecto) return arr;
       return [nuevaAlerta, ...arr];
     });
     // Determinar si la alerta es de Golf
