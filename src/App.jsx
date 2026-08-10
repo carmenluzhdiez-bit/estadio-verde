@@ -3040,13 +3040,19 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                         {t.indicacion&&<div style={{fontSize:11,color:"#f59e0b",marginTop:2,marginLeft:17}}>📋 {t.indicacion}</div>}
                         {(t.alturaCorteObj||t.alturaCorte)&&<div style={{fontSize:11,color:"#fbbf24",marginTop:2,marginLeft:17,fontWeight:600}}>✂️ Altura de corte indicada: {t.alturaCorteObj||t.alturaCorte}mm</div>}
                         {puedeEditar ? (
-                          <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                          <div style={{display:"flex",gap:4,flexWrap:"wrap",alignItems:"center"}}>
                             {Object.entries(ESTADOS_TAREA).map(([k,v])=>(
                               <button key={k} onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:normalizarEstado(k),notaWorker:k!=="no_pudo"?(t.notaWorker||""):""})}
                                 style={{cursor:"pointer",border:`1px solid ${t.estado===k?v.color+"60":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"4px 10px",fontSize:11,background:t.estado===k?`${v.color}15`:"transparent",color:t.estado===k?v.color:"#6aaa7a",fontFamily:"'Georgia',serif"}}>
                                 {v.icon} {v.label}
                               </button>
                             ))}
+                            {esJefaApp&&(
+                              <button onClick={()=>{if(window.confirm("¿Eliminar esta tarea? No se puede deshacer."))onUpdateTarea(fechaVer,t.id,{_eliminar:true});}}
+                                style={{cursor:"pointer",border:"1px solid rgba(239,68,68,0.25)",borderRadius:8,padding:"4px 8px",fontSize:11,background:"rgba(239,68,68,0.06)",color:"#f87171",marginLeft:4}}>
+                                🗑
+                              </button>
+                            )}
                           </div>
                         ) : (
                           <div style={{display:"flex",alignItems:"center",gap:6}}>
@@ -3093,9 +3099,11 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                         {/* Registro de gasto de producto — aparece cuando tarea de aplicación está hecha */}
                         {t.estado==="hecha"&&(
                           (t.tarea||"").toLowerCase().includes("aplicac")||
+                          (t.tarea||"").toLowerCase().includes("aplicar")||
                           (t.tarea||"").toLowerCase().includes("fungicid")||
                           (t.tarea||"").toLowerCase().includes("fumigac")||
-                          (t.tarea||"").toLowerCase().startsWith("🧪")
+                          (t.tarea||"").toLowerCase().startsWith("🧪")||
+                          (t.tarea||"").toLowerCase().startsWith("✏️ aplicar")
                         )&&(()=>{
                           const tid = String(t.id);
                           const gastoGuardado = t.gastoProducto;
@@ -19505,6 +19513,13 @@ export default function App() {
                 hojasSeguridad={Array.isArray(hojasSeguridad)?hojasSeguridad:[]}
                 onUpdateTarea={(fecha,tid,patch)=>{
                   const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+                  if(patch._eliminar){
+                    setTareasProg(prev=>{
+                      const lista=normArr(prev[fecha]);
+                      return {...prev,[fecha]:lista.filter(t=>String(t.id)!==String(tid))};
+                    });
+                    return;
+                  }
                   setTareasProg(prev=>{
                     const lista=normArr(prev[fecha]);
                     const actualizadas=lista.map(t=>{
