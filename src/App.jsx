@@ -2719,7 +2719,78 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   // Estado de grupos colapsables — objeto {key: bool}
   const [gruposAbiertos, setGruposAbiertos] = React.useState({diarias:true,corte:false,medicion:false,riego:false,fitosan:false,limpieza:false,poda:false,otros:false});
   const [showHojas, setShowHojas] = React.useState(false);
-  const [gastosShow, setGastosShow] = React.useState({}); // {tareaId: bool}
+  const renderBloqueGasto = (t) => {
+    const textoLimpio=(t.tarea||"").replace(/\p{Emoji}/gu,"").trim().toLowerCase();
+    const esTareaAplic = textoLimpio.includes("aplicar")||textoLimpio.includes("aplicac")||textoLimpio.includes("fumigac")||textoLimpio.includes("fungicid");
+    if(t.estado!=="hecha"||!esTareaAplic) return null;
+    const tid=String(t.id);
+    const gastoGuardado=t.gastoProducto;
+    const showGasto=gastosShow[tid]||false;
+    const cantGasto=gastosCant[tid]!==undefined?gastosCant[tid]:(t.cantidadUsada||"");
+    const unidGasto=gastosUnid[tid]||t.unidadUsada||"ml";
+    const obsGasto=gastosObs[tid]!==undefined?gastosObs[tid]:(t.obsGasto||"");
+    return (
+      <div style={{marginTop:8,padding:"10px 12px",background:"rgba(52,211,153,0.05)",border:"1px solid rgba(52,211,153,0.25)",borderRadius:8}}>
+        {gastoGuardado?(
+          <div style={{fontSize:11,color:"#34d399"}}>
+            ✅ Gasto registrado: <strong>{t.cantidadUsada} {t.unidadUsada}</strong>
+            {t.productoAplicar&&<span> de <strong>{t.productoAplicar}</strong></span>}
+            {t.gastoConfirmado?<span style={{marginLeft:8,color:"#22c55e"}}>· ✓ Confirmado</span>:<span style={{marginLeft:8,color:"#f59e0b",fontSize:10}}>· ⏳ Pendiente confirmación jefa</span>}
+          </div>
+        ):(
+          <>
+            <div style={{fontSize:11,color:"#34d399",fontWeight:700,marginBottom:6}}>🧪 ¿Cuánto producto usaste?</div>
+            {!showGasto?(
+              <button onClick={()=>setGastosShow(p=>({...p,[tid]:true}))}
+                style={{fontSize:12,padding:"6px 14px",borderRadius:6,border:"1px solid rgba(52,211,153,0.4)",background:"rgba(52,211,153,0.1)",color:"#34d399",cursor:"pointer",fontWeight:600}}>
+                🧪 Registrar gasto de producto
+              </button>
+            ):(
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                <div style={{display:"flex",gap:8,alignItems:"flex-end",flexWrap:"wrap"}}>
+                  <div style={{flex:1,minWidth:90}}>
+                    <div style={{fontSize:10,color:"#6aaa7a",marginBottom:3,textTransform:"uppercase",letterSpacing:".5px"}}>Cantidad usada</div>
+                    <input type="text" inputMode="decimal" value={cantGasto}
+                      onChange={e=>setGastosCant(p=>({...p,[tid]:e.target.value}))}
+                      placeholder="ej: 54" style={{width:"100%",background:"rgba(255,255,255,0.08)",border:"1px solid rgba(52,211,153,0.4)",borderRadius:6,color:"#ede9e0",padding:"7px 10px",fontSize:18,fontWeight:700}}/>
+                  </div>
+                  <div>
+                    <div style={{fontSize:10,color:"#6aaa7a",marginBottom:3,textTransform:"uppercase",letterSpacing:".5px"}}>Unidad</div>
+                    <select value={unidGasto} onChange={e=>setGastosUnid(p=>({...p,[tid]:e.target.value}))}
+                      style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(52,211,153,0.3)",borderRadius:6,color:"#ede9e0",padding:"7px 10px",fontSize:13}}>
+                      {["ml","cc","L","g","kg"].map(u=><option key={u}>{u}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <input value={obsGasto} onChange={e=>setGastosObs(p=>({...p,[tid]:e.target.value}))}
+                  placeholder="Observación (opcional)" style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(52,211,153,0.2)",borderRadius:6,color:"#ede9e0",padding:"5px 10px",fontSize:12,boxSizing:"border-box"}}/>
+                <div style={{display:"flex",gap:6}}>
+                  <button disabled={!cantGasto} onClick={()=>{
+                    if(!cantGasto) return;
+                    onUpdateTarea(fechaVer,t.id,{gastoProducto:true,cantidadUsada:cantGasto,unidadUsada:unidGasto,obsGasto,gastoConfirmado:false,gastoFecha:fechaVer,productoAplicar:t.productoAplicar||t.tarea||""});
+                    crearNotificacion&&crearNotificacion("gasto_producto",{
+                      titulo:"🧪 Gasto de producto registrado",
+                      mensaje:`${trabajador?.nombre||"Aplicador"} usó ${cantGasto} ${unidGasto}${t.productoAplicar?" de "+t.productoAplicar:""}. Confirma y descuenta del stock.`,
+                      fecha:fechaVer, hora:new Date().toTimeString().slice(0,5),
+                      tipo:"gasto_producto", tareaId:String(t.id), tareaFecha:fechaVer,
+                      cantidadUsada:cantGasto, unidadUsada:unidGasto, productoAplicar:t.productoAplicar||"",
+                    });
+                    setGastosShow(p=>({...p,[tid]:false}));
+                  }} style={{fontSize:11,padding:"5px 14px",borderRadius:6,border:"1px solid rgba(52,211,153,0.4)",background:"rgba(52,211,153,0.15)",color:"#34d399",cursor:"pointer",fontWeight:600,opacity:cantGasto?1:0.4}}>
+                    💾 Guardar
+                  </button>
+                  <button onClick={()=>setGastosShow(p=>({...p,[tid]:false}))}
+                    style={{fontSize:11,padding:"5px 10px",borderRadius:6,border:"1px solid rgba(255,255,255,0.1)",background:"transparent",color:"#5a9a7a",cursor:"pointer"}}>
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    );
+  };
   const [gastosCant, setGastosCant] = React.useState({}); // {tareaId: string}
   const [gastosUnid, setGastosUnid] = React.useState({}); // {tareaId: string}
   const [gastosObs,  setGastosObs]  = React.useState({}); // {tareaId: string}
@@ -3096,83 +3167,7 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                             </div>
                           </div>
                         )}
-                        {/* Registro de gasto de producto — aparece cuando tarea de aplicación está hecha */}
-                        {t.estado==="hecha"&&(()=>{
-                          const textoLimpio=(t.tarea||"").replace(/[\u{1F300}-\u{1FFFF}]|[\u2600-\u27FF]/gu,"").trim().toLowerCase();
-                          return textoLimpio.includes("aplicar")||textoLimpio.includes("aplicac")||textoLimpio.includes("fumigac")||textoLimpio.includes("fungicid");
-                        })()&&(()=>{
-                          const tid = String(t.id);
-                          const gastoGuardado = t.gastoProducto;
-                          const showGasto = gastosShow[tid]||false;
-                          const cantGasto = gastosCant[tid]!==undefined ? gastosCant[tid] : (t.cantidadUsada||"");
-                          const unidGasto = gastosUnid[tid]||t.unidadUsada||"ml";
-                          const obsGasto  = gastosObs[tid]!==undefined  ? gastosObs[tid]  : (t.obsGasto||"");
-                          return (
-                            <div style={{marginTop:8,padding:"10px 12px",background:"rgba(52,211,153,0.04)",border:"1px solid rgba(52,211,153,0.2)",borderRadius:8}}>
-                              {gastoGuardado?(
-                                <div style={{fontSize:11,color:"#34d399"}}>
-                                  ✅ Gasto registrado: <strong>{t.cantidadUsada} {t.unidadUsada}</strong>
-                                  {t.productoAplicar&&<span> de <strong>{t.productoAplicar}</strong></span>}
-                                  {t.gastoConfirmado
-                                    ?<span style={{marginLeft:8,color:"#22c55e"}}>· ✓ Confirmado por jefa</span>
-                                    :<span style={{marginLeft:8,color:"#f59e0b",fontSize:10}}>· ⏳ Pendiente confirmación jefa</span>}
-                                </div>
-                              ):(
-                                <>
-                                  <div style={{fontSize:11,color:"#34d399",fontWeight:600,marginBottom:6}}>🧪 ¿Cuánto producto usaste?</div>
-                                  {!showGasto?(
-                                    <button onClick={()=>setGastosShow(p=>({...p,[tid]:true}))} style={{fontSize:11,padding:"5px 12px",borderRadius:6,border:"1px solid rgba(52,211,153,0.3)",background:"rgba(52,211,153,0.08)",color:"#34d399",cursor:"pointer"}}>
-                                      🧪 Registrar gasto de producto
-                                    </button>
-                                  ):(
-                                    <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                                      <div style={{display:"flex",gap:8,alignItems:"flex-end",flexWrap:"wrap"}}>
-                                        <div style={{flex:1,minWidth:80}}>
-                                          <div style={{fontSize:10,color:"#6aaa7a",marginBottom:3}}>Cantidad usada</div>
-                                          <input type="text" inputMode="decimal" value={cantGasto}
-                                            onChange={e=>setGastosCant(p=>({...p,[tid]:e.target.value}))}
-                                            placeholder="ej: 54" style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(52,211,153,0.3)",borderRadius:6,color:"#ede9e0",padding:"6px 8px",fontSize:16,fontWeight:700}}/>
-                                        </div>
-                                        <div>
-                                          <div style={{fontSize:10,color:"#6aaa7a",marginBottom:3}}>Unidad</div>
-                                          <select value={unidGasto} onChange={e=>setGastosUnid(p=>({...p,[tid]:e.target.value}))}
-                                            style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(52,211,153,0.3)",borderRadius:6,color:"#ede9e0",padding:"6px 8px",fontSize:12}}>
-                                            {["ml","cc","L","g","kg"].map(u=><option key={u}>{u}</option>)}
-                                          </select>
-                                        </div>
-                                      </div>
-                                      <input value={obsGasto} onChange={e=>setGastosObs(p=>({...p,[tid]:e.target.value}))}
-                                        placeholder="Observación (opcional)" style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(52,211,153,0.2)",borderRadius:6,color:"#ede9e0",padding:"5px 8px",fontSize:12,boxSizing:"border-box"}}/>
-                                      <div style={{display:"flex",gap:6}}>
-                                        <button disabled={!cantGasto} onClick={()=>{
-                                          if(!cantGasto) return;
-                                          onUpdateTarea(fechaVer,t.id,{
-                                            gastoProducto:true, cantidadUsada:cantGasto,
-                                            unidadUsada:unidGasto, obsGasto,
-                                            gastoConfirmado:false, gastoFecha:fechaVer,
-                                            productoAplicar:t.productoAplicar||t.tarea||"",
-                                          });
-                                          crearNotificacion&&crearNotificacion("gasto_producto",{
-                                            titulo:"🧪 Gasto de producto registrado",
-                                            mensaje:`${trabajador?.nombre||"Aplicador"} usó ${cantGasto} ${unidGasto}${t.productoAplicar?" de "+t.productoAplicar:""}. Confirma y descuenta del stock.`,
-                                            fecha:fechaVer, hora:new Date().toTimeString().slice(0,5),
-                                            tipo:"gasto_producto", tareaId:String(t.id), tareaFecha:fechaVer,
-                                            cantidadUsada:cantGasto, unidadUsada:unidGasto,
-                                            productoAplicar:t.productoAplicar||"",
-                                          });
-                                          setGastosShow(p=>({...p,[tid]:false}));
-                                        }} style={{fontSize:11,padding:"5px 12px",borderRadius:6,border:"1px solid rgba(52,211,153,0.3)",background:"rgba(52,211,153,0.12)",color:"#34d399",cursor:"pointer",opacity:cantGasto?1:0.4}}>
-                                          💾 Guardar
-                                        </button>
-                                        <button onClick={()=>setGastosShow(p=>({...p,[tid]:false}))} style={{fontSize:11,padding:"5px 10px",borderRadius:6,border:"1px solid rgba(255,255,255,0.1)",background:"transparent",color:"#5a9a7a",cursor:"pointer"}}>Cancelar</button>
-                                      </div>
-                                    </div>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                          );
-                        })()}
+                        {renderBloqueGasto(t)}
                         {t.estado==="no_pudo"&&(
                           <div style={{marginTop:6}}>
                             <textarea rows={2} placeholder="¿Por qué no se pudo? (obligatorio)" value={t.notaWorker||""} onChange={e=>onUpdateTarea(fechaVer,t.id,{notaWorker:e.target.value})} style={{width:"100%",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:8,color:"#ede9e0",padding:"6px 10px",fontFamily:"'Georgia',serif",fontSize:12,resize:"vertical"}}/>
@@ -3396,68 +3391,7 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                                 </div>
                               )}
                               {t.notaWorker&&t.estado!=="no_pudo"&&<div style={{fontSize:11,color:"#f59e0b",marginTop:3,fontStyle:"italic"}}>💬 {t.notaWorker}</div>}
-                              {/* Bloque de gasto de producto para tareas de aplicación */}
-                              {t.estado==="hecha"&&(()=>{
-                                const textoLimpio=(t.tarea||"").replace(/[\u{1F300}-\u{1FFFF}]|[\u2600-\u27FF]/gu,"").trim().toLowerCase();
-                                return textoLimpio.includes("aplicar")||textoLimpio.includes("aplicac")||textoLimpio.includes("fumigac")||textoLimpio.includes("fungicid");
-                              })()&&(()=>{
-                                const tid=String(t.id);
-                                const gastoGuardado=t.gastoProducto;
-                                const showGasto=gastosShow[tid]||false;
-                                const cantGasto=gastosCant[tid]!==undefined?gastosCant[tid]:(t.cantidadUsada||"");
-                                const unidGasto=gastosUnid[tid]||t.unidadUsada||"ml";
-                                const obsGasto=gastosObs[tid]!==undefined?gastosObs[tid]:(t.obsGasto||"");
-                                return (
-                                  <div style={{marginTop:8,padding:"10px 12px",background:"rgba(52,211,153,0.04)",border:"1px solid rgba(52,211,153,0.2)",borderRadius:8}}>
-                                    {gastoGuardado?(
-                                      <div style={{fontSize:11,color:"#34d399"}}>
-                                        ✅ Gasto registrado: <strong>{t.cantidadUsada} {t.unidadUsada}</strong>
-                                        {t.productoAplicar&&<span> de <strong>{t.productoAplicar}</strong></span>}
-                                        {t.gastoConfirmado?<span style={{marginLeft:8,color:"#22c55e"}}>· ✓ Confirmado</span>:<span style={{marginLeft:8,color:"#f59e0b",fontSize:10}}>· ⏳ Pendiente jefa</span>}
-                                      </div>
-                                    ):(
-                                      <>
-                                        <div style={{fontSize:11,color:"#34d399",fontWeight:600,marginBottom:6}}>🧪 ¿Cuánto producto usaste?</div>
-                                        {!showGasto?(
-                                          <button onClick={()=>setGastosShow(p=>({...p,[tid]:true}))} style={{fontSize:11,padding:"5px 12px",borderRadius:6,border:"1px solid rgba(52,211,153,0.3)",background:"rgba(52,211,153,0.08)",color:"#34d399",cursor:"pointer"}}>
-                                            🧪 Registrar gasto de producto
-                                          </button>
-                                        ):(
-                                          <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                                            <div style={{display:"flex",gap:8,alignItems:"flex-end",flexWrap:"wrap"}}>
-                                              <div style={{flex:1,minWidth:80}}>
-                                                <div style={{fontSize:10,color:"#6aaa7a",marginBottom:3}}>Cantidad usada</div>
-                                                <input type="text" inputMode="decimal" value={cantGasto} onChange={e=>setGastosCant(p=>({...p,[tid]:e.target.value}))}
-                                                  placeholder="ej: 54" style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(52,211,153,0.3)",borderRadius:6,color:"#ede9e0",padding:"6px 8px",fontSize:16,fontWeight:700}}/>
-                                              </div>
-                                              <div>
-                                                <div style={{fontSize:10,color:"#6aaa7a",marginBottom:3}}>Unidad</div>
-                                                <select value={unidGasto} onChange={e=>setGastosUnid(p=>({...p,[tid]:e.target.value}))}
-                                                  style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(52,211,153,0.3)",borderRadius:6,color:"#ede9e0",padding:"6px 8px",fontSize:12}}>
-                                                  {["ml","cc","L","g","kg"].map(u=><option key={u}>{u}</option>)}
-                                                </select>
-                                              </div>
-                                            </div>
-                                            <input value={obsGasto} onChange={e=>setGastosObs(p=>({...p,[tid]:e.target.value}))}
-                                              placeholder="Observación (opcional)" style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(52,211,153,0.2)",borderRadius:6,color:"#ede9e0",padding:"5px 8px",fontSize:12,boxSizing:"border-box"}}/>
-                                            <div style={{display:"flex",gap:6}}>
-                                              <button disabled={!cantGasto} onClick={()=>{
-                                                if(!cantGasto) return;
-                                                onUpdateTarea(fechaVer,t.id,{gastoProducto:true,cantidadUsada:cantGasto,unidadUsada:unidGasto,obsGasto,gastoConfirmado:false,gastoFecha:fechaVer,productoAplicar:t.productoAplicar||t.tarea||""});
-                                                crearNotificacion&&crearNotificacion("gasto_producto",{titulo:"🧪 Gasto registrado",mensaje:`${trabajador?.nombre||"Aplicador"} usó ${cantGasto} ${unidGasto}${t.productoAplicar?" de "+t.productoAplicar:""}. Confirma y descuenta del stock.`,fecha:fechaVer,hora:new Date().toTimeString().slice(0,5),tipo:"gasto_producto",tareaId:String(t.id),tareaFecha:fechaVer,cantidadUsada:cantGasto,unidadUsada:unidGasto,productoAplicar:t.productoAplicar||""});
-                                                setGastosShow(p=>({...p,[tid]:false}));
-                                              }} style={{fontSize:11,padding:"5px 12px",borderRadius:6,border:"1px solid rgba(52,211,153,0.3)",background:"rgba(52,211,153,0.12)",color:"#34d399",cursor:"pointer",opacity:cantGasto?1:0.4}}>
-                                                💾 Guardar
-                                              </button>
-                                              <button onClick={()=>setGastosShow(p=>({...p,[tid]:false}))} style={{fontSize:11,padding:"5px 10px",borderRadius:6,border:"1px solid rgba(255,255,255,0.1)",background:"transparent",color:"#5a9a7a",cursor:"pointer"}}>Cancelar</button>
-                                            </div>
-                                          </div>
-                                        )}
-                                      </>
-                                    )}
-                                  </div>
-                                );
-                              })()}
+                              {renderBloqueGasto(t)}
                             </div>
                           );
                         })}
