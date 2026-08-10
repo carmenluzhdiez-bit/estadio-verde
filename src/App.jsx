@@ -16717,7 +16717,20 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
               <button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(34,197,94,0.1)",color:"#22c55e",border:"1px solid rgba(34,197,94,0.3)"}} onClick={()=>resolverAlerta(inc)}>✅ Resolver</button>
               <button style={{...S.btn,fontSize:11,padding:"3px 10px"}} onClick={()=>setAlertaSelId(alertaSelId===inc.id?null:inc.id)}>{alertaSelId===inc.id?"▲ Ocultar":"▼ Detalle"}</button>
               <button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(96,165,250,0.1)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.3)"}} onClick={()=>generarReporteAlerta(inc)}>📋 Imprimir ficha</button>
-              {esJefa&&<button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(239,68,68,0.08)",color:"#f87171",border:"1px solid rgba(239,68,68,0.25)"}} onClick={()=>{if(window.confirm("¿Eliminar esta alerta? Esta acción no se puede deshacer."))setIncidencias(prev=>(Array.isArray(prev)?prev:Object.values(prev||{})).filter(x=>x.id!==inc.id));}}>🗑 Eliminar</button>}
+              {esJefa&&<button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(239,68,68,0.08)",color:"#f87171",border:"1px solid rgba(239,68,68,0.25)"}} onClick={()=>{
+                if(!window.confirm("¿Eliminar esta alerta y sus tareas asociadas? Esta acción no se puede deshacer.")) return;
+                setIncidencias(prev=>(Array.isArray(prev)?prev:Object.values(prev||{})).filter(x=>x.id!==inc.id));
+                // Eliminar tareas vinculadas a esta alerta
+                setTareasProg(prev=>{
+                  const nuevo={};
+                  Object.entries(prev||{}).forEach(([fecha,tareas])=>{
+                    const arr=Array.isArray(tareas)?tareas:Object.values(tareas||{});
+                    const filtradas=arr.filter(t=>t.origenAlerta!==inc.id);
+                    if(filtradas.length>0) nuevo[fecha]=filtradas;
+                  });
+                  return nuevo;
+                });
+              }}>🗑 Eliminar</button>}
             </div>
             {alertaSelId===inc.id&&(
               <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
@@ -16853,7 +16866,19 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
                 <div style={{display:"flex",gap:6,flexShrink:0}}>
                   <button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(96,165,250,0.1)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.3)"}} onClick={()=>generarReporteAlerta(inc)}>📋 Ficha</button>
                   {esJefa&&<button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(239,68,68,0.06)",color:"#f87171",border:"1px solid rgba(239,68,68,0.2)"}}
-                    onClick={()=>{if(window.confirm("¿Eliminar esta alerta resuelta?"))setIncidencias(prev=>(Array.isArray(prev)?prev:Object.values(prev||{})).filter(x=>x.id!==inc.id));}}>🗑</button>}
+                    onClick={()=>{
+                      if(!window.confirm("¿Eliminar esta alerta resuelta y sus tareas?")) return;
+                      setIncidencias(prev=>(Array.isArray(prev)?prev:Object.values(prev||{})).filter(x=>x.id!==inc.id));
+                      setTareasProg(prev=>{
+                        const nuevo={};
+                        Object.entries(prev||{}).forEach(([fecha,tareas])=>{
+                          const arr=Array.isArray(tareas)?tareas:Object.values(tareas||{});
+                          const filtradas=arr.filter(t=>t.origenAlerta!==inc.id);
+                          if(filtradas.length>0) nuevo[fecha]=filtradas;
+                        });
+                        return nuevo;
+                      });
+                    }}>🗑</button>}
                 </div>
               </div>
             </div>
