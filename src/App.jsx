@@ -16419,12 +16419,15 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
                 style={{...S.btn,opacity:stepFito===1?0.3:1}}>← Anterior</button>
               {stepFito<4
                 ? <button className="btn-p" style={{...S.btn,background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}}
-                    onClick={()=>setStepFito(p=>Math.min(4,p+1))}>Siguiente →</button>
-                : <button className="btn-p" style={{...S.btn,background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}}
-                    disabled={!alertaForm.zonas.length||!alertaForm.descripcion.trim()}
+                    onClick={()=>setStepFito(p=>Math.min(4,p+1))}>Siguiente →</button>                : <button className="btn-p" style={{...S.btn,background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}}
+                    disabled={!alertaForm.zonas.length||(esFito?!fitoForm.agenteCausal.trim():!alertaForm.descripcion.trim())}
                     onClick={()=>{
+                      // Construir descripcion automáticamente si está vacía
+                      const descAuto = alertaForm.descripcion.trim()||
+                        [fitoForm.agenteCausal, fitoForm.sintomas, fitoForm.extensionAfectada].filter(Boolean).join(" · ");
                       // Enriquecer la alerta con datos fitosanitarios
                       setAlertaForm(p=>({...p,
+                        descripcion: descAuto,
                         tipoIcon:"🦠", tipoLabel:"Fitosanitario",
                         agenteCausal:fitoForm.agenteCausal,
                         sintomas:fitoForm.sintomas,
