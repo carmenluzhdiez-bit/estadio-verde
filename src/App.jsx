@@ -16567,8 +16567,6 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
     const nuevaAlerta = limpiarUndef({id:nuevaId,estado:"activa",tipo:alertaForm.tipo,tipoLabel:tipoObj.label,tipoIcon:tipoObj.icon,zonas:alertaForm.zonas,origen:alertaForm.origen,urgencia:alertaForm.urgencia,descripcion:alertaForm.descripcion,responsable:alertaForm.responsable,fecha:alertaForm.fecha,hora:alertaForm.hora,fechaCreacion:new Date().toISOString(),tareas:tareasEditables.filter(t=>t.incluir).map(t=>({texto:t.texto,responsable:t.responsable,estado:"pendiente"})),historial:[{accion:"Alerta creada",fecha:alertaForm.fecha,hora:alertaForm.hora,responsable:alertaForm.responsable}]});
     setIncidencias(prev=>{
       const arr = Array.isArray(prev)?prev:Object.values(prev||{});
-      // Evitar duplicado si onGuardarDirecto ya guarda en Firebase
-      if(onGuardarDirecto) return arr;
       return [nuevaAlerta, ...arr];
     });
     // Determinar si la alerta es de Golf
@@ -16616,8 +16614,7 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
       return {...prev,[alertaForm.fecha]:[tareaCierre,...tareasGen,...tareasInst,...normArr(prev[alertaForm.fecha]||[])].map(limpiarUndef)};
     });
     crearNotificacion?.("alerta",{titulo:`${tipoObj.icon} Nueva alerta: ${alertaForm.zonas.join(", ")}`,mensaje:alertaForm.descripcion,fecha:alertaForm.fecha});
-    // Guardar directamente en Firebase como respaldo
-    onGuardarDirecto&&onGuardarDirecto(nuevaAlerta);
+    // setIncidencias ya sincroniza con Firebase via useFirebaseState — no usar onGuardarDirecto
     setAlertaForm(emptyAlerta);
     setShowNuevaAlerta(false);
     setTabAlerta("incidencias");
