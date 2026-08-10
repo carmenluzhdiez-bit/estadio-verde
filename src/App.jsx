@@ -16580,7 +16580,7 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
       id:Date.now()+Math.random(), fecha:alertaForm.fecha,
       zona: esGolf ? "Golf" : zonaLabel, elemento:"",
       tarea:`🚫 CIERRE: ${zonaLabel} — ${tipoObj.icon} ${tipoObj.label}`,
-      responsable:alertaForm.responsable||"", estado:"pendiente",
+      responsable:"", estado:"por_designar",
       obs:alertaForm.descripcion, tipoEvento:"cierre_sectorial",
       origenAlerta: nuevaId,
     });
@@ -16588,7 +16588,9 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
     const tareasGen = tareasEditables.filter(t=>t.incluir).map(t=>limpiarUndef({
       id:Date.now()+Math.random(), fecha:alertaForm.fecha,
       zona: esGolf ? "Golf" : zonaLabel, elemento:"",
-      tarea:t.texto, responsable:t.responsable||alertaForm.responsable||"",
+      tarea:t.texto,
+      // Solo asignar responsable si la tarea lo tiene explícitamente
+      responsable:t.responsable||"",
       estado:t.responsable?"pendiente":"por_designar",
       obs:`Generada por alerta: ${alertaForm.descripcion}`,
       origenAlerta: nuevaId,
