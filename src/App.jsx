@@ -2719,6 +2719,10 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   // Estado de grupos colapsables — objeto {key: bool}
   const [gruposAbiertos, setGruposAbiertos] = React.useState({diarias:true,corte:false,medicion:false,riego:false,fitosan:false,limpieza:false,poda:false,otros:false});
   const [showHojas, setShowHojas] = React.useState(false);
+  const [gastosShow, setGastosShow] = React.useState({}); // {tareaId: bool}
+  const [gastosCant, setGastosCant] = React.useState({}); // {tareaId: string}
+  const [gastosUnid, setGastosUnid] = React.useState({}); // {tareaId: string}
+  const [gastosObs,  setGastosObs]  = React.useState({}); // {tareaId: string}
   const [alturaInputs, setAlturaInputs] = React.useState({});
   const [tareasAbiertas, setTareasAbiertas] = React.useState({}); // {taskId: true/false} — retraídas por defecto
   const toggleTareaAbierta = (tid) => setTareasAbiertas(p=>({...p,[tid]:!p[tid]}));
@@ -3093,11 +3097,12 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                           (t.tarea||"").toLowerCase().includes("fumigac")||
                           (t.tarea||"").toLowerCase().startsWith("🧪")
                         )&&(()=>{
+                          const tid = String(t.id);
                           const gastoGuardado = t.gastoProducto;
-                          const [showGasto,setShowGasto] = React.useState(false);
-                          const [cantGasto,setCantGasto] = React.useState(t.cantidadUsada||"");
-                          const [unidGasto,setUnidGasto] = React.useState(t.unidadUsada||"ml");
-                          const [obsGasto,setObsGasto] = React.useState(t.obsGasto||"");
+                          const showGasto = gastosShow[tid]||false;
+                          const cantGasto = gastosCant[tid]!==undefined ? gastosCant[tid] : (t.cantidadUsada||"");
+                          const unidGasto = gastosUnid[tid]||t.unidadUsada||"ml";
+                          const obsGasto  = gastosObs[tid]!==undefined  ? gastosObs[tid]  : (t.obsGasto||"");
                           return (
                             <div style={{marginTop:8,padding:"10px 12px",background:"rgba(52,211,153,0.04)",border:"1px solid rgba(52,211,153,0.2)",borderRadius:8}}>
                               {gastoGuardado?(
@@ -3112,7 +3117,7 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                                 <>
                                   <div style={{fontSize:11,color:"#34d399",fontWeight:600,marginBottom:6}}>🧪 ¿Cuánto producto usaste?</div>
                                   {!showGasto?(
-                                    <button onClick={()=>setShowGasto(true)} style={{fontSize:11,padding:"5px 12px",borderRadius:6,border:"1px solid rgba(52,211,153,0.3)",background:"rgba(52,211,153,0.08)",color:"#34d399",cursor:"pointer"}}>
+                                    <button onClick={()=>setGastosShow(p=>({...p,[tid]:true}))} style={{fontSize:11,padding:"5px 12px",borderRadius:6,border:"1px solid rgba(52,211,153,0.3)",background:"rgba(52,211,153,0.08)",color:"#34d399",cursor:"pointer"}}>
                                       🧪 Registrar gasto de producto
                                     </button>
                                   ):(
@@ -3120,18 +3125,19 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                                       <div style={{display:"flex",gap:8,alignItems:"flex-end",flexWrap:"wrap"}}>
                                         <div style={{flex:1,minWidth:80}}>
                                           <div style={{fontSize:10,color:"#6aaa7a",marginBottom:3}}>Cantidad usada</div>
-                                          <input type="text" inputMode="decimal" value={cantGasto} onChange={e=>setCantGasto(e.target.value)}
+                                          <input type="text" inputMode="decimal" value={cantGasto}
+                                            onChange={e=>setGastosCant(p=>({...p,[tid]:e.target.value}))}
                                             placeholder="ej: 54" style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(52,211,153,0.3)",borderRadius:6,color:"#ede9e0",padding:"6px 8px",fontSize:16,fontWeight:700}}/>
                                         </div>
                                         <div>
                                           <div style={{fontSize:10,color:"#6aaa7a",marginBottom:3}}>Unidad</div>
-                                          <select value={unidGasto} onChange={e=>setUnidGasto(e.target.value)}
+                                          <select value={unidGasto} onChange={e=>setGastosUnid(p=>({...p,[tid]:e.target.value}))}
                                             style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(52,211,153,0.3)",borderRadius:6,color:"#ede9e0",padding:"6px 8px",fontSize:12}}>
                                             {["ml","cc","L","g","kg"].map(u=><option key={u}>{u}</option>)}
                                           </select>
                                         </div>
                                       </div>
-                                      <input value={obsGasto} onChange={e=>setObsGasto(e.target.value)}
+                                      <input value={obsGasto} onChange={e=>setGastosObs(p=>({...p,[tid]:e.target.value}))}
                                         placeholder="Observación (opcional)" style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(52,211,153,0.2)",borderRadius:6,color:"#ede9e0",padding:"5px 8px",fontSize:12,boxSizing:"border-box"}}/>
                                       <div style={{display:"flex",gap:6}}>
                                         <button disabled={!cantGasto} onClick={()=>{
@@ -3140,18 +3146,21 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                                             gastoProducto:true, cantidadUsada:cantGasto,
                                             unidadUsada:unidGasto, obsGasto,
                                             gastoConfirmado:false, gastoFecha:fechaVer,
+                                            productoAplicar:t.productoAplicar||t.tarea||"",
                                           });
                                           crearNotificacion&&crearNotificacion("gasto_producto",{
                                             titulo:"🧪 Gasto de producto registrado",
                                             mensaje:`${trabajador?.nombre||"Aplicador"} usó ${cantGasto} ${unidGasto}${t.productoAplicar?" de "+t.productoAplicar:""}. Confirma y descuenta del stock.`,
                                             fecha:fechaVer, hora:new Date().toTimeString().slice(0,5),
-                                            tipo:"gasto_producto", tareaId:t.id, tareaFecha:fechaVer,
+                                            tipo:"gasto_producto", tareaId:String(t.id), tareaFecha:fechaVer,
+                                            cantidadUsada:cantGasto, unidadUsada:unidGasto,
+                                            productoAplicar:t.productoAplicar||"",
                                           });
-                                          setShowGasto(false);
+                                          setGastosShow(p=>({...p,[tid]:false}));
                                         }} style={{fontSize:11,padding:"5px 12px",borderRadius:6,border:"1px solid rgba(52,211,153,0.3)",background:"rgba(52,211,153,0.12)",color:"#34d399",cursor:"pointer",opacity:cantGasto?1:0.4}}>
                                           💾 Guardar
                                         </button>
-                                        <button onClick={()=>setShowGasto(false)} style={{fontSize:11,padding:"5px 10px",borderRadius:6,border:"1px solid rgba(255,255,255,0.1)",background:"transparent",color:"#5a9a7a",cursor:"pointer"}}>Cancelar</button>
+                                        <button onClick={()=>setGastosShow(p=>({...p,[tid]:false}))} style={{fontSize:11,padding:"5px 10px",borderRadius:6,border:"1px solid rgba(255,255,255,0.1)",background:"transparent",color:"#5a9a7a",cursor:"pointer"}}>Cancelar</button>
                                       </div>
                                     </div>
                                   )}
@@ -16879,40 +16888,44 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
                       <div style={{fontSize:10,color:"#4a7a5a"}}>{n.fecha} {n.hora}</div>
                     </div>
                     <button onClick={()=>{
-                      if(!n.tareaId||!n.tareaFecha) return;
-                      setTareasProg(prev=>{
-                        const arr=Array.isArray(prev[n.tareaFecha])?[...prev[n.tareaFecha]]:Object.values(prev[n.tareaFecha]||{});
-                        const tarea=arr.find(t=>String(t.id)===String(n.tareaId));
-                        if(!tarea) return prev;
-                        const cant=Number(tarea.cantidadUsada||0);
-                        const unid=(tarea.unidadUsada||"ml").toLowerCase();
-                        if(cant>0&&setBodegasData){
-                          setBodegasData(prev2=>{
-                            const nuevo={...prev2};
-                            Object.keys(nuevo).forEach(bid=>{
-                              const bdIt=nuevo[bid];
-                              const items=(bdIt.items||[]).map(it=>{
-                                const prod=(tarea.productoAplicar||"").toLowerCase().split(" ")[0];
-                                if(!prod||!it.nombre.toLowerCase().includes(prod)) return it;
-                                let descuento=cant;
-                                const su=(it.unidad||"").toLowerCase();
-                                if(su==="l"&&(unid==="ml"||unid==="cc")) descuento=cant/1000;
-                                else if((su==="ml"||su==="cc")&&unid==="l") descuento=cant*1000;
-                                else if(su==="kg"&&unid==="g") descuento=cant/1000;
-                                else if(su==="g"&&unid==="kg") descuento=cant*1000;
-                                return {...it,stockActual:Math.max(0,Number(it.stockActual||0)-descuento)};
-                              });
-                              nuevo[bid]={...bdIt,items};
+                      const cant = Number(n.cantidadUsada||0);
+                      const unid = (n.unidadUsada||"ml").toLowerCase();
+                      const prod = (n.productoAplicar||"").toLowerCase();
+                      // Descontar del stock de pesticidas
+                      if(cant>0&&prod&&setBodegasData){
+                        setBodegasData(prev2=>{
+                          const nuevo={...prev2};
+                          Object.keys(nuevo).forEach(bid=>{
+                            const bdIt=nuevo[bid];
+                            const items=(bdIt.items||[]).map(it=>{
+                              const itNom=it.nombre.toLowerCase();
+                              const palabraClave=prod.split(" ").find(w=>w.length>3&&itNom.includes(w));
+                              if(!palabraClave) return it;
+                              let descuento=cant;
+                              const su=(it.unidad||"").toLowerCase();
+                              if(su==="l"&&(unid==="ml"||unid==="cc")) descuento=cant/1000;
+                              else if((su==="ml"||su==="cc")&&unid==="l") descuento=cant*1000;
+                              else if(su==="kg"&&unid==="g") descuento=cant/1000;
+                              else if(su==="g"&&unid==="kg") descuento=cant*1000;
+                              return {...it,stockActual:Math.max(0,Number(it.stockActual||0)-descuento)};
                             });
-                            return nuevo;
+                            nuevo[bid]={...bdIt,items};
                           });
-                        }
-                        return {...prev,[n.tareaFecha]:arr.map(t=>String(t.id)===String(n.tareaId)?{...t,gastoConfirmado:true}:t)};
-                      });
+                          return nuevo;
+                        });
+                      }
+                      // Marcar notificación como confirmada
                       setNotificaciones(prev=>{
                         const arr=Array.isArray(prev)?prev:Object.values(prev||{});
-                        return arr.map(x=>x.tareaId===n.tareaId?{...x,gastoConfirmado:true}:x);
+                        return arr.map(x=>x===n||x.tareaId===n.tareaId?{...x,gastoConfirmado:true}:x);
                       });
+                      // Marcar tarea como confirmada si existe
+                      if(n.tareaId&&n.tareaFecha&&setTareasProg){
+                        setTareasProg(prev=>{
+                          const arr=Array.isArray(prev[n.tareaFecha])?[...prev[n.tareaFecha]]:Object.values(prev[n.tareaFecha]||{});
+                          return {...prev,[n.tareaFecha]:arr.map(t=>String(t.id)===String(n.tareaId)?{...t,gastoConfirmado:true}:t)};
+                        });
+                      }
                     }} style={{fontSize:11,padding:"5px 12px",borderRadius:6,border:"1px solid rgba(52,211,153,0.3)",background:"rgba(52,211,153,0.1)",color:"#34d399",cursor:"pointer",flexShrink:0}}>
                       ✅ Confirmar y descontar stock
                     </button>
