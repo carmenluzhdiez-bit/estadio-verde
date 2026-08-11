@@ -16519,6 +16519,8 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
 function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotificaciones, marcarTodasLeidas, notifNoLeidas, MACROZONAS_BASE, zonas=[], personal, tareasProg, setTareasProg, crearNotificacion, onGuardarDirecto, esJefa, autoOpen, onAutoOpenDone, bodegasData={}, setBodegasData }) {
   const [tabAlerta, setTabAlerta] = React.useState("incidencias");
   React.useEffect(()=>{ window._alertaTab = setTabAlerta; return()=>{ delete window._alertaTab; }; },[]);
+  const [editAlertaId, setEditAlertaId] = React.useState(null);
+  const [editAlertaForm, setEditAlertaForm] = React.useState({});
   const [showNuevaAlerta, setShowNuevaAlerta] = React.useState(false);
   React.useEffect(()=>{
     if(autoOpen){ setShowNuevaAlerta(true); setTabAlerta("incidencias"); onAutoOpenDone?.(); }
@@ -16760,6 +16762,20 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
               <button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(34,197,94,0.1)",color:"#22c55e",border:"1px solid rgba(34,197,94,0.3)"}} onClick={()=>resolverAlerta(inc)}>✅ Resolver</button>
               <button style={{...S.btn,fontSize:11,padding:"3px 10px"}} onClick={()=>setAlertaSelId(alertaSelId===inc.id?null:inc.id)}>{alertaSelId===inc.id?"▲ Ocultar":"▼ Detalle"}</button>
               <button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(96,165,250,0.1)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.3)"}} onClick={()=>generarReporteAlerta(inc)}>📋 Imprimir ficha</button>
+              {esJefa&&<button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(251,191,36,0.08)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.25)"}} onClick={()=>{
+                if(editAlertaId===inc.id){setEditAlertaId(null);return;}
+                setEditAlertaId(inc.id);
+                setEditAlertaForm({
+                  tipoLabel:inc.tipoLabel||"",
+                  zonas:inc.zonas||[],
+                  urgencia:inc.urgencia||"alta",
+                  responsable:inc.responsable||"",
+                  descripcion:inc.descripcion||"",
+                  elementoAfectado:inc.elementoAfectado||"",
+                  fecha:inc.fecha||"",
+                  hora:inc.hora||"",
+                });
+              }}>✏️ Editar</button>}
               {esJefa&&<button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(239,68,68,0.08)",color:"#f87171",border:"1px solid rgba(239,68,68,0.25)"}} onClick={()=>{
                 if(!window.confirm("¿Eliminar esta alerta y sus tareas asociadas? Esta acción no se puede deshacer.")) return;
                 setIncidencias(prev=>(Array.isArray(prev)?prev:Object.values(prev||{})).filter(x=>x.id!==inc.id));
@@ -16775,8 +16791,46 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
                 });
               }}>🗑 Eliminar</button>}
             </div>
-            {alertaSelId===inc.id&&(
-              <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+            {editAlertaId===inc.id&&(
+              <div style={{...S.card,padding:14,marginTop:8,border:"1px solid rgba(251,191,36,0.3)",background:"rgba(251,191,36,0.03)"}} className="ein">
+                <div style={{fontSize:12,fontWeight:700,color:"#fbbf24",marginBottom:10}}>✏️ Editar alerta</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+                  <div><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:3}}>Urgencia</label>
+                    <select style={S.input} value={editAlertaForm.urgencia} onChange={e=>setEditAlertaForm(p=>({...p,urgencia:e.target.value}))}>
+                      <option value="inmediata">🔴 Inmediata</option>
+                      <option value="alta">🟠 Alta</option>
+                      <option value="media">🟡 Media</option>
+                    </select>
+                  </div>
+                  <div><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:3}}>Responsable</label>
+                    <select style={S.input} value={editAlertaForm.responsable} onChange={e=>setEditAlertaForm(p=>({...p,responsable:e.target.value}))}>
+                      <option value="">Sin asignar</option>
+                      {personalArr.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                    </select>
+                  </div>
+                  <div><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:3}}>Elemento afectado</label>
+                    <input style={S.input} value={editAlertaForm.elementoAfectado||""} onChange={e=>setEditAlertaForm(p=>({...p,elementoAfectado:e.target.value}))} placeholder="Ej: Césped bermuda, Rododendros..."/>
+                  </div>
+                  <div><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:3}}>Fecha incidente</label>
+                    <input type="date" style={S.input} value={editAlertaForm.fecha} onChange={e=>setEditAlertaForm(p=>({...p,fecha:e.target.value}))}/>
+                  </div>
+                  <div style={{gridColumn:"1/-1"}}><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:3}}>Descripción</label>
+                    <textarea style={{...S.input,resize:"vertical",minHeight:56}} value={editAlertaForm.descripcion} onChange={e=>setEditAlertaForm(p=>({...p,descripcion:e.target.value}))}/>
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:8}}>
+                  <button className="btn-p" style={S.btn} onClick={()=>{
+                    setIncidencias(prev=>{
+                      const arr=Array.isArray(prev)?prev:Object.values(prev||{});
+                      return arr.map(x=>x.id===inc.id?{...x,...editAlertaForm}:x);
+                    });
+                    setEditAlertaId(null);
+                  }}>✓ Guardar</button>
+                  <button className="btn-g" style={S.btn} onClick={()=>setEditAlertaId(null)}>Cancelar</button>
+                </div>
+              </div>
+            )}
+            {alertaSelId===inc.id&&(              <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
                 <div style={{fontSize:11,color:"#6aaa7a",marginBottom:5}}>TAREAS GENERADAS:</div>
                 {(inc.tareas||[]).map((t,i)=>(
                   <div key={i} style={{fontSize:12,padding:"4px 8px",marginBottom:3,background:"rgba(255,255,255,0.03)",borderRadius:5,display:"flex",justifyContent:"space-between"}}>
