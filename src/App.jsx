@@ -16152,7 +16152,7 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
 
   // Campos extra fitosanitarios
   const [fitoForm, setFitoForm] = React.useState({
-    agenteCausal:"", sintomas:"", extensionAfectada:"",
+    agenteCausal:"", sintomas:"", extensionAfectada:"", elementoAfectado:"",
     productoSel:"", dosis:"", volAgua:"", responsableAplic:"",
     tiempoReingreso:"", tiempoReingresoUnidad:"horas",
     cercarZona:true, letrero:true, notificarGerencia:false,
@@ -16290,6 +16290,11 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
             {stepFito===1&&(
               <div style={{display:"flex",flexDirection:"column",gap:10}}>
                 <div style={{fontSize:13,fontWeight:600,color:"#fca5a5",marginBottom:4}}>🔍 Paso 1 — Detección del problema</div>
+                <div><label style={labelSt}>Elemento infectado / afectado</label>
+                  <input style={S.input} value={fitoForm.elementoAfectado||""} onChange={e=>setFito("elementoAfectado",e.target.value)}
+                    placeholder="Ej: Césped bermuda, Rododendros sector norte, Liquidámbar nº3, Rosales bordeadura..."/>
+                  <div style={{fontSize:10,color:"#4a7a5a",marginTop:3}}>Especifica la planta, árbol, superficie o especie afectada dentro de la zona</div>
+                </div>
                 <div><label style={labelSt}>Agente causal (qué observas)</label>
                   <input style={S.input} value={fitoForm.agenteCausal} onChange={e=>setFito("agenteCausal",e.target.value)} placeholder="Ej: Hongos, mancha parda, pulgones, ácaros..."/>
                 </div>
@@ -16455,12 +16460,13 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
                     onClick={()=>{
                       // Construir descripcion automáticamente si está vacía
                       const descAuto = alertaForm.descripcion.trim()||
-                        [fitoForm.agenteCausal, fitoForm.sintomas, fitoForm.extensionAfectada].filter(Boolean).join(" · ");
+                        [fitoForm.elementoAfectado, fitoForm.agenteCausal, fitoForm.sintomas, fitoForm.extensionAfectada].filter(Boolean).join(" · ");
                       // Enriquecer la alerta con datos fitosanitarios
                       setAlertaForm(p=>({...p,
                         descripcion: descAuto,
                         tipoIcon:"🦠", tipoLabel:"Fitosanitario",
                         agenteCausal:fitoForm.agenteCausal,
+                        elementoAfectado:fitoForm.elementoAfectado,
                         sintomas:fitoForm.sintomas,
                         extensionAfectada:fitoForm.extensionAfectada,
                         productoAplicar:fitoForm.productoSel,
@@ -16744,8 +16750,10 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
             {(()=>{
               // Extraer la observación real quitando el prefijo "Alerta fitosanitaria Golf: "
               const desc = (inc.descripcion||"").replace(/^🦠\s*/,"").replace(/^Alerta fitosanitaria\s*(Golf)?:\s*/i,"");
-              return desc ? <div style={{fontSize:12,color:"#c8e0c8",marginBottom:8,padding:"6px 10px",background:"rgba(255,255,255,0.03)",borderRadius:6,borderLeft:"2px solid rgba(52,211,153,0.2)"}}>
-                💬 <em>{desc}</em>
+              const elementoStr = inc.elementoAfectado ? `🌿 ${inc.elementoAfectado}` : null;
+              return (elementoStr||desc) ? <div style={{fontSize:12,color:"#c8e0c8",marginBottom:8,padding:"6px 10px",background:"rgba(255,255,255,0.03)",borderRadius:6,borderLeft:"2px solid rgba(52,211,153,0.2)"}}>
+                {elementoStr&&<div style={{fontWeight:600,marginBottom:2}}>{elementoStr}</div>}
+                {desc&&<em style={{color:"#9ab8a0"}}>{desc}</em>}
               </div> : null;
             })()}
             <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
