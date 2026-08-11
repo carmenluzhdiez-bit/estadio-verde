@@ -16520,7 +16520,6 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
                     onClick={()=>setStepFito(p=>Math.min(4,p+1))}>Siguiente →</button>                : <button className="btn-p" style={{...S.btn,background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}}
                     disabled={!alertaForm.zonas.length||(esFito?!fitoForm.agenteCausal.trim():!alertaForm.descripcion.trim())}
                     onClick={()=>{
-                      // Construir descripcion automáticamente si está vacía
                       const elementoFinal = Array.isArray(fitoForm.elementoAfectado)
                         ? fitoForm.elementoAfectado.join(", ")
                         : (fitoForm.elementoAfectado==="__otro__"
@@ -16528,8 +16527,9 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
                           : (fitoForm.elementoAfectado||""));
                       const descAuto = alertaForm.descripcion.trim()||
                         [elementoFinal, fitoForm.agenteCausal, fitoForm.sintomas, fitoForm.extensionAfectada].filter(Boolean).join(" · ");
-                      // Enriquecer la alerta con datos fitosanitarios
-                      setAlertaForm(p=>({...p,
+                      // Actualizar alertaForm sincrónicamente y llamar onGuardar con los datos completos
+                      const alertaCompleta = {
+                        ...alertaForm,
                         descripcion: descAuto,
                         tipoIcon:"🦠", tipoLabel:"Fitosanitario",
                         agenteCausal:fitoForm.agenteCausal,
@@ -16543,8 +16543,11 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
                         tiempoReingreso:fitoForm.tiempoReingreso+" "+fitoForm.tiempoReingresoUnidad,
                         cercarZona:fitoForm.cercarZona,
                         letrero:fitoForm.letrero,
-                      }));
-                      onGuardar();
+                        fechaAplicacion:fitoForm.fechaAplicacion||alertaForm.fecha,
+                      };
+                      setAlertaForm(alertaCompleta);
+                      // Llamar onGuardar con los datos completos directamente
+                      onGuardar(alertaCompleta);
                     }}>🚨 Registrar incidencia fitosanitaria</button>
               }
             </div>
@@ -16654,39 +16657,38 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
   const notifSorted = notifArr.filter(n=>n&&n.titulo&&n.tipo!=="bono_cancha").sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
   const URGENCIA_COLORS = {inmediata:"#ef4444",alta:"#f59e0b",media:"#60a5fa"};
 
-  const guardarAlerta = () => {
-    if(!alertaForm.zonas.length||!alertaForm.descripcion.trim()) return;
+  const guardarAlerta = (datosExtra) => {
+    const af = datosExtra || alertaForm;
+    if(!af.zonas.length||(!af.descripcion?.trim()&&!datosExtra)) return;
     if(typeof crearNotificacion !== "function") { console.error("crearNotificacion no es función"); }
-    const tipoObj = TIPOS_ALERTA.find(t=>t.id===alertaForm.tipo)||TIPOS_ALERTA[0];
+    const tipoObj = TIPOS_ALERTA.find(t=>t.id===af.tipo)||TIPOS_ALERTA[0];
     const nuevaId = Date.now()+Math.random();
-    const nuevaAlerta = limpiarUndef({id:nuevaId,estado:"activa",tipo:alertaForm.tipo,tipoLabel:tipoObj.label,tipoIcon:tipoObj.icon,zonas:alertaForm.zonas,origen:alertaForm.origen,urgencia:alertaForm.urgencia,descripcion:alertaForm.descripcion,responsable:alertaForm.responsable,fecha:alertaForm.fecha,hora:alertaForm.hora,fechaAplicacion:fitoForm.fechaAplicacion||alertaForm.fecha,elementoAfectado:Array.isArray(fitoForm.elementoAfectado)?fitoForm.elementoAfectado.join(", "):fitoForm.elementoAfectado||"",fechaCreacion:new Date().toISOString(),tareas:tareasEditables.filter(t=>t.incluir).map(t=>({texto:t.texto,responsable:t.responsable,estado:"pendiente"})),historial:[{accion:"Alerta creada",fecha:alertaForm.fecha,hora:alertaForm.hora,responsable:alertaForm.responsable}]});
+    const nuevaAlerta = limpiarUndef({id:nuevaId,estado:"activa",tipo:af.tipo,tipoLabel:af.tipoLabel||tipoObj.label,tipoIcon:af.tipoIcon||tipoObj.icon,zonas:af.zonas,origen:af.origen,urgencia:af.urgencia,descripcion:af.descripcion||"(sin descripción)",responsable:af.responsable,fecha:af.fecha,hora:af.hora,fechaAplicacion:af.fechaAplicacion||fitoForm.fechaAplicacion||af.fecha,elementoAfectado:af.elementoAfectado||"",agenteCausal:af.agenteCausal||"",fechaCreacion:new Date().toISOString(),tareas:tareasEditables.filter(t=>t.incluir).map(t=>({texto:t.texto,responsable:t.responsable,estado:"pendiente"})),historial:[{accion:"Alerta creada",fecha:af.fecha,hora:af.hora,responsable:af.responsable}]});
     setIncidencias(prev=>{
       const arr = Array.isArray(prev)?prev:Object.values(prev||{});
       return [nuevaAlerta, ...arr];
     });
     // Determinar si la alerta es de Golf
-    const esGolf = alertaForm.zonas.some(z=>z==="Golf"||(z||"").toLowerCase().includes("golf")) ||
-                   alertaForm.tipo==="golf_incid";
-    const zonaLabel = alertaForm.zonas.join(", ");
+    const esGolf = af.zonas.some(z=>z==="Golf"||(z||"").toLowerCase().includes("golf")) ||
+                   af.tipo==="golf_incid";
+    const zonaLabel = af.zonas.join(", ");
 
-
-
-    const fechaTareas = fitoForm.fechaAplicacion || alertaForm.fecha;
+    const fechaTareas = af.fechaAplicacion || fitoForm.fechaAplicacion || af.fecha;
     const tareaCierre = limpiarUndef({
       id:Date.now()+Math.random(), fecha:fechaTareas,
       zona: esGolf ? "Golf" : zonaLabel, elemento:"",
       tarea:`🚫 CIERRE: ${zonaLabel} — ${tipoObj.icon} ${tipoObj.label}`,
       responsable:"", estado:"por_designar",
-      obs:alertaForm.descripcion, tipoEvento:"cierre_sectorial",
+      obs:af.descripcion, tipoEvento:"cierre_sectorial",
       origenAlerta: nuevaId,
     });
     const tareasGen = tareasEditables.filter(t=>t.incluir).map(t=>limpiarUndef({
       id:Date.now()+Math.random(), fecha:fechaTareas,
       zona: esGolf ? "Golf" : zonaLabel, elemento:"",
       tarea:t.texto,
-      responsable:t.responsable||alertaForm.responsable||"",
-      estado:(t.responsable||alertaForm.responsable)?"pendiente":"por_designar",
-      obs:`Generada por alerta: ${alertaForm.descripcion}`,
+      responsable:t.responsable||af.responsable||"",
+      estado:(t.responsable||af.responsable)?"pendiente":"por_designar",
+      obs:`Generada por alerta: ${af.descripcion}`,
       origenAlerta: nuevaId,
     }));
 
@@ -16698,9 +16700,9 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
     ].map((t,i)=>limpiarUndef({
       id:Date.now()+Math.random()+i+100, fecha:fechaTareas,
       zona:"Administración", elemento:"",
-      tarea:t.texto+` — ${tipoObj.icon} ${alertaForm.descripcion.slice(0,60)}`,
+      tarea:t.texto+` — ${tipoObj.icon} ${af.descripcion.slice(0,60)}`,
       responsable:"", estado:"pendiente",
-      obs:`Notificación institucional — Alerta Golf ${alertaForm.fecha}`,
+      obs:`Notificación institucional — Alerta Golf ${af.fecha}`,
       origenAlerta: nuevaId,
     })) : [];
 
@@ -16708,8 +16710,7 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
       const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
       return {...prev,[fechaTareas]:[tareaCierre,...tareasGen,...tareasInst,...normArr(prev[fechaTareas]||[])].map(limpiarUndef)};
     });
-    crearNotificacion?.("alerta",{titulo:`${tipoObj.icon} Nueva alerta: ${alertaForm.zonas.join(", ")}`,mensaje:alertaForm.descripcion,fecha:alertaForm.fecha});
-    // setIncidencias ya sincroniza con Firebase via useFirebaseState — no usar onGuardarDirecto
+    crearNotificacion?.("alerta",{titulo:`${tipoObj.icon} Nueva alerta: ${af.zonas.join(", ")}`,mensaje:af.descripcion,fecha:af.fecha});
     setAlertaForm(emptyAlerta);
     setShowNuevaAlerta(false);
     setTabAlerta("incidencias");
