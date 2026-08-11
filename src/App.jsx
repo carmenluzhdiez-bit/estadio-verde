@@ -16143,7 +16143,7 @@ function PanelFrecuenciasZona({ S, zonas, getAllElems, getZD, setElemFrecs, esJe
   );
 }
 
-function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZONAS_BASE, zonas=[], personal, tareasEditables, setTareasEditables, onGuardar, onClose, bodegasData={} }) {
+function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZONAS_BASE, zonas=[], personal, tareasEditables, setTareasEditables, onGuardar, onClose, bodegasData={}, getAllElems, getZD }) {
   // Usar zonas reales si están disponibles, si no usar MACROZONAS_BASE
   const zonasLista = (zonas.length>0 ? zonas : MACROZONAS_BASE).slice().sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
   const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
@@ -16291,9 +16291,46 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
               <div style={{display:"flex",flexDirection:"column",gap:10}}>
                 <div style={{fontSize:13,fontWeight:600,color:"#fca5a5",marginBottom:4}}>🔍 Paso 1 — Detección del problema</div>
                 <div><label style={labelSt}>Elemento infectado / afectado</label>
-                  <input style={S.input} value={fitoForm.elementoAfectado||""} onChange={e=>setFito("elementoAfectado",e.target.value)}
-                    placeholder="Ej: Césped bermuda, Rododendros sector norte, Liquidámbar nº3, Rosales bordeadura..."/>
-                  <div style={{fontSize:10,color:"#4a7a5a",marginTop:3}}>Especifica la planta, árbol, superficie o especie afectada dentro de la zona</div>
+                  {(()=>{
+                    // Construir lista de elementos desde las zonas seleccionadas
+                    const elemsDisp = [];
+                    if(getAllElems && alertaForm.zonas?.length>0){
+                      alertaForm.zonas.forEach(nombreZona=>{
+                        const zona = zonas.find(z=>z.nombre===nombreZona);
+                        if(zona){
+                          const elems = getAllElems(zona.id)||[];
+                          elems.forEach(e=>{
+                            if(e.nombre) elemsDisp.push({nombre:e.nombre, tipo:e.tipo||"", zona:nombreZona});
+                          });
+                        }
+                      });
+                    }
+                    elemsDisp.sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+                    if(elemsDisp.length>0) return (
+                      <>
+                        <select style={S.input} value={fitoForm.elementoAfectado||""} onChange={e=>setFito("elementoAfectado",e.target.value)}>
+                          <option value="">— Seleccionar elemento —</option>
+                          {elemsDisp.map((e,i)=>(
+                            <option key={i} value={e.nombre}>{e.nombre}{e.tipo?" ("+e.tipo+")":""}</option>
+                          ))}
+                          <option value="__otro__">Otro (escribir)</option>
+                        </select>
+                        {fitoForm.elementoAfectado==="__otro__"&&(
+                          <input style={{...S.input,marginTop:6}} placeholder="Describe el elemento afectado..."
+                            value={fitoForm.elementoAfectadoCustom||""} onChange={e=>setFito("elementoAfectadoCustom",e.target.value)}/>
+                        )}
+                      </>
+                    );
+                    // Si no hay zonas seleccionadas o no hay elementos registrados
+                    return (
+                      <>
+                        {alertaForm.zonas?.length===0&&<div style={{fontSize:10,color:"#4a7a5a",marginBottom:4}}>Selecciona primero la zona afectada para ver sus elementos registrados</div>}
+                        <input style={S.input} value={fitoForm.elementoAfectado||""} onChange={e=>setFito("elementoAfectado",e.target.value)}
+                          placeholder="Ej: Césped bermuda, Rododendros sector norte..."/>
+                      </>
+                    );
+                  })()}
+                  <div style={{fontSize:10,color:"#4a7a5a",marginTop:3}}>Planta, árbol o superficie afectada dentro de la zona</div>
                 </div>
                 <div><label style={labelSt}>Agente causal (qué observas)</label>
                   <input style={S.input} value={fitoForm.agenteCausal} onChange={e=>setFito("agenteCausal",e.target.value)} placeholder="Ej: Hongos, mancha parda, pulgones, ácaros..."/>
@@ -16413,6 +16450,11 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
                 </div>
 
                 <div style={{fontSize:11,color:"#5a9a7a",marginBottom:8}}>Revisa y edita las tareas. Asigna responsables. Puedes agregar más.</div>
+                {tareasEditables.some(t=>t.incluir&&!t.responsable&&!alertaForm.responsable)&&(
+                  <div style={{fontSize:11,color:"#f59e0b",background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.2)",borderRadius:6,padding:"6px 10px",marginBottom:8}}>
+                    ⚠️ Algunas tareas no tienen responsable — asígnalos para que aparezcan en el turno del trabajador. Sin responsable quedan como "Por designar" en Programación.
+                  </div>
+                )}
                 {tareasEditables.map((t,i)=>(
                   <div key={t.id} style={{display:"flex",alignItems:"center",gap:6,marginBottom:6,padding:"6px 10px",background:"rgba(255,255,255,0.03)",borderRadius:8,border:"1px solid rgba(255,255,255,0.06)"}}>
                     <input type="checkbox" checked={t.incluir} onChange={()=>setTareasEditables(p=>p.map((x,j)=>j===i?{...x,incluir:!x.incluir}:x))} style={{cursor:"pointer",flexShrink:0}}/>
@@ -16459,14 +16501,17 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
                     disabled={!alertaForm.zonas.length||(esFito?!fitoForm.agenteCausal.trim():!alertaForm.descripcion.trim())}
                     onClick={()=>{
                       // Construir descripcion automáticamente si está vacía
+                      const elementoFinal = fitoForm.elementoAfectado==="__otro__"
+                        ? (fitoForm.elementoAfectadoCustom||"")
+                        : (fitoForm.elementoAfectado||"");
                       const descAuto = alertaForm.descripcion.trim()||
-                        [fitoForm.elementoAfectado, fitoForm.agenteCausal, fitoForm.sintomas, fitoForm.extensionAfectada].filter(Boolean).join(" · ");
+                        [elementoFinal, fitoForm.agenteCausal, fitoForm.sintomas, fitoForm.extensionAfectada].filter(Boolean).join(" · ");
                       // Enriquecer la alerta con datos fitosanitarios
                       setAlertaForm(p=>({...p,
                         descripcion: descAuto,
                         tipoIcon:"🦠", tipoLabel:"Fitosanitario",
                         agenteCausal:fitoForm.agenteCausal,
-                        elementoAfectado:fitoForm.elementoAfectado,
+                        elementoAfectado:elementoFinal,
                         sintomas:fitoForm.sintomas,
                         extensionAfectada:fitoForm.extensionAfectada,
                         productoAplicar:fitoForm.productoSel,
@@ -16516,7 +16561,7 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
   );
 }
 
-function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotificaciones, marcarTodasLeidas, notifNoLeidas, MACROZONAS_BASE, zonas=[], personal, tareasProg, setTareasProg, crearNotificacion, onGuardarDirecto, esJefa, autoOpen, onAutoOpenDone, bodegasData={}, setBodegasData }) {
+function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotificaciones, marcarTodasLeidas, notifNoLeidas, MACROZONAS_BASE, zonas=[], personal, tareasProg, setTareasProg, crearNotificacion, onGuardarDirecto, esJefa, autoOpen, onAutoOpenDone, bodegasData={}, setBodegasData, getAllElems, getZD }) {
   const [tabAlerta, setTabAlerta] = React.useState("incidencias");
   React.useEffect(()=>{ window._alertaTab = setTabAlerta; return()=>{ delete window._alertaTab; }; },[]);
   const [editAlertaId, setEditAlertaId] = React.useState(null);
@@ -16617,8 +16662,8 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
       id:Date.now()+Math.random(), fecha:fechaTareas,
       zona: esGolf ? "Golf" : zonaLabel, elemento:"",
       tarea:t.texto,
-      responsable:t.responsable||"",
-      estado:t.responsable?"pendiente":"por_designar",
+      responsable:t.responsable||alertaForm.responsable||"",
+      estado:(t.responsable||alertaForm.responsable)?"pendiente":"por_designar",
       obs:`Generada por alerta: ${alertaForm.descripcion}`,
       origenAlerta: nuevaId,
     }));
@@ -16703,7 +16748,7 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
       </div>
 
       {/* Modal nueva alerta */}
-      {showNuevaAlerta&&<ModalNuevaAlerta S={S} alertaForm={alertaForm} setAlertaForm={setAlertaForm} TIPOS_ALERTA={TIPOS_ALERTA} MACROZONAS_BASE={MACROZONAS_BASE} zonas={zonas.length>0?zonas:MACROZONAS_BASE} personal={personal} tareasEditables={tareasEditables} setTareasEditables={setTareasEditables} onGuardar={guardarAlerta} onClose={()=>setShowNuevaAlerta(false)} bodegasData={bodegasData}/>}
+      {showNuevaAlerta&&<ModalNuevaAlerta S={S} alertaForm={alertaForm} setAlertaForm={setAlertaForm} TIPOS_ALERTA={TIPOS_ALERTA} MACROZONAS_BASE={MACROZONAS_BASE} zonas={zonas.length>0?zonas:MACROZONAS_BASE} personal={personal} tareasEditables={tareasEditables} setTareasEditables={setTareasEditables} onGuardar={guardarAlerta} onClose={()=>setShowNuevaAlerta(false)} bodegasData={bodegasData} getAllElems={getAllElems} getZD={getZD}/>}
 
       {/* Tabs */}
       <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
@@ -20998,7 +21043,7 @@ export default function App() {
                   .then(()=>console.log("✅ Alerta guardada en Firebase:",id))
                   .catch(e=>console.error("❌ Error guardando alerta:",e));
               }}
-              autoOpen={autoOpenAlerta} onAutoOpenDone={()=>setAutoOpenAlerta(false)} notificaciones={notificaciones} setNotificaciones={setNotificaciones} marcarTodasLeidas={marcarTodasLeidas} notifNoLeidas={notifNoLeidas} MACROZONAS_BASE={MACROZONAS_BASE} zonas={zonasConCust} personal={personal} tareasProg={tareasProg} setTareasProg={setTareasProg} crearNotificacion={crearNotificacion} esJefa={esJefa} bodegasData={bodegasData} setBodegasData={setBodegasData}/>
+              autoOpen={autoOpenAlerta} onAutoOpenDone={()=>setAutoOpenAlerta(false)} notificaciones={notificaciones} setNotificaciones={setNotificaciones} marcarTodasLeidas={marcarTodasLeidas} notifNoLeidas={notifNoLeidas} MACROZONAS_BASE={MACROZONAS_BASE} zonas={zonasConCust} personal={personal} tareasProg={tareasProg} setTareasProg={setTareasProg} crearNotificacion={crearNotificacion} esJefa={esJefa} bodegasData={bodegasData} setBodegasData={setBodegasData} getAllElems={getAllElems} getZD={getZD}/>
         </ErrorBoundary>)}
 
         {showCierreSectorial&&<ModalCierreSectorial S={S} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} onClose={()=>setShowCierreSectorial(false)}/>}
