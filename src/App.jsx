@@ -16659,7 +16659,7 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
     if(typeof crearNotificacion !== "function") { console.error("crearNotificacion no es función"); }
     const tipoObj = TIPOS_ALERTA.find(t=>t.id===alertaForm.tipo)||TIPOS_ALERTA[0];
     const nuevaId = Date.now()+Math.random();
-    const nuevaAlerta = limpiarUndef({id:nuevaId,estado:"activa",tipo:alertaForm.tipo,tipoLabel:tipoObj.label,tipoIcon:tipoObj.icon,zonas:alertaForm.zonas,origen:alertaForm.origen,urgencia:alertaForm.urgencia,descripcion:alertaForm.descripcion,responsable:alertaForm.responsable,fecha:alertaForm.fecha,hora:alertaForm.hora,fechaCreacion:new Date().toISOString(),tareas:tareasEditables.filter(t=>t.incluir).map(t=>({texto:t.texto,responsable:t.responsable,estado:"pendiente"})),historial:[{accion:"Alerta creada",fecha:alertaForm.fecha,hora:alertaForm.hora,responsable:alertaForm.responsable}]});
+    const nuevaAlerta = limpiarUndef({id:nuevaId,estado:"activa",tipo:alertaForm.tipo,tipoLabel:tipoObj.label,tipoIcon:tipoObj.icon,zonas:alertaForm.zonas,origen:alertaForm.origen,urgencia:alertaForm.urgencia,descripcion:alertaForm.descripcion,responsable:alertaForm.responsable,fecha:alertaForm.fecha,hora:alertaForm.hora,fechaAplicacion:fitoForm.fechaAplicacion||alertaForm.fecha,elementoAfectado:Array.isArray(fitoForm.elementoAfectado)?fitoForm.elementoAfectado.join(", "):fitoForm.elementoAfectado||"",fechaCreacion:new Date().toISOString(),tareas:tareasEditables.filter(t=>t.incluir).map(t=>({texto:t.texto,responsable:t.responsable,estado:"pendiente"})),historial:[{accion:"Alerta creada",fecha:alertaForm.fecha,hora:alertaForm.hora,responsable:alertaForm.responsable}]});
     setIncidencias(prev=>{
       const arr = Array.isArray(prev)?prev:Object.values(prev||{});
       return [nuevaAlerta, ...arr];
@@ -16809,7 +16809,10 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
                   <div style={{fontSize:11,color:"#5a9a7a"}}>
                     {inc.zonas?.length>0&&<span>📍 {inc.zonas.join(", ")} · </span>}
                     {inc.responsable&&<span>👤 {inc.responsable} · </span>}
-                    <span>📅 {inc.fecha}{inc.hora?" "+inc.hora:""}</span>
+                    <span>📅 Incidente: {inc.fecha}{inc.hora?" "+inc.hora:""}</span>
+                    {inc.fechaAplicacion&&inc.fechaAplicacion!==inc.fecha&&(
+                      <span style={{marginLeft:6,color:"#34d399",fontWeight:600}}>· 🗓️ Aplicación: {inc.fechaAplicacion}</span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -16878,9 +16881,13 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
                     </select>
                   </div>
                   <div><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:3}}>Elemento afectado</label>
-                    <input style={S.input} value={editAlertaForm.elementoAfectado||""} onChange={e=>setEditAlertaForm(p=>({...p,elementoAfectado:e.target.value}))} placeholder="Ej: Césped bermuda, Rododendros..."/>
+                    <input style={S.input} value={
+                      Array.isArray(editAlertaForm.elementoAfectado)
+                        ? editAlertaForm.elementoAfectado.join(", ")
+                        : editAlertaForm.elementoAfectado||""
+                    } onChange={e=>setEditAlertaForm(p=>({...p,elementoAfectado:e.target.value}))} placeholder="Ej: Césped bermuda, Rododendros..."/>
                   </div>
-                  <div><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:3}}>Fecha incidente</label>
+                  <div><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:3}}>Fecha del incidente</label>
                     <input type="date" style={S.input} value={editAlertaForm.fecha} onChange={e=>setEditAlertaForm(p=>({...p,fecha:e.target.value}))}/>
                   </div>
                   <div style={{gridColumn:"1/-1"}}><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:3}}>Descripción</label>
@@ -19835,7 +19842,7 @@ export default function App() {
             )}
             {/* ── Turnos de trabajadores hoy ── */}
             {(()=>{
-              const tdHoy=new Date().toISOString().slice(0,10);
+              const tdHoy=fechaLocal();  // fecha local correcta, evita problema de timezone
               const tdNorm=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
               const tdTareas=tdNorm(tareasProg[tdHoy]);
               const tdPersonal=Array.isArray(personal)?personal:Object.values(personal||{});
