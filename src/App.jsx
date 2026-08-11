@@ -2719,6 +2719,11 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   // Estado de grupos colapsables — objeto {key: bool}
   const [gruposAbiertos, setGruposAbiertos] = React.useState({diarias:true,corte:false,medicion:false,riego:false,fitosan:false,limpieza:false,poda:false,otros:false});
   const [showHojas, setShowHojas] = React.useState(false);
+  const [gastosShow, setGastosShow] = React.useState({}); // {tareaId: bool}
+  const [gastosCant, setGastosCant] = React.useState({}); // {tareaId: string}
+  const [gastosUnid, setGastosUnid] = React.useState({}); // {tareaId: string}
+  const [gastosObs,  setGastosObs]  = React.useState({}); // {tareaId: string}
+
   const renderBloqueGasto = (t) => {
     const textoLimpio=(t.tarea||"").replace(/\p{Emoji}/gu,"").trim().toLowerCase();
     const esTareaAplic = textoLimpio.includes("aplicar")||textoLimpio.includes("aplicac")||textoLimpio.includes("fumigac")||textoLimpio.includes("fungicid");
@@ -2791,9 +2796,6 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
       </div>
     );
   };
-  const [gastosCant, setGastosCant] = React.useState({}); // {tareaId: string}
-  const [gastosUnid, setGastosUnid] = React.useState({}); // {tareaId: string}
-  const [gastosObs,  setGastosObs]  = React.useState({}); // {tareaId: string}
   const [alturaInputs, setAlturaInputs] = React.useState({});
   const [tareasAbiertas, setTareasAbiertas] = React.useState({}); // {taskId: true/false} — retraídas por defecto
   const toggleTareaAbierta = (tid) => setTareasAbiertas(p=>({...p,[tid]:!p[tid]}));
@@ -19713,7 +19715,17 @@ export default function App() {
                     {tdTrabs.map(w=>{
                       const tdKey=`${tdHoy}_${w.nombre.split(" ")[0].toLowerCase()}`;
                       const tdCerrado=cierresTurno?.[tdKey];
-                      const tdTT=tdTareasAll.filter(x=>x.responsable===w.nombre);
+                      const wN=normaliz(w.nombre);
+                      const tdTT=tdTareasAll.filter(x=>{
+                        const rN=normaliz(x.responsable);
+                        if(rN===wN) return true;
+                        if(wN.includes("bhalu")&&(rN.includes("bhalu")||rN.includes("osmar"))) return true;
+                        if(rN.includes("bhalu")&&wN.includes("osmar")) return true;
+                        // Coincidencia parcial: primer apellido
+                        const wParts=wN.split(" ").filter(p=>p.length>2);
+                        const rParts=rN.split(" ").filter(p=>p.length>2);
+                        return wParts.length>0&&rParts.length>0&&wParts.some(p=>rParts.includes(p));
+                      });
                       const tdHechas=tdTT.filter(t=>["hecha","completada"].includes(t.estado)).length;
                       const tdPct=tdTT.length?Math.round((tdHechas/tdTT.length)*100):0;
                       return (
