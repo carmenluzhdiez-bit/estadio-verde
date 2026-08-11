@@ -16152,7 +16152,7 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
 
   // Campos extra fitosanitarios
   const [fitoForm, setFitoForm] = React.useState({
-    agenteCausal:"", sintomas:"", extensionAfectada:"", elementoAfectado:"",
+    agenteCausal:"", sintomas:"", extensionAfectada:"", elementoAfectado:[], elementoCustomInput:"",
     productoSel:"", dosis:"", volAgua:"", responsableAplic:"",
     tiempoReingreso:"", tiempoReingresoUnidad:"horas",
     cercarZona:true, letrero:true, notificarGerencia:false,
@@ -16290,9 +16290,8 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
             {stepFito===1&&(
               <div style={{display:"flex",flexDirection:"column",gap:10}}>
                 <div style={{fontSize:13,fontWeight:600,color:"#fca5a5",marginBottom:4}}>🔍 Paso 1 — Detección del problema</div>
-                <div><label style={labelSt}>Elemento infectado / afectado</label>
+                <div><label style={labelSt}>Elemento(s) infectado(s) / afectado(s)</label>
                   {(()=>{
-                    // Construir lista de elementos desde las zonas seleccionadas
                     const elemsDisp = [];
                     if(getAllElems && alertaForm.zonas?.length>0){
                       alertaForm.zonas.forEach(nombreZona=>{
@@ -16300,34 +16299,55 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
                         if(zona){
                           const elems = getAllElems(zona.id)||[];
                           elems.forEach(e=>{
-                            if(e.nombre) elemsDisp.push({nombre:e.nombre, tipo:e.tipo||"", zona:nombreZona});
+                            if(e.nombre&&!elemsDisp.find(x=>x.nombre===e.nombre))
+                              elemsDisp.push({nombre:e.nombre, tipo:e.tipo||"", zona:nombreZona});
                           });
                         }
                       });
                     }
                     elemsDisp.sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
-                    if(elemsDisp.length>0) return (
-                      <>
-                        <select style={S.input} value={fitoForm.elementoAfectado||""} onChange={e=>setFito("elementoAfectado",e.target.value)}>
-                          <option value="">— Seleccionar elemento —</option>
-                          {elemsDisp.map((e,i)=>(
-                            <option key={i} value={e.nombre}>{e.nombre}{e.tipo?" ("+e.tipo+")":""}</option>
-                          ))}
-                          <option value="__otro__">Otro (escribir)</option>
-                        </select>
-                        {fitoForm.elementoAfectado==="__otro__"&&(
-                          <input style={{...S.input,marginTop:6}} placeholder="Describe el elemento afectado..."
-                            value={fitoForm.elementoAfectadoCustom||""} onChange={e=>setFito("elementoAfectadoCustom",e.target.value)}/>
-                        )}
-                      </>
-                    );
-                    // Si no hay zonas seleccionadas o no hay elementos registrados
+                    const seleccionados = Array.isArray(fitoForm.elementoAfectado)
+                      ? fitoForm.elementoAfectado
+                      : fitoForm.elementoAfectado ? [fitoForm.elementoAfectado] : [];
+                    const toggleElem = (nombre) => {
+                      const ya = seleccionados.includes(nombre);
+                      setFito("elementoAfectado", ya ? seleccionados.filter(x=>x!==nombre) : [...seleccionados, nombre]);
+                    };
                     return (
-                      <>
-                        {alertaForm.zonas?.length===0&&<div style={{fontSize:10,color:"#4a7a5a",marginBottom:4}}>Selecciona primero la zona afectada para ver sus elementos registrados</div>}
-                        <input style={S.input} value={fitoForm.elementoAfectado||""} onChange={e=>setFito("elementoAfectado",e.target.value)}
-                          placeholder="Ej: Césped bermuda, Rododendros sector norte..."/>
-                      </>
+                      <div>
+                        {/* Chips seleccionados */}
+                        {seleccionados.length>0&&(
+                          <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
+                            {seleccionados.map(n=>(
+                              <span key={n} style={{fontSize:11,padding:"3px 10px",borderRadius:20,background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)",display:"flex",gap:5,alignItems:"center"}}>
+                                {n}
+                                <button onClick={()=>toggleElem(n)} style={{background:"none",border:"none",color:"#f87171",cursor:"pointer",fontSize:13,lineHeight:1,padding:0}}>×</button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {/* Selector desde catastro */}
+                        {elemsDisp.length>0?(
+                          <select style={S.input} value="" onChange={e=>{if(e.target.value)toggleElem(e.target.value);}}>
+                            <option value="">+ Agregar elemento del catastro...</option>
+                            {elemsDisp.filter(e=>!seleccionados.includes(e.nombre)).map((e,i)=>(
+                              <option key={i} value={e.nombre}>{e.nombre}{e.tipo?" ("+e.tipo+")":""}</option>
+                            ))}
+                          </select>
+                        ):(
+                          alertaForm.zonas?.length===0&&<div style={{fontSize:10,color:"#4a7a5a",marginBottom:4}}>Selecciona primero la zona para ver sus elementos registrados</div>
+                        )}
+                        {/* Campo libre para agregar elemento no catalogado */}
+                        <div style={{display:"flex",gap:6,marginTop:6}}>
+                          <input style={{...S.input,flex:1}} placeholder="O escribe un elemento no catalogado y presiona +"
+                            value={fitoForm.elementoCustomInput||""}
+                            onChange={e=>setFito("elementoCustomInput",e.target.value)}
+                            onKeyDown={e=>{if(e.key==="Enter"&&fitoForm.elementoCustomInput?.trim()){toggleElem(fitoForm.elementoCustomInput.trim());setFito("elementoCustomInput","");}}}/>
+                          <button onClick={()=>{if(fitoForm.elementoCustomInput?.trim()){toggleElem(fitoForm.elementoCustomInput.trim());setFito("elementoCustomInput","");}}}
+                            style={{...S.btn,padding:"6px 12px",background:"rgba(239,68,68,0.1)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)",flexShrink:0}}>+</button>
+                        </div>
+                        {seleccionados.length===0&&<div style={{fontSize:10,color:"#4a7a5a",marginTop:4}}>Selecciona o escribe al menos un elemento afectado</div>}
+                      </div>
                     );
                   })()}
                   <div style={{fontSize:10,color:"#4a7a5a",marginTop:3}}>Planta, árbol o superficie afectada dentro de la zona</div>
@@ -16501,9 +16521,11 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
                     disabled={!alertaForm.zonas.length||(esFito?!fitoForm.agenteCausal.trim():!alertaForm.descripcion.trim())}
                     onClick={()=>{
                       // Construir descripcion automáticamente si está vacía
-                      const elementoFinal = fitoForm.elementoAfectado==="__otro__"
-                        ? (fitoForm.elementoAfectadoCustom||"")
-                        : (fitoForm.elementoAfectado||"");
+                      const elementoFinal = Array.isArray(fitoForm.elementoAfectado)
+                        ? fitoForm.elementoAfectado.join(", ")
+                        : (fitoForm.elementoAfectado==="__otro__"
+                          ? (fitoForm.elementoAfectadoCustom||"")
+                          : (fitoForm.elementoAfectado||""));
                       const descAuto = alertaForm.descripcion.trim()||
                         [elementoFinal, fitoForm.agenteCausal, fitoForm.sintomas, fitoForm.extensionAfectada].filter(Boolean).join(" · ");
                       // Enriquecer la alerta con datos fitosanitarios
@@ -16797,7 +16819,9 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
             {(()=>{
               // Extraer la observación real quitando el prefijo "Alerta fitosanitaria Golf: "
               const desc = (inc.descripcion||"").replace(/^🦠\s*/,"").replace(/^Alerta fitosanitaria\s*(Golf)?:\s*/i,"");
-              const elementoStr = inc.elementoAfectado ? `🌿 ${inc.elementoAfectado}` : null;
+              const elementoStr = inc.elementoAfectado
+                ? `🌿 ${Array.isArray(inc.elementoAfectado)?inc.elementoAfectado.join(", "):inc.elementoAfectado}`
+                : null;
               return (elementoStr||desc) ? <div style={{fontSize:12,color:"#c8e0c8",marginBottom:8,padding:"6px 10px",background:"rgba(255,255,255,0.03)",borderRadius:6,borderLeft:"2px solid rgba(52,211,153,0.2)"}}>
                 {elementoStr&&<div style={{fontWeight:600,marginBottom:2}}>{elementoStr}</div>}
                 {desc&&<em style={{color:"#9ab8a0"}}>{desc}</em>}
