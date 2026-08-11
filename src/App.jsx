@@ -7212,24 +7212,28 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                     <div style={{display:"flex",flexDirection:"column",gap:6,alignItems:"flex-end",flexShrink:0}}>
                       {/* Botón para seguir el proceso — ir a Registrar con datos pre-cargados */}
                       {esJefa&&inc.tipoCierre==="fitosanitario"&&inc.estado!=="reabierta"&&(
-                        <button style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(96,165,250,0.15)",color:"#93c5fd",border:"1px solid rgba(96,165,250,0.3)"}}
-                          onClick={()=>{
-                            setSubTab("registro");
-                            // Pre-cargar el formulario con los datos de la incidencia
-                            setTimeout(()=>{
-                              const sects=[...(inc.sectoresCerrados||[]),(inc.sectorCustom||"")].filter(Boolean);
-                              setForm(p=>({...p,
-                                sectorGrupo:"",sectorDetalle:"",sectorCustom:"",
-                                sectoresSeleccionados:sects,
-                                superficie:sects[0]||"",
-                                responsable:inc.observador||"",
-                                fecha:new Date().toISOString().slice(0,10),
-                                obs:"Tratamiento: "+(inc.agenteCausal||inc.diagnostico||""),
-                              }));
-                            },100);
-                          }}>
-                          📝 Ir a Registrar
-                        </button>
+                        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3}}>
+                          <button style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(96,165,250,0.15)",color:"#93c5fd",border:"1px solid rgba(96,165,250,0.3)"}}
+                            onClick={()=>{
+                              setSubTab("registro");
+                              setTimeout(()=>{
+                                const sects=[...(inc.sectoresCerrados||[]),(inc.sectorCustom||"")].filter(Boolean);
+                                setForm(p=>({...p,
+                                  sectorGrupo:"",sectorDetalle:"",sectorCustom:"",
+                                  sectoresSeleccionados:sects,
+                                  superficie:sects[0]||"",
+                                  responsable:inc.observador||"",
+                                  fecha:new Date().toISOString().slice(0,10),
+                                  obs:"Tratamiento: "+(inc.agenteCausal||inc.diagnostico||""),
+                                }));
+                              },100);
+                            }}>
+                            📝 Ir a Registrar aplicación
+                          </button>
+                          <div style={{fontSize:9,color:"#4a7a5a",textAlign:"right",maxWidth:160,lineHeight:1.3}}>
+                            Al registrar con ✓ Enviar a programación, la tarea de aplicación queda asignada en Programación General
+                          </div>
+                        </div>
                       )}
                       {inc.estado==="cerrada"&&(
                         <button style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(34,197,94,0.15)",color:"#86efac",border:"1px solid rgba(34,197,94,0.3)"}}
@@ -7496,8 +7500,8 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                     {form.enviarProg&&<span style={{color:"#fff",fontSize:13}}>✓</span>}
                   </div>
                   <div>
-                    <div style={{fontSize:13,color:"#a0d8b0",fontWeight:600}}>📆 Enviar a Programa del Día</div>
-                    <div style={{fontSize:11,color:"#5a8a6a"}}>Aparecerá en la vista Programación para asignar al equipo</div>
+                    <div style={{fontSize:13,color:"#a0d8b0",fontWeight:600}}>📆 Enviar a Programación General</div>
+                    <div style={{fontSize:11,color:"#5a8a6a"}}>Crea una tarea de aplicación en Programación Diaria → visible para el equipo y asignable a un jardinero</div>
                   </div>
                 </div>
               </div>
@@ -16385,7 +16389,25 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
             {stepFito===4&&(
               <div>
                 <div style={{fontSize:13,fontWeight:600,color:"#fca5a5",marginBottom:8}}>✅ Paso 4 — Tareas y documentación</div>
-                <div style={{fontSize:11,color:"#5a9a7a",marginBottom:10}}>Revisa y edita las tareas. Asigna responsables. Puedes agregar más.</div>
+
+                {/* Fecha de aplicación — puede ser distinta a la fecha del incidente */}
+                <div style={{...S.card,padding:12,marginBottom:12,background:"rgba(52,211,153,0.04)",border:"1px solid rgba(52,211,153,0.2)"}}>
+                  <div style={{fontSize:11,fontWeight:700,color:"#34d399",marginBottom:6}}>📅 ¿Cuándo se realizarán estas tareas?</div>
+                  <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+                    <div style={{flex:1}}>
+                      <label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:3}}>Fecha de aplicación / intervención</label>
+                      <input type="date" style={S.input} value={fitoForm.fechaAplicacion||alertaForm.fecha}
+                        onChange={e=>setFito("fechaAplicacion",e.target.value)}/>
+                    </div>
+                    <div style={{fontSize:11,color:"#5a9a7a",paddingTop:18}}>
+                      {(fitoForm.fechaAplicacion||alertaForm.fecha)===alertaForm.fecha
+                        ?"📌 Mismo día del incidente"
+                        :"📅 Programado para "+ new Date((fitoForm.fechaAplicacion||alertaForm.fecha)+"T12:00:00").toLocaleDateString("es-CL",{weekday:"long",day:"numeric",month:"long"})}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{fontSize:11,color:"#5a9a7a",marginBottom:8}}>Revisa y edita las tareas. Asigna responsables. Puedes agregar más.</div>
                 {tareasEditables.map((t,i)=>(
                   <div key={t.id} style={{display:"flex",alignItems:"center",gap:6,marginBottom:6,padding:"6px 10px",background:"rgba(255,255,255,0.03)",borderRadius:8,border:"1px solid rgba(255,255,255,0.06)"}}>
                     <input type="checkbox" checked={t.incluir} onChange={()=>setTareasEditables(p=>p.map((x,j)=>j===i?{...x,incluir:!x.incluir}:x))} style={{cursor:"pointer",flexShrink:0}}/>
@@ -16572,34 +16594,34 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
                    alertaForm.tipo==="golf_incid";
     const zonaLabel = alertaForm.zonas.join(", ");
 
+
+
+    const fechaTareas = fitoForm.fechaAplicacion || alertaForm.fecha;
     const tareaCierre = limpiarUndef({
-      id:Date.now()+Math.random(), fecha:alertaForm.fecha,
+      id:Date.now()+Math.random(), fecha:fechaTareas,
       zona: esGolf ? "Golf" : zonaLabel, elemento:"",
       tarea:`🚫 CIERRE: ${zonaLabel} — ${tipoObj.icon} ${tipoObj.label}`,
       responsable:"", estado:"por_designar",
       obs:alertaForm.descripcion, tipoEvento:"cierre_sectorial",
       origenAlerta: nuevaId,
     });
-
     const tareasGen = tareasEditables.filter(t=>t.incluir).map(t=>limpiarUndef({
-      id:Date.now()+Math.random(), fecha:alertaForm.fecha,
+      id:Date.now()+Math.random(), fecha:fechaTareas,
       zona: esGolf ? "Golf" : zonaLabel, elemento:"",
       tarea:t.texto,
-      // Solo asignar responsable si la tarea lo tiene explícitamente
       responsable:t.responsable||"",
       estado:t.responsable?"pendiente":"por_designar",
       obs:`Generada por alerta: ${alertaForm.descripcion}`,
       origenAlerta: nuevaId,
     }));
 
-    // Si es Golf: agregar tareas institucionales de notificación
     const tareasInst = esGolf ? [
       {texto:"🏌️ Avisar a socios Rama Golf", resp:""},
       {texto:"⚽ Informar a Gerencia Deportes", resp:""},
       {texto:"⚙️ Informar a GO Marco Romero", resp:""},
       {texto:"🏢 Informar a GG Javier Viñales", resp:""},
     ].map((t,i)=>limpiarUndef({
-      id:Date.now()+Math.random()+i+100, fecha:alertaForm.fecha,
+      id:Date.now()+Math.random()+i+100, fecha:fechaTareas,
       zona:"Administración", elemento:"",
       tarea:t.texto+` — ${tipoObj.icon} ${alertaForm.descripcion.slice(0,60)}`,
       responsable:"", estado:"pendiente",
@@ -16609,7 +16631,7 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
 
     setTareasProg(prev=>{
       const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-      return {...prev,[alertaForm.fecha]:[tareaCierre,...tareasGen,...tareasInst,...normArr(prev[alertaForm.fecha]||[])].map(limpiarUndef)};
+      return {...prev,[fechaTareas]:[tareaCierre,...tareasGen,...tareasInst,...normArr(prev[fechaTareas]||[])].map(limpiarUndef)};
     });
     crearNotificacion?.("alerta",{titulo:`${tipoObj.icon} Nueva alerta: ${alertaForm.zonas.join(", ")}`,mensaje:alertaForm.descripcion,fecha:alertaForm.fecha});
     // setIncidencias ya sincroniza con Firebase via useFirebaseState — no usar onGuardarDirecto
