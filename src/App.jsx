@@ -40,8 +40,11 @@ const getRolByEmail = (email, emailsExtra={}) => {
   if(!email) return null;
   const lower = email.toLowerCase();
   if(ROLES_EMAIL[lower]) return ROLES_EMAIL[lower];
+  // Firebase no permite puntos en claves — se guardan con comas
+  const lowerConComas = lower.replace(/\./g,",");
   if(emailsExtra[lower]) return emailsExtra[lower];
-  return null; // sin acceso si no está registrado
+  if(emailsExtra[lowerConComas]) return emailsExtra[lowerConComas];
+  return null;
 };
 
 // Hook genérico Firebase ↔ React state
@@ -20812,14 +20815,11 @@ export default function App() {
                     <button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}}
                       onClick={()=>{
                         if(!window.confirm(`¿Eliminar acceso de ${email}?`)) return;
-                        fbUpdate(ref(db, `${ROOT}/config/emails_extra`), {[email]:null})
-                          .then(()=>console.log("✅ Email eliminado:",email))
-                          .catch(e=>console.error("❌ Error:",e));
-                        setEmailsExtra(prev=>{
-                          const n={...prev};
-                          delete n[email];
-                          return n;
-                        });
+                        fbSet(ref(db, `${ROOT}/config/emails_extra/${email.replace(/\./g,",")}`), null)
+                          .then(()=>{
+                            setEmailsExtra(prev=>{ const n={...prev}; delete n[email]; return n; });
+                          })
+                          .catch(e=>alert("❌ Error: "+e.message));
                       }}>🗑</button>
                   </div>
                 ))}
@@ -20847,13 +20847,20 @@ export default function App() {
                     disabled={!newAccesoEmail||!newAccesoEmail.includes("@")}
                     onClick={()=>{
                       if(!newAccesoEmail||!newAccesoEmail.includes("@")) return;
-                      // Guardar directamente en Firebase para asegurar persistencia
-                      const emailKey = newAccesoEmail.replace(/\./g,"_dot_").replace(/@/g,"_at_");
-                      fbUpdate(ref(db, `${ROOT}/config/emails_extra`), {[newAccesoEmail]:newAccesoRol})
-                        .then(()=>console.log("✅ Email guardado:",newAccesoEmail,newAccesoRol))
-                        .catch(e=>console.error("❌ Error:",e));
-                      setEmailsExtra(prev=>({...prev,[newAccesoEmail]:newAccesoRol}));
-                      setNewAccesoEmail("");
+                      const emailGuardar = newAccesoEmail;
+                      const rolGuardar = newAccesoRol;
+                      // Intentar escritura directa en Firebase
+                      fbSet(ref(db, `${ROOT}/config/emails_extra/${emailGuardar.replace(/\./g,",")}`), rolGuardar)
+                        .then(()=>{
+                          console.log("✅ Guardado:",emailGuardar,rolGuardar);
+                          setEmailsExtra(prev=>({...prev,[emailGuardar]:rolGuardar}));
+                          setNewAccesoEmail("");
+                          alert("✅ Acceso guardado correctamente");
+                        })
+                        .catch(e=>{
+                          console.error("❌ Error guardando:",e);
+                          alert("❌ Error: "+e.message+"\n\nRevisa las reglas de Firebase.");
+                        });
                     }}>➕ Agregar</button>
                 </div>
                 <div style={{fontSize:10,color:"#4a7a5a",marginTop:8}}>
@@ -20877,17 +20884,7 @@ export default function App() {
                     <input type={type} style={S.input} value={nuevoTrabajador[key]||""} onChange={e=>setNuevoTrabajador(p=>({...p,[key]:e.target.value}))}/>
                   </div>
                 ))}
-                {/* PIN en fila propia */}
-                <div style={{gridColumn:"1/-1",background:"rgba(61,122,82,0.08)",border:"1px solid rgba(61,122,82,0.2)",borderRadius:10,padding:"12px 14px"}}>
-                  <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:6,letterSpacing:"0.5px"}}>🔐 PIN DE ACCESO (4 DÍGITOS)</label>
-                  <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
-                    <input type="password" maxLength={4} placeholder="••••"
-                      style={{...S.input,maxWidth:140,fontSize:20,letterSpacing:"0.5em",textAlign:"center"}}
-                      value={nuevoTrabajador.pin||""} onChange={e=>setNuevoTrabajador(p=>({...p,pin:e.target.value}))}/>
-                    <div style={{fontSize:12,color:"#5a8a6a"}}>El trabajador usa este PIN para acceder a sus tareas en 🌿 Mi Turno</div>
-                  </div>
-                </div>
-                <div>
+                <div style={{gridColumn:"1/-1"}}>
                   <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>CARGO</label>
                   <select style={S.input} value={nuevoTrabajador.cargo} onChange={e=>setNuevoTrabajador(p=>({...p,cargo:e.target.value}))}>
                     <option value="">Seleccionar...</option>
