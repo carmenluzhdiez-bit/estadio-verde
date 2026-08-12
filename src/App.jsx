@@ -18522,9 +18522,6 @@ export default function App() {
   const [workerARevisar, setWorkerARevisar] = useState(null);
   const [showCierreSectorial, setShowCierreSectorial] = useState(false);
   const [workerLogueado, setWorkerLogueado] = useState(null);
-  const [workerPinError, setWorkerPinError] = useState(false);
-  const [workerPinInput, setWorkerPinInput] = useState("");
-  const [rolSeleccionado, setRolSeleccionado] = useState("trabajador");
   const [fbRol,     setFbRol]     = useState(null);
   const [authReady, setAuthReady] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
@@ -20747,108 +20744,6 @@ export default function App() {
               </div>
             )}
 
-            {/* ── Login screen ── */}
-            {!rolLogueado&&(
-              <div style={{maxWidth:380,margin:"50px auto 0"}}>
-                <div style={{textAlign:"center",marginBottom:28}}>
-                  <div style={{fontSize:48,marginBottom:12}}>🌿</div>
-                  <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:900,marginBottom:6}}>Acceso por Rol</h2>
-                  <p style={{color:"#6aaa7a",fontSize:14}}>Selecciona tu rol e ingresa tu PIN</p>
-                </div>
-
-                {/* Role selector */}
-                <div style={{display:"flex",gap:8,marginBottom:20,justifyContent:"center"}}>
-                  {[
-                    {key:"trabajador",label:"👷 Trabajador",color:"#3d7a52"},
-                    {key:"supervisor",label:"🎯 Supervisor",color:"#2563eb"},
-                    {key:"jefa",     label:"🌿 Jefa AV",   color:"#7c3aed"},
-                  ].map(r=>(
-                    <button key={r.key} onClick={()=>{setRolSeleccionado(r.key);setWorkerPinInput("");setWorkerPinError(false);setWorkerLogueado(null);}}
-                      style={{flex:1,cursor:"pointer",border:`2px solid ${rolSeleccionado===r.key?r.color:"rgba(255,255,255,0.1)"}`,borderRadius:10,padding:"10px 6px",background:rolSeleccionado===r.key?`${r.color}22`:"rgba(255,255,255,0.04)",color:rolSeleccionado===r.key?"#fff":"#7aaa80",fontFamily:"'Georgia',serif",fontSize:12,transition:"all .15s"}}>
-                      {r.label}
-                    </button>
-                  ))}
-                </div>
-
-                <div style={{background:"rgba(255,255,255,0.055)",border:"1px solid rgba(255,255,255,0.10)",borderRadius:14,padding:24}}>
-                  {/* Worker: select from list */}
-                  {rolSeleccionado==="trabajador"&&(
-                    <div style={{marginBottom:14}}>
-                      <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:5,letterSpacing:"0.5px"}}>TRABAJADOR</label>
-                      <select style={S.input} value={workerLogueado||""} onChange={e=>{setWorkerLogueado(e.target.value);setWorkerPinError(false);setWorkerPinInput("");}}>
-                        <option value="">Seleccionar...</option>
-                        {personal.filter(p=>p.cargo!=="Jefa de Áreas Verdes"&&p.cargo!=="Supervisor de Áreas Verdes")
-                          .sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}))
-                          .map(t=><option key={t.id} value={t.id}>{t.nombre} {t.cargo?" · "+t.cargo:""}</option>)}
-                      </select>
-                    </div>
-                  )}
-
-                  <div style={{marginBottom:18}}>
-                    <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:5,letterSpacing:"0.5px"}}>PIN (4 DÍGITOS)</label>
-                    <input type="password" maxLength={4} placeholder="••••"
-                      style={{...S.input,fontSize:22,letterSpacing:"0.6em",textAlign:"center"}}
-                      value={workerPinInput}
-                      onChange={e=>{setWorkerPinInput(e.target.value);setWorkerPinError(false);}}
-                      onKeyDown={e=>{
-                        if(e.key!=="Enter") return;
-                        if(rolSeleccionado==="trabajador"){
-                          const wrkT=personal.find(x=>String(x.id)===String(workerLogueado));
-                          if(wrkT&&String(wrkT.pin)===String(workerPinInput)){setVistaWorker(true);setWorkerPinError(false);}
-                          else setWorkerPinError(true);
-                        } else {
-                          if(checkPin(rolSeleccionado,workerPinInput)){setWorkerPinError(false);}
-                          else setWorkerPinError(true);
-                        }
-                      }}
-                    />
-                    {workerPinError&&<div style={{color:"#fca5a5",fontSize:12,marginTop:6,textAlign:"center"}}>PIN incorrecto. Intenta nuevamente.</div>}
-                    {rolSeleccionado==="trabajador"&&workerLogueado&&!personal.find(x=>String(x.id)===String(workerLogueado))?.pin&&(
-                      <div style={{color:"#f59e0b",fontSize:11,marginTop:6,textAlign:"center"}}>⚠️ Sin PIN configurado. Configúralo en la ficha.</div>
-                    )}
-                    {(rolSeleccionado==="supervisor"||rolSeleccionado==="jefa")&&!getPines()[rolSeleccionado]&&(
-                      <div style={{color:"#f59e0b",fontSize:11,marginTop:6,textAlign:"center"}}>⚠️ PIN no configurado aún.</div>
-                    )}
-                  </div>
-
-                  <button style={{...S.btn,width:"100%",padding:"12px",fontSize:15,background:"#3d7a52",color:"#fff",cursor:"pointer"}}
-                    onClick={()=>{
-                      if(rolSeleccionado==="trabajador"){
-                        const wrkT2=personal.find(x=>String(x.id)===String(workerLogueado));
-                        if(wrkT2&&String(wrkT2.pin)===String(workerPinInput)){setVistaWorker(true);setWorkerPinError(false);}
-                        else setWorkerPinError(true);
-                      } else {
-                        if(checkPin(rolSeleccionado,workerPinInput)){setWorkerPinError(false);}
-                        else setWorkerPinError(true);
-                      }
-                    }}>
-                    Ingresar →
-                  </button>
-                </div>
-
-                {/* PIN config for jefa/supervisor roles */}
-                {/* Configuración de PINs — siempre disponible en modo setup */}
-                <PinConfig getPines={getPines} setPinRol={setPinRol} S={S}/>
-              </div>
-            )}
-
-            {/* ── Jefa logged in → redirect to main app ── */}
-            {rolLogueado==="jefa"&&(
-              <div className="ein" style={{textAlign:"center",paddingTop:40}}>
-                <div style={{fontSize:48,marginBottom:16}}>🌿</div>
-                <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:900,marginBottom:8}}>Bienvenida, Jefa de Áreas Verdes</h2>
-                <p style={{color:"#6aaa7a",fontSize:14,marginBottom:24}}>Usa el menú de navegación para acceder a todas las secciones.</p>
-                <button onClick={()=>setVista("programacion")} style={{...S.btn,background:"#3d7a52",color:"#fff",fontSize:15,padding:"12px 28px"}}>📆 Ir a Programación →</button>
-                <button onClick={()=>setVista("fungicidas")} style={{...S.btn,background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)",fontSize:13,padding:"10px 20px"}}>🚫 Registrar cierre sectorial</button>
-                <div style={{marginTop:12}}>
-                  <button onClick={()=>{setWorkerPinInput("");}} style={{...S.btn,background:"transparent",color:"#6aaa7a",border:"1px solid rgba(255,255,255,0.1)",fontSize:13}}>← Cerrar sesión</button>
-
-                <div style={{maxWidth:380,margin:"24px auto 0"}}>
-                  <PinConfig getPines={getPines} setPinRol={setPinRol} S={S}/>
-                </div>
-                </div>
-              </div>
-            )}
           </div>
         )}
 
