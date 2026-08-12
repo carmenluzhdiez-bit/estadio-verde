@@ -4225,62 +4225,6 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
 }
 
 // ─── CONFIGURADOR DE PIN POR ROL ─────────────────────────────────────────────
-function PinConfig({ getPines, setPinRol, S }) {
-  const [open, setOpen] = React.useState(false);
-  const [editRol, setEditRol] = React.useState("jefa");
-  const [pin1, setPin1] = React.useState("");
-  const [pin2, setPin2] = React.useState("");
-  const [msg, setMsg] = React.useState("");
-  const [pines, setPines] = React.useState(getPines);
-
-  const guardar = () => {
-    if(pin1.length!==4){setMsg("El PIN debe tener 4 dígitos.");return;}
-    if(pin1!==pin2){setMsg("Los PINs no coinciden.");return;}
-    setPinRol(editRol, pin1);
-    setPines(getPines()); // re-read to update UI
-    setPin1(""); setPin2("");
-    setMsg("✅ PIN guardado correctamente.");
-    setTimeout(()=>setMsg(""),3000);
-  };
-
-  return (
-    <div style={{marginTop:20}}>
-      <button onClick={()=>setOpen(o=>!o)}
-        style={{...S.btn,background:"transparent",color:"#5a8a6a",border:"1px solid rgba(255,255,255,0.08)",fontSize:12,width:"100%"}}>
-        ⚙️ {open?"Ocultar":"Configurar"} PINs de Jefa / Supervisor
-      </button>
-      {open&&(
-        <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:18,marginTop:10}} className="ein">
-          <div style={{marginBottom:12}}>
-            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>ROL</label>
-            <div style={{display:"flex",gap:6}}>
-              {[["jefa","🌿 Jefa AV"],["supervisor","🎯 Supervisor"]].map(([r,l])=>(
-                <button key={r} onClick={()=>{setEditRol(r);setPin1("");setPin2("");setMsg("");}}
-                  style={{flex:1,cursor:"pointer",border:`1px solid ${editRol===r?"rgba(61,122,82,0.5)":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"7px 4px",background:editRol===r?"rgba(61,122,82,0.2)":"transparent",color:editRol===r?"#90d0a0":"#7aaa80",fontFamily:"'Georgia',serif",fontSize:12}}>
-                  {l} {pines[r]?"🔒":"❌"}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
-            <div>
-              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>NUEVO PIN</label>
-              <input type="password" maxLength={4} placeholder="••••" value={pin1} onChange={e=>setPin1(e.target.value)}
-                style={{...S.input,fontSize:18,letterSpacing:"0.5em",textAlign:"center"}}/>
-            </div>
-            <div>
-              <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>CONFIRMAR</label>
-              <input type="password" maxLength={4} placeholder="••••" value={pin2} onChange={e=>setPin2(e.target.value)}
-                style={{...S.input,fontSize:18,letterSpacing:"0.5em",textAlign:"center"}}/>
-            </div>
-          </div>
-          {msg&&<div style={{fontSize:12,color:msg.startsWith("✅")?"#86efac":"#fca5a5",marginBottom:8,textAlign:"center"}}>{msg}</div>}
-          <button onClick={guardar} style={{...S.btn,background:"#3d7a52",color:"#fff",width:"100%",fontSize:13}}>💾 Guardar PIN</button>
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ─── VISTA DESIGNACIÓN (SUPERVISOR) ─────────────────────────────────────────
 function VistaDesignacion({ S, tareasProg, setTareasProg, personal, MACROZONAS_BASE, zonas=[], onSalir }) {
@@ -5679,7 +5623,6 @@ function TipoEventoSelector({ value, onChange, S, TIPO_EVENTO }) {
 
 function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDeleteEvento, onUpdateEvento }) {
   const [tab, setTab] = React.useState("ficha");
-  const [verPin, setVerPin] = React.useState(false);
   const [showNuevoEvento, setShowNuevoEvento] = React.useState(false);
   const [nuevoEvento, setNuevoEvento] = React.useState({ tipo:"permiso", fecha:"", fechaFin:"", horas:"", descripcion:"", estado:"pendiente" });
   const [editEventoId, setEditEventoId] = React.useState(null);
@@ -6257,7 +6200,7 @@ const PERSONAL_INICIAL = [
       {dias:"Jue · Vie",entrada:"08:00",almInicio:"13:00",almTermino:"14:00",salida:"16:00",hrsDia:"7"},
       {dias:"Sáb",entrada:"08:00",almInicio:"—",almTermino:"—",salida:"12:00",hrsDia:"4"},
     ],
-    estado:"vigente", pin:"", notas:"", eventos:[],
+    estado:"vigente", notas:"", eventos:[],
   },
   {
     id: 1003, nombre:"Andrés Astorga Guzmán", rut:"17.879.479-5",
@@ -6272,7 +6215,7 @@ const PERSONAL_INICIAL = [
       {dias:"Jue · Vie",entrada:"08:00",almInicio:"13:00",almTermino:"14:00",salida:"16:00",hrsDia:"7"},
       {dias:"Sáb",entrada:"08:00",almInicio:"—",almTermino:"—",salida:"12:00",hrsDia:"4"},
     ],
-    estado:"vigente", pin:"", notas:"Ingreso anterior: 30-08-2021", eventos:[],
+    estado:"vigente", notas:"Ingreso anterior: 30-08-2021", eventos:[],
   },
   {
     id: 1004, nombre:"Osmar Bhalú Armijo Zúñiga", rut:"15.065.268-5",
@@ -6287,7 +6230,7 @@ const PERSONAL_INICIAL = [
       {dias:"Jue · Vie",entrada:"08:00",almInicio:"13:00",almTermino:"14:00",salida:"16:00",hrsDia:"7"},
       {dias:"Sáb",entrada:"08:00",almInicio:"—",almTermino:"—",salida:"12:00",hrsDia:"4"},
     ],
-    estado:"vigente", pin:"", notas:"", eventos:[],
+    estado:"vigente", notas:"", eventos:[],
   },
   {
     id: 1005, nombre:"Sergio Esteban Peña Quintanilla", rut:"13.682.102-4",
@@ -6302,7 +6245,7 @@ const PERSONAL_INICIAL = [
       {dias:"Jue · Vie",entrada:"08:00",almInicio:"13:00",almTermino:"14:00",salida:"16:00",hrsDia:"7"},
       {dias:"Sáb",entrada:"08:00",almInicio:"—",almTermino:"—",salida:"12:00",hrsDia:"4"},
     ],
-    estado:"vigente", pin:"", notas:"", eventos:[],
+    estado:"vigente", notas:"", eventos:[],
   },
   {
     id: 1006, nombre:"Saúl Molina Escalera", rut:"28.444.223-7",
@@ -6317,7 +6260,7 @@ const PERSONAL_INICIAL = [
       {dias:"Jue · Vie",entrada:"08:00",almInicio:"13:00",almTermino:"14:00",salida:"16:00",hrsDia:"7"},
       {dias:"Sáb",entrada:"08:00",almInicio:"—",almTermino:"—",salida:"12:00",hrsDia:"4"},
     ],
-    estado:"vigente", pin:"", notas:"", eventos:[],
+    estado:"vigente", notas:"", eventos:[],
   },
 ];
 
@@ -18831,8 +18774,6 @@ export default function App() {
   }, [fbRol, fbUser, personal]);
 
   // PINes siguen en localStorage (son locales por dispositivo)
-  const getPines    = () => { try { return JSON.parse(localStorage.getItem("ev2-pines")||"{}"); } catch { return {}; } };
-  const setPinRol   = (rol, pin) => { const p=getPines(); p[rol]=pin; localStorage.setItem("ev2-pines", JSON.stringify(p)); };
   const [personalVista, setPersonalVista] = useState("lista");
   const [newAccesoEmail, setNewAccesoEmail] = useState("");
   const [newAccesoRol, setNewAccesoRol] = useState("jefa");
@@ -18840,7 +18781,7 @@ export default function App() {
   const [personalTab, setPersonalTab] = useState("ficha");
   const [showNuevoEvento, setShowNuevoEvento] = useState(false);
   const [nuevoEvento, setNuevoEvento] = useState({ tipo:"permiso", fecha:"", fechaFin:"", horas:"", descripcion:"", estado:"pendiente" });
-  const [nuevoTrabajador, setNuevoTrabajador] = useState({ nombre:"", rut:"", cargo:"", zona:"", telefono:"", email:"", fechaIngreso:"", contrato:"indefinido", foto:"", pin:"" });
+  const [nuevoTrabajador, setNuevoTrabajador] = useState({ nombre:"", rut:"", cargo:"", zona:"", telefono:"", email:"", fechaIngreso:"", contrato:"indefinido", foto:"" });
   // [worker states moved up]
   const rolLogueado = fbRol;
   // Gerencia: solo lectura — envuelve todos los setters para que no escriban
@@ -18864,7 +18805,6 @@ export default function App() {
   },[esTrabajador]);
 
   // ─── FUNGICIDAS ──────────────────────────────────────────────────────────────
-  const checkPin = (rol, pin) => { const p=getPines(); return p[rol] && String(p[rol])===String(pin); };
 
   // updateZona — actualiza una zona en el estado data
 
