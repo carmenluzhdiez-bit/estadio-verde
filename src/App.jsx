@@ -31,16 +31,18 @@ const ROOT  = "estadio-verde-data";
 
 
 // ─── ROLES POR EMAIL ─────────────────────────────────────────────────────────
+// Solo el Programador queda fijo — garantiza acceso técnico siempre
+// Todos los demás roles se gestionan desde Personal → Gestión de Accesos
 const ROLES_EMAIL = {
-  "carmenluzhdiez@gmail.com":    "jefa",
-  "juberjuarez1234@gmail.com":   "supervisor",
-  "astorga.guzman@gmail.com":    "trabajador",
-  "bhalu.armijo@gmail.com":      "trabajador",
-  "bandiiiixx@gmail.com":        "trabajador",
-  "saulmolina@gmail.com":        "trabajador",
+  "carmenluzhdiez@gmail.com": "programador", // email inicial del programador — cambiar desde Gestión de Accesos
 };
-
-const getRolByEmail = (email) => ROLES_EMAIL[email?.toLowerCase()] || "trabajador";
+const getRolByEmail = (email, emailsExtra={}) => {
+  if(!email) return null;
+  const lower = email.toLowerCase();
+  if(ROLES_EMAIL[lower]) return ROLES_EMAIL[lower];
+  if(emailsExtra[lower]) return emailsExtra[lower];
+  return null; // sin acceso si no está registrado
+};
 
 // Hook genérico Firebase ↔ React state
 // Sincroniza un nodo de Firebase con un estado local.
@@ -3896,7 +3898,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           }} style={{...S.btn,background:"rgba(61,122,82,0.25)",color:"#90d0a0",border:"1px solid rgba(61,122,82,0.35)",fontSize:13}}>➕ Agregar tarea</button>
         </div>
       </div>
-      <ConfiguradorSemanal S={S} personal={personal} configSemanal={configSemanal||{}} setConfigSemanal={setConfigSemanal} esJefa={esJefa}/>
+      <ConfiguradorSemanal S={S} personal={personal} configSemanal={configSemanal||{}} setConfigSemanal={setConfigSemanal} esJefa={esJefa&&!soloLectura}/>
 
       {/* Tabs */}
       <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
@@ -3907,7 +3909,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
 
       {/* ── FRECUENCIAS POR MACROZONA ── */}
       {tabProg==="frecuencias"&&(
-        <PanelFrecuenciasZona S={S} zonas={zonas.filter(z=>String(z.id)!=="31"&&!(z.nombre||"").toLowerCase().includes("golf"))} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} esJefa={esJefa}/>
+        <PanelFrecuenciasZona S={S} zonas={zonas.filter(z=>String(z.id)!=="31"&&!(z.nombre||"").toLowerCase().includes("golf"))} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} esJefa={esJefa&&!soloLectura}/>
       )}
 
       {/* ── HISTORIAL ── */}
@@ -3917,11 +3919,11 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           personal={personal} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones}
           tareasProg={tareas} setTareasProg={setTareas}
           stockFito={stockFito} setStockFito={setStockFito}
-          crearNotificacion={crearNotificacion} esJefa={esJefa}/>
+          crearNotificacion={crearNotificacion} esJefa={esJefa&&!soloLectura}/>
       )}
 
       {tabProg==="historial" && (
-        <HistorialProg tareas={tareas} setTareas={setTareas} MACROZONAS_BASE={MACROZONAS_BASE} zonas={zonas} S={S} esJefa={esJefa} puedeCrear={puedeCrear} cierresTurno={cierresTurno} onReabrirTurno={onReabrirTurno}/>
+        <HistorialProg tareas={tareas} setTareas={setTareas} MACROZONAS_BASE={MACROZONAS_BASE} zonas={zonas} S={S} esJefa={esJefa&&!soloLectura} puedeCrear={puedeCrear} cierresTurno={cierresTurno} onReabrirTurno={onReabrirTurno}/>
       )}
 
       {/* ── PROGRAMAR ── */}
@@ -12031,7 +12033,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           {/* ── TAREAS GOLF HOY ── */}
           <TareasGolfPanel
             tareasGolfHoy={(tareasProg[hoy]||[]).filter(t=>t.zona==="Golf")}
-            hoy={hoy} esJefa={esJefa}
+            hoy={hoy} esJefa={esJefa&&!soloLectura}
             setTareasProg={setTareasProg} tareasProg={tareasProg} S={S}
           />
       </>)}
@@ -13056,7 +13058,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           {(esJefa||rolLogueado==="supervisor")&&(
             <MedicionesAnalisis
               mediciones={mediciones} GREENS_DEF={GREENS_DEF} rango={rango}
-              colorAltura={colorAltura} S={S} esJefa={esJefa}
+              colorAltura={colorAltura} S={S} esJefa={esJefa&&!soloLectura}
               tareasProg={tareasProg}
               onBorrar={(id)=>setG({mediciones:mediciones.filter(m=>m.id!==id)})}
               onBorrarTodo={()=>setG({mediciones:[]})}
@@ -13071,7 +13073,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           setG={setG}
           listaPersonal={listaPersonal}
           hoy={hoy}
-          esJefa={esJefa}
+          esJefa={esJefa&&!soloLectura}
           tareasProg={tareasProg}
           setTareasProg={setTareasProg}
           onRegistroGuardado={onRegistroGuardado}
@@ -13307,7 +13309,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
 
           {getAllElems&&getZD&&setElemFrecs&&(()=>{
             const golfZonaObj2=MACROZONAS_BASE.find(z=>z.id===31);
-            return golfZonaObj2?(<div style={{marginTop:4}}><PanelFrecuenciasZona S={S} zonas={[golfZonaObj2]} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} esJefa={esJefa}/></div>):null;
+            return golfZonaObj2?(<div style={{marginTop:4}}><PanelFrecuenciasZona S={S} zonas={[golfZonaObj2]} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} esJefa={esJefa&&!soloLectura}/></div>):null;
           })()}
         </div>
         );
@@ -13449,7 +13451,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           aplicaciones={aplicaciones}
           setAplicaciones={setAplicaciones}
           personal={personal}
-          esJefa={esJefa}
+          esJefa={esJefa&&!soloLectura}
           tareasProg={tareasProg}
           setTareasProg={setTareasProg}
           incidenciasFito={incidenciasFito}
@@ -17463,13 +17465,13 @@ function PanelProtocolos({ S, personal, esJefa, crearNotificacion }) {
             <div style={{flex:1,height:1,background:"rgba(255,255,255,0.06)"}}/>
           </div>
           <div style={{fontSize:12,fontWeight:700,color:"#34d399",marginBottom:12}}>🌿 Poda en Altura — Protocolo de subida</div>
-          <ProtocoloPodaAltura S={S} personal={personal} esJefa={esJefa} crearNotificacion={crearNotificacion}/>
+          <ProtocoloPodaAltura S={S} personal={personal} esJefa={esJefa&&!soloLectura} crearNotificacion={crearNotificacion}/>
 
           <div style={{borderTop:"1px solid rgba(255,255,255,0.08)",margin:"28px 0 20px",display:"flex",alignItems:"center",gap:10}}>
             <span style={{fontSize:11,color:"#4a7a5a",whiteSpace:"nowrap"}}>📝 Formulario activo</span>
             <div style={{flex:1,height:1,background:"rgba(255,255,255,0.06)"}}/>
           </div>
-          <ChecklistEsmeril S={S} personal={personal} esJefa={esJefa}/>
+          <ChecklistEsmeril S={S} personal={personal} esJefa={esJefa&&!soloLectura}/>
         </div>
       )}
     </div>
@@ -18602,11 +18604,12 @@ export default function App() {
   const [loginPass,  setLoginPass]  = useState("");
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
+  const [emailsExtra, setEmailsExtra] = useFirebaseState(`${ROOT}/config/emails_extra`, {});
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       setFbUser(user);
-      const rol = user ? getRolByEmail(user.email) : null;
+      const rol = user ? getRolByEmail(user.email, emailsExtra) : null;
       setFbRol(rol);
       setAuthReady(true);
       // Si es trabajador, auto-activar vistaWorker con su id de personal
@@ -18914,7 +18917,17 @@ export default function App() {
   const [nuevoTrabajador, setNuevoTrabajador] = useState({ nombre:"", rut:"", cargo:"", zona:"", telefono:"", email:"", fechaIngreso:"", contrato:"indefinido", foto:"", pin:"" });
   // [worker states moved up]
   const rolLogueado = fbRol;
-  const esJefa = fbRol === "jefa";
+  // Gerencia: solo lectura — envuelve todos los setters para que no escriban
+  const soloLectura = fbRol === "gerencia";
+  const guardadoSeguro = (fn) => soloLectura ? ()=>{} : fn;
+  // Re-evaluar rol cuando cambian los emails extra (ej: al agregar email de gerencia)
+  useEffect(()=>{
+    if(fbUser) setFbRol(getRolByEmail(fbUser.email, emailsExtra));
+  },[emailsExtra, fbUser]);
+  const esJefa = fbRol === "jefa" || fbRol === "programador";
+  const esProgramador = fbRol === "programador";
+  const esGerencia = fbRol === "gerencia";
+  const soloLectura = fbRol === "gerencia";
   const { pushActivo, activarPush } = usePushNotifications(esJefa);
 
   const esSupervisor = fbRol === "supervisor";
@@ -19476,8 +19489,12 @@ export default function App() {
             </div>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-            <span style={{fontSize:11,color:fbRol==="jefa"?"#86efac":fbRol==="supervisor"?"#93c5fd":"#fcd34d",background:fbRol==="jefa"?"rgba(34,197,94,0.1)":fbRol==="supervisor"?"rgba(59,130,246,0.1)":"rgba(252,211,77,0.1)",padding:"4px 10px",borderRadius:20,border:`1px solid ${fbRol==="jefa"?"rgba(34,197,94,0.25)":fbRol==="supervisor"?"rgba(59,130,246,0.25)":"rgba(252,211,77,0.25)"}`}}>
-              {fbRol==="jefa"?"🌿 Jefa AV":fbRol==="supervisor"?"👷 Supervisor":(()=>{
+            <span style={{fontSize:11,
+              color:fbRol==="jefa"?"#86efac":fbRol==="programador"?"#a78bfa":fbRol==="supervisor"?"#93c5fd":fbRol==="gerencia"?"#f59e0b":"#fcd34d",
+              background:fbRol==="jefa"?"rgba(34,197,94,0.1)":fbRol==="programador"?"rgba(167,139,250,0.1)":fbRol==="supervisor"?"rgba(59,130,246,0.1)":fbRol==="gerencia"?"rgba(245,158,11,0.1)":"rgba(252,211,77,0.1)",
+              padding:"4px 10px",borderRadius:20,
+              border:`1px solid ${fbRol==="jefa"?"rgba(34,197,94,0.25)":fbRol==="programador"?"rgba(167,139,250,0.25)":fbRol==="supervisor"?"rgba(59,130,246,0.25)":fbRol==="gerencia"?"rgba(245,158,11,0.25)":"rgba(252,211,77,0.25)"}`}}>
+              {fbRol==="jefa"?"🌿 Jefa AV":fbRol==="programador"?"⚙️ Programador":fbRol==="supervisor"?"👷 Supervisor":fbRol==="gerencia"?"🏢 Gerencia":(()=>{
                 const arr=Array.isArray(personal)?personal:Object.values(personal||{});
                 const fbU=fbUser?arr.find(x=>x.email?.toLowerCase()===fbUser.email?.toLowerCase()):null;
                 return fbU?`🌱 ${fbU.nombre.split(" ")[0]}`:"🌱 Jardinero";
@@ -19490,10 +19507,12 @@ export default function App() {
           </div>
         </div>
         <div style={S.headerNav} className="headerNav">
-          {(fbRol==="jefa"
+          {(fbRol==="jefa"||fbRol==="programador"
             ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["compras","🛒","Compras"],["bodegas","🏪","Bodegas"],["golf","🏌️","Golf"],["personal","👷","Personal"],["protocolos","📋","Protocolos"]]
             : fbRol==="supervisor"
             ? [["dashboard","📊","Panel"],["programacion","📆","Programa"],["reporte","📋","Reporte"],["golf","🏌️","Golf"],["protocolos","📋","Protocolos"],["miturno","🌿","Mi Turno"]]
+            : fbRol==="gerencia"
+            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["golf","🏌️","Golf"],["notificaciones","🔔","Alertas"]]
             : [["miturno","🌿","Mi Turno"]]
           ).map(([v,ico,lbl])=>(
             <button key={v} onClick={()=>{setVista(v);setZonaId(null);setAiText("");if(v==="notificaciones")setTimeout(marcarTodasLeidas,4000);}} style={{cursor:"pointer",border:"none",background:"transparent",color:vista===v?"#fff":"#7aaa80",fontFamily:"'Georgia',serif",fontSize:12,padding:"10px 14px",borderBottom:vista===v?"2px solid #4a9a64":"2px solid transparent",transition:"all .15s",whiteSpace:"nowrap",display:"flex",flexDirection:"column",alignItems:"center",gap:2,flexShrink:0,position:"relative"}}>
@@ -19504,7 +19523,7 @@ export default function App() {
         </div>
 
         {/* ── CAMPANILLA FLOTANTE — siempre visible y llamativa ── */}
-        {fbRol==="jefa"&&(()=>{
+        {(fbRol==="jefa"||fbRol==="programador")&&(()=>{
           const incActAhora=(Array.isArray(incidencias)?incidencias:Object.values(incidencias||{})).filter(i=>i.estado==="activa"||i.estado==="en_gestion");
           const hayIncidencias = incActAhora.length>0;
           const hayNotifs = notifNoLeidas.length>0;
@@ -19588,7 +19607,14 @@ export default function App() {
       </div>
 
       <div style={S.main}>
-        {/* TOAST DE ALERTA — aparece cuando llega alerta nueva */}
+        {/* Banner modo solo lectura para Gerencia */}
+        {soloLectura&&(
+          <div style={{background:"rgba(245,158,11,0.1)",border:"1px solid rgba(245,158,11,0.3)",borderRadius:8,padding:"8px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:16}}>👁️</span>
+            <span style={{fontSize:12,color:"#f59e0b",fontWeight:600}}>Modo solo lectura — Gerencia</span>
+            <span style={{fontSize:11,color:"#b07a3a"}}>Puedes ver toda la información pero no modificar datos</span>
+          </div>
+        )}
         {toastAlerta&&(
           <div onClick={()=>{setVista("notificaciones");setTimeout(marcarTodasLeidas,4000);setToastAlerta(null);}}
             style={{position:"fixed",top:70,right:16,zIndex:9999,
@@ -20901,17 +20927,17 @@ export default function App() {
 
         {/* FUNGICIDAS */}
         {vista==="fungicidas"&&(
-          <PanelFungicidas S={S} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} stockFito={stockFito} setStockFito={setStockFito} crearNotificacion={crearNotificacion} bodegasData={bodegasData} setBodegasData={setBodegasData}/>
+          <PanelFungicidas S={S} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} personal={personal} esJefa={esJefa&&!soloLectura} tareasProg={tareasProg} setTareasProg={setTareasProg} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} stockFito={stockFito} setStockFito={setStockFito} crearNotificacion={crearNotificacion} bodegasData={bodegasData} setBodegasData={setBodegasData}/>
         )}
 
         {/* COMPRAS */}
         {vista==="compras"&&(
-          <PanelCompras S={S} comprasData={comprasData} setComprasData={setComprasData} personal={personal} esJefa={esJefa} data={data} updateZona={updateZona} MACROZONAS_BASE={MACROZONAS_BASE} bodegasData={bodegasData} setBodegasData={setBodegasData} />
+          <PanelCompras S={S} comprasData={comprasData} setComprasData={setComprasData} personal={personal} esJefa={esJefa&&!soloLectura} data={data} updateZona={updateZona} MACROZONAS_BASE={MACROZONAS_BASE} bodegasData={bodegasData} setBodegasData={setBodegasData} />
         )}
 
         {/* GOLF */}
         {vista==="golf"&&(
-          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial} setVista={setVista} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} onCierreSectorial={()=>setShowCierreSectorial(true)} onNuevaAlerta={()=>{setAutoOpenAlerta(true);setVista("notificaciones");}} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} bodegasData={bodegasData} setBodegasData={setBodegasData}
+          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={esJefa&&!soloLectura} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial} setVista={setVista} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} onCierreSectorial={()=>setShowCierreSectorial(true)} onNuevaAlerta={()=>{setAutoOpenAlerta(true);setVista("notificaciones");}} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} bodegasData={bodegasData} setBodegasData={setBodegasData}
             crearNotificacion={crearNotificacion}
             initialSubTab={golfInitTab}
             onRegistroGuardado={(tipo)=>{
@@ -20922,7 +20948,7 @@ export default function App() {
 
         {/* BODEGAS */}
         {vista==="bodegas"&&(
-          <PanelBodegas S={S} bodegasData={bodegasData} setBodegasData={setBodegasData} personal={personal} esJefa={esJefa} tareasProg={tareasProg} setTareasProg={setTareasProg} compras={comprasData?.compras||[]} />
+          <PanelBodegas S={S} bodegasData={bodegasData} setBodegasData={setBodegasData} personal={personal} esJefa={esJefa&&!soloLectura} tareasProg={tareasProg} setTareasProg={setTareasProg} compras={comprasData?.compras||[]} />
         )}
 
         
@@ -20938,6 +20964,7 @@ export default function App() {
               <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                 <button style={{...S.btn,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}} onClick={()=>setPersonalVista("informe-rrhh")}>📄 Informe RRHH</button>
                 <button style={{...S.btn,background:"rgba(196,181,253,0.15)",color:"#c4b5fd",border:"1px solid rgba(196,181,253,0.3)"}} onClick={()=>setPersonalVista("bono-masivo")}>💰 Bono por Tarea</button>
+                {esProgramador&&<button style={{...S.btn,background:"rgba(245,158,11,0.12)",color:"#fbbf24",border:"1px solid rgba(245,158,11,0.25)"}} onClick={()=>setPersonalVista("accesos")}>🔑 Gestión de Accesos</button>}
                 <button className="btn-p" style={S.btn} onClick={()=>setPersonalVista("nuevo")}>➕ Nuevo Trabajador</button>
               </div>
             </div>
@@ -20990,6 +21017,89 @@ export default function App() {
           />
         )}
 
+        {/* ACCESOS — gestión de emails con rol gerencia u otros */}
+        {vista==="personal"&&personalVista==="accesos"&&esProgramador&&(
+          <div className="ein">
+            <button className="btn-g" style={{...S.btn,marginBottom:16}} onClick={()=>setPersonalVista("lista")}>← Volver a Personal</button>
+            <div style={{...S.card,padding:24}}>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,marginBottom:4}}>🔑 Gestión de Accesos</div>
+              <div style={{fontSize:12,color:"#5a9a7a",marginBottom:20}}>
+                Todos los accesos a la app se gestionan desde aquí. Solo el email del <strong style={{color:"#a78bfa"}}>Programador</strong> está fijo en el código como respaldo técnico — todos los demás roles se asignan aquí.
+              </div>
+
+              {/* Emails actuales con rol especial */}
+              <div style={{marginBottom:20}}>
+                <div style={{fontSize:11,fontWeight:700,color:"#7aaa80",textTransform:"uppercase",letterSpacing:".5px",marginBottom:8}}>Emails configurados</div>
+                {Object.keys(emailsExtra).length===0&&(
+                  <div style={{fontSize:12,color:"#4a7a5a",fontStyle:"italic"}}>No hay emails adicionales configurados</div>
+                )}
+                {Object.entries(emailsExtra).map(([email,rol])=>(
+                  <div key={email} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",background:"rgba(255,255,255,0.03)",borderRadius:8,border:"1px solid rgba(255,255,255,0.06)",marginBottom:6}}>
+                    <span style={{fontSize:16}}>{rol==="gerencia"?"🏢":rol==="programador"?"⚙️":rol==="jefa"?"🌿":rol==="supervisor"?"👷":"👤"}</span>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,fontWeight:600}}>{email}</div>
+                      <div style={{fontSize:11,color:"#5a9a7a"}}>{
+                        rol==="jefa"?"🌿 Jefa AV":
+                        rol==="programador"?"⚙️ Programador":
+                        rol==="supervisor"?"👷 Supervisor":
+                        rol==="gerencia"?"🏢 Gerencia (solo lectura)":
+                        "👤 Trabajador"
+                      }</div>
+                    </div>
+                    <button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}}
+                      onClick={()=>{
+                        if(!window.confirm(`¿Eliminar acceso de ${email}?`)) return;
+                        setEmailsExtra(prev=>{
+                          const n={...prev};
+                          delete n[email];
+                          return n;
+                        });
+                      }}>🗑</button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Agregar nuevo email */}
+              {(()=>{
+                const [newEmail,setNewEmail] = React.useState("");
+                const [newRol,setNewRol] = React.useState("gerencia");
+                return (
+                  <div style={{borderTop:"1px solid rgba(255,255,255,0.08)",paddingTop:16}}>
+                    <div style={{fontSize:11,fontWeight:700,color:"#7aaa80",textTransform:"uppercase",letterSpacing:".5px",marginBottom:10}}>Agregar email</div>
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"flex-end"}}>
+                      <div style={{flex:2,minWidth:200}}>
+                        <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:".5px"}}>Email</label>
+                        <input type="email" style={S.input} value={newEmail} onChange={e=>setNewEmail(e.target.value.toLowerCase().trim())} placeholder="nombre@dominio.com"/>
+                      </div>
+                      <div style={{flex:1,minWidth:130}}>
+                        <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:".5px"}}>Rol</label>
+                        <select style={S.input} value={newRol} onChange={e=>setNewRol(e.target.value)}>
+                          <option value="jefa">🌿 Jefa AV</option>
+                          <option value="supervisor">👷 Supervisor</option>
+                          <option value="trabajador">👤 Trabajador</option>
+                          <option value="gerencia">🏢 Gerencia (solo lectura)</option>
+                          <option value="programador">⚙️ Programador (acceso total)</option>
+                        </select>
+                      </div>
+                      <button className="btn-p" style={{...S.btn,padding:"8px 16px",flexShrink:0}}
+                        disabled={!newEmail||!newEmail.includes("@")}
+                        onClick={()=>{
+                          if(!newEmail||!newEmail.includes("@")) return;
+                          setEmailsExtra(prev=>({...prev,[newEmail]:newRol}));
+                          setNewEmail("");
+                        }}>➕ Agregar</button>
+                    </div>
+                    <div style={{fontSize:10,color:"#4a7a5a",marginTop:8}}>
+                      ⚠️ El usuario debe registrarse en la app con ese mismo email para que el acceso funcione.
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        )}
+
+        {/* PERSONAL — nuevo */}
         {vista==="personal"&&personalVista==="nuevo"&&(
           <div className="ein">
             <button className="btn-g" style={S.btn} onClick={()=>setPersonalVista("lista")}>← Volver</button>
@@ -21065,7 +21175,7 @@ export default function App() {
 
         {/* ── ALERTAS / NOTIFICACIONES ── */}
           {vista==="protocolos"&&(
-            <PanelProtocolos S={S} personal={personal} esJefa={esJefa} crearNotificacion={crearNotificacion} rolLogueado={rolLogueado}/>
+            <PanelProtocolos S={S} personal={personal} esJefa={esJefa&&!soloLectura} crearNotificacion={crearNotificacion} rolLogueado={rolLogueado}/>
           )}
         {vista==="notificaciones"&&(<ErrorBoundary>
           <PanelAlertas S={S} incidencias={incidencias} setIncidencias={setIncidencias}
@@ -21075,7 +21185,7 @@ export default function App() {
                   .then(()=>console.log("✅ Alerta guardada en Firebase:",id))
                   .catch(e=>console.error("❌ Error guardando alerta:",e));
               }}
-              autoOpen={autoOpenAlerta} onAutoOpenDone={()=>setAutoOpenAlerta(false)} notificaciones={notificaciones} setNotificaciones={setNotificaciones} marcarTodasLeidas={marcarTodasLeidas} notifNoLeidas={notifNoLeidas} MACROZONAS_BASE={MACROZONAS_BASE} zonas={zonasConCust} personal={personal} tareasProg={tareasProg} setTareasProg={setTareasProg} crearNotificacion={crearNotificacion} esJefa={esJefa} bodegasData={bodegasData} setBodegasData={setBodegasData} getAllElems={getAllElems} getZD={getZD}/>
+              autoOpen={autoOpenAlerta} onAutoOpenDone={()=>setAutoOpenAlerta(false)} notificaciones={notificaciones} setNotificaciones={setNotificaciones} marcarTodasLeidas={marcarTodasLeidas} notifNoLeidas={notifNoLeidas} MACROZONAS_BASE={MACROZONAS_BASE} zonas={zonasConCust} personal={personal} tareasProg={tareasProg} setTareasProg={setTareasProg} crearNotificacion={crearNotificacion} esJefa={esJefa&&!soloLectura} bodegasData={bodegasData} setBodegasData={setBodegasData} getAllElems={getAllElems} getZD={getZD}/>
         </ErrorBoundary>)}
 
         {showCierreSectorial&&<ModalCierreSectorial S={S} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} onClose={()=>setShowCierreSectorial(false)}/>}
