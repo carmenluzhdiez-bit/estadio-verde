@@ -20812,6 +20812,9 @@ export default function App() {
                     <button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}}
                       onClick={()=>{
                         if(!window.confirm(`¿Eliminar acceso de ${email}?`)) return;
+                        fbUpdate(ref(db, `${ROOT}/config/emails_extra`), {[email]:null})
+                          .then(()=>console.log("✅ Email eliminado:",email))
+                          .catch(e=>console.error("❌ Error:",e));
                         setEmailsExtra(prev=>{
                           const n={...prev};
                           delete n[email];
@@ -20844,6 +20847,11 @@ export default function App() {
                     disabled={!newAccesoEmail||!newAccesoEmail.includes("@")}
                     onClick={()=>{
                       if(!newAccesoEmail||!newAccesoEmail.includes("@")) return;
+                      // Guardar directamente en Firebase para asegurar persistencia
+                      const emailKey = newAccesoEmail.replace(/\./g,"_dot_").replace(/@/g,"_at_");
+                      fbUpdate(ref(db, `${ROOT}/config/emails_extra`), {[newAccesoEmail]:newAccesoRol})
+                        .then(()=>console.log("✅ Email guardado:",newAccesoEmail,newAccesoRol))
+                        .catch(e=>console.error("❌ Error:",e));
                       setEmailsExtra(prev=>({...prev,[newAccesoEmail]:newAccesoRol}));
                       setNewAccesoEmail("");
                     }}>➕ Agregar</button>
