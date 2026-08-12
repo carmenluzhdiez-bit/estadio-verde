@@ -18927,7 +18927,6 @@ export default function App() {
   const esJefa = fbRol === "jefa" || fbRol === "programador";
   const esProgramador = fbRol === "programador";
   const esGerencia = fbRol === "gerencia";
-  const soloLectura = fbRol === "gerencia";
   const { pushActivo, activarPush } = usePushNotifications(esJefa);
 
   const esSupervisor = fbRol === "supervisor";
