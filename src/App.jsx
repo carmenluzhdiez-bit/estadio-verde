@@ -18528,7 +18528,7 @@ export default function App() {
   const [loginPass,  setLoginPass]  = useState("");
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
-  const [emailsExtra, setEmailsExtra] = useFirebaseState(`${ROOT}/config/emails_extra`, {});
+  const [emailsExtra, setEmailsExtra] = useFirebaseState(`config/emails_extra`, {});
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
