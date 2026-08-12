@@ -3901,7 +3901,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           }} style={{...S.btn,background:"rgba(61,122,82,0.25)",color:"#90d0a0",border:"1px solid rgba(61,122,82,0.35)",fontSize:13}}>➕ Agregar tarea</button>
         </div>
       </div>
-      <ConfiguradorSemanal S={S} personal={personal} configSemanal={configSemanal||{}} setConfigSemanal={setConfigSemanal} esJefa={esJefa&&!soloLectura}/>
+      <ConfiguradorSemanal S={S} personal={personal} configSemanal={configSemanal||{}} setConfigSemanal={setConfigSemanal} esJefa={esJefa}/>
 
       {/* Tabs */}
       <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
@@ -3912,7 +3912,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
 
       {/* ── FRECUENCIAS POR MACROZONA ── */}
       {tabProg==="frecuencias"&&(
-        <PanelFrecuenciasZona S={S} zonas={zonas.filter(z=>String(z.id)!=="31"&&!(z.nombre||"").toLowerCase().includes("golf"))} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} esJefa={esJefa&&!soloLectura}/>
+        <PanelFrecuenciasZona S={S} zonas={zonas.filter(z=>String(z.id)!=="31"&&!(z.nombre||"").toLowerCase().includes("golf"))} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} esJefa={esJefa}/>
       )}
 
       {/* ── HISTORIAL ── */}
@@ -3922,11 +3922,11 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           personal={personal} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones}
           tareasProg={tareas} setTareasProg={setTareas}
           stockFito={stockFito} setStockFito={setStockFito}
-          crearNotificacion={crearNotificacion} esJefa={esJefa&&!soloLectura}/>
+          crearNotificacion={crearNotificacion} esJefa={esJefa}/>
       )}
 
       {tabProg==="historial" && (
-        <HistorialProg tareas={tareas} setTareas={setTareas} MACROZONAS_BASE={MACROZONAS_BASE} zonas={zonas} S={S} esJefa={esJefa&&!soloLectura} puedeCrear={puedeCrear} cierresTurno={cierresTurno} onReabrirTurno={onReabrirTurno}/>
+        <HistorialProg tareas={tareas} setTareas={setTareas} MACROZONAS_BASE={MACROZONAS_BASE} zonas={zonas} S={S} esJefa={esJefa} puedeCrear={puedeCrear} cierresTurno={cierresTurno} onReabrirTurno={onReabrirTurno}/>
       )}
 
       {/* ── PROGRAMAR ── */}
@@ -11906,7 +11906,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           {/* ── TAREAS GOLF HOY ── */}
           <TareasGolfPanel
             tareasGolfHoy={(tareasProg[hoy]||[]).filter(t=>t.zona==="Golf")}
-            hoy={hoy} esJefa={esJefa&&!soloLectura}
+            hoy={hoy} esJefa={esJefa}
             setTareasProg={setTareasProg} tareasProg={tareasProg} S={S}
           />
       </>)}
@@ -12931,7 +12931,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           {(esJefa||rolLogueado==="supervisor")&&(
             <MedicionesAnalisis
               mediciones={mediciones} GREENS_DEF={GREENS_DEF} rango={rango}
-              colorAltura={colorAltura} S={S} esJefa={esJefa&&!soloLectura}
+              colorAltura={colorAltura} S={S} esJefa={esJefa}
               tareasProg={tareasProg}
               onBorrar={(id)=>setG({mediciones:mediciones.filter(m=>m.id!==id)})}
               onBorrarTodo={()=>setG({mediciones:[]})}
@@ -12946,7 +12946,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           setG={setG}
           listaPersonal={listaPersonal}
           hoy={hoy}
-          esJefa={esJefa&&!soloLectura}
+          esJefa={esJefa}
           tareasProg={tareasProg}
           setTareasProg={setTareasProg}
           onRegistroGuardado={onRegistroGuardado}
@@ -13182,7 +13182,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
 
           {getAllElems&&getZD&&setElemFrecs&&(()=>{
             const golfZonaObj2=MACROZONAS_BASE.find(z=>z.id===31);
-            return golfZonaObj2?(<div style={{marginTop:4}}><PanelFrecuenciasZona S={S} zonas={[golfZonaObj2]} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} esJefa={esJefa&&!soloLectura}/></div>):null;
+            return golfZonaObj2?(<div style={{marginTop:4}}><PanelFrecuenciasZona S={S} zonas={[golfZonaObj2]} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} esJefa={esJefa}/></div>):null;
           })()}
         </div>
         );
@@ -13324,7 +13324,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           aplicaciones={aplicaciones}
           setAplicaciones={setAplicaciones}
           personal={personal}
-          esJefa={esJefa&&!soloLectura}
+          esJefa={esJefa}
           tareasProg={tareasProg}
           setTareasProg={setTareasProg}
           incidenciasFito={incidenciasFito}
@@ -17338,13 +17338,13 @@ function PanelProtocolos({ S, personal, esJefa, crearNotificacion }) {
             <div style={{flex:1,height:1,background:"rgba(255,255,255,0.06)"}}/>
           </div>
           <div style={{fontSize:12,fontWeight:700,color:"#34d399",marginBottom:12}}>🌿 Poda en Altura — Protocolo de subida</div>
-          <ProtocoloPodaAltura S={S} personal={personal} esJefa={esJefa&&!soloLectura} crearNotificacion={crearNotificacion}/>
+          <ProtocoloPodaAltura S={S} personal={personal} esJefa={esJefa} crearNotificacion={crearNotificacion}/>
 
           <div style={{borderTop:"1px solid rgba(255,255,255,0.08)",margin:"28px 0 20px",display:"flex",alignItems:"center",gap:10}}>
             <span style={{fontSize:11,color:"#4a7a5a",whiteSpace:"nowrap"}}>📝 Formulario activo</span>
             <div style={{flex:1,height:1,background:"rgba(255,255,255,0.06)"}}/>
           </div>
-          <ChecklistEsmeril S={S} personal={personal} esJefa={esJefa&&!soloLectura}/>
+          <ChecklistEsmeril S={S} personal={personal} esJefa={esJefa}/>
         </div>
       )}
     </div>
