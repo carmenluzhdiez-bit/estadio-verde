@@ -18910,6 +18910,8 @@ export default function App() {
   const getPines    = () => { try { return JSON.parse(localStorage.getItem("ev2-pines")||"{}"); } catch { return {}; } };
   const setPinRol   = (rol, pin) => { const p=getPines(); p[rol]=pin; localStorage.setItem("ev2-pines", JSON.stringify(p)); };
   const [personalVista, setPersonalVista] = useState("lista");
+  const [newAccesoEmail, setNewAccesoEmail] = useState("");
+  const [newAccesoRol, setNewAccesoRol] = useState("jefa");
   const [personalId, setPersonalId] = useState(null);
   const [personalTab, setPersonalTab] = useState("ficha");
   const [showNuevoEvento, setShowNuevoEvento] = useState(false);
@@ -21059,41 +21061,35 @@ export default function App() {
               </div>
 
               {/* Agregar nuevo email */}
-              {(()=>{
-                const [newEmail,setNewEmail] = React.useState("");
-                const [newRol,setNewRol] = React.useState("gerencia");
-                return (
-                  <div style={{borderTop:"1px solid rgba(255,255,255,0.08)",paddingTop:16}}>
-                    <div style={{fontSize:11,fontWeight:700,color:"#7aaa80",textTransform:"uppercase",letterSpacing:".5px",marginBottom:10}}>Agregar email</div>
-                    <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"flex-end"}}>
-                      <div style={{flex:2,minWidth:200}}>
-                        <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:".5px"}}>Email</label>
-                        <input type="email" style={S.input} value={newEmail} onChange={e=>setNewEmail(e.target.value.toLowerCase().trim())} placeholder="nombre@dominio.com"/>
-                      </div>
-                      <div style={{flex:1,minWidth:130}}>
-                        <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:".5px"}}>Rol</label>
-                        <select style={S.input} value={newRol} onChange={e=>setNewRol(e.target.value)}>
-                          <option value="jefa">🌿 Jefa AV</option>
-                          <option value="supervisor">👷 Supervisor</option>
-                          <option value="trabajador">👤 Trabajador</option>
-                          <option value="gerencia">🏢 Gerencia (solo lectura)</option>
-                          <option value="programador">⚙️ Programador (acceso total)</option>
-                        </select>
-                      </div>
-                      <button className="btn-p" style={{...S.btn,padding:"8px 16px",flexShrink:0}}
-                        disabled={!newEmail||!newEmail.includes("@")}
-                        onClick={()=>{
-                          if(!newEmail||!newEmail.includes("@")) return;
-                          setEmailsExtra(prev=>({...prev,[newEmail]:newRol}));
-                          setNewEmail("");
-                        }}>➕ Agregar</button>
-                    </div>
-                    <div style={{fontSize:10,color:"#4a7a5a",marginTop:8}}>
-                      ⚠️ El usuario debe registrarse en la app con ese mismo email para que el acceso funcione.
-                    </div>
+              <div style={{borderTop:"1px solid rgba(255,255,255,0.08)",paddingTop:16}}>
+                <div style={{fontSize:11,fontWeight:700,color:"#7aaa80",textTransform:"uppercase",letterSpacing:".5px",marginBottom:10}}>Agregar email</div>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"flex-end"}}>
+                  <div style={{flex:2,minWidth:200}}>
+                    <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:".5px"}}>Email</label>
+                    <input type="email" style={S.input} value={newAccesoEmail} onChange={e=>setNewAccesoEmail(e.target.value.toLowerCase().trim())} placeholder="nombre@dominio.com"/>
                   </div>
-                );
-              })()}
+                  <div style={{flex:1,minWidth:130}}>
+                    <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:".5px"}}>Rol</label>
+                    <select style={S.input} value={newAccesoRol} onChange={e=>setNewAccesoRol(e.target.value)}>
+                      <option value="jefa">🌿 Jefa AV</option>
+                      <option value="supervisor">👷 Supervisor</option>
+                      <option value="trabajador">👤 Trabajador</option>
+                      <option value="gerencia">🏢 Gerencia (solo lectura)</option>
+                      <option value="programador">⚙️ Programador (acceso total)</option>
+                    </select>
+                  </div>
+                  <button className="btn-p" style={{...S.btn,padding:"8px 16px",flexShrink:0}}
+                    disabled={!newAccesoEmail||!newAccesoEmail.includes("@")}
+                    onClick={()=>{
+                      if(!newAccesoEmail||!newAccesoEmail.includes("@")) return;
+                      setEmailsExtra(prev=>({...prev,[newAccesoEmail]:newAccesoRol}));
+                      setNewAccesoEmail("");
+                    }}>➕ Agregar</button>
+                </div>
+                <div style={{fontSize:10,color:"#4a7a5a",marginTop:8}}>
+                  ⚠️ El usuario debe registrarse en la app con ese mismo email para que el acceso funcione.
+                </div>
+              </div>
             </div>
           </div>
         )}
