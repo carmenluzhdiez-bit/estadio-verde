@@ -18508,6 +18508,12 @@ export default function App() {
   const [modoLogin, setModoLogin] = useState("trabajador");
   const [workerSel, setWorkerSel] = useState("");
   const [emailsExtra, setEmailsExtra, emailsExtraReady] = useFirebaseState(`config/emails_extra`, {});
+  const [emailsExtraTimedOut, setEmailsExtraTimedOut] = useState(false);
+  useEffect(()=>{
+    const t = setTimeout(()=>setEmailsExtraTimedOut(true), 3000);
+    return ()=>clearTimeout(t);
+  },[]);
+  const emailsExtraListo = emailsExtraReady || emailsExtraTimedOut;
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -18792,7 +18798,7 @@ export default function App() {
   // Cuando personal o emailsExtra cargan, configurar workerLogueado
   useEffect(()=>{
     if(!fbUser||fbUser.esLocal) return;
-    if(!emailsExtraReady) return;
+    if(!emailsExtraListo) return;
     const rolActual = getRolByEmail(fbUser.email, emailsExtra);
     // Roles administrativos nunca van a Mi Turno
     if(rolActual==="jefa"||rolActual==="programador"||rolActual==="gerencia") return;
@@ -18810,7 +18816,7 @@ export default function App() {
       setVistaWorker(true);
       setVista("miturno");
     }
-  }, [fbRol, fbUser, personal, emailsExtra, emailsExtraReady]);
+  }, [fbRol, fbUser, personal, emailsExtra, emailsExtraListo]);
 
   // PINes siguen en localStorage (son locales por dispositivo)
   const [personalVista, setPersonalVista] = useState("lista");
@@ -18828,14 +18834,14 @@ export default function App() {
   const guardadoSeguro = (fn) => soloLectura ? ()=>{} : fn;
   // Re-evaluar rol cuando cargan emailsExtra — punto único de asignación
   useEffect(()=>{
-    if(!fbUser||fbUser.esLocal||!emailsExtraReady) return;
+    if(!fbUser||fbUser.esLocal||!emailsExtraListo) return;
     console.log("🔍 emailsExtra al evaluar rol:", JSON.stringify(emailsExtra));
     console.log("🔍 email del usuario:", fbUser.email);
     const rol = getRolByEmail(fbUser.email, emailsExtra);
     console.log("🔍 rol encontrado:", rol);
     if(rol) setFbRol(rol);
     else console.warn("⚠️ No se encontró rol para:", fbUser.email);
-  },[emailsExtra, emailsExtraReady, fbUser]);
+  },[emailsExtra, emailsExtraListo, fbUser]);
   const esJefa = fbRol === "jefa" || fbRol === "programador";
   const esProgramador = fbRol === "programador";
   const esGerencia = fbRol === "gerencia";
@@ -19293,7 +19299,7 @@ export default function App() {
   };
 
   // ── Esperando Firebase Auth ───────────────────────────────────────────────
-  if (!authReady || (fbUser && !fbUser.esLocal && !emailsExtraReady)) return (
+  if (!authReady || (fbUser && !fbUser.esLocal && !emailsExtraListo)) return (
     <div style={{minHeight:"100vh",background:"#0d1f13",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
       <div style={{fontSize:48}}>🌿</div>
       <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,color:"#a0d8b0",fontWeight:700}}>Estadio Español</div>
