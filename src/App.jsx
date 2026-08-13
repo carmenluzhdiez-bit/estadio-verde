@@ -40,10 +40,13 @@ const getRolByEmail = (email, emailsExtra={}) => {
   if(!email) return null;
   const lower = email.toLowerCase();
   if(ROLES_EMAIL[lower]) return ROLES_EMAIL[lower];
-  // Firebase no permite puntos en claves — se guardan con comas
-  const lowerConComas = lower.replace(/\./g,",").replace(/@/g,"_at_");
-  if(emailsExtra[lower]) return emailsExtra[lower];
-  if(emailsExtra[lowerConComas]) return emailsExtra[lowerConComas];
+  // Buscar en emailsExtra — soporta formato nuevo {email,rol} y antiguo string
+  for(const entry of Object.values(emailsExtra||{})) {
+    if(typeof entry==="object" && entry.email?.toLowerCase()===lower) return entry.rol;
+    if(typeof entry==="string") {
+      // formato antiguo: clave codificada
+    }
+  }
   return null;
 };
 
@@ -20799,10 +20802,12 @@ export default function App() {
                 {Object.keys(emailsExtra).length===0&&(
                   <div style={{fontSize:12,color:"#4a7a5a",fontStyle:"italic"}}>No hay emails adicionales configurados</div>
                 )}
-                {Object.entries(emailsExtra).map(([emailClave,rol])=>{
-                  const emailMostrar = emailClave.replace(/_at_/g,"@").replace(/,/g,".");
+                {Object.entries(emailsExtra).map(([key,entry])=>{
+                  // Soporta formato nuevo {email,rol} y formato antiguo string
+                  const emailMostrar = typeof entry==="object" ? entry.email : key.replace(/_at_/g,"@").replace(/,/g,".");
+                  const rol = typeof entry==="object" ? entry.rol : entry;
                   return (
-                  <div key={emailClave} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",background:"rgba(255,255,255,0.03)",borderRadius:8,border:"1px solid rgba(255,255,255,0.06)",marginBottom:6}}>
+                  <div key={key} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",background:"rgba(255,255,255,0.03)",borderRadius:8,border:"1px solid rgba(255,255,255,0.06)",marginBottom:6}}>
                     <span style={{fontSize:16}}>{rol==="gerencia"?"🏢":rol==="programador"?"⚙️":rol==="jefa"?"🌿":rol==="supervisor"?"👷":"👤"}</span>
                     <div style={{flex:1}}>
                       <div style={{fontSize:13,fontWeight:600}}>{emailMostrar}</div>
@@ -20817,10 +20822,8 @@ export default function App() {
                     <button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}}
                       onClick={()=>{
                         if(!window.confirm(`¿Eliminar acceso de ${emailMostrar}?`)) return;
-                        fbSet(ref(db, `${ROOT}/config/emails_extra/${emailClave}`), null)
-                          .then(()=>{
-                            setEmailsExtra(prev=>{ const n={...prev}; delete n[emailClave]; return n; });
-                          })
+                        fbSet(ref(db, `${ROOT}/config/emails_extra/${key}`), null)
+                          .then(()=>{ setEmailsExtra(prev=>{ const n={...prev}; delete n[key]; return n; }); })
                           .catch(e=>alert("❌ Error: "+e.message));
                       }}>🗑</button>
                   </div>
@@ -20850,20 +20853,16 @@ export default function App() {
                     disabled={!newAccesoEmail||!newAccesoEmail.includes("@")}
                     onClick={()=>{
                       if(!newAccesoEmail||!newAccesoEmail.includes("@")) return;
-                      const emailGuardar = newAccesoEmail;
+                      const emailGuardar = newAccesoEmail.trim().toLowerCase();
                       const rolGuardar = newAccesoRol;
-                      // Intentar escritura directa en Firebase
-                      fbSet(ref(db, `${ROOT}/config/emails_extra/${emailGuardar.replace(/\./g,",").replace(/@/g,"_at_")}`), rolGuardar)
+                      const key = "u_"+Date.now();
+                      fbSet(ref(db, `${ROOT}/config/emails_extra/${key}`), {email:emailGuardar, rol:rolGuardar})
                         .then(()=>{
-                          console.log("✅ Guardado:",emailGuardar,rolGuardar);
-                          setEmailsExtra(prev=>({...prev,[emailGuardar]:rolGuardar}));
+                          setEmailsExtra(prev=>({...prev,[key]:{email:emailGuardar,rol:rolGuardar}}));
                           setNewAccesoEmail("");
-                          alert("✅ Acceso guardado correctamente");
+                          alert("✅ Acceso guardado: "+emailGuardar);
                         })
-                        .catch(e=>{
-                          console.error("❌ Error guardando:",e);
-                          alert("❌ Error: "+e.message+"\n\nRevisa las reglas de Firebase.");
-                        });
+                        .catch(e=>alert("❌ Error: "+e.message));
                     }}>➕ Agregar</button>
                 </div>
                 <div style={{fontSize:10,color:"#4a7a5a",marginTop:8}}>
