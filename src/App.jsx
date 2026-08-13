@@ -18796,24 +18796,29 @@ export default function App() {
 
   // Cuando personal o emailsExtra cargan, configurar workerLogueado
   useEffect(()=>{
-    if(!fbUser) return;
+    if(!fbUser||fbUser.esLocal) return;
+    if(!emailsExtraReady) return; // esperar que carguen los roles
     const arr = Array.isArray(personal)?personal:Object.values(personal||{});
     if(arr.length===0) return;
     const fbP = arr.find(x=>x.email?.toLowerCase()===fbUser.email?.toLowerCase());
     if(!fbP) return;
 
-    const rolActual = getRolByEmail(fbUser.email, emailsExtra) || fbRol;
+    const rolActual = getRolByEmail(fbUser.email, emailsExtra);
 
-    // Si es trabajador (por emailsExtra, por fbRol, o simplemente existe en personal)
-    if(rolActual==="trabajador" || rolActual==="supervisor" || !rolActual) {
-      if(rolActual==="trabajador" || !rolActual) {
-        setWorkerLogueado(fbP.id);
-        setVistaWorker(true);
-        setVista("miturno");
-        if(!rolActual) setFbRol("trabajador");
-      }
+    // Solo ir a Mi Turno si el rol es trabajador o supervisor
+    if(rolActual==="trabajador"||rolActual==="supervisor") {
+      setWorkerLogueado(fbP.id);
+      setVistaWorker(true);
+      setVista("miturno");
     }
-  }, [fbRol, fbUser, personal, emailsExtra]);
+    // Si no tiene rol asignado en emailsExtra, tratarlo como trabajador
+    if(!rolActual) {
+      setFbRol("trabajador");
+      setWorkerLogueado(fbP.id);
+      setVistaWorker(true);
+      setVista("miturno");
+    }
+  }, [fbRol, fbUser, personal, emailsExtra, emailsExtraReady]);
 
   // PINes siguen en localStorage (son locales por dispositivo)
   const [personalVista, setPersonalVista] = useState("lista");
