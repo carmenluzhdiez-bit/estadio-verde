@@ -18764,20 +18764,23 @@ export default function App() {
     if(hayCorreccion) setTareasProg(nuevoProg);
   }, [progReady]);
 
-  // Cuando personal carga y el rol es trabajador, setear workerLogueado por email
+  // Cuando personal o emailsExtra cargan, configurar workerLogueado
   useEffect(()=>{
-    if(fbRol==="trabajador" && fbUser) {
-      const arr = Array.isArray(personal)?personal:Object.values(personal||{});
-      if(arr.length>0){
-        const fbP = arr.find(x=>x.email?.toLowerCase()===fbUser.email?.toLowerCase());
-        if(fbP){
-          setWorkerLogueado(fbP.id);
-          setVistaWorker(true);
-          setVista("miturno");
-        }
-      }
+    if(!fbUser) return;
+    const arr = Array.isArray(personal)?personal:Object.values(personal||{});
+    if(arr.length===0) return;
+    const fbP = arr.find(x=>x.email?.toLowerCase()===fbUser.email?.toLowerCase());
+    if(!fbP) return; // usuario no está en personal
+
+    const rolActual = getRolByEmail(fbUser.email, emailsExtra);
+
+    if(rolActual==="trabajador" || (!rolActual && fbP)) {
+      setWorkerLogueado(fbP.id);
+      setVistaWorker(true);
+      setVista("miturno");
+      if(!rolActual) setFbRol("trabajador");
     }
-  }, [fbRol, fbUser, personal]);
+  }, [fbRol, fbUser, personal, emailsExtra]);
 
   // PINes siguen en localStorage (son locales por dispositivo)
   const [personalVista, setPersonalVista] = useState("lista");
