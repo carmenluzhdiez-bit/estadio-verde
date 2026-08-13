@@ -18507,7 +18507,7 @@ export default function App() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [modoLogin, setModoLogin] = useState("trabajador");
   const [workerSel, setWorkerSel] = useState("");
-  const [emailsExtra, setEmailsExtra] = useFirebaseState(`config/emails_extra`, {});
+  const [emailsExtra, setEmailsExtra, emailsExtraReady] = useFirebaseState(`config/emails_extra`, {});
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -18829,10 +18829,12 @@ export default function App() {
   // Gerencia: solo lectura — envuelve todos los setters para que no escriban
   const soloLectura = fbRol === "gerencia";
   const guardadoSeguro = (fn) => soloLectura ? ()=>{} : fn;
-  // Re-evaluar rol cuando cambian los emails extra (ej: al agregar email de gerencia)
+  // Re-evaluar rol cuando cargan emailsExtra — esperar a que estén listos
   useEffect(()=>{
-    if(fbUser) setFbRol(getRolByEmail(fbUser.email, emailsExtra));
-  },[emailsExtra, fbUser]);
+    if(!fbUser||!emailsExtraReady) return;
+    const rol = getRolByEmail(fbUser.email, emailsExtra);
+    if(rol) setFbRol(rol);
+  },[emailsExtra, emailsExtraReady, fbUser]);
   const esJefa = fbRol === "jefa" || fbRol === "programador";
   const esProgramador = fbRol === "programador";
   const esGerencia = fbRol === "gerencia";
@@ -19290,7 +19292,7 @@ export default function App() {
   };
 
   // ── Esperando Firebase Auth ───────────────────────────────────────────────
-  if (!authReady) return (
+  if (!authReady || (fbUser && !fbUser.esLocal && !emailsExtraReady)) return (
     <div style={{minHeight:"100vh",background:"#0d1f13",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
       <div style={{fontSize:48}}>🌿</div>
       <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,color:"#a0d8b0",fontWeight:700}}>Estadio Español</div>
