@@ -5627,7 +5627,7 @@ function TipoEventoSelector({ value, onChange, S, TIPO_EVENTO }) {
   );
 }
 
-function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDeleteEvento, onUpdateEvento }) {
+function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDeleteEvento, onUpdateEvento, esProgramador=false }) {
   const [tab, setTab] = React.useState("ficha");
   const [showNuevoEvento, setShowNuevoEvento] = React.useState(false);
   const [nuevoEvento, setNuevoEvento] = React.useState({ tipo:"permiso", fecha:"", fechaFin:"", horas:"", descripcion:"", estado:"pendiente" });
@@ -5803,6 +5803,29 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
               ))}
             </div>
           </div>
+
+          {/* ── SECCIÓN 5: ACCESO ── */}
+          {esProgramador&&(
+          <div style={{...S.card,padding:18,marginBottom:12}}>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:12,color:"#a0d8b0",borderBottom:"1px solid rgba(255,255,255,0.08)",paddingBottom:8}}>🔑 Acceso al Sistema</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <div>
+                <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px",textTransform:"uppercase"}}>Email Firebase</label>
+                <div style={{fontSize:12,color:"#ede9e0",background:"rgba(255,255,255,0.05)",padding:"6px 12px",borderRadius:8,border:"1px solid rgba(255,255,255,0.1)",fontFamily:"monospace"}}>
+                  {t.email||"—"}
+                </div>
+              </div>
+              <div>
+                <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px",textTransform:"uppercase"}}>Contraseña Firebase</label>
+                <input style={S.input} type="text"
+                  value={t.claveFirebase||""}
+                  onChange={e=>onUpdate({claveFirebase:e.target.value})}
+                  placeholder="Contraseña del trabajador..."/>
+                <div style={{fontSize:10,color:"#4a7a5a",marginTop:3}}>Solo visible para el Programador. Esta contraseña debe coincidir con la de Firebase Auth.</div>
+              </div>
+            </div>
+          </div>
+          )}
 
           {/* ── SECCIÓN 6: OBSERVACIONES ── */}
           <div style={{...S.card,padding:18}}>
@@ -18770,15 +18793,18 @@ export default function App() {
     const arr = Array.isArray(personal)?personal:Object.values(personal||{});
     if(arr.length===0) return;
     const fbP = arr.find(x=>x.email?.toLowerCase()===fbUser.email?.toLowerCase());
-    if(!fbP) return; // usuario no está en personal
+    if(!fbP) return;
 
-    const rolActual = getRolByEmail(fbUser.email, emailsExtra);
+    const rolActual = getRolByEmail(fbUser.email, emailsExtra) || fbRol;
 
-    if(rolActual==="trabajador" || (!rolActual && fbP)) {
-      setWorkerLogueado(fbP.id);
-      setVistaWorker(true);
-      setVista("miturno");
-      if(!rolActual) setFbRol("trabajador");
+    // Si es trabajador (por emailsExtra, por fbRol, o simplemente existe en personal)
+    if(rolActual==="trabajador" || rolActual==="supervisor" || !rolActual) {
+      if(rolActual==="trabajador" || !rolActual) {
+        setWorkerLogueado(fbP.id);
+        setVistaWorker(true);
+        setVista("miturno");
+        if(!rolActual) setFbRol("trabajador");
+      }
     }
   }, [fbRol, fbUser, personal, emailsExtra]);
 
@@ -19270,33 +19296,90 @@ export default function App() {
   if (!fbUser) return (
     <div style={{minHeight:"100vh",background:"#0d1f13",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&display=swap');*{box-sizing:border-box;margin:0;padding:0}`}</style>
-      <div style={{background:"#0f2517",border:"1px solid #1e3a22",borderRadius:20,padding:40,width:"100%",maxWidth:380,boxShadow:"0 20px 60px rgba(0,0,0,0.5)"}}>
-        <div style={{textAlign:"center",marginBottom:32}}>
+      <div style={{background:"#0f2517",border:"1px solid #1e3a22",borderRadius:20,padding:40,width:"100%",maxWidth:420,boxShadow:"0 20px 60px rgba(0,0,0,0.5)"}}>
+        <div style={{textAlign:"center",marginBottom:28}}>
           <div style={{fontSize:52,marginBottom:12}}>🌿</div>
           <div style={{fontFamily:"'Playfair Display',serif",fontSize:26,fontWeight:900,color:"#ede9e0",marginBottom:4}}>Estadio Español</div>
           <div style={{fontSize:12,color:"#4a8a5a",letterSpacing:"2px",textTransform:"uppercase"}}>Gestión · Áreas Verdes</div>
         </div>
-        <div style={{display:"flex",flexDirection:"column",gap:14}}>
-          <div>
-            <label style={{fontSize:11,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:6,textTransform:"uppercase"}}>Correo electrónico</label>
-            <input type="email" autoComplete="email" style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"12px 14px",color:"#ede9e0",fontSize:14,outline:"none"}}
-              value={loginEmail} onChange={e=>setLoginEmail(e.target.value)}
-              onKeyDown={e=>e.key==="Enter"&&handleLogin()}
-              placeholder="tu@email.com"/>
-          </div>
-          <div>
-            <label style={{fontSize:11,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:6,textTransform:"uppercase"}}>Contraseña</label>
-            <input type="password" autoComplete="current-password" style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"12px 14px",color:"#ede9e0",fontSize:14,outline:"none"}}
-              value={loginPass} onChange={e=>setLoginPass(e.target.value)}
-              onKeyDown={e=>e.key==="Enter"&&handleLogin()}
-              placeholder="••••••••"/>
-          </div>
-          {loginError&&<div style={{fontSize:13,color:"#fca5a5",background:"rgba(239,68,68,0.1)",borderRadius:8,padding:"8px 12px",textAlign:"center"}}>{loginError}</div>}
-          <button onClick={handleLogin} disabled={loginLoading}
-            style={{background:"#2d6a3f",color:"#fff",border:"none",borderRadius:10,padding:"14px",fontSize:15,fontWeight:700,cursor:"pointer",marginTop:6,opacity:loginLoading?0.7:1}}>
-            {loginLoading?"Ingresando...":"Ingresar →"}
-          </button>
-        </div>
+
+        {/* Selector de modo de acceso */}
+        {(()=>{
+          const [modoLogin, setModoLogin] = React.useState("trabajador");
+          const [workerSel, setWorkerSel] = React.useState("");
+          const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
+          const trabajadores = personalArr.filter(p=>p.nombre&&p.estado!=="retirado").sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+
+          return (
+            <>
+              {/* Tabs */}
+              <div style={{display:"flex",gap:8,marginBottom:24}}>
+                <button onClick={()=>setModoLogin("trabajador")} style={{flex:1,padding:"8px",borderRadius:8,border:`1px solid ${modoLogin==="trabajador"?"rgba(52,211,153,0.4)":"rgba(255,255,255,0.1)"}`,background:modoLogin==="trabajador"?"rgba(52,211,153,0.1)":"transparent",color:modoLogin==="trabajador"?"#34d399":"#6aaa7a",fontSize:12,cursor:"pointer",fontFamily:"'Georgia',serif"}}>
+                  👷 Jardinero / Supervisor
+                </button>
+                <button onClick={()=>setModoLogin("admin")} style={{flex:1,padding:"8px",borderRadius:8,border:`1px solid ${modoLogin==="admin"?"rgba(167,139,250,0.4)":"rgba(255,255,255,0.1)"}`,background:modoLogin==="admin"?"rgba(167,139,250,0.1)":"transparent",color:modoLogin==="admin"?"#a78bfa":"#6aaa7a",fontSize:12,cursor:"pointer",fontFamily:"'Georgia',serif"}}>
+                  🔐 Jefa / Gerencia / Programador
+                </button>
+              </div>
+
+              {/* Modo trabajador: selección de nombre */}
+              {modoLogin==="trabajador"&&(
+                <div style={{display:"flex",flexDirection:"column",gap:14}}>
+                  <div>
+                    <label style={{fontSize:11,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:6,textTransform:"uppercase"}}>Selecciona tu nombre</label>
+                    <select style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"12px 14px",color:"#ede9e0",fontSize:14,outline:"none"}}
+                      value={workerSel} onChange={e=>setWorkerSel(e.target.value)}>
+                      <option value="">— Elige tu nombre —</option>
+                      {trabajadores.map(p=>(
+                        <option key={p.id} value={p.id}>{p.nombre} · {p.cargo||"Jardinero"}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <button disabled={!workerSel}
+                    onClick={()=>{
+                      const p = trabajadores.find(x=>String(x.id)===String(workerSel));
+                      if(!p) return;
+                      setWorkerLogueado(p.id);
+                      setVistaWorker(true);
+                      setFbRol(p.cargo?.toLowerCase().includes("supervisor")?"supervisor":"trabajador");
+                      setVista("miturno");
+                      // Simular usuario logueado sin Firebase Auth
+                      setFbUser({email:p.email||p.nombre, displayName:p.nombre, uid:"local_"+p.id});
+                    }}
+                    style={{background:"#2d6a3f",color:"#fff",border:"none",borderRadius:10,padding:"14px",fontSize:15,fontWeight:700,cursor:"pointer",opacity:workerSel?1:0.5}}>
+                    Entrar →
+                  </button>
+                </div>
+              )}
+
+              {/* Modo admin: email + contraseña */}
+              {modoLogin==="admin"&&(
+                <div style={{display:"flex",flexDirection:"column",gap:14}}>
+                  <div>
+                    <label style={{fontSize:11,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:6,textTransform:"uppercase"}}>Correo electrónico</label>
+                    <input type="email" autoComplete="email" style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"12px 14px",color:"#ede9e0",fontSize:14,outline:"none"}}
+                      value={loginEmail} onChange={e=>setLoginEmail(e.target.value)}
+                      onKeyDown={e=>e.key==="Enter"&&handleLogin()}
+                      placeholder="tu@email.com"/>
+                  </div>
+                  <div>
+                    <label style={{fontSize:11,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:6,textTransform:"uppercase"}}>Contraseña</label>
+                    <input type="password" autoComplete="current-password" style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"12px 14px",color:"#ede9e0",fontSize:14,outline:"none"}}
+                      value={loginPass} onChange={e=>setLoginPass(e.target.value)}
+                      onKeyDown={e=>e.key==="Enter"&&handleLogin()}
+                      placeholder="••••••••"/>
+                  </div>
+                  {loginError&&<div style={{fontSize:13,color:"#fca5a5",background:"rgba(239,68,68,0.1)",borderRadius:8,padding:"8px 12px",textAlign:"center"}}>{loginError}</div>}
+                  <button onClick={handleLogin} disabled={loginLoading}
+                    style={{background:"#2d6a3f",color:"#fff",border:"none",borderRadius:10,padding:"14px",fontSize:15,fontWeight:700,cursor:"pointer",marginTop:6,opacity:loginLoading?0.7:1}}>
+                    {loginLoading?"Ingresando...":"Ingresar →"}
+                  </button>
+                </div>
+              )}
+            </>
+          );
+        })()}
+
         <div style={{textAlign:"center",marginTop:20,fontSize:11,color:"#2a5a35"}}>Acceso restringido · Personal autorizado</div>
       </div>
     </div>
@@ -20869,7 +20952,8 @@ export default function App() {
                     }}>➕ Agregar</button>
                 </div>
                 <div style={{fontSize:10,color:"#4a7a5a",marginTop:8}}>
-                  ⚠️ El usuario debe registrarse en la app con ese mismo email para que el acceso funcione.
+                  ⚠️ <strong style={{color:"#f59e0b"}}>Jefa / Gerencia / Programador</strong>: deben entrar con email+contraseña → crear usuario en Firebase Auth Console.<br/>
+                  <strong style={{color:"#34d399"}}>Trabajadores y Supervisor</strong>: no necesitan email ni contraseña → entran seleccionando su nombre de la lista.
                 </div>
               </div>
             </div>
@@ -20931,6 +21015,7 @@ export default function App() {
           <FichaTrabajador
             t={getTrabajador(personalId)}
             S={S}
+            esProgramador={esProgramador}
             onVolver={()=>{setPersonalVista("lista");setPersonalId(null);}}
             onDelete={()=>{deleteTrabajador(personalId);setPersonalVista("lista");setPersonalId(null);}}
             onUpdate={(patch)=>updateTrabajador(personalId,patch)}
