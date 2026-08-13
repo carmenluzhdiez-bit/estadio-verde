@@ -16681,7 +16681,7 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
 
       {/* Tabs */}
       <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
-        {[["incidencias","🚨 Activas"],["viento","🌬️ Viento"],["resueltas","✅ Resueltas"],["notifs","🔔 Registros"]].map(([t,l])=>(
+        {[["incidencias","🚨 Activas"],["viento","🌬️ Viento"],["uv","☀️ Rad. UV"],["resueltas","✅ Resueltas"],["notifs","🔔 Registros"]].map(([t,l])=>(
           <button key={t} className={`tab${tabAlerta===t?" on":""}`} onClick={()=>setTabAlerta(t)} style={{fontFamily:"'Georgia',serif",position:"relative"}}>
             {l}
             {t==="incidencias"&&incActivas.length>0&&<span style={{marginLeft:5,background:"#ef4444",color:"#fff",borderRadius:"50%",fontSize:9,padding:"1px 5px"}}>{incActivas.length}</span>}
@@ -16916,6 +16916,85 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
               </div>
             );
           })()}
+        </div>
+      )}
+
+      {/* TAB: RADIACIÓN UV */}
+      {tabAlerta==="uv"&&(
+        <div className="ein">
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,color:"#f59e0b",marginBottom:4}}>☀️ Radiación Ultravioleta — Protocolo de Protección</div>
+          <div style={{fontSize:12,color:"#5a9a7a",marginBottom:16}}>Según Protocolo de Exposición Ocupacional a Radiación UV · Mutual de Seguridad ACHS</div>
+
+          {/* Tabla de índices UV */}
+          <div style={{...S.card,padding:16,marginBottom:14}}>
+            <div style={{fontSize:12,fontWeight:700,color:"#f59e0b",marginBottom:10}}>📊 Índice UV y Medidas de Protección</div>
+            <div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                <thead>
+                  <tr style={{background:"rgba(245,158,11,0.15)"}}>
+                    {["Índice UV","Categoría","Color","Medidas obligatorias"].map(h=>(
+                      <th key={h} style={{padding:"8px 12px",textAlign:"left",borderBottom:"1px solid rgba(245,158,11,0.3)",color:"#f59e0b",fontSize:11,textTransform:"uppercase",letterSpacing:".4px"}}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    ["0 – 2","Bajo","#22c55e","Sin protección especial requerida"],
+                    ["3 – 5","Moderado","#84cc16","Lentes de sol, sombrero ala ancha, protector solar FPS 30+"],
+                    ["6 – 7","Alto","#f59e0b","Todo lo anterior + buscar sombra entre 11:00–15:00h, manga larga recomendada"],
+                    ["8 – 10","Muy alto","#f97316","Todo lo anterior + manga larga obligatoria, reducir exposición 11:00–15:00h"],
+                    ["11+","Extremo","#ef4444","Evitar exposición 10:00–16:00h, manga larga + cuello protegido, hidratación constante"],
+                  ].map(([idx,cat,color,medidas],i)=>(
+                    <tr key={i} style={{borderBottom:"1px solid rgba(255,255,255,0.05)",background:i%2?"rgba(255,255,255,0.02)":"transparent"}}>
+                      <td style={{padding:"8px 12px",fontWeight:700,color,fontSize:14}}>{idx}</td>
+                      <td style={{padding:"8px 12px",color,fontWeight:600}}>{cat}</td>
+                      <td style={{padding:"8px 12px"}}><span style={{display:"inline-block",width:18,height:18,borderRadius:"50%",background:color,verticalAlign:"middle"}}/></td>
+                      <td style={{padding:"8px 12px",fontSize:11,color:"#c8e0c8"}}>{medidas}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Medidas EPP obligatorias */}
+          <div style={{...S.card,padding:16,marginBottom:14}}>
+            <div style={{fontSize:12,fontWeight:700,color:"#f59e0b",marginBottom:10}}>🦺 EPP Obligatorio para Trabajo Exterior (Protocolo DAV)</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:10}}>
+              {[
+                ["🧢","Sombrero o jockey","Ala mínima 7.5 cm o casco con ala"],
+                ["😎","Lentes de sol","Protección UV 380nm, categoría 3 o 4"],
+                ["🧴","Protector solar","FPS 50+ en cara, cuello y manos. Reaplicar cada 2 horas"],
+                ["👕","Ropa manga larga","En índice UV ≥ 8. Tela con factor UPF 30+"],
+                ["💧","Hidratación","Agua disponible. Beber 250ml cada 20 min en exposición intensa"],
+                ["🏠","Sombra","Buscar sombra entre 11:00–15:00h. Rotar tareas en zonas sombreadas"],
+              ].map(([ico,titulo,desc])=>(
+                <div key={titulo} style={{padding:"10px 12px",background:"rgba(245,158,11,0.06)",borderRadius:8,border:"1px solid rgba(245,158,11,0.15)"}}>
+                  <div style={{fontSize:20,marginBottom:4}}>{ico}</div>
+                  <div style={{fontSize:12,fontWeight:600,color:"#fbbf24",marginBottom:2}}>{titulo}</div>
+                  <div style={{fontSize:11,color:"#8aaa8a"}}>{desc}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Síntomas de alerta */}
+          <div style={{...S.card,padding:16,background:"rgba(239,68,68,0.04)",border:"1px solid rgba(239,68,68,0.2)"}}>
+            <div style={{fontSize:12,fontWeight:700,color:"#f87171",marginBottom:8}}>🚨 Síntomas de Alarma — Detener trabajo e informar</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+              {["Enrojecimiento de piel","Náuseas o mareos","Dolor de cabeza intenso","Calambres musculares","Temperatura corporal elevada","Confusión o desorientación"].map(s=>(
+                <span key={s} style={{fontSize:11,padding:"4px 10px",borderRadius:16,background:"rgba(239,68,68,0.1)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.2)"}}>{s}</span>
+              ))}
+            </div>
+            <div style={{fontSize:11,color:"#5a9a7a",marginTop:10}}>
+              En caso de golpe de calor: trasladar a sombra, aplicar agua fría en cuello/axilas, llamar inmediatamente al supervisor y/o emergencias.
+            </div>
+          </div>
+
+          {/* Consulta UV actual */}
+          <div style={{marginTop:14,padding:"10px 14px",background:"rgba(245,158,11,0.04)",border:"1px solid rgba(245,158,11,0.15)",borderRadius:8,fontSize:11,color:"#8aaa8a"}}>
+            💡 Consulta el índice UV del día en <a href="https://www.meteochile.gob.cl/PortalDMC/index.xhtml" target="_blank" rel="noopener noreferrer" style={{color:"#f59e0b"}}>meteochile.gob.cl</a> o en la app Clima de tu teléfono antes de iniciar trabajos exteriores.
+          </div>
         </div>
       )}
 
@@ -18546,7 +18625,7 @@ export default function App() {
     } finally { setLoginLoading(false); }
   };
 
-  const handleLogout = () => signOut(auth);
+  const handleLogout = () => { signOut(auth); setVista("dashboard"); setFbRol(null); };
   const CUENTAS_DEFAULT = ["Rama Golf","Mantenimiento Jardines","Obras","Insumos Generales","Maquinaria y Equipos","Fitosanitarios","Semillas y Plantas","Uniformes y EPP"];
   const [data,           setData,           dataReady, setDataLocal]     = useFirebaseState("data",           initData());
   // zonasConCust: zonas base + personalizadas, con nombre/ícono/categoría YA actualizados según lo editado
@@ -19492,7 +19571,7 @@ export default function App() {
             : fbRol==="supervisor"
             ? [["dashboard","📊","Panel"],["programacion","📆","Programa"],["reporte","📋","Reporte"],["golf","🏌️","Golf"],["protocolos","📋","Protocolos"],["miturno","🌿","Mi Turno"]]
             : fbRol==="gerencia"
-            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["compras","🛒","Compras"],["bodegas","🏪","Bodegas"],["golf","🏌️","Golf"],["notificaciones","🔔","Alertas"]]
+            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["compras","🛒","Compras"],["bodegas","🏪","Bodegas"],["golf","🏌️","Golf"],["protocolos","📋","Protocolos"],["notificaciones","🔔","Alertas"]]
             : [["miturno","🌿","Mi Turno"]]
           ).map(([v,ico,lbl])=>(
             <button key={v} onClick={()=>{setVista(v);setZonaId(null);setAiText("");if(v==="notificaciones")setTimeout(marcarTodasLeidas,4000);}} style={{cursor:"pointer",border:"none",background:"transparent",color:vista===v?"#fff":"#7aaa80",fontFamily:"'Georgia',serif",fontSize:12,padding:"10px 14px",borderBottom:vista===v?"2px solid #4a9a64":"2px solid transparent",transition:"all .15s",whiteSpace:"nowrap",display:"flex",flexDirection:"column",alignItems:"center",gap:2,flexShrink:0,position:"relative"}}>
