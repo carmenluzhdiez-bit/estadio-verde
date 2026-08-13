@@ -18500,6 +18500,8 @@ export default function App() {
   const [loginPass,  setLoginPass]  = useState("");
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
+  const [modoLogin, setModoLogin] = useState("trabajador");
+  const [workerSel, setWorkerSel] = useState("");
   const [emailsExtra, setEmailsExtra] = useFirebaseState(`config/emails_extra`, {});
 
   useEffect(() => {
@@ -19305,11 +19307,8 @@ export default function App() {
 
         {/* Selector de modo de acceso */}
         {(()=>{
-          const [modoLogin, setModoLogin] = React.useState("trabajador");
-          const [workerSel, setWorkerSel] = React.useState("");
           const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
           const trabajadores = personalArr.filter(p=>p.nombre&&p.estado!=="retirado").sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
-
           return (
             <>
               {/* Tabs */}
