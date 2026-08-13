@@ -5710,6 +5710,11 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
                 <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>NOMBRE COMPLETO</label>
                 <input style={S.input} value={t.nombre||""} onChange={e=>onUpdate({nombre:e.target.value})}/>
               </div>
+              <div>
+                <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>APODO / NOMBRE CONOCIDO</label>
+                <input style={S.input} value={t.apodo||""} onChange={e=>onUpdate({apodo:e.target.value})} placeholder="Ej: Bhalú, Andrés, Sergio..."/>
+                <div style={{fontSize:10,color:"#4a7a5a",marginTop:3}}>Nombre que aparece en el selector de acceso</div>
+              </div>
               <div><label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>RUT</label><input style={S.input} value={t.rut||""} onChange={e=>onUpdate({rut:e.target.value})}/></div>
               <div><label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>FECHA DE NACIMIENTO</label><input type="date" style={S.input} value={t.fechaNacimiento||""} onChange={e=>onUpdate({fechaNacimiento:e.target.value})}/></div>
               <div><label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>NACIONALIDAD</label><input style={S.input} value={t.nacionalidad||""} onChange={e=>onUpdate({nacionalidad:e.target.value})} placeholder="Chileno/a, Peruano/a..."/></div>
@@ -19295,7 +19300,7 @@ export default function App() {
   );
 
   // ── Login ─────────────────────────────────────────────────────────────────
-  if (!fbUser) return (
+  if (!fbUser && !workerLogueado) return (
     <div style={{minHeight:"100vh",background:"#0d1f13",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&display=swap');*{box-sizing:border-box;margin:0;padding:0}`}</style>
       <div style={{background:"#0f2517",border:"1px solid #1e3a22",borderRadius:20,padding:40,width:"100%",maxWidth:420,boxShadow:"0 20px 60px rgba(0,0,0,0.5)"}}>
@@ -19308,7 +19313,13 @@ export default function App() {
         {/* Selector de modo de acceso */}
         {(()=>{
           const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
-          const trabajadores = personalArr.filter(p=>p.nombre&&p.estado!=="retirado").sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+          const trabajadores = personalArr.filter(p=>{
+            if(!p.nombre||p.estado==="retirado") return false;
+            // Excluir a quienes tienen rol especial en emailsExtra o en ROLES_EMAIL
+            const rolEmail = getRolByEmail(p.email||"", emailsExtra);
+            if(rolEmail==="jefa"||rolEmail==="programador"||rolEmail==="gerencia") return false;
+            return true;
+          }).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
           return (
             <>
               {/* Tabs */}
@@ -19340,10 +19351,10 @@ export default function App() {
                       if(!p) return;
                       setWorkerLogueado(p.id);
                       setVistaWorker(true);
-                      setFbRol(p.cargo?.toLowerCase().includes("supervisor")?"supervisor":"trabajador");
+                      const esSup = p.cargo?.toLowerCase().includes("supervisor");
+                      setFbRol(esSup?"supervisor":"trabajador");
                       setVista("miturno");
-                      // Simular usuario logueado sin Firebase Auth
-                      setFbUser({email:p.email||p.nombre, displayName:p.nombre, uid:"local_"+p.id});
+                      setFbUser({email:p.email||"local@"+p.id, displayName:p.nombre, uid:"local_"+p.id, esLocal:true});
                     }}
                     style={{background:"#2d6a3f",color:"#fff",border:"none",borderRadius:10,padding:"14px",fontSize:15,fontWeight:700,cursor:"pointer",opacity:workerSel?1:0.5}}>
                     Entrar →
