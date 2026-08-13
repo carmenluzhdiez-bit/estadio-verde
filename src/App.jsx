@@ -40,12 +40,12 @@ const getRolByEmail = (email, emailsExtra={}) => {
   if(!email) return null;
   const lower = email.toLowerCase();
   if(ROLES_EMAIL[lower]) return ROLES_EMAIL[lower];
-  // Buscar en emailsExtra — soporta formato nuevo {email,rol} y antiguo string
-  for(const entry of Object.values(emailsExtra||{})) {
-    if(typeof entry==="object" && entry.email?.toLowerCase()===lower) return entry.rol;
-    if(typeof entry==="string") {
-      // formato antiguo: clave codificada
-    }
+  const clave = lower.replace(/\./g,",").replace(/@/g,"_at_");
+  for(const [k,v] of Object.entries(emailsExtra||{})) {
+    // Formato nuevo: {email, rol}
+    if(typeof v==="object" && v!==null && v.email?.toLowerCase()===lower) return v.rol;
+    // Formato antiguo: clave codificada → valor string
+    if(typeof v==="string" && k===clave) return v;
   }
   return null;
 };
