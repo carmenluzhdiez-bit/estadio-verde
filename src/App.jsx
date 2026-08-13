@@ -18512,19 +18512,14 @@ export default function App() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       setFbUser(user);
-      const rol = user ? getRolByEmail(user.email, emailsExtra) : null;
-      setFbRol(rol);
-      setAuthReady(true);
-      // Si es trabajador, auto-activar vistaWorker con su id de personal
-      if(user && rol==="trabajador") {
-        // Buscar en personalArr por email (se carga después, usar setTimeout)
-        setTimeout(()=>{
-          setVistaWorker(true);
-        }, 500);
-      } else {
+      if(!user) {
+        setFbRol(null);
         setVistaWorker(false);
         setWorkerLogueado(null);
       }
+      // No setear fbRol aquí — esperar a que emailsExtra cargue
+      // El useEffect de emailsExtra lo asignará correctamente
+      setAuthReady(true);
     });
     return () => unsub();
   }, []);
@@ -18831,11 +18826,15 @@ export default function App() {
   // Gerencia: solo lectura — envuelve todos los setters para que no escriban
   const soloLectura = fbRol === "gerencia";
   const guardadoSeguro = (fn) => soloLectura ? ()=>{} : fn;
-  // Re-evaluar rol cuando cargan emailsExtra — esperar a que estén listos
+  // Re-evaluar rol cuando cargan emailsExtra — punto único de asignación
   useEffect(()=>{
-    if(!fbUser||!emailsExtraReady) return;
+    if(!fbUser||fbUser.esLocal||!emailsExtraReady) return;
+    console.log("🔍 emailsExtra al evaluar rol:", JSON.stringify(emailsExtra));
+    console.log("🔍 email del usuario:", fbUser.email);
     const rol = getRolByEmail(fbUser.email, emailsExtra);
+    console.log("🔍 rol encontrado:", rol);
     if(rol) setFbRol(rol);
+    else console.warn("⚠️ No se encontró rol para:", fbUser.email);
   },[emailsExtra, emailsExtraReady, fbUser]);
   const esJefa = fbRol === "jefa" || fbRol === "programador";
   const esProgramador = fbRol === "programador";
