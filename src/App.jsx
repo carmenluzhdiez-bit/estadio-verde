@@ -19337,11 +19337,11 @@ export default function App() {
                 <div style={{display:"flex",flexDirection:"column",gap:14}}>
                   <div>
                     <label style={{fontSize:11,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:6,textTransform:"uppercase"}}>Selecciona tu nombre</label>
-                    <select style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"12px 14px",color:"#ede9e0",fontSize:14,outline:"none"}}
+                    <select style={{width:"100%",background:"#1a3a22",border:"1px solid rgba(52,211,153,0.3)",borderRadius:10,padding:"12px 14px",color:"#e8f5e9",fontSize:15,outline:"none",cursor:"pointer"}}
                       value={workerSel} onChange={e=>setWorkerSel(e.target.value)}>
-                      <option value="">— Elige tu nombre —</option>
+                      <option value="" style={{background:"#1a3a22",color:"#6aaa7a"}}>— Elige tu nombre —</option>
                       {trabajadores.map(p=>(
-                        <option key={p.id} value={p.id}>{p.nombre} · {p.cargo||"Jardinero"}</option>
+                        <option key={p.id} value={p.id} style={{background:"#1a3a22",color:"#e8f5e9",padding:"8px"}}>{p.nombre} · {p.cargo||"Jardinero"}</option>
                       ))}
                     </select>
                   </div>
