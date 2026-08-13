@@ -18522,13 +18522,17 @@ export default function App() {
         setFbRol(null);
         setVistaWorker(false);
         setWorkerLogueado(null);
+      } else {
+        // Intentar fijar el rol inmediatamente si emailsExtra ya cargó
+        if(emailsExtraListo) {
+          const rol = getRolByEmail(user.email, emailsExtra);
+          if(rol) setFbRol(rol);
+        }
       }
-      // No setear fbRol aquí — esperar a que emailsExtra cargue
-      // El useEffect de emailsExtra lo asignará correctamente
       setAuthReady(true);
     });
     return () => unsub();
-  }, []);
+  }, [emailsExtraListo, emailsExtra]);
 
 
 
@@ -19488,7 +19492,7 @@ export default function App() {
             : fbRol==="supervisor"
             ? [["dashboard","📊","Panel"],["programacion","📆","Programa"],["reporte","📋","Reporte"],["golf","🏌️","Golf"],["protocolos","📋","Protocolos"],["miturno","🌿","Mi Turno"]]
             : fbRol==="gerencia"
-            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["golf","🏌️","Golf"],["notificaciones","🔔","Alertas"]]
+            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["compras","🛒","Compras"],["bodegas","🏪","Bodegas"],["golf","🏌️","Golf"],["notificaciones","🔔","Alertas"]]
             : [["miturno","🌿","Mi Turno"]]
           ).map(([v,ico,lbl])=>(
             <button key={v} onClick={()=>{setVista(v);setZonaId(null);setAiText("");if(v==="notificaciones")setTimeout(marcarTodasLeidas,4000);}} style={{cursor:"pointer",border:"none",background:"transparent",color:vista===v?"#fff":"#7aaa80",fontFamily:"'Georgia',serif",fontSize:12,padding:"10px 14px",borderBottom:vista===v?"2px solid #4a9a64":"2px solid transparent",transition:"all .15s",whiteSpace:"nowrap",display:"flex",flexDirection:"column",alignItems:"center",gap:2,flexShrink:0,position:"relative"}}>
