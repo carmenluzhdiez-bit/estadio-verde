@@ -18797,22 +18797,19 @@ export default function App() {
   // Cuando personal o emailsExtra cargan, configurar workerLogueado
   useEffect(()=>{
     if(!fbUser||fbUser.esLocal) return;
-    if(!emailsExtraReady) return; // esperar que carguen los roles
+    if(!emailsExtraReady) return;
+    const rolActual = getRolByEmail(fbUser.email, emailsExtra);
+    // Roles administrativos nunca van a Mi Turno
+    if(rolActual==="jefa"||rolActual==="programador"||rolActual==="gerencia") return;
     const arr = Array.isArray(personal)?personal:Object.values(personal||{});
     if(arr.length===0) return;
     const fbP = arr.find(x=>x.email?.toLowerCase()===fbUser.email?.toLowerCase());
     if(!fbP) return;
-
-    const rolActual = getRolByEmail(fbUser.email, emailsExtra);
-
-    // Solo ir a Mi Turno si el rol es trabajador o supervisor
     if(rolActual==="trabajador"||rolActual==="supervisor") {
       setWorkerLogueado(fbP.id);
       setVistaWorker(true);
       setVista("miturno");
-    }
-    // Si no tiene rol asignado en emailsExtra, tratarlo como trabajador
-    if(!rolActual) {
+    } else if(!rolActual) {
       setFbRol("trabajador");
       setWorkerLogueado(fbP.id);
       setVistaWorker(true);
