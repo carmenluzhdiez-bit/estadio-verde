@@ -18933,6 +18933,15 @@ export default function App() {
   const esSupervisor = fbRol === "supervisor";
   const esTrabajador = fbRol === "trabajador";
 
+  // Roles administrativos: resetear vistaWorker si quedó activo
+  useEffect(()=>{
+    if(fbRol==="jefa"||fbRol==="programador"||fbRol==="gerencia") {
+      setVistaWorker(false);
+      setWorkerLogueado(null);
+      if(vista==="miturno") setVista("dashboard");
+    }
+  },[fbRol]);
+
   // Trabajador siempre va a Mi Turno
   useEffect(()=>{
     if(esTrabajador && vista!=="miturno") setVista("miturno");
