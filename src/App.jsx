@@ -13397,6 +13397,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
   const [selMaq, setSelMaq] = React.useState([]);
   const [hojaCatsAb, setHojaCatsAb] = React.useState({});
   const [horoOpen, setHoroOpen] = React.useState({}); // {equipoId: bool}
+  const [repCatsAb, setRepCatsAb] = React.useState({}); // {maquina: bool} — abierto/cerrado en tab Repuestos
   // ── Horómetro (Maquinaria) ──
   const [horometroData, setHorometroData] = useFirebaseState(`${ROOT}/horometro`, {});
   const [showHoroForm, setShowHoroForm] = React.useState(false);
@@ -14622,7 +14623,6 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
         const porMaquina = {};
         repuestos.forEach(r=>{ const m=r.maquinaAsociada||"Sin asignar"; if(!porMaquina[m]) porMaquina[m]=[]; porMaquina[m].push(r); });
         const maquinas = Object.keys(porMaquina).sort();
-        const [repCatsAb,setRepCatsAb] = React.useState(Object.fromEntries(maquinas.map(m=>[m,true])));
 
         return (
           <div className="ein">
