@@ -18699,8 +18699,19 @@ export default function App() {
   },[]);
   const emailsExtraListo = emailsExtraReady || emailsExtraTimedOut;
 
+  // true mientras haya una sesión de jardinero/supervisor por lista (esLocal:true) activa.
+  // Se marca al entrar por lista y se limpia al salir (handleLogout).
+  const esLocalRef = useRef(false);
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
+      // Sesión local activa (jardinero/supervisor por lista, esLocal:true) —
+      // este listener NO debe pisarla. onAuthStateChanged se re-dispara con
+      // user=null cada vez que este efecto se re-suscribe (emailsExtra cambia
+      // en tiempo real), porque un usuario local nunca se autentica de verdad
+      // en Firebase Auth. Sin este guard, eso reseteaba fbUser/workerLogueado
+      // y devolvía al jardinero al login en bucle.
+      if(esLocalRef.current) { setAuthReady(true); return; }
       setFbUser(user);
       if(!user) {
         setFbRol(null);
@@ -18733,6 +18744,7 @@ export default function App() {
   const handleLogout = () => {
     if(fbUser?.esLocal) {
       // Usuario local (jardinero/supervisor por lista) — limpiar estado sin Firebase
+      esLocalRef.current = false;
       setFbUser(null); setFbRol(null); setWorkerLogueado(null);
       setVistaWorker(false); setVista("dashboard"); setModoLogin("trabajador");
     } else {
@@ -19594,6 +19606,7 @@ export default function App() {
                         if(!pinGuardado) { alert("PIN no configurado. Ve a Personal → ficha del Supervisor y guarda el PIN."); return; }
                         if(loginPinSup!==pinGuardado) { setLoginPinError(true); return; }
                       }
+                      esLocalRef.current = true;
                       setFbUser({email:p.email||"local@"+p.id, displayName:p.nombre, uid:"local_"+p.id, esLocal:true});
                       setWorkerLogueado(p.id);
                       setVistaWorker(true);
@@ -20943,14 +20956,14 @@ export default function App() {
                 personal={personal}
                 MACROZONAS_BASE={MACROZONAS_BASE}
                 zonas={zonasConCust}
-                onSalir={()=>{setWorkerLogueado(null);setFbRol(null);setFbUser(null);setVistaWorker(false);}}
+                onSalir={()=>{esLocalRef.current=false;setWorkerLogueado(null);setFbRol(null);setFbUser(null);setVistaWorker(false);}}
               />
             )}
 
             {/* ── Logged in as worker ── */}
             {rolLogueado==="trabajador"&&(vistaWorker||fbUser)&&(
               <div>
-                <button className="btn-g" style={{...S.btn,marginBottom:16}} onClick={()=>{setVistaWorker(false);setWorkerLogueado(null);setFbRol(null);setFbUser(null);}}>← Salir</button>
+                <button className="btn-g" style={{...S.btn,marginBottom:16}} onClick={()=>{esLocalRef.current=false;setVistaWorker(false);setWorkerLogueado(null);setFbRol(null);setFbUser(null);}}>← Salir</button>
                 <VistaWorker
                   trabajador={(()=>{
                     const arr=Array.isArray(personal)?personal:Object.values(personal||{});
