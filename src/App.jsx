@@ -19024,14 +19024,15 @@ export default function App() {
   const esSupervisor = fbRol === "supervisor";
   const esTrabajador = fbRol === "trabajador";
 
-  // Roles con acceso al panel: resetear vistaWorker si quedó activo
+  // Roles con acceso al panel: resetear vistaWorker si quedó activo — NUNCA para esLocal
   useEffect(()=>{
+    if(fbUser?.esLocal) return;
     if(fbRol==="jefa"||fbRol==="programador"||fbRol==="gerencia"||fbRol==="supervisor") {
       setVistaWorker(false);
       setWorkerLogueado(null);
       if(vista==="miturno") setVista("dashboard");
     }
-  },[fbRol]);
+  },[fbRol, fbUser]);
 
   // Trabajador siempre va a Mi Turno
   useEffect(()=>{
