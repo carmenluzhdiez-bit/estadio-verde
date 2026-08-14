@@ -5710,6 +5710,16 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
                 <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>NOMBRE COMPLETO</label>
                 <input style={S.input} value={t.nombre||""} onChange={e=>onUpdate({nombre:e.target.value})}/>
               </div>
+              {t.cargo?.toLowerCase().includes("supervisor")&&(
+                <div>
+                  <label style={{fontSize:11,color:"#93c5fd",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>🔐 PIN DE ACCESO (4 DÍGITOS)</label>
+                  <input type="text" maxLength={4} inputMode="numeric" style={{...S.input,letterSpacing:"0.5em",fontSize:18,textAlign:"center",maxWidth:140}}
+                    value={t.pinSupervisor||""} onChange={e=>onUpdate({pinSupervisor:e.target.value.replace(/\D/g,"")})}
+                    placeholder="0000"/>
+                  <div style={{fontSize:10,color:"#4a7a5a",marginTop:3}}>PIN que el Supervisor debe ingresar para acceder a la app</div>
+                </div>
+              )}
+              </div>
               <div>
                 <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>APODO / NOMBRE CONOCIDO</label>
                 <input style={S.input} value={t.apodo||""} onChange={e=>onUpdate({apodo:e.target.value})} placeholder="Ej: Bhalú, Andrés, Sergio..."/>
@@ -18677,6 +18687,8 @@ export default function App() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [modoLogin, setModoLogin] = useState("trabajador");
   const [workerSel, setWorkerSel] = useState("");
+  const [loginPinSup, setLoginPinSup] = useState("");
+  const [loginPinError, setLoginPinError] = useState(false);
   const [emailsExtra, setEmailsExtra, emailsExtraReady] = useFirebaseState(`config/emails_extra`, {});
   const [emailsExtraTimedOut, setEmailsExtraTimedOut] = useState(false);
   useEffect(()=>{
@@ -18716,7 +18728,15 @@ export default function App() {
     } finally { setLoginLoading(false); }
   };
 
-  const handleLogout = () => { signOut(auth); setVista("dashboard"); setFbRol(null); };
+  const handleLogout = () => {
+    if(fbUser?.esLocal) {
+      // Usuario local (jardinero/supervisor por lista) — limpiar estado sin Firebase
+      setFbUser(null); setFbRol(null); setWorkerLogueado(null);
+      setVistaWorker(false); setVista("dashboard"); setModoLogin("trabajador");
+    } else {
+      signOut(auth); setVista("dashboard"); setFbRol(null);
+    }
+  };
   const CUENTAS_DEFAULT = ["Rama Golf","Mantenimiento Jardines","Obras","Insumos Generales","Maquinaria y Equipos","Fitosanitarios","Semillas y Plantas","Uniformes y EPP"];
   const [data,           setData,           dataReady, setDataLocal]     = useFirebaseState("data",           initData());
   // zonasConCust: zonas base + personalizadas, con nombre/ícono/categoría YA actualizados según lo editado
@@ -19510,7 +19530,7 @@ export default function App() {
             if(!p.nombre||p.estado==="retirado") return false;
             // Excluir a quienes tienen rol especial en emailsExtra o en ROLES_EMAIL
             const rolEmail = getRolByEmail(p.email||"", emailsExtra);
-            if(rolEmail==="jefa"||rolEmail==="programador"||rolEmail==="gerencia") return false;
+            if(rolEmail==="jefa"||rolEmail==="programador"||rolEmail==="gerencia"||rolEmail==="supervisor") return false;
             return true;
           }).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
           return (
@@ -19518,10 +19538,10 @@ export default function App() {
               {/* Tabs */}
               <div style={{display:"flex",gap:8,marginBottom:24}}>
                 <button onClick={()=>setModoLogin("trabajador")} style={{flex:1,padding:"8px",borderRadius:8,border:`1px solid ${modoLogin==="trabajador"?"rgba(52,211,153,0.4)":"rgba(255,255,255,0.1)"}`,background:modoLogin==="trabajador"?"rgba(52,211,153,0.1)":"transparent",color:modoLogin==="trabajador"?"#34d399":"#6aaa7a",fontSize:12,cursor:"pointer",fontFamily:"'Georgia',serif"}}>
-                  👷 Jardinero / Supervisor
+                  👤 Jardinero
                 </button>
                 <button onClick={()=>setModoLogin("admin")} style={{flex:1,padding:"8px",borderRadius:8,border:`1px solid ${modoLogin==="admin"?"rgba(167,139,250,0.4)":"rgba(255,255,255,0.1)"}`,background:modoLogin==="admin"?"rgba(167,139,250,0.1)":"transparent",color:modoLogin==="admin"?"#a78bfa":"#6aaa7a",fontSize:12,cursor:"pointer",fontFamily:"'Georgia',serif"}}>
-                  🔐 Jefa / Gerencia / Programador
+                  🔐 Supervisor / Jefa / Gerencia / Programador
                 </button>
               </div>
 
@@ -19531,23 +19551,44 @@ export default function App() {
                   <div>
                     <label style={{fontSize:11,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:6,textTransform:"uppercase"}}>Selecciona tu nombre</label>
                     <select style={{width:"100%",background:"#1a3a22",border:"1px solid rgba(52,211,153,0.3)",borderRadius:10,padding:"12px 14px",color:"#e8f5e9",fontSize:15,outline:"none",cursor:"pointer"}}
-                      value={workerSel} onChange={e=>setWorkerSel(e.target.value)}>
+                      value={workerSel} onChange={e=>{setWorkerSel(e.target.value);setLoginPinSup("");setLoginPinError(false);}}>
                       <option value="" style={{background:"#1a3a22",color:"#6aaa7a"}}>— Elige tu nombre —</option>
                       {trabajadores.map(p=>(
                         <option key={p.id} value={p.id} style={{background:"#1a3a22",color:"#e8f5e9",padding:"8px"}}>{p.nombre} · {p.cargo||"Jardinero"}</option>
                       ))}
                     </select>
                   </div>
+                  {(()=>{
+                    const sel = trabajadores.find(x=>String(x.id)===String(workerSel));
+                    if(!sel?.cargo?.toLowerCase().includes("supervisor")) return null;
+                    return (
+                      <div>
+                        <label style={{fontSize:11,color:"#93c5fd",letterSpacing:"0.6px",display:"block",marginBottom:6,textTransform:"uppercase"}}>🔐 PIN de Supervisor (4 dígitos)</label>
+                        <input type="password" maxLength={4} inputMode="numeric"
+                          value={loginPinSup} onChange={e=>{setLoginPinSup(e.target.value.replace(/\D/g,""));setLoginPinError(false);}}
+                          placeholder="••••"
+                          style={{width:"100%",background:"rgba(147,197,253,0.06)",border:`1px solid ${loginPinError?"#ef4444":"rgba(147,197,253,0.3)"}`,borderRadius:10,padding:"12px 14px",color:"#e8f5e9",fontSize:22,letterSpacing:"0.5em",textAlign:"center",outline:"none"}}/>
+                        {loginPinError&&<div style={{fontSize:11,color:"#f87171",marginTop:4,textAlign:"center"}}>PIN incorrecto</div>}
+                        <div style={{fontSize:10,color:"#4a7a5a",marginTop:4}}>El PIN se configura en Personal → ficha del Supervisor</div>
+                      </div>
+                    );
+                  })()}
                   <button disabled={!workerSel}
                     onClick={()=>{
                       const p = trabajadores.find(x=>String(x.id)===String(workerSel));
                       if(!p) return;
+                      const esSup = p.cargo?.toLowerCase().includes("supervisor");
+                      if(esSup) {
+                        const pinGuardado = String(p.pinSupervisor||"");
+                        if(!pinGuardado) { alert("Este supervisor no tiene PIN configurado. Agrégalo en Personal → ficha del Supervisor."); return; }
+                        if(loginPinSup!==pinGuardado) { setLoginPinError(true); return; }
+                      }
                       setWorkerLogueado(p.id);
                       setVistaWorker(true);
-                      const esSup = p.cargo?.toLowerCase().includes("supervisor");
                       setFbRol(esSup?"supervisor":"trabajador");
                       setVista("miturno");
                       setFbUser({email:p.email||"local@"+p.id, displayName:p.nombre, uid:"local_"+p.id, esLocal:true});
+                      setLoginPinSup("");
                     }}
                     style={{background:"#2d6a3f",color:"#fff",border:"none",borderRadius:10,padding:"14px",fontSize:15,fontWeight:700,cursor:"pointer",opacity:workerSel?1:0.5}}>
                     Entrar →
