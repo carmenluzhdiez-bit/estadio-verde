@@ -7,7 +7,7 @@ import * as React from "react";
 // ─── FIREBASE ────────────────────────────────────────────────────────────────
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, onValue, set as fbSet, update as fbUpdate, get } from "firebase/database";
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
+import { getAuth, signInWithEmailAndPassword, signInAnonymously, signOut, onAuthStateChanged } from "firebase/auth";
 import { getFunctions, httpsCallable } from "firebase/functions";
 
 const firebaseConfig = {
@@ -18744,8 +18744,10 @@ export default function App() {
 
   const handleLogout = () => {
     if(fbUser?.esLocal) {
-      // Usuario local (jardinero/supervisor por lista) — limpiar estado sin Firebase
+      // Usuario local (jardinero/supervisor por lista) — limpiar estado y
+      // cerrar también la sesión anónima de Firebase que se abrió al entrar
       esLocalRef.current = false;
+      signOut(auth).catch(()=>{});
       setFbUser(null); setFbRol(null); setWorkerLogueado(null);
       setVistaWorker(false); setVista("dashboard"); setModoLogin("trabajador");
     } else {
@@ -19597,7 +19599,7 @@ export default function App() {
                     );
                   })()}
                   <button disabled={!workerSel}
-                    onClick={()=>{
+                    onClick={async ()=>{
                       console.log("🌿 Clic en Entrar. workerSel:", workerSel, "trabajadores.length:", trabajadores.length);
                       const p = trabajadores.find(x=>String(x.id)===String(workerSel));
                       console.log("🌿 Trabajador encontrado:", p);
@@ -19610,6 +19612,20 @@ export default function App() {
                         if(loginPinSup!==pinGuardado) { setLoginPinError(true); return; }
                       }
                       esLocalRef.current = true;
+                      // Login anónimo de Firebase: las reglas de Realtime Database exigen
+                      // auth != null para leer/escribir. Los usuarios por lista (jardinero/
+                      // supervisor) no tienen email+contraseña, así que se les da una sesión
+                      // anónima real de Firebase Auth (invisible para ellos) para que las
+                      // lecturas de personal/data/prog dejen de ser rechazadas.
+                      try {
+                        await signInAnonymously(auth);
+                        console.log("🔓 Sesión anónima de Firebase establecida");
+                      } catch(err) {
+                        console.error("🚨 Error en signInAnonymously:", err);
+                        alert("No se pudo conectar con el servidor. Verifica tu conexión e intenta de nuevo.");
+                        esLocalRef.current = false;
+                        return;
+                      }
                       console.log("🌿 Iniciando sesión local:", p.nombre, "esSup:", esSup);
                       setFbUser({email:p.email||"local@"+p.id, displayName:p.nombre, uid:"local_"+p.id, esLocal:true});
                       setWorkerLogueado(p.id);
@@ -20960,14 +20976,14 @@ export default function App() {
                 personal={personal}
                 MACROZONAS_BASE={MACROZONAS_BASE}
                 zonas={zonasConCust}
-                onSalir={()=>{esLocalRef.current=false;setWorkerLogueado(null);setFbRol(null);setFbUser(null);setVistaWorker(false);}}
+                onSalir={()=>{esLocalRef.current=false;signOut(auth).catch(()=>{});setWorkerLogueado(null);setFbRol(null);setFbUser(null);setVistaWorker(false);}}
               />
             )}
 
             {/* ── Logged in as worker ── */}
             {rolLogueado==="trabajador"&&(vistaWorker||fbUser)&&(
               <div>
-                <button className="btn-g" style={{...S.btn,marginBottom:16}} onClick={()=>{esLocalRef.current=false;setVistaWorker(false);setWorkerLogueado(null);setFbRol(null);setFbUser(null);}}>← Salir</button>
+                <button className="btn-g" style={{...S.btn,marginBottom:16}} onClick={()=>{esLocalRef.current=false;signOut(auth).catch(()=>{});setVistaWorker(false);setWorkerLogueado(null);setFbRol(null);setFbUser(null);}}>← Salir</button>
                 <VistaWorker
                   trabajador={(()=>{
                     const arr=Array.isArray(personal)?personal:Object.values(personal||{});
