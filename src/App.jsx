@@ -16529,6 +16529,29 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
   },[alertaForm.tipo]);
 
   React.useEffect(()=>{ if(tabAlerta==="viento") fetchViento(); },[tabAlerta]);
+  React.useEffect(()=>{ if(tabAlerta==="uv") fetchUV(); },[tabAlerta]);
+
+  const [uvData, setUvData] = React.useState(null);
+  const [uvLoading, setUvLoading] = React.useState(false);
+  const [uvError, setUvError] = React.useState(null);
+
+  const fetchUV = React.useCallback(async()=>{
+    setUvLoading(true); setUvError(null);
+    try {
+      const url = "https://api.open-meteo.com/v1/forecast?latitude=-33.4127&longitude=-70.5775&current=uv_index,temperature_2m&hourly=uv_index&timezone=America/Santiago&forecast_days=1";
+      const res = await fetch(url);
+      if(!res.ok) throw new Error("Error API");
+      const json = await res.json();
+      const curr = json.current;
+      const ahora = new Date();
+      const pronostico = json.hourly.time.slice(0,24).map((t,i)=>({
+        hora:t.slice(11,16),
+        uv:Math.round(json.hourly.uv_index[i]*10)/10
+      })).filter(h=>{const [hh]=h.hora.split(":").map(Number);const dt=new Date();dt.setHours(hh,0,0,0);return dt>=ahora;}).slice(0,8);
+      setUvData({uv:Math.round(curr.uv_index*10)/10, temperatura:Math.round(curr.temperature_2m), hora:curr.time?.slice(11,16)||"", pronostico});
+    } catch(e){ setUvError("No se pudo conectar con Open-Meteo. Verificar conexión."); }
+    finally{ setUvLoading(false); }
+  },[]);
 
   const NIVELES_VIENTO = [
     {nivel:0,label:"Normal",         rango:"< 40 km/h (vel. y ráfagas)",  color:"#22c55e",bg:"rgba(34,197,94,0.08)",   min:0, max:39, icon:"N0",acciones:[]},
@@ -16922,8 +16945,80 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
       {/* TAB: RADIACIÓN UV */}
       {tabAlerta==="uv"&&(
         <div className="ein">
-          <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,color:"#f59e0b",marginBottom:4}}>☀️ Radiación Ultravioleta — Protocolo de Protección</div>
-          <div style={{fontSize:12,color:"#5a9a7a",marginBottom:16}}>Según Protocolo de Exposición Ocupacional a Radiación UV · Mutual de Seguridad ACHS</div>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,color:"#f59e0b",marginBottom:4}}>☀️ Radiación Ultravioleta — Las Condes</div>
+          <div style={{fontSize:12,color:"#5a9a7a",marginBottom:16}}>Datos en tiempo real + Protocolo de Protección · Mutual de Seguridad ACHS</div>
+
+          {/* Panel en tiempo real */}
+          {(()=>{
+            const getNivelUV = (uv) => {
+              if(uv<=2) return {label:"Bajo",color:"#22c55e",bg:"rgba(34,197,94,0.08)",epp:"Sin protección especial requerida"};
+              if(uv<=5) return {label:"Moderado",color:"#84cc16",bg:"rgba(132,204,18,0.08)",epp:"Lentes de sol, sombrero ala ancha, FPS 30+"};
+              if(uv<=7) return {label:"Alto",color:"#f59e0b",bg:"rgba(245,158,11,0.08)",epp:"Todo lo anterior + buscar sombra 11:00–15:00h"};
+              if(uv<=10) return {label:"Muy alto",color:"#f97316",bg:"rgba(249,115,22,0.08)",epp:"Manga larga obligatoria, reducir exposición 11:00–15:00h"};
+              return {label:"Extremo",color:"#ef4444",bg:"rgba(239,68,68,0.08)",epp:"Evitar exposición 10:00–16:00h, protección máxima"};
+            };
+            const nivel = uvData ? getNivelUV(uvData.uv) : null;
+            return (
+              <div style={{...S.card,padding:16,marginBottom:14,border:`1px solid ${nivel?nivel.color+"40":"rgba(245,158,11,0.2)"}`,background:nivel?nivel.bg:"rgba(245,158,11,0.04)"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:10}}>
+                  <div style={{fontSize:12,fontWeight:700,color:"#f59e0b"}}>📡 Índice UV Actual — Las Condes</div>
+                  <button onClick={fetchUV} disabled={uvLoading}
+                    style={{...S.btn,fontSize:11,padding:"4px 12px",color:"#60a5fa",background:"rgba(96,165,250,0.08)",border:"1px solid rgba(96,165,250,0.2)"}}>
+                    {uvLoading?"⏳ Actualizando...":"🔄 Actualizar"}
+                  </button>
+                </div>
+                {uvError&&<div style={{fontSize:12,color:"#f87171",padding:"8px 12px",background:"rgba(239,68,68,0.08)",borderRadius:6}}>{uvError}</div>}
+                {!uvData&&!uvLoading&&!uvError&&(
+                  <button className="btn-p" style={{...S.btn,padding:"8px 20px"}} onClick={fetchUV}>Consultar ahora</button>
+                )}
+                {uvLoading&&<div style={{fontSize:12,color:"#5a9a7a"}}>⏳ Consultando Open-Meteo...</div>}
+                {uvData&&nivel&&(
+                  <div>
+                    <div style={{display:"flex",gap:20,alignItems:"center",flexWrap:"wrap",marginBottom:10}}>
+                      <div style={{textAlign:"center"}}>
+                        <div style={{fontFamily:"'Playfair Display',serif",fontSize:56,fontWeight:900,color:nivel.color,lineHeight:1}}>{uvData.uv}</div>
+                        <div style={{fontSize:12,color:nivel.color,fontWeight:700}}>{nivel.label}</div>
+                      </div>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:11,color:"#7aaa80",marginBottom:4}}>🕐 Actualizado: {uvData.hora} · 🌡️ {uvData.temperatura}°C</div>
+                        <div style={{fontSize:13,color:"#ede9e0",fontWeight:600,marginBottom:4}}>⚠️ {nivel.epp}</div>
+                      </div>
+                    </div>
+                    {uvData.pronostico?.length>0&&(
+                      <div>
+                        <div style={{fontSize:10,color:"#5a9a7a",textTransform:"uppercase",letterSpacing:".5px",marginBottom:6}}>Próximas horas</div>
+                        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                          {uvData.pronostico.map((h,i)=>{
+                            const n=getNivelUV(h.uv);
+                            return <div key={i} style={{textAlign:"center",padding:"4px 8px",borderRadius:6,background:n.bg,border:`1px solid ${n.color}30`,minWidth:44}}>
+                              <div style={{fontSize:10,color:"#7aaa80"}}>{h.hora}</div>
+                              <div style={{fontSize:14,fontWeight:700,color:n.color}}>{h.uv}</div>
+                            </div>;
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* Alerta automática cuando UV amerita acción */}
+          {uvData&&uvData.uv>=6&&(
+            <div style={{...S.card,padding:14,marginBottom:14,borderLeft:`3px solid ${uvData.uv>=11?"#ef4444":uvData.uv>=8?"#f97316":"#f59e0b"}`,background:`rgba(${uvData.uv>=11?"239,68,68":uvData.uv>=8?"249,115,22":"245,158,11"},0.06)`}}>
+              <div style={{fontSize:13,fontWeight:700,color:uvData.uv>=11?"#f87171":uvData.uv>=8?"#fb923c":"#fbbf24",marginBottom:6}}>
+                {uvData.uv>=11?"🚨 ALERTA EXTREMA":uvData.uv>=8?"⚠️ ALERTA MUY ALTO":"⚠️ ALERTA ALTO"} — UV {uvData.uv}
+              </div>
+              <div style={{fontSize:12,color:"#c8e0c8"}}>
+                {uvData.uv>=11
+                  ?"Evitar exposición entre 10:00–16:00h. Protección máxima obligatoria. Considerar suspender trabajos exteriores."
+                  :uvData.uv>=8
+                  ?"Manga larga y FPS 50+ obligatorios. Reducir exposición entre 11:00–15:00h. Rotar tareas en sombra."
+                  :"Buscar sombra entre 11:00–15:00h. Usar sombrero, lentes y FPS 30+ mínimo."}
+              </div>
+            </div>
+          )}
 
           {/* Tabla de índices UV */}
           <div style={{...S.card,padding:16,marginBottom:14}}>
@@ -16991,10 +17086,6 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
             </div>
           </div>
 
-          {/* Consulta UV actual */}
-          <div style={{marginTop:14,padding:"10px 14px",background:"rgba(245,158,11,0.04)",border:"1px solid rgba(245,158,11,0.15)",borderRadius:8,fontSize:11,color:"#8aaa8a"}}>
-            💡 Consulta el índice UV del día en <a href="https://www.meteochile.gob.cl/PortalDMC/index.xhtml" target="_blank" rel="noopener noreferrer" style={{color:"#f59e0b"}}>meteochile.gob.cl</a> o en la app Clima de tu teléfono antes de iniciar trabajos exteriores.
-          </div>
         </div>
       )}
 
