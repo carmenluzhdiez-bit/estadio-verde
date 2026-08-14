@@ -18752,6 +18752,7 @@ export default function App() {
     return [...base, ...macrozonasCust];
   },[zonas,macrozonasCust,data]);
   const [personal, setPersonal, personalReady] = useFirebaseState("personal", PERSONAL_INICIAL);
+  const [pinesSupervisor, setPinesSupervisor] = useFirebaseState("pines_supervisor", {});
   const [tareasProg,     setTareasProg,     progReady]     = useFirebaseState("prog",           {});
   const [stockFito, setStockFito]  = useFirebaseState("fung-stock", {});
   const [aplicaciones,   setAplicaciones,   aplReady]      = useFirebaseState("fungicidas",     []);
@@ -19278,7 +19279,13 @@ export default function App() {
   const removeBaseElem = (zid,eid) => { updateZona(zid,{elementos:{...data[String(zid)]?.elementos,[eid]:{...data[String(zid)]?.elementos?.[eid],eliminado:true}}}); addHistorial(zid,`Elemento eliminado`); };
 
   const addTrabajador = (t) => { const id=Date.now(); setPersonal(p=>[...(Array.isArray(p)?p:Object.values(p||{})),{...t,id,eventos:[]}]); };
-  const updateTrabajador = (id,patch) => setPersonal(p=>(Array.isArray(p)?p:Object.values(p||{})).map(t=>t.id===id?{...t,...patch}:t));
+  const updateTrabajador = (id,patch) => {
+    setPersonal(p=>(Array.isArray(p)?p:Object.values(p||{})).map(t=>t.id===id?{...t,...patch}:t));
+    // Si se actualiza el PIN del supervisor, guardarlo en ruta separada
+    if(patch.pinSupervisor!==undefined) {
+      setPinesSupervisor(prev=>({...prev,[String(id)]:patch.pinSupervisor||null}));
+    }
+  };
   const deleteTrabajador = (id) => setPersonal(p=>(Array.isArray(p)?p:Object.values(p||{})).filter(t=>t.id!==id));
   const addEvento = (tid,ev) => setPersonal(p=>(Array.isArray(p)?p:Object.values(p||{})).map(t=>t.id===tid?{...t,eventos:[...(t.eventos||[]),{...ev,id:Date.now()}]}:t));
   const deleteEvento = (tid,eid) => setPersonal(p=>(Array.isArray(p)?p:Object.values(p||{})).map(t=>t.id===tid?{...t,eventos:(t.eventos||[]).filter(e=>e.id!==eid)}:t));
@@ -19579,9 +19586,9 @@ export default function App() {
                       if(!p) return;
                       const esSup = p.cargo?.toLowerCase().includes("supervisor");
                       if(esSup) {
-                        const pinGuardado = String(p.pinSupervisor||"");
-                        console.log("🔑 PIN guardado:", JSON.stringify(p.pinSupervisor), "| ingresado:", loginPinSup, "| match:", loginPinSup===pinGuardado);
-                        if(!pinGuardado) { alert("Este supervisor no tiene PIN configurado. Agrégalo en Personal → ficha del Supervisor."); return; }
+                        const pinGuardado = String(pinesSupervisor[String(p.id)]||p.pinSupervisor||"");
+                        console.log("🔑 PIN id:", p.id, "pines:", JSON.stringify(pinesSupervisor), "guardado:", pinGuardado, "ingresado:", loginPinSup);
+                        if(!pinGuardado) { alert("PIN no configurado. Ve a Personal → ficha del Supervisor y guarda el PIN."); return; }
                         if(loginPinSup!==pinGuardado) { setLoginPinError(true); return; }
                       }
                       setFbUser({email:p.email||"local@"+p.id, displayName:p.nombre, uid:"local_"+p.id, esLocal:true});
