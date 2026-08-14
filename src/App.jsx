@@ -19707,7 +19707,7 @@ export default function App() {
         )}
         {/* DASHBOARD */}
         {/* ── JEFA REVISA TURNO DE UN TRABAJADOR ── */}
-        {workerARevisar&&rolLogueado==="jefa"&&(()=>{
+        {workerARevisar&&(rolLogueado==="jefa"||rolLogueado==="programador")&&(()=>{
           const arr=Array.isArray(personal)?personal:Object.values(personal||{});
           const trab=arr.find(x=>String(x.id)===String(workerARevisar));
           if(!trab) return null;
