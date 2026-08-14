@@ -5713,9 +5713,12 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
               {t.cargo?.toLowerCase().includes("supervisor")&&(
                 <div>
                   <label style={{fontSize:11,color:"#93c5fd",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>🔐 PIN DE ACCESO (4 DÍGITOS)</label>
-                  <input type="text" maxLength={4} inputMode="numeric" style={{...S.input,letterSpacing:"0.5em",fontSize:18,textAlign:"center",maxWidth:140}}
-                    value={t.pinSupervisor||""} onChange={e=>onUpdate({pinSupervisor:e.target.value.replace(/\D/g,"")})}
-                    placeholder="0000"/>
+                  <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                    <input type="text" maxLength={4} inputMode="numeric" style={{...S.input,letterSpacing:"0.5em",fontSize:18,textAlign:"center",width:120}}
+                      value={t.pinSupervisor||""} onChange={e=>onUpdate({pinSupervisor:e.target.value.replace(/\D/g,"")})}
+                      placeholder="0000"/>
+                    {t.pinSupervisor&&<span style={{fontSize:11,color:"#34d399"}}>✓ PIN: {t.pinSupervisor} (guardado automáticamente)</span>}
+                  </div>
                   <div style={{fontSize:10,color:"#4a7a5a",marginTop:3}}>PIN que el Supervisor debe ingresar para acceder a la app</div>
                 </div>
               )}
