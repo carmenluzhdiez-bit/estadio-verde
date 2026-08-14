@@ -18703,6 +18703,19 @@ export default function App() {
   // Se marca al entrar por lista y se limpia al salir (handleLogout).
   const esLocalRef = useRef(false);
 
+  // Login anónimo de Firebase apenas carga la página (no esperar a que el
+  // usuario elija su nombre y haga clic en Entrar). Las reglas de Realtime
+  // Database exigen auth != null para leer/escribir — si esperamos al clic,
+  // el temporizador de 12s de "conectando..." (que arranca desde que carga
+  // la página) puede agotarse antes de que lleguen los datos. Iniciando la
+  // sesión anónima de inmediato, los datos ya están casi listos para cuando
+  // el usuario realmente hace clic en Entrar.
+  useEffect(() => {
+    if (!auth.currentUser) {
+      signInAnonymously(auth).catch(err => console.warn("⚠️ signInAnonymously (mount) falló:", err));
+    }
+  }, []);
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       // Sesión local activa (jardinero/supervisor por lista, esLocal:true) —
@@ -18712,6 +18725,10 @@ export default function App() {
       // en Firebase Auth. Sin este guard, eso reseteaba fbUser/workerLogueado
       // y devolvía al jardinero al login en bucle.
       if(esLocalRef.current) { console.log("🔒 onAuthStateChanged ignorado (sesión local activa)"); setAuthReady(true); return; }
+      // Usuario anónimo (solo "plomería" para satisfacer auth != null en las
+      // reglas de Firebase) — invisible para la app, nunca debe tratarse como
+      // una sesión real ni mostrar nada distinto al login.
+      if(user?.isAnonymous) { console.log("🔓 Sesión anónima detectada (plomería, no afecta la UI)"); setAuthReady(true); return; }
       console.warn("🚨 onAuthStateChanged VA A RESETEAR fbUser. user:", user, "esLocalRef.current:", esLocalRef.current);
       setFbUser(user);
       if(!user) {
@@ -18729,6 +18746,7 @@ export default function App() {
     });
     return () => unsub();
   }, [emailsExtraListo, emailsExtra]);
+
 
 
 
