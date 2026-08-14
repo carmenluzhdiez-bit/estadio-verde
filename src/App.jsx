@@ -18680,7 +18680,7 @@ export default function App() {
   const [emailsExtra, setEmailsExtra, emailsExtraReady] = useFirebaseState(`config/emails_extra`, {});
   const [emailsExtraTimedOut, setEmailsExtraTimedOut] = useState(false);
   useEffect(()=>{
-    const t = setTimeout(()=>setEmailsExtraTimedOut(true), 3000);
+    const t = setTimeout(()=>setEmailsExtraTimedOut(true), 1500);
     return ()=>clearTimeout(t);
   },[]);
   const emailsExtraListo = emailsExtraReady || emailsExtraTimedOut;
@@ -19482,7 +19482,7 @@ export default function App() {
   };
 
   // ── Esperando Firebase Auth ───────────────────────────────────────────────
-  if (!authReady || (fbUser && !fbUser.esLocal && !emailsExtraListo)) return (
+  if (!authReady) return (
     <div style={{minHeight:"100vh",background:"#0d1f13",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
       <div style={{fontSize:48}}>🌿</div>
       <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,color:"#a0d8b0",fontWeight:700}}>Estadio Español</div>
