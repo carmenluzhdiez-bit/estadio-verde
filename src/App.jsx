@@ -20890,14 +20890,14 @@ export default function App() {
                 personal={personal}
                 MACROZONAS_BASE={MACROZONAS_BASE}
                 zonas={zonasConCust}
-                onSalir={()=>{setWorkerPinInput("");setWorkerLogueado(null);setFbRol(null);setFbUser(null);setVistaWorker(false);}}
+                onSalir={()=>{setWorkerLogueado(null);setFbRol(null);setFbUser(null);setVistaWorker(false);}}
               />
             )}
 
             {/* ── Logged in as worker ── */}
             {rolLogueado==="trabajador"&&(vistaWorker||fbUser)&&(
               <div>
-                <button className="btn-g" style={{...S.btn,marginBottom:16}} onClick={()=>{setVistaWorker(false);setWorkerPinInput("");setWorkerLogueado(null);setFbRol(null);setFbUser(null);}}>← Salir</button>
+                <button className="btn-g" style={{...S.btn,marginBottom:16}} onClick={()=>{setVistaWorker(false);setWorkerLogueado(null);setFbRol(null);setFbUser(null);}}>← Salir</button>
                 <VistaWorker
                   trabajador={(()=>{
                     const arr=Array.isArray(personal)?personal:Object.values(personal||{});
