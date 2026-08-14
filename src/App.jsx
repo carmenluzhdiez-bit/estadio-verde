@@ -19562,7 +19562,7 @@ export default function App() {
                   👤 Jardinero / Supervisor
                 </button>
                 <button onClick={()=>setModoLogin("admin")} style={{flex:1,padding:"8px",borderRadius:8,border:`1px solid ${modoLogin==="admin"?"rgba(167,139,250,0.4)":"rgba(255,255,255,0.1)"}`,background:modoLogin==="admin"?"rgba(167,139,250,0.1)":"transparent",color:modoLogin==="admin"?"#a78bfa":"#6aaa7a",fontSize:12,cursor:"pointer",fontFamily:"'Georgia',serif"}}>
-                  🔐 Supervisor / Jefa / Gerencia / Programador
+                  🔐 Jefa / Gerencia / Programador
                 </button>
               </div>
 
