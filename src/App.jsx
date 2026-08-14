@@ -19579,6 +19579,7 @@ export default function App() {
                       const esSup = p.cargo?.toLowerCase().includes("supervisor");
                       if(esSup) {
                         const pinGuardado = String(p.pinSupervisor||"");
+                        console.log("🔑 PIN guardado:", JSON.stringify(p.pinSupervisor), "| ingresado:", loginPinSup, "| match:", loginPinSup===pinGuardado);
                         if(!pinGuardado) { alert("Este supervisor no tiene PIN configurado. Agrégalo en Personal → ficha del Supervisor."); return; }
                         if(loginPinSup!==pinGuardado) { setLoginPinError(true); return; }
                       }
