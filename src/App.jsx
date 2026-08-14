@@ -19569,14 +19569,9 @@ export default function App() {
               {/* Modo trabajador: selección de nombre */}
               {modoLogin==="trabajador"&&(
                 <div style={{display:"flex",flexDirection:"column",gap:14}}>
-                  {!personalReady&&(
-                    <div style={{fontSize:12,color:"#6aaa7a",textAlign:"center",padding:"8px",background:"rgba(74,154,100,0.08)",borderRadius:8}}>
-                      Cargando lista de personal...
-                    </div>
-                  )}
                   <div>
                     <label style={{fontSize:11,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:6,textTransform:"uppercase"}}>Selecciona tu nombre</label>
-                    <select disabled={!personalReady} style={{width:"100%",background:"#1a3a22",border:"1px solid rgba(52,211,153,0.3)",borderRadius:10,padding:"12px 14px",color:"#e8f5e9",fontSize:15,outline:"none",cursor:personalReady?"pointer":"not-allowed",opacity:personalReady?1:0.6}}
+                    <select style={{width:"100%",background:"#1a3a22",border:"1px solid rgba(52,211,153,0.3)",borderRadius:10,padding:"12px 14px",color:"#e8f5e9",fontSize:15,outline:"none",cursor:"pointer"}}
                       value={workerSel} onChange={e=>{setWorkerSel(e.target.value);setLoginPinSup("");setLoginPinError(false);}}>
                       <option value="" style={{background:"#1a3a22",color:"#6aaa7a"}}>— Elige tu nombre —</option>
                       {trabajadores.map(p=>(
@@ -19600,7 +19595,7 @@ export default function App() {
                       </div>
                     );
                   })()}
-                  <button disabled={!workerSel||!personalReady}
+                  <button disabled={!workerSel}
                     onClick={()=>{
                       const p = trabajadores.find(x=>String(x.id)===String(workerSel));
                       if(!p) return;
@@ -19619,7 +19614,7 @@ export default function App() {
                       setVista("miturno");
                       setLoginPinSup("");
                     }}
-                    style={{background:"#2d6a3f",color:"#fff",border:"none",borderRadius:10,padding:"14px",fontSize:15,fontWeight:700,cursor:"pointer",opacity:(workerSel&&personalReady)?1:0.5}}>
+                    style={{background:"#2d6a3f",color:"#fff",border:"none",borderRadius:10,padding:"14px",fontSize:15,fontWeight:700,cursor:"pointer",opacity:workerSel?1:0.5}}>
                     Entrar →
                   </button>
                 </div>
