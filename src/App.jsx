@@ -19527,9 +19527,9 @@ export default function App() {
           const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
           const trabajadores = personalArr.filter(p=>{
             if(!p.nombre||p.estado==="retirado") return false;
-            // Excluir a quienes tienen rol especial en emailsExtra o en ROLES_EMAIL
+            // Excluir solo jefa, programador y gerencia — supervisor sí aparece (con PIN)
             const rolEmail = getRolByEmail(p.email||"", emailsExtra);
-            if(rolEmail==="jefa"||rolEmail==="programador"||rolEmail==="gerencia"||rolEmail==="supervisor") return false;
+            if(rolEmail==="jefa"||rolEmail==="programador"||rolEmail==="gerencia") return false;
             return true;
           }).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
           return (
@@ -19537,7 +19537,7 @@ export default function App() {
               {/* Tabs */}
               <div style={{display:"flex",gap:8,marginBottom:24}}>
                 <button onClick={()=>setModoLogin("trabajador")} style={{flex:1,padding:"8px",borderRadius:8,border:`1px solid ${modoLogin==="trabajador"?"rgba(52,211,153,0.4)":"rgba(255,255,255,0.1)"}`,background:modoLogin==="trabajador"?"rgba(52,211,153,0.1)":"transparent",color:modoLogin==="trabajador"?"#34d399":"#6aaa7a",fontSize:12,cursor:"pointer",fontFamily:"'Georgia',serif"}}>
-                  👤 Jardinero
+                  👤 Jardinero / Supervisor
                 </button>
                 <button onClick={()=>setModoLogin("admin")} style={{flex:1,padding:"8px",borderRadius:8,border:`1px solid ${modoLogin==="admin"?"rgba(167,139,250,0.4)":"rgba(255,255,255,0.1)"}`,background:modoLogin==="admin"?"rgba(167,139,250,0.1)":"transparent",color:modoLogin==="admin"?"#a78bfa":"#6aaa7a",fontSize:12,cursor:"pointer",fontFamily:"'Georgia',serif"}}>
                   🔐 Supervisor / Jefa / Gerencia / Programador
@@ -19559,7 +19559,8 @@ export default function App() {
                   </div>
                   {(()=>{
                     const sel = trabajadores.find(x=>String(x.id)===String(workerSel));
-                    if(!sel?.cargo?.toLowerCase().includes("supervisor")) return null;
+                    const esSup2 = sel?.cargo?.toLowerCase().includes("supervisor") || getRolByEmail(sel?.email||"", emailsExtra)==="supervisor";
+                    if(!esSup2) return null;
                     return (
                       <div>
                         <label style={{fontSize:11,color:"#93c5fd",letterSpacing:"0.6px",display:"block",marginBottom:6,textTransform:"uppercase"}}>🔐 PIN de Supervisor (4 dígitos)</label>
