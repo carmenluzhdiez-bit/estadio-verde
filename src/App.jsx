@@ -18974,8 +18974,8 @@ export default function App() {
     if(!fbUser||fbUser.esLocal) return;
     if(!emailsExtraListo) return;
     const rolActual = getRolByEmail(fbUser.email, emailsExtra);
-    // Roles administrativos nunca van a Mi Turno
-    if(rolActual==="jefa"||rolActual==="programador"||rolActual==="gerencia") return;
+    // Roles administrativos y supervisor: nunca van a Mi Turno automáticamente
+    if(rolActual==="jefa"||rolActual==="programador"||rolActual==="gerencia"||rolActual==="supervisor") return;
     const arr = Array.isArray(personal)?personal:Object.values(personal||{});
     if(arr.length===0) return;
     const fbP = arr.find(x=>x.email?.toLowerCase()===fbUser.email?.toLowerCase());
@@ -19024,9 +19024,9 @@ export default function App() {
   const esSupervisor = fbRol === "supervisor";
   const esTrabajador = fbRol === "trabajador";
 
-  // Roles administrativos: resetear vistaWorker si quedó activo
+  // Roles con acceso al panel: resetear vistaWorker si quedó activo
   useEffect(()=>{
-    if(fbRol==="jefa"||fbRol==="programador"||fbRol==="gerencia") {
+    if(fbRol==="jefa"||fbRol==="programador"||fbRol==="gerencia"||fbRol==="supervisor") {
       setVistaWorker(false);
       setWorkerLogueado(null);
       if(vista==="miturno") setVista("dashboard");
@@ -19669,7 +19669,7 @@ export default function App() {
           {(fbRol==="jefa"||fbRol==="programador"
             ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["compras","🛒","Compras"],["bodegas","🏪","Bodegas"],["golf","🏌️","Golf"],["personal","👷","Personal"],["protocolos","📋","Protocolos"]]
             : fbRol==="supervisor"
-            ? [["dashboard","📊","Panel"],["programacion","📆","Programa"],["reporte","📋","Reporte"],["golf","🏌️","Golf"],["protocolos","📋","Protocolos"],["miturno","🌿","Mi Turno"]]
+            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["programacion","📆","Programa"],["reporte","📋","Reporte"],["golf","🏌️","Golf"],["bodegas","🏪","Bodegas"],["protocolos","📋","Protocolos"],["notificaciones","🔔","Alertas"],["miturno","🌿","Mi Turno"]]
             : fbRol==="gerencia"
             ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["compras","🛒","Compras"],["bodegas","🏪","Bodegas"],["golf","🏌️","Golf"],["protocolos","📋","Protocolos"],["notificaciones","🔔","Alertas"]]
             : [["miturno","🌿","Mi Turno"]]
@@ -19682,7 +19682,7 @@ export default function App() {
         </div>
 
         {/* ── CAMPANILLA FLOTANTE — siempre visible y llamativa ── */}
-        {(fbRol==="jefa"||fbRol==="programador")&&(()=>{
+        {(fbRol==="jefa"||fbRol==="programador"||fbRol==="supervisor")&&(()=>{
           const incActAhora=(Array.isArray(incidencias)?incidencias:Object.values(incidencias||{})).filter(i=>i.estado==="activa"||i.estado==="en_gestion");
           const hayIncidencias = incActAhora.length>0;
           const hayNotifs = notifNoLeidas.length>0;
