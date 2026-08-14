@@ -5719,7 +5719,6 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
                   <div style={{fontSize:10,color:"#4a7a5a",marginTop:3}}>PIN que el Supervisor debe ingresar para acceder a la app</div>
                 </div>
               )}
-              </div>
               <div>
                 <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>APODO / NOMBRE CONOCIDO</label>
                 <input style={S.input} value={t.apodo||""} onChange={e=>onUpdate({apodo:e.target.value})} placeholder="Ej: Bhalú, Andrés, Sergio..."/>
@@ -19583,11 +19582,11 @@ export default function App() {
                         if(!pinGuardado) { alert("Este supervisor no tiene PIN configurado. Agrégalo en Personal → ficha del Supervisor."); return; }
                         if(loginPinSup!==pinGuardado) { setLoginPinError(true); return; }
                       }
+                      setFbUser({email:p.email||"local@"+p.id, displayName:p.nombre, uid:"local_"+p.id, esLocal:true});
                       setWorkerLogueado(p.id);
                       setVistaWorker(true);
                       setFbRol(esSup?"supervisor":"trabajador");
                       setVista("miturno");
-                      setFbUser({email:p.email||"local@"+p.id, displayName:p.nombre, uid:"local_"+p.id, esLocal:true});
                       setLoginPinSup("");
                     }}
                     style={{background:"#2d6a3f",color:"#fff",border:"none",borderRadius:10,padding:"14px",fontSize:15,fontWeight:700,cursor:"pointer",opacity:workerSel?1:0.5}}>
