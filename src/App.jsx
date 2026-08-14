@@ -18711,7 +18711,8 @@ export default function App() {
       // en tiempo real), porque un usuario local nunca se autentica de verdad
       // en Firebase Auth. Sin este guard, eso reseteaba fbUser/workerLogueado
       // y devolvía al jardinero al login en bucle.
-      if(esLocalRef.current) { setAuthReady(true); return; }
+      if(esLocalRef.current) { console.log("🔒 onAuthStateChanged ignorado (sesión local activa)"); setAuthReady(true); return; }
+      console.warn("🚨 onAuthStateChanged VA A RESETEAR fbUser. user:", user, "esLocalRef.current:", esLocalRef.current);
       setFbUser(user);
       if(!user) {
         setFbRol(null);
@@ -19562,7 +19563,7 @@ export default function App() {
                   👤 Jardinero / Supervisor
                 </button>
                 <button onClick={()=>setModoLogin("admin")} style={{flex:1,padding:"8px",borderRadius:8,border:`1px solid ${modoLogin==="admin"?"rgba(167,139,250,0.4)":"rgba(255,255,255,0.1)"}`,background:modoLogin==="admin"?"rgba(167,139,250,0.1)":"transparent",color:modoLogin==="admin"?"#a78bfa":"#6aaa7a",fontSize:12,cursor:"pointer",fontFamily:"'Georgia',serif"}}>
-                  🔐 Jefa / Gerencia / Programador
+                  🔐 Supervisor / Jefa / Gerencia / Programador
                 </button>
               </div>
 
@@ -19597,8 +19598,10 @@ export default function App() {
                   })()}
                   <button disabled={!workerSel}
                     onClick={()=>{
+                      console.log("🌿 Clic en Entrar. workerSel:", workerSel, "trabajadores.length:", trabajadores.length);
                       const p = trabajadores.find(x=>String(x.id)===String(workerSel));
-                      if(!p) return;
+                      console.log("🌿 Trabajador encontrado:", p);
+                      if(!p) { console.warn("⚠️ No se encontró el trabajador seleccionado — revisa el id"); return; }
                       const esSup = p.cargo?.toLowerCase().includes("supervisor");
                       if(esSup) {
                         const pinGuardado = String(pinesSupervisor[String(p.id)]||p.pinSupervisor||"");
@@ -19607,6 +19610,7 @@ export default function App() {
                         if(loginPinSup!==pinGuardado) { setLoginPinError(true); return; }
                       }
                       esLocalRef.current = true;
+                      console.log("🌿 Iniciando sesión local:", p.nombre, "esSup:", esSup);
                       setFbUser({email:p.email||"local@"+p.id, displayName:p.nombre, uid:"local_"+p.id, esLocal:true});
                       setWorkerLogueado(p.id);
                       setVistaWorker(true);
