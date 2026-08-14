@@ -19533,38 +19533,6 @@ export default function App() {
     </div>
   );
 
-  // ── Pantalla de carga Firebase (ANTES del login: la lista de personal/
-  // jardineros debe estar completa antes de mostrar el formulario, si no el
-  // selector puede aparecer vacío o incompleto y el botón "Entrar" no reacciona) ──
-  if (!appReady) return (
-    <div style={{minHeight:"100vh",background:"#0d1f13",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,padding:20}}>
-      <div style={{fontSize:48}}>🌿</div>
-      <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,color:"#a0d8b0",fontWeight:700}}>Estadio Español</div>
-      {!connTimeout ? (<>
-        <div style={{fontSize:13,color:"#4a8a5a",marginBottom:8}}>Conectando con Firebase...</div>
-        <div style={{width:40,height:40,border:"3px solid #1a3a22",borderTop:"3px solid #4a9a64",borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
-        <div style={{fontSize:11,color:"#3a6a4a",marginTop:8}}>
-          {!dataReady&&"• Datos principales... "}
-          {!personalReady&&"• Personal... "}
-          {!progReady&&"• Programación... "}
-        </div>
-      </>) : (<>
-        <div style={{fontSize:13,color:"#fca5a5",marginBottom:4}}>No se pudo conectar con Firebase</div>
-        <div style={{fontSize:11,color:"#5a7a5a",textAlign:"center",maxWidth:280}}>
-          Verifica tu conexión a internet e intenta recargar la página.
-        </div>
-        <div style={{fontSize:11,color:"#3a5a3a",marginTop:4}}>
-          {!dataReady&&"• Datos pendientes "}{!personalReady&&"• Personal pendiente "}{!progReady&&"• Programación pendiente "}
-        </div>
-        <button onClick={()=>window.location.reload()}
-          style={{marginTop:12,padding:"8px 20px",borderRadius:8,border:"1px solid rgba(74,154,100,0.4)",background:"rgba(74,154,100,0.1)",color:"#4a9a64",cursor:"pointer",fontSize:13}}>
-          🔄 Reintentar
-        </button>
-      </>)}
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-    </div>
-  );
-
   // ── Login ─────────────────────────────────────────────────────────────────
   if (!fbUser && !workerLogueado) return (
     <div style={{minHeight:"100vh",background:"#0d1f13",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
@@ -19601,9 +19569,14 @@ export default function App() {
               {/* Modo trabajador: selección de nombre */}
               {modoLogin==="trabajador"&&(
                 <div style={{display:"flex",flexDirection:"column",gap:14}}>
+                  {!personalReady&&(
+                    <div style={{fontSize:12,color:"#6aaa7a",textAlign:"center",padding:"8px",background:"rgba(74,154,100,0.08)",borderRadius:8}}>
+                      Cargando lista de personal...
+                    </div>
+                  )}
                   <div>
                     <label style={{fontSize:11,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:6,textTransform:"uppercase"}}>Selecciona tu nombre</label>
-                    <select style={{width:"100%",background:"#1a3a22",border:"1px solid rgba(52,211,153,0.3)",borderRadius:10,padding:"12px 14px",color:"#e8f5e9",fontSize:15,outline:"none",cursor:"pointer"}}
+                    <select disabled={!personalReady} style={{width:"100%",background:"#1a3a22",border:"1px solid rgba(52,211,153,0.3)",borderRadius:10,padding:"12px 14px",color:"#e8f5e9",fontSize:15,outline:"none",cursor:personalReady?"pointer":"not-allowed",opacity:personalReady?1:0.6}}
                       value={workerSel} onChange={e=>{setWorkerSel(e.target.value);setLoginPinSup("");setLoginPinError(false);}}>
                       <option value="" style={{background:"#1a3a22",color:"#6aaa7a"}}>— Elige tu nombre —</option>
                       {trabajadores.map(p=>(
@@ -19627,7 +19600,7 @@ export default function App() {
                       </div>
                     );
                   })()}
-                  <button disabled={!workerSel}
+                  <button disabled={!workerSel||!personalReady}
                     onClick={()=>{
                       const p = trabajadores.find(x=>String(x.id)===String(workerSel));
                       if(!p) return;
@@ -19646,7 +19619,7 @@ export default function App() {
                       setVista("miturno");
                       setLoginPinSup("");
                     }}
-                    style={{background:"#2d6a3f",color:"#fff",border:"none",borderRadius:10,padding:"14px",fontSize:15,fontWeight:700,cursor:"pointer",opacity:workerSel?1:0.5}}>
+                    style={{background:"#2d6a3f",color:"#fff",border:"none",borderRadius:10,padding:"14px",fontSize:15,fontWeight:700,cursor:"pointer",opacity:(workerSel&&personalReady)?1:0.5}}>
                     Entrar →
                   </button>
                 </div>
@@ -19682,6 +19655,36 @@ export default function App() {
 
         <div style={{textAlign:"center",marginTop:20,fontSize:11,color:"#2a5a35"}}>Acceso restringido · Personal autorizado</div>
       </div>
+    </div>
+  );
+
+  // ── Pantalla de carga Firebase ────────────────────────────────────────────
+  if (!appReady) return (
+    <div style={{minHeight:"100vh",background:"#0d1f13",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,padding:20}}>
+      <div style={{fontSize:48}}>🌿</div>
+      <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,color:"#a0d8b0",fontWeight:700}}>Estadio Español</div>
+      {!connTimeout ? (<>
+        <div style={{fontSize:13,color:"#4a8a5a",marginBottom:8}}>Conectando con Firebase...</div>
+        <div style={{width:40,height:40,border:"3px solid #1a3a22",borderTop:"3px solid #4a9a64",borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
+        <div style={{fontSize:11,color:"#3a6a4a",marginTop:8}}>
+          {!dataReady&&"• Datos principales... "}
+          {!personalReady&&"• Personal... "}
+          {!progReady&&"• Programación... "}
+        </div>
+      </>) : (<>
+        <div style={{fontSize:13,color:"#fca5a5",marginBottom:4}}>No se pudo conectar con Firebase</div>
+        <div style={{fontSize:11,color:"#5a7a5a",textAlign:"center",maxWidth:280}}>
+          Verifica tu conexión a internet e intenta recargar la página.
+        </div>
+        <div style={{fontSize:11,color:"#3a5a3a",marginTop:4}}>
+          {!dataReady&&"• Datos pendientes "}{!personalReady&&"• Personal pendiente "}{!progReady&&"• Programación pendiente "}
+        </div>
+        <button onClick={()=>window.location.reload()}
+          style={{marginTop:12,padding:"8px 20px",borderRadius:8,border:"1px solid rgba(74,154,100,0.4)",background:"rgba(74,154,100,0.1)",color:"#4a9a64",cursor:"pointer",fontSize:13}}>
+          🔄 Reintentar
+        </button>
+      </>)}
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   );
 
