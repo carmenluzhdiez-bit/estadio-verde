@@ -20920,7 +20920,7 @@ export default function App() {
               >🖨️ Imprimir Reporte</button>
             </div>
             {tabReporte==="semanal" && (
-              <ReporteSemanal S={S} tareasProg={tareasProg} semanaBase={semanaBase} setSemanaBase={setSemanaBase} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} incidenciasFito={incidenciasFito} esJefa={rolLogueado==="jefa"}/>
+              <ReporteSemanal S={S} tareasProg={tareasProg} semanaBase={semanaBase} setSemanaBase={setSemanaBase} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} incidenciasFito={incidenciasFito} esJefa={esJefa}/>
             )}
             {tabReporte==="general" && <>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(270px,1fr))",gap:18,marginBottom:26}}>
@@ -21001,8 +21001,8 @@ export default function App() {
           <ProgramacionDiaria key="prog" S={S} zonas={zonasConCust} data={data} personal={personal} getZD={getZD} getAllElems={getAllElems} MACROZONAS_BASE={MACROZONAS_BASE} tareas={tareasProg} setTareas={setTareasProg} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal}
             getElemFrecs={getElemFrecs} setElemFrecs={setElemFrecs} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} stockFito={stockFito} setStockFito={setStockFito} crearNotificacion={crearNotificacion}
             tareasZonaHoy={(tareasProg[new Date().toISOString().slice(0,10)]||[]).filter(t=>t.origenZona&&t.estado==="por_designar").length}
-            esJefa={rolLogueado==="jefa"}
-            puedeCrear={rolLogueado==="jefa"||rolLogueado==="supervisor"}
+            esJefa={esJefa}
+            puedeCrear={rolLogueado==="jefa"||rolLogueado==="supervisor"||esJefa}
             cierresTurno={cierresTurno}
             onReabrirTurno={(fecha,nombre)=>{
               const key=`${fecha}_${nombre.split(" ")[0].toLowerCase()}`;
@@ -21202,7 +21202,7 @@ export default function App() {
             bonosMasivos={bonosMasivos} setBonosMasivos={setBonosMasivos}
             setPersonal={setPersonal}
             onVolver={()=>{setPersonalVista("lista");setBonoPrefill(null);}}
-            esJefa={rolLogueado==="jefa"}
+            esJefa={esJefa}
             prefill={bonoPrefill}
           />
         )}
