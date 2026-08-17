@@ -15487,10 +15487,14 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
   };
 
   const fondoTotal  = Math.round(Number(form.valorMercado||0) * pctFondo / 100);
-  const montoEjec   = Math.round(fondoTotal * pctEjecutor / 100);
-  const montoAyud   = Math.round(fondoTotal * pctAyudante / 100);
   const nApoyos     = form.apoyos.filter(a=>a).length;
-  const montoApoyo  = nApoyos>0 ? Math.round((fondoTotal * pctApoyo / 100) / nApoyos) : 0;
+  // Reparto proporcional: si falta Ayudante y/o Apoyo, su % se redistribuye
+  // entre los roles presentes (según su peso relativo) para que siempre se
+  // distribuya el 100% del fondo, en vez de perder el % del rol ausente.
+  const pesoTotal   = pctEjecutor + (form.ayudante?pctAyudante:0) + (nApoyos>0?pctApoyo:0);
+  const montoEjec   = pesoTotal>0 ? Math.round(fondoTotal * pctEjecutor / pesoTotal) : 0;
+  const montoAyud   = (form.ayudante&&pesoTotal>0) ? Math.round(fondoTotal * pctAyudante / pesoTotal) : 0;
+  const montoApoyo  = (nApoyos>0&&pesoTotal>0) ? Math.round((fondoTotal * pctApoyo / pesoTotal) / nApoyos) : 0;
   const totalDistr  = montoEjec + montoAyud + (montoApoyo * nApoyos);
 
   const imprimirBono = (bono) => {
@@ -15568,9 +15572,9 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
     if(!form.descripcion.trim()||!form.valorMercado||!form.ejecutor) return;
     const apoyosValidos = form.apoyos.filter(a=>a);
     const participantes = [
-      {trabajadorId:String(form.ejecutor), nombre:form.ejecutorNombre||getNombre(form.ejecutor), rol:"Ejecutor", pct:pctEjecutor, monto:montoEjec},
-      ...(form.ayudante?[{trabajadorId:String(form.ayudante), nombre:form.ayudanteNombre||getNombre(form.ayudante), rol:"Ayudante", pct:pctAyudante, monto:montoAyud}]:[]),
-      ...apoyosValidos.map(id=>({trabajadorId:String(id), nombre:listaPersonal.find(p=>String(p.id)===String(id))?.nombre||getNombre(id), rol:"Apoyo", pct:pctApoyo, monto:montoApoyo})),
+      {trabajadorId:String(form.ejecutor), nombre:form.ejecutorNombre||getNombre(form.ejecutor), rol:"Ejecutor", pct:pesoTotal>0?Math.round(pctEjecutor/pesoTotal*100):0, monto:montoEjec},
+      ...(form.ayudante?[{trabajadorId:String(form.ayudante), nombre:form.ayudanteNombre||getNombre(form.ayudante), rol:"Ayudante", pct:pesoTotal>0?Math.round(pctAyudante/pesoTotal*100):0, monto:montoAyud}]:[]),
+      ...apoyosValidos.map(id=>({trabajadorId:String(id), nombre:listaPersonal.find(p=>String(p.id)===String(id))?.nombre||getNombre(id), rol:"Apoyo", pct:pesoTotal>0?Math.round(pctApoyo/pesoTotal*100):0, monto:montoApoyo})),
     ];
     const nuevoBono = {
       id:Date.now(), fecha:form.fecha, descripcion:form.descripcion, tipo:form.tipoBono||"bonoConstruccion",
@@ -15758,18 +15762,19 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
               </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginTop:10}}>
                 <div style={{background:"rgba(74,222,128,0.08)",borderRadius:7,padding:"8px 10px",border:"1px solid rgba(74,222,128,0.2)"}}>
-                  <div style={{fontSize:10,color:"#4ade80",marginBottom:2}}>EJECUTOR ({pctEjecutor}%)</div>
+                  <div style={{fontSize:10,color:"#4ade80",marginBottom:2}}>EJECUTOR ({pesoTotal>0?Math.round(pctEjecutor/pesoTotal*100):0}%)</div>
                   <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#4ade80"}}>${montoEjec.toLocaleString("es-CL")}</div>
                 </div>
                 <div style={{background:"rgba(96,165,250,0.08)",borderRadius:7,padding:"8px 10px",border:"1px solid rgba(96,165,250,0.2)"}}>
-                  <div style={{fontSize:10,color:"#60a5fa",marginBottom:2}}>AYUDANTE ({pctAyudante}%)</div>
+                  <div style={{fontSize:10,color:"#60a5fa",marginBottom:2}}>AYUDANTE ({form.ayudante&&pesoTotal>0?Math.round(pctAyudante/pesoTotal*100):0}%)</div>
                   <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#60a5fa"}}>${montoAyud.toLocaleString("es-CL")}</div>
                 </div>
                 <div style={{background:"rgba(251,191,36,0.08)",borderRadius:7,padding:"8px 10px",border:"1px solid rgba(251,191,36,0.2)"}}>
-                  <div style={{fontSize:10,color:"#fbbf24",marginBottom:2}}>APOYO c/u ({pctApoyo}%÷{Math.max(nApoyos,1)})</div>
+                  <div style={{fontSize:10,color:"#fbbf24",marginBottom:2}}>APOYO c/u ({nApoyos>0&&pesoTotal>0?Math.round(pctApoyo/pesoTotal*100):0}%÷{Math.max(nApoyos,1)})</div>
                   <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#fbbf24"}}>${montoApoyo.toLocaleString("es-CL")}</div>
                 </div>
               </div>
+              {(!form.ayudante||nApoyos===0)&&<div style={{fontSize:11,color:"#86efac",marginTop:6}}>ℹ️ % redistribuido proporcionalmente entre los roles presentes — se reparte el 100% del fondo.</div>}
               {totalDistr!==fondoTotal&&<div style={{fontSize:11,color:"#f59e0b",marginTop:6}}>⚠️ Distribuido: ${totalDistr.toLocaleString("es-CL")} de ${fondoTotal.toLocaleString("es-CL")}</div>}
             </div>
           )}
