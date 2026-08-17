@@ -7927,6 +7927,9 @@ function BodegaSelector({ items, compra, onConfirm, onCancel, S, bodegasData={} 
   const [maquinas, setMaquinas] = React.useState(
     items.map(it=>it.maquinaAsociada||"")
   );
+  const [categoriasBod, setCategoriasBod] = React.useState(
+    items.map(it=>it.categoriaBodega||"")
+  );
   // Equipos disponibles en Maquinaria (excluye combustible y repuestos)
   const equiposMaq = ((bodegasData["b04"]?.items)||[]).filter(i=>{
     const cat=(i.categoria||"").toLowerCase();
@@ -7940,17 +7943,31 @@ function BodegaSelector({ items, compra, onConfirm, onCancel, S, bodegasData={} 
       <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
         {items.map((it,i)=>(
           <div key={it.id||i} style={{background:"rgba(255,255,255,0.03)",borderRadius:7,padding:"7px 10px"}}>
-            <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:asignaciones[i]==="b04"?6:0}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:asignaciones[i]?6:0}}>
               <div style={{flex:1,minWidth:120}}>
                 <div style={{fontSize:12,fontWeight:600}}>{it.descripcion||"Sin descripción"}</div>
                 <div style={{fontSize:11,color:"#6aaa7a"}}>{it.cantidad} {it.unidad}</div>
               </div>
               <select style={{...S.input,fontSize:11,padding:"5px 8px",minWidth:160,flex:1}}
-                value={asignaciones[i]} onChange={e=>setAsignaciones(p=>{const n=[...p];n[i]=e.target.value;return n;})}>
+                value={asignaciones[i]} onChange={e=>{const v=e.target.value;setAsignaciones(p=>{const n=[...p];n[i]=v;return n;});setCategoriasBod(p=>{const n=[...p];n[i]="";return n;});}}>
                 <option value="">🚫 No ingresar (servicio/mano de obra)</option>
                 {BODEGAS_DEF.map(b=><option key={b.id} value={b.id}>{b.icono} {b.nombre}</option>)}
               </select>
             </div>
+            {/* Categoría específica de la bodega elegida */}
+            {asignaciones[i]&&(()=>{
+              const bodSel = BODEGAS_DEF.find(b=>b.id===asignaciones[i]);
+              return bodSel&&(bodSel.categorias||[]).length>0&&(
+                <div style={{display:"flex",gap:8,alignItems:"center",marginTop:4}}>
+                  <span style={{fontSize:10,color:"#86efac",whiteSpace:"nowrap"}}>🏷️ Categoría:</span>
+                  <select style={{...S.input,fontSize:11,padding:"4px 8px",flex:1}}
+                    value={categoriasBod[i]} onChange={e=>{const v=e.target.value;setCategoriasBod(p=>{const n=[...p];n[i]=v;return n;});}}>
+                    <option value="">Seleccionar...</option>
+                    {bodSel.categorias.map(c=><option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              );
+            })()}
             {/* Si va a Maquinaria, pedir máquina asociada */}
             {asignaciones[i]==="b04"&&(
               <div style={{display:"flex",gap:8,alignItems:"center",marginTop:4}}>
@@ -7967,7 +7984,7 @@ function BodegaSelector({ items, compra, onConfirm, onCancel, S, bodegasData={} 
         ))}
       </div>
       <div style={{display:"flex",gap:8}}>
-        <button className="btn-p" style={S.btn} onClick={()=>onConfirm(asignaciones, maquinas)}>✓ Confirmar</button>
+        <button className="btn-p" style={S.btn} onClick={()=>onConfirm(asignaciones, maquinas, categoriasBod)}>✓ Confirmar</button>
         <button className="btn-g" style={S.btn} onClick={onCancel}>Cancelar</button>
       </div>
     </div>
@@ -8005,7 +8022,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
         if(idx>=0) {
           nuevosItems[idx] = {...nuevosItems[idx], stockActual:(Number(nuevosItems[idx].stockActual)||0)+cant};
         } else {
-          nuevosItems.push({id:Date.now()+Math.random(), nombre:it.descripcion, categoria:it.categoria||"", unidad:it.unidad||"unidad", stockActual:cant, stockMinimo:0, ubicacion:"", obs:`Ingresado desde ${docRef}`, maquinaAsociada:it.maquinaAsociada||""});
+          nuevosItems.push({id:Date.now()+Math.random(), nombre:it.descripcion, categoria:it.categoriaBodega||it.categoria||"", unidad:it.unidad||"unidad", stockActual:cant, stockMinimo:0, ubicacion:"", obs:`Ingresado desde ${docRef}`, maquinaAsociada:it.maquinaAsociada||""});
         }
         const itemId = idx>=0?nuevosItems[idx].id:nuevosItems[nuevosItems.length-1].id;
         nuevosMovs.unshift({id:Date.now()+Math.random(), fecha:docFecha, tipo:"entrada", cantidad:cant, unidad:it.unidad||"unidad", motivo:`Compra — ${docRef}`, responsable:"", itemId:String(itemId), docRef, itemNombre:it.descripcion.trim()});
@@ -8073,7 +8090,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   const labelSt = {fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
 
   // ── Formulario cabecera + ítems ───────────────────────────────────────────
-  const emptyItem = {id:Date.now(), descripcion:"", categoria:"", cantidad:1, unidad:"unidad", precioUnitario:"", totalNeto:"", iva:"", totalBruto:"", bodegaDestino:""};
+  const emptyItem = {id:Date.now(), descripcion:"", categoria:"", cantidad:1, unidad:"unidad", precioUnitario:"", totalNeto:"", iva:"", totalBruto:"", bodegaDestino:"", categoriaBodega:""};
   const emptyForm = {
     fecha:hoy.toISOString().slice(0,10),
     proveedor:"", rut:"", nDocumento:"", tipoDoc:"Factura",
@@ -8896,11 +8913,23 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                     </div>
                     <div style={{marginTop:8}}>
                       <label style={labelSt}>📦 Ingresar a bodega</label>
-                      <select style={{...S.input,fontSize:12}} value={item.bodegaDestino||""} onChange={e=>updateItem(idx,{bodegaDestino:e.target.value})}>
+                      <select style={{...S.input,fontSize:12}} value={item.bodegaDestino||""} onChange={e=>updateItem(idx,{bodegaDestino:e.target.value,categoriaBodega:""})}>
                         <option value="">— No ingresar a stock —</option>
                         {BODEGAS_DEF.map(b=><option key={b.id} value={b.id}>{b.icono} {b.nombre}</option>)}
                       </select>
                     </div>
+                    {item.bodegaDestino&&(()=>{
+                      const bodSel = BODEGAS_DEF.find(b=>b.id===item.bodegaDestino);
+                      return bodSel&&(bodSel.categorias||[]).length>0&&(
+                        <div style={{marginTop:8}}>
+                          <label style={{...labelSt,color:"#86efac"}}>🏷️ Categoría en {bodSel.nombre}</label>
+                          <select style={{...S.input,fontSize:12}} value={item.categoriaBodega||""} onChange={e=>updateItem(idx,{categoriaBodega:e.target.value})}>
+                            <option value="">Seleccionar...</option>
+                            {bodSel.categorias.map(c=><option key={c} value={c}>{c}</option>)}
+                          </select>
+                        </div>
+                      );
+                    })()}
                   </div>
                 ))}
                 {/* Totales documento */}
@@ -9029,8 +9058,8 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                       <BodegaSelector
                         key={c.id} items={items} compra={c}
                         bodegasData={bodegasData}
-                        onConfirm={(asignaciones, maquinas=[])=>{
-                          const itemsConBodega = items.map((it,i)=>({...it,bodegaDestino:asignaciones[i]||"",maquinaAsociada:maquinas[i]||""}));
+                        onConfirm={(asignaciones, maquinas=[], categoriasBod=[])=>{
+                          const itemsConBodega = items.map((it,i)=>({...it,bodegaDestino:asignaciones[i]||"",maquinaAsociada:maquinas[i]||"",categoriaBodega:categoriasBod[i]||""}));
                           ingresarItemsABodega(c.fecha,`${c.tipoDoc} ${c.nDocumento||""} ${c.proveedor||""}`,itemsConBodega,c.id);
                           setSelectBodegaId(null);
                         }}
