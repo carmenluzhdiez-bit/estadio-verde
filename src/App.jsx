@@ -5644,7 +5644,7 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
     licencia:         { label:"Licencia",              color:"#a78bfa", icon:"🏥" },
     amonestacion:     { label:"Amonestación",          color:"#ef4444", icon:"⚠️" },
     capacitacion:     { label:"Capacitación",          color:"#2dd4bf", icon:"📚" },
-    bonoConstruccion: { label:"Bono Construcción",     color:"#f97316", icon:"🏗️" },
+    bonoConstruccion: { label:"Bono Trabajo Externo",     color:"#f97316", icon:"🏗️" },
     bonoPesado:       { label:"Bono Trabajo Pesado",   color:"#dc2626", icon:"💪" },
     bonoEspecializado:{ label:"Bono Especializado",    color:"#7c3aed", icon:"⭐" },
     otro:             { label:"Otro",                  color:"#94a3b8", icon:"📌" },
@@ -5993,18 +5993,17 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
         <div className="ein">
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,marginBottom:20}}>
             {[
-              {tipo:"bonoConstruccion",label:"Bono Construcción",  color:"#f97316",icon:"🏗️"},
+              {tipo:"bonoConstruccion",label:"Bono Trabajo Externo",  color:"#f97316",icon:"🏗️"},
               {tipo:"bonoPesado",      label:"Bono Trabajo Pesado",color:"#dc2626",icon:"💪"},
               {tipo:"bonoEspecializado",label:"Bono Especializado",color:"#7c3aed",icon:"⭐"},
             ].map(b=>{
               const aprobados=eventos.filter(e=>e.tipo===b.tipo&&e.estado==="aprobado");
-              const totalH=aprobados.reduce((a,e)=>a+Number(e.horas||0),0);
               return (
                 <div key={b.tipo} style={{...S.card,padding:"18px 14px",textAlign:"center"}}>
                   <div style={{fontSize:28,marginBottom:6}}>{b.icon}</div>
-                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:26,fontWeight:700,color:b.color}}>{totalH}<span style={{fontSize:14,marginLeft:3}}>h</span></div>
+                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:26,fontWeight:700,color:b.color}}>{aprobados.length}</div>
                   <div style={{fontSize:12,color:"#6aaa7a",marginBottom:4}}>{b.label}</div>
-                  <div style={{fontSize:11,color:"#4a7a5a"}}>{aprobados.length} registro{aprobados.length!==1?"s":""}</div>
+                  <div style={{fontSize:11,color:"#4a7a5a"}}>bono{aprobados.length!==1?"s":""} aprobado{aprobados.length!==1?"s":""}</div>
                 </div>
               );
             })}
@@ -6019,7 +6018,7 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
                   <div>
                     <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>TIPO DE BONO</label>
                     <select style={S.input} value={nuevoEvento.tipo} onChange={e=>setNuevoEvento(p=>({...p,tipo:e.target.value}))}>
-                      <option value="bonoConstruccion">🏗️ Bono Construcción</option>
+                      <option value="bonoConstruccion">🏗️ Bono Trabajo Externo</option>
                       <option value="bonoPesado">💪 Bono Trabajo Pesado</option>
                       <option value="bonoEspecializado">⭐ Bono Especializado</option>
                     </select>
@@ -6170,7 +6169,7 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
             <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,marginBottom:10}}>💰 Bonos por tarea</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:bonosRegistros.length>0?10:0}}>
               {[
-                {tipo:"bonoConstruccion",label:"Bono Construcción",color:"#f97316",icon:"🏗️"},
+                {tipo:"bonoConstruccion",label:"Bono Trabajo Externo",color:"#f97316",icon:"🏗️"},
                 {tipo:"bonoPesado",label:"Bono Trabajo Pesado",color:"#dc2626",icon:"💪"},
                 {tipo:"bonoEspecializado",label:"Bono Especializado",color:"#7c3aed",icon:"⭐"},
               ].map(b=>{
