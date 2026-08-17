@@ -15587,6 +15587,7 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
     setPersonal(p=>{
       const arr=Array.isArray(p)?p:Object.values(p||{});
       return arr.map(t=>{
+        const partic = participantes.find(x=>String(x.trabajadorId)===String(t.id));
         if(!partic) return t;
         const nuevaEntrada = {
           id:Date.now()+Math.random(), tipo:"bonoConstruccion",
