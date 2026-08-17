@@ -15927,7 +15927,19 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
             <div key={bono.id} style={{...S.card,padding:16}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:8,marginBottom:10}}>
                 <div>
-                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,marginBottom:3}}>{bono.descripcion}</div>
+                  <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:3}}>
+                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700}}>{bono.descripcion}</div>
+                    {bono.estado==="rendido"?(
+                      <span style={{fontSize:10,padding:"2px 8px",borderRadius:10,background:"rgba(255,255,255,0.06)",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.12)",fontWeight:600,whiteSpace:"nowrap"}}>📤 Rendido{bono.fechaRendicion?` · ${bono.fechaRendicion}`:""}</span>
+                    ):(
+                      <span style={{fontSize:10,padding:"2px 8px",borderRadius:10,background:"rgba(251,191,36,0.12)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.3)",fontWeight:600,whiteSpace:"nowrap"}}>⏳ Pendiente de rendir</span>
+                    )}
+                    {bono.tipo&&(
+                      <span style={{fontSize:10,padding:"2px 8px",borderRadius:10,background:"rgba(196,181,253,0.1)",color:"#c4b5fd",border:"1px solid rgba(196,181,253,0.25)",whiteSpace:"nowrap"}}>
+                        {bono.tipo==="bonoPesado"?"💪 Trabajo Pesado":bono.tipo==="bonoEspecializado"?"⭐ Especializado":"🏗️ Trabajo Externo"}
+                      </span>
+                    )}
+                  </div>
                   <div style={{fontSize:12,color:"#6aaa7a"}}>📅 {bono.fecha}</div>
                 </div>
                 <div style={{display:"flex",gap:8,alignItems:"start",flexWrap:"wrap"}}>
