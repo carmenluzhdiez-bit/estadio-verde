@@ -15432,7 +15432,7 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
   const [editBonoForm, setEditBonoForm] = React.useState(null);
   const [modoBono, setModoBono] = React.useState("tarea"); // "tarea" | "jornada"
   const [formJornada, setFormJornada] = React.useState({
-    fecha: hoy, descripcion:"", valorJornada:"",
+    fecha: hoy, descripcion:"", valorJornada:"", tipoBono:"bonoConstruccion",
     participantes: [{id:"p1", trabajadorId:"", jornadas:""}],
     obs:""
   });
@@ -15443,14 +15443,14 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
       return {
         fecha: prefill.tareaFecha||hoy,
         descripcion: prefill.descripcionBono||"",
-        valorMercado: "",
+        valorMercado: "", tipoBono:"bonoEspecializado",
         ejecutor: trabajador?String(trabajador.id):"",
         ejecutorNombre: prefill.trabajadorNombre||"",
         ayudante:"", ayudanteNombre:"", apoyos:[], obs:"⭐ Bono especializado — generado automáticamente al completar limpieza de Cancha de Fútbol Sintética"
       };
     }
     return {
-      fecha: hoy, descripcion:"", valorMercado:"",
+      fecha: hoy, descripcion:"", valorMercado:"", tipoBono:"bonoConstruccion",
       ejecutor:"", ejecutorNombre:"", ayudante:"", ayudanteNombre:"", apoyos:[], obs:""
     };
   });
@@ -15573,7 +15573,7 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
       ...apoyosValidos.map(id=>({trabajadorId:String(id), nombre:listaPersonal.find(p=>String(p.id)===String(id))?.nombre||getNombre(id), rol:"Apoyo", pct:pctApoyo, monto:montoApoyo})),
     ];
     const nuevoBono = {
-      id:Date.now(), fecha:form.fecha, descripcion:form.descripcion,
+      id:Date.now(), fecha:form.fecha, descripcion:form.descripcion, tipo:form.tipoBono||"bonoConstruccion",
       valorMercado:Number(form.valorMercado), fondoTotal, obs:form.obs,
       estado:"generado", participantes,
     };
@@ -15582,22 +15582,23 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
       const existe = arr.some(b=>b.id===nuevoBono.id);
       return existe ? arr.map(b=>b.id===nuevoBono.id?nuevoBono:b) : [nuevoBono,...arr];
     });
-    // Agregar bono en ficha de cada trabajador
+    // Agregar bono en ficha de cada trabajador — ya aprobado: el % se calculó
+    // y confirmó al momento de generarlo, no requiere una segunda aprobación.
     setPersonal(p=>{
       const arr=Array.isArray(p)?p:Object.values(p||{});
       return arr.map(t=>{
         const partic = participantes.find(x=>String(x.trabajadorId)===String(t.id));
         if(!partic) return t;
         const nuevaEntrada = {
-          id:Date.now()+Math.random(), tipo:"bonoConstruccion",
-          fecha:form.fecha, estado:"pendiente",
+          id:Date.now()+Math.random(), tipo:form.tipoBono||"bonoConstruccion",
+          fecha:form.fecha, estado:"aprobado",
           descripcion:`${partic.rol} — ${form.descripcion}`,
           valor:String(partic.monto), horas:"",
         };
         return {...t, eventos:[...(t.eventos||[]),nuevaEntrada]};
       });
     });
-    setForm({fecha:hoy,descripcion:"",valorMercado:"",ejecutor:"",ejecutorNombre:"",ayudante:"",ayudanteNombre:"",apoyos:[],obs:""});
+    setForm({fecha:hoy,descripcion:"",valorMercado:"",tipoBono:"bonoConstruccion",ejecutor:"",ejecutorNombre:"",ayudante:"",ayudanteNombre:"",apoyos:[],obs:""});
     setShowForm(false);
   };
 
@@ -15629,7 +15630,7 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
       monto: Number(p.jornadas)*valorJornadaNum,
     }));
     const nuevoBono = {
-      id: Date.now(), fecha: formJornada.fecha, descripcion: formJornada.descripcion,
+      id: Date.now(), fecha: formJornada.fecha, descripcion: formJornada.descripcion, tipo: formJornada.tipoBono||"bonoConstruccion",
       modo: "jornada", valorJornada: valorJornadaNum, totalJornadas, fondoTotal: totalBonoJornada,
       obs: formJornada.obs, estado: "generado", participantes,
     };
@@ -15644,15 +15645,15 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
         const partic = participantes.find(x=>String(x.trabajadorId)===String(t.id));
         if(!partic) return t;
         const nuevaEntrada = {
-          id:Date.now()+Math.random(), tipo:"bonoConstruccion",
-          fecha:formJornada.fecha, estado:"pendiente",
+          id:Date.now()+Math.random(), tipo:formJornada.tipoBono||"bonoConstruccion",
+          fecha:formJornada.fecha, estado:"aprobado",
           descripcion:`Jornada (${partic.jornadas}×$${partic.valorJornada.toLocaleString("es-CL")}) — ${formJornada.descripcion}`,
           valor:String(partic.monto), horas:"",
         };
         return {...t, eventos:[...(t.eventos||[]),nuevaEntrada]};
       });
     });
-    setFormJornada({fecha:hoy,descripcion:"",valorJornada:"",participantes:[{id:"p1",trabajadorId:"",jornadas:""}],obs:""});
+    setFormJornada({fecha:hoy,descripcion:"",valorJornada:"",tipoBono:"bonoConstruccion",participantes:[{id:"p1",trabajadorId:"",jornadas:""}],obs:""});
     setShowForm(false);
   };
 
@@ -15734,6 +15735,13 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
             <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={form.fecha} onChange={e=>setForm(p=>({...p,fecha:e.target.value}))}/></div>
             <div><label style={labelSt}>Valor mercado de la tarea ($)</label>
               <input type="number" min={0} style={S.input} placeholder="ej: 200000" value={form.valorMercado} onChange={e=>setForm(p=>({...p,valorMercado:e.target.value}))}/>
+            </div>
+            <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Tipo de bono</label>
+              <select style={S.input} value={form.tipoBono||"bonoConstruccion"} onChange={e=>setForm(p=>({...p,tipoBono:e.target.value}))}>
+                <option value="bonoConstruccion">🏗️ Bono Trabajo Externo</option>
+                <option value="bonoPesado">💪 Bono Trabajo Pesado</option>
+                <option value="bonoEspecializado">⭐ Bono Especializado</option>
+              </select>
             </div>
             <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Descripción de la tarea</label>
               <input style={S.input} placeholder="ej: Tala palmera cancha golf hoyo 5" value={form.descripcion} onChange={e=>setForm(p=>({...p,descripcion:e.target.value}))}/>
@@ -15825,6 +15833,13 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
             <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={formJornada.fecha} onChange={e=>setFormJornada(p=>({...p,fecha:e.target.value}))}/></div>
             <div><label style={labelSt}>Valor de mercado por jornada ($)</label>
               <input type="number" min={0} style={S.input} placeholder="ej: 30000" value={formJornada.valorJornada} onChange={e=>setFormJornada(p=>({...p,valorJornada:e.target.value}))}/>
+            </div>
+            <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Tipo de bono</label>
+              <select style={S.input} value={formJornada.tipoBono||"bonoConstruccion"} onChange={e=>setFormJornada(p=>({...p,tipoBono:e.target.value}))}>
+                <option value="bonoConstruccion">🏗️ Bono Trabajo Externo</option>
+                <option value="bonoPesado">💪 Bono Trabajo Pesado</option>
+                <option value="bonoEspecializado">⭐ Bono Especializado</option>
+              </select>
             </div>
             <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Descripción de la obra/construcción</label>
               <input style={S.input} placeholder="ej: Construcción jardín lineal Avenida Madrid" value={formJornada.descripcion} onChange={e=>setFormJornada(p=>({...p,descripcion:e.target.value}))}/>
