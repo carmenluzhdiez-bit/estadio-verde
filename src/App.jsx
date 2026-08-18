@@ -15665,12 +15665,44 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
     setShowForm(false);
   };
 
+  // Reparación retroactiva: bonos generados mientras existía un bug (variable
+  // "partic" indefinida) quedaron guardados en bonosMasivos pero SIN el evento
+  // correspondiente en la ficha de cada trabajador participante (el código se
+  // interrumpía antes de crearlo). Esta función detecta esos casos y crea el
+  // evento faltante, ya aprobado, para que aparezcan y se puedan editar.
+  const repararEventosFaltantes = () => {
+    const nuevoPersonal = personalArr.map(t=>{
+      let eventosNuevos = [...(t.eventos||[])];
+      bonosArr.forEach(b=>{
+        const partic = (b.participantes||[]).find(x=>String(x.trabajadorId)===String(t.id));
+        if(!partic) return;
+        const yaExiste = eventosNuevos.some(e=>
+          (e.bonoId && String(e.bonoId)===String(b.id)) ||
+          (["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo) &&
+           e.fecha===b.fecha && b.descripcion && (e.descripcion||"").includes(b.descripcion))
+        );
+        if(yaExiste) return;
+        eventosNuevos.push({
+          id:Date.now()+Math.random(), tipo:b.tipo||"bonoConstruccion", bonoId:b.id,
+          fecha:b.fecha, estado: b.estado==="rendido"?"rendido":"aprobado",
+          descripcion:`${partic.rol} — ${b.descripcion}`,
+          valor:String(partic.monto), horas:"",
+        });
+      });
+      return {...t, eventos:eventosNuevos};
+    });
+    const totalNuevos = nuevoPersonal.reduce((a,t,i)=>a+((t.eventos||[]).length-(personalArr[i].eventos||[]).length),0);
+    setPersonal(nuevoPersonal);
+    alert(totalNuevos>0 ? `✅ Se repararon ${totalNuevos} evento(s) faltante(s) en fichas de trabajadores.` : "No se encontraron bonos con eventos faltantes — todo está en orden.");
+  };
+
   return (
     <div className="ein">
       <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:20,flexWrap:"wrap"}}>
         <button className="btn-g" style={S.btn} onClick={onVolver}>← Volver</button>
         <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:900,flex:1}}>💰 Bono por Tarea</h1>
         {esJefa&&<button style={{...S.btn,fontSize:12,background:"rgba(255,255,255,0.06)",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)"}} onClick={()=>setShowConfig(p=>!p)}>⚙️ Configurar %</button>}
+        {esJefa&&<button style={{...S.btn,fontSize:12,background:"rgba(251,191,36,0.1)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.25)"}} onClick={repararEventosFaltantes}>🔧 Reparar bonos sin evento en ficha</button>}
         <button className="btn-p" style={S.btn} onClick={()=>setShowForm(p=>!p)}>➕ Nueva tarea con bono</button>
       </div>
 
