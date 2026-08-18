@@ -13570,7 +13570,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
   const puedeRegistrarBasicoEPP = esJefa || rolLogueado==="supervisor";
   const personalArrEpp = Array.isArray(personal)?personal:Object.values(personal||{});
 
-  const emptyEntregaEpp = {trabajadorId:"",tipo:"",agente:"",labor:"",cantidad:1,talla:"",proveedor:"",observaciones:""};
+  const emptyEntregaEpp = {trabajadorId:"",tipo:"",agente:"",labor:"",cantidad:1,talla:"",modelo:"",registroISP:"",proveedor:"",fechaEntrega:hoy,observaciones:""};
   const [formEntregaEpp, setFormEntregaEpp] = React.useState(emptyEntregaEpp);
   const [showEntregaEppForm, setShowEntregaEppForm] = React.useState(false);
 
@@ -13607,7 +13607,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
 
   const guardarEntregaEpp = () => {
     if(!formEntregaEpp.trabajadorId||!formEntregaEpp.tipo){ alert("Selecciona trabajador y tipo de EPP."); return; }
-    const nueva = {...formEntregaEpp, id:Date.now()+Math.random(), fechaEntrega:hoy, firmaRecepcion:false, registradoPor:currentUserId};
+    const nueva = {...formEntregaEpp, id:Date.now()+Math.random(), fechaEntrega:formEntregaEpp.fechaEntrega||hoy, firmaRecepcion:false, registradoPor:currentUserId};
     setEppEntregas([nueva, ...(Array.isArray(eppEntregas)?eppEntregas:[])]);
     setFormEntregaEpp(emptyEntregaEpp); setShowEntregaEppForm(false);
   };
@@ -13843,9 +13843,12 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                     ))}
                   </select>
                 </div>
+                <div><label style={labelSt}>Fecha de entrega</label><input type="date" style={S.input} value={formEntregaEpp.fechaEntrega} onChange={e=>setFormEntregaEpp(p=>({...p,fechaEntrega:e.target.value}))}/></div>
                 <div><label style={labelSt}>Labor asociada</label><input style={S.input} value={formEntregaEpp.labor} onChange={e=>setFormEntregaEpp(p=>({...p,labor:e.target.value}))}/></div>
                 <div><label style={labelSt}>Cantidad</label><input type="number" min={1} style={S.input} value={formEntregaEpp.cantidad} onChange={e=>setFormEntregaEpp(p=>({...p,cantidad:e.target.value}))}/></div>
                 <div><label style={labelSt}>Talla (opcional)</label><input style={S.input} value={formEntregaEpp.talla} onChange={e=>setFormEntregaEpp(p=>({...p,talla:e.target.value}))}/></div>
+                <div><label style={labelSt}>Modelo</label><input style={S.input} placeholder="ej: 3M 6200" value={formEntregaEpp.modelo} onChange={e=>setFormEntregaEpp(p=>({...p,modelo:e.target.value}))}/></div>
+                <div><label style={labelSt}>Registro ISP</label><input style={S.input} placeholder="N° de registro sanitario ISP" value={formEntregaEpp.registroISP} onChange={e=>setFormEntregaEpp(p=>({...p,registroISP:e.target.value}))}/></div>
                 <div><label style={labelSt}>Proveedor</label><input style={S.input} value={formEntregaEpp.proveedor} onChange={e=>setFormEntregaEpp(p=>({...p,proveedor:e.target.value}))}/></div>
                 <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observaciones</label><textarea style={{...S.input,minHeight:60}} value={formEntregaEpp.observaciones} onChange={e=>setFormEntregaEpp(p=>({...p,observaciones:e.target.value}))}/></div>
               </div>
@@ -13858,7 +13861,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
           <div style={{overflowX:"auto"}}>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
               <thead><tr style={{color:"#6aaa7a",textAlign:"left"}}>
-                <th style={{padding:"6px 8px"}}>Fecha</th><th style={{padding:"6px 8px"}}>Trabajador</th><th style={{padding:"6px 8px"}}>EPP</th>
+                <th style={{padding:"6px 8px"}}>Fecha</th><th style={{padding:"6px 8px"}}>Trabajador</th><th style={{padding:"6px 8px"}}>EPP</th><th style={{padding:"6px 8px"}}>Modelo</th>
                 <th style={{padding:"6px 8px"}}>Labor</th><th style={{padding:"6px 8px"}}>Cant.</th><th style={{padding:"6px 8px"}}>Firma</th>
               </tr></thead>
               <tbody>
@@ -13869,13 +13872,14 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                       <td style={{padding:"6px 8px"}}>{e.fechaEntrega}</td>
                       <td style={{padding:"6px 8px"}}>{trab?.nombre||"—"}</td>
                       <td style={{padding:"6px 8px"}}>{e.tipo}</td>
+                      <td style={{padding:"6px 8px"}}>{e.modelo||"—"}{e.registroISP?<div style={{fontSize:10,color:"#6aaa7a"}}>ISP: {e.registroISP}</div>:null}</td>
                       <td style={{padding:"6px 8px"}}>{e.labor}</td>
                       <td style={{padding:"6px 8px"}}>{e.cantidad}</td>
                       <td style={{padding:"6px 8px"}}>{e.firmaRecepcion?"✓":(puedeRegistrarBasicoEPP?<button className="btn-g" style={{...S.btn,fontSize:10,padding:"3px 8px"}} onClick={()=>marcarFirmaEntrega(e.id)}>Marcar firmada</button>:"—")}</td>
                     </tr>
                   );
                 })}
-                {(Array.isArray(eppEntregas)?eppEntregas:[]).length===0&&<tr><td colSpan={6} style={{padding:14,textAlign:"center",color:"#4a7a5a"}}>Sin entregas registradas.</td></tr>}
+                {(Array.isArray(eppEntregas)?eppEntregas:[]).length===0&&<tr><td colSpan={7} style={{padding:14,textAlign:"center",color:"#4a7a5a"}}>Sin entregas registradas.</td></tr>}
               </tbody>
             </table>
           </div>
