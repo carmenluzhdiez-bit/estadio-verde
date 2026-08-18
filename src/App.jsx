@@ -15995,7 +15995,25 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
                     </>)}
                   </div>
                   <button style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(255,255,255,0.06)",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)"}} onClick={()=>{setEditBonoId(bono.id);setEditBonoForm({...bono});}}>✏️ Editar</button>
-                  <button style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(239,68,68,0.08)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.2)"}} onClick={()=>{if(window.confirm("¿Eliminar este bono? Esta acción no se puede deshacer."))setBonosMasivos(p=>(Array.isArray(p)?p:Object.values(p||{})).filter(b=>b.id!==bono.id));}}>🗑 Eliminar</button>
+                  <button style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(239,68,68,0.08)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.2)"}} onClick={()=>{
+                    if(!window.confirm("¿Eliminar este bono? Esta acción no se puede deshacer.")) return;
+                    setBonosMasivos(p=>(Array.isArray(p)?p:Object.values(p||{})).filter(b=>b.id!==bono.id));
+                    // También eliminar los eventos ya creados en la ficha de cada trabajador
+                    // participante (enlazados por bonoId, o por coincidencia fecha+descripción
+                    // para bonos antiguos sin ese enlace).
+                    setPersonal(p=>{
+                      const arr=Array.isArray(p)?p:Object.values(p||{});
+                      return arr.map(t=>({
+                        ...t,
+                        eventos:(t.eventos||[]).filter(e=>{
+                          if(e.bonoId && String(e.bonoId)===String(bono.id)) return false;
+                          if(!["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)) return true;
+                          if(!e.bonoId && e.fecha===bono.fecha && bono.descripcion && (e.descripcion||"").includes(bono.descripcion)) return false;
+                          return true;
+                        })
+                      }));
+                    });
+                  }}>🗑 Eliminar</button>
                   <button style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}} onClick={()=>imprimirBono(bono)}>🖨️ Informe RRHH</button>
                 </div>
               </div>
