@@ -15066,7 +15066,24 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
 
     const paginas = personalArr.map(t=>{
       const bonosT = bonosSel.filter(b=>(b.participantes||[]).some(p=>String(p.trabajadorId)===String(t.id)));
-      const eventosT = (t.eventos||[]).filter(e=>selEventos[`${t.id}_${e.id}`]);
+      // Eventos "bono" individuales que YA están representados por un bono masivo
+      // pendiente (bonosPendientes) — sea porque están enlazados por bonoId (bonos
+      // nuevos) o porque coinciden por descripción con uno no seleccionado (bonos
+      // antiguos, sin enlace). Estos nunca deben contarse aparte: si el bono masivo
+      // está seleccionado ya se cuenta vía bonosT; si está deseleccionado, se excluye
+      // del informe por completo (no se "cuela" como línea individual).
+      const esEventoDeBonoMasivo = (e) => {
+        if(!["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)) return false;
+        if(e.bonoId && bonosPendientes.some(b=>String(b.id)===String(e.bonoId))) return true;
+        if(e.origenBonoId&&bonosPendientes.some(b=>String(b.id)===String(e.origenBonoId))) return true;
+        const descE = (e.descripcion||"").toLowerCase().trim();
+        return bonosPendientes.some(b=>{
+          const descB = (b.descripcion||"").toLowerCase().trim();
+          const palabras = descB.split(" ").filter(p=>p.length>4);
+          return palabras.length>0 && palabras.filter(p=>descE.includes(p)).length >= Math.ceil(palabras.length*0.5);
+        });
+      };
+      const eventosT = (t.eventos||[]).filter(e=>selEventos[`${t.id}_${e.id}`]&&!esEventoDeBonoMasivo(e));
       if(!bonosT.length&&!eventosT.length) return "";
 
       const totalBonos = bonosT.reduce((a,b)=>{
@@ -15085,22 +15102,9 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
           <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px;text-align:right;font-weight:700;color:#7b1fa2">$${Number(bonoP3?.monto||0).toLocaleString("es-CL")}</td>
         </tr>`;}).join("");
 
-      // Excluir bonos individuales que correspondan a bonos masivos no seleccionados
-      const bonosNoSel = bonosPendientes.filter(b=>!selBonos[b.id]);
-      const filasBonosInd = eventosT.filter(e=>{
-        if(!["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)) return false;
-        // Excluir si tiene origenBonoId explícito
-        if(e.origenBonoId&&bonosNoSel.some(b=>String(b.id)===String(e.origenBonoId))) return false;
-        // Excluir si la descripción coincide con un bono masivo no seleccionado
-        const descE = (e.descripcion||"").toLowerCase().trim();
-        if(bonosNoSel.some(b=>{
-          const descB = (b.descripcion||"").toLowerCase().trim();
-          // Match si descripción del evento contiene palabras clave del bono masivo
-          const palabras = descB.split(" ").filter(p=>p.length>4);
-          return palabras.length>0 && palabras.filter(p=>descE.includes(p)).length >= Math.ceil(palabras.length*0.5);
-        })) return false;
-        return true;
-      }).map(e=>`
+      const filasBonosInd = eventosT.filter(e=>
+        ["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)
+      ).map(e=>`
         <tr><td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${e.fecha}</td>
         <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${e.descripcion||"Bono"}</td>
         <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px;text-align:right;font-weight:700;color:#7b1fa2">${e.valor?`$${Number(e.valor).toLocaleString("es-CL")}`:"—"}</td></tr>`).join("");
@@ -15594,7 +15598,7 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
         const partic = participantes.find(x=>String(x.trabajadorId)===String(t.id));
         if(!partic) return t;
         const nuevaEntrada = {
-          id:Date.now()+Math.random(), tipo:form.tipoBono||"bonoConstruccion",
+          id:Date.now()+Math.random(), tipo:form.tipoBono||"bonoConstruccion", bonoId:nuevoBono.id,
           fecha:form.fecha, estado:"aprobado",
           descripcion:`${partic.rol} — ${form.descripcion}`,
           valor:String(partic.monto), horas:"",
@@ -15649,7 +15653,7 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
         const partic = participantes.find(x=>String(x.trabajadorId)===String(t.id));
         if(!partic) return t;
         const nuevaEntrada = {
-          id:Date.now()+Math.random(), tipo:formJornada.tipoBono||"bonoConstruccion",
+          id:Date.now()+Math.random(), tipo:formJornada.tipoBono||"bonoConstruccion", bonoId:nuevoBono.id,
           fecha:formJornada.fecha, estado:"aprobado",
           descripcion:`Jornada (${partic.jornadas}×$${partic.valorJornada.toLocaleString("es-CL")}) — ${formJornada.descripcion}`,
           valor:String(partic.monto), horas:"",
@@ -15994,13 +15998,25 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
                       <input type="number" min={0} style={S.input} value={editBonoForm.valorMercado||""} onChange={e=>{
                         const vm=Number(e.target.value);
                         const ft=Math.round(vm*pctFondo/100);
-                        const partic=(editBonoForm.participantes||[]).map(p=>({...p,
-                          monto:p.rol==="Ejecutor"?Math.round(ft*pctEjecutor/100):
-                                p.rol==="Ayudante"?Math.round(ft*pctAyudante/100):
-                                Math.round((ft*pctApoyo/100)/Math.max(1,(editBonoForm.participantes||[]).filter(x=>x.rol==="Apoyo").length))
+                        const rolesEdit=editBonoForm.participantes||[];
+                        const tieneAyudanteEdit=rolesEdit.some(x=>x.rol==="Ayudante");
+                        const nApoyosEdit=rolesEdit.filter(x=>x.rol==="Apoyo").length;
+                        const pesoTotalEdit=pctEjecutor+(tieneAyudanteEdit?pctAyudante:0)+(nApoyosEdit>0?pctApoyo:0);
+                        const partic=rolesEdit.map(p=>({...p,
+                          monto:pesoTotalEdit<=0?0:
+                                p.rol==="Ejecutor"?Math.round(ft*pctEjecutor/pesoTotalEdit):
+                                p.rol==="Ayudante"?Math.round(ft*pctAyudante/pesoTotalEdit):
+                                Math.round((ft*pctApoyo/pesoTotalEdit)/Math.max(1,nApoyosEdit))
                         }));
                         setEditBonoForm(p=>({...p,valorMercado:vm,fondoTotal:ft,participantes:partic}));
                       }}/>
+                    </div>
+                    <div style={{gridColumn:"1/-1"}}><label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3}}>TIPO DE BONO</label>
+                      <select style={S.input} value={editBonoForm.tipo||"bonoConstruccion"} onChange={e=>setEditBonoForm(p=>({...p,tipo:e.target.value}))}>
+                        <option value="bonoConstruccion">🏗️ Bono Trabajo Externo</option>
+                        <option value="bonoPesado">💪 Bono Trabajo Pesado</option>
+                        <option value="bonoEspecializado">⭐ Bono Especializado</option>
+                      </select>
                     </div>
                     <div style={{gridColumn:"1/-1"}}><label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3}}>DESCRIPCIÓN</label>
                       <input style={S.input} value={editBonoForm.descripcion||""} onChange={e=>setEditBonoForm(p=>({...p,descripcion:e.target.value}))}/>
@@ -16038,6 +16054,22 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
                   <div style={{display:"flex",gap:8,marginTop:10}}>
                     <button className="btn-p" style={S.btn} onClick={()=>{
                       setBonosMasivos(p=>(Array.isArray(p)?p:Object.values(p||{})).map(b=>b.id===editBonoId?editBonoForm:b));
+                      // Sincronizar los eventos ya creados en la ficha de cada trabajador
+                      // (solo funciona para bonos generados después de este cambio, que
+                      // quedaron enlazados con bonoId; los anteriores no se pueden enlazar).
+                      setPersonal(p=>{
+                        const arr=Array.isArray(p)?p:Object.values(p||{});
+                        return arr.map(t=>{
+                          const eventosAct = (t.eventos||[]).map(ev=>{
+                            if(ev.bonoId!==editBonoId) return ev;
+                            const partic = (editBonoForm.participantes||[]).find(x=>String(x.trabajadorId)===String(t.id));
+                            if(!partic) return ev;
+                            return {...ev, tipo:editBonoForm.tipo||"bonoConstruccion", fecha:editBonoForm.fecha,
+                              descripcion:`${partic.rol} — ${editBonoForm.descripcion}`, valor:String(partic.monto)};
+                          });
+                          return {...t, eventos:eventosAct};
+                        });
+                      });
                       setEditBonoId(null);setEditBonoForm(null);
                     }}>✓ Guardar</button>
                     <button className="btn-g" style={S.btn} onClick={()=>{setEditBonoId(null);setEditBonoForm(null);}}>Cancelar</button>
