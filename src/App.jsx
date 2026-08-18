@@ -15037,7 +15037,7 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
   const bonosRendidos   = bonosArr.filter(b=>b.estado==="rendido");
   const trabajadoresCon = personalArr.map(t=>{
     const eventosT = (t.eventos||[]).filter(e=>
-      ["bonoConstruccion","bonoPesado","bonoEspecializado","horaExtra","permiso","vacaciones","licencia"].includes(e.tipo) &&
+      ["bonoConstruccion","bonoPesado","bonoEspecializado","horaExtra","permiso","vacaciones","licencia","otro","amonestacion","capacitacion"].includes(e.tipo) &&
       e.estado!=="rendido"
     );
     if(!bonosPendientes.some(b=>(b.participantes||[]).some(p=>String(p.trabajadorId)===String(t.id)))&&!eventosT.length) return null;
@@ -15119,6 +15119,11 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
         <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${e.tipo==="permiso"?"Permiso":e.tipo==="vacaciones"?"Vacaciones":"Licencia"}${e.descripcion?` — ${e.descripcion}`:""}</td>
         <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px;text-align:center">—</td></tr>`).join("");
 
+      const filasOtros = eventosT.filter(e=>["otro","amonestacion","capacitacion"].includes(e.tipo)).map(e=>`
+        <tr><td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${e.fecha}</td>
+        <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${e.tipo==="amonestacion"?"Amonestación":e.tipo==="capacitacion"?"Capacitación":"Otro"}${e.descripcion?` — ${e.descripcion}`:""}</td>
+        <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px;text-align:center">—</td></tr>`).join("");
+
       return `<div class="pagina">
         <div class="hdr">
           <div><h1>${titulo||"Informe de Personal"} — ${mesRendicion}</h1>
@@ -15155,6 +15160,9 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
         ${filasPermisos?`<div class="sec">📋 Permisos y Ausentismo</div>
         <table><thead><tr><th>Período</th><th>Tipo</th><th>—</th></tr></thead>
         <tbody>${filasPermisos}</tbody></table>`:""}
+        ${filasOtros?`<div class="sec">📌 Otros Registros</div>
+        <table><thead><tr><th>Fecha</th><th>Detalle</th><th>—</th></tr></thead>
+        <tbody>${filasOtros}</tbody></table>`:""}
         <div class="firmas">
           <div class="firma"><div class="flinea"><strong>${t.nombre}</strong><br>Firma trabajador</div></div>
           <div class="firma"><div class="flinea"><strong>Carmen Luz Hermosilla Diez</strong><br>Jefe Dpto. Áreas Verdes</div></div>
@@ -15383,7 +15391,7 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
                     {selEventos[`${t.id}_${e.id}`]&&<span style={{color:"#000",fontSize:10,fontWeight:700}}>✓</span>}
                   </div>
                   <div style={{flex:1,fontSize:12}}>
-                    <span style={{fontWeight:["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)?700:400,color:["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)?"#c4b5fd":"inherit"}}>{e.tipo==="horaExtra"?"⏰":e.tipo==="bonoConstruccion"||e.tipo==="bonoPesado"||e.tipo==="bonoEspecializado"?"🎖️":e.tipo==="permiso"?"📋":e.tipo==="vacaciones"?"🏖️":e.tipo==="licencia"?"🏥":"💰"}</span>
+                    <span style={{fontWeight:["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)?700:400,color:["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)?"#c4b5fd":"inherit"}}>{e.tipo==="horaExtra"?"⏰":e.tipo==="bonoConstruccion"||e.tipo==="bonoPesado"||e.tipo==="bonoEspecializado"?"🎖️":e.tipo==="permiso"?"📋":e.tipo==="vacaciones"?"🏖️":e.tipo==="licencia"?"🏥":e.tipo==="amonestacion"?"⚠️":e.tipo==="capacitacion"?"📚":e.tipo==="otro"?"📌":"💰"}</span>
                     {" "}{e.descripcion||e.tipo} · {e.fecha}{e.fechaFin?` → ${e.fechaFin}`:""}
                     {e.tipo==="horaExtra"&&e.estado!=="aprobado"&&<span style={{fontSize:10,color:"#f59e0b",marginLeft:6,background:"rgba(245,158,11,0.1)",padding:"1px 6px",borderRadius:8,border:"1px solid rgba(245,158,11,0.2)"}}>⚠️ Pendiente aprobación — no se sumará</span>}
                   </div>
