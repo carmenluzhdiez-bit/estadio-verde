@@ -13835,10 +13835,10 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                     const sel=TIPOS_EPP_FLAT.find(t=>t.tipo===e.target.value);
                     setFormEntregaEpp(p=>({...p,tipo:e.target.value,agente:sel?sel.agente:""}));
                   }}>
-                    <option value="">Seleccionar...</option>
+                    <option value="" style={{background:"#1a3a22",color:"#6aaa7a"}}>Seleccionar...</option>
                     {AGENTES_RIESGO_EPP.filter(a=>!a.sinEppFisico).map(a=>(
-                      <optgroup key={a.id} label={a.label}>
-                        {a.epp.map(tipo=><option key={tipo} value={tipo}>{tipo}</option>)}
+                      <optgroup key={a.id} label={a.label} style={{background:"#0d1f13",color:"#7dd3fc",fontWeight:700}}>
+                        {a.epp.map(tipo=><option key={tipo} value={tipo} style={{background:"#1a3a22",color:"#e8f5e9",padding:"8px"}}>{tipo}</option>)}
                       </optgroup>
                     ))}
                   </select>
