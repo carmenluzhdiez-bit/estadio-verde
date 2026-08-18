@@ -15671,9 +15671,10 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
   // interrumpía antes de crearlo). Esta función detecta esos casos y crea el
   // evento faltante, ya aprobado, para que aparezcan y se puedan editar.
   const repararEventosFaltantes = () => {
+    const bonosArrRep = Array.isArray(bonosMasivos) ? bonosMasivos : Object.values(bonosMasivos||{});
     const nuevoPersonal = personalArr.map(t=>{
       let eventosNuevos = [...(t.eventos||[])];
-      bonosArr.forEach(b=>{
+      bonosArrRep.forEach(b=>{
         const partic = (b.participantes||[]).find(x=>String(x.trabajadorId)===String(t.id));
         if(!partic) return;
         const yaExiste = eventosNuevos.some(e=>
