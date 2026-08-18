@@ -15697,6 +15697,53 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
     alert(totalNuevos>0 ? `✅ Se repararon ${totalNuevos} evento(s) faltante(s) en fichas de trabajadores.` : "No se encontraron bonos con eventos faltantes — todo está en orden.");
   };
 
+  // Enlaza (sin duplicar) eventos de bono ya existentes en fichas — creados por
+  // texto/heurística antes de que existiera el enlace bonoId — con su registro
+  // real en bonosMasivos. Una vez enlazados, la detección de duplicados y la
+  // exclusión al deseleccionar un bono dejan de depender de comparar texto.
+  const enlazarBonosExistentes = () => {
+    const bonosArrRep = Array.isArray(bonosMasivos) ? bonosMasivos : Object.values(bonosMasivos||{});
+    let enlazados = 0;
+    const nuevoPersonal = personalArr.map(t=>{
+      const eventosNuevos = (t.eventos||[]).map(e=>{
+        if(e.bonoId) return e; // ya enlazado
+        if(!["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)) return e;
+        const bonoMatch = bonosArrRep.find(b=>{
+          const partic = (b.participantes||[]).find(x=>String(x.trabajadorId)===String(t.id));
+          return partic && e.fecha===b.fecha && b.descripcion && (e.descripcion||"").includes(b.descripcion);
+        });
+        if(!bonoMatch) return e;
+        enlazados++;
+        return {...e, bonoId:bonoMatch.id};
+      });
+      return {...t, eventos:eventosNuevos};
+    });
+    setPersonal(nuevoPersonal);
+    alert(enlazados>0 ? `🔗 Se enlazaron ${enlazados} evento(s) con su bono correspondiente.` : "No se encontraron eventos sin enlazar — todo está en orden.");
+  };
+
+  // Elimina eventos de bono en fichas cuyo bonoId apunta a un bono que ya no
+  // existe en bonosMasivos (quedaron huérfanos por bonos eliminados antes del
+  // arreglo al botón "Eliminar"). Solo toca eventos con bonoId confirmado —
+  // nunca eventos sin enlace, para no arriesgar datos agregados manualmente.
+  const limpiarEventosHuerfanos = () => {
+    const bonosArrRep = Array.isArray(bonosMasivos) ? bonosMasivos : Object.values(bonosMasivos||{});
+    const idsVigentes = new Set(bonosArrRep.map(b=>String(b.id)));
+    let eliminados = 0;
+    const nuevoPersonal = personalArr.map(t=>{
+      const eventosNuevos = (t.eventos||[]).filter(e=>{
+        if(!e.bonoId) return true;
+        if(idsVigentes.has(String(e.bonoId))) return true;
+        eliminados++;
+        return false;
+      });
+      return {...t, eventos:eventosNuevos};
+    });
+    if(eliminados>0 && !window.confirm(`Se encontraron ${eliminados} evento(s) huérfano(s) de bonos ya eliminados. ¿Eliminarlos de las fichas?`)) return;
+    setPersonal(nuevoPersonal);
+    alert(eliminados>0 ? `🧹 Se eliminaron ${eliminados} evento(s) huérfano(s).` : "No se encontraron eventos huérfanos — todo está en orden.");
+  };
+
   return (
     <div className="ein">
       <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:20,flexWrap:"wrap"}}>
@@ -15704,6 +15751,8 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
         <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:900,flex:1}}>💰 Bono por Tarea</h1>
         {esJefa&&<button style={{...S.btn,fontSize:12,background:"rgba(255,255,255,0.06)",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)"}} onClick={()=>setShowConfig(p=>!p)}>⚙️ Configurar %</button>}
         {esJefa&&<button style={{...S.btn,fontSize:12,background:"rgba(251,191,36,0.1)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.25)"}} onClick={repararEventosFaltantes}>🔧 Reparar bonos sin evento en ficha</button>}
+        {esJefa&&<button style={{...S.btn,fontSize:12,background:"rgba(96,165,250,0.1)",color:"#93c5fd",border:"1px solid rgba(96,165,250,0.25)"}} onClick={enlazarBonosExistentes}>🔗 Enlazar bonos existentes</button>}
+        {esJefa&&<button style={{...S.btn,fontSize:12,background:"rgba(239,68,68,0.1)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.25)"}} onClick={limpiarEventosHuerfanos}>🧹 Limpiar bonos eliminados</button>}
         <button className="btn-p" style={S.btn} onClick={()=>setShowForm(p=>!p)}>➕ Nueva tarea con bono</button>
       </div>
 
