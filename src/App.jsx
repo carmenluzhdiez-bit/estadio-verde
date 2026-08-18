@@ -7954,7 +7954,7 @@ const AGENTES_RIESGO_EPP = [
   { id:"silice", label:"Sílice", presencia:"Movimiento de tierra, mezclas con arena",
     epp:["Respirador con filtro específico sílice"] },
   { id:"quimico", label:"Agentes químicos (fitosanitarios, fertilizantes)", presencia:"Aplicación de plaguicidas, herbicidas, fungicidas",
-    epp:["Respirador filtro químico (media cara)","Respirador filtro químico (cara completa)","Traje desechable","Guantes de nitrilo","Guantes de PVC","Antiparras herméticas"] },
+    epp:["Respirador filtro químico (media cara)","Respirador filtro químico (cara completa)","Filtro (repuesto)","Traje desechable","Guantes de nitrilo","Guantes de PVC","Antiparras herméticas"] },
   { id:"uv", label:"Radiación UV / exposición térmica", presencia:"Trabajo prolongado a la intemperie",
     epp:["Bloqueador solar","Gorro de ala ancha","Casco con protección de cuello","Ropa manga larga liviana"] },
   { id:"corte", label:"Riesgo de corte", presencia:"Motosierra, tijeras de poda, herramientas de corte",
