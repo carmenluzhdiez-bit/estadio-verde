@@ -5627,7 +5627,9 @@ function TipoEventoSelector({ value, onChange, S, TIPO_EVENTO }) {
   );
 }
 
-function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDeleteEvento, onUpdateEvento, esProgramador=false }) {
+function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDeleteEvento, onUpdateEvento, esProgramador=false,
+  eppEntregas=[], eppFiltros=[], eppVidaUtil=[], eppFitTests=[]
+} ) {
   const [tab, setTab] = React.useState("ficha");
   const [showNuevoEvento, setShowNuevoEvento] = React.useState(false);
   const [nuevoEvento, setNuevoEvento] = React.useState({ tipo:"permiso", fecha:"", fechaFin:"", horas:"", descripcion:"", estado:"pendiente" });
@@ -5695,7 +5697,7 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
       </div>
 
       <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
-        {[["ficha","📋 Ficha"],["eventos","📅 Eventos"],["bonos","💰 Bonos"],["resumen","📊 Resumen"]].map(([tb,lb])=>(
+        {[["ficha","📋 Ficha"],["eventos","📅 Eventos"],["bonos","💰 Bonos"],["epp","🦺 EPP"],["resumen","📊 Resumen"]].map(([tb,lb])=>(
           <button key={tb} className={`tab${tab===tb?" on":""}`} onClick={()=>setTab(tb)}>{lb}</button>
         ))}
       </div>
@@ -6145,6 +6147,70 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
           </div>
         </div>
       )}
+
+      {tab==="epp"&&(()=>{
+        const misEntregas = (Array.isArray(eppEntregas)?eppEntregas:[]).filter(e=>String(e.trabajadorId)===String(t.id));
+        const misVidaUtil = (Array.isArray(eppVidaUtil)?eppVidaUtil:[]).filter(e=>String(e.trabajadorId)===String(t.id));
+        const misFiltros = (Array.isArray(eppFiltros)?eppFiltros:[]).filter(e=>String(e.trabajadorId)===String(t.id));
+        const misFitTests = (Array.isArray(eppFitTests)?eppFitTests:[]).filter(e=>String(e.trabajadorId)===String(t.id));
+        const calcEstadoLocal = (fechaLimite, umbral) => {
+          const hoyD=new Date(); hoyD.setHours(0,0,0,0);
+          const diffDias = Math.ceil((new Date(fechaLimite)-hoyD)/(1000*60*60*24));
+          if(diffDias<0) return "vencido"; if(diffDias<=umbral) return "por_vencer"; return "vigente";
+        };
+        const colorEst = {vigente:"#4ade80", por_vencer:"#fbbf24", vencido:"#ef4444", fuera_de_servicio:"#6b7280"};
+        const labelEst = {vigente:"Vigente", por_vencer:"Por vencer", vencido:"Vencido", fuera_de_servicio:"Fuera de servicio"};
+        return (
+          <div className="ein" style={{display:"flex",flexDirection:"column",gap:14}}>
+            <div style={{...S.card,padding:16}}>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#38bdf8",marginBottom:10}}>📦 EPP entregados ({misEntregas.length})</div>
+              {misEntregas.length===0?<div style={{fontSize:12,color:"#4a7a5a"}}>Sin entregas registradas.</div>:
+                misEntregas.map(e=>(
+                  <div key={e.id} style={{fontSize:12,padding:"6px 0",borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+                    <strong>{e.tipo}</strong> · {e.fechaEntrega} · {e.labor||"—"} · cant. {e.cantidad} {e.firmaRecepcion?"· ✓ firmado":""}
+                  </div>
+                ))
+              }
+            </div>
+            <div style={{...S.card,padding:16}}>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#38bdf8",marginBottom:10}}>⏳ EPP crítico (vida útil) ({misVidaUtil.length})</div>
+              {misVidaUtil.length===0?<div style={{fontSize:12,color:"#4a7a5a"}}>Sin equipos asignados.</div>:
+                misVidaUtil.map(eq=>{
+                  const est = eq.estado==="fuera_de_servicio"?"fuera_de_servicio":calcEstadoLocal(eq.fechaRenovacion,60);
+                  return (
+                    <div key={eq.id} style={{fontSize:12,padding:"6px 0",borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+                      <strong>{eq.tipoEpp}</strong> · renueva {eq.fechaRenovacion} · <span style={{color:colorEst[est]}}>{labelEst[est]}</span>
+                    </div>
+                  );
+                })
+              }
+            </div>
+            <div style={{...S.card,padding:16}}>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#38bdf8",marginBottom:10}}>🌬️ Filtros de respirador ({misFiltros.length})</div>
+              {misFiltros.length===0?<div style={{fontSize:12,color:"#4a7a5a"}}>Sin filtros asignados.</div>:
+                misFiltros.map(f=>{
+                  const est = f.estado==="fuera_de_servicio"?"fuera_de_servicio":calcEstadoLocal(f.fechaVencimiento,7);
+                  return (
+                    <div key={f.id} style={{fontSize:12,padding:"6px 0",borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+                      <strong>{f.tipoFiltro}</strong> · vence {f.fechaVencimiento} · <span style={{color:colorEst[est]}}>{labelEst[est]}</span>
+                    </div>
+                  );
+                })
+              }
+            </div>
+            <div style={{...S.card,padding:16}}>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#38bdf8",marginBottom:10}}>😮‍💨 Fit test de respirador ({misFitTests.length})</div>
+              {misFitTests.length===0?<div style={{fontSize:12,color:"#4a7a5a"}}>Sin fit test registrado.</div>:
+                misFitTests.map(ft=>(
+                  <div key={ft.id} style={{fontSize:12,padding:"6px 0",borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+                    {ft.fechaFitTest} · <span style={{color:ft.resultado==="aprobado"?"#4ade80":"#ef4444"}}>{ft.resultado==="aprobado"?"Aprobado":"No aprobado"}</span> · próximo {ft.proximoFitTest}
+                  </div>
+                ))
+              }
+            </div>
+          </div>
+        );
+      })()}
 
       {tab==="resumen"&&(
         <div className="ein">
@@ -7869,7 +7935,44 @@ const BODEGAS_DEF = [
     categorias:["Documentos","Equipos informáticos","Material de oficina","EPP y uniformes","Archivo","Llaves y accesos","Otro"],
     tareasTipo:["Inventario","Orden y limpieza","Archivo","Revisión equipos","Recepción"],
   },
+  { id:"b08", nombre:"EPP", icono:"🦺", color:"#38bdf8",
+    descripcion:"Programa de Protección Personal — entrega, control y trazabilidad de EPP por agente de riesgo",
+    categorias:[],
+    tareasTipo:[],
+    esEPP:true,
+  },
 ];
+
+// Programa de Protección Personal (EPP) — catálogo por agente de riesgo (EC-087533)
+const AGENTES_RIESGO_EPP = [
+  { id:"ruido", label:"Ruido", presencia:"Motosierras, desmalezadoras, sopladoras, cortacésped",
+    epp:["Protección auditiva tipo copa","Protección auditiva tipo tapón","Copa integrada en casco forestal (motosierra)"] },
+  { id:"vibracion", label:"Vibración mano-brazo", presencia:"Motosierra, desmalezadora, herramientas motorizadas",
+    epp:["Guantes antivibración certificados"] },
+  { id:"polvo", label:"Polvo / material particulado", presencia:"Desmalezado, soplado de hojas, corte en seco",
+    epp:["Mascarilla/respirador filtro partículas P95","Mascarilla/respirador filtro partículas P100","Lentes de seguridad"] },
+  { id:"silice", label:"Sílice", presencia:"Movimiento de tierra, mezclas con arena",
+    epp:["Respirador con filtro específico sílice"] },
+  { id:"quimico", label:"Agentes químicos (fitosanitarios, fertilizantes)", presencia:"Aplicación de plaguicidas, herbicidas, fungicidas",
+    epp:["Respirador filtro químico (media cara)","Respirador filtro químico (cara completa)","Traje desechable","Guantes de nitrilo","Guantes de PVC","Antiparras herméticas"] },
+  { id:"uv", label:"Radiación UV / exposición térmica", presencia:"Trabajo prolongado a la intemperie",
+    epp:["Bloqueador solar","Gorro de ala ancha","Casco con protección de cuello","Ropa manga larga liviana"] },
+  { id:"corte", label:"Riesgo de corte", presencia:"Motosierra, tijeras de poda, herramientas de corte",
+    epp:["Guantes anticorte","Pantalón/polainas anticorte","Calzado de seguridad"] },
+  { id:"altura", label:"Caída de altura", presencia:"Poda y manejo arbóreo en altura",
+    epp:["Arnés de cuerpo completo","Cabos de posicionamiento","Casco con barbiquejo","Línea de vida certificada"] },
+  { id:"ergonomico", label:"Riesgo ergonómico (posturas, carga manual)", presencia:"Uso prolongado de herramientas, carga de materiales",
+    epp:[], sinEppFisico:true, medidas:"Herramientas ergonómicas cuando sea posible, rotación de tareas, capacitación en manejo manual de carga" },
+  { id:"golpes", label:"Golpes / atrapamiento", presencia:"Uso de trituradoras, maquinaria con partes móviles",
+    epp:["Guantes reforzados","Calzado de seguridad","Resguardos de máquina"] },
+];
+// Lista plana de todos los tipos de EPP físicos (para selects), con su agente de riesgo asociado
+const TIPOS_EPP_FLAT = AGENTES_RIESGO_EPP.flatMap(a=>(a.epp||[]).map(tipo=>({tipo, agente:a.id, agenteLabel:a.label})));
+// Tipos de EPP que son "críticos no desechables" (requieren control de vida útil, no solo entrega)
+const EPP_VIDA_UTIL_TIPOS = ["Arnés de cuerpo completo","Cabos de posicionamiento","Casco con barbiquejo","Línea de vida certificada","Casco forestal","Copa integrada en casco forestal (motosierra)"];
+// Tipos de EPP con filtro reemplazable (requieren control de vencimiento del filtro)
+const EPP_FILTRO_TIPOS = ["Respirador filtro químico (media cara)","Respirador filtro químico (cara completa)","Mascarilla/respirador filtro partículas P95","Mascarilla/respirador filtro partículas P100","Respirador con filtro específico sílice"];
+
 const ESTADOS_MOV = {
   entrada:   {color:"#22c55e", label:"📥 Entrada"},
   salida:    {color:"#ef4444", label:"📤 Salida"},
@@ -13411,7 +13514,10 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
 }
 
 // ─── PANEL BODEGAS ───────────────────────────────────────────────────────────
-function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareasProg, setTareasProg, compras=[] }) {
+function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLectura=false, rolLogueado="", currentUserId="", tareasProg, setTareasProg, compras=[], crearNotificacion=()=>{},
+  eppEntregas=[], setEppEntregas=()=>{}, eppFiltros=[], setEppFiltros=()=>{}, eppVidaUtil=[], setEppVidaUtil=()=>{},
+  eppInspecciones=[], setEppInspecciones=()=>{}, eppFitTests=[], setEppFitTests=()=>{}, eppDisposiciones=[], setEppDisposiciones=()=>{}
+} ) {
   const hoy = fechaLocal();
   const [bodegaActiva, setBodegaActiva] = React.useState("b01");
   const [subTab, setSubTab] = React.useState("stock");
@@ -13458,6 +13564,119 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
   };
 
   const bodega = BODEGAS_DEF.find(b=>b.id===bodegaActiva);
+
+  // ══════════════ EPP — estados de formularios (nivel superior, sin condicionales) ══════════════
+  const puedeGestionarEPP = esJefa; // Jefa/Programador (ya viene con esJefa&&!soloLectura desde arriba)
+  const puedeRegistrarBasicoEPP = esJefa || rolLogueado==="supervisor";
+  const personalArrEpp = Array.isArray(personal)?personal:Object.values(personal||{});
+
+  const emptyEntregaEpp = {trabajadorId:"",tipo:"",agente:"",labor:"",cantidad:1,talla:"",proveedor:"",observaciones:""};
+  const [formEntregaEpp, setFormEntregaEpp] = React.useState(emptyEntregaEpp);
+  const [showEntregaEppForm, setShowEntregaEppForm] = React.useState(false);
+
+  const emptyFiltroEpp = {trabajadorId:"",tipoFiltro:"",productoAsociado:"",fechaApertura:hoy,vidaUtilDias:30};
+  const [formFiltroEpp, setFormFiltroEpp] = React.useState(emptyFiltroEpp);
+  const [showFiltroEppForm, setShowFiltroEppForm] = React.useState(false);
+
+  const emptyVidaUtilEpp = {trabajadorId:"",tipoEpp:"",fechaFabricacion:hoy,vidaUtilAnios:5};
+  const [formVidaUtilEpp, setFormVidaUtilEpp] = React.useState(emptyVidaUtilEpp);
+  const [showVidaUtilEppForm, setShowVidaUtilEppForm] = React.useState(false);
+
+  const emptyInspeccionEpp = {tipoEppRef:"vidaUtil",eppRef:"",trabajadorId:"",tipoInspeccion:"diaria",resultado:"conforme",hallazgo:"",medidaCorrectiva:""};
+  const [formInspeccionEpp, setFormInspeccionEpp] = React.useState(emptyInspeccionEpp);
+  const [showInspeccionEppForm, setShowInspeccionEppForm] = React.useState(false);
+
+  const emptyFitTestEpp = {trabajadorId:"",tipoRespirador:"media_cara",resultado:"aprobado",observaciones:""};
+  const [formFitTestEpp, setFormFitTestEpp] = React.useState(emptyFitTestEpp);
+  const [showFitTestEppForm, setShowFitTestEppForm] = React.useState(false);
+
+  const emptyDisposicionEpp = {tipoEppRef:"vidaUtil",eppRef:"",trabajadorId:"",motivo:"vencimiento",metodoDisposicion:"",esResiduoPeligroso:false,observaciones:""};
+  const [formDisposicionEpp, setFormDisposicionEpp] = React.useState(emptyDisposicionEpp);
+  const [showDisposicionEppForm, setShowDisposicionEppForm] = React.useState(false);
+  // ══════════════ EPP — helpers y funciones de guardado ══════════════
+  const calcEstadoFecha = (fechaLimite, umbralDias) => {
+    const hoyD = new Date(); hoyD.setHours(0,0,0,0);
+    const lim = new Date(fechaLimite);
+    const diffDias = Math.ceil((lim-hoyD)/(1000*60*60*24));
+    if(diffDias<0) return "vencido";
+    if(diffDias<=umbralDias) return "por_vencer";
+    return "vigente";
+  };
+  const ESTADO_EPP_COLOR = {vigente:"#4ade80", por_vencer:"#fbbf24", vencido:"#ef4444", fuera_de_servicio:"#6b7280"};
+  const ESTADO_EPP_LABEL = {vigente:"Vigente", por_vencer:"Por vencer", vencido:"Vencido", fuera_de_servicio:"Fuera de servicio"};
+
+  const guardarEntregaEpp = () => {
+    if(!formEntregaEpp.trabajadorId||!formEntregaEpp.tipo){ alert("Selecciona trabajador y tipo de EPP."); return; }
+    const nueva = {...formEntregaEpp, id:Date.now()+Math.random(), fechaEntrega:hoy, firmaRecepcion:false, registradoPor:currentUserId};
+    setEppEntregas([nueva, ...(Array.isArray(eppEntregas)?eppEntregas:[])]);
+    setFormEntregaEpp(emptyEntregaEpp); setShowEntregaEppForm(false);
+  };
+  const marcarFirmaEntrega = (id) => {
+    setEppEntregas((Array.isArray(eppEntregas)?eppEntregas:[]).map(e=>e.id===id?{...e,firmaRecepcion:true,fechaFirma:hoy}:e));
+  };
+
+  const guardarFiltroEpp = () => {
+    if(!formFiltroEpp.trabajadorId||!formFiltroEpp.tipoFiltro){ alert("Selecciona trabajador y tipo de filtro."); return; }
+    const fApertura = new Date(formFiltroEpp.fechaApertura);
+    const fVenc = new Date(fApertura); fVenc.setDate(fVenc.getDate()+Number(formFiltroEpp.vidaUtilDias||30));
+    const fechaVencimiento = fVenc.toISOString().slice(0,10);
+    const nuevo = {...formFiltroEpp, id:Date.now()+Math.random(), fechaVencimiento, alertaEnviada:false, registradoPor:currentUserId};
+    setEppFiltros([nuevo, ...(Array.isArray(eppFiltros)?eppFiltros:[])]);
+    setFormFiltroEpp(emptyFiltroEpp); setShowFiltroEppForm(false);
+  };
+
+  const guardarVidaUtilEpp = () => {
+    if(!formVidaUtilEpp.trabajadorId||!formVidaUtilEpp.tipoEpp){ alert("Selecciona trabajador y tipo de EPP."); return; }
+    const fFab = new Date(formVidaUtilEpp.fechaFabricacion);
+    const fRenov = new Date(fFab); fRenov.setFullYear(fRenov.getFullYear()+Number(formVidaUtilEpp.vidaUtilAnios||5));
+    const fechaRenovacion = fRenov.toISOString().slice(0,10);
+    const nuevo = {...formVidaUtilEpp, id:Date.now()+Math.random(), fechaRenovacion, estado:"vigente", alertaEnviada:false, ultimaInspeccionId:null, registradoPor:currentUserId};
+    setEppVidaUtil([nuevo, ...(Array.isArray(eppVidaUtil)?eppVidaUtil:[])]);
+    setFormVidaUtilEpp(emptyVidaUtilEpp); setShowVidaUtilEppForm(false);
+  };
+
+  const equiposVidaUtilDisponibles = (Array.isArray(eppVidaUtil)?eppVidaUtil:[]).filter(e=>e.estado!=="fuera_de_servicio");
+  const filtrosDisponibles = (Array.isArray(eppFiltros)?eppFiltros:[]).filter(f=>f.estado!=="fuera_de_servicio");
+
+  const guardarInspeccionEpp = () => {
+    if(!formInspeccionEpp.eppRef||!formInspeccionEpp.trabajadorId){ alert("Selecciona el equipo y el trabajador."); return; }
+    if(formInspeccionEpp.resultado==="hallazgo"&&!formInspeccionEpp.hallazgo){ alert("Describe el hallazgo detectado."); return; }
+    const nueva = {...formInspeccionEpp, id:Date.now()+Math.random(), fechaInspeccion:hoy,
+      hallazgo:formInspeccionEpp.resultado==="hallazgo"?formInspeccionEpp.hallazgo:null,
+      medidaCorrectiva:formInspeccionEpp.resultado==="hallazgo"?formInspeccionEpp.medidaCorrectiva:null,
+      responsableId:currentUserId};
+    setEppInspecciones([nueva, ...(Array.isArray(eppInspecciones)?eppInspecciones:[])]);
+    if(formInspeccionEpp.tipoEppRef==="vidaUtil"){
+      setEppVidaUtil((Array.isArray(eppVidaUtil)?eppVidaUtil:[]).map(e=>e.id===formInspeccionEpp.eppRef?{...e,ultimaInspeccionId:nueva.id}:e));
+    }
+    if(formInspeccionEpp.resultado==="hallazgo"){
+      crearNotificacion("hallazgo_inspeccion_epp",{mensaje:`⚠️ Hallazgo EPP: ${formInspeccionEpp.hallazgo}`});
+    }
+    setFormInspeccionEpp(emptyInspeccionEpp); setShowInspeccionEppForm(false);
+  };
+
+  const guardarFitTestEpp = () => {
+    if(!formFitTestEpp.trabajadorId){ alert("Selecciona el trabajador."); return; }
+    const fFT = new Date(); const fProx = new Date(fFT); fProx.setMonth(fProx.getMonth()+12);
+    const nuevo = {...formFitTestEpp, id:Date.now()+Math.random(), fechaFitTest:hoy, proximoFitTest:fProx.toISOString().slice(0,10), responsableId:currentUserId};
+    setEppFitTests([nuevo, ...(Array.isArray(eppFitTests)?eppFitTests:[])]);
+    setFormFitTestEpp(emptyFitTestEpp); setShowFitTestEppForm(false);
+  };
+
+  const guardarDisposicionEpp = () => {
+    if(!formDisposicionEpp.eppRef||!formDisposicionEpp.trabajadorId||!formDisposicionEpp.metodoDisposicion.trim()){ alert("Completa equipo, trabajador y método de disposición."); return; }
+    const origen = formDisposicionEpp.tipoEppRef==="vidaUtil" ? equiposVidaUtilDisponibles.find(e=>e.id===formDisposicionEpp.eppRef) : filtrosDisponibles.find(f=>f.id===formDisposicionEpp.eppRef);
+    const nueva = {...formDisposicionEpp, id:Date.now()+Math.random(), tipoEpp:origen?(origen.tipoEpp||origen.tipoFiltro):"", fechaDisposicion:hoy, responsableId:currentUserId};
+    setEppDisposiciones([nueva, ...(Array.isArray(eppDisposiciones)?eppDisposiciones:[])]);
+    if(formDisposicionEpp.tipoEppRef==="vidaUtil"){
+      setEppVidaUtil((Array.isArray(eppVidaUtil)?eppVidaUtil:[]).map(e=>e.id===formDisposicionEpp.eppRef?{...e,estado:"fuera_de_servicio"}:e));
+    } else {
+      setEppFiltros((Array.isArray(eppFiltros)?eppFiltros:[]).map(f=>f.id===formDisposicionEpp.eppRef?{...f,estado:"fuera_de_servicio"}:f));
+    }
+    setFormDisposicionEpp(emptyDisposicionEpp); setShowDisposicionEppForm(false);
+  };
+  // ══════════════════════════════════════════════════════════════════════
+
   const bd = bodegasData[bodegaActiva]||{items:[],movimientos:[],tareas:[],traslados:[]};
   const setbd = (patch) => setBodegasData(p=>({...p,[bodegaActiva]:{...bd,...patch}}));
 
@@ -13553,7 +13772,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
           const bajo=(bd2.items||[]).some(i=>Number(i.stockActual||0)<=Number(i.stockMinimo||0)&&Number(i.stockMinimo||0)>0);
           const traslP=(bd2.traslados||[]).some(t=>t.conRegreso&&t.estado==="en_camino");
           return (
-            <button key={b.id} onClick={()=>{setBodegaActiva(b.id);setSubTab("stock");}}
+            <button key={b.id} onClick={()=>{setBodegaActiva(b.id);setSubTab(b.id==="b08"?"epp_entregas":"stock");}}
               style={{position:"relative",background:bodegaActiva===b.id?`${b.color}22`:"rgba(255,255,255,0.05)",border:`1px solid ${bodegaActiva===b.id?b.color+"60":"rgba(255,255,255,0.1)"}`,borderRadius:10,padding:"8px 14px",color:bodegaActiva===b.id?b.color:"#7aaa80",fontFamily:"'Georgia',serif",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
               <span style={{fontSize:16}}>{b.icono}</span><span>{b.nombre}</span>
               {(bajo||traslP)&&<span style={{width:7,height:7,borderRadius:"50%",background:"#ef4444",flexShrink:0}}/>}
@@ -13586,13 +13805,425 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, tareas
 
       {/* Sub-tabs */}
       <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
-        {[["stock","📦 Stock"],["movimientos","🔄 Movimientos"],["traslados","🚛 Traslados"],["tareas","✅ Tareas"],["historial","📜 Historial"],
+        {(bodegaActiva==="b08" ? [
+          ["epp_entregas","📦 Entregas"],["epp_filtros","🌬️ Filtros"],["epp_vidautil","⏳ Vida útil"],
+          ["epp_inspecciones","🔍 Inspecciones"],["epp_fittest","😮‍💨 Fit test"],["epp_disposicion","🗑️ Disposición final"],["epp_catalogo","📖 Catálogo de riesgos"],
+        ] : [["stock","📦 Stock"],["movimientos","🔄 Movimientos"],["traslados","🚛 Traslados"],["tareas","✅ Tareas"],["historial","📜 Historial"],
           ...(bodegaActiva==="b05"?[["hojas_seguridad","🛡️ Hojas de Seguridad"]]:[]),
           ...(bodegaActiva==="b04"?[["horometro","⏱️ Horómetro"],["repuestos","🔩 Repuestos"]]:[]),
-        ].map(([t,l])=>(
+        ]).map(([t,l])=>(
           <button key={t} className={`tab${subTab===t?" on":""}`} onClick={()=>setSubTab(t)}>{l}</button>
         ))}
       </div>
+
+      {/* ══════════════ BODEGA EPP ══════════════ */}
+      {bodegaActiva==="b08"&&subTab==="epp_entregas"&&(
+        <div className="ein">
+          {puedeRegistrarBasicoEPP&&<button className="btn-p" style={{...S.btn,marginBottom:14}} onClick={()=>{setFormEntregaEpp(emptyEntregaEpp);setShowEntregaEppForm(p=>!p);}}>➕ Registrar entrega</button>}
+          {showEntregaEppForm&&(
+            <div style={{...S.card,padding:18,marginBottom:14}} className="ein">
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#38bdf8",marginBottom:12}}>➕ Nueva entrega de EPP</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <div><label style={labelSt}>Trabajador</label>
+                  <select style={S.input} value={formEntregaEpp.trabajadorId} onChange={e=>setFormEntregaEpp(p=>({...p,trabajadorId:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    {personalArrEpp.map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}
+                  </select>
+                </div>
+                <div><label style={labelSt}>Tipo de EPP</label>
+                  <select style={S.input} value={formEntregaEpp.tipo} onChange={e=>{
+                    const sel=TIPOS_EPP_FLAT.find(t=>t.tipo===e.target.value);
+                    setFormEntregaEpp(p=>({...p,tipo:e.target.value,agente:sel?sel.agente:""}));
+                  }}>
+                    <option value="">Seleccionar...</option>
+                    {AGENTES_RIESGO_EPP.filter(a=>!a.sinEppFisico).map(a=>(
+                      <optgroup key={a.id} label={a.label}>
+                        {a.epp.map(tipo=><option key={tipo} value={tipo}>{tipo}</option>)}
+                      </optgroup>
+                    ))}
+                  </select>
+                </div>
+                <div><label style={labelSt}>Labor asociada</label><input style={S.input} value={formEntregaEpp.labor} onChange={e=>setFormEntregaEpp(p=>({...p,labor:e.target.value}))}/></div>
+                <div><label style={labelSt}>Cantidad</label><input type="number" min={1} style={S.input} value={formEntregaEpp.cantidad} onChange={e=>setFormEntregaEpp(p=>({...p,cantidad:e.target.value}))}/></div>
+                <div><label style={labelSt}>Talla (opcional)</label><input style={S.input} value={formEntregaEpp.talla} onChange={e=>setFormEntregaEpp(p=>({...p,talla:e.target.value}))}/></div>
+                <div><label style={labelSt}>Proveedor</label><input style={S.input} value={formEntregaEpp.proveedor} onChange={e=>setFormEntregaEpp(p=>({...p,proveedor:e.target.value}))}/></div>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observaciones</label><textarea style={{...S.input,minHeight:60}} value={formEntregaEpp.observaciones} onChange={e=>setFormEntregaEpp(p=>({...p,observaciones:e.target.value}))}/></div>
+              </div>
+              <div style={{display:"flex",gap:8,marginTop:14}}>
+                <button className="btn-p" style={S.btn} onClick={guardarEntregaEpp}>✓ Guardar</button>
+                <button className="btn-g" style={S.btn} onClick={()=>setShowEntregaEppForm(false)}>Cancelar</button>
+              </div>
+            </div>
+          )}
+          <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+              <thead><tr style={{color:"#6aaa7a",textAlign:"left"}}>
+                <th style={{padding:"6px 8px"}}>Fecha</th><th style={{padding:"6px 8px"}}>Trabajador</th><th style={{padding:"6px 8px"}}>EPP</th>
+                <th style={{padding:"6px 8px"}}>Labor</th><th style={{padding:"6px 8px"}}>Cant.</th><th style={{padding:"6px 8px"}}>Firma</th>
+              </tr></thead>
+              <tbody>
+                {(Array.isArray(eppEntregas)?eppEntregas:[]).map(e=>{
+                  const trab = personalArrEpp.find(p=>String(p.id)===String(e.trabajadorId));
+                  return (
+                    <tr key={e.id} style={{borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+                      <td style={{padding:"6px 8px"}}>{e.fechaEntrega}</td>
+                      <td style={{padding:"6px 8px"}}>{trab?.nombre||"—"}</td>
+                      <td style={{padding:"6px 8px"}}>{e.tipo}</td>
+                      <td style={{padding:"6px 8px"}}>{e.labor}</td>
+                      <td style={{padding:"6px 8px"}}>{e.cantidad}</td>
+                      <td style={{padding:"6px 8px"}}>{e.firmaRecepcion?"✓":(puedeRegistrarBasicoEPP?<button className="btn-g" style={{...S.btn,fontSize:10,padding:"3px 8px"}} onClick={()=>marcarFirmaEntrega(e.id)}>Marcar firmada</button>:"—")}</td>
+                    </tr>
+                  );
+                })}
+                {(Array.isArray(eppEntregas)?eppEntregas:[]).length===0&&<tr><td colSpan={6} style={{padding:14,textAlign:"center",color:"#4a7a5a"}}>Sin entregas registradas.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {bodegaActiva==="b08"&&subTab==="epp_filtros"&&(
+        <div className="ein">
+          {puedeRegistrarBasicoEPP&&<button className="btn-p" style={{...S.btn,marginBottom:14}} onClick={()=>{setFormFiltroEpp(emptyFiltroEpp);setShowFiltroEppForm(p=>!p);}}>➕ Registrar filtro</button>}
+          {showFiltroEppForm&&(
+            <div style={{...S.card,padding:18,marginBottom:14}} className="ein">
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#38bdf8",marginBottom:12}}>➕ Nuevo filtro de respirador</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <div><label style={labelSt}>Trabajador</label>
+                  <select style={S.input} value={formFiltroEpp.trabajadorId} onChange={e=>setFormFiltroEpp(p=>({...p,trabajadorId:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    {personalArrEpp.map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}
+                  </select>
+                </div>
+                <div><label style={labelSt}>Tipo de filtro</label>
+                  <select style={S.input} value={formFiltroEpp.tipoFiltro} onChange={e=>setFormFiltroEpp(p=>({...p,tipoFiltro:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    {EPP_FILTRO_TIPOS.map(t=><option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div><label style={labelSt}>Producto fitosanitario asociado (si aplica)</label><input style={S.input} value={formFiltroEpp.productoAsociado} onChange={e=>setFormFiltroEpp(p=>({...p,productoAsociado:e.target.value}))}/></div>
+                <div><label style={labelSt}>Fecha de apertura</label><input type="date" style={S.input} value={formFiltroEpp.fechaApertura} onChange={e=>setFormFiltroEpp(p=>({...p,fechaApertura:e.target.value}))}/></div>
+                <div><label style={labelSt}>Vida útil desde apertura (días)</label><input type="number" min={1} style={S.input} value={formFiltroEpp.vidaUtilDias} onChange={e=>setFormFiltroEpp(p=>({...p,vidaUtilDias:e.target.value}))}/></div>
+              </div>
+              <div style={{display:"flex",gap:8,marginTop:14}}>
+                <button className="btn-p" style={S.btn} onClick={guardarFiltroEpp}>✓ Guardar</button>
+                <button className="btn-g" style={S.btn} onClick={()=>setShowFiltroEppForm(false)}>Cancelar</button>
+              </div>
+            </div>
+          )}
+          <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+              <thead><tr style={{color:"#6aaa7a",textAlign:"left"}}>
+                <th style={{padding:"6px 8px"}}>Trabajador</th><th style={{padding:"6px 8px"}}>Filtro</th><th style={{padding:"6px 8px"}}>Producto</th>
+                <th style={{padding:"6px 8px"}}>Apertura</th><th style={{padding:"6px 8px"}}>Vencimiento</th><th style={{padding:"6px 8px"}}>Estado</th>
+              </tr></thead>
+              <tbody>
+                {(Array.isArray(eppFiltros)?eppFiltros:[]).map(f=>{
+                  const trab = personalArrEpp.find(p=>String(p.id)===String(f.trabajadorId));
+                  const est = f.estado==="fuera_de_servicio"?"fuera_de_servicio":calcEstadoFecha(f.fechaVencimiento,7);
+                  return (
+                    <tr key={f.id} style={{borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+                      <td style={{padding:"6px 8px"}}>{trab?.nombre||"—"}</td>
+                      <td style={{padding:"6px 8px"}}>{f.tipoFiltro}</td>
+                      <td style={{padding:"6px 8px"}}>{f.productoAsociado||"—"}</td>
+                      <td style={{padding:"6px 8px"}}>{f.fechaApertura}</td>
+                      <td style={{padding:"6px 8px"}}>{f.fechaVencimiento}</td>
+                      <td style={{padding:"6px 8px",color:ESTADO_EPP_COLOR[est]}}>{ESTADO_EPP_LABEL[est]}</td>
+                    </tr>
+                  );
+                })}
+                {(Array.isArray(eppFiltros)?eppFiltros:[]).length===0&&<tr><td colSpan={6} style={{padding:14,textAlign:"center",color:"#4a7a5a"}}>Sin filtros registrados.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {bodegaActiva==="b08"&&subTab==="epp_vidautil"&&(
+        <div className="ein">
+          {puedeGestionarEPP&&<button className="btn-p" style={{...S.btn,marginBottom:14}} onClick={()=>{setFormVidaUtilEpp(emptyVidaUtilEpp);setShowVidaUtilEppForm(p=>!p);}}>➕ Registrar equipo</button>}
+          {showVidaUtilEppForm&&(
+            <div style={{...S.card,padding:18,marginBottom:14}} className="ein">
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#38bdf8",marginBottom:12}}>➕ Nuevo EPP crítico (vida útil)</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <div><label style={labelSt}>Trabajador asignado</label>
+                  <select style={S.input} value={formVidaUtilEpp.trabajadorId} onChange={e=>setFormVidaUtilEpp(p=>({...p,trabajadorId:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    {personalArrEpp.map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}
+                  </select>
+                </div>
+                <div><label style={labelSt}>Tipo de EPP</label>
+                  <select style={S.input} value={formVidaUtilEpp.tipoEpp} onChange={e=>setFormVidaUtilEpp(p=>({...p,tipoEpp:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    {EPP_VIDA_UTIL_TIPOS.map(t=><option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div><label style={labelSt}>Fecha de fabricación</label><input type="date" style={S.input} value={formVidaUtilEpp.fechaFabricacion} onChange={e=>setFormVidaUtilEpp(p=>({...p,fechaFabricacion:e.target.value}))}/></div>
+                <div><label style={labelSt}>Vida útil (años)</label><input type="number" min={1} style={S.input} value={formVidaUtilEpp.vidaUtilAnios} onChange={e=>setFormVidaUtilEpp(p=>({...p,vidaUtilAnios:e.target.value}))}/></div>
+              </div>
+              <div style={{display:"flex",gap:8,marginTop:14}}>
+                <button className="btn-p" style={S.btn} onClick={guardarVidaUtilEpp}>✓ Guardar</button>
+                <button className="btn-g" style={S.btn} onClick={()=>setShowVidaUtilEppForm(false)}>Cancelar</button>
+              </div>
+            </div>
+          )}
+          <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+              <thead><tr style={{color:"#6aaa7a",textAlign:"left"}}>
+                <th style={{padding:"6px 8px"}}>Trabajador</th><th style={{padding:"6px 8px"}}>EPP</th><th style={{padding:"6px 8px"}}>Fabricación</th>
+                <th style={{padding:"6px 8px"}}>Renovación</th><th style={{padding:"6px 8px"}}>Estado</th>
+              </tr></thead>
+              <tbody>
+                {(Array.isArray(eppVidaUtil)?eppVidaUtil:[]).map(eq=>{
+                  const trab = personalArrEpp.find(p=>String(p.id)===String(eq.trabajadorId));
+                  const est = eq.estado==="fuera_de_servicio"?"fuera_de_servicio":calcEstadoFecha(eq.fechaRenovacion,60);
+                  return (
+                    <tr key={eq.id} style={{borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+                      <td style={{padding:"6px 8px"}}>{trab?.nombre||"—"}</td>
+                      <td style={{padding:"6px 8px"}}>{eq.tipoEpp}</td>
+                      <td style={{padding:"6px 8px"}}>{eq.fechaFabricacion}</td>
+                      <td style={{padding:"6px 8px"}}>{eq.fechaRenovacion}</td>
+                      <td style={{padding:"6px 8px",color:ESTADO_EPP_COLOR[est]}}>{ESTADO_EPP_LABEL[est]}</td>
+                    </tr>
+                  );
+                })}
+                {(Array.isArray(eppVidaUtil)?eppVidaUtil:[]).length===0&&<tr><td colSpan={5} style={{padding:14,textAlign:"center",color:"#4a7a5a"}}>Sin equipos registrados.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {bodegaActiva==="b08"&&subTab==="epp_inspecciones"&&(
+        <div className="ein">
+          {puedeRegistrarBasicoEPP&&<button className="btn-p" style={{...S.btn,marginBottom:14}} onClick={()=>{setFormInspeccionEpp(emptyInspeccionEpp);setShowInspeccionEppForm(p=>!p);}}>➕ Registrar inspección</button>}
+          {showInspeccionEppForm&&(
+            <div style={{...S.card,padding:18,marginBottom:14}} className="ein">
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#38bdf8",marginBottom:12}}>➕ Nueva inspección</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <div><label style={labelSt}>Tipo de EPP a inspeccionar</label>
+                  <select style={S.input} value={formInspeccionEpp.tipoEppRef} onChange={e=>setFormInspeccionEpp(p=>({...p,tipoEppRef:e.target.value,eppRef:""}))}>
+                    <option value="vidaUtil">EPP crítico (arnés, casco, etc.)</option>
+                    <option value="filtro">Filtro de respirador</option>
+                  </select>
+                </div>
+                <div><label style={labelSt}>Equipo</label>
+                  <select style={S.input} value={formInspeccionEpp.eppRef} onChange={e=>setFormInspeccionEpp(p=>({...p,eppRef:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    {(formInspeccionEpp.tipoEppRef==="vidaUtil"?equiposVidaUtilDisponibles:filtrosDisponibles).map(eq=>{
+                      const trab = personalArrEpp.find(p=>String(p.id)===String(eq.trabajadorId));
+                      return <option key={eq.id} value={eq.id}>{(eq.tipoEpp||eq.tipoFiltro)} — {trab?.nombre||"?"}</option>;
+                    })}
+                  </select>
+                </div>
+                <div><label style={labelSt}>Trabajador</label>
+                  <select style={S.input} value={formInspeccionEpp.trabajadorId} onChange={e=>setFormInspeccionEpp(p=>({...p,trabajadorId:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    {personalArrEpp.map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}
+                  </select>
+                </div>
+                <div><label style={labelSt}>Tipo de inspección</label>
+                  <select style={S.input} value={formInspeccionEpp.tipoInspeccion} onChange={e=>setFormInspeccionEpp(p=>({...p,tipoInspeccion:e.target.value}))}>
+                    <option value="diaria">Autoinspección diaria</option>
+                    <option value="periodica">Inspección periódica (supervisor)</option>
+                  </select>
+                </div>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Resultado</label>
+                  <select style={S.input} value={formInspeccionEpp.resultado} onChange={e=>setFormInspeccionEpp(p=>({...p,resultado:e.target.value}))}>
+                    <option value="conforme">Conforme</option>
+                    <option value="hallazgo">Hallazgo</option>
+                  </select>
+                </div>
+                {formInspeccionEpp.resultado==="hallazgo"&&(<>
+                  <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Describe el hallazgo</label><textarea style={{...S.input,minHeight:60}} value={formInspeccionEpp.hallazgo} onChange={e=>setFormInspeccionEpp(p=>({...p,hallazgo:e.target.value}))}/></div>
+                  <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Medida correctiva</label><textarea style={{...S.input,minHeight:60}} value={formInspeccionEpp.medidaCorrectiva} onChange={e=>setFormInspeccionEpp(p=>({...p,medidaCorrectiva:e.target.value}))}/></div>
+                </>)}
+              </div>
+              <div style={{display:"flex",gap:8,marginTop:14}}>
+                <button className="btn-p" style={S.btn} onClick={guardarInspeccionEpp}>✓ Guardar</button>
+                <button className="btn-g" style={S.btn} onClick={()=>setShowInspeccionEppForm(false)}>Cancelar</button>
+              </div>
+            </div>
+          )}
+          <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+              <thead><tr style={{color:"#6aaa7a",textAlign:"left"}}>
+                <th style={{padding:"6px 8px"}}>Fecha</th><th style={{padding:"6px 8px"}}>Trabajador</th><th style={{padding:"6px 8px"}}>Tipo</th>
+                <th style={{padding:"6px 8px"}}>Resultado</th><th style={{padding:"6px 8px"}}>Hallazgo</th>
+              </tr></thead>
+              <tbody>
+                {(Array.isArray(eppInspecciones)?eppInspecciones:[]).map(insp=>{
+                  const trab = personalArrEpp.find(p=>String(p.id)===String(insp.trabajadorId));
+                  return (
+                    <tr key={insp.id} style={{borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+                      <td style={{padding:"6px 8px"}}>{insp.fechaInspeccion}</td>
+                      <td style={{padding:"6px 8px"}}>{trab?.nombre||"—"}</td>
+                      <td style={{padding:"6px 8px"}}>{insp.tipoInspeccion==="diaria"?"Diaria":"Periódica"}</td>
+                      <td style={{padding:"6px 8px",color:insp.resultado==="hallazgo"?"#fbbf24":"#4ade80"}}>{insp.resultado==="conforme"?"Conforme":"Hallazgo"}</td>
+                      <td style={{padding:"6px 8px"}}>{insp.hallazgo||"—"}</td>
+                    </tr>
+                  );
+                })}
+                {(Array.isArray(eppInspecciones)?eppInspecciones:[]).length===0&&<tr><td colSpan={5} style={{padding:14,textAlign:"center",color:"#4a7a5a"}}>Sin inspecciones registradas.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {bodegaActiva==="b08"&&subTab==="epp_fittest"&&(
+        <div className="ein">
+          {puedeRegistrarBasicoEPP&&<button className="btn-p" style={{...S.btn,marginBottom:14}} onClick={()=>{setFormFitTestEpp(emptyFitTestEpp);setShowFitTestEppForm(p=>!p);}}>➕ Registrar fit test</button>}
+          {showFitTestEppForm&&(
+            <div style={{...S.card,padding:18,marginBottom:14}} className="ein">
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#38bdf8",marginBottom:12}}>➕ Nuevo fit test de respirador</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <div><label style={labelSt}>Trabajador</label>
+                  <select style={S.input} value={formFitTestEpp.trabajadorId} onChange={e=>setFormFitTestEpp(p=>({...p,trabajadorId:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    {personalArrEpp.map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}
+                  </select>
+                </div>
+                <div><label style={labelSt}>Tipo de respirador</label>
+                  <select style={S.input} value={formFitTestEpp.tipoRespirador} onChange={e=>setFormFitTestEpp(p=>({...p,tipoRespirador:e.target.value}))}>
+                    <option value="media_cara">Media cara</option>
+                    <option value="cara_completa">Cara completa</option>
+                  </select>
+                </div>
+                <div><label style={labelSt}>Resultado</label>
+                  <select style={S.input} value={formFitTestEpp.resultado} onChange={e=>setFormFitTestEpp(p=>({...p,resultado:e.target.value}))}>
+                    <option value="aprobado">Aprobado</option>
+                    <option value="no_aprobado">No aprobado</option>
+                  </select>
+                </div>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observaciones (modelo/talla)</label><textarea style={{...S.input,minHeight:60}} value={formFitTestEpp.observaciones} onChange={e=>setFormFitTestEpp(p=>({...p,observaciones:e.target.value}))}/></div>
+              </div>
+              <div style={{display:"flex",gap:8,marginTop:14}}>
+                <button className="btn-p" style={S.btn} onClick={guardarFitTestEpp}>✓ Guardar</button>
+                <button className="btn-g" style={S.btn} onClick={()=>setShowFitTestEppForm(false)}>Cancelar</button>
+              </div>
+            </div>
+          )}
+          <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+              <thead><tr style={{color:"#6aaa7a",textAlign:"left"}}>
+                <th style={{padding:"6px 8px"}}>Trabajador</th><th style={{padding:"6px 8px"}}>Tipo</th><th style={{padding:"6px 8px"}}>Fecha</th>
+                <th style={{padding:"6px 8px"}}>Resultado</th><th style={{padding:"6px 8px"}}>Próximo</th>
+              </tr></thead>
+              <tbody>
+                {(Array.isArray(eppFitTests)?eppFitTests:[]).map(ft=>{
+                  const trab = personalArrEpp.find(p=>String(p.id)===String(ft.trabajadorId));
+                  return (
+                    <tr key={ft.id} style={{borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+                      <td style={{padding:"6px 8px"}}>{trab?.nombre||"—"}</td>
+                      <td style={{padding:"6px 8px"}}>{ft.tipoRespirador==="media_cara"?"Media cara":"Cara completa"}</td>
+                      <td style={{padding:"6px 8px"}}>{ft.fechaFitTest}</td>
+                      <td style={{padding:"6px 8px",color:ft.resultado==="aprobado"?"#4ade80":"#ef4444"}}>{ft.resultado==="aprobado"?"Aprobado":"No aprobado"}</td>
+                      <td style={{padding:"6px 8px"}}>{ft.proximoFitTest}</td>
+                    </tr>
+                  );
+                })}
+                {(Array.isArray(eppFitTests)?eppFitTests:[]).length===0&&<tr><td colSpan={5} style={{padding:14,textAlign:"center",color:"#4a7a5a"}}>Sin fit tests registrados.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {bodegaActiva==="b08"&&subTab==="epp_disposicion"&&(
+        <div className="ein">
+          {puedeGestionarEPP&&<button className="btn-p" style={{...S.btn,marginBottom:14}} onClick={()=>{setFormDisposicionEpp(emptyDisposicionEpp);setShowDisposicionEppForm(p=>!p);}}>➕ Registrar disposición final</button>}
+          {showDisposicionEppForm&&(
+            <div style={{...S.card,padding:18,marginBottom:14}} className="ein">
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#38bdf8",marginBottom:12}}>➕ Nueva disposición final</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <div><label style={labelSt}>Tipo de EPP</label>
+                  <select style={S.input} value={formDisposicionEpp.tipoEppRef} onChange={e=>setFormDisposicionEpp(p=>({...p,tipoEppRef:e.target.value,eppRef:""}))}>
+                    <option value="vidaUtil">EPP crítico (arnés, casco, etc.)</option>
+                    <option value="filtro">Filtro de respirador</option>
+                  </select>
+                </div>
+                <div><label style={labelSt}>Equipo a dar de baja</label>
+                  <select style={S.input} value={formDisposicionEpp.eppRef} onChange={e=>setFormDisposicionEpp(p=>({...p,eppRef:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    {(formDisposicionEpp.tipoEppRef==="vidaUtil"?equiposVidaUtilDisponibles:filtrosDisponibles).map(eq=>{
+                      const trab = personalArrEpp.find(p=>String(p.id)===String(eq.trabajadorId));
+                      return <option key={eq.id} value={eq.id}>{(eq.tipoEpp||eq.tipoFiltro)} — {trab?.nombre||"?"}</option>;
+                    })}
+                  </select>
+                </div>
+                <div><label style={labelSt}>Trabajador asociado</label>
+                  <select style={S.input} value={formDisposicionEpp.trabajadorId} onChange={e=>setFormDisposicionEpp(p=>({...p,trabajadorId:e.target.value}))}>
+                    <option value="">Seleccionar...</option>
+                    {personalArrEpp.map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}
+                  </select>
+                </div>
+                <div><label style={labelSt}>Motivo</label>
+                  <select style={S.input} value={formDisposicionEpp.motivo} onChange={e=>setFormDisposicionEpp(p=>({...p,motivo:e.target.value}))}>
+                    <option value="vencimiento">Vencimiento de vida útil</option>
+                    <option value="dano">Daño o deterioro</option>
+                    <option value="incidente">Incidente (caída/impacto)</option>
+                    <option value="hallazgo_inspeccion">Hallazgo en inspección</option>
+                  </select>
+                </div>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Método de disposición</label><input style={S.input} value={formDisposicionEpp.metodoDisposicion} onChange={e=>setFormDisposicionEpp(p=>({...p,metodoDisposicion:e.target.value}))}/></div>
+                <div style={{gridColumn:"1/-1",display:"flex",alignItems:"center",gap:8}}>
+                  <input type="checkbox" checked={formDisposicionEpp.esResiduoPeligroso} onChange={e=>setFormDisposicionEpp(p=>({...p,esResiduoPeligroso:e.target.checked}))}/>
+                  <label style={{fontSize:12,color:"#8aba9a"}}>Es residuo peligroso</label>
+                </div>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observaciones</label><textarea style={{...S.input,minHeight:60}} value={formDisposicionEpp.observaciones} onChange={e=>setFormDisposicionEpp(p=>({...p,observaciones:e.target.value}))}/></div>
+              </div>
+              <div style={{display:"flex",gap:8,marginTop:14}}>
+                <button className="btn-p" style={S.btn} onClick={guardarDisposicionEpp}>✓ Guardar</button>
+                <button className="btn-g" style={S.btn} onClick={()=>setShowDisposicionEppForm(false)}>Cancelar</button>
+              </div>
+            </div>
+          )}
+          <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+              <thead><tr style={{color:"#6aaa7a",textAlign:"left"}}>
+                <th style={{padding:"6px 8px"}}>Fecha</th><th style={{padding:"6px 8px"}}>Trabajador</th><th style={{padding:"6px 8px"}}>EPP</th>
+                <th style={{padding:"6px 8px"}}>Motivo</th><th style={{padding:"6px 8px"}}>Método</th><th style={{padding:"6px 8px"}}>Residuo pelig.</th>
+              </tr></thead>
+              <tbody>
+                {(Array.isArray(eppDisposiciones)?eppDisposiciones:[]).map(d=>{
+                  const trab = personalArrEpp.find(p=>String(p.id)===String(d.trabajadorId));
+                  const motivoLabel={vencimiento:"Vencimiento",dano:"Daño/deterioro",incidente:"Incidente",hallazgo_inspeccion:"Hallazgo inspección"}[d.motivo]||d.motivo;
+                  return (
+                    <tr key={d.id} style={{borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+                      <td style={{padding:"6px 8px"}}>{d.fechaDisposicion}</td>
+                      <td style={{padding:"6px 8px"}}>{trab?.nombre||"—"}</td>
+                      <td style={{padding:"6px 8px"}}>{d.tipoEpp}</td>
+                      <td style={{padding:"6px 8px"}}>{motivoLabel}</td>
+                      <td style={{padding:"6px 8px"}}>{d.metodoDisposicion}</td>
+                      <td style={{padding:"6px 8px"}}>{d.esResiduoPeligroso?"Sí":"No"}</td>
+                    </tr>
+                  );
+                })}
+                {(Array.isArray(eppDisposiciones)?eppDisposiciones:[]).length===0&&<tr><td colSpan={6} style={{padding:14,textAlign:"center",color:"#4a7a5a"}}>Sin disposiciones registradas.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {bodegaActiva==="b08"&&subTab==="epp_catalogo"&&(
+        <div className="ein" style={{display:"flex",flexDirection:"column",gap:10}}>
+          {AGENTES_RIESGO_EPP.map(a=>(
+            <div key={a.id} style={{...S.card,padding:16}}>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,color:"#38bdf8",marginBottom:4}}>{a.label}</div>
+              <div style={{fontSize:12,color:"#8aba9a",marginBottom:8}}>Presencia: {a.presencia}</div>
+              {a.sinEppFisico ? (
+                <div style={{fontSize:12,color:"#fbbf24"}}>Sin EPP físico asociado — medidas de control: {a.medidas}</div>
+              ) : (
+                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                  {a.epp.map(tipo=><span key={tipo} style={{fontSize:11,padding:"4px 10px",borderRadius:20,background:"rgba(56,189,248,0.1)",color:"#7dd3fc",border:"1px solid rgba(56,189,248,0.25)"}}>{tipo}</span>)}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ── STOCK ── */}
       {subTab==="stock"&&(
@@ -18990,6 +19621,14 @@ export default function App() {
   },[zonas,macrozonasCust,data]);
   const [personal, setPersonal, personalReady] = useFirebaseState("personal", PERSONAL_INICIAL);
   const [pinesSupervisor, setPinesSupervisor] = useFirebaseState("pines_supervisor", {});
+
+  // ── Programa de Protección Personal (EPP) — bodega "EPP" ──
+  const [eppEntregas, setEppEntregas] = useFirebaseState("epp_entregas", []);
+  const [eppFiltros, setEppFiltros] = useFirebaseState("epp_filtros", []);
+  const [eppVidaUtil, setEppVidaUtil] = useFirebaseState("epp_vida_util", []);
+  const [eppInspecciones, setEppInspecciones] = useFirebaseState("epp_inspecciones", []);
+  const [eppFitTests, setEppFitTests] = useFirebaseState("epp_fit_tests", []);
+  const [eppDisposiciones, setEppDisposiciones] = useFirebaseState("epp_disposiciones", []);
   const [tareasProg,     setTareasProg,     progReady]     = useFirebaseState("prog",           {});
   const [stockFito, setStockFito]  = useFirebaseState("fung-stock", {});
   const [aplicaciones,   setAplicaciones,   aplReady]      = useFirebaseState("fungicidas",     []);
@@ -21310,7 +21949,14 @@ export default function App() {
 
         {/* BODEGAS */}
         {vista==="bodegas"&&(
-          <PanelBodegas S={S} bodegasData={bodegasData} setBodegasData={setBodegasData} personal={personal} esJefa={esJefa&&!soloLectura} tareasProg={tareasProg} setTareasProg={setTareasProg} compras={comprasData?.compras||[]} />
+          <PanelBodegas S={S} bodegasData={bodegasData} setBodegasData={setBodegasData} personal={personal} esJefa={esJefa&&!soloLectura} soloLectura={soloLectura} rolLogueado={rolLogueado} currentUserId={fbUser?.uid||workerLogueado||"desconocido"} tareasProg={tareasProg} setTareasProg={setTareasProg} compras={comprasData?.compras||[]} crearNotificacion={crearNotificacion}
+            eppEntregas={eppEntregas} setEppEntregas={setEppEntregas}
+            eppFiltros={eppFiltros} setEppFiltros={setEppFiltros}
+            eppVidaUtil={eppVidaUtil} setEppVidaUtil={setEppVidaUtil}
+            eppInspecciones={eppInspecciones} setEppInspecciones={setEppInspecciones}
+            eppFitTests={eppFitTests} setEppFitTests={setEppFitTests}
+            eppDisposiciones={eppDisposiciones} setEppDisposiciones={setEppDisposiciones}
+          />
         )}
 
         
@@ -21529,6 +22175,7 @@ export default function App() {
             onAddEvento={(ev)=>addEvento(personalId,ev)}
             onDeleteEvento={(eid)=>deleteEvento(personalId,eid)}
             onUpdateEvento={(eid,patch)=>setPersonal(p=>(Array.isArray(p)?p:Object.values(p||{})).map(t=>t.id===personalId?{...t,eventos:(t.eventos||[]).map(e=>e.id===eid?{...e,...patch}:e)}:t))}
+            eppEntregas={eppEntregas} eppFiltros={eppFiltros} eppVidaUtil={eppVidaUtil} eppFitTests={eppFitTests}
           />
         )}
 
