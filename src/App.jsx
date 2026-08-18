@@ -13636,6 +13636,82 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
   const marcarFirmaEntrega = (id) => {
     setEppEntregas((Array.isArray(eppEntregas)?eppEntregas:[]).map(e=>e.id===id?{...e,firmaRecepcion:true,fechaFirma:hoy}:e));
   };
+  const eliminarEntregaEpp = (id) => {
+    if(!window.confirm("¿Eliminar esta entrega de EPP? Esta acción no se puede deshacer.")) return;
+    setEppEntregas((Array.isArray(eppEntregas)?eppEntregas:[]).filter(e=>e.id!==id));
+  };
+  const imprimirEntregaEpp = (e) => {
+    const trab = personalArrEpp.find(p=>String(p.id)===String(e.trabajadorId));
+    const fechaHoy = new Date().toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"});
+    const fechaEnt = e.fechaEntrega ? new Date(e.fechaEntrega+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"}) : e.fechaEntrega;
+    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+    <title>Comprobante entrega EPP — ${trab?.nombre||"—"}</title>
+    <style>
+      body{font-family:Arial,sans-serif;margin:0;color:#1a1a1a;font-size:13px}
+      .pagina{padding:30px;max-width:700px;margin:0 auto}
+      h1{font-size:17px;color:#1a5c2a;margin:0 0 3px}
+      h2{font-size:12px;color:#444;margin:0;font-weight:normal}
+      .hdr{display:flex;justify-content:space-between;border-bottom:2px solid #1a5c2a;padding-bottom:10px;margin-bottom:16px}
+      table{width:100%;border-collapse:collapse;margin-bottom:18px}
+      td{padding:8px 10px;border:1px solid #ddd;font-size:13px}
+      td.lbl{background:#f8f9fa;font-weight:700;color:#555;width:38%}
+      @media print{.noprint{display:none}}
+    </style></head><body>
+    <div class="pagina">
+      <div class="hdr">
+        <div>
+          <h1>Comprobante de Entrega de EPP</h1>
+          <h2>Programa de Protección Personal · Departamento de Áreas Verdes</h2>
+          <h2>Estadio Español de Las Condes</h2>
+        </div>
+        <div style="text-align:right;font-size:12px;color:#555">
+          <div>Fecha entrega: <strong>${fechaEnt}</strong></div>
+          <div>Emisión: <strong>${fechaHoy}</strong></div>
+        </div>
+      </div>
+      <table>
+        <tr><td class="lbl">Trabajador</td><td>${trab?.nombre||"—"}</td></tr>
+        <tr><td class="lbl">Cargo</td><td>${trab?.cargo||"—"}</td></tr>
+        <tr><td class="lbl">EPP entregado</td><td><strong>${e.tipo}</strong></td></tr>
+        <tr><td class="lbl">Agente de riesgo asociado</td><td>${AGENTES_RIESGO_EPP.find(a=>a.id===e.agente)?.label||"—"}</td></tr>
+        <tr><td class="lbl">Modelo</td><td>${e.modelo||"—"}</td></tr>
+        <tr><td class="lbl">Registro ISP</td><td>${e.registroISP||"—"}</td></tr>
+        <tr><td class="lbl">Talla</td><td>${e.talla||"—"}</td></tr>
+        <tr><td class="lbl">Cantidad</td><td>${e.cantidad}</td></tr>
+        <tr><td class="lbl">Labor asociada</td><td>${e.labor||"—"}</td></tr>
+        <tr><td class="lbl">Proveedor</td><td>${e.proveedor||"—"}</td></tr>
+        <tr><td class="lbl">Observaciones</td><td>${e.observaciones||"—"}</td></tr>
+      </table>
+      <div style="background:#fff8e1;border:1px solid #f57f17;border-radius:8px;padding:14px;margin-bottom:30px;font-size:12px;color:#555">
+        Declaro haber recibido el Elemento de Protección Personal (EPP) descrito arriba, en buen estado y con las instrucciones
+        de uso, mantención y vida útil correspondientes. Me comprometo a utilizarlo en las labores para las que fue destinado
+        y a informar de inmediato cualquier daño, deterioro o pérdida.
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:50px">
+        <div style="text-align:center">
+          <div style="border-top:1px solid #333;padding-top:8px;margin-top:40px;font-size:12px">
+            <strong>${trab?.nombre||"—"}</strong><br>RUT: ${trab?.rut||"___________________"}<br>Firma trabajador y fecha recepción
+          </div>
+        </div>
+        <div style="text-align:center">
+          <div style="border-top:1px solid #333;padding-top:8px;margin-top:40px;font-size:12px">
+            <strong>Carmen Luz Hermosilla Diez</strong><br>Jefe Dpto. de Áreas Verdes<br>Responsable entrega
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:20px;padding-top:8px;border-top:1px solid #ccc;font-size:10px;color:#888;text-align:center">
+        Estadio Español de Las Condes · Departamento de Áreas Verdes · Programa de Protección Personal
+      </div>
+    </div>
+    <div class="noprint" style="text-align:center;padding:20px;background:#f5f5f5">
+      <button onclick="window.print()" style="background:#1a5c2a;color:#fff;border:none;padding:10px 28px;border-radius:7px;font-size:13px;cursor:pointer">🖨️ Imprimir / Guardar PDF</button>
+    </div>
+    </body></html>`;
+    const blob = new Blob([html], {type:"text/html;charset=utf-8"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href=url; a.target="_blank"; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url), 5000);
+  };
 
   const guardarFiltroEpp = () => {
     if(!formFiltroEpp.trabajadorId||!formFiltroEpp.tipoFiltro){ alert("Selecciona trabajador y tipo de filtro."); return; }
@@ -13914,7 +13990,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
               <thead><tr style={{color:"#6aaa7a",textAlign:"left"}}>
                 <th style={{padding:"6px 8px"}}>Fecha</th><th style={{padding:"6px 8px"}}>Trabajador</th><th style={{padding:"6px 8px"}}>EPP</th><th style={{padding:"6px 8px"}}>Modelo</th>
-                <th style={{padding:"6px 8px"}}>Labor</th><th style={{padding:"6px 8px"}}>Cant.</th><th style={{padding:"6px 8px"}}>Firma</th>
+                <th style={{padding:"6px 8px"}}>Labor</th><th style={{padding:"6px 8px"}}>Cant.</th><th style={{padding:"6px 8px"}}>Firma</th><th style={{padding:"6px 8px"}}></th>
               </tr></thead>
               <tbody>
                 {(Array.isArray(eppEntregas)?eppEntregas:[]).filter(e=>!e.borrador).map(e=>{
@@ -13928,10 +14004,14 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                       <td style={{padding:"6px 8px"}}>{e.labor}</td>
                       <td style={{padding:"6px 8px"}}>{e.cantidad}</td>
                       <td style={{padding:"6px 8px"}}>{e.firmaRecepcion?"✓":(puedeRegistrarBasicoEPP?<button className="btn-g" style={{...S.btn,fontSize:10,padding:"3px 8px"}} onClick={()=>marcarFirmaEntrega(e.id)}>Marcar firmada</button>:"—")}</td>
+                      <td style={{padding:"6px 8px",whiteSpace:"nowrap"}}>
+                        <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 8px",marginRight:4}} onClick={()=>imprimirEntregaEpp(e)} title="Imprimir comprobante para firma">🖨️</button>
+                        {puedeRegistrarBasicoEPP&&<button style={{...S.btn,fontSize:11,padding:"4px 8px",background:"rgba(239,68,68,0.1)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.25)"}} onClick={()=>eliminarEntregaEpp(e.id)} title="Eliminar (deshacer)">🗑️</button>}
+                      </td>
                     </tr>
                   );
                 })}
-                {(Array.isArray(eppEntregas)?eppEntregas:[]).filter(e=>!e.borrador).length===0&&<tr><td colSpan={7} style={{padding:14,textAlign:"center",color:"#4a7a5a"}}>Sin entregas registradas.</td></tr>}
+                {(Array.isArray(eppEntregas)?eppEntregas:[]).filter(e=>!e.borrador).length===0&&<tr><td colSpan={8} style={{padding:14,textAlign:"center",color:"#4a7a5a"}}>Sin entregas registradas.</td></tr>}
               </tbody>
             </table>
           </div>
