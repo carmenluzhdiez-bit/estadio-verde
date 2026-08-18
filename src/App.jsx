@@ -6165,11 +6165,15 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
             <div style={{...S.card,padding:16}}>
               <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#38bdf8",marginBottom:10}}>📦 EPP entregados ({misEntregas.length})</div>
               {misEntregas.length===0?<div style={{fontSize:12,color:"#4a7a5a"}}>Sin entregas registradas.</div>:
-                misEntregas.map(e=>(
-                  <div key={e.id} style={{fontSize:12,padding:"6px 0",borderTop:"1px solid rgba(255,255,255,0.06)"}}>
-                    <strong>{e.tipo}</strong> · {e.fechaEntrega} · {e.labor||"—"} · cant. {e.cantidad} {e.firmaRecepcion?"· ✓ firmado":""}
-                  </div>
-                ))
+                misEntregas.map(e=>{
+                  const estVenc = e.fechaVencimiento?calcEstadoLocal(e.fechaVencimiento,7):null;
+                  return (
+                    <div key={e.id} style={{fontSize:12,padding:"6px 0",borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+                      <strong>{e.tipo}</strong> · {e.fechaEntrega} · {e.labor||"—"} · cant. {e.cantidad} {e.firmaRecepcion?"· ✓ firmado":""}
+                      {e.fechaVencimiento&&<span style={{color:colorEst[estVenc]}}> · vence {e.fechaVencimiento} ({labelEst[estVenc]})</span>}
+                    </div>
+                  );
+                })
               }
             </div>
             <div style={{...S.card,padding:16}}>
@@ -13592,7 +13596,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
   const puedeRegistrarBasicoEPP = esJefa || rolLogueado==="supervisor";
   const personalArrEpp = Array.isArray(personal)?personal:Object.values(personal||{});
 
-  const emptyEntregaEpp = {trabajadorId:"",tipo:"",agente:"",labor:"",cantidad:1,talla:"",modelo:"",registroISP:"",proveedor:"",fechaEntrega:hoy,observaciones:""};
+  const emptyEntregaEpp = {trabajadorId:"",tipo:"",agente:"",labor:"",cantidad:1,talla:"",modelo:"",registroISP:"",proveedor:"",fechaEntrega:hoy,fechaVencimiento:"",observaciones:""};
   const [formEntregaEpp, setFormEntregaEpp] = React.useState(emptyEntregaEpp);
   const [showEntregaEppForm, setShowEntregaEppForm] = React.useState(false);
 
@@ -13676,6 +13680,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
         <tr><td class="lbl">Agente de riesgo asociado</td><td>${AGENTES_RIESGO_EPP.find(a=>a.id===e.agente)?.label||"—"}</td></tr>
         <tr><td class="lbl">Modelo</td><td>${e.modelo||"—"}</td></tr>
         <tr><td class="lbl">Registro ISP</td><td>${e.registroISP||"—"}</td></tr>
+        <tr><td class="lbl">Fecha de vencimiento</td><td>${e.fechaVencimiento||"—"}</td></tr>
         <tr><td class="lbl">Talla</td><td>${e.talla||"—"}</td></tr>
         <tr><td class="lbl">Cantidad</td><td>${e.cantidad}</td></tr>
         <tr><td class="lbl">Labor asociada</td><td>${e.labor||"—"}</td></tr>
@@ -13961,7 +13966,16 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                 <div><label style={labelSt}>Tipo de EPP</label>
                   <select style={S.input} value={formEntregaEpp.tipo} onChange={e=>{
                     const sel=TIPOS_EPP_FLAT.find(t=>t.tipo===e.target.value);
-                    setFormEntregaEpp(p=>({...p,tipo:e.target.value,agente:sel?sel.agente:""}));
+                    const esFiltro = EPP_FILTRO_TIPOS.includes(e.target.value);
+                    setFormEntregaEpp(p=>{
+                      let fVenc = p.fechaVencimiento;
+                      if(esFiltro && !fVenc) {
+                        const base = new Date((p.fechaEntrega||hoy)+"T12:00:00");
+                        base.setDate(base.getDate()+30);
+                        fVenc = base.toISOString().slice(0,10);
+                      }
+                      return {...p,tipo:e.target.value,agente:sel?sel.agente:"",fechaVencimiento:fVenc};
+                    });
                   }}>
                     <option value="" style={{background:"#1a3a22",color:"#6aaa7a"}}>Seleccionar...</option>
                     {AGENTES_RIESGO_EPP.filter(a=>!a.sinEppFisico).map(a=>(
@@ -13977,6 +13991,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                 <div><label style={labelSt}>Talla (opcional)</label><input style={S.input} value={formEntregaEpp.talla} onChange={e=>setFormEntregaEpp(p=>({...p,talla:e.target.value}))}/></div>
                 <div><label style={labelSt}>Modelo</label><input style={S.input} placeholder="ej: 3M 6200" value={formEntregaEpp.modelo} onChange={e=>setFormEntregaEpp(p=>({...p,modelo:e.target.value}))}/></div>
                 <div><label style={labelSt}>Registro ISP</label><input style={S.input} placeholder="N° de registro sanitario ISP" value={formEntregaEpp.registroISP} onChange={e=>setFormEntregaEpp(p=>({...p,registroISP:e.target.value}))}/></div>
+                <div><label style={labelSt}>Fecha de vencimiento (opcional)</label><input type="date" style={S.input} value={formEntregaEpp.fechaVencimiento} onChange={e=>setFormEntregaEpp(p=>({...p,fechaVencimiento:e.target.value}))}/></div>
                 <div><label style={labelSt}>Proveedor</label><input style={S.input} value={formEntregaEpp.proveedor} onChange={e=>setFormEntregaEpp(p=>({...p,proveedor:e.target.value}))}/></div>
                 <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observaciones</label><textarea style={{...S.input,minHeight:60}} value={formEntregaEpp.observaciones} onChange={e=>setFormEntregaEpp(p=>({...p,observaciones:e.target.value}))}/></div>
               </div>
@@ -13990,11 +14005,12 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
               <thead><tr style={{color:"#6aaa7a",textAlign:"left"}}>
                 <th style={{padding:"6px 8px"}}>Fecha</th><th style={{padding:"6px 8px"}}>Trabajador</th><th style={{padding:"6px 8px"}}>EPP</th><th style={{padding:"6px 8px"}}>Modelo</th>
-                <th style={{padding:"6px 8px"}}>Labor</th><th style={{padding:"6px 8px"}}>Cant.</th><th style={{padding:"6px 8px"}}>Firma</th><th style={{padding:"6px 8px"}}></th>
+                <th style={{padding:"6px 8px"}}>Labor</th><th style={{padding:"6px 8px"}}>Cant.</th><th style={{padding:"6px 8px"}}>Vencimiento</th><th style={{padding:"6px 8px"}}>Firma</th><th style={{padding:"6px 8px"}}></th>
               </tr></thead>
               <tbody>
                 {(Array.isArray(eppEntregas)?eppEntregas:[]).filter(e=>!e.borrador).map(e=>{
                   const trab = personalArrEpp.find(p=>String(p.id)===String(e.trabajadorId));
+                  const estVenc = e.fechaVencimiento?calcEstadoFecha(e.fechaVencimiento,7):null;
                   return (
                     <tr key={e.id} style={{borderTop:"1px solid rgba(255,255,255,0.06)"}}>
                       <td style={{padding:"6px 8px"}}>{e.fechaEntrega}</td>
@@ -14003,6 +14019,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                       <td style={{padding:"6px 8px"}}>{e.modelo||"—"}{e.registroISP?<div style={{fontSize:10,color:"#6aaa7a"}}>ISP: {e.registroISP}</div>:null}</td>
                       <td style={{padding:"6px 8px"}}>{e.labor}</td>
                       <td style={{padding:"6px 8px"}}>{e.cantidad}</td>
+                      <td style={{padding:"6px 8px",color:estVenc?ESTADO_EPP_COLOR[estVenc]:"#4a7a5a"}}>{e.fechaVencimiento?`${e.fechaVencimiento} · ${ESTADO_EPP_LABEL[estVenc]}`:"—"}</td>
                       <td style={{padding:"6px 8px"}}>{e.firmaRecepcion?"✓":(puedeRegistrarBasicoEPP?<button className="btn-g" style={{...S.btn,fontSize:10,padding:"3px 8px"}} onClick={()=>marcarFirmaEntrega(e.id)}>Marcar firmada</button>:"—")}</td>
                       <td style={{padding:"6px 8px",whiteSpace:"nowrap"}}>
                         <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 8px",marginRight:4}} onClick={()=>imprimirEntregaEpp(e)} title="Imprimir comprobante para firma">🖨️</button>
@@ -14011,7 +14028,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                     </tr>
                   );
                 })}
-                {(Array.isArray(eppEntregas)?eppEntregas:[]).filter(e=>!e.borrador).length===0&&<tr><td colSpan={8} style={{padding:14,textAlign:"center",color:"#4a7a5a"}}>Sin entregas registradas.</td></tr>}
+                {(Array.isArray(eppEntregas)?eppEntregas:[]).filter(e=>!e.borrador).length===0&&<tr><td colSpan={9} style={{padding:14,textAlign:"center",color:"#4a7a5a"}}>Sin entregas registradas.</td></tr>}
               </tbody>
             </table>
           </div>
