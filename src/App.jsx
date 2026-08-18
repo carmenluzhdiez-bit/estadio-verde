@@ -6149,7 +6149,7 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
       )}
 
       {tab==="epp"&&(()=>{
-        const misEntregas = (Array.isArray(eppEntregas)?eppEntregas:[]).filter(e=>String(e.trabajadorId)===String(t.id));
+        const misEntregas = (Array.isArray(eppEntregas)?eppEntregas:[]).filter(e=>String(e.trabajadorId)===String(t.id)&&!e.borrador);
         const misVidaUtil = (Array.isArray(eppVidaUtil)?eppVidaUtil:[]).filter(e=>String(e.trabajadorId)===String(t.id));
         const misFiltros = (Array.isArray(eppFiltros)?eppFiltros:[]).filter(e=>String(e.trabajadorId)===String(t.id));
         const misFitTests = (Array.isArray(eppFitTests)?eppFitTests:[]).filter(e=>String(e.trabajadorId)===String(t.id));
@@ -7968,6 +7968,9 @@ const AGENTES_RIESGO_EPP = [
 ];
 // Lista plana de todos los tipos de EPP físicos (para selects), con su agente de riesgo asociado
 const TIPOS_EPP_FLAT = AGENTES_RIESGO_EPP.flatMap(a=>(a.epp||[]).map(tipo=>({tipo, agente:a.id, agenteLabel:a.label})));
+// Rellenar las categorías de la bodega EPP con el catálogo de tipos de EPP,
+// para que el selector "Categoría en bodega" de Compras funcione con esta bodega.
+{ const bodEPP = BODEGAS_DEF.find(b=>b.id==="b08"); if(bodEPP) bodEPP.categorias = TIPOS_EPP_FLAT.map(t=>t.tipo); }
 // Tipos de EPP que son "críticos no desechables" (requieren control de vida útil, no solo entrega)
 const EPP_VIDA_UTIL_TIPOS = ["Arnés de cuerpo completo","Cabos de posicionamiento","Casco con barbiquejo","Línea de vida certificada","Casco forestal","Copa integrada en casco forestal (motosierra)"];
 // Tipos de EPP con filtro reemplazable (requieren control de vencimiento del filtro)
@@ -8093,18 +8096,37 @@ function BodegaSelector({ items, compra, onConfirm, onCancel, S, bodegasData={} 
   );
 }
 
-function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={}, updateZona=()=>{}, MACROZONAS_BASE=[], bodegasData={}, setBodegasData=()=>{} }) {
+function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={}, updateZona=()=>{}, MACROZONAS_BASE=[], bodegasData={}, setBodegasData=()=>{}, eppEntregas=[], setEppEntregas=()=>{} }) {
   const { compras, rendiciones=[], fondo=3000000, saldoAnterior=0, periodoAnterior="" } = comprasData;
   const set = (patch) => setComprasData(p=>({...p,...patch}));
 
   // ── Ingreso automático a bodega ───────────────────────────────────────────
   const ingresarItemsABodega = (docFecha, docRef, items, compraId) => {
     const porBodega = {};
+    const itemsEPP = [];
     items.forEach(it=>{
       if(!it.bodegaDestino||!it.descripcion?.trim()) return;
+      if(it.bodegaDestino==="b08") { itemsEPP.push(it); return; }
       if(!porBodega[it.bodegaDestino]) porBodega[it.bodegaDestino]=[];
       porBodega[it.bodegaDestino].push(it);
     });
+    // EPP no es stock genérico — crea un borrador de "Entrega EPP" pendiente de
+    // asignar a un trabajador específico, en vez de un ítem de inventario normal.
+    if(itemsEPP.length) {
+      const eppArr = Array.isArray(eppEntregas)?eppEntregas:[];
+      const nuevosBorradores = itemsEPP.filter(it=>
+        !eppArr.some(e=>e.docRef===docRef&&(e.tipo||e.descripcionCompra||"").toLowerCase()===it.descripcion.trim().toLowerCase())
+      ).map(it=>{
+        const matchTipo = TIPOS_EPP_FLAT.find(t=>t.tipo.toLowerCase()===it.categoriaBodega?.toLowerCase());
+        return {
+          id:Date.now()+Math.random(), trabajadorId:"", tipo:matchTipo?matchTipo.tipo:(it.categoriaBodega||""), agente:matchTipo?matchTipo.agente:"",
+          descripcionCompra:it.descripcion.trim(), labor:"", cantidad:Number(it.cantidad)||1, talla:"", modelo:"", registroISP:"",
+          proveedor:"", fechaEntrega:docFecha, observaciones:`Comprado — ${docRef}`, firmaRecepcion:false,
+          registradoPor:"compras", borrador:true, docRef,
+        };
+      });
+      if(nuevosBorradores.length) setEppEntregas([...nuevosBorradores, ...eppArr]);
+    }
     if(!Object.keys(porBodega).length) {
       // Igual guardar asignación aunque no haya bodegas (todo es servicio)
       if(compraId) set({compras:compras.map(compraC=>compraC.id===compraId?{...compraC,items:(compraC.items||[]).map((it,i)=>({...it,bodegaDestino:items[i]?.bodegaDestino||""}))}:compraC)});
@@ -13819,6 +13841,36 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
       {/* ══════════════ BODEGA EPP ══════════════ */}
       {bodegaActiva==="b08"&&subTab==="epp_entregas"&&(
         <div className="ein">
+          {/* Borradores pendientes de asignar, creados automáticamente desde Compras */}
+          {(Array.isArray(eppEntregas)?eppEntregas:[]).filter(e=>e.borrador).length>0&&(
+            <div style={{...S.card,padding:16,marginBottom:14,background:"rgba(251,191,36,0.06)",borderColor:"rgba(251,191,36,0.3)"}}>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#fbbf24",marginBottom:10}}>⏳ Pendientes de asignar (desde Compras)</div>
+              {(Array.isArray(eppEntregas)?eppEntregas:[]).filter(e=>e.borrador).map(e=>(
+                <div key={e.id} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",gap:8,alignItems:"center",padding:"8px 0",borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+                  <div style={{fontSize:12}}>{e.descripcionCompra}<div style={{fontSize:10,color:"#6aaa7a"}}>{e.observaciones}</div></div>
+                  <select style={{...S.input,fontSize:12,padding:"6px 8px"}} value={e.trabajadorId} onChange={ev=>setEppEntregas((Array.isArray(eppEntregas)?eppEntregas:[]).map(x=>x.id===e.id?{...x,trabajadorId:ev.target.value}:x))}>
+                    <option value="">Trabajador...</option>
+                    {personalArrEpp.map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}
+                  </select>
+                  <select style={{...S.input,fontSize:12,padding:"6px 8px"}} value={e.tipo} onChange={ev=>{
+                    const sel=TIPOS_EPP_FLAT.find(t=>t.tipo===ev.target.value);
+                    setEppEntregas((Array.isArray(eppEntregas)?eppEntregas:[]).map(x=>x.id===e.id?{...x,tipo:ev.target.value,agente:sel?sel.agente:""}:x));
+                  }}>
+                    <option value="">Tipo de EPP...</option>
+                    {AGENTES_RIESGO_EPP.filter(a=>!a.sinEppFisico).map(a=>(
+                      <optgroup key={a.id} label={a.label} style={{background:"#0d1f13",color:"#7dd3fc",fontWeight:700}}>
+                        {a.epp.map(tipo=><option key={tipo} value={tipo} style={{background:"#1a3a22",color:"#e8f5e9"}}>{tipo}</option>)}
+                      </optgroup>
+                    ))}
+                  </select>
+                  <button className="btn-p" style={{...S.btn,fontSize:11,padding:"6px 10px"}} disabled={!e.trabajadorId||!e.tipo}
+                    onClick={()=>setEppEntregas((Array.isArray(eppEntregas)?eppEntregas:[]).map(x=>x.id===e.id?{...x,borrador:false}:x))}>
+                    ✓ Confirmar
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
           {puedeRegistrarBasicoEPP&&<button className="btn-p" style={{...S.btn,marginBottom:14}} onClick={()=>{setFormEntregaEpp(emptyEntregaEpp);setShowEntregaEppForm(p=>!p);}}>➕ Registrar entrega</button>}
           {showEntregaEppForm&&(
             <div style={{...S.card,padding:18,marginBottom:14}} className="ein">
@@ -13865,7 +13917,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                 <th style={{padding:"6px 8px"}}>Labor</th><th style={{padding:"6px 8px"}}>Cant.</th><th style={{padding:"6px 8px"}}>Firma</th>
               </tr></thead>
               <tbody>
-                {(Array.isArray(eppEntregas)?eppEntregas:[]).map(e=>{
+                {(Array.isArray(eppEntregas)?eppEntregas:[]).filter(e=>!e.borrador).map(e=>{
                   const trab = personalArrEpp.find(p=>String(p.id)===String(e.trabajadorId));
                   return (
                     <tr key={e.id} style={{borderTop:"1px solid rgba(255,255,255,0.06)"}}>
@@ -13879,7 +13931,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                     </tr>
                   );
                 })}
-                {(Array.isArray(eppEntregas)?eppEntregas:[]).length===0&&<tr><td colSpan={7} style={{padding:14,textAlign:"center",color:"#4a7a5a"}}>Sin entregas registradas.</td></tr>}
+                {(Array.isArray(eppEntregas)?eppEntregas:[]).filter(e=>!e.borrador).length===0&&<tr><td colSpan={7} style={{padding:14,textAlign:"center",color:"#4a7a5a"}}>Sin entregas registradas.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -21937,7 +21989,7 @@ export default function App() {
 
         {/* COMPRAS */}
         {vista==="compras"&&(
-          <PanelCompras S={S} comprasData={comprasData} setComprasData={setComprasData} personal={personal} esJefa={esJefa&&!soloLectura} data={data} updateZona={updateZona} MACROZONAS_BASE={MACROZONAS_BASE} bodegasData={bodegasData} setBodegasData={setBodegasData} />
+          <PanelCompras S={S} comprasData={comprasData} setComprasData={setComprasData} personal={personal} esJefa={esJefa&&!soloLectura} data={data} updateZona={updateZona} MACROZONAS_BASE={MACROZONAS_BASE} bodegasData={bodegasData} setBodegasData={setBodegasData} eppEntregas={eppEntregas} setEppEntregas={setEppEntregas} />
         )}
 
         {/* GOLF */}
