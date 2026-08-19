@@ -8318,7 +8318,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
       const estadoLabel = compra.estado==="pagada"?"ya fue pagada por transferencia":compra.estado==="pagada_efectivo"?"ya fue pagada en efectivo":compra.estado==="rendida"?"ya fue rendida":"está en proceso de rendición";
       if(!window.confirm(`⚠️ Esta factura ${estadoLabel}. ¿Deseas marcarla como pagada de todas formas?`)) return;
     }
-    set({compras:compras.map(compraC=>compraC.id===id?{...compraC,estado:"pagada",formaPago:forma,fechaPago:c.fechaPago||hoy.toISOString().slice(0,10)}:compraC)});
+    set({compras:compras.map(compraC=>compraC.id===id?{...compraC,estado:"pagada",formaPago:forma,fechaPago:compra?.fechaPago||hoy.toISOString().slice(0,10)}:compraC)});
   };
 
   // ── Rendición ─────────────────────────────────────────────────────────────
@@ -8446,7 +8446,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     <div class="noprint" style="text-align:center;margin-top:18px">
       <button onclick="window.print()" style="background:#1a5c2a;color:#fff;border:none;padding:10px 28px;border-radius:7px;font-size:13px;cursor:pointer">Imprimir / Guardar PDF</button>
     </div></body></html>`;
-    const winC=window.open("","_blank"); winC.document.write(html); w.document.close();
+    const winC=window.open("","_blank"); winC.document.write(html); winC.document.close();
   };
   // Fondo disponible real = saldo anterior (si no hay reembolso pendiente → fondo base)
   // Si hay rendición pendiente de reembolso → el fondo real es el saldo anterior
@@ -8622,12 +8622,12 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                     const mesActual = new Date().toLocaleDateString("es-CL",{month:"long",year:"numeric"});
                     // Por cuenta con %
                     const filasCuenta = porCuenta.map(optC=>{
-                      const pct = totalGeneral?Math.round((c.total/totalGeneral)*100):0;
+                      const pct = totalGeneral?Math.round((optC.total/totalGeneral)*100):0;
                       return `<tr>
-                        <td style="padding:6px 10px;border:1px solid #e0e0e0">${c.cuenta}</td>
-                        <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:10px;color:#888">${CUENTAS_INTERNAS.includes(c.cuenta)?"Interna":"Externa"}</td>
-                        <td style="padding:6px 10px;border:1px solid #e0e0e0;text-align:center">${c.n}</td>
-                        <td style="padding:6px 10px;border:1px solid #e0e0e0;text-align:right;font-weight:600">$${c.total.toLocaleString("es-CL")}</td>
+                        <td style="padding:6px 10px;border:1px solid #e0e0e0">${optC.cuenta}</td>
+                        <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:10px;color:#888">${CUENTAS_INTERNAS.includes(optC.cuenta)?"Interna":"Externa"}</td>
+                        <td style="padding:6px 10px;border:1px solid #e0e0e0;text-align:center">${optC.n}</td>
+                        <td style="padding:6px 10px;border:1px solid #e0e0e0;text-align:right;font-weight:600">$${optC.total.toLocaleString("es-CL")}</td>
                         <td style="padding:6px 10px;border:1px solid #e0e0e0;text-align:right">
                           <div style="display:flex;align-items:center;justify-content:flex-end;gap:6px">
                             <div style="width:80px;height:8px;background:#e0e0e0;border-radius:4px;overflow:hidden">
@@ -8643,11 +8643,11 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                     const filasPend = pendientes.length===0
                       ? "<tr><td colspan='5' style='text-align:center;color:#888;padding:10px'>Sin compras pendientes</td></tr>"
                       : pendientes.map(optC=>`<tr>
-                          <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.fecha}</td>
-                          <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.tipoDoc} N°${c.nDocumento||"—"}</td>
-                          <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.proveedor||"—"}</td>
-                          <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.cuenta||"—"}</td>
-                          <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right;font-weight:600;color:${c.tipoDoc==='Nota de Crédito'?'#ef4444':'inherit'}">${c.tipoDoc==="Nota de Crédito"?"-":""}$${Math.abs(Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0)).toLocaleString("es-CL")}</td>
+                          <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${optC.fecha}</td>
+                          <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${optC.tipoDoc} N°${optC.nDocumento||"—"}</td>
+                          <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${optC.proveedor||"—"}</td>
+                          <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${optC.cuenta||"—"}</td>
+                          <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right;font-weight:600;color:${optC.tipoDoc==='Nota de Crédito'?'#ef4444':'inherit'}">${optC.tipoDoc==="Nota de Crédito"?"-":""}$${Math.abs(Number(optC.totalBrutoDoc||optC.totalBruto||optC.totalNeto||0)).toLocaleString("es-CL")}</td>
                         </tr>`).join("");
                     // Rendiciones pendientes
                     const rendPend = rendiciones.filter(r=>!r.reembolso);
@@ -8721,7 +8721,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                     <div class="noprint" style="text-align:center;margin-top:18px">
                       <button onclick="window.print()" style="background:#1a5c2a;color:#fff;border:none;padding:10px 28px;border-radius:7px;font-size:13px;cursor:pointer">Imprimir / Guardar PDF</button>
                     </div></body></html>`;
-                    const winC2=window.open("","_blank"); winC2.document.write(html); w.document.close();
+                    const winC2=window.open("","_blank"); winC2.document.write(html); winC2.document.close();
                   }}>
                   🖨️ Imprimir resumen
                 </button>
@@ -8875,18 +8875,18 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                       Internas — beneficio general socios
                     </div>
                     {CUENTAS_INTERNAS.map(cuentaGrp=>(
-                      <div key={c} style={{padding:"7px 14px 7px 20px",cursor:"pointer",fontSize:12,color:filtroCuenta===c?"#86efac":"#ede9e0",background:filtroCuenta===c?"rgba(34,197,94,0.08)":"transparent"}}
-                        onClick={()=>{setFiltroCuenta(c);setShowCuentaMenu(false);}}>
-                        {c}
+                      <div key={cuentaGrp} style={{padding:"7px 14px 7px 20px",cursor:"pointer",fontSize:12,color:filtroCuenta===cuentaGrp?"#86efac":"#ede9e0",background:filtroCuenta===cuentaGrp?"rgba(34,197,94,0.08)":"transparent"}}
+                        onClick={()=>{setFiltroCuenta(cuentaGrp);setShowCuentaMenu(false);}}>
+                        {cuentaGrp}
                       </div>
                     ))}
                     <div style={{padding:"5px 14px 3px",fontSize:10,color:"#3d6a7a",fontWeight:700,letterSpacing:"0.8px",textTransform:"uppercase",borderTop:"1px solid rgba(255,255,255,0.06)",marginTop:2}}>
                       Externas — beneficio área específica
                     </div>
                     {CUENTAS_EXTERNAS.map(cuentaGrp=>(
-                      <div key={c} style={{padding:"7px 14px 7px 20px",cursor:"pointer",fontSize:12,color:filtroCuenta===c?"#93c5fd":"#ede9e0",background:filtroCuenta===c?"rgba(59,130,246,0.08)":"transparent"}}
-                        onClick={()=>{setFiltroCuenta(c);setShowCuentaMenu(false);}}>
-                        {c}
+                      <div key={cuentaGrp} style={{padding:"7px 14px 7px 20px",cursor:"pointer",fontSize:12,color:filtroCuenta===cuentaGrp?"#93c5fd":"#ede9e0",background:filtroCuenta===cuentaGrp?"rgba(59,130,246,0.08)":"transparent"}}
+                        onClick={()=>{setFiltroCuenta(cuentaGrp);setShowCuentaMenu(false);}}>
+                        {cuentaGrp}
                       </div>
                     ))}
                   </div>
