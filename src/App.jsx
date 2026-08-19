@@ -8500,11 +8500,25 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     const mc=filtroCuenta==="todas"||c.cuenta===filtroCuenta;
     const mm=filtroMes==="todos"||(c.fecha||"").slice(0,7)===filtroMes;
     const mf=mostrarFacturadas||c.estado!=="facturada";
-    const mCat=filtroCategoriaCompra==="todas"||(c.items||[]).some(it=>it.categoria===filtroCategoriaCompra);
+    const mCat=filtroCategoriaCompra==="todas"||(c.items||[]).some(it=>(it.categoria||"").trim().toLowerCase()===filtroCategoriaCompra.trim().toLowerCase());
     return mc&&mm&&mf&&mCat;
   });
   // Categorías realmente presentes en las compras registradas (evita mostrar opciones vacías)
-  const categoriasCompraPresentes = [...new Set(compras.flatMap(c=>(c.items||[]).map(it=>it.categoria)).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es"));
+  // Agrupa categorías que solo difieren en mayúsculas/minúsculas (datos antiguos
+  // guardados de forma inconsistente, ej: "planta" y "Planta"), sin modificar lo
+  // ya guardado — solo para presentarlas como una sola opción en el filtro.
+  // Prioriza la forma oficial de CATEGORIAS si existe una coincidencia exacta
+  // (case-insensitive); si no, usa la primera variante encontrada.
+  const categoriasCompraPresentes = (() => {
+    const brutas = [...new Set(compras.flatMap(c=>(c.items||[]).map(it=>it.categoria)).filter(Boolean))];
+    const porClave = {};
+    brutas.forEach(cat=>{
+      const clave = cat.trim().toLowerCase();
+      const oficial = CATEGORIAS.find(co=>co.toLowerCase()===clave);
+      if(!porClave[clave] || oficial) porClave[clave] = oficial||porClave[clave]||cat;
+    });
+    return Object.values(porClave).sort((a,b)=>a.localeCompare(b,"es"));
+  })();
 
   return (
     <div className="ein">
