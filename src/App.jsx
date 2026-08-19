@@ -8210,6 +8210,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   const [editId, setEditId] = React.useState(null);
   const [filtroCuenta, setFiltroCuenta] = React.useState("todas");
   const [filtroMes, setFiltroMes] = React.useState("todos");
+  const [filtroCategoriaCompra, setFiltroCategoriaCompra] = React.useState("todas");
   const [seleccionadas, setSeleccionadas] = React.useState([]);
   const [rendForm, setRendForm] = React.useState({fecha:hoy.toISOString().slice(0,10),obs:""});
   const [reembolsoForm, setReembolsoForm] = React.useState({fecha:hoy.toISOString().slice(0,10),monto:"",banco:"",nTransferencia:"",obs:""});
@@ -8499,8 +8500,11 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     const mc=filtroCuenta==="todas"||c.cuenta===filtroCuenta;
     const mm=filtroMes==="todos"||(c.fecha||"").slice(0,7)===filtroMes;
     const mf=mostrarFacturadas||c.estado!=="facturada";
-    return mc&&mm&&mf;
+    const mCat=filtroCategoriaCompra==="todas"||(c.items||[]).some(it=>it.categoria===filtroCategoriaCompra);
+    return mc&&mm&&mf&&mCat;
   });
+  // Categorías realmente presentes en las compras registradas (evita mostrar opciones vacías)
+  const categoriasCompraPresentes = [...new Set(compras.flatMap(c=>(c.items||[]).map(it=>it.categoria)).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es"));
 
   return (
     <div className="ein">
@@ -8896,6 +8900,10 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
             <select style={{...S.input,flex:1,minWidth:100,fontSize:12}} value={filtroMes} onChange={e=>setFiltroMes(e.target.value)}>
               <option value="todos">Todos los meses</option>
               {mesesUnicos.map(m=><option key={m} value={m}>{m}</option>)}
+            </select>
+            <select style={{...S.input,flex:1,minWidth:140,fontSize:12}} value={filtroCategoriaCompra} onChange={e=>setFiltroCategoriaCompra(e.target.value)}>
+              <option value="todas">Todas las categorías</option>
+              {categoriasCompraPresentes.map(cat=><option key={cat} value={cat}>{cat}</option>)}
             </select>
           </div>
 
