@@ -8129,7 +8129,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     if(itemsEPP.length) {
       const eppArr = Array.isArray(eppEntregas)?eppEntregas:[];
       const nuevosBorradores = itemsEPP.filter(it=>
-        !eppArr.some(e=>e.docRef===docRef&&(e.tipo||e.descripcionCompra||"").toLowerCase()===it.descripcion.trim().toLowerCase())
+        !eppArr.some(e=>e.docRef===docRef&&(e.descripcionCompra||e.tipo||"").toLowerCase()===it.descripcion.trim().toLowerCase())
       ).map(it=>{
         const matchTipo = TIPOS_EPP_FLAT.find(t=>t.tipo.toLowerCase()===it.categoriaBodega?.toLowerCase());
         return {
@@ -13740,6 +13740,31 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
     if(!window.confirm("¿Eliminar esta entrega de EPP? Esta acción no se puede deshacer.")) return;
     setEppEntregas((Array.isArray(eppEntregas)?eppEntregas:[]).filter(e=>e.id!==id));
   };
+  // Fusiona pendientes duplicados (mismo docRef + misma descripción de compra)
+  // que se hayan creado antes de corregir el chequeo de duplicados — suma sus
+  // cantidades en un solo pendiente en vez de dejarlos repetidos.
+  const limpiarPendientesEppDuplicados = () => {
+    const arr = Array.isArray(eppEntregas)?eppEntregas:[];
+    const pendientes = arr.filter(e=>e.borrador);
+    const otros = arr.filter(e=>!e.borrador);
+    const grupos = {};
+    pendientes.forEach(e=>{
+      const clave = `${e.docRef}__${(e.descripcionCompra||e.tipo||"").toLowerCase()}`;
+      if(!grupos[clave]) grupos[clave] = [];
+      grupos[clave].push(e);
+    });
+    let fusionados = 0;
+    const pendientesFusionados = Object.values(grupos).map(grupo=>{
+      if(grupo.length>1) fusionados += grupo.length-1;
+      const base = grupo[0];
+      const cantidadTotal = grupo.reduce((a,e)=>a+(Number(e.cantidad)||0),0);
+      return {...base, cantidad:cantidadTotal};
+    });
+    if(fusionados===0){ alert("No se encontraron pendientes duplicados — todo está en orden."); return; }
+    if(!window.confirm(`Se encontraron ${fusionados} pendiente(s) duplicado(s). ¿Fusionarlos en uno solo por artículo (sumando cantidades)?`)) return;
+    setEppEntregas([...pendientesFusionados, ...otros]);
+    alert(`✅ Se fusionaron ${fusionados} pendiente(s) duplicado(s).`);
+  };
   const imprimirEntregaEpp = (e) => {
     const trab = personalArrEpp.find(p=>String(p.id)===String(e.trabajadorId));
     const fechaHoy = new Date().toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"});
@@ -14021,7 +14046,10 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
           {/* Borradores pendientes de asignar, creados automáticamente desde Compras */}
           {(Array.isArray(eppEntregas)?eppEntregas:[]).filter(e=>e.borrador).length>0&&(
             <div style={{...S.card,padding:16,marginBottom:14,background:"rgba(251,191,36,0.06)",borderColor:"rgba(251,191,36,0.3)"}}>
-              <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#fbbf24",marginBottom:10}}>⏳ Pendientes de asignar (desde Compras)</div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:10}}>
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#fbbf24"}}>⏳ Pendientes de asignar (desde Compras)</div>
+                <button style={{...S.btn,fontSize:11,padding:"5px 10px",background:"rgba(239,68,68,0.1)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.25)"}} onClick={limpiarPendientesEppDuplicados}>🧹 Limpiar duplicados</button>
+              </div>
               {(Array.isArray(eppEntregas)?eppEntregas:[]).filter(e=>e.borrador).map(e=>(
                 <div key={e.id} style={{padding:"10px 0",borderTop:"1px solid rgba(255,255,255,0.06)"}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap"}}>
