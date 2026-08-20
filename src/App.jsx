@@ -14423,8 +14423,6 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
               ➕ {bodegaActiva==="b04"?"Nueva máquina":"Nuevo ítem"}
             </button>}
             {esJefa&&<button style={{...S.btn,background:"rgba(167,139,250,0.15)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.3)"}} onClick={()=>{setShowInventForm(p=>!p);setShowItemForm(false);setShowMovForm(false);}}>📋 Inventario inicial</button>}
-            {esJefa&&<button style={{...S.btn,background:"rgba(34,197,94,0.12)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)"}} onClick={()=>{setShowMovForm(true);setShowInventForm(false);}}>📥 Movimiento</button>}
-            {esJefa&&<button style={{...S.btn,background:"rgba(245,158,11,0.12)",color:"#fcd34d",border:"1px solid rgba(245,158,11,0.25)"}} onClick={()=>{setShowTraslForm(true);setShowInventForm(false);}}>🚛 Traslado</button>}
           </div>
 
           {/* Inventario inicial */}
@@ -14569,98 +14567,6 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
               <div style={{display:"flex",gap:8}}>
                 <button className="btn-p" style={S.btn} onClick={guardarItem}>✓ Guardar</button>
                 <button className="btn-g" style={S.btn} onClick={()=>{setShowItemForm(false);setEditItemId(null);}}>Cancelar</button>
-              </div>
-            </div>
-          )}
-
-          {/* Movimiento */}
-          {showMovForm&&(
-            <div style={{...S.card,padding:16,marginBottom:14,background:"rgba(34,197,94,0.05)",borderColor:"rgba(34,197,94,0.2)"}} className="ein">
-              <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#86efac",marginBottom:12}}>📥 Registrar movimiento</div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-                <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={movForm.fecha} onChange={e=>setMovForm(p=>({...p,fecha:e.target.value}))}/></div>
-                <div><label style={labelSt}>Tipo</label>
-                  <select style={S.input} value={movForm.tipo} onChange={e=>setMovForm(p=>({...p,tipo:e.target.value}))}>
-                    {Object.entries(ESTADOS_MOV).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
-                  </select>
-                </div>
-                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Ítem</label>
-                  <select style={S.input} value={movForm.itemId} onChange={e=>{const it=(bd.items||[]).find(i=>String(i.id)===e.target.value);setMovForm(p=>({...p,itemId:e.target.value,unidad:it?.unidad||"unidad"}));}}>
-                    <option value="">Seleccionar ítem...</option>
-                    {(bd.items||[]).map(i=><option key={i.id} value={i.id}>{i.nombre} (stock: {i.stockActual} {i.unidad})</option>)}
-                  </select>
-                </div>
-                <div><label style={labelSt}>Cantidad</label><input type="number" min={0.01} step={0.01} style={S.input} value={movForm.cantidad} onChange={e=>setMovForm(p=>({...p,cantidad:e.target.value}))}/></div>
-                <div><label style={labelSt}>Responsable</label>
-                  <select style={S.input} value={movForm.responsable} onChange={e=>setMovForm(p=>({...p,responsable:e.target.value}))}>
-                    <option value="">Seleccionar...</option>
-                    {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
-                  </select>
-                </div>
-                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Motivo</label><input style={S.input} value={movForm.motivo} onChange={e=>setMovForm(p=>({...p,motivo:e.target.value}))} placeholder="ej: Uso mantenimiento, Compra factura..."/></div>
-                {movForm.tipo==="entrada"&&<>
-                  <div><label style={labelSt}>Proveedor</label><input style={S.input} value={movForm.proveedor} onChange={e=>setMovForm(p=>({...p,proveedor:e.target.value}))}/></div>
-                  <div><label style={labelSt}>N° Documento</label><input style={S.input} value={movForm.nDoc} onChange={e=>setMovForm(p=>({...p,nDoc:e.target.value}))}/></div>
-                </>}
-                {bodegaActiva==="b04"&&movForm.tipo==="salida"&&(
-                  <div style={{gridColumn:"1/-1",background:"rgba(249,115,22,0.06)",borderRadius:8,padding:"10px 12px",border:"1px solid rgba(249,115,22,0.2)"}}>
-                    <div style={{fontSize:11,color:"#fb923c",marginBottom:6}}>⛽ Registro combustible</div>
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                      <div><label style={labelSt}>Litros cargados</label><input type="number" min={0} style={S.input} value={movForm.litros} onChange={e=>setMovForm(p=>({...p,litros:e.target.value}))}/></div>
-                      <div><label style={labelSt}>Horas actuales</label><input type="number" min={0} style={S.input} value={movForm.horasActuales} onChange={e=>setMovForm(p=>({...p,horasActuales:e.target.value}))}/></div>
-                    </div>
-                  </div>
-                )}
-                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observaciones</label><input style={S.input} value={movForm.obs} onChange={e=>setMovForm(p=>({...p,obs:e.target.value}))}/></div>
-              </div>
-              <div style={{display:"flex",gap:8}}>
-                <button className="btn-p" style={S.btn} onClick={guardarMov}>✓ Registrar</button>
-                <button className="btn-g" style={S.btn} onClick={()=>setShowMovForm(false)}>Cancelar</button>
-              </div>
-            </div>
-          )}
-
-          {/* Traslado */}
-          {showTraslForm&&(
-            <div style={{...S.card,padding:16,marginBottom:14,background:"rgba(245,158,11,0.05)",borderColor:"rgba(245,158,11,0.2)"}} className="ein">
-              <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#fcd34d",marginBottom:12}}>🚛 Traslado</div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-                <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={traslForm.fecha} onChange={e=>setTraslForm(p=>({...p,fecha:e.target.value}))}/></div>
-                <div><label style={labelSt}>Responsable</label>
-                  <select style={S.input} value={traslForm.responsable} onChange={e=>setTraslForm(p=>({...p,responsable:e.target.value}))}>
-                    <option value="">Seleccionar...</option>
-                    {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
-                  </select>
-                </div>
-                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Ítem</label>
-                  <select style={S.input} value={traslForm.itemId} onChange={e=>setTraslForm(p=>({...p,itemId:e.target.value}))}>
-                    <option value="">Seleccionar...</option>
-                    {(bd.items||[]).map(i=><option key={i.id} value={i.id}>{i.nombre} (disponible: {i.stockActual} {i.unidad})</option>)}
-                  </select>
-                </div>
-                <div><label style={labelSt}>Cantidad</label><input type="number" min={1} style={S.input} value={traslForm.cantidad} onChange={e=>setTraslForm(p=>({...p,cantidad:e.target.value}))}/></div>
-                <div style={{gridColumn:"1/-1"}}>
-                  <label style={labelSt}>Destino (macrozona o lugar)</label>
-                  <select style={{...S.input,marginBottom:4}} value={MACROZONAS_BASE.find(z=>z.nombre===traslForm.destino)?traslForm.destino:traslForm.destino?"__otro__":""} onChange={e=>{if(e.target.value==="__otro__"){}else setTraslForm(p=>({...p,destino:e.target.value}));}}>
-                    <option value="">— Seleccionar macrozona —</option>
-                    {[...MACROZONAS_BASE].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(z=><option key={z.id} value={z.nombre}>{z.icono} {z.nombre}</option>)}
-                    <option value="__otro__">✏️ Otro destino (escribir)</option>
-                  </select>
-                  <input style={S.input} value={traslForm.destino} onChange={e=>setTraslForm(p=>({...p,destino:e.target.value}))} placeholder="o escribe directamente: Taller externo, Evento..."/>
-                </div>
-                <div><label style={labelSt}>Motivo</label><input style={S.input} value={traslForm.motivo} onChange={e=>setTraslForm(p=>({...p,motivo:e.target.value}))}/></div>
-                <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",cursor:"pointer"}} onClick={()=>setTraslForm(p=>({...p,conRegreso:!p.conRegreso}))}>
-                  <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${traslForm.conRegreso?"#3d7a52":"rgba(255,255,255,0.2)"}`,background:traslForm.conRegreso?"#3d7a52":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                    {traslForm.conRegreso&&<span style={{color:"#fff",fontSize:11}}>✓</span>}
-                  </div>
-                  <span style={{fontSize:13}}>¿Regresa a bodega?</span>
-                </div>
-                {traslForm.conRegreso&&<div><label style={labelSt}>Fecha estimada regreso</label><input type="date" style={S.input} value={traslForm.fechaRegreso} onChange={e=>setTraslForm(p=>({...p,fechaRegreso:e.target.value}))}/></div>}
-                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observaciones</label><input style={S.input} value={traslForm.obs} onChange={e=>setTraslForm(p=>({...p,obs:e.target.value}))}/></div>
-              </div>
-              <div style={{display:"flex",gap:8}}>
-                <button className="btn-p" style={S.btn} onClick={guardarTrasl}>✓ Registrar</button>
-                <button className="btn-g" style={S.btn} onClick={()=>setShowTraslForm(false)}>Cancelar</button>
               </div>
             </div>
           )}
