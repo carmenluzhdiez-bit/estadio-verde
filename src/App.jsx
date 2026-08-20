@@ -8617,7 +8617,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
       {/* Sub-tabs */}
       <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
         {[["fondo","📊 Resumen"],["lista","📋 Compras"],["rendiciones","📤 Rendiciones"],["gastos","📊 Gastos por categoría"]].map(([t,l])=>{
-          const badge=t==="lista"?compras.filter(c=>c.estado==="pendiente").length:t==="rendiciones"?rendiciones.filter(r=>!r.reembolso).length:0;
+          const badge=t==="lista"?compras.filter(c=>c.estado==="pendiente"&&!["Guía de Despacho","Nota de Pedido","Cotización","Orden de Compra"].includes(c.tipoDoc)).length:t==="rendiciones"?rendiciones.filter(r=>!r.reembolso).length:0;
           return <button key={t} className={`tab${subTab===t?" on":""}`} onClick={()=>{setSubTab(t);setShowForm(false);}} style={{position:"relative"}}>
             {l}{badge>0&&<span style={{position:"absolute",top:1,right:1,background:"#ef4444",color:"#fff",borderRadius:"50%",width:14,height:14,fontSize:9,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>{badge}</span>}
           </button>;
@@ -9151,9 +9151,12 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
           ):(
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
               {comprasFilt.map(c=>{
-                const est=ESTADO_C[c.estado]||ESTADO_C.pendiente;
+                const esDocPagable = !["Guía de Despacho","Nota de Pedido","Cotización","Orden de Compra"].includes(c.tipoDoc);
+                const est = (c.estado==="pendiente"&&!esDocPagable)
+                  ? {color:"#94a3b8",bg:"rgba(148,163,184,0.1)",label:"⏳ Pendiente de facturar"}
+                  : (ESTADO_C[c.estado]||ESTADO_C.pendiente);
                 const sel=seleccionadas.includes(c.id);
-                const selectable=["pendiente","pagada","pagada_efectivo"].includes(c.estado);
+                const selectable=esDocPagable&&["pendiente","pagada","pagada_efectivo"].includes(c.estado);
                 const totalDoc = Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
                 const items = c.items||[{descripcion:c.descripcion,cantidad:c.cantidad,unidad:c.unidad}];
                 return (
@@ -9190,7 +9193,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                       <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:5,flexShrink:0}}>
                         <span style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#93c5fd"}}>${totalDoc.toLocaleString("es-CL")}</span>
                         <div style={{display:"flex",gap:5,flexWrap:"wrap",justifyContent:"flex-end"}}>
-                          {c.estado==="pendiente"&&<>
+                          {esDocPagable&&c.estado==="pendiente"&&<>
                             <button style={{...S.btn,fontSize:10,padding:"3px 8px",background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}} onClick={()=>marcarPagada(c.id,"transferencia")}>💳 Trans.</button>
                             <button style={{...S.btn,fontSize:10,padding:"3px 8px",background:"rgba(139,92,246,0.15)",color:"#c4b5fd",border:"1px solid rgba(139,92,246,0.3)"}} onClick={()=>marcarPagada(c.id,"efectivo")}>💵 Efect.</button>
                           </>}
