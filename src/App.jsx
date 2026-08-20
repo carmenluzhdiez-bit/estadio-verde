@@ -8115,7 +8115,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   const set = (patch) => setComprasData(p=>({...p,...patch}));
 
   // ── Ingreso automático a bodega ───────────────────────────────────────────
-  const ingresarItemsABodega = (docFecha, docRef, items, compraId) => {
+  const ingresarItemsABodega = (docFecha, docRef, items, compraId, proveedorDoc="") => {
     const porBodega = {};
     const itemsEPP = [];
     items.forEach(it=>{
@@ -8135,7 +8135,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
         return {
           id:Date.now()+Math.random(), trabajadorId:"", tipo:matchTipo?matchTipo.tipo:(it.categoriaBodega||""), agente:matchTipo?matchTipo.agente:"",
           descripcionCompra:it.descripcion.trim(), labor:"", cantidad:Number(it.cantidad)||1, unidad:it.unidad||"unidad", talla:"", modelo:it.modelo||"", registroISP:it.registroISP||"",
-          proveedor:"", fechaEntrega:docFecha, observaciones:`Comprado — ${docRef}`, firmaRecepcion:false,
+          proveedor:proveedorDoc||"", fechaEntrega:docFecha, observaciones:`Comprado — ${docRef}`, firmaRecepcion:false,
           registradoPor:"compras", borrador:true, docRef,
         };
       });
@@ -8310,7 +8310,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
       if(doc.tipoDoc==="Nota de Crédito") {
         descontarItemsDeBodega(doc.fecha, `NC ${doc.nDocumento||""} ${doc.proveedor||""}`, doc.items||[]);
       } else {
-        ingresarItemsABodega(doc.fecha, `${doc.tipoDoc} ${doc.nDocumento||""} ${doc.proveedor||""}`, doc.items||[]);
+        ingresarItemsABodega(doc.fecha, `${doc.tipoDoc} ${doc.nDocumento||""} ${doc.proveedor||""}`, doc.items||[], undefined, doc.proveedor||"");
       }
     } else {
       set({compras:[doc,...compras.map(compraC=>notasVinculadas.includes(compraC.id)?{...compraC,estado:"facturada",facturaId:docId}:compraC)]});
@@ -8319,7 +8319,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
         // NC: descontar stock de bodega
         descontarItemsDeBodega(doc.fecha, `NC ${doc.nDocumento||""} ${doc.proveedor||""}`, doc.items||[]);
       } else {
-        ingresarItemsABodega(doc.fecha, `${doc.tipoDoc} ${doc.nDocumento||""} ${doc.proveedor||""}`, doc.items||[]);
+        ingresarItemsABodega(doc.fecha, `${doc.tipoDoc} ${doc.nDocumento||""} ${doc.proveedor||""}`, doc.items||[], undefined, doc.proveedor||"");
       }
     }
     setForm(emptyForm); setShowForm(false); setAlertaDuplicado(null);
@@ -9245,7 +9245,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                         bodegasData={bodegasData}
                         onConfirm={(asignaciones, maquinas=[], categoriasBod=[], modelosEpp=[], registrosISP=[])=>{
                           const itemsConBodega = items.map((it,i)=>({...it,bodegaDestino:asignaciones[i]||"",maquinaAsociada:maquinas[i]||"",categoriaBodega:categoriasBod[i]||"",modelo:modelosEpp[i]||it.modelo||"",registroISP:registrosISP[i]||it.registroISP||""}));
-                          ingresarItemsABodega(c.fecha,`${c.tipoDoc} ${c.nDocumento||""} ${c.proveedor||""}`,itemsConBodega,c.id);
+                          ingresarItemsABodega(c.fecha,`${c.tipoDoc} ${c.nDocumento||""} ${c.proveedor||""}`,itemsConBodega,c.id,c.proveedor||"");
                           setSelectBodegaId(null);
                         }}
                         onCancel={()=>setSelectBodegaId(null)}
@@ -13753,17 +13753,18 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
       if(!grupos[clave]) grupos[clave] = [];
       grupos[clave].push(e);
     });
-    let fusionados = 0;
-    const pendientesFusionados = Object.values(grupos).map(grupo=>{
-      if(grupo.length>1) fusionados += grupo.length-1;
-      const base = grupo[0];
-      const cantidadTotal = grupo.reduce((a,e)=>a+(Number(e.cantidad)||0),0);
-      return {...base, cantidad:cantidadTotal};
+    let eliminados = 0;
+    const pendientesLimpios = Object.values(grupos).map(grupo=>{
+      if(grupo.length>1) eliminados += grupo.length-1;
+      // Son copias exactas del mismo registro (creadas por el bug al re-guardar
+      // la compra) — se descartan las copias de más, NO se suman cantidades,
+      // ya que representan la misma compra contada varias veces, no compras distintas.
+      return grupo[0];
     });
-    if(fusionados===0){ alert("No se encontraron pendientes duplicados — todo está en orden."); return; }
-    if(!window.confirm(`Se encontraron ${fusionados} pendiente(s) duplicado(s). ¿Fusionarlos en uno solo por artículo (sumando cantidades)?`)) return;
-    setEppEntregas([...pendientesFusionados, ...otros]);
-    alert(`✅ Se fusionaron ${fusionados} pendiente(s) duplicado(s).`);
+    if(eliminados===0){ alert("No se encontraron pendientes duplicados — todo está en orden."); return; }
+    if(!window.confirm(`Se encontraron ${eliminados} copia(s) duplicada(s). ¿Descartarlas, dejando solo una por artículo (sin sumar cantidades)?`)) return;
+    setEppEntregas([...pendientesLimpios, ...otros]);
+    alert(`✅ Se eliminaron ${eliminados} copia(s) duplicada(s).`);
   };
   const imprimirEntregaEpp = (e) => {
     const trab = personalArrEpp.find(p=>String(p.id)===String(e.trabajadorId));
@@ -14054,7 +14055,9 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                 <div key={e.id} style={{padding:"10px 0",borderTop:"1px solid rgba(255,255,255,0.06)"}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                     <div style={{fontSize:12}}>
-                      {e.descripcionCompra} <span style={{color:"#fbbf24",fontWeight:700}}>· {e.cantidad} sin repartir</span>
+                      {e.descripcionCompra} · sin repartir:
+                      <input type="number" min={0} style={{...S.input,width:70,fontSize:12,padding:"3px 6px",marginLeft:6,display:"inline-block"}}
+                        value={e.cantidad} onChange={ev=>setEppEntregas((Array.isArray(eppEntregas)?eppEntregas:[]).map(x=>x.id===e.id?{...x,cantidad:ev.target.value}:x))}/>
                       <div style={{fontSize:10,color:"#6aaa7a"}}>{e.observaciones}</div>
                     </div>
                     {asignandoEppId!==e.id&&<button className="btn-p" style={{...S.btn,fontSize:11,padding:"6px 10px"}} onClick={()=>iniciarRepartoEpp(e)}>📋 Asignar / repartir</button>}
