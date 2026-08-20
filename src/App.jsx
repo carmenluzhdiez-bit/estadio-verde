@@ -8174,6 +8174,9 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     Object.entries(porBodega).forEach(([bodId, bItems])=>{
       setBodegasData(prev=>{
         const bod = prev[bodId]||{nombre:bodId,items:[],historial:[]};
+        // Evitar descontar dos veces si esta función se llama de nuevo para el
+        // mismo documento (ej: al editar la Nota de Crédito sin cambiar los ítems)
+        if((bod.historial||[]).some(h=>h.ref===docRef)) return prev;
         const itemsAct = (bod.items||[]).map(bi=>{
           const match = bItems.find(ni=>ni.descripcion?.toLowerCase()===bi.nombre?.toLowerCase()||bi.descripcion?.toLowerCase()===ni.descripcion?.toLowerCase());
           if(!match) return bi;
@@ -8291,6 +8294,14 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     if(editId) {
       set({compras:compras.map(compraC=>compraC.id===editId?doc:compraC)});
       setEditId(null);
+      // También intentar ingresar/descontar a bodega — por si al editar recién
+      // se asignó la bodega destino que faltaba (ambas funciones son seguras:
+      // no vuelven a aplicar un ítem/documento que ya se procesó antes).
+      if(doc.tipoDoc==="Nota de Crédito") {
+        descontarItemsDeBodega(doc.fecha, `NC ${doc.nDocumento||""} ${doc.proveedor||""}`, doc.items||[]);
+      } else {
+        ingresarItemsABodega(doc.fecha, `${doc.tipoDoc} ${doc.nDocumento||""} ${doc.proveedor||""}`, doc.items||[]);
+      }
     } else {
       set({compras:[doc,...compras.map(compraC=>notasVinculadas.includes(compraC.id)?{...compraC,estado:"facturada",facturaId:docId}:compraC)]});
       // Ingresar ítems a bodegas
