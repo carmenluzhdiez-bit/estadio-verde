@@ -8749,7 +8749,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                     const mesActual = new Date().toISOString().slice(0,7);
                     const anioActual = new Date().getFullYear();
                     // Agrupar por CATEGORÍA
-                    const comprasAnio = compras.filter(c=>c.fecha?.startsWith(String(anioActual)) && c.tipoDoc!=="Cotización" && c.tipoDoc!=="Nota de Pedido");
+                    const comprasAnio = compras.filter(c=>c.fecha?.startsWith(String(anioActual)) && !["Cotización","Nota de Pedido","Guía de Despacho"].includes(c.tipoDoc));
                     const porCatInf = {};
                     comprasAnio.forEach(comp=>{
                       const signo = comp.tipoDoc==="Nota de Crédito"?-1:1;
@@ -8943,22 +8943,23 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
             <div style={{...S.card,padding:20,marginBottom:16}} className="ein">
               <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:16,color:"#a0d8b0"}}>{editId?"✏️ Editar":"➕ Nueva"} compra</div>
 
-              {/* Panel notas de pedido AL INICIO — seleccionar primero si es Factura */}
+              {/* Panel notas de pedido / guías de despacho AL INICIO — seleccionar primero si es Factura */}
               {form.tipoDoc==="Factura"&&!editId&&(()=>{
                 const notasDisp = compras.filter(c=>
-                  c.tipoDoc==="Nota de Pedido" &&
+                  ["Nota de Pedido","Guía de Despacho"].includes(c.tipoDoc) &&
                   !["facturada","cancelada"].includes(c.estado)
                 );
                 if(!notasDisp.length) return null;
                 return (
                   <div style={{background:"rgba(251,191,36,0.06)",border:"1px solid rgba(251,191,36,0.25)",borderRadius:10,padding:"12px 14px",marginBottom:16}}>
                     <div style={{fontSize:11,color:"#fcd34d",letterSpacing:"0.6px",marginBottom:8,textTransform:"uppercase"}}>
-                      📋 ¿Esta factura corresponde a Notas de Pedido? — Selecciona las que incluye
+                      📋 ¿Esta factura corresponde a Notas de Pedido o Guías de Despacho? — Selecciona las que incluye
                     </div>
                     <div style={{fontSize:11,color:"#a08050",marginBottom:10}}>Al seleccionar, se copian automáticamente proveedor, RUT e ítems</div>
                     <div style={{display:"flex",flexDirection:"column",gap:6}}>
                       {notasDisp.map(np=>{
                         const vinculada=(form.notasVinculadas||[]).includes(np.id);
+                        const prefijo = np.tipoDoc==="Guía de Despacho"?"GD":"NP";
                         return (
                           <div key={np.id} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 10px",borderRadius:7,background:vinculada?"rgba(251,191,36,0.1)":"rgba(255,255,255,0.03)",border:`1px solid ${vinculada?"rgba(251,191,36,0.35)":"rgba(255,255,255,0.07)"}`,cursor:"pointer"}}
                             onClick={()=>{
@@ -8990,7 +8991,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                               {vinculada&&<span style={{color:"#000",fontSize:11,fontWeight:700}}>✓</span>}
                             </div>
                             <div style={{flex:1,minWidth:0}}>
-                              <div style={{fontSize:12,fontWeight:600}}>NP {np.nDocumento} — {np.proveedor} <span style={{fontSize:10,color:"#8a7050"}}>RUT {np.rut}</span></div>
+                              <div style={{fontSize:12,fontWeight:600}}>{prefijo} {np.nDocumento} — {np.proveedor} <span style={{fontSize:10,color:"#8a7050"}}>RUT {np.rut}</span></div>
                               <div style={{fontSize:11,color:"#a08050"}}>{np.fecha} · {(np.items||[{descripcion:np.descripcion}]).map(i=>i.descripcion).filter(Boolean).join(", ")} · <strong>${Number(np.totalBrutoDoc||np.totalBruto||np.totalNeto||0).toLocaleString("es-CL")}</strong></div>
                             </div>
                           </div>
@@ -8999,7 +9000,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                     </div>
                     {(form.notasVinculadas||[]).length>0&&(
                       <div style={{fontSize:11,color:"#fcd34d",marginTop:8,background:"rgba(251,191,36,0.06)",borderRadius:6,padding:"5px 10px"}}>
-                        ✓ {(form.notasVinculadas||[]).length} nota{(form.notasVinculadas||[]).length!==1?"s":""} vinculada{(form.notasVinculadas||[]).length!==1?"s":""} — proveedor, RUT e ítems copiados automáticamente
+                        ✓ {(form.notasVinculadas||[]).length} documento{(form.notasVinculadas||[]).length!==1?"s":""} vinculado{(form.notasVinculadas||[]).length!==1?"s":""} — proveedor, RUT e ítems copiados automáticamente
                       </div>
                     )}
                   </div>
@@ -9010,7 +9011,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                 <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={form.fecha} onChange={e=>setForm(p=>({...p,fecha:e.target.value}))}/></div>
                 <div><label style={labelSt}>Tipo documento</label>
                   <select style={S.input} value={form.tipoDoc} onChange={e=>setForm(p=>({...p,tipoDoc:e.target.value}))}>
-                    {["Factura","Boleta","Boleta de Honorarios","Nota de Crédito","Nota de Pedido","Cotización","Orden de Compra","Otro"].map(t=><option key={t}>{t}</option>)}
+                    {["Factura","Boleta","Boleta de Honorarios","Nota de Crédito","Nota de Pedido","Guía de Despacho","Cotización","Orden de Compra","Otro"].map(t=><option key={t}>{t}</option>)}
                   </select>
                 </div>
                 <div><label style={labelSt}>Proveedor</label><input style={S.input} placeholder="Nombre empresa / persona" value={form.proveedor} onChange={e=>setForm(p=>({...p,proveedor:e.target.value}))}/></div>
