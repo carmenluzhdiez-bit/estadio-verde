@@ -6169,7 +6169,7 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
                   const estVenc = e.fechaVencimiento?calcEstadoLocal(e.fechaVencimiento,7):null;
                   return (
                     <div key={e.id} style={{fontSize:12,padding:"6px 0",borderTop:"1px solid rgba(255,255,255,0.06)"}}>
-                      <strong>{e.tipo}</strong> · {e.fechaEntrega} · {e.labor||"—"} · cant. {e.cantidad} {e.firmaRecepcion?"· ✓ firmado":""}
+                      <strong>{e.tipo}</strong> · {e.fechaEntrega} · {e.labor||"—"} · cant. {e.cantidad} {e.unidad||"unidad"} {e.firmaRecepcion?"· ✓ firmado":""}
                       {e.fechaVencimiento&&<span style={{color:colorEst[estVenc]}}> · vence {e.fechaVencimiento} ({labelEst[estVenc]})</span>}
                     </div>
                   );
@@ -8039,6 +8039,8 @@ function BodegaSelector({ items, compra, onConfirm, onCancel, S, bodegasData={} 
   const [categoriasBod, setCategoriasBod] = React.useState(
     items.map(it=>it.categoriaBodega||"")
   );
+  const [modelosEpp, setModelosEpp] = React.useState(items.map(it=>it.modelo||""));
+  const [registrosISP, setRegistrosISP] = React.useState(items.map(it=>it.registroISP||""));
   // Equipos disponibles en Maquinaria (excluye combustible y repuestos)
   const equiposMaq = ((bodegasData["b04"]?.items)||[]).filter(i=>{
     const cat=(i.categoria||"").toLowerCase();
@@ -8077,6 +8079,14 @@ function BodegaSelector({ items, compra, onConfirm, onCancel, S, bodegasData={} 
                 </div>
               );
             })()}
+            {asignaciones[i]==="b08"&&(
+              <div style={{display:"flex",gap:8,marginTop:6}}>
+                <input placeholder="Modelo (opcional)" style={{...S.input,fontSize:11,padding:"4px 8px",flex:1}}
+                  value={modelosEpp[i]} onChange={e=>{const v=e.target.value;setModelosEpp(p=>{const n=[...p];n[i]=v;return n;});}}/>
+                <input placeholder="Registro ISP (opcional)" style={{...S.input,fontSize:11,padding:"4px 8px",flex:1}}
+                  value={registrosISP[i]} onChange={e=>{const v=e.target.value;setRegistrosISP(p=>{const n=[...p];n[i]=v;return n;});}}/>
+              </div>
+            )}
             {/* Si va a Maquinaria, pedir máquina asociada */}
             {asignaciones[i]==="b04"&&(
               <div style={{display:"flex",gap:8,alignItems:"center",marginTop:4}}>
@@ -8093,7 +8103,7 @@ function BodegaSelector({ items, compra, onConfirm, onCancel, S, bodegasData={} 
         ))}
       </div>
       <div style={{display:"flex",gap:8}}>
-        <button className="btn-p" style={S.btn} onClick={()=>onConfirm(asignaciones, maquinas, categoriasBod)}>✓ Confirmar</button>
+        <button className="btn-p" style={S.btn} onClick={()=>onConfirm(asignaciones, maquinas, categoriasBod, modelosEpp, registrosISP)}>✓ Confirmar</button>
         <button className="btn-g" style={S.btn} onClick={onCancel}>Cancelar</button>
       </div>
     </div>
@@ -8124,7 +8134,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
         const matchTipo = TIPOS_EPP_FLAT.find(t=>t.tipo.toLowerCase()===it.categoriaBodega?.toLowerCase());
         return {
           id:Date.now()+Math.random(), trabajadorId:"", tipo:matchTipo?matchTipo.tipo:(it.categoriaBodega||""), agente:matchTipo?matchTipo.agente:"",
-          descripcionCompra:it.descripcion.trim(), labor:"", cantidad:Number(it.cantidad)||1, talla:"", modelo:"", registroISP:"",
+          descripcionCompra:it.descripcion.trim(), labor:"", cantidad:Number(it.cantidad)||1, unidad:it.unidad||"unidad", talla:"", modelo:it.modelo||"", registroISP:it.registroISP||"",
           proveedor:"", fechaEntrega:docFecha, observaciones:`Comprado — ${docRef}`, firmaRecepcion:false,
           registradoPor:"compras", borrador:true, docRef,
         };
@@ -8222,7 +8232,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   const labelSt = {fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
 
   // ── Formulario cabecera + ítems ───────────────────────────────────────────
-  const emptyItem = {id:Date.now(), descripcion:"", categoria:"", cantidad:1, unidad:"unidad", precioUnitario:"", totalNeto:"", iva:"", totalBruto:"", bodegaDestino:"", categoriaBodega:""};
+  const emptyItem = {id:Date.now(), descripcion:"", categoria:"", cantidad:1, unidad:"unidad", precioUnitario:"", totalNeto:"", iva:"", totalBruto:"", bodegaDestino:"", categoriaBodega:"", modelo:"", registroISP:""};
   const emptyForm = {
     fecha:hoy.toISOString().slice(0,10),
     proveedor:"", rut:"", nDocumento:"", tipoDoc:"Factura",
@@ -9092,6 +9102,16 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                         </div>
                       );
                     })()}
+                    {item.bodegaDestino==="b08"&&(
+                      <div style={{marginTop:8,display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                        <div><label style={{...labelSt,color:"#86efac"}}>Modelo (opcional)</label>
+                          <input style={{...S.input,fontSize:12}} placeholder="ej: 3M 6200" value={item.modelo||""} onChange={e=>updateItem(idx,{modelo:e.target.value})}/>
+                        </div>
+                        <div><label style={{...labelSt,color:"#86efac"}}>Registro ISP (opcional)</label>
+                          <input style={{...S.input,fontSize:12}} value={item.registroISP||""} onChange={e=>updateItem(idx,{registroISP:e.target.value})}/>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
                 {/* Totales documento */}
@@ -9223,8 +9243,8 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                       <BodegaSelector
                         key={c.id} items={items} compra={c}
                         bodegasData={bodegasData}
-                        onConfirm={(asignaciones, maquinas=[], categoriasBod=[])=>{
-                          const itemsConBodega = items.map((it,i)=>({...it,bodegaDestino:asignaciones[i]||"",maquinaAsociada:maquinas[i]||"",categoriaBodega:categoriasBod[i]||""}));
+                        onConfirm={(asignaciones, maquinas=[], categoriasBod=[], modelosEpp=[], registrosISP=[])=>{
+                          const itemsConBodega = items.map((it,i)=>({...it,bodegaDestino:asignaciones[i]||"",maquinaAsociada:maquinas[i]||"",categoriaBodega:categoriasBod[i]||"",modelo:modelosEpp[i]||it.modelo||"",registroISP:registrosISP[i]||it.registroISP||""}));
                           ingresarItemsABodega(c.fecha,`${c.tipoDoc} ${c.nDocumento||""} ${c.proveedor||""}`,itemsConBodega,c.id);
                           setSelectBodegaId(null);
                         }}
@@ -13633,9 +13653,13 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
   const puedeRegistrarBasicoEPP = esJefa || rolLogueado==="supervisor";
   const personalArrEpp = Array.isArray(personal)?personal:Object.values(personal||{});
 
-  const emptyEntregaEpp = {trabajadorId:"",tipo:"",agente:"",labor:"",cantidad:1,talla:"",modelo:"",registroISP:"",proveedor:"",fechaEntrega:hoy,fechaVencimiento:"",observaciones:""};
+  const emptyEntregaEpp = {trabajadorId:"",tipo:"",agente:"",labor:"",cantidad:1,unidad:"unidad",talla:"",modelo:"",registroISP:"",proveedor:"",fechaEntrega:hoy,fechaVencimiento:"",observaciones:""};
   const [formEntregaEpp, setFormEntregaEpp] = React.useState(emptyEntregaEpp);
   const [showEntregaEppForm, setShowEntregaEppForm] = React.useState(false);
+  // Reparto de un borrador de EPP (venido de Compras) entre uno o varios trabajadores
+  const [asignandoEppId, setAsignandoEppId] = React.useState(null);
+  const emptyRepartoEpp = {tipo:"",agente:"",unidad:"unidad",modelo:"",registroISP:"",fechaVencimiento:"",labor:"",filas:[{trabajadorId:"",cantidad:1,talla:""}]};
+  const [repartoEppForm, setRepartoEppForm] = React.useState(emptyRepartoEpp);
 
   const emptyFiltroEpp = {trabajadorId:"",tipoFiltro:"",productoAsociado:"",fechaApertura:hoy,vidaUtilDias:30};
   const [formFiltroEpp, setFormFiltroEpp] = React.useState(emptyFiltroEpp);
@@ -13667,6 +13691,41 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
   };
   const ESTADO_EPP_COLOR = {vigente:"#4ade80", por_vencer:"#fbbf24", vencido:"#ef4444", fuera_de_servicio:"#6b7280"};
   const ESTADO_EPP_LABEL = {vigente:"Vigente", por_vencer:"Por vencer", vencido:"Vencido", fuera_de_servicio:"Fuera de servicio"};
+
+  const iniciarRepartoEpp = (borrador) => {
+    setAsignandoEppId(borrador.id);
+    setRepartoEppForm({
+      tipo: borrador.tipo||"", agente: borrador.agente||"", unidad: borrador.unidad||"unidad",
+      modelo: borrador.modelo||"", registroISP: borrador.registroISP||"", fechaVencimiento:"", labor:"",
+      filas:[{trabajadorId:"", cantidad:borrador.cantidad||1, talla:""}],
+    });
+  };
+  const confirmarRepartoEpp = () => {
+    const arr = Array.isArray(eppEntregas)?eppEntregas:[];
+    const borrador = arr.find(e=>e.id===asignandoEppId);
+    if(!borrador) return;
+    if(!repartoEppForm.tipo){ alert("Selecciona el tipo de EPP."); return; }
+    const filasValidas = repartoEppForm.filas.filter(f=>f.trabajadorId&&Number(f.cantidad)>0);
+    if(!filasValidas.length){ alert("Agrega al menos un trabajador con cantidad."); return; }
+    const totalRepartido = filasValidas.reduce((a,f)=>a+Number(f.cantidad),0);
+    const totalComprado = Number(borrador.cantidad||0);
+    if(totalRepartido>totalComprado){ alert(`Estás repartiendo ${totalRepartido} unidad(es), pero la compra fue de ${totalComprado}.`); return; }
+    const nuevasEntregas = filasValidas.map(f=>({
+      id:Date.now()+Math.random(), trabajadorId:f.trabajadorId, tipo:repartoEppForm.tipo, agente:repartoEppForm.agente,
+      labor:repartoEppForm.labor, cantidad:Number(f.cantidad), unidad:repartoEppForm.unidad||"unidad", talla:f.talla, modelo:repartoEppForm.modelo,
+      registroISP:repartoEppForm.registroISP, proveedor:borrador.proveedor||"", fechaEntrega:borrador.fechaEntrega||hoy,
+      fechaVencimiento:repartoEppForm.fechaVencimiento, observaciones:borrador.observaciones||"", firmaRecepcion:false,
+      registradoPor:currentUserId, docRef:borrador.docRef,
+    }));
+    const restante = totalComprado-totalRepartido;
+    setEppEntregas(prev=>{
+      const prevArr = Array.isArray(prev)?prev:[];
+      let sinBorrador = prevArr.filter(e=>e.id!==borrador.id);
+      if(restante>0) sinBorrador = [...sinBorrador, {...borrador, cantidad:restante}]; // lo que falta por repartir sigue pendiente
+      return [...nuevasEntregas, ...sinBorrador];
+    });
+    setAsignandoEppId(null); setRepartoEppForm(emptyRepartoEpp);
+  };
 
   const guardarEntregaEpp = () => {
     if(!formEntregaEpp.trabajadorId||!formEntregaEpp.tipo){ alert("Selecciona trabajador y tipo de EPP."); return; }
@@ -13719,7 +13778,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
         <tr><td class="lbl">Registro ISP</td><td>${e.registroISP||"—"}</td></tr>
         <tr><td class="lbl">Fecha de vencimiento</td><td>${e.fechaVencimiento||"—"}</td></tr>
         <tr><td class="lbl">Talla</td><td>${e.talla||"—"}</td></tr>
-        <tr><td class="lbl">Cantidad</td><td>${e.cantidad}</td></tr>
+        <tr><td class="lbl">Cantidad</td><td>${e.cantidad} ${e.unidad||"unidad"}</td></tr>
         <tr><td class="lbl">Labor asociada</td><td>${e.labor||"—"}</td></tr>
         <tr><td class="lbl">Proveedor</td><td>${e.proveedor||"—"}</td></tr>
         <tr><td class="lbl">Observaciones</td><td>${e.observaciones||"—"}</td></tr>
@@ -13964,27 +14023,63 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
             <div style={{...S.card,padding:16,marginBottom:14,background:"rgba(251,191,36,0.06)",borderColor:"rgba(251,191,36,0.3)"}}>
               <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#fbbf24",marginBottom:10}}>⏳ Pendientes de asignar (desde Compras)</div>
               {(Array.isArray(eppEntregas)?eppEntregas:[]).filter(e=>e.borrador).map(e=>(
-                <div key={e.id} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",gap:8,alignItems:"center",padding:"8px 0",borderTop:"1px solid rgba(255,255,255,0.06)"}}>
-                  <div style={{fontSize:12}}>{e.descripcionCompra}<div style={{fontSize:10,color:"#6aaa7a"}}>{e.observaciones}</div></div>
-                  <select style={{...S.input,fontSize:12,padding:"6px 8px"}} value={e.trabajadorId} onChange={ev=>setEppEntregas((Array.isArray(eppEntregas)?eppEntregas:[]).map(x=>x.id===e.id?{...x,trabajadorId:ev.target.value}:x))}>
-                    <option value="">Trabajador...</option>
-                    {personalArrEpp.map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}
-                  </select>
-                  <select style={{...S.input,fontSize:12,padding:"6px 8px"}} value={e.tipo} onChange={ev=>{
-                    const sel=TIPOS_EPP_FLAT.find(t=>t.tipo===ev.target.value);
-                    setEppEntregas((Array.isArray(eppEntregas)?eppEntregas:[]).map(x=>x.id===e.id?{...x,tipo:ev.target.value,agente:sel?sel.agente:""}:x));
-                  }}>
-                    <option value="">Tipo de EPP...</option>
-                    {AGENTES_RIESGO_EPP.filter(a=>!a.sinEppFisico).map(a=>(
-                      <optgroup key={a.id} label={a.label} style={{background:"#0d1f13",color:"#7dd3fc",fontWeight:700}}>
-                        {a.epp.map(tipo=><option key={tipo} value={tipo} style={{background:"#1a3a22",color:"#e8f5e9"}}>{tipo}</option>)}
-                      </optgroup>
-                    ))}
-                  </select>
-                  <button className="btn-p" style={{...S.btn,fontSize:11,padding:"6px 10px"}} disabled={!e.trabajadorId||!e.tipo}
-                    onClick={()=>setEppEntregas((Array.isArray(eppEntregas)?eppEntregas:[]).map(x=>x.id===e.id?{...x,borrador:false}:x))}>
-                    ✓ Confirmar
-                  </button>
+                <div key={e.id} style={{padding:"10px 0",borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                    <div style={{fontSize:12}}>
+                      {e.descripcionCompra} <span style={{color:"#fbbf24",fontWeight:700}}>· {e.cantidad} sin repartir</span>
+                      <div style={{fontSize:10,color:"#6aaa7a"}}>{e.observaciones}</div>
+                    </div>
+                    {asignandoEppId!==e.id&&<button className="btn-p" style={{...S.btn,fontSize:11,padding:"6px 10px"}} onClick={()=>iniciarRepartoEpp(e)}>📋 Asignar / repartir</button>}
+                  </div>
+                  {asignandoEppId===e.id&&(
+                    <div style={{...S.card,padding:14,marginTop:10,background:"rgba(255,255,255,0.03)"}}>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
+                        <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Tipo de EPP</label>
+                          <select style={{...S.input,fontSize:12}} value={repartoEppForm.tipo} onChange={ev=>{
+                            const sel=TIPOS_EPP_FLAT.find(t=>t.tipo===ev.target.value);
+                            setRepartoEppForm(p=>({...p,tipo:ev.target.value,agente:sel?sel.agente:""}));
+                          }}>
+                            <option value="">Seleccionar...</option>
+                            {AGENTES_RIESGO_EPP.filter(a=>!a.sinEppFisico).map(a=>(
+                              <optgroup key={a.id} label={a.label} style={{background:"#0d1f13",color:"#7dd3fc",fontWeight:700}}>
+                                {a.epp.map(tipo=><option key={tipo} value={tipo} style={{background:"#1a3a22",color:"#e8f5e9"}}>{tipo}</option>)}
+                              </optgroup>
+                            ))}
+                          </select>
+                        </div>
+                        <div><label style={labelSt}>Modelo</label><input style={{...S.input,fontSize:12}} placeholder="ej: 3M 6200" value={repartoEppForm.modelo} onChange={ev=>setRepartoEppForm(p=>({...p,modelo:ev.target.value}))}/></div>
+                        <div><label style={labelSt}>Registro ISP</label><input style={{...S.input,fontSize:12}} value={repartoEppForm.registroISP} onChange={ev=>setRepartoEppForm(p=>({...p,registroISP:ev.target.value}))}/></div>
+                        <div><label style={labelSt}>Unidad de medida</label>
+                          <select style={{...S.input,fontSize:12}} value={repartoEppForm.unidad} onChange={ev=>setRepartoEppForm(p=>({...p,unidad:ev.target.value}))}>
+                            {["unidad","par","caja","paquete","set"].map(u=><option key={u} value={u}>{u}</option>)}
+                          </select>
+                        </div>
+                        <div><label style={labelSt}>Fecha de vencimiento (opcional)</label><input type="date" style={{...S.input,fontSize:12}} value={repartoEppForm.fechaVencimiento} onChange={ev=>setRepartoEppForm(p=>({...p,fechaVencimiento:ev.target.value}))}/></div>
+                        <div><label style={labelSt}>Labor asociada</label><input style={{...S.input,fontSize:12}} value={repartoEppForm.labor} onChange={ev=>setRepartoEppForm(p=>({...p,labor:ev.target.value}))}/></div>
+                      </div>
+
+                      <div style={{fontSize:11,color:"#8aba9a",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.5px"}}>
+                        Repartir entre trabajadores ({repartoEppForm.filas.reduce((a,f)=>a+(Number(f.cantidad)||0),0)} / {e.cantidad} {repartoEppForm.unidad})
+                      </div>
+                      {repartoEppForm.filas.map((fila,i)=>(
+                        <div key={i} style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr auto",gap:6,marginBottom:6,alignItems:"center"}}>
+                          <select style={{...S.input,fontSize:12,padding:"6px 8px"}} value={fila.trabajadorId} onChange={ev=>setRepartoEppForm(p=>({...p,filas:p.filas.map((f,fi)=>fi===i?{...f,trabajadorId:ev.target.value}:f)}))}>
+                            <option value="">Trabajador...</option>
+                            {personalArrEpp.map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}
+                          </select>
+                          <input type="number" min={1} style={{...S.input,fontSize:12,padding:"6px 8px"}} value={fila.cantidad} onChange={ev=>setRepartoEppForm(p=>({...p,filas:p.filas.map((f,fi)=>fi===i?{...f,cantidad:ev.target.value}:f)}))}/>
+                          <input placeholder="Talla" style={{...S.input,fontSize:12,padding:"6px 8px"}} value={fila.talla} onChange={ev=>setRepartoEppForm(p=>({...p,filas:p.filas.map((f,fi)=>fi===i?{...f,talla:ev.target.value}:f)}))}/>
+                          <button style={{...S.btn,fontSize:11,padding:"6px 8px",background:"rgba(239,68,68,0.1)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.25)"}} disabled={repartoEppForm.filas.length===1} onClick={()=>setRepartoEppForm(p=>({...p,filas:p.filas.filter((_,fi)=>fi!==i)}))}>🗑️</button>
+                        </div>
+                      ))}
+                      <button className="btn-g" style={{...S.btn,fontSize:11,padding:"5px 10px",marginBottom:12}} onClick={()=>setRepartoEppForm(p=>({...p,filas:[...p.filas,{trabajadorId:"",cantidad:1,talla:""}]}))}>+ Agregar otro trabajador</button>
+
+                      <div style={{display:"flex",gap:8}}>
+                        <button className="btn-p" style={{...S.btn,fontSize:12}} onClick={confirmarRepartoEpp}>✓ Confirmar reparto</button>
+                        <button className="btn-g" style={{...S.btn,fontSize:12}} onClick={()=>{setAsignandoEppId(null);setRepartoEppForm(emptyRepartoEpp);}}>Cancelar</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -14025,6 +14120,11 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                 <div><label style={labelSt}>Fecha de entrega</label><input type="date" style={S.input} value={formEntregaEpp.fechaEntrega} onChange={e=>setFormEntregaEpp(p=>({...p,fechaEntrega:e.target.value}))}/></div>
                 <div><label style={labelSt}>Labor asociada</label><input style={S.input} value={formEntregaEpp.labor} onChange={e=>setFormEntregaEpp(p=>({...p,labor:e.target.value}))}/></div>
                 <div><label style={labelSt}>Cantidad</label><input type="number" min={1} style={S.input} value={formEntregaEpp.cantidad} onChange={e=>setFormEntregaEpp(p=>({...p,cantidad:e.target.value}))}/></div>
+                <div><label style={labelSt}>Unidad de medida</label>
+                  <select style={S.input} value={formEntregaEpp.unidad} onChange={e=>setFormEntregaEpp(p=>({...p,unidad:e.target.value}))}>
+                    {["unidad","par","caja","paquete","set"].map(u=><option key={u} value={u}>{u}</option>)}
+                  </select>
+                </div>
                 <div><label style={labelSt}>Talla (opcional)</label><input style={S.input} value={formEntregaEpp.talla} onChange={e=>setFormEntregaEpp(p=>({...p,talla:e.target.value}))}/></div>
                 <div><label style={labelSt}>Modelo</label><input style={S.input} placeholder="ej: 3M 6200" value={formEntregaEpp.modelo} onChange={e=>setFormEntregaEpp(p=>({...p,modelo:e.target.value}))}/></div>
                 <div><label style={labelSt}>Registro ISP</label><input style={S.input} placeholder="N° de registro sanitario ISP" value={formEntregaEpp.registroISP} onChange={e=>setFormEntregaEpp(p=>({...p,registroISP:e.target.value}))}/></div>
@@ -14055,7 +14155,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                       <td style={{padding:"6px 8px"}}>{e.tipo}</td>
                       <td style={{padding:"6px 8px"}}>{e.modelo||"—"}{e.registroISP?<div style={{fontSize:10,color:"#6aaa7a"}}>ISP: {e.registroISP}</div>:null}</td>
                       <td style={{padding:"6px 8px"}}>{e.labor}</td>
-                      <td style={{padding:"6px 8px"}}>{e.cantidad}</td>
+                      <td style={{padding:"6px 8px"}}>{e.cantidad} {e.unidad||"unidad"}</td>
                       <td style={{padding:"6px 8px",color:estVenc?ESTADO_EPP_COLOR[estVenc]:"#4a7a5a"}}>{e.fechaVencimiento?`${e.fechaVencimiento} · ${ESTADO_EPP_LABEL[estVenc]}`:"—"}</td>
                       <td style={{padding:"6px 8px"}}>{e.firmaRecepcion?"✓":(puedeRegistrarBasicoEPP?<button className="btn-g" style={{...S.btn,fontSize:10,padding:"3px 8px"}} onClick={()=>marcarFirmaEntrega(e.id)}>Marcar firmada</button>:"—")}</td>
                       <td style={{padding:"6px 8px",whiteSpace:"nowrap"}}>
