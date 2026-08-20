@@ -14902,7 +14902,38 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                           <div class="subtitulo">Departamento de Áreas Verdes · Estadio Español · ${hoyStr}</div>
                           ${bencHTML}
                           <h3>📦 Inventario por Categoría${esMaq&&selMaq.length>0?" ("+selMaq.length+" equipo"+(selMaq.length!==1?"s":"")+" seleccionados)":""}</h3>
-                          ${itemsHTML}</body></html>`;
+                          ${itemsHTML}
+                          ${(()=>{
+                            const nombreItem = (id)=>(bd.items||[]).find(i=>String(i.id)===String(id))?.nombre||"—";
+                            const movsRecientes = (bd.movimientos||[]).slice(0,50);
+                            const traslRecientes = (bd.traslados||[]).slice(0,50);
+                            const filasMov = movsRecientes.map(m=>`<tr>
+                              <td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px">${m.fecha||"—"}</td>
+                              <td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px;font-weight:600;color:${m.tipo==="entrada"?"#2e7d32":"#c62828"}">${m.tipo==="entrada"?"⬆️ Entrada":"⬇️ Salida"}</td>
+                              <td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px">${m.itemNombre||nombreItem(m.itemId)}</td>
+                              <td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px;text-align:right">${m.cantidad||0} ${m.unidad||""}</td>
+                              <td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px">${m.motivo||m.docRef||"—"}</td>
+                              <td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px">${m.responsable||"—"}</td>
+                            </tr>`).join("");
+                            const filasTrasl = traslRecientes.map(t=>`<tr>
+                              <td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px">${t.fecha||"—"}</td>
+                              <td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px">${nombreItem(t.itemId)}</td>
+                              <td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px;text-align:right">${t.cantidad||0}</td>
+                              <td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px">${t.destino||"—"}</td>
+                              <td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px">${t.conRegreso?(t.estado==="regresó"?`✅ Regresó ${t.fechaRegresoReal||""}`:`🔄 En camino${t.fechaRegreso?` (vuelve ${t.fechaRegreso})`:""}`):"➡️ Sin regreso"}</td>
+                              <td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px">${t.responsable||"—"}</td>
+                            </tr>`).join("");
+                            return `
+                              <h3>🔄 Movimientos recientes${movsRecientes.length?` (últimos ${movsRecientes.length})`:""}</h3>
+                              ${filasMov?`<table><thead><tr>
+                                <th>Fecha</th><th>Tipo</th><th>Ítem</th><th>Cantidad</th><th>Motivo/Doc.</th><th>Responsable</th>
+                              </tr></thead><tbody>${filasMov}</tbody></table>`:`<div style="font-size:11px;color:#888;margin-bottom:16px">Sin movimientos registrados.</div>`}
+                              <h3>🚛 Traslados${traslRecientes.length?` (últimos ${traslRecientes.length})`:""}</h3>
+                              ${filasTrasl?`<table><thead><tr>
+                                <th>Fecha</th><th>Ítem</th><th>Cantidad</th><th>Destino</th><th>Estado</th><th>Responsable</th>
+                              </tr></thead><tbody>${filasTrasl}</tbody></table>`:`<div style="font-size:11px;color:#888;margin-bottom:16px">Sin traslados registrados.</div>`}
+                            `;
+                          })()}</body></html>`;
                           const url=URL.createObjectURL(new Blob([html],{type:"text/html"}));const a=document.createElement("a");a.href=url;a.target="_blank";a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);
                         }}>🖨️ Imprimir informe{esMaq&&selMaq.length>0?` (${selMaq.length} equipo${selMaq.length!==1?"s":""})`:""}</button>
                     </div>
