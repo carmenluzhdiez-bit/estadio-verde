@@ -9056,7 +9056,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                       <div><label style={labelSt}>Cantidad</label><input type="number" min={1} step={0.01} style={S.input} value={item.cantidad} onChange={e=>updateItem(idx,{cantidad:e.target.value})}/></div>
                       <div><label style={labelSt}>Unidad</label>
                         <select style={S.input} value={item.unidad} onChange={e=>updateItem(idx,{unidad:e.target.value})}>
-                          {["unidad","kg","L","ml","g","m²","m","hora","servicio","saco","caja"].map(u=><option key={u}>{u}</option>)}
+                          {["unidad","kg","L","ml","g","m²","m³","m","hora","servicio","saco","caja"].map(u=><option key={u}>{u}</option>)}
                         </select>
                       </div>
                       <div><label style={labelSt}>P. unitario neto</label><input type="number" min={0} style={S.input} value={item.precioUnitario} onChange={e=>updateItem(idx,{precioUnitario:e.target.value})}/></div>
@@ -14442,7 +14442,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                         <td style={{padding:"4px 6px"}}><select style={{...S.input,fontSize:12,padding:"5px 8px"}} value={item.categoria} onChange={e=>setInventItems(p=>p.map((x,i)=>i===idx?{...x,categoria:e.target.value}:x))}>
                           <option value="">—</option>{bodega.categorias.map(optC=><option key={optC}>{optC}</option>)}</select></td>
                         <td style={{padding:"4px 6px"}}><select style={{...S.input,fontSize:12,padding:"5px 8px"}} value={item.unidad} onChange={e=>setInventItems(p=>p.map((x,i)=>i===idx?{...x,unidad:e.target.value}:x))}>
-                          {["unidad","kg","L","m","m²","saco","caja","bolsa","par","set"].map(u=><option key={u}>{u}</option>)}</select></td>
+                          {["unidad","kg","L","m","m²","m³","saco","caja","bolsa","par","set"].map(u=><option key={u}>{u}</option>)}</select></td>
                         <td style={{padding:"4px 6px"}}><input type="text" inputMode="decimal" style={{...S.input,fontSize:12,padding:"5px 8px",textAlign:"center"}} placeholder="ej: 1.3" value={item.stockActual} onChange={e=>setInventItems(p=>p.map((x,i)=>i===idx?{...x,stockActual:e.target.value}:x))}/></td>
                         <td style={{padding:"4px 6px"}}><input type="text" inputMode="decimal" style={{...S.input,fontSize:12,padding:"5px 8px",textAlign:"center"}} placeholder="ej: 0.5" value={item.stockMinimo} onChange={e=>setInventItems(p=>p.map((x,i)=>i===idx?{...x,stockMinimo:e.target.value}:x))}/></td>
                         <td style={{padding:"4px 6px"}}><input style={{...S.input,fontSize:12,padding:"5px 8px"}} placeholder="ej: Estante A" value={item.ubicacion} onChange={e=>setInventItems(p=>p.map((x,i)=>i===idx?{...x,ubicacion:e.target.value}:x))}/></td>
@@ -14473,7 +14473,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                 </div>
                 <div><label style={labelSt}>Unidad</label>
                   <select style={S.input} value={itemForm.unidad} onChange={e=>setItemForm(p=>({...p,unidad:e.target.value}))}>
-                    {["unidad","kg","L","m","m²","saco","caja","bolsa","par","set"].map(u=><option key={u}>{u}</option>)}
+                    {["unidad","kg","L","m","m²","m³","saco","caja","bolsa","par","set"].map(u=><option key={u}>{u}</option>)}
                   </select>
                 </div>
                 <div><label style={labelSt}>Stock actual</label><input type="text" inputMode="decimal" style={S.input} value={itemForm.stockActual} placeholder="ej: 1.3" onChange={e=>setItemForm(p=>({...p,stockActual:e.target.value}))}/></div>
