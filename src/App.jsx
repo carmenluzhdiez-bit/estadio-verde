@@ -13759,7 +13759,15 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
       // Son copias exactas del mismo registro (creadas por el bug al re-guardar
       // la compra) — se descartan las copias de más, NO se suman cantidades,
       // ya que representan la misma compra contada varias veces, no compras distintas.
-      return grupo[0];
+      // Se prioriza conservar la copia con más datos completos (modelo/registro
+      // ISP), no simplemente la primera — para no perder correcciones hechas
+      // después de la compra original.
+      const mejor = [...grupo].sort((a,b)=>{
+        const puntajeA = (a.modelo?1:0)+(a.registroISP?1:0);
+        const puntajeB = (b.modelo?1:0)+(b.registroISP?1:0);
+        return puntajeB-puntajeA;
+      })[0];
+      return mejor;
     });
     if(eliminados===0){ alert("No se encontraron pendientes duplicados — todo está en orden."); return; }
     if(!window.confirm(`Se encontraron ${eliminados} copia(s) duplicada(s). ¿Descartarlas, dejando solo una por artículo (sin sumar cantidades)?`)) return;
