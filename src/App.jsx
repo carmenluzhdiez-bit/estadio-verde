@@ -8543,6 +8543,8 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     return Object.values(porClave).sort((a,b)=>a.localeCompare(b,"es"));
   })();
 
+  const esSinIva = ["Boleta","Boleta de Honorarios","Nota de Crédito"].includes(form.tipoDoc);
+
   return (
     <div className="ein">
       <div style={{marginBottom:16}}>
@@ -9075,15 +9077,15 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                         </select>
                       </div>
                     </div>
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8}}>
+                    <div style={{display:"grid",gridTemplateColumns:esSinIva?"1fr 1fr 1fr":"1fr 1fr 1fr 1fr",gap:8}}>
                       <div><label style={labelSt}>Cantidad</label><input type="number" min={1} step={0.01} style={S.input} value={item.cantidad} onChange={e=>updateItem(idx,{cantidad:e.target.value})}/></div>
                       <div><label style={labelSt}>Unidad</label>
                         <select style={S.input} value={item.unidad} onChange={e=>updateItem(idx,{unidad:e.target.value})}>
                           {["unidad","kg","L","ml","g","m²","m³","m","hora","servicio","saco","caja"].map(u=><option key={u}>{u}</option>)}
                         </select>
                       </div>
-                      <div><label style={labelSt}>{["Boleta","Boleta de Honorarios","Nota de Crédito"].includes(form.tipoDoc)?"P. unitario (total, sin IVA)":"P. unitario neto"}</label><input type="number" min={0} style={S.input} value={item.precioUnitario} onChange={e=>updateItem(idx,{precioUnitario:e.target.value})}/></div>
-                      <div><label style={labelSt}>Total bruto</label><input type="number" style={{...S.input,background:"rgba(59,130,246,0.08)",fontWeight:600}} value={item.totalBruto} readOnly/></div>
+                      <div><label style={labelSt}>{esSinIva?"Valor unitario":"P. unitario neto"}</label><input type="number" min={0} style={S.input} value={item.precioUnitario} onChange={e=>updateItem(idx,{precioUnitario:e.target.value})}/></div>
+                      {!esSinIva&&<div><label style={labelSt}>Total bruto</label><input type="number" style={{...S.input,background:"rgba(59,130,246,0.08)",fontWeight:600}} value={item.totalBruto} readOnly/></div>}
                     </div>
                     <div style={{marginTop:8}}>
                       <label style={labelSt}>📦 Ingresar a bodega</label>
@@ -9117,10 +9119,14 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                   </div>
                 ))}
                 {/* Totales documento */}
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginTop:10,background:"rgba(59,130,246,0.06)",borderRadius:8,padding:"10px 12px",border:"1px solid rgba(59,130,246,0.15)"}}>
-                  <div><label style={labelSt}>Total neto</label><input type="number" style={{...S.input,background:"rgba(59,130,246,0.08)"}} value={form.totalNetoDoc} readOnly/></div>
-                  <div><label style={labelSt}>IVA 19%</label><input type="number" style={{...S.input,background:"rgba(59,130,246,0.08)"}} value={form.ivaDoc} readOnly/></div>
-                  <div><label style={labelSt}>Total bruto</label><input type="number" style={{...S.input,background:"rgba(59,130,246,0.12)",fontWeight:700,color:"#93c5fd"}} value={form.totalBrutoDoc} readOnly/></div>
+                <div style={{display:"grid",gridTemplateColumns:esSinIva?"1fr":"1fr 1fr 1fr",gap:8,marginTop:10,background:"rgba(59,130,246,0.06)",borderRadius:8,padding:"10px 12px",border:"1px solid rgba(59,130,246,0.15)"}}>
+                  {esSinIva ? (
+                    <div><label style={labelSt}>Total documento</label><input type="number" style={{...S.input,background:"rgba(59,130,246,0.12)",fontWeight:700,color:"#93c5fd"}} value={form.totalBrutoDoc} readOnly/></div>
+                  ) : (<>
+                    <div><label style={labelSt}>Total neto</label><input type="number" style={{...S.input,background:"rgba(59,130,246,0.08)"}} value={form.totalNetoDoc} readOnly/></div>
+                    <div><label style={labelSt}>IVA 19%</label><input type="number" style={{...S.input,background:"rgba(59,130,246,0.08)"}} value={form.ivaDoc} readOnly/></div>
+                    <div><label style={labelSt}>Total bruto</label><input type="number" style={{...S.input,background:"rgba(59,130,246,0.12)",fontWeight:700,color:"#93c5fd"}} value={form.totalBrutoDoc} readOnly/></div>
+                  </>)}
                 </div>
               </div>
 
