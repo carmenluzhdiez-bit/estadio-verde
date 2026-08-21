@@ -9082,7 +9082,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                           {["unidad","kg","L","ml","g","m²","m³","m","hora","servicio","saco","caja"].map(u=><option key={u}>{u}</option>)}
                         </select>
                       </div>
-                      <div><label style={labelSt}>P. unitario neto</label><input type="number" min={0} style={S.input} value={item.precioUnitario} onChange={e=>updateItem(idx,{precioUnitario:e.target.value})}/></div>
+                      <div><label style={labelSt}>{["Boleta","Boleta de Honorarios","Nota de Crédito"].includes(form.tipoDoc)?"P. unitario (total, sin IVA)":"P. unitario neto"}</label><input type="number" min={0} style={S.input} value={item.precioUnitario} onChange={e=>updateItem(idx,{precioUnitario:e.target.value})}/></div>
                       <div><label style={labelSt}>Total bruto</label><input type="number" style={{...S.input,background:"rgba(59,130,246,0.08)",fontWeight:600}} value={item.totalBruto} readOnly/></div>
                     </div>
                     <div style={{marginTop:8}}>
