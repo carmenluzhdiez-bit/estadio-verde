@@ -9496,10 +9496,11 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                     <div style={{borderTop:"1px solid rgba(255,255,255,0.07)",paddingTop:10,marginBottom:10}}>
                       {itemsRend.map(c=>{
                         const items=c.items||[{descripcion:c.descripcion}];
+                        const esNC = c.tipoDoc==="Nota de Crédito";
                         return <div key={c.id} style={{fontSize:12,color:"#7aaa80",padding:"3px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
                           <div style={{display:"flex",justifyContent:"space-between"}}>
-                            <span>{c.proveedor} · {c.tipoDoc} {c.nDocumento} ({items.length} ítem{items.length!==1?"s":""})</span>
-                            <span style={{fontWeight:600,color:"#93c5fd"}}>${Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0).toLocaleString("es-CL")}</span>
+                            <span>{c.proveedor} · {c.tipoDoc} {c.nDocumento} ({items.length} ítem{items.length!==1?"s":""}){esNC&&<span style={{color:"#f87171",fontWeight:600}}> · descuenta del total</span>}</span>
+                            <span style={{fontWeight:600,color:esNC?"#f87171":"#93c5fd"}}>{esNC?"− ":""}${Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0).toLocaleString("es-CL")}</span>
                           </div>
                         </div>;
                       })}
