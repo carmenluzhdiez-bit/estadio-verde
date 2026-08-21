@@ -8387,6 +8387,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     const filas = itemsRend.map(c=>{
       const items = c.items||[{descripcion:c.descripcion,cantidad:c.cantidad||1,unidad:c.unidad||"unidad",totalNeto:c.totalNeto||0,iva:c.iva||0,totalBruto:c.totalBruto||0}];
       const esNC = c.tipoDoc==="Nota de Crédito";
+      const esSinIvaDoc = ["Boleta","Boleta de Honorarios","Nota de Crédito"].includes(c.tipoDoc);
       const totalDoc = Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
       const notasVinc = compras.filter(np=>np.facturaId===c.id);
       const notasHtml = notasVinc.length>0?`<tr><td colspan="8" style="padding:3px 8px 3px 24px;font-size:10px;color:#777;background:#fffde7;border:1px solid #e0e0e0"><em>NP vinculadas: ${notasVinc.map(np=>"NP "+np.nDocumento+" ("+np.fecha+")").join(", ")}</em></td></tr>`:"";
@@ -8395,8 +8396,8 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
         <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.tipoDoc} N°${c.nDocumento||"—"}</td>
         <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.proveedor||"—"}</td>
         <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${items.map(it=>it.descripcion+(it.categoria?" ("+it.categoria+")":"")).join("<br>")}</td>
-        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right">${esNC?"-":""}$${items.reduce((a,it)=>a+Number(it.totalNeto||0),0).toLocaleString("es-CL")}</td>
-        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right">${esNC?"-":""}$${items.reduce((a,it)=>a+Number(it.iva||0),0).toLocaleString("es-CL")}</td>
+        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right">${esSinIvaDoc?"":(esNC?"-":"")+"$"+items.reduce((a,it)=>a+Number(it.totalNeto||0),0).toLocaleString("es-CL")}</td>
+        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right">${esSinIvaDoc?"":(esNC?"-":"")+"$"+items.reduce((a,it)=>a+Number(it.iva||0),0).toLocaleString("es-CL")}</td>
         <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right;font-weight:bold;color:${esNC?"#c62828":"inherit"}">${esNC?"-":""}$${totalDoc.toLocaleString("es-CL")}</td>
         <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.cuenta||"—"}</td>
       </tr>${notasHtml}`;
