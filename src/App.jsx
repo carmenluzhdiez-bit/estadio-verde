@@ -8473,14 +8473,15 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   // Fondo disponible real = saldo anterior (si no hay reembolso pendiente → fondo base)
   // Si hay rendición pendiente de reembolso → el fondo real es el saldo anterior
   // Cuando llega el reembolso → el fondo vuelve a $3.000.000
-  const totalGeneral = compras.reduce((a,c)=>a+(c.tipoDoc==="Nota de Crédito"?-1:1)*Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
+  const totalGeneral = compras.filter(c=>!["Guía de Despacho","Nota de Pedido","Cotización","Orden de Compra"].includes(c.tipoDoc)).reduce((a,c)=>a+(c.tipoDoc==="Nota de Crédito"?-1:1)*Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
   const totalReembolsado = rendiciones.reduce((a,r)=>a+(r.reembolso?Number(r.montoReembolso||0):0),0);
   const hayRendicionPendiente = rendiciones.some(r=>!r.reembolso);
   // Si hay saldo anterior ingresado → ese es el fondo actual (reembolso pendiente)
   // Si no hay saldo anterior → fondo base ($3M)
   const fondoActual = Number(saldoAnterior)>0 ? Number(saldoAnterior) : fondo;
   const gastadoPendiente = compras
-    .filter(c=>["pendiente","pagada","pagada_efectivo","pagada_debito","en_rendicion"].includes(c.estado))
+    .filter(c=>["pendiente","pagada","pagada_efectivo","pagada_debito","en_rendicion"].includes(c.estado)
+      && !["Guía de Despacho","Nota de Pedido","Cotización","Orden de Compra"].includes(c.tipoDoc))
     .reduce((a,c)=>{
       const monto = Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
       // Nota de Crédito descuenta del gasto (recuperación de dinero)
@@ -8491,7 +8492,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   const colorSaldo      = saldoDisponible>fondoActual*0.4?"#22c55e":saldoDisponible>fondoActual*0.15?"#f59e0b":"#ef4444";
 
   const porCuenta = TODAS_CUENTAS.map(cu=>{
-    const items=compras.filter(c=>c.cuenta===cu);
+    const items=compras.filter(c=>c.cuenta===cu&&!["Guía de Despacho","Nota de Pedido","Cotización","Orden de Compra"].includes(c.tipoDoc));
     const total=items.reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
     return {cuenta:cu,total,n:items.length,esInterna:CUENTAS_INTERNAS.includes(cu)};
   }).filter(x=>x.total>0).sort((a,b)=>b.total-a.total);
