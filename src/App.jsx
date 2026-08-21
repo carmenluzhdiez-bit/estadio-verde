@@ -8347,7 +8347,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   const crearRendicion = () => {
     if(!seleccionadas.length) return;
     const items = compras.filter(c=>seleccionadas.includes(c.id));
-    const total = items.reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
+    const total = items.reduce((a,c)=>a+(c.tipoDoc==="Nota de Crédito"?-1:1)*Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
     const nueva = {id:Date.now(),fecha:rendForm.fecha,obs:rendForm.obs,items:seleccionadas,total,estado:"presentada",reembolso:false,montoReembolso:0,fechaReembolso:"",nTransReembolso:""};
     set({compras:compras.map(compraC=>seleccionadas.includes(compraC.id)?{...compraC,estado:"en_rendicion"}:compraC),rendiciones:[nueva,...rendiciones]});
     setSeleccionadas([]); setRendForm({fecha:hoy.toISOString().slice(0,10),obs:""}); setShowRendForm(false);
@@ -8381,11 +8381,12 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     const porCuentaRend = {};
     itemsRend.forEach(c=>{
       if(!porCuentaRend[c.cuenta]) porCuentaRend[c.cuenta]={total:0,n:0};
-      porCuentaRend[c.cuenta].total += Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
+      porCuentaRend[c.cuenta].total += (c.tipoDoc==="Nota de Crédito"?-1:1)*Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
       porCuentaRend[c.cuenta].n++;
     });
     const filas = itemsRend.map(c=>{
       const items = c.items||[{descripcion:c.descripcion,cantidad:c.cantidad||1,unidad:c.unidad||"unidad",totalNeto:c.totalNeto||0,iva:c.iva||0,totalBruto:c.totalBruto||0}];
+      const esNC = c.tipoDoc==="Nota de Crédito";
       const totalDoc = Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
       const notasVinc = compras.filter(np=>np.facturaId===c.id);
       const notasHtml = notasVinc.length>0?`<tr><td colspan="8" style="padding:3px 8px 3px 24px;font-size:10px;color:#777;background:#fffde7;border:1px solid #e0e0e0"><em>NP vinculadas: ${notasVinc.map(np=>"NP "+np.nDocumento+" ("+np.fecha+")").join(", ")}</em></td></tr>`:"";
@@ -8394,15 +8395,15 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
         <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.tipoDoc} N°${c.nDocumento||"—"}</td>
         <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.proveedor||"—"}</td>
         <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${items.map(it=>it.descripcion+(it.categoria?" ("+it.categoria+")":"")).join("<br>")}</td>
-        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right">$${items.reduce((a,it)=>a+Number(it.totalNeto||0),0).toLocaleString("es-CL")}</td>
-        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right">$${items.reduce((a,it)=>a+Number(it.iva||0),0).toLocaleString("es-CL")}</td>
-        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right;font-weight:bold">$${totalDoc.toLocaleString("es-CL")}</td>
+        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right">${esNC?"-":""}$${items.reduce((a,it)=>a+Number(it.totalNeto||0),0).toLocaleString("es-CL")}</td>
+        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right">${esNC?"-":""}$${items.reduce((a,it)=>a+Number(it.iva||0),0).toLocaleString("es-CL")}</td>
+        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right;font-weight:bold;color:${esNC?"#c62828":"inherit"}">${esNC?"-":""}$${totalDoc.toLocaleString("es-CL")}</td>
         <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.cuenta||"—"}</td>
       </tr>${notasHtml}`;
     }).join("");
     const subtotales = Object.entries(porCuentaRend).map(([cu,d])=>`<tr style="background:#f5f5f5"><td colspan="6" style="padding:4px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right">Subtotal ${cu}:</td><td style="padding:4px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right;font-weight:600">$${d.total.toLocaleString("es-CL")}</td><td style="padding:4px 8px;border:1px solid #e0e0e0;font-size:10px;color:#888">${d.n} doc.</td></tr>`).join("");
-    const totalNeto  = itemsRend.reduce((a,c)=>a+Number((c.items||[]).reduce((b,it)=>b+Number(it.totalNeto||0),0)||c.totalNeto||0),0);
-    const totalIva   = itemsRend.reduce((a,c)=>a+Number((c.items||[]).reduce((b,it)=>b+Number(it.iva||0),0)||c.iva||0),0);
+    const totalNeto  = itemsRend.reduce((a,c)=>a+(c.tipoDoc==="Nota de Crédito"?-1:1)*Number((c.items||[]).reduce((b,it)=>b+Number(it.totalNeto||0),0)||c.totalNeto||0),0);
+    const totalIva   = itemsRend.reduce((a,c)=>a+(c.tipoDoc==="Nota de Crédito"?-1:1)*Number((c.items||[]).reduce((b,it)=>b+Number(it.iva||0),0)||c.iva||0),0);
     const totalBruto = r.total;
     const pendienteReembolso = fondo - Number(saldoAnterior||0);
     const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Rendicion Gastos Dpto Areas Verdes</title>
