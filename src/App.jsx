@@ -14006,7 +14006,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
       {/* Sub-tabs */}
       <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
         {(bodegaActiva==="b08" ? [
-          ["epp_entregas","📦 Entregas"],["epp_filtros","🌬️ Filtros"],["epp_vidautil","⏳ Vida útil"],
+          ["epp_stock","📊 Stock"],["epp_entregas","📦 Entregas"],["epp_filtros","🌬️ Filtros"],["epp_vidautil","⏳ Vida útil"],
           ["epp_inspecciones","🔍 Inspecciones"],["epp_fittest","😮‍💨 Fit test"],["epp_disposicion","🗑️ Disposición final"],["epp_catalogo","📖 Catálogo de riesgos"],
         ] : [["stock","📦 Stock"],["movimientos","🔄 Movimientos"],["traslados","🚛 Traslados"],["tareas","✅ Tareas"],["historial","📜 Historial"],
           ...(bodegaActiva==="b05"?[["hojas_seguridad","🛡️ Hojas de Seguridad"]]:[]),
@@ -14017,6 +14017,60 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
       </div>
 
       {/* ══════════════ BODEGA EPP ══════════════ */}
+      {bodegaActiva==="b08"&&subTab==="epp_stock"&&(()=>{
+        const eppEntregasArr = Array.isArray(eppEntregas)?eppEntregas:[];
+        const grupos = {};
+        eppEntregasArr.forEach(e=>{
+          const key = e.tipo||"(sin tipo)";
+          if(!grupos[key]) grupos[key] = {tipo:key, agente:e.agente, disponible:0, repartido:0, pendientes:[]};
+          const cant = Number(e.cantidad)||0;
+          if(e.borrador) { grupos[key].disponible += cant; grupos[key].pendientes.push(e); }
+          else { grupos[key].repartido += cant; }
+        });
+        const listaGrupos = Object.values(grupos).sort((a,b)=>b.disponible-a.disponible||a.tipo.localeCompare(b.tipo,"es"));
+        return (
+          <div className="ein" style={{display:"flex",flexDirection:"column",gap:12}}>
+            {listaGrupos.length===0&&<div style={{...S.card,padding:20,textAlign:"center",color:"#4a7a5a"}}>Sin movimientos de EPP registrados todavía.</div>}
+            {listaGrupos.map(g=>(
+              <div key={g.tipo} style={{...S.card,padding:16}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:g.pendientes.length?10:0}}>
+                  <div>
+                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,color:"#38bdf8"}}>{g.tipo}</div>
+                    <div style={{fontSize:11,color:"#8aba9a"}}>{AGENTES_RIESGO_EPP.find(a=>a.id===g.agente)?.label||"—"}</div>
+                  </div>
+                  <div style={{display:"flex",gap:16}}>
+                    <div style={{textAlign:"center"}}>
+                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:700,color:g.disponible>0?"#4ade80":"#6b7280"}}>{g.disponible}</div>
+                      <div style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase"}}>Disponible</div>
+                    </div>
+                    <div style={{textAlign:"center"}}>
+                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:700,color:"#93c5fd"}}>{g.repartido}</div>
+                      <div style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase"}}>Repartido</div>
+                    </div>
+                  </div>
+                </div>
+                {g.pendientes.length>0&&(
+                  <div style={{borderTop:"1px solid rgba(255,255,255,0.06)",paddingTop:10}}>
+                    <div style={{fontSize:10,color:"#fbbf24",textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:6}}>Datos para registrar la entrega</div>
+                    {g.pendientes.map(p=>(
+                      <div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,fontSize:12,padding:"6px 0",borderTop:"1px solid rgba(255,255,255,0.04)"}}>
+                        <div>
+                          <strong>{p.cantidad} {p.unidad||"unidad"}</strong> — {p.descripcionCompra||p.tipo}
+                          <div style={{fontSize:10,color:"#6aaa7a"}}>
+                            {p.modelo?`Modelo: ${p.modelo} · `:""}{p.registroISP?`ISP: ${p.registroISP} · `:""}{p.proveedor?`Proveedor: ${p.proveedor} · `:""}Comprado: {p.fechaEntrega}
+                          </div>
+                        </div>
+                        <button className="btn-p" style={{...S.btn,fontSize:11,padding:"5px 10px"}} onClick={()=>{setSubTab("epp_entregas");iniciarRepartoEpp(p);}}>📋 Asignar / repartir</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
       {bodegaActiva==="b08"&&subTab==="epp_entregas"&&(
         <div className="ein">
           {/* Borradores pendientes de asignar, creados automáticamente desde Compras */}
