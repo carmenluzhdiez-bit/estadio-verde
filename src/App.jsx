@@ -2726,6 +2726,11 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   const [nuevaTareaEmerg, setNuevaTareaEmerg] = React.useState({ zona:"", tarea:"", notas:"" });
   // Estado de grupos colapsables — objeto {key: bool}
   const [gruposAbiertos, setGruposAbiertos] = React.useState({diarias:true,corte:false,medicion:false,riego:false,fitosan:false,limpieza:false,poda:false,otros:false});
+  // Confirmación de cantidad real usada al marcar como "Hecha" una tarea de
+  // aplicación fitosanitaria (esAplicacion:true) — antes de esto no se pedía
+  // nada, así que la jefa nunca veía cuánto producto/agua se usó realmente.
+  const [confirmandoAplicId, setConfirmandoAplicId] = React.useState(null);
+  const [formAplicConfirm, setFormAplicConfirm] = React.useState({producto:"",dosis:"",agua:""});
   const [showHojas, setShowHojas] = React.useState(false);
   const [gastosShow, setGastosShow] = React.useState({}); // {tareaId: bool}
   const [gastosCant, setGastosCant] = React.useState({}); // {tareaId: string}
@@ -3349,7 +3354,14 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                               {puedeEditar ? (
                                 <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                                   {Object.entries(ESTADOS_TAREA).map(([k,v])=>(
-                                    <button key={k} onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:normalizarEstado(k),notaWorker:k!=="no_pudo"?(t.notaWorker||""):""})}
+                                    <button key={k} onClick={()=>{
+                                      if(t.esAplicacion&&k==="hecha"){
+                                        setConfirmandoAplicId(t.id);
+                                        setFormAplicConfirm({producto:t.productoPlan||"",dosis:t.dosisPlan||"",agua:t.volAguaPlan||""});
+                                        return;
+                                      }
+                                      onUpdateTarea(fechaVer,t.id,{estado:normalizarEstado(k),notaWorker:k!=="no_pudo"?(t.notaWorker||""):""});
+                                    }}
                                       style={{cursor:"pointer",border:`1px solid ${t.estado===k?v.color+"50":"rgba(255,255,255,0.08)"}`,borderRadius:8,padding:"3px 9px",fontSize:11,background:t.estado===k?`${v.color}12`:"transparent",color:t.estado===k?v.color:"#6aaa7a",fontFamily:"'Georgia',serif"}}>
                                       {v.icon} {v.label}
                                     </button>
@@ -3367,6 +3379,42 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                                 </div>
                               )}
                               {t.notaWorker&&t.estado!=="no_pudo"&&<div style={{fontSize:11,color:"#f59e0b",marginTop:3,fontStyle:"italic"}}>💬 {t.notaWorker}</div>}
+                              {t.esAplicacion&&t.estado==="hecha"&&(
+                                <div style={{marginTop:6,fontSize:11,color:"#86efac",background:"rgba(52,211,153,0.06)",border:"1px solid rgba(52,211,153,0.2)",borderRadius:6,padding:"6px 10px"}}>
+                                  ✅ Aplicado: {t.productoUsado||"—"} · dosis {t.dosisUsado||"—"} · {t.aguaUsada?`${t.aguaUsada} L de agua`:"agua no registrada"}
+                                </div>
+                              )}
+                              {confirmandoAplicId===t.id&&(
+                                <div style={{marginTop:8,padding:10,background:"rgba(167,139,250,0.06)",border:"1px solid rgba(167,139,250,0.25)",borderRadius:8}}>
+                                  <div style={{fontSize:11,color:"#c4b5fd",marginBottom:8,fontWeight:600}}>⚗ Confirma lo que realmente usaste</div>
+                                  <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                                    <input placeholder="Producto aplicado" value={formAplicConfirm.producto} onChange={e=>setFormAplicConfirm(p=>({...p,producto:e.target.value}))} style={{background:"rgba(0,0,0,0.2)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:6,color:"#ede9e0",padding:"6px 10px",fontSize:12}}/>
+                                    <input placeholder="Dosis usada (ej: 1.5 ml/L)" value={formAplicConfirm.dosis} onChange={e=>setFormAplicConfirm(p=>({...p,dosis:e.target.value}))} style={{background:"rgba(0,0,0,0.2)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:6,color:"#ede9e0",padding:"6px 10px",fontSize:12}}/>
+                                    <input placeholder="Agua utilizada (L)" type="number" value={formAplicConfirm.agua} onChange={e=>setFormAplicConfirm(p=>({...p,agua:e.target.value}))} style={{background:"rgba(0,0,0,0.2)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:6,color:"#ede9e0",padding:"6px 10px",fontSize:12}}/>
+                                  </div>
+                                  <div style={{display:"flex",gap:6,marginTop:8}}>
+                                    <button onClick={()=>{
+                                      onUpdateTarea(fechaVer,t.id,{
+                                        estado:"hecha",
+                                        productoUsado:formAplicConfirm.producto,
+                                        dosisUsado:formAplicConfirm.dosis,
+                                        aguaUsada:formAplicConfirm.agua,
+                                        fechaAplicacionReal:fechaVer,
+                                      });
+                                      crearNotificacion&&crearNotificacion("alerta",{
+                                        titulo:"⚗ Aplicación fitosanitaria confirmada",
+                                        mensaje:`${formAplicConfirm.producto||"Producto"} · dosis ${formAplicConfirm.dosis||"—"} · ${formAplicConfirm.agua||"—"} L agua · ${trabajador?.nombre||""} · ${fechaVer}`,
+                                        fecha:fechaVer,
+                                        fechaTarea:fechaVer,
+                                        esGolf:(t.zona||"")==="Golf"||(t.zona||"").toLowerCase().includes("golf"),
+                                        urgente:true,
+                                      });
+                                      setConfirmandoAplicId(null);
+                                    }} style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(167,139,250,0.15)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.35)",cursor:"pointer"}}>✓ Confirmar aplicación</button>
+                                    <button onClick={()=>setConfirmandoAplicId(null)} style={{...S.btn,fontSize:11,padding:"5px 12px",cursor:"pointer"}}>Cancelar</button>
+                                  </div>
+                                </div>
+                              )}
                               {renderBloqueGasto(t)}
                             </div>
                           );
@@ -17229,7 +17277,7 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
     if(fitoForm.cercarZona) tareas.push({id:Date.now()+1,texto:"🚧 Cercar y encintear la zona afectada",incluir:true,responsable:alertaForm.responsable});
     const riTexto = fitoForm.tiempoReingreso ? `${fitoForm.tiempoReingreso} ${fitoForm.tiempoReingresoUnidad}` : "ver HDS del producto";
     if(fitoForm.letrero) tareas.push({id:Date.now()+2,texto:`⚠️ Instalar letrero de peligro y tiempo de reingreso (${riTexto})`,incluir:true,responsable:alertaForm.responsable});
-    if(fitoForm.productoSel) tareas.push({id:Date.now()+3,texto:`🧪 Aplicar ${fitoForm.productoSel}${fitoForm.dosis?" — dosis "+fitoForm.dosis:""}${fitoForm.volAgua?" — "+fitoForm.volAgua+" L/ha agua":""}`,incluir:true,responsable:fitoForm.responsableAplic||alertaForm.responsable,esAplicacion:true});
+    if(fitoForm.productoSel) tareas.push({id:Date.now()+3,texto:`🧪 Aplicar ${fitoForm.productoSel}${fitoForm.dosis?" — dosis "+fitoForm.dosis:""}${fitoForm.volAgua?" — "+fitoForm.volAgua+" L/ha agua":""}`,incluir:true,responsable:fitoForm.responsableAplic||alertaForm.responsable,esAplicacion:true,productoPlan:fitoForm.productoSel,dosisPlan:fitoForm.dosis||"",volAguaPlan:fitoForm.volAgua||""});
     tareas.push({id:Date.now()+4,texto:`🕐 Verificar reingreso a las ${riTexto} — retirar letrero y cinta`,incluir:true,responsable:alertaForm.responsable});
     tareas.push({id:Date.now()+5,texto:"📸 Documentar con fotografías antes y después del tratamiento",incluir:true,responsable:alertaForm.responsable});
     tareas.push({id:Date.now()+6,texto:"📋 Monitoreo diario por 3 días post-aplicación",incluir:true,responsable:fitoForm.responsableAplic||alertaForm.responsable});
@@ -17769,6 +17817,10 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
       obs:`Generada por alerta: ${af.descripcion}`,
       origenAlerta: nuevaId,
       recordatorioBodega: t.esAplicacion?true:undefined,
+      esAplicacion: t.esAplicacion?true:undefined,
+      productoPlan: t.productoPlan||undefined,
+      dosisPlan: t.dosisPlan||undefined,
+      volAguaPlan: t.volAguaPlan||undefined,
     }));
 
     const tareasInst = (esGolf ? [
@@ -20071,6 +20123,7 @@ export default function App() {
         origenAlerta:nuevaId,
         urgente:i===0,
         recordatorioBodega:t.esAplicacion?true:undefined,
+        esAplicacion:t.esAplicacion?true:undefined,
       };
       setTareasProg(prev=>{
         const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
