@@ -3042,27 +3042,34 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                               trabajador: trabajador?.nombre,
                               fecha: fechaVer,
                             });
-                            // Crear tarea urgente en programación
-                            onAddTarea&&onAddTarea({
-                              id:Date.now()+Math.random(),
-                              fecha:fechaVer,
-                              tarea:"🚨 ALERTA FITOSANITARIA: "+rutinasGolfState.fito_obs.slice(0,80),
-                              responsable:"",
-                              zona:"Golf",
-                              elemento:"",
-                              estado:"por_designar",
-                              notas:"Reportado por "+trabajador?.nombre+" · "+fechaVer,
-                              tipoEvento:"alerta_fito",
-                              urgente:true,
+                            // Crear el set base de tareas de "Enfermedad/Plaga" (el mismo
+                            // que genera el asistente formal de alertas), no solo una tarea
+                            // genérica — así la jefa ya tiene el checklist listo para asignar.
+                            const idAlertaGen = Date.now();
+                            const origenLabel = "🦠 ALERTA FITOSANITARIA: "+rutinasGolfState.fito_obs.slice(0,80);
+                            [origenLabel, "🚧 Encintar zona afectada", "Aplicar tratamiento fitosanitario", "Registrar agente causal", "Monitoreo diario", "🏢 Informar a Gerencia General"].forEach((textoTarea,i)=>{
+                              onAddTarea&&onAddTarea({
+                                id:idAlertaGen+i+Math.random(),
+                                fecha:fechaVer,
+                                tarea:textoTarea,
+                                responsable:"",
+                                zona:"Golf",
+                                elemento:"",
+                                estado:"por_designar",
+                                notas:"Reportado por "+trabajador?.nombre+" · "+fechaVer,
+                                tipoEvento:"alerta_fito",
+                                urgente:i===0,
+                              });
                             });
                             crearNotificacion&&crearNotificacion("alerta",{
                               titulo:"🦠 Alerta fitosanitaria Golf",
                               mensaje:rutinasGolfState.fito_obs+" · "+trabajador?.nombre+" · "+fechaVer,
                               fecha:fechaVer,
-                              tipo:"golf_fito",
+                              fechaTarea:fechaVer,
+                              subtipo:"golf_fito",
                               urgente:true,
                             });
-                            alert("⚠️ Alerta fitosanitaria generada y enviada a la jefa.");
+                            alert("⚠️ Alerta fitosanitaria generada (con set de tareas base) y enviada a la jefa.");
                           }} style={{marginTop:6,fontSize:11,padding:"3px 10px",borderRadius:5,border:"1px solid rgba(239,68,68,0.4)",background:"rgba(239,68,68,0.1)",color:"#fca5a5",cursor:"pointer"}}>
                             🚨 Generar alerta fitosanitaria
                           </button>
@@ -3196,25 +3203,32 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                             <div style={{fontSize:10,color:"#7a6a9a",marginTop:3}}>Si hay novedad, se generará una alerta fitosanitaria automáticamente.</div>
                             {t.notaFito?.trim()&&t.notaFito.toLowerCase()!=="sin novedad"&&(
                               <button onClick={()=>{
-                                // Crear alerta fitosanitaria real en el sistema
-                                onAddTarea&&onAddTarea({
-                                  id:Date.now()+Math.random(),
-                                  fecha:fechaVer,
-                                  tarea:"🚨 ALERTA FITOSANITARIA: "+t.notaFito.slice(0,80),
-                                  responsable:"",
-                                  zona:"Golf",
-                                  elemento:t.elemento||"",
-                                  estado:"por_designar",
-                                  notas:"Reportado por "+trabajador?.nombre+" · "+fechaVer+" · Tarea: "+t.tarea,
-                                  tipoEvento:"alerta_fito",
-                                  urgente:true,
+                                // Crear el set base de tareas de "Enfermedad/Plaga" (el mismo
+                                // que genera el asistente formal de alertas), no solo una tarea
+                                // genérica — así la jefa ya tiene el checklist listo para asignar.
+                                const idAlertaGen = Date.now();
+                                const origenLabel = "🦠 ALERTA FITOSANITARIA: "+t.notaFito.slice(0,80);
+                                [origenLabel, "🚧 Encintar zona afectada", "Aplicar tratamiento fitosanitario", "Registrar agente causal", "Monitoreo diario", "🏢 Informar a Gerencia General"].forEach((textoTarea,i)=>{
+                                  onAddTarea&&onAddTarea({
+                                    id:idAlertaGen+i+Math.random(),
+                                    fecha:fechaVer,
+                                    tarea:textoTarea,
+                                    responsable:"",
+                                    zona:"Golf",
+                                    elemento:i===0?(t.elemento||""):"",
+                                    estado:"por_designar",
+                                    notas:"Reportado por "+trabajador?.nombre+" · "+fechaVer+" · Tarea: "+t.tarea,
+                                    tipoEvento:"alerta_fito",
+                                    urgente:i===0,
+                                  });
                                 });
-                                alert("⚠️ Alerta fitosanitaria generada. La jefa será notificada.");
+                                alert("⚠️ Alerta fitosanitaria generada (con set de tareas base). La jefa será notificada.");
                                 crearNotificacion&&crearNotificacion("alerta",{
                                   titulo:"🦠 Alerta fitosanitaria Golf",
                                   mensaje:t.notaFito+" · "+trabajador?.nombre+" · "+fechaVer,
                                   fecha:fechaVer,
-                                  tipo:"golf_fito",
+                                  fechaTarea:fechaVer,
+                                  subtipo:"golf_fito",
                                   urgente:true,
                                 });
                               }} style={{marginTop:6,fontSize:11,padding:"4px 12px",borderRadius:6,border:"1px solid rgba(239,68,68,0.4)",background:"rgba(239,68,68,0.1)",color:"#fca5a5",cursor:"pointer"}}>
@@ -3636,9 +3650,9 @@ function ZonaRow({ zona, tz, zonasColapsadas, toggleZonaColapso, MACROZONAS_BASE
 
 
 
-function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACROZONAS_BASE, tareas, setTareas, tareasZonaHoy=0, esJefa=false, configSemanal={}, setConfigSemanal, puedeCrear=false, cierresTurno={}, onReabrirTurno, getElemFrecs, setElemFrecs, aplicaciones=[], setAplicaciones, stockFito, setStockFito, crearNotificacion }) {
+function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACROZONAS_BASE, tareas, setTareas, tareasZonaHoy=0, esJefa=false, configSemanal={}, setConfigSemanal, puedeCrear=false, cierresTurno={}, onReabrirTurno, getElemFrecs, setElemFrecs, aplicaciones=[], setAplicaciones, stockFito, setStockFito, crearNotificacion, fechaInicial=null, onIrARegistrarAplicacion=()=>{} }) {
   const hoy = fechaLocal();
-  const [fecha, setFecha] = React.useState(hoy);
+  const [fecha, setFecha] = React.useState(fechaInicial||hoy);
   const [tabProg, setTabProg] = React.useState("programa");
   const [showAgregar, setShowAgregar] = React.useState(false);
   const EC = {hecha:{color:"#22c55e",icon:"✅",label:"Hecha"},completada:{color:"#22c55e",icon:"✅",label:"Hecha"},no_pudo:{color:"#ef4444",icon:"🔴",label:"No se pudo"},haciendose:{color:"#3b82f6",icon:"🔵",label:"Haciéndose"},en_curso:{color:"#3b82f6",icon:"🔵",label:"En curso"},pendiente:{color:"#f59e0b",icon:"⏳",label:"Pendiente"},por_designar:{color:"#94a3b8",icon:"⬜",label:"Por designar"},cancelada:{color:"#ef4444",icon:"❌",label:"Cancelada"}};
@@ -3659,7 +3673,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     : _elemsZona.length>0
       ? [...new Set(_elemsZona.flatMap(e=>(TAREAS_DEFAULT[e.tipo]||[]).map(t=>t.tarea)))].sort()
       : TAREAS_PRESET;
-  const [filtroEstado, setFiltroEstado] = React.useState("todos");
+  const [filtroEstado, setFiltroEstado] = React.useState(fechaInicial?"por_designar":"todos");
   const [filtroZona, setFiltroZona] = React.useState("todas");
   const [filtroCategoria, setFiltroCategoria] = React.useState("todas");
   const [vistaSemanal, setVistaSemanal] = React.useState(false);
@@ -3908,7 +3922,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
 
       {/* Tabs */}
       <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
-        {[["programa","📆 Programar"],["frecuencias","🔄 Frecuencias"],["fitosanitario","⚗ Fitosanitario"],["historial","📜 Historial"]].map(([t,l])=>(
+        {[["programa","📆 Programar"],["frecuencias","🔄 Frecuencias"],["historial","📜 Historial"]].map(([t,l])=>(
           <button key={t} className={`tab${tabProg===t?" on":""}`} onClick={()=>setTabProg(t)}>{l}</button>
         ))}
       </div>
@@ -3916,16 +3930,6 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
       {/* ── FRECUENCIAS POR MACROZONA ── */}
       {tabProg==="frecuencias"&&(
         <PanelFrecuenciasZona S={S} zonas={zonas.filter(z=>String(z.id)!=="31"&&!(z.nombre||"").toLowerCase().includes("golf"))} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} esJefa={esJefa}/>
-      )}
-
-      {/* ── HISTORIAL ── */}
-      {tabProg==="fitosanitario"&&(
-        <PanelFitosanitarioGlobal
-          S={S} MACROZONAS_BASE={MACROZONAS_BASE} getAllElems={getAllElems}
-          personal={personal} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones}
-          tareasProg={tareas} setTareasProg={setTareas}
-          stockFito={stockFito} setStockFito={setStockFito}
-          crearNotificacion={crearNotificacion} esJefa={esJefa}/>
       )}
 
       {tabProg==="historial" && (
@@ -13609,11 +13613,12 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
 // ─── PANEL BODEGAS ───────────────────────────────────────────────────────────
 function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLectura=false, rolLogueado="", currentUserId="", tareasProg, setTareasProg, compras=[], crearNotificacion=()=>{},
   eppEntregas=[], setEppEntregas=()=>{}, eppFiltros=[], setEppFiltros=()=>{}, eppVidaUtil=[], setEppVidaUtil=()=>{},
-  eppInspecciones=[], setEppInspecciones=()=>{}, eppFitTests=[], setEppFitTests=()=>{}, eppDisposiciones=[], setEppDisposiciones=()=>{}
+  eppInspecciones=[], setEppInspecciones=()=>{}, eppFitTests=[], setEppFitTests=()=>{}, eppDisposiciones=[], setEppDisposiciones=()=>{},
+  bodegaInicial=null, subTabInicial=null
 } ) {
   const hoy = fechaLocal();
-  const [bodegaActiva, setBodegaActiva] = React.useState("b01");
-  const [subTab, setSubTab] = React.useState("stock");
+  const [bodegaActiva, setBodegaActiva] = React.useState(bodegaInicial||"b01");
+  const [subTab, setSubTab] = React.useState(subTabInicial||"stock");
   const [showItemForm, setShowItemForm] = React.useState(false);
   const [showMovForm, setShowMovForm] = React.useState(false);
   const [showTareaForm, setShowTareaForm] = React.useState(false);
@@ -17218,7 +17223,7 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
     if(fitoForm.cercarZona) tareas.push({id:Date.now()+1,texto:"🚧 Cercar y encintear la zona afectada",incluir:true,responsable:alertaForm.responsable});
     const riTexto = fitoForm.tiempoReingreso ? `${fitoForm.tiempoReingreso} ${fitoForm.tiempoReingresoUnidad}` : "ver HDS del producto";
     if(fitoForm.letrero) tareas.push({id:Date.now()+2,texto:`⚠️ Instalar letrero de peligro y tiempo de reingreso (${riTexto})`,incluir:true,responsable:alertaForm.responsable});
-    if(fitoForm.productoSel) tareas.push({id:Date.now()+3,texto:`🧪 Aplicar ${fitoForm.productoSel}${fitoForm.dosis?" — dosis "+fitoForm.dosis:""}${fitoForm.volAgua?" — "+fitoForm.volAgua+" L/ha agua":""}`,incluir:true,responsable:fitoForm.responsableAplic||alertaForm.responsable});
+    if(fitoForm.productoSel) tareas.push({id:Date.now()+3,texto:`🧪 Aplicar ${fitoForm.productoSel}${fitoForm.dosis?" — dosis "+fitoForm.dosis:""}${fitoForm.volAgua?" — "+fitoForm.volAgua+" L/ha agua":""}`,incluir:true,responsable:fitoForm.responsableAplic||alertaForm.responsable,esAplicacion:true});
     tareas.push({id:Date.now()+4,texto:`🕐 Verificar reingreso a las ${riTexto} — retirar letrero y cinta`,incluir:true,responsable:alertaForm.responsable});
     tareas.push({id:Date.now()+5,texto:"📸 Documentar con fotografías antes y después del tratamiento",incluir:true,responsable:alertaForm.responsable});
     tareas.push({id:Date.now()+6,texto:"📋 Monitoreo diario por 3 días post-aplicación",incluir:true,responsable:fitoForm.responsableAplic||alertaForm.responsable});
@@ -17612,7 +17617,7 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
   );
 }
 
-function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotificaciones, marcarTodasLeidas, notifNoLeidas, MACROZONAS_BASE, zonas=[], personal, tareasProg, setTareasProg, crearNotificacion, onGuardarDirecto, esJefa, autoOpen, onAutoOpenDone, bodegasData={}, setBodegasData, getAllElems, getZD }) {
+function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotificaciones, marcarTodasLeidas, notifNoLeidas, MACROZONAS_BASE, zonas=[], personal, tareasProg, setTareasProg, crearNotificacion, onGuardarDirecto, esJefa, autoOpen, onAutoOpenDone, bodegasData={}, setBodegasData, getAllElems, getZD, onIrATarea=()=>{}, onIrARegistrarAplicacion=()=>{} }) {
   const [tabAlerta, setTabAlerta] = React.useState("incidencias");
   React.useEffect(()=>{ window._alertaTab = setTabAlerta; return()=>{ delete window._alertaTab; }; },[]);
   const [editAlertaId, setEditAlertaId] = React.useState(null);
@@ -17712,7 +17717,7 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
     if(typeof crearNotificacion !== "function") { console.error("crearNotificacion no es función"); }
     const tipoObj = TIPOS_ALERTA.find(t=>t.id===af.tipo)||TIPOS_ALERTA[0];
     const nuevaId = Date.now()+Math.random();
-    const nuevaAlerta = limpiarUndef({id:nuevaId,estado:"activa",tipo:af.tipo,tipoLabel:af.tipoLabel||tipoObj.label,tipoIcon:af.tipoIcon||tipoObj.icon,zonas:af.zonas,origen:af.origen,urgencia:af.urgencia,descripcion:af.descripcion||"(sin descripción)",responsable:af.responsable,fecha:af.fecha,hora:af.hora,fechaAplicacion:af.fechaAplicacion||fitoForm.fechaAplicacion||af.fecha,elementoAfectado:af.elementoAfectado||"",agenteCausal:af.agenteCausal||"",fechaCreacion:new Date().toISOString(),tareas:tareasEditables.filter(t=>t.incluir).map(t=>({texto:t.texto,responsable:t.responsable,estado:"pendiente"})),historial:[{accion:"Alerta creada",fecha:af.fecha,hora:af.hora,responsable:af.responsable}]});
+    const nuevaAlerta = limpiarUndef({id:nuevaId,estado:"activa",tipo:af.tipo,tipoLabel:af.tipoLabel||tipoObj.label,tipoIcon:af.tipoIcon||tipoObj.icon,zonas:af.zonas,origen:af.origen,urgencia:af.urgencia,descripcion:af.descripcion||"(sin descripción)",responsable:af.responsable,fecha:af.fecha,hora:af.hora,fechaAplicacion:af.fechaAplicacion||fitoForm.fechaAplicacion||af.fecha,elementoAfectado:af.elementoAfectado||"",agenteCausal:af.agenteCausal||"",fechaCreacion:new Date().toISOString(),tareas:tareasEditables.filter(t=>t.incluir).map(t=>({texto:t.texto,responsable:t.responsable,estado:"pendiente",esAplicacion:t.esAplicacion||false})),historial:[{accion:"Alerta creada",fecha:af.fecha,hora:af.hora,responsable:af.responsable}]});
     setIncidencias(prev=>{
       const arr = Array.isArray(prev)?prev:Object.values(prev||{});
       return [nuevaAlerta, ...arr];
@@ -17739,21 +17744,24 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
       estado:(t.responsable||af.responsable)?"pendiente":"por_designar",
       obs:`Generada por alerta: ${af.descripcion}`,
       origenAlerta: nuevaId,
+      recordatorioBodega: t.esAplicacion?true:undefined,
     }));
 
-    const tareasInst = esGolf ? [
+    const tareasInst = (esGolf ? [
       {texto:"🏌️ Avisar a socios Rama Golf", resp:""},
       {texto:"⚽ Informar a Gerencia Deportes", resp:""},
       {texto:"⚙️ Informar a GO Marco Romero", resp:""},
       {texto:"🏢 Informar a GG Javier Viñales", resp:""},
-    ].map((t,i)=>limpiarUndef({
+    ] : [
+      {texto:"🏢 Informar a Gerencia General", resp:""},
+    ]).map((t,i)=>limpiarUndef({
       id:Date.now()+Math.random()+i+100, fecha:fechaTareas,
       zona:"Administración", elemento:"",
       tarea:t.texto+` — ${tipoObj.icon} ${af.descripcion.slice(0,60)}`,
       responsable:"", estado:"pendiente",
-      obs:`Notificación institucional — Alerta Golf ${af.fecha}`,
+      obs:`Notificación institucional — Alerta ${esGolf?"Golf":tipoObj.label} ${af.fecha}`,
       origenAlerta: nuevaId,
-    })) : [];
+    }));
 
     setTareasProg(prev=>{
       const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
@@ -17959,9 +17967,18 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
             {alertaSelId===inc.id&&(              <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
                 <div style={{fontSize:11,color:"#6aaa7a",marginBottom:5}}>TAREAS GENERADAS:</div>
                 {(inc.tareas||[]).map((t,i)=>(
-                  <div key={i} style={{fontSize:12,padding:"4px 8px",marginBottom:3,background:"rgba(255,255,255,0.03)",borderRadius:5,display:"flex",justifyContent:"space-between"}}>
-                    <span>{t.texto}</span>
-                    <span style={{color:t.estado==="hecha"?"#22c55e":"#f59e0b",fontSize:10}}>{t.estado==="hecha"?"✅":"⏳"} {t.responsable||""}</span>
+                  <div key={i} style={{fontSize:12,padding:"4px 8px",marginBottom:3,background:"rgba(255,255,255,0.03)",borderRadius:5}}>
+                    <div style={{display:"flex",justifyContent:"space-between"}}>
+                      <span>{t.texto}</span>
+                      <span style={{color:t.estado==="hecha"?"#22c55e":"#f59e0b",fontSize:10}}>{t.estado==="hecha"?"✅":"⏳"} {t.responsable||""}</span>
+                    </div>
+                    {t.esAplicacion&&(
+                      <div style={{marginTop:4,padding:"5px 8px",background:"rgba(167,139,250,0.08)",border:"1px solid rgba(167,139,250,0.25)",borderRadius:5,display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+                        <span style={{fontSize:10,color:"#c4b5fd"}}>⚗ Al aplicar, regístralo en Bodegas para descontar el stock real</span>
+                        <button style={{fontSize:10,padding:"3px 8px",borderRadius:5,border:"1px solid rgba(167,139,250,0.4)",background:"rgba(167,139,250,0.15)",color:"#c4b5fd",cursor:"pointer",whiteSpace:"nowrap"}}
+                          onClick={()=>onIrARegistrarAplicacion()}>📍 Ir a registrar</button>
+                      </div>
+                    )}
                   </div>
                 ))}
                 {(!inc.tareas||inc.tareas.length===0)&&<div style={{fontSize:11,color:"#4a7a5a",fontStyle:"italic"}}>Sin tareas generadas</div>}
@@ -18355,6 +18372,10 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
                       <div>{notifN.fecha}</div>
                       {notifN.hora&&<div>{notifN.hora}</div>}
                     </div>
+                    {esJefa&&["alerta","alerta_fito","alerta_fito_golf"].includes(notifN.tipo)&&notifN.fechaTarea&&(
+                      <button style={{background:"rgba(239,68,68,0.12)",border:"1px solid rgba(239,68,68,0.3)",color:"#fca5a5",cursor:"pointer",fontSize:10,padding:"3px 8px",borderRadius:5,whiteSpace:"nowrap"}}
+                        onClick={()=>onIrATarea(notifN.fechaTarea)}>📍 Ir a la tarea</button>
+                    )}
                     {esJefa&&<button style={{background:"transparent",border:"none",color:"#5a7a5a",cursor:"pointer",fontSize:13,padding:"0 2px",lineHeight:1}}
                       onClick={()=>setNotificaciones(prev=>{
                         const arr=Array.isArray(prev)?prev:Object.values(prev||{});
@@ -19921,6 +19942,18 @@ export default function App() {
   const [notificaciones, setNotificaciones]   = useFirebaseState("notificaciones", []);
   const [incidencias, setIncidencias]         = useFirebaseState("incidencias", []);
   const [autoOpenAlerta, setAutoOpenAlerta]   = React.useState(false);
+  // Navegación directa desde una notificación de alerta hacia su tarea en Programación
+  const [fechaProgramaObjetivo, setFechaProgramaObjetivo] = React.useState(null);
+  const [progNonce, setProgNonce] = React.useState(0);
+  // Navegación directa desde una tarea de "aplicar producto" hacia Bodegas → Pesticidas → Fitosanitario
+  const [bodegaNonce, setBodegaNonce] = React.useState(0);
+  const [bodegaObjetivo, setBodegaObjetivo] = React.useState(null);
+  const [subTabObjetivo, setSubTabObjetivo] = React.useState(null);
+  const irARegistrarAplicacion = () => {
+    setBodegaObjetivo("b05"); setSubTabObjetivo("fitosanitario");
+    setBodegaNonce(n=>n+1);
+    setVista("bodegas");
+  };
   const [toastAlerta, setToastAlerta] = React.useState(null); // {msg, tipo, icon}
   const prevIncLen = React.useRef(0);
   React.useEffect(()=>{
@@ -22085,12 +22118,14 @@ export default function App() {
 
         {/* PROGRAMACIÓN */}
         {vista==="programacion"&&(
-          <ProgramacionDiaria key="prog" S={S} zonas={zonasConCust} data={data} personal={personal} getZD={getZD} getAllElems={getAllElems} MACROZONAS_BASE={MACROZONAS_BASE} tareas={tareasProg} setTareas={setTareasProg} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal}
+          <ProgramacionDiaria key={"prog-"+progNonce} S={S} zonas={zonasConCust} data={data} personal={personal} getZD={getZD} getAllElems={getAllElems} MACROZONAS_BASE={MACROZONAS_BASE} tareas={tareasProg} setTareas={setTareasProg} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal}
             getElemFrecs={getElemFrecs} setElemFrecs={setElemFrecs} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} stockFito={stockFito} setStockFito={setStockFito} crearNotificacion={crearNotificacion}
             tareasZonaHoy={(tareasProg[new Date().toISOString().slice(0,10)]||[]).filter(t=>t.origenZona&&t.estado==="por_designar").length}
             esJefa={esJefa}
             puedeCrear={rolLogueado==="jefa"||rolLogueado==="supervisor"||esJefa}
             cierresTurno={cierresTurno}
+            fechaInicial={fechaProgramaObjetivo}
+            onIrARegistrarAplicacion={irARegistrarAplicacion}
             onReabrirTurno={(fecha,nombre)=>{
               const key=`${fecha}_${nombre.split(" ")[0].toLowerCase()}`;
               setCierresTurno(prev=>{ const n={...prev}; delete n[key]; return n; });
@@ -22225,13 +22260,14 @@ export default function App() {
 
         {/* BODEGAS */}
         {vista==="bodegas"&&(
-          <PanelBodegas S={S} bodegasData={bodegasData} setBodegasData={setBodegasData} personal={personal} esJefa={esJefa&&!soloLectura} soloLectura={soloLectura} rolLogueado={rolLogueado} currentUserId={fbUser?.uid||workerLogueado||"desconocido"} tareasProg={tareasProg} setTareasProg={setTareasProg} compras={comprasData?.compras||[]} crearNotificacion={crearNotificacion}
+          <PanelBodegas key={"bod-"+bodegaNonce} S={S} bodegasData={bodegasData} setBodegasData={setBodegasData} personal={personal} esJefa={esJefa&&!soloLectura} soloLectura={soloLectura} rolLogueado={rolLogueado} currentUserId={fbUser?.uid||workerLogueado||"desconocido"} tareasProg={tareasProg} setTareasProg={setTareasProg} compras={comprasData?.compras||[]} crearNotificacion={crearNotificacion}
             eppEntregas={eppEntregas} setEppEntregas={setEppEntregas}
             eppFiltros={eppFiltros} setEppFiltros={setEppFiltros}
             eppVidaUtil={eppVidaUtil} setEppVidaUtil={setEppVidaUtil}
             eppInspecciones={eppInspecciones} setEppInspecciones={setEppInspecciones}
             eppFitTests={eppFitTests} setEppFitTests={setEppFitTests}
             eppDisposiciones={eppDisposiciones} setEppDisposiciones={setEppDisposiciones}
+            bodegaInicial={bodegaObjetivo} subTabInicial={subTabObjetivo}
           />
         )}
 
@@ -22467,7 +22503,13 @@ export default function App() {
                   .then(()=>console.log("✅ Alerta guardada en Firebase:",id))
                   .catch(e=>console.error("❌ Error guardando alerta:",e));
               }}
-              autoOpen={autoOpenAlerta} onAutoOpenDone={()=>setAutoOpenAlerta(false)} notificaciones={notificaciones} setNotificaciones={setNotificaciones} marcarTodasLeidas={marcarTodasLeidas} notifNoLeidas={notifNoLeidas} MACROZONAS_BASE={MACROZONAS_BASE} zonas={zonasConCust} personal={personal} tareasProg={tareasProg} setTareasProg={setTareasProg} crearNotificacion={crearNotificacion} esJefa={esJefa&&!soloLectura} bodegasData={bodegasData} setBodegasData={setBodegasData} getAllElems={getAllElems} getZD={getZD}/>
+              autoOpen={autoOpenAlerta} onAutoOpenDone={()=>setAutoOpenAlerta(false)} notificaciones={notificaciones} setNotificaciones={setNotificaciones} marcarTodasLeidas={marcarTodasLeidas} notifNoLeidas={notifNoLeidas} MACROZONAS_BASE={MACROZONAS_BASE} zonas={zonasConCust} personal={personal} tareasProg={tareasProg} setTareasProg={setTareasProg} crearNotificacion={crearNotificacion} esJefa={esJefa&&!soloLectura} bodegasData={bodegasData} setBodegasData={setBodegasData} getAllElems={getAllElems} getZD={getZD}
+              onIrATarea={(fechaTarea)=>{
+                setFechaProgramaObjetivo(fechaTarea);
+                setProgNonce(n=>n+1);
+                setVista("programacion");
+              }}
+              onIrARegistrarAplicacion={irARegistrarAplicacion}/>
         </ErrorBoundary>)}
 
         {showCierreSectorial&&<ModalCierreSectorial S={S} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} onClose={()=>setShowCierreSectorial(false)}/>}
