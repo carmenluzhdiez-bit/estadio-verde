@@ -6575,7 +6575,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
     try {
     const reap = calcReapertura(incidForm.productoAplicar, incidForm.fechaAplicacion, incidForm.horaAplicacion);
     const nueva = { ...incidForm, id:Date.now(), fechaReaperturaISO:reap?.fechaISO||"", notaReingreso:reap?.nota||"", estado: (incidForm.sectoresCerrados||[]).length>0?"cerrada":"observacion" };
-    setIncidencias(prev=>{const arr=Array.isArray(prev)?prev:Object.values(prev||{});return [nueva,...arr].slice(0,100);});
+    setIncidenciasFito(prev=>{const arr=Array.isArray(prev)?prev:Object.values(prev||{});return [nueva,...arr].slice(0,100);});
 
     // Tareas al programa del día
     const fp = incidForm.fechaAplicacion;
@@ -7228,14 +7228,14 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                       )}
                       {inc.estado==="cerrada"&&(
                         <button style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(34,197,94,0.15)",color:"#86efac",border:"1px solid rgba(34,197,94,0.3)"}}
-                          onClick={()=>setIncidencias(prev=>prev.map(x=>x.id===inc.id?{...x,estado:"reabierta"}:x))}>
+                          onClick={()=>setIncidenciasFito(prev=>prev.map(x=>x.id===inc.id?{...x,estado:"reabierta"}:x))}>
                           ✅ Marcar reabierta
                         </button>
                       )}
                       <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>setExpandIncid(expandIncid===inc.id?null:inc.id)}>
                         {expandIncid===inc.id?"▲":"▼"}
                       </button>
-                      {esJefa&&<button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>setIncidencias(prev=>prev.filter(x=>x.id!==inc.id))}>🗑</button>}
+                      {esJefa&&<button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>setIncidenciasFito(prev=>prev.filter(x=>x.id!==inc.id))}>🗑</button>}
                     </div>
                   </div>
                   {expandIncid===inc.id&&(
@@ -17846,7 +17846,20 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
           {incActivas.length>0&&esJefa&&(
             <div style={{display:"flex",justifyContent:"flex-end",marginBottom:10}}>
               <button style={{...S.btn,fontSize:11,color:"#f87171",background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.2)"}}
-                onClick={()=>{if(window.confirm(`¿Eliminar TODAS las alertas activas (${incActivas.length})? Esta acción no se puede deshacer.`))setIncidencias(prev=>(Array.isArray(prev)?prev:Object.values(prev||{})).filter(x=>x.estado!=="activa"&&x.estado!=="en_gestion"));}}>
+                onClick={()=>{
+                  if(!window.confirm(`¿Eliminar TODAS las alertas activas (${incActivas.length}) y sus tareas asociadas? Esta acción no se puede deshacer.`)) return;
+                  const idsAEliminar = incActivas.map(x=>x.id);
+                  setIncidencias(prev=>(Array.isArray(prev)?prev:Object.values(prev||{})).filter(x=>x.estado!=="activa"&&x.estado!=="en_gestion"));
+                  setTareasProg(prev=>{
+                    const nuevo={};
+                    Object.entries(prev||{}).forEach(([fecha,tareasD])=>{
+                      const arr=Array.isArray(tareasD)?tareasD:Object.values(tareasD||{});
+                      const filtradas=arr.filter(t=>!idsAEliminar.includes(t.origenAlerta));
+                      if(filtradas.length>0) nuevo[fecha]=filtradas;
+                    });
+                    return nuevo;
+                  });
+                }}>
                 🗑 Eliminar todas las activas
               </button>
             </div>
@@ -18232,7 +18245,20 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
           {incResueltas.length>0&&esJefa&&(
             <div style={{display:"flex",justifyContent:"flex-end",marginBottom:10}}>
               <button style={{...S.btn,fontSize:11,color:"#f87171",background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.2)"}}
-                onClick={()=>{if(window.confirm(`¿Eliminar todas las alertas resueltas (${incResueltas.length})? No se puede deshacer.`))setIncidencias(prev=>(Array.isArray(prev)?prev:Object.values(prev||{})).filter(x=>x.estado!=="resuelta"));}}>
+                onClick={()=>{
+                  if(!window.confirm(`¿Eliminar todas las alertas resueltas (${incResueltas.length}) y sus tareas asociadas? No se puede deshacer.`)) return;
+                  const idsAEliminar = incResueltas.map(x=>x.id);
+                  setIncidencias(prev=>(Array.isArray(prev)?prev:Object.values(prev||{})).filter(x=>x.estado!=="resuelta"));
+                  setTareasProg(prev=>{
+                    const nuevo={};
+                    Object.entries(prev||{}).forEach(([fecha,tareasD])=>{
+                      const arr=Array.isArray(tareasD)?tareasD:Object.values(tareasD||{});
+                      const filtradas=arr.filter(t=>!idsAEliminar.includes(t.origenAlerta));
+                      if(filtradas.length>0) nuevo[fecha]=filtradas;
+                    });
+                    return nuevo;
+                  });
+                }}>
                 🗑 Eliminar todas las resueltas
               </button>
             </div>
@@ -21188,9 +21214,12 @@ export default function App() {
                 onAddTarea={(t)=>{
                   setTareasProg(prev=>{
                     const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-                    // Auto-asignar Bhalú si zona Golf y sin responsable
+                    // Auto-asignar Bhalú si zona Golf y sin responsable — excepto tareas
+                    // generadas por una alerta, que deben quedar "Por designar" para que
+                    // la Jefa las asigne manualmente, no auto-asignarse al reportante.
                     const esGolfT = (t.zona||"")==="Golf"||(t.zona||"").toLowerCase().includes("golf");
-                    const tFinal = esGolfT&&!t.responsable ? {...t, responsable:"Osmar Bhalú Armijo Zúñiga", estado:"pendiente"} : t;
+                    const esDeAlerta = (t.tipoEvento||"").includes("alerta");
+                    const tFinal = (esGolfT&&!t.responsable&&!esDeAlerta) ? {...t, responsable:"Osmar Bhalú Armijo Zúñiga", estado:"pendiente"} : t;
                     const lista=[...normArr(prev[tFinal.fecha]||[]),tFinal];
                     fbUpdate(ref(db,`${ROOT}/prog`),{[tFinal.fecha]:lista}).catch(e=>console.error(e));
                     return {...prev,[tFinal.fecha]:lista};
