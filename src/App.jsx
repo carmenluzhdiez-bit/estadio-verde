@@ -13413,11 +13413,11 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
 
       {subTab==="eventos"&&rolLogueado!=="trabajador"&&(
         <div className="ein">
-          {rolLogueado==="jefa"&&(
+          {esJefa&&(
             <button className="btn-p" style={{...S.btn,marginBottom:14}} onClick={()=>setShowEventoForm(true)}>🏆 Cargar evento / torneo</button>
           )}
 
-            {showEventoForm&&rolLogueado==="jefa"&&(
+            {showEventoForm&&esJefa&&(
             <div style={{...S.card,padding:20,marginBottom:14,background:"rgba(251,191,36,0.04)",borderColor:"rgba(251,191,36,0.25)"}} className="ein">
               <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#fbbf24",marginBottom:14}}>
                 {editEventoId?"✏️ Editar":"🏆 Nuevo"} evento / torneo
@@ -13502,7 +13502,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                     {ev.restricciones?.length>0&&<div style={{fontSize:11,color:"#f59e0b",marginTop:2}}>🚫 Restringido: {ev.restricciones.join(", ")}</div>}
                     {ev.obs&&<div style={{fontSize:11,color:"#5a9a7a",fontStyle:"italic",marginTop:2}}>{ev.obs}</div>}
                   </div>
-                  {rolLogueado==="jefa"&&<div style={{display:"flex",gap:6,flexShrink:0,flexWrap:"wrap"}}>
+                  {esJefa&&<div style={{display:"flex",gap:6,flexShrink:0,flexWrap:"wrap"}}>
                     <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(52,211,153,0.12)",color:"#34d399",border:"1px solid rgba(52,211,153,0.25)"}}
                       onClick={()=>setShowPreTorneo(showPreTorneo===ev.id?null:ev.id)}>
                       📋 Pre-torneo
@@ -21981,7 +21981,7 @@ export default function App() {
               <div className="ein">
                 {(zd.historial||[]).length===0?<div style={{textAlign:"center",color:"#4a8a5a",padding:40,fontSize:15}}>Sin registros aún.</div>:(
                   <div style={{display:"flex",flexDirection:"column",gap:7}}>
-                    {rolLogueado==="jefa"&&(
+                    {esJefa&&(
                       <div style={{display:"flex",justifyContent:"flex-end",marginBottom:8}}>
                         <button onClick={()=>{if(window.confirm("¿Borrar todo el historial de esta zona?"))updateZona(zonaId,{historial:[]});}}
                           style={{...S.btn,background:"rgba(239,68,68,0.12)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.25)",fontSize:12,padding:"5px 12px"}}>
@@ -21997,7 +21997,7 @@ export default function App() {
                         </div>
                         <div style={{display:"flex",alignItems:"center",gap:8}}>
                           <div style={{fontSize:11,color:"#4a8a5a",whiteSpace:"nowrap"}}>{h.fecha} {h.hora}</div>
-                          {rolLogueado==="jefa"&&(
+                          {esJefa&&(
                             <button onClick={()=>updateZona(zonaId,{historial:(zd.historial||[]).filter((_,j)=>j!==i)})}
                               style={{background:"transparent",border:"none",color:"#7a5a5a",cursor:"pointer",fontSize:13,padding:"2px 4px",flexShrink:0}}>🗑</button>
                           )}
