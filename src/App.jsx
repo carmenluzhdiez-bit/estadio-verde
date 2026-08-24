@@ -2715,7 +2715,7 @@ const getNombreRef = (nombreCompleto) => {
   return nombreCompleto.trim().split(" ")[0]||nombreCompleto;
 };
 
-function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE, onAccesoRapido, onCambiarMetodo, cierresTurno={}, onCerrarTurno, onReabrirTurno, crearNotificacion, esJefaApp=false, onGuardarRutinas, onGuardarAlertaFito, hojasSeguridad=[] }) {
+function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE, onAccesoRapido, onCambiarMetodo, cierresTurno={}, onCerrarTurno, onReabrirTurno, crearNotificacion, esJefaApp=false, onGuardarRutinas, onGuardarAlertaFito, onCrearAlertaCompleta=()=>{}, hojasSeguridad=[] }) {
   const hoy = fechaLocal();
   const [fechaVer, setFechaVer] = React.useState(fecha || hoy);
   // Cierre de turno
@@ -3036,40 +3036,13 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                           style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(167,139,250,0.3)",borderRadius:6,color:"#ede9e0",padding:"5px 8px",fontSize:11,boxSizing:"border-box"}}/>
                         {rutinasGolfState.fito_obs?.trim()&&rutinasGolfState.fito_obs.toLowerCase()!=="sin novedad"&&(
                           <button onClick={()=>{
-                            // Guardar alerta en Firebase incidencias
-                            onGuardarAlertaFito&&onGuardarAlertaFito({
+                            onCrearAlertaCompleta({
                               obs: rutinasGolfState.fito_obs,
                               trabajador: trabajador?.nombre,
                               fecha: fechaVer,
+                              zona: "Golf",
                             });
-                            // Crear el set base de tareas de "Enfermedad/Plaga" (el mismo
-                            // que genera el asistente formal de alertas), no solo una tarea
-                            // genérica — así la jefa ya tiene el checklist listo para asignar.
-                            const idAlertaGen = Date.now();
-                            const origenLabel = "🦠 ALERTA FITOSANITARIA: "+rutinasGolfState.fito_obs.slice(0,80);
-                            [origenLabel, "🚧 Encintar zona afectada", "Aplicar tratamiento fitosanitario", "Registrar agente causal", "Monitoreo diario", "🏢 Informar a Gerencia General"].forEach((textoTarea,i)=>{
-                              onAddTarea&&onAddTarea({
-                                id:idAlertaGen+i+Math.random(),
-                                fecha:fechaVer,
-                                tarea:textoTarea,
-                                responsable:"",
-                                zona:"Golf",
-                                elemento:"",
-                                estado:"por_designar",
-                                notas:"Reportado por "+trabajador?.nombre+" · "+fechaVer,
-                                tipoEvento:"alerta_fito",
-                                urgente:i===0,
-                              });
-                            });
-                            crearNotificacion&&crearNotificacion("alerta",{
-                              titulo:"🦠 Alerta fitosanitaria Golf",
-                              mensaje:rutinasGolfState.fito_obs+" · "+trabajador?.nombre+" · "+fechaVer,
-                              fecha:fechaVer,
-                              fechaTarea:fechaVer,
-                              subtipo:"golf_fito",
-                              urgente:true,
-                            });
-                            alert("⚠️ Alerta fitosanitaria generada (con set de tareas base) y enviada a la jefa.");
+                            alert("⚠️ Alerta fitosanitaria generada y enviada a la jefa.");
                           }} style={{marginTop:6,fontSize:11,padding:"3px 10px",borderRadius:5,border:"1px solid rgba(239,68,68,0.4)",background:"rgba(239,68,68,0.1)",color:"#fca5a5",cursor:"pointer"}}>
                             🚨 Generar alerta fitosanitaria
                           </button>
@@ -3203,34 +3176,13 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                             <div style={{fontSize:10,color:"#7a6a9a",marginTop:3}}>Si hay novedad, se generará una alerta fitosanitaria automáticamente.</div>
                             {t.notaFito?.trim()&&t.notaFito.toLowerCase()!=="sin novedad"&&(
                               <button onClick={()=>{
-                                // Crear el set base de tareas de "Enfermedad/Plaga" (el mismo
-                                // que genera el asistente formal de alertas), no solo una tarea
-                                // genérica — así la jefa ya tiene el checklist listo para asignar.
-                                const idAlertaGen = Date.now();
-                                const origenLabel = "🦠 ALERTA FITOSANITARIA: "+t.notaFito.slice(0,80);
-                                [origenLabel, "🚧 Encintar zona afectada", "Aplicar tratamiento fitosanitario", "Registrar agente causal", "Monitoreo diario", "🏢 Informar a Gerencia General"].forEach((textoTarea,i)=>{
-                                  onAddTarea&&onAddTarea({
-                                    id:idAlertaGen+i+Math.random(),
-                                    fecha:fechaVer,
-                                    tarea:textoTarea,
-                                    responsable:"",
-                                    zona:"Golf",
-                                    elemento:i===0?(t.elemento||""):"",
-                                    estado:"por_designar",
-                                    notas:"Reportado por "+trabajador?.nombre+" · "+fechaVer+" · Tarea: "+t.tarea,
-                                    tipoEvento:"alerta_fito",
-                                    urgente:i===0,
-                                  });
+                                onCrearAlertaCompleta({
+                                  obs: t.notaFito,
+                                  trabajador: trabajador?.nombre,
+                                  fecha: fechaVer,
+                                  zona: "Golf",
                                 });
-                                alert("⚠️ Alerta fitosanitaria generada (con set de tareas base). La jefa será notificada.");
-                                crearNotificacion&&crearNotificacion("alerta",{
-                                  titulo:"🦠 Alerta fitosanitaria Golf",
-                                  mensaje:t.notaFito+" · "+trabajador?.nombre+" · "+fechaVer,
-                                  fecha:fechaVer,
-                                  fechaTarea:fechaVer,
-                                  subtipo:"golf_fito",
-                                  urgente:true,
-                                });
+                                alert("⚠️ Alerta fitosanitaria generada y enviada a la jefa.");
                               }} style={{marginTop:6,fontSize:11,padding:"4px 12px",borderRadius:6,border:"1px solid rgba(239,68,68,0.4)",background:"rgba(239,68,68,0.1)",color:"#fca5a5",cursor:"pointer"}}>
                                 🚨 Generar alerta fitosanitaria
                               </button>
@@ -18400,7 +18352,7 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
                     </div>
                     {esJefa&&["alerta","alerta_fito","alerta_fito_golf"].includes(notifN.tipo)&&notifN.fechaTarea&&(
                       <button style={{background:"rgba(239,68,68,0.12)",border:"1px solid rgba(239,68,68,0.3)",color:"#fca5a5",cursor:"pointer",fontSize:10,padding:"3px 8px",borderRadius:5,whiteSpace:"nowrap"}}
-                        onClick={()=>onIrATarea(notifN.fechaTarea)}>📍 Ir a la tarea</button>
+                        onClick={()=>onIrATarea(notifN.fechaTarea, notifN.esGolf)}>📍 {notifN.esGolf?"Ir a Fitosanitario Golf":"Ir a la tarea"}</button>
                     )}
                     {esJefa&&<button style={{background:"transparent",border:"none",color:"#5a7a5a",cursor:"pointer",fontSize:13,padding:"0 2px",lineHeight:1}}
                       onClick={()=>setNotificaciones(prev=>{
@@ -19980,6 +19932,70 @@ export default function App() {
     setBodegaNonce(n=>n+1);
     setVista("bodegas");
   };
+
+  // ══════ Creación unificada de alerta fitosanitaria desde reporte de trabajador ══════
+  // Reemplaza los flujos duplicados anteriores: genera UNA sola incidencia con sus
+  // tareas ya vinculadas (origenAlerta), enrutadas según la zona (Golf u otra
+  // macrozona), y UNA sola notificación — evita el doble registro en "Registros".
+  const crearAlertaDesdeReporte = ({obs, trabajador: nombreTrab, fecha: fec, zona: zonaAlerta}) => {
+    const fechaAlerta = fec||fechaLocal();
+    const esGolfAlerta = (zonaAlerta||"Golf")==="Golf" || (zonaAlerta||"").toLowerCase().includes("golf");
+    const zonaLabelAlerta = esGolfAlerta ? "Golf" : (zonaAlerta||"General");
+    const nuevaId = "fito_"+Date.now();
+    const tareasBase = [
+      {texto:"🦠 ALERTA FITOSANITARIA: "+String(obs||"").slice(0,80), esAplicacion:false},
+      {texto:"🚧 Encintar zona afectada", esAplicacion:false},
+      {texto:"Aplicar tratamiento fitosanitario", esAplicacion:true},
+      {texto:"Registrar agente causal", esAplicacion:false},
+      {texto:"Monitoreo diario", esAplicacion:false},
+      {texto: esGolfAlerta?"🏢 Informar a Gerencia General":"🏢 Informar a Gerencia General", esAplicacion:false},
+    ];
+    const nuevaIncidencia = {
+      id:nuevaId, tipo:"enfermedad", tipoIcon:"🦠", tipoLabel:"Fitosanitario",
+      descripcion:"Observación: "+(obs||""),
+      zonas:[zonaLabelAlerta],
+      responsable:"", fecha:fechaAlerta, hora:new Date().toTimeString().slice(0,5),
+      estado:"activa", urgencia:"alta", origen:"trabajador",
+      creadoEn:new Date().toISOString(),
+      tareas:tareasBase.map(t=>({texto:t.texto, responsable:"", estado:"pendiente", esAplicacion:t.esAplicacion})),
+      historial:[{accion:"Alerta generada por "+(nombreTrab||"trabajador"), fecha:fechaAlerta, responsable:nombreTrab||""}],
+    };
+    setIncidencias(prev=>{
+      const arr=Array.isArray(prev)?prev:Object.values(prev||{});
+      return [nuevaIncidencia,...arr];
+    });
+    tareasBase.forEach((t,i)=>{
+      const nuevaTarea = {
+        id:Date.now()+i+Math.random(),
+        fecha:fechaAlerta,
+        tarea:t.texto,
+        responsable:"",
+        zona:zonaLabelAlerta,
+        elemento:"",
+        estado:"por_designar",
+        notas:"Reportado por "+(nombreTrab||"")+" · "+fechaAlerta,
+        tipoEvento:"alerta_fito",
+        origenAlerta:nuevaId,
+        urgente:i===0,
+        recordatorioBodega:t.esAplicacion?true:undefined,
+      };
+      setTareasProg(prev=>{
+        const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+        const lista=[...normArr(prev[fechaAlerta]||[]),nuevaTarea];
+        fbUpdate(ref(db,`${ROOT}/prog`),{[fechaAlerta]:lista}).catch(e=>console.error(e));
+        return {...prev,[fechaAlerta]:lista};
+      });
+    });
+    crearNotificacion&&crearNotificacion("alerta",{
+      titulo: esGolfAlerta?"🦠 Alerta fitosanitaria Golf":"🦠 Alerta fitosanitaria",
+      mensaje:(obs||"")+" · "+(nombreTrab||"")+" · "+fechaAlerta,
+      fecha:fechaAlerta,
+      fechaTarea:fechaAlerta,
+      zonaAlerta:zonaLabelAlerta,
+      esGolf:esGolfAlerta,
+      urgente:true,
+    });
+  };
   const [toastAlerta, setToastAlerta] = React.useState(null); // {msg, tipo, icon}
   const prevIncLen = React.useRef(0);
   React.useEffect(()=>{
@@ -21105,37 +21121,7 @@ export default function App() {
                   fbUpdate(ref(db, ROOT+"/rutinas-golf/"+fechaLocal()+"/"+tId), estado)
                     .catch(e=>console.error("rutinas firebase:",e));
                 }}
-                onGuardarAlertaFito={({obs, trabajador: trab, fecha: fec})=>{
-                  const nueva = {
-                    id:"fito_"+Date.now(),
-                    tipo:"enfermedad",
-                    tipoIcon:"🦠",
-                    tipoLabel:"Fitosanitario",
-                    descripcion:"Observación: "+obs,
-                    zonas:[MACROZONAS_BASE.find(z=>z.id===31)?.nombre||"Golf - Pitch & Putt"],
-                    responsable:trab||"Bhalú",
-                    fecha:fec||fechaLocal(),
-                    hora:new Date().toTimeString().slice(0,5),
-                    estado:"activa",
-                    urgencia:"alta",
-                    origen:"trabajador",
-                    creadoEn:new Date().toISOString(),
-                    tareas:[],
-                    historial:[{accion:"Alerta generada por jardinero",fecha:fec||fechaLocal(),responsable:trab||"Bhalú"}],
-                  };
-                  setIncidencias(prev=>{
-                    const arr=Array.isArray(prev)?prev:Object.values(prev||{});
-                    return [nueva,...arr];
-                  });
-                  // Crear notificación para que aparezca en la campanilla de la jefa
-                  crearNotificacion&&crearNotificacion("alerta_fito_golf",{
-                    titulo:"🦠 Alerta Fitosanitaria Golf",
-                    mensaje:obs+" · Reportado por "+(trab||"Bhalú")+" · "+(fec||fechaLocal()),
-                    fecha:fec||fechaLocal(),
-                    tipo:"alerta_fito",
-                    urgente:true,
-                  });
-                }}
+                onCrearAlertaCompleta={crearAlertaDesdeReporte}
                 cierresTurno={cierresTurno}
                 hojasSeguridad={Array.isArray(hojasSeguridad)?hojasSeguridad:[]}
                 onUpdateTarea={(fecha,tid,patch)=>{
@@ -22193,6 +22179,7 @@ export default function App() {
                   tareas={tareasProg}
                   S={S}
                   MACROZONAS_BASE={MACROZONAS_BASE}
+                  onCrearAlertaCompleta={crearAlertaDesdeReporte}
                   onUpdateTarea={(fecha,tid,patch)=>{
                     const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
                     setTareasProg(prev=>{
@@ -22533,10 +22520,16 @@ export default function App() {
                   .catch(e=>console.error("❌ Error guardando alerta:",e));
               }}
               autoOpen={autoOpenAlerta} onAutoOpenDone={()=>setAutoOpenAlerta(false)} notificaciones={notificaciones} setNotificaciones={setNotificaciones} marcarTodasLeidas={marcarTodasLeidas} notifNoLeidas={notifNoLeidas} MACROZONAS_BASE={MACROZONAS_BASE} zonas={zonasConCust} personal={personal} tareasProg={tareasProg} setTareasProg={setTareasProg} crearNotificacion={crearNotificacion} esJefa={esJefa&&!soloLectura} bodegasData={bodegasData} setBodegasData={setBodegasData} getAllElems={getAllElems} getZD={getZD}
-              onIrATarea={(fechaTarea)=>{
-                setFechaProgramaObjetivo(fechaTarea);
-                setProgNonce(n=>n+1);
-                setVista("programacion");
+              onIrATarea={(fechaTarea, esGolf)=>{
+                if(esGolf) {
+                  setBodegaObjetivo("b05"); setSubTabObjetivo("fitosanitario");
+                  setBodegaNonce(n=>n+1);
+                  setVista("bodegas");
+                } else {
+                  setFechaProgramaObjetivo(fechaTarea);
+                  setProgNonce(n=>n+1);
+                  setVista("programacion");
+                }
               }}
               onIrARegistrarAplicacion={irARegistrarAplicacion}/>
         </ErrorBoundary>)}
