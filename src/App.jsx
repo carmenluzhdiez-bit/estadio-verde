@@ -3275,10 +3275,7 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
             </div>
             {showHojas&&(
               <div style={{padding:"10px 14px",display:"flex",flexDirection:"column",gap:8}}>
-                {[...hojasSeguridad].sort((a,b)=>{
-                  const ta=a.tipo||"Otro"; const tb=b.tipo||"Otro";
-                  return ta.localeCompare(tb,"es",{sensitivity:"base"})||a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"});
-                }).map(h=>(
+                {[...hojasSeguridad].sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||"","es",{sensitivity:"base"})).map(h=>(
                   <div key={h.id} style={{display:"flex",gap:10,alignItems:"center",padding:"8px 10px",background:"rgba(255,255,255,0.03)",borderRadius:8,border:"1px solid rgba(167,139,250,0.1)"}}>
                     <span style={{fontSize:18,flexShrink:0}}>🧪</span>
                     <div style={{flex:1,minWidth:0}}>
@@ -8332,6 +8329,14 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   const guardarIgual = () => {
     const doc = {...form, id:Date.now()};
     set({compras:[doc,...compras]});
+    // Igual que en guardar(): ingresar/descontar de bodega — esta función no lo
+    // hacía, así que una compra confirmada como "posible duplicado" nunca
+    // llegaba a generar su pendiente en Bodega (EPP u otra).
+    if(doc.tipoDoc==="Nota de Crédito") {
+      descontarItemsDeBodega(doc.fecha, `NC ${doc.nDocumento||""} ${doc.proveedor||""}`, doc.items||[]);
+    } else {
+      ingresarItemsABodega(doc.fecha, `${doc.tipoDoc} ${doc.nDocumento||""} ${doc.proveedor||""}`, doc.items||[], undefined, doc.proveedor||"");
+    }
     setForm(emptyForm); setShowForm(false); setAlertaDuplicado(null);
   };
 
