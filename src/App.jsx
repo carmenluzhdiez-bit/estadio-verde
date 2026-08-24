@@ -22550,7 +22550,7 @@ export default function App() {
           {vista==="protocolos"&&(
             <PanelProtocolos S={S} personal={personal} esJefa={esJefa&&!soloLectura} crearNotificacion={crearNotificacion} rolLogueado={rolLogueado}/>
           )}
-        {vista==="notificaciones"&&(<ErrorBoundary>
+        {vista==="notificaciones"&&rolLogueado!=="trabajador"&&(<ErrorBoundary>
           <PanelAlertas S={S} incidencias={incidencias} setIncidencias={setIncidencias}
               onGuardarDirecto={(alerta)=>{
                 const id = "inc_"+Date.now();
