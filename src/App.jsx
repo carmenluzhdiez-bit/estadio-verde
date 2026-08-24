@@ -17575,6 +17575,10 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
   const [editAlertaId, setEditAlertaId] = React.useState(null);
   const [editAlertaForm, setEditAlertaForm] = React.useState({});
   const [showNuevaAlerta, setShowNuevaAlerta] = React.useState(false);
+  // Id de una alerta ya reportada (por un trabajador) que se está "formalizando"
+  // con el asistente completo — al guardar, se actualiza esa misma alerta en vez
+  // de crear una duplicada, y se reemplazan sus tareas placeholder por las reales.
+  const [gestionandoAlertaId, setGestionandoAlertaId] = React.useState(null);
   React.useEffect(()=>{
     if(autoOpen){ setShowNuevaAlerta(true); setTabAlerta("incidencias"); onAutoOpenDone?.(); }
   },[autoOpen]);
@@ -17668,12 +17672,26 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
     if(!af.zonas.length||(!af.descripcion?.trim()&&!datosExtra)) return;
     if(typeof crearNotificacion !== "function") { console.error("crearNotificacion no es función"); }
     const tipoObj = TIPOS_ALERTA.find(t=>t.id===af.tipo)||TIPOS_ALERTA[0];
-    const nuevaId = Date.now()+Math.random();
-    const nuevaAlerta = limpiarUndef({id:nuevaId,estado:"activa",tipo:af.tipo,tipoLabel:af.tipoLabel||tipoObj.label,tipoIcon:af.tipoIcon||tipoObj.icon,zonas:af.zonas,origen:af.origen,urgencia:af.urgencia,descripcion:af.descripcion||"(sin descripción)",responsable:af.responsable,fecha:af.fecha,hora:af.hora,fechaAplicacion:af.fechaAplicacion||fitoForm.fechaAplicacion||af.fecha,elementoAfectado:af.elementoAfectado||"",agenteCausal:af.agenteCausal||"",fechaCreacion:new Date().toISOString(),tareas:tareasEditables.filter(t=>t.incluir).map(t=>({texto:t.texto,responsable:t.responsable,estado:"pendiente",esAplicacion:t.esAplicacion||false})),historial:[{accion:"Alerta creada",fecha:af.fecha,hora:af.hora,responsable:af.responsable}]});
+    const esGestion = !!gestionandoAlertaId;
+    const nuevaId = esGestion ? gestionandoAlertaId : Date.now()+Math.random();
+    const nuevaAlerta = limpiarUndef({id:nuevaId,estado:"activa",tipo:af.tipo,tipoLabel:af.tipoLabel||tipoObj.label,tipoIcon:af.tipoIcon||tipoObj.icon,zonas:af.zonas,origen:af.origen,urgencia:af.urgencia,descripcion:af.descripcion||"(sin descripción)",responsable:af.responsable,fecha:af.fecha,hora:af.hora,fechaAplicacion:af.fechaAplicacion||fitoForm.fechaAplicacion||af.fecha,elementoAfectado:af.elementoAfectado||"",agenteCausal:af.agenteCausal||"",fechaCreacion:new Date().toISOString(),tareas:tareasEditables.filter(t=>t.incluir).map(t=>({texto:t.texto,responsable:t.responsable,estado:"pendiente",esAplicacion:t.esAplicacion||false})),historial:[{accion:esGestion?"Tareas formalizadas por la jefa":"Alerta creada",fecha:af.fecha,hora:af.hora,responsable:af.responsable}]});
     setIncidencias(prev=>{
       const arr = Array.isArray(prev)?prev:Object.values(prev||{});
-      return [nuevaAlerta, ...arr];
+      return esGestion ? arr.map(x=>String(x.id)===String(nuevaId)?nuevaAlerta:x) : [nuevaAlerta, ...arr];
     });
+    // Si se está formalizando una alerta ya reportada, quitar sus tareas
+    // placeholder ("por_designar" genéricas) antes de crear las reales de abajo.
+    if(esGestion) {
+      setTareasProg(prev=>{
+        const nuevo={};
+        Object.entries(prev||{}).forEach(([fecha,tareasD])=>{
+          const arr=Array.isArray(tareasD)?tareasD:Object.values(tareasD||{});
+          const filtradas=arr.filter(t=>String(t.origenAlerta)!==String(nuevaId));
+          nuevo[fecha]=filtradas;
+        });
+        return nuevo;
+      });
+    }
     // Determinar si la alerta es de Golf
     const esGolf = af.zonas.some(z=>z==="Golf"||(z||"").toLowerCase().includes("golf")) ||
                    af.tipo==="golf_incid";
@@ -17722,6 +17740,7 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
     crearNotificacion?.("alerta",{titulo:`${tipoObj.icon} Nueva alerta: ${af.zonas.join(", ")}`,mensaje:af.descripcion,fecha:af.fecha});
     setAlertaForm(emptyAlerta);
     setShowNuevaAlerta(false);
+    setGestionandoAlertaId(null);
     setTabAlerta("incidencias");
   };
 
@@ -17780,7 +17799,7 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
       </div>
 
       {/* Modal nueva alerta */}
-      {showNuevaAlerta&&<ModalNuevaAlerta S={S} alertaForm={alertaForm} setAlertaForm={setAlertaForm} TIPOS_ALERTA={TIPOS_ALERTA} MACROZONAS_BASE={MACROZONAS_BASE} zonas={zonas.length>0?zonas:MACROZONAS_BASE} personal={personal} tareasEditables={tareasEditables} setTareasEditables={setTareasEditables} onGuardar={guardarAlerta} onClose={()=>setShowNuevaAlerta(false)} bodegasData={bodegasData} getAllElems={getAllElems} getZD={getZD}/>}
+      {showNuevaAlerta&&<ModalNuevaAlerta S={S} alertaForm={alertaForm} setAlertaForm={setAlertaForm} TIPOS_ALERTA={TIPOS_ALERTA} MACROZONAS_BASE={MACROZONAS_BASE} zonas={zonas.length>0?zonas:MACROZONAS_BASE} personal={personal} tareasEditables={tareasEditables} setTareasEditables={setTareasEditables} onGuardar={guardarAlerta} onClose={()=>{setShowNuevaAlerta(false);setGestionandoAlertaId(null);}} bodegasData={bodegasData} getAllElems={getAllElems} getZD={getZD}/>}
 
       {/* Tabs */}
       <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
@@ -17857,6 +17876,26 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
               <button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(34,197,94,0.1)",color:"#22c55e",border:"1px solid rgba(34,197,94,0.3)"}} onClick={()=>resolverAlerta(inc)}>✅ Resolver</button>
               <button style={{...S.btn,fontSize:11,padding:"3px 10px"}} onClick={()=>setAlertaSelId(alertaSelId===inc.id?null:inc.id)}>{alertaSelId===inc.id?"▲ Ocultar":"▼ Detalle"}</button>
               <button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(96,165,250,0.1)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.3)"}} onClick={()=>generarReporteAlerta(inc)}>📋 Imprimir ficha</button>
+              {esJefa&&inc.origen==="trabajador"&&(
+                <button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(167,139,250,0.12)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.3)"}} onClick={()=>{
+                  setGestionandoAlertaId(inc.id);
+                  setAlertaForm({
+                    tipo: inc.tipo||"enfermedad",
+                    zonas: inc.zonas||[],
+                    origen: "trabajador",
+                    urgencia: inc.urgencia||"alta",
+                    descripcion: inc.descripcion||"",
+                    responsable: inc.responsable||"",
+                    fecha: inc.fecha||fechaLocal(),
+                    hora: inc.hora||new Date().toTimeString().slice(0,5),
+                    elementoAfectado: inc.elementoAfectado||"",
+                    agenteCausal: inc.agenteCausal||"",
+                  });
+                  const tipoObjSel = TIPOS_ALERTA.find(t=>t.id===(inc.tipo||"enfermedad"))||TIPOS_ALERTA[0];
+                  setTareasEditables(tipoObjSel.tareas.map((t,i)=>({id:i,texto:t,incluir:true,responsable:""})));
+                  setShowNuevaAlerta(true);
+                }}>🧪 Generar tareas</button>
+              )}
               {esJefa&&<button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(251,191,36,0.08)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.25)"}} onClick={()=>{
                 if(editAlertaId===inc.id){setEditAlertaId(null);return;}
                 setEditAlertaId(inc.id);
