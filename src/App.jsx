@@ -13678,7 +13678,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
   const [showEntregaEppForm, setShowEntregaEppForm] = React.useState(false);
   // Reparto de un borrador de EPP (venido de Compras) entre uno o varios trabajadores
   const [asignandoEppId, setAsignandoEppId] = React.useState(null);
-  const emptyRepartoEpp = {tipo:"",agente:"",unidad:"unidad",modelo:"",registroISP:"",fechaVencimiento:"",labor:"",filas:[{trabajadorId:"",cantidad:1,talla:""}]};
+  const emptyRepartoEpp = {tipo:"",agente:"",unidad:"unidad",modelo:"",registroISP:"",fechaEntrega:hoy,fechaVencimiento:"",labor:"",filas:[{trabajadorId:"",cantidad:1,talla:""}]};
   const [repartoEppForm, setRepartoEppForm] = React.useState(emptyRepartoEpp);
 
   const emptyFiltroEpp = {trabajadorId:"",tipoFiltro:"",productoAsociado:"",fechaApertura:hoy,vidaUtilDias:30};
@@ -13716,7 +13716,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
     setAsignandoEppId(borrador.id);
     setRepartoEppForm({
       tipo: borrador.tipo||"", agente: borrador.agente||"", unidad: borrador.unidad||"unidad",
-      modelo: borrador.modelo||"", registroISP: borrador.registroISP||"", fechaVencimiento:"", labor:"",
+      modelo: borrador.modelo||"", registroISP: borrador.registroISP||"", fechaEntrega: hoy, fechaVencimiento:"", labor:"",
       filas:[{trabajadorId:"", cantidad:borrador.cantidad||1, talla:""}],
     });
   };
@@ -13733,7 +13733,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
     const nuevasEntregas = filasValidas.map(f=>({
       id:Date.now()+Math.random(), trabajadorId:f.trabajadorId, tipo:repartoEppForm.tipo, agente:repartoEppForm.agente,
       labor:repartoEppForm.labor, cantidad:Number(f.cantidad), unidad:repartoEppForm.unidad||"unidad", talla:f.talla, modelo:repartoEppForm.modelo,
-      registroISP:repartoEppForm.registroISP, proveedor:borrador.proveedor||"", fechaEntrega:borrador.fechaEntrega||hoy,
+      registroISP:repartoEppForm.registroISP, proveedor:borrador.proveedor||"", fechaEntrega:repartoEppForm.fechaEntrega||hoy,
       fechaVencimiento:repartoEppForm.fechaVencimiento, observaciones:borrador.observaciones||"", firmaRecepcion:false,
       registradoPor:currentUserId, docRef:borrador.docRef,
     }));
@@ -14167,6 +14167,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                             {["unidad","par","caja","paquete","set"].map(u=><option key={u} value={u}>{u}</option>)}
                           </select>
                         </div>
+                        <div><label style={labelSt}>Fecha de entrega</label><input type="date" style={{...S.input,fontSize:12}} value={repartoEppForm.fechaEntrega} onChange={ev=>setRepartoEppForm(p=>({...p,fechaEntrega:ev.target.value}))}/></div>
                         <div><label style={labelSt}>Fecha de vencimiento (opcional)</label><input type="date" style={{...S.input,fontSize:12}} value={repartoEppForm.fechaVencimiento} onChange={ev=>setRepartoEppForm(p=>({...p,fechaVencimiento:ev.target.value}))}/></div>
                         <div><label style={labelSt}>Labor asociada</label><input style={{...S.input,fontSize:12}} value={repartoEppForm.labor} onChange={ev=>setRepartoEppForm(p=>({...p,labor:ev.target.value}))}/></div>
                       </div>
