@@ -3313,9 +3313,14 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
             return "📋";
           };
           const nombresUnicos=[...new Set(misTareasOtras.map(t=>t.tarea||"Sin nombre"))];
-          const grupos=nombresUnicos.map(nombre=>({
-            key:nombre, icon:iconoPorNombre(nombre), label:nombre,
-            tareas: misTareasOtras.filter(t=>(t.tarea||"Sin nombre")===nombre),
+          // Agrupar por el nombre "base" (lo que va antes de " · elemento"), para
+          // que tareas como "Corte de greens HOC 5mm · Green 01/02/03..." queden
+          // todas colapsadas bajo un solo grupo en vez de una fila por cada green.
+          const nombreBase = (nombre) => (nombre||"Sin nombre").split(" · ")[0];
+          const basesUnicas = [...new Set(nombresUnicos.map(nombreBase))];
+          const grupos=basesUnicas.map(base=>({
+            key:base, icon:iconoPorNombre(base), label:base,
+            tareas: misTareasOtras.filter(t=>nombreBase(t.tarea||"Sin nombre")===base),
           }));
           return (
             <div style={{marginBottom:14}}>
@@ -3345,7 +3350,7 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                                 <span style={{fontSize:10,fontWeight:600,color:est.color,background:`${est.color}12`,padding:"2px 7px",borderRadius:8,border:`1px solid ${est.color}25`,whiteSpace:"nowrap",flexShrink:0}}>{est.icon} {est.label}</span>
                               </div>
                               {t.zona&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:1,marginBottom:4}}>📍 {t.zona}{t.elemento?` · ${t.elemento}`:""}</div>}
-                              {t.alturaCorte&&<div style={{fontSize:12,color:"#fbbf24",fontWeight:600,marginBottom:4,background:"rgba(251,191,36,0.08)",border:"1px solid rgba(251,191,36,0.2)",borderRadius:6,padding:"3px 8px",display:"inline-block"}}>✂️ Cortar a: {t.alturaCorte} {t.unidadAlturaCorte==="cm"?"cm":t.unidadAlturaCorte==="mm"?"mm":"pulgadas"}</div>}
+                              {t.alturaCorte&&<div style={{fontSize:12,color:"#fbbf24",fontWeight:600,marginBottom:4,background:"rgba(251,191,36,0.08)",border:"1px solid rgba(251,191,36,0.2)",borderRadius:6,padding:"3px 8px",display:"inline-block"}}>✂️ Cortar a: {t.alturaCorte} {t.unidadAlturaCorte==="cm"?"cm":t.unidadAlturaCorte==="pulgadas"?"pulgadas":"mm"}</div>}
                               {t.metodoLimpieza&&<span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.08)",padding:"1px 8px",borderRadius:8,border:"1px solid rgba(251,191,36,0.2)",display:"inline-block",marginBottom:4}}>{t.metodoLimpieza==="sopladora"?"🌬️ Sopladora":t.metodoLimpieza==="barrido"?"🧹 Barrido":"🌬️+🧹 Sopladora + Barrido"}</span>}
                               {t.notas&&<div style={{fontSize:11,color:"#5a8a6a",marginTop:2,marginBottom:4,fontStyle:"italic"}}>💡 {t.notas}</div>}
                               {puedeEditar ? (
@@ -3621,7 +3626,7 @@ function ZonaRow({ zona, tz, zonasColapsadas, toggleZonaColapso, MACROZONAS_BASE
                             {listaPersonalZR.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
                           </select>
                         </div>
-                        {t.alturaCorte&&<div style={{fontSize:11,color:"#fbbf24",fontWeight:600,marginTop:3}}>✂️ Cortar a: {t.alturaCorte} {t.unidadAlturaCorte==="cm"?"cm":t.unidadAlturaCorte==="mm"?"mm":"pulgadas"}</div>}
+                        {t.alturaCorte&&<div style={{fontSize:11,color:"#fbbf24",fontWeight:600,marginTop:3}}>✂️ Cortar a: {t.alturaCorte} {t.unidadAlturaCorte==="cm"?"cm":t.unidadAlturaCorte==="pulgadas"?"pulgadas":"mm"}</div>}
                         {t.notas && <div style={{fontSize:11,color:"#5a8a6a",marginTop:3,fontStyle:"italic"}}>{t.notas}</div>}
                         {t.notaWorker && <div style={{fontSize:11,color:t.estado==="no_pudo"?"#fca5a5":"#7aaa80",marginTop:2}}>💬 {t.notaWorker}</div>}
                       </div>
@@ -3726,8 +3731,8 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           const respDefault = esZonaGolf
             ? configSemanal?.corte_golf||"Osmar Bhalú Armijo Zúñiga"
             : getResponsablePorTipo(f.tarea, configSemanal, nombreZona)||"";
-          const notaAltura = f.alturaCorte ? `Cortar a: ${f.alturaCorte} ${f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="mm"?"milímetros":"pulgadas"}.` : "";
-          const item = { id: Date.now()+Math.random(), fecha, zona:nombreZona, elemento:e.nombre, tarea:f.tarea, responsable:respDefault, estado:respDefault?"pendiente":"por_designar", notas:[notaAltura,f.obs].filter(Boolean).join(" "), alturaCorte:f.alturaCorte||"", unidadAlturaCorte:f.unidadAlturaCorte||"", frecuencia:f.modo==="diasSemana"?`cada ${f.diasMinimos||"?"} días`:f[estProp], estacion:estProp, auto:true, fechaCorrespondiente:prox.fecha, origenZid:String(z.id), origenEid:e.id, origenFrecId:f.id, origenEsCustom:!!e.isCustom };
+          const notaAltura = f.alturaCorte ? `Cortar a: ${f.alturaCorte} ${f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="pulgadas"?"pulgadas":"milímetros"}.` : "";
+          const item = { id: Date.now()+Math.random(), fecha, zona:nombreZona, elemento:e.nombre, tarea:f.tarea, responsable:respDefault, estado:respDefault?"pendiente":"por_designar", notas:[notaAltura,f.obs].filter(Boolean).join(" "), alturaCorte:f.alturaCorte||"", unidadAlturaCorte:f.unidadAlturaCorte||"mm", frecuencia:f.modo==="diasSemana"?`cada ${f.diasMinimos||"?"} días`:f[estProp], estacion:estProp, auto:true, fechaCorrespondiente:prox.fecha, origenZid:String(z.id), origenEid:e.id, origenFrecId:f.id, origenEsCustom:!!e.isCustom };
           propuestas.push(item);
           if(esVencida) { const vKey=`${nombreZona} — ${f.tarea}`; if(!vencidas.includes(vKey)) vencidas.push(vKey); }
         });
@@ -5425,7 +5430,7 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
                           <option value="pulgadas">pulgadas</option>
                         </select>
                       </div>
-                      {f.alturaCorte&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:4}}>Se anotará en la tarea: "Corte a: {f.alturaCorte} {f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="mm"?"milímetros":"pulgadas"}"</div>}
+                      {f.alturaCorte&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:4}}>Se anotará en la tarea: "Corte a: {f.alturaCorte} {f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="pulgadas"?"pulgadas":"milímetros"}"</div>}
                     </div>
                   )}
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
@@ -13272,7 +13277,14 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                                 return (
                                   <td key={d} style={{padding:"4px 5px",textAlign:"center",background:d===hoy?"rgba(251,191,36,0.04)":"transparent"}}>
                                     {tDia?(
-                                      <span title={est.label} style={{display:"inline-block",padding:"2px 7px",borderRadius:8,fontSize:10,fontWeight:600,background:est.bg,color:est.color,border:`1px solid ${est.color}30`}}>
+                                      <span title={`${est.label} — clic para eliminar`} onClick={()=>{
+                                        if(!window.confirm(`¿Eliminar la tarea "${tDia.tarea}" del ${d}?`)) return;
+                                        setTareasProg(prev=>{
+                                          const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+                                          const nuevaLista = normArr(prev[d]).filter(x=>x.id!==tDia.id);
+                                          return {...prev,[d]:nuevaLista};
+                                        });
+                                      }} style={{display:"inline-block",padding:"2px 7px",borderRadius:8,fontSize:10,fontWeight:600,background:est.bg,color:est.color,border:`1px solid ${est.color}30`,cursor:"pointer"}}>
                                         {est.icon}
                                       </span>
                                     ):(
