@@ -18626,6 +18626,24 @@ function PanelProtocolos({ S, personal, esJefa, crearNotificacion }) {
   const [tipoForm, setTipoForm] = React.useState("seguridad");
   const emptyDoc = {nombre:"",descripcion:"",link:"",categoria:"",fecha:fechaLocal()};
   const [docForm, setDocForm] = React.useState(emptyDoc);
+  const [editDocId, setEditDocId] = React.useState(null);
+  const [editDocForm, setEditDocForm] = React.useState(null);
+  const [editDocTipo, setEditDocTipo] = React.useState(null);
+
+  const iniciarEdicionDoc = (tipo, doc) => {
+    setEditDocTipo(tipo);
+    setEditDocId(doc.id);
+    setEditDocForm({...doc});
+  };
+  const guardarEdicionDoc = () => {
+    if(!editDocForm.nombre.trim()||!editDocForm.link.trim()) { alert("Falta nombre y/o link del documento."); return; }
+    if(editDocTipo==="seguridad") {
+      setDocsSeguridad((Array.isArray(docsSeguridad)?docsSeguridad:[]).map(d=>d.id===editDocId?editDocForm:d));
+    } else {
+      setDocsCheckin((Array.isArray(docsCheckin)?docsCheckin:[]).map(d=>d.id===editDocId?editDocForm:d));
+    }
+    setEditDocId(null); setEditDocForm(null); setEditDocTipo(null);
+  };
 
   const guardarDoc = () => {
     if(!docForm.nombre.trim()||!docForm.link.trim()) { alert("Falta nombre y/o link del documento."); return; }
@@ -18696,23 +18714,52 @@ function PanelProtocolos({ S, personal, esJefa, crearNotificacion }) {
         ):(
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
             {lista.map(doc=>(
-              <div key={doc.id} style={{...S.card,padding:14,display:"flex",gap:12,alignItems:"center"}}>
-                <div style={{fontSize:28,flexShrink:0}}>📄</div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:2}}>
-                    <span style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700}}>{doc.nombre}</span>
-                    {doc.categoria&&<span style={{...S.chip,fontSize:10,background:"rgba(52,211,153,0.08)",color:"#5a9a7a"}}>{doc.categoria}</span>}
+              <div key={doc.id} style={{...S.card,padding:14}} className="ein">
+                <div style={{display:"flex",gap:12,alignItems:"center"}}>
+                  <div style={{fontSize:28,flexShrink:0}}>📄</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:2}}>
+                      <span style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700}}>{doc.nombre}</span>
+                      {doc.categoria&&<span style={{...S.chip,fontSize:10,background:"rgba(52,211,153,0.08)",color:"#5a9a7a"}}>{doc.categoria}</span>}
+                    </div>
+                    {doc.descripcion&&<div style={{fontSize:11,color:"#5a9a7a",marginBottom:2}}>{doc.descripcion}</div>}
+                    <div style={{fontSize:10,color:"#4a7a5a"}}>Subido: {doc.fechaSubida||doc.fecha}</div>
                   </div>
-                  {doc.descripcion&&<div style={{fontSize:11,color:"#5a9a7a",marginBottom:2}}>{doc.descripcion}</div>}
-                  <div style={{fontSize:10,color:"#4a7a5a"}}>Subido: {doc.fechaSubida||doc.fecha}</div>
+                  <div style={{display:"flex",gap:6,flexShrink:0}}>
+                    <a href={doc.link} target="_blank" rel="noopener noreferrer"
+                      style={{...S.btn,background:"rgba(96,165,250,0.12)",color:"#93c5fd",border:"1px solid rgba(96,165,250,0.25)",fontSize:12,padding:"6px 12px",textDecoration:"none",borderRadius:8,fontFamily:"'Georgia',serif"}}>
+                      👁️ Ver
+                    </a>
+                    {esJefa&&<button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>iniciarEdicionDoc(tipo,doc)}>✏️</button>}
+                    {esJefa&&<button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>eliminarDoc(tipo,doc.id)}>🗑</button>}
+                  </div>
                 </div>
-                <div style={{display:"flex",gap:6,flexShrink:0}}>
-                  <a href={doc.link} target="_blank" rel="noopener noreferrer"
-                    style={{...S.btn,background:"rgba(96,165,250,0.12)",color:"#93c5fd",border:"1px solid rgba(96,165,250,0.25)",fontSize:12,padding:"6px 12px",textDecoration:"none",borderRadius:8,fontFamily:"'Georgia',serif"}}>
-                    👁️ Ver
-                  </a>
-                  {esJefa&&<button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>eliminarDoc(tipo,doc.id)}>🗑</button>}
-                </div>
+                {editDocId===doc.id&&(
+                  <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid rgba(255,255,255,0.08)"}}>
+                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:13,fontWeight:700,color:"#c4b5fd",marginBottom:10}}>✏️ Editar protocolo</div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                      <div style={{gridColumn:"1/-1"}}><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:4}}>Nombre del protocolo *</label>
+                        <input style={S.input} value={editDocForm.nombre} onChange={e=>setEditDocForm(p=>({...p,nombre:e.target.value}))}/></div>
+                      <div><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:4}}>Categoría</label>
+                        <input style={S.input} value={editDocForm.categoria} onChange={e=>setEditDocForm(p=>({...p,categoria:e.target.value}))}/></div>
+                      <div><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:4}}>Fecha</label>
+                        <input type="date" style={S.input} value={editDocForm.fecha} onChange={e=>setEditDocForm(p=>({...p,fecha:e.target.value}))}/></div>
+                      <div style={{gridColumn:"1/-1"}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                          <label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px"}}>Link de Google Drive *</label>
+                          <a href="https://drive.google.com/drive/my-drive" target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:"#60a5fa",textDecoration:"none"}}>📤 Abrir Drive</a>
+                        </div>
+                        <input style={S.input} value={editDocForm.link} onChange={e=>setEditDocForm(p=>({...p,link:e.target.value}))}/>
+                      </div>
+                      <div style={{gridColumn:"1/-1"}}><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:4}}>Descripción</label>
+                        <input style={S.input} value={editDocForm.descripcion} onChange={e=>setEditDocForm(p=>({...p,descripcion:e.target.value}))}/></div>
+                    </div>
+                    <div style={{display:"flex",gap:8}}>
+                      <button className="btn-p" style={S.btn} onClick={guardarEdicionDoc}>✓ Guardar cambios</button>
+                      <button className="btn-g" style={S.btn} onClick={()=>{setEditDocId(null);setEditDocForm(null);}}>Cancelar</button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -18760,23 +18807,52 @@ function PanelProtocolos({ S, personal, esJefa, crearNotificacion }) {
             return lista.length>0&&(
               <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:20}}>
                 {lista.map(doc=>(
-                  <div key={doc.id} style={{...S.card,padding:14,display:"flex",gap:12,alignItems:"center"}}>
-                    <div style={{fontSize:28,flexShrink:0}}>📄</div>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:2}}>
-                        <span style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700}}>{doc.nombre}</span>
-                        {doc.categoria&&<span style={{...S.chip,fontSize:10,background:"rgba(52,211,153,0.08)",color:"#5a9a7a"}}>{doc.categoria}</span>}
+                  <div key={doc.id} style={{...S.card,padding:14}} className="ein">
+                    <div style={{display:"flex",gap:12,alignItems:"center"}}>
+                      <div style={{fontSize:28,flexShrink:0}}>📄</div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:2}}>
+                          <span style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700}}>{doc.nombre}</span>
+                          {doc.categoria&&<span style={{...S.chip,fontSize:10,background:"rgba(52,211,153,0.08)",color:"#5a9a7a"}}>{doc.categoria}</span>}
+                        </div>
+                        {doc.descripcion&&<div style={{fontSize:11,color:"#5a9a7a",marginBottom:2}}>{doc.descripcion}</div>}
+                        <div style={{fontSize:10,color:"#4a7a5a"}}>Subido: {doc.fechaSubida||doc.fecha}</div>
                       </div>
-                      {doc.descripcion&&<div style={{fontSize:11,color:"#5a9a7a",marginBottom:2}}>{doc.descripcion}</div>}
-                      <div style={{fontSize:10,color:"#4a7a5a"}}>Subido: {doc.fechaSubida||doc.fecha}</div>
+                      <div style={{display:"flex",gap:6,flexShrink:0}}>
+                        <a href={doc.link} target="_blank" rel="noopener noreferrer"
+                          style={{...S.btn,background:"rgba(96,165,250,0.12)",color:"#93c5fd",border:"1px solid rgba(96,165,250,0.25)",fontSize:12,padding:"6px 12px",textDecoration:"none",borderRadius:8,fontFamily:"'Georgia',serif"}}>
+                          👁️ Ver
+                        </a>
+                        {esJefa&&<button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>iniciarEdicionDoc("checkin",doc)}>✏️</button>}
+                        {esJefa&&<button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>eliminarDoc("checkin",doc.id)}>🗑</button>}
+                      </div>
                     </div>
-                    <div style={{display:"flex",gap:6,flexShrink:0}}>
-                      <a href={doc.link} target="_blank" rel="noopener noreferrer"
-                        style={{...S.btn,background:"rgba(96,165,250,0.12)",color:"#93c5fd",border:"1px solid rgba(96,165,250,0.25)",fontSize:12,padding:"6px 12px",textDecoration:"none",borderRadius:8,fontFamily:"'Georgia',serif"}}>
-                        👁️ Ver
-                      </a>
-                      {esJefa&&<button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>eliminarDoc("checkin",doc.id)}>🗑</button>}
-                    </div>
+                    {editDocId===doc.id&&(
+                      <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid rgba(255,255,255,0.08)"}}>
+                        <div style={{fontFamily:"'Playfair Display',serif",fontSize:13,fontWeight:700,color:"#c4b5fd",marginBottom:10}}>✏️ Editar protocolo</div>
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                          <div style={{gridColumn:"1/-1"}}><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:4}}>Nombre del protocolo *</label>
+                            <input style={S.input} value={editDocForm.nombre} onChange={e=>setEditDocForm(p=>({...p,nombre:e.target.value}))}/></div>
+                          <div><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:4}}>Categoría</label>
+                            <input style={S.input} value={editDocForm.categoria} onChange={e=>setEditDocForm(p=>({...p,categoria:e.target.value}))}/></div>
+                          <div><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:4}}>Fecha</label>
+                            <input type="date" style={S.input} value={editDocForm.fecha} onChange={e=>setEditDocForm(p=>({...p,fecha:e.target.value}))}/></div>
+                          <div style={{gridColumn:"1/-1"}}>
+                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                              <label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px"}}>Link de Google Drive *</label>
+                              <a href="https://drive.google.com/drive/my-drive" target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:"#60a5fa",textDecoration:"none"}}>📤 Abrir Drive</a>
+                            </div>
+                            <input style={S.input} value={editDocForm.link} onChange={e=>setEditDocForm(p=>({...p,link:e.target.value}))}/>
+                          </div>
+                          <div style={{gridColumn:"1/-1"}}><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:4}}>Descripción</label>
+                            <input style={S.input} value={editDocForm.descripcion} onChange={e=>setEditDocForm(p=>({...p,descripcion:e.target.value}))}/></div>
+                        </div>
+                        <div style={{display:"flex",gap:8}}>
+                          <button className="btn-p" style={S.btn} onClick={guardarEdicionDoc}>✓ Guardar cambios</button>
+                          <button className="btn-g" style={S.btn} onClick={()=>{setEditDocId(null);setEditDocForm(null);}}>Cancelar</button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
