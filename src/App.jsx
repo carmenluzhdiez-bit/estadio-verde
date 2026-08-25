@@ -2715,7 +2715,8 @@ const getNombreRef = (nombreCompleto) => {
   return nombreCompleto.trim().split(" ")[0]||nombreCompleto;
 };
 
-function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE, onAccesoRapido, onCambiarMetodo, cierresTurno={}, onCerrarTurno, onReabrirTurno, crearNotificacion, esJefaApp=false, onGuardarRutinas, onGuardarAlertaFito, onCrearAlertaCompleta=()=>{}, hojasSeguridad=[] }) {
+function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE, onAccesoRapido, onCambiarMetodo, cierresTurno={}, onCerrarTurno, onReabrirTurno, crearNotificacion, esJefaApp=false, onGuardarRutinas, onGuardarAlertaFito, onCrearAlertaCompleta=()=>{}, hojasSeguridad=[], personal=[] }) {
+  const [showProtocolosWorker, setShowProtocolosWorker] = React.useState(false);
   const hoy = fechaLocal();
   const [fechaVer, setFechaVer] = React.useState(fecha || hoy);
   // Cierre de turno
@@ -3261,6 +3262,23 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
             </div>
           </div>
         )}
+
+        {/* ── Protocolos de Seguridad y Check-In — solo lectura para trabajador ── */}
+        <div style={{marginBottom:14,border:"1px solid rgba(96,165,250,0.2)",borderRadius:12,overflow:"hidden"}}>
+          <div onClick={()=>setShowProtocolosWorker(p=>!p)}
+              style={{padding:"12px 14px",background:"rgba(96,165,250,0.05)",borderBottom:showProtocolosWorker?"1px solid rgba(96,165,250,0.15)":"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div>
+              <div style={{fontSize:14,fontWeight:700,color:"#93c5fd",marginBottom:2}}>📋 Protocolos</div>
+              <div style={{fontSize:11,color:"#5a7a9a"}}>Protocolos de seguridad y Check-In</div>
+            </div>
+            <span style={{color:"#5a7a9a",fontSize:14,transform:showProtocolosWorker?"rotate(180deg)":"none",transition:"transform .2s"}}>▼</span>
+          </div>
+          {showProtocolosWorker&&(
+            <div style={{padding:"10px 14px"}}>
+              <PanelProtocolos S={S} personal={personal} esJefa={false} crearNotificacion={crearNotificacion}/>
+            </div>
+          )}
+        </div>
 
         {/* ── Hojas de Seguridad — módulo independiente ── */}
         {Array.isArray(hojasSeguridad)&&hojasSeguridad.length>0&&(
@@ -21332,6 +21350,7 @@ export default function App() {
                 onCrearAlertaCompleta={crearAlertaDesdeReporte}
                 cierresTurno={cierresTurno}
                 hojasSeguridad={Array.isArray(hojasSeguridad)?hojasSeguridad:[]}
+                personal={personal}
                 onUpdateTarea={(fecha,tid,patch)=>{
                   const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
                   if(patch._eliminar){
@@ -22389,6 +22408,7 @@ export default function App() {
                   MACROZONAS_BASE={MACROZONAS_BASE}
                   onCrearAlertaCompleta={crearAlertaDesdeReporte}
                   hojasSeguridad={Array.isArray(hojasSeguridad)?hojasSeguridad:[]}
+                  personal={personal}
                   onUpdateTarea={(fecha,tid,patch)=>{
                     const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
                     setTareasProg(prev=>{
