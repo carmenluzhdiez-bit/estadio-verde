@@ -11657,46 +11657,6 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
     const nuevasMed = [nueva, ...mediciones].slice(0,100);
     setG({mediciones:nuevasMed});
     sincronizarMacrozona("Medición de alturas", `${medForm.tipo} — ${medForm.responsable||"Sin responsable"}`);
-    // Marcar tarea de medición de alturas como hecha en el programa del día
-    const fechaMed = medForm.fecha || hoy;
-    const respMed = (medForm.responsable||"").trim().toLowerCase();
-    setTareasProg(prev => {
-      const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-      const tareasDelDia = normArr(prev[fechaMed]);
-      const actualizadas = tareasDelDia.map(t => {
-        if(["hecha","completada"].includes(t.estado)) return t;
-        const tNom = (t.tarea||"").toLowerCase();
-        const esMedicion = tNom.includes("medici") || tNom.includes("altura") ||
-                           tNom.includes("registr") || tNom.includes("golf");
-        const tResp = (t.responsable||"").trim().toLowerCase();
-        const esDelResponsable = !t.responsable ||
-          tResp===respMed ||
-          (respMed && tResp.split(" ").some(w=>respMed.includes(w)&&w.length>3)) ||
-          (tResp && respMed.split(" ").some(w=>tResp.includes(w)&&w.length>3));
-        if(esMedicion && (esDelResponsable || !respMed)) return {...t, estado:"hecha"};
-        return t;
-      });
-      // Si no existía tarea de medición, crear una como hecha
-      const yaMarcada = actualizadas.some(t =>
-        ["hecha","completada"].includes(t.estado) &&
-        ((t.tarea||"").toLowerCase().includes("altura") || (t.tarea||"").toLowerCase().includes("medici"))
-      );
-      const listafinal = yaMarcada ? actualizadas : [
-        ...actualizadas,
-        {
-          id: Date.now()+Math.random(),
-          fecha: fechaMed,
-          tarea: "📏 Medición de alturas greens",
-          zona: "Golf",
-          responsable: medForm.responsable||"",
-          estado: "hecha",
-          notas: `Tipo: ${medForm.tipo||"rutinaria"}. Alturas registradas.`,
-          auto: true,
-          esDiario: true,
-        }
-      ];
-      return {...prev, [fechaMed]: listafinal};
-    });
     setMedForm({...emptyMed, fecha:hoy});
     setShowMedForm(false);
     // Notificar a la jefa
@@ -22332,6 +22292,7 @@ export default function App() {
                   S={S}
                   MACROZONAS_BASE={MACROZONAS_BASE}
                   onCrearAlertaCompleta={crearAlertaDesdeReporte}
+                  hojasSeguridad={Array.isArray(hojasSeguridad)?hojasSeguridad:[]}
                   onUpdateTarea={(fecha,tid,patch)=>{
                     const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
                     setTareasProg(prev=>{
