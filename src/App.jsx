@@ -15717,7 +15717,11 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                   <input style={S.input} value={hojaForm.fabricante} onChange={e=>setHojaForm(p=>({...p,fabricante:e.target.value}))} placeholder="Ej: Syngenta"/></div>
                 <div><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:4}}>Fecha</label>
                   <input type="date" style={S.input} value={hojaForm.fecha} onChange={e=>setHojaForm(p=>({...p,fecha:e.target.value}))}/></div>
-                <div style={{gridColumn:"1/-1"}}><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:4}}>Link de Google Drive *</label>
+                <div style={{gridColumn:"1/-1"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                    <label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px"}}>Link de Google Drive *</label>
+                    <a href="https://drive.google.com/drive/my-drive" target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:"#60a5fa",textDecoration:"none",display:"inline-flex",alignItems:"center",gap:4}}>📤 Abrir Drive para subir el archivo</a>
+                  </div>
                   <input style={S.input} value={hojaForm.link} onChange={e=>setHojaForm(p=>({...p,link:e.target.value}))} placeholder="https://drive.google.com/file/d/..."/>
                   <div style={{fontSize:10,color:"#4a7a5a",marginTop:4}}>💡 Drive: clic derecho → Compartir → "Cualquiera con el enlace puede ver" → copiar link</div></div>
               </div>
@@ -18664,7 +18668,11 @@ function PanelProtocolos({ S, personal, esJefa, crearNotificacion }) {
                     <input style={S.input} value={docForm.categoria} onChange={e=>setDocForm(p=>({...p,categoria:e.target.value}))} placeholder="Ej: Maquinaria, Química, Altura..."/></div>
                   <div><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:4}}>Fecha</label>
                     <input type="date" style={S.input} value={docForm.fecha} onChange={e=>setDocForm(p=>({...p,fecha:e.target.value}))}/></div>
-                  <div style={{gridColumn:"1/-1"}}><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px",display:"block",marginBottom:4}}>Link de Google Drive *</label>
+                  <div style={{gridColumn:"1/-1"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                      <label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",letterSpacing:".5px"}}>Link de Google Drive *</label>
+                      <a href="https://drive.google.com/drive/my-drive" target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:"#60a5fa",textDecoration:"none",display:"inline-flex",alignItems:"center",gap:4}}>📤 Abrir Drive para subir el archivo</a>
+                    </div>
                     <input style={S.input} value={docForm.link} onChange={e=>setDocForm(p=>({...p,link:e.target.value}))} placeholder="https://drive.google.com/file/d/..."/>
                     <div style={{fontSize:10,color:"#4a7a5a",marginTop:4}}>💡 En Drive: clic derecho en el archivo → Compartir → "Cualquiera con el enlace puede ver" → copiar link</div>
                   </div>
