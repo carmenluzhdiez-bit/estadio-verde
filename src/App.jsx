@@ -2225,7 +2225,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
             {dias.map(dia=>{
               const tDia=nA(tareas[dia]);
               const porTrab={};
-              tDia.forEach(hpTask=>{const r=hpTask.responsable||"Sin asignar";if(!porTrab[r])porTrab[r]=[];porTrab[r].push(t);});
+              tDia.forEach(hpTask=>{const r=hpTask.responsable||"Sin asignar";if(!porTrab[r])porTrab[r]=[];porTrab[r].push(hpTask);});
               if(Object.keys(porTrab).length===0) return null;
               return (
                 <div key={dia} style={{marginBottom:14,border:"1px solid rgba(52,211,153,0.15)",borderRadius:12,overflow:"hidden"}}>
