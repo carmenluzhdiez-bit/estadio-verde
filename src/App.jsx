@@ -14051,7 +14051,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
     const tarea = {...tareaForm,id:Date.now()};
     setbd({tareas:[tarea,...(bd.tareas||[])].slice(0,100)});
     if(tareaForm.responsable&&tareaForm.fecha) {
-      setTareasProg(p=>({...p,[tareaForm.fecha]:[...(p[tareaForm.fecha]||[]),{id:Date.now()+1,fecha:tareaForm.fecha,zona:bodega.nombre,elemento:"",tarea:`${bodega.icono} ${tareaForm.tipo}: ${tareaForm.descripcion||bodega.nombre}`,responsable:tareaForm.responsable,estado:tareaForm.responsable?"pendiente":"por_designar",notas:tareaForm.obs||"",auto:false}]}));
+      setTareasProg(p=>({...p,[tareaForm.fecha]:[...(p[tareaForm.fecha]||[]),{id:Date.now()+1,fecha:tareaForm.fecha,zona:bodega.nombre,elemento:tareaForm.itemNombre||"",tarea:`${bodega.icono} ${tareaForm.tipo}: ${tareaForm.itemNombre||tareaForm.descripcion||bodega.nombre}${tareaForm.itemNombre&&tareaForm.descripcion?" — "+tareaForm.descripcion:""}`,responsable:tareaForm.responsable,estado:tareaForm.responsable?"pendiente":"por_designar",notas:tareaForm.obs||"",auto:false}]}));
     }
     setTareaForm(emptyTarea); setShowTareaForm(false);
   };
@@ -15316,6 +15316,17 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                     <option value="Otro">Otro</option>
                   </select>
                 </div>
+                {(bd.items||[]).length>0&&(
+                  <div style={{gridColumn:"1/-1"}}><label style={labelSt}>🔧 Maquinaria / equipo / ítem (opcional)</label>
+                    <select style={S.input} value={tareaForm.itemId||""} onChange={e=>{
+                      const it=(bd.items||[]).find(i=>String(i.id)===e.target.value);
+                      setTareaForm(p=>({...p,itemId:e.target.value,itemNombre:it?.nombre||""}));
+                    }}>
+                      <option value="">— Sin asociar a un ítem específico —</option>
+                      {(bd.items||[]).map(it=><option key={it.id} value={it.id}>{it.nombre}</option>)}
+                    </select>
+                  </div>
+                )}
                 <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Descripción</label><input style={S.input} value={tareaForm.descripcion} onChange={e=>setTareaForm(p=>({...p,descripcion:e.target.value}))}/></div>
                 <div><label style={labelSt}>Responsable</label>
                   <select style={S.input} value={tareaForm.responsable} onChange={e=>setTareaForm(p=>({...p,responsable:e.target.value}))}>
@@ -15340,6 +15351,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:6}}>
                     <div style={{flex:1}}>
                       <div style={{fontSize:13,fontWeight:600,marginBottom:3}}>{t.tipo}{t.descripcion&&` — ${t.descripcion}`}</div>
+                      {t.itemNombre&&<div style={{fontSize:11,color:"#fbbf24",marginBottom:3}}>🔧 {t.itemNombre}</div>}
                       <div style={{display:"flex",gap:10,fontSize:11,color:"#7aaa80",flexWrap:"wrap"}}>
                         <span>📅 {t.fecha}</span>
                         {t.responsable&&<span>👤 {t.responsable}</span>}
