@@ -15104,7 +15104,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                                       </div>
                                       {esJefa&&(
                                         <div style={{display:"flex",gap:6,flexShrink:0}}>
-                                          <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(34,197,94,0.12)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)"}} onClick={()=>{setMovForm({...emptyMov,itemId:String(item.id),unidad:item.unidad||"unidad"});setShowMovForm(true);}}>± Mov.</button>
+                                          <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(34,197,94,0.12)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)"}} onClick={()=>{setMovForm({...emptyMov,itemId:String(item.id),unidad:item.unidad||"unidad"});setShowMovForm(true);setSubTab("movimientos");}}>± Mov.</button>
                                           <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>{setItemForm({nombre:item.nombre,categoria:item.categoria||"",descripcion:item.descripcion||"",unidad:item.unidad||"unidad",stockActual:item.stockActual||0,stockMinimo:item.stockMinimo||0,ubicacion:item.ubicacion||"",obs:item.obs||"",vencimiento:item.vencimiento||"",tiempoReingreso:item.tiempoReingreso||"",tiempoReingresoUnidad:item.tiempoReingresoUnidad||"horas",maquinaAsociada:item.maquinaAsociada||""});setMaqForm({marca:item.marca||"",modelo:item.modelo||"",patente:item.patente||"",horasUso:item.horasUso||0,nivelAceite:item.nivelAceite||"OK",nivelCombustible:item.nivelCombustible||"OK",proxMantención:item.proxMantención||""});setEditItemId(item.id);setShowItemForm(true);}}>✏️</button>
                                           <button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>eliminarItem(item.id)}>🗑</button>
                                         </div>
@@ -15688,7 +15688,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                             {esJefa&&(
                               <div style={{display:"flex",gap:6,flexShrink:0}}>
                                 <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(34,197,94,0.12)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)"}}
-                                  onClick={()=>{setMovForm({...emptyMov,itemId:String(item.id),unidad:item.unidad||"unidad"});setShowMovForm(true);}}>± Mov.</button>
+                                  onClick={()=>{setMovForm({...emptyMov,itemId:String(item.id),unidad:item.unidad||"unidad"});setShowMovForm(true);setSubTab("movimientos");}}>± Mov.</button>
                                 <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}}
                                   onClick={()=>{setItemForm({nombre:item.nombre,categoria:"Repuesto",descripcion:item.descripcion||"",unidad:item.unidad||"unidad",stockActual:item.stockActual||0,stockMinimo:item.stockMinimo||0,ubicacion:item.ubicacion||"",obs:item.obs||"",maquinaAsociada:item.maquinaAsociada||""});setMaqForm({marca:"",modelo:"",patente:"",horasUso:0,nivelAceite:"OK",nivelCombustible:"OK",proxMantención:""});setEditItemId(item.id);setShowItemForm(true);}}>✏️</button>
                                 <button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>eliminarItem(item.id)}>🗑</button>
