@@ -10509,7 +10509,12 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
             const meds=[...mediciones].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
             const filas=meds.map(m=>{
               const alts=[...GREENS_DEF.map(g=>m.alturas?.[g.id]?`${g.nombre}: <b>${m.alturas[g.id]}mm</b>`:"").filter(Boolean),m.alturas?.vivero?`Vivero: <b>${m.alturas.vivero}mm</b>`:""].filter(Boolean).join(" · ");
-              return `<tr><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;font-weight:600">${m.fecha}</td><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;color:#6b7280">${m.responsable||"—"}</td><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;font-size:12px">${alts}</td><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;font-size:11px;color:#888">${m.obs||""}</td></tr>`;
+              const obsPorGreen = Object.entries(m.obsGreen||{}).filter(([,v])=>v?.trim()).map(([gid,txt])=>{
+                const nombreG = gid==="vivero"?"Vivero":(GREENS_DEF.find(g=>g.id===gid)?.nombre||gid);
+                return `${nombreG}: ${txt}`;
+              }).join(" · ");
+              const obsCompleta = [m.obs||"", obsPorGreen].filter(Boolean).join(" · ");
+              return `<tr><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;font-weight:600">${m.fecha}</td><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;color:#6b7280">${m.responsable||"—"}</td><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;font-size:12px">${alts}</td><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;font-size:11px;color:#888">${obsCompleta}</td></tr>`;
             }).join("");
             const win=window.open("","_blank","width=1000,height=700");
             win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Registros Greens</title><style>body{font-family:Calibri,Arial,sans-serif;padding:28px;font-size:13px;color:#222}h1{font-size:18px;color:#14532d;margin-bottom:2px}h2{font-size:12px;color:#888;font-weight:normal;margin-top:0}table{width:100%;border-collapse:collapse}th{background:#14532d;color:#fff;padding:8px 10px;font-size:11px;text-align:left}tr:nth-child(even){background:#f9fafb}@media print{button{display:none}}</style></head><body><h1>⛳ Registros de Medición — Greens y Vivero</h1><h2>Estadio Español · ${hoyR} · ${meds.length} medición(es)</h2><table><thead><tr><th>Fecha</th><th>Responsable</th><th>Alturas</th><th>Obs.</th></tr></thead><tbody>${filas}</tbody></table><div style="margin-top:14px;text-align:center"><button onclick="window.print()" style="background:#14532d;color:#fff;border:none;padding:9px 22px;border-radius:6px;cursor:pointer">🖨️ Imprimir / PDF</button></div></body></html>`);
@@ -10528,8 +10533,8 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
               <button style={{...S.btn,fontSize:10,padding:"2px 8px",background:"rgba(52,211,153,0.08)",color:"#34d399",border:"1px solid rgba(52,211,153,0.2)"}}
                 onClick={()=>{
                   const win=window.open("","_blank","width=700,height=500");
-                  const alts=[...GREENS_DEF.map(g=>m.alturas?.[g.id]?`<tr><td style="padding:7px 12px;border-bottom:1px solid #f0f0f0;font-weight:600">${g.nombre}</td><td style="padding:7px 12px;border-bottom:1px solid #f0f0f0;text-align:center;font-weight:700;color:#14532d">${m.alturas[g.id]} mm</td></tr>`:"").filter(Boolean),m.alturas?.vivero?`<tr><td style="padding:7px 12px;border-bottom:1px solid #f0f0f0;font-weight:600">Vivero</td><td style="padding:7px 12px;border-bottom:1px solid #f0f0f0;text-align:center;font-weight:700;color:#4ade80">${m.alturas.vivero} mm</td></tr>`:""].filter(Boolean).join("");
-                  win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Medición ${m.fecha}</title><style>body{font-family:Calibri,Arial,sans-serif;padding:28px;font-size:13px;color:#222}h1{font-size:17px;color:#14532d;margin-bottom:2px}h2{font-size:12px;color:#888;font-weight:normal;margin-top:0}table{width:100%;border-collapse:collapse;max-width:380px}th{background:#14532d;color:#fff;padding:8px 12px;font-size:11px;text-align:left}tr:nth-child(even){background:#f9fafb}@media print{button{display:none}}</style></head><body><h1>⛳ Registro de Medición — ${m.fecha}</h1><h2>Responsable: ${m.responsable||"—"} · Tipo: ${m.tipo==="semanal"?"Semanal":m.tipo==="siembra"?"Post siembra":"Puntual"}</h2><table><thead><tr><th>Green / Zona</th><th style="text-align:center">Altura (mm)</th></tr></thead><tbody>${alts}</tbody></table>${m.obs?`<div style="margin-top:12px;padding:10px 14px;background:#fefce8;border-left:3px solid #ca8a04;border-radius:4px;font-size:12px"><b>Obs:</b> ${m.obs}</div>`:""}<div style="margin-top:14px;text-align:center"><button onclick="window.print()" style="background:#14532d;color:#fff;border:none;padding:9px 22px;border-radius:6px;cursor:pointer">🖨️ Imprimir / PDF</button></div></body></html>`);
+                  const alts=[...GREENS_DEF.map(g=>m.alturas?.[g.id]?`<tr><td style="padding:7px 12px;border-bottom:1px solid #f0f0f0;font-weight:600">${g.nombre}</td><td style="padding:7px 12px;border-bottom:1px solid #f0f0f0;text-align:center;font-weight:700;color:#14532d">${m.alturas[g.id]} mm</td><td style="padding:7px 12px;border-bottom:1px solid #f0f0f0;font-size:11px;color:#888">${m.obsGreen?.[g.id]||""}</td></tr>`:"").filter(Boolean),m.alturas?.vivero?`<tr><td style="padding:7px 12px;border-bottom:1px solid #f0f0f0;font-weight:600">Vivero</td><td style="padding:7px 12px;border-bottom:1px solid #f0f0f0;text-align:center;font-weight:700;color:#4ade80">${m.alturas.vivero} mm</td><td style="padding:7px 12px;border-bottom:1px solid #f0f0f0;font-size:11px;color:#888">${m.obsGreen?.vivero||""}</td></tr>`:""].filter(Boolean).join("");
+                  win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Medición ${m.fecha}</title><style>body{font-family:Calibri,Arial,sans-serif;padding:28px;font-size:13px;color:#222}h1{font-size:17px;color:#14532d;margin-bottom:2px}h2{font-size:12px;color:#888;font-weight:normal;margin-top:0}table{width:100%;border-collapse:collapse;max-width:480px}th{background:#14532d;color:#fff;padding:8px 12px;font-size:11px;text-align:left}tr:nth-child(even){background:#f9fafb}@media print{button{display:none}}</style></head><body><h1>⛳ Registro de Medición — ${m.fecha}</h1><h2>Responsable: ${m.responsable||"—"} · Tipo: ${m.tipo==="semanal"?"Semanal":m.tipo==="siembra"?"Post siembra":"Puntual"}</h2><table><thead><tr><th>Green / Zona</th><th style="text-align:center">Altura (mm)</th><th>Obs.</th></tr></thead><tbody>${alts}</tbody></table>${m.obs?`<div style="margin-top:12px;padding:10px 14px;background:#fefce8;border-left:3px solid #ca8a04;border-radius:4px;font-size:12px"><b>Obs. general:</b> ${m.obs}</div>`:""}<div style="margin-top:14px;text-align:center"><button onclick="window.print()" style="background:#14532d;color:#fff;border:none;padding:9px 22px;border-radius:6px;cursor:pointer">🖨️ Imprimir / PDF</button></div></body></html>`);
                   win.document.close();
                 }}>📋 Guardar</button>
               {esJefa&&<button className="btn-d" style={{...S.btn,fontSize:11,padding:"3px 8px"}} onClick={()=>onBorrar(m.id)}>🗑</button>}
@@ -10540,15 +10545,26 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
               const alt=m.alturas?.[g.id];
               if(!alt) return null;
               const color=colorAltura(alt);
-              return <div key={g.id} style={{background:`${color}10`,border:`1px solid ${color}30`,borderRadius:6,padding:"3px 8px",fontSize:11}}>
+              const obsG = m.obsGreen?.[g.id];
+              return <div key={g.id} title={obsG||""} style={{background:`${color}10`,border:`1px solid ${color}30`,borderRadius:6,padding:"3px 8px",fontSize:11}}>
                 <span style={{color:"#5a9a7a"}}>{g.nombre}: </span><span style={{color,fontWeight:700}}>{alt}mm</span>
+                {obsG&&<span style={{color:"#fbbf24",marginLeft:3}}>💬</span>}
               </div>;
             })}
-            {m.alturas?.vivero&&<div style={{background:"rgba(74,222,128,0.08)",border:"1px solid rgba(74,222,128,0.2)",borderRadius:6,padding:"3px 8px",fontSize:11}}>
+            {m.alturas?.vivero&&<div title={m.obsGreen?.vivero||""} style={{background:"rgba(74,222,128,0.08)",border:"1px solid rgba(74,222,128,0.2)",borderRadius:6,padding:"3px 8px",fontSize:11}}>
               <span style={{color:"#5a9a7a"}}>Vivero: </span><span style={{color:"#4ade80",fontWeight:700}}>{m.alturas.vivero}mm</span>
+              {m.obsGreen?.vivero&&<span style={{color:"#fbbf24",marginLeft:3}}>💬</span>}
             </div>}
           </div>
-          {m.obs&&<div style={{fontSize:11,color:"#4a7a5a",fontStyle:"italic",marginTop:4}}>{m.obs}</div>}
+          {Object.entries(m.obsGreen||{}).filter(([,v])=>v?.trim()).length>0&&(
+            <div style={{marginTop:6,display:"flex",flexDirection:"column",gap:2}}>
+              {Object.entries(m.obsGreen||{}).filter(([,v])=>v?.trim()).map(([gid,txt])=>{
+                const nombreG = gid==="vivero"?"Vivero":(GREENS_DEF.find(g=>g.id===gid)?.nombre||gid);
+                return <div key={gid} style={{fontSize:11,color:"#fbbf24"}}>💬 <strong>{nombreG}:</strong> {txt}</div>;
+              })}
+            </div>
+          )}
+          {m.obs&&<div style={{fontSize:11,color:"#4a7a5a",fontStyle:"italic",marginTop:4}}>📝 {m.obs}</div>}
         </div>
       ))}
     </div>
