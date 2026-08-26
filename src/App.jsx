@@ -9791,7 +9791,7 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
       (t.estado==="hecha"||t.estado==="completada") &&
       (t.tarea||"").toLowerCase().includes("corte") &&
       (t.zona==="Golf"||(t.zona||"").includes("Golf"))
-    ).map(t=>({fecha, alturaCorte:t.alturaCorteReal?Number(t.alturaCorteReal):(t.alturaCorte?Number(t.alturaCorte):null), tarea:t.tarea||"", elemento:t.elemento||""}));
+    ).map(t=>({fecha, alturaCorte:t.alturaCorteReal?Number(t.alturaCorteReal):(t.alturaCorte?Number(t.alturaCorte):null), unidad:t.unidadAlturaCorte||"mm", tarea:t.tarea||"", elemento:t.elemento||"", responsable:t.responsable||""}));
   }).sort((a,b)=>b.fecha.localeCompare(a.fecha));
 
   const zonasDatos = ZONAS.map(z=>{
@@ -9926,6 +9926,31 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
         <span><span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:"#f59e0b",marginRight:4}}/>Sobre umbral — considerar corte</span>
         <span><span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:"#ef4444",marginRight:4}}/>Muy sobre umbral — corte urgente</span>
       </div>
+      {todosLosCortes.length>0&&(
+        <div style={{marginTop:16,paddingTop:14,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+          <div style={{fontSize:12,fontWeight:700,color:"#60a5fa",marginBottom:2}}>✂️ Historial de cortes registrados</div>
+          <div style={{fontSize:10,color:"#5a9a7a",marginBottom:8}}>Para verificar que la altura y fecha de cada corte "Hecho" sean correctas — la proyección usa el corte más reciente de cada green.</div>
+          <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+              <thead><tr style={{color:"#5a9a7a",textAlign:"left"}}>
+                <th style={{padding:"5px 8px"}}>Fecha</th><th style={{padding:"5px 8px"}}>Tarea</th><th style={{padding:"5px 8px"}}>Elemento</th>
+                <th style={{padding:"5px 8px"}}>Altura registrada</th><th style={{padding:"5px 8px"}}>Responsable</th>
+              </tr></thead>
+              <tbody>
+                {todosLosCortes.slice(0,25).map((c,i)=>(
+                  <tr key={i} style={{borderTop:"1px solid rgba(255,255,255,0.04)"}}>
+                    <td style={{padding:"5px 8px"}}>{c.fecha}</td>
+                    <td style={{padding:"5px 8px"}}>{c.tarea}</td>
+                    <td style={{padding:"5px 8px"}}>{c.elemento||"—"}</td>
+                    <td style={{padding:"5px 8px",fontWeight:700,color:c.alturaCorte?"#93c5fd":"#ef4444"}}>{c.alturaCorte?`${c.alturaCorte}${c.unidad}`:"⚠️ Sin altura registrada"}</td>
+                    <td style={{padding:"5px 8px"}}>{c.responsable||"—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
