@@ -2885,7 +2885,7 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
   }, [tareas, fechaVer, trabajador]
   );
   const misTareasDiarias  = React.useMemo(()=>sortTareas(todasMisTareas.filter(t=>esDiaria(t))),[todasMisTareas]);
-  const misTareasOtras    = React.useMemo(()=>sortTareas(todasMisTareas.filter(t=>!esDiaria(t))),[todasMisTareas]);
+  const misTareasOtras    = React.useMemo(()=>sortTareas(todasMisTareas.filter(t=>!esDiaria(t)&&!t.oculto)),[todasMisTareas]);
   const misTargets = [...misTareasDiarias, ...misTareasOtras];
 
   const stats = {
@@ -11680,6 +11680,20 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
     const nuevasMed = [nueva, ...mediciones].slice(0,100);
     setG({mediciones:nuevasMed});
     sincronizarMacrozona("Medición de alturas", `${medForm.tipo} — ${medForm.responsable||"Sin responsable"}`);
+    // Registro invisible (no aparece como tarea aparte en Mi Turno) solo para
+    // que "Revisión de turnos" detecte que este trabajador tuvo actividad hoy.
+    if(medForm.responsable) {
+      setTareasProg(prev=>{
+        const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+        const lista=[...normArr(prev[medForm.fecha]||[]),{
+          id:Date.now()+Math.random(), fecha:medForm.fecha, tarea:"📏 Medición de alturas greens",
+          zona:"Golf", responsable:medForm.responsable, estado:"hecha",
+          notas:`Tipo: ${medForm.tipo||"rutinaria"}.${medForm.obs?" "+medForm.obs:""}`,
+          auto:true, oculto:true,
+        }];
+        return {...prev,[medForm.fecha]:lista};
+      });
+    }
     setMedForm({...emptyMed, fecha:hoy});
     setShowMedForm(false);
     // Notificar a la jefa
@@ -11688,9 +11702,10 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
         .filter(([,v])=>v)
         .map(([k,v])=>`${k.replace("green","G")}:${v}mm`)
         .join(" · ");
+      const obsGreenTxt = Object.entries(nueva.obsGreen||{}).filter(([,v])=>v?.trim()).map(([k,v])=>`${k}: ${v}`).join(" · ");
       crearNotificacion("medicion", {
         responsable: nueva.responsable||"",
-        detalle: `Alturas registradas — ${alturas||"sin datos"}`,
+        detalle: `Alturas registradas — ${alturas||"sin datos"}${nueva.obs?.trim()?` · Obs: ${nueva.obs}`:""}${obsGreenTxt?` · ${obsGreenTxt}`:""}`,
         valores: nueva.alturas||{},
         tipo_medicion: nueva.tipo||"rutinaria",
       });
