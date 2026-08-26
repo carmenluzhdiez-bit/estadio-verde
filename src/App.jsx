@@ -2154,7 +2154,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                         {hpTask.elemento&&<span style={{fontSize:11,color:"#5a8a6a",background:"rgba(255,255,255,0.05)",padding:"1px 6px",borderRadius:6}}>{hpTask.elemento}</span>}
                         {(()=>{
                           const resp=hpTask.responsable||"";
-                          const key=`${d}_${resp.split(" ")[0]?.toLowerCase()||""}`;
+                          const key=`${dia}_${resp.split(" ")[0]?.toLowerCase()||""}`;
                           const cerrado=cierresTurno?.[key];
                           return cerrado?(<span style={{fontSize:9,color:"#22c55e",background:"rgba(34,197,94,0.1)",padding:"1px 6px",borderRadius:8,border:"1px solid rgba(34,197,94,0.25)"}}>✅ Turno cerrado {cerrado.hora}</span>):null;
                         })()}
@@ -2170,7 +2170,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                           <select value={hpTask.estado}
                             onChange={e=>{
                               const nA=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-                              setTareas(prev=>({...prev,[d]:nA(prev[d]).map(x=>x.id===hpTask.id?{...x,estado:e.target.value}:x)}));
+                              setTareas(prev=>({...prev,[dia]:nA(prev[dia]).map(x=>x.id===hpTask.id?{...x,estado:e.target.value}:x)}));
                             }}
                             style={{fontSize:11,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:6,color:"#ede9e0",padding:"3px 6px",cursor:"pointer"}}>
                             {Object.entries(EC).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
@@ -2179,13 +2179,13 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                             value={hpTask.notaJefa||""}
                             onChange={e=>{
                               const nA=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-                              setTareas(prev=>({...prev,[d]:nA(prev[d]).map(x=>x.id===hpTask.id?{...x,notaJefa:e.target.value}:x)}));
+                              setTareas(prev=>({...prev,[dia]:nA(prev[dia]).map(x=>x.id===hpTask.id?{...x,notaJefa:e.target.value}:x)}));
                             }}
                             style={{fontSize:11,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:6,color:"#ede9e0",padding:"3px 8px",flex:1,minWidth:100,fontFamily:"'Georgia',serif"}}/>
                           <button onClick={()=>{
                             if(window.confirm(`¿Eliminar la tarea "${hpTask.tarea}" de ${hpTask.responsable||"sin asignar"}?`)){
                               const nA=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-                              setTareas(prev=>({...prev,[d]:nA(prev[d]).filter(x=>x.id!==hpTask.id)}));
+                              setTareas(prev=>({...prev,[dia]:nA(prev[dia]).filter(x=>x.id!==hpTask.id)}));
                             }
                           }} style={{cursor:"pointer",border:"1px solid rgba(239,68,68,0.3)",borderRadius:6,padding:"3px 8px",background:"rgba(239,68,68,0.07)",color:"#f87171",fontSize:11,fontFamily:"'Georgia',serif"}}>
                             🗑
