@@ -9804,9 +9804,11 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
 
   const zonasDatos = ZONAS.map(z=>{
     const anal = analisisTasas(z.id);
-    const ultMed = [...medOrdenadas].reverse().find(m=>m.alturas?.[z.id]);
     const zonaNum = z.id.replace(/[^0-9]/g,"");
-    const corteRecZ = todosLosCortes.find(c=>{
+
+    // Todos los cortes que apliquen a esta zona (no solo el más reciente),
+    // ordenados cronológicamente — igual que las filas de corte en tu Excel.
+    const cortesZona = todosLosCortes.filter(c=>{
       const elem = c.elemento.toLowerCase();
       const tar = c.tarea.toLowerCase();
       if(z.id.includes("vivero")) return elem.includes("vivero")||tar.includes("vivero");
@@ -9814,55 +9816,64 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
              (zonaNum && elem.includes(`green ${Number(zonaNum)}`)) ||
              (zonaNum && tar.includes(`green ${zonaNum.padStart(2,"0")}`)) ||
              tar.includes("todos") || elem.includes("todos");
-    });
+    }).filter(c=>c.alturaCorte).sort((a,b)=>a.fecha.localeCompare(b.fecha));
 
-    let altBase, fechaBase, baseOrigen;
-    // REGLA: si el corte es más reciente QUE la medición, o es el mismo día
-    // → el corte tiene prioridad (se mide primero, luego se corta)
-    // Si la última medición es POSTERIOR al último corte → usar medición
-    const corteEsPosteriorOIgual = corteRecZ && ultMed && corteRecZ.fecha >= ultMed.fecha;
-    const corteEsPosterior       = corteRecZ && ultMed && corteRecZ.fecha > ultMed.fecha;
-    
-    if(corteRecZ && corteRecZ.alturaCorte && corteEsPosteriorOIgual) {
-      // Corte más reciente o mismo día que medición → partir desde altura de corte
-      altBase = corteRecZ.alturaCorte;
-      fechaBase = corteRecZ.fecha;
-      baseOrigen = "corte";
-    } else if(ultMed && (!corteRecZ || ultMed.fecha > corteRecZ.fecha)) {
-      // Medición posterior al corte → partir desde medición
-      altBase = Number(ultMed.alturas[z.id]);
-      fechaBase = ultMed.fecha;
-      baseOrigen = "medicion";
-    } else if(corteRecZ && corteRecZ.alturaCorte) {
-      // Solo hay corte (sin medición posterior)
-      altBase = corteRecZ.alturaCorte;
-      fechaBase = corteRecZ.fecha;
-      baseOrigen = "corte";
-    } else if(ultMed) {
-      // Solo hay medición histórica — mostrar igual pero marcada como poco confiable si es muy vieja
-      altBase = Number(ultMed.alturas[z.id]);
-      fechaBase = ultMed.fecha;
-      baseOrigen = "medicion_antigua";
-    } else return null;
+    // Todas las mediciones reales de esta zona, ordenadas cronológicamente.
+    const medicionesZona = medOrdenadas
+      .filter(m=>m.alturas?.[z.id])
+      .map(m=>({fecha:m.fecha, alt:Number(m.alturas[z.id])}))
+      .sort((a,b)=>a.fecha.localeCompare(b.fecha));
 
-    const diasDesdeBase = Math.round((new Date(hoyProjStr+"T12:00:00")-new Date(fechaBase+"T12:00:00"))/(1000*60*60*24));
-    const datoPocoConfiable = diasDesdeBase > 10;
+    // Línea de tiempo combinada: cada evento real conocido (corte o medición),
+    // en orden. Si coinciden el mismo día, el corte manda (se mide, luego se corta).
+    const eventos = [
+      ...cortesZona.map(c=>({fecha:c.fecha, alt:c.alturaCorte, tipo:"corte"})),
+      ...medicionesZona.map(m=>({fecha:m.fecha, alt:m.alt, tipo:"medicion"})),
+    ].sort((a,b)=>a.fecha.localeCompare(b.fecha)||(a.tipo==="corte"?-1:1));
+
+    if(!eventos.length) return null;
 
     const tasaGlobal = anal ? anal.tasaGlobal : null;
     const tasasCalc = calcTasa(z.id);
     const ultimaTasaReal = tasasCalc && tasasCalc.length > 0 ? tasasCalc[tasasCalc.length-1] : null;
-    const tasaReal = (ultimaTasaReal && (!corteRecZ || ultimaTasaReal.fecha >= corteRecZ.fecha)) ? ultimaTasaReal.tasa : null;
-    const diasUltimoIntervalo = tasaReal !== null ? ultimaTasaReal.dias : null;
-    const deltaUltimo = tasaReal !== null ? ultimaTasaReal.delta : null;
-    const tasaUsar = tasaReal !== null ? tasaReal : (tasaGlobal || 0.4);
+    const tasaUsar = (ultimaTasaReal ? ultimaTasaReal.tasa : null) ?? (tasaGlobal || 0.4);
     const categoria = anal ? anal.categoria : "Sin datos";
 
-    const proj = diasProx.map(d=>{
-      const diasDesde = Math.round((new Date(d.fecha+"T12:00:00")-new Date(fechaBase+"T12:00:00"))/(1000*60*60*24));
-      const altProj = Math.round((altBase + tasaUsar*diasDesde)*10)/10;
-      return {...d, altProj, diasDesde};
-    });
-    return {zona:z, tasaGlobal, tasaReal, diasUltimoIntervalo, deltaUltimo, altBase, fechaBase, baseOrigen, proj, categoria, datoPocoConfiable, diasDesdeBase};
+    // Último evento conocido, para mostrar en la columna "Green"
+    const ultEvento = eventos[eventos.length-1];
+    const altBase = ultEvento.alt;
+    const fechaBase = ultEvento.fecha;
+    const baseOrigen = ultEvento.tipo==="corte" ? "corte" : "medicion";
+    const diasDesdeBase = Math.round((new Date(hoyProjStr+"T12:00:00")-new Date(fechaBase+"T12:00:00"))/(1000*60*60*24));
+    const datoPocoConfiable = diasDesdeBase > 10;
+
+    // Simulación día por día desde el primer evento conocido hasta el domingo de
+    // la semana mostrada — igual que las columnas de tu Excel: cada día = el
+    // anterior + tasa, salvo que ese día tenga un evento real (corte/medición),
+    // en cuyo caso ese valor manda y se sigue acumulando desde ahí.
+    const eventosPorFecha = {};
+    eventos.forEach(e=>{ eventosPorFecha[e.fecha] = e; }); // si hay corte y medición el mismo día, el corte queda (por el sort)
+    const primeraFecha = eventos[0].fecha;
+    const ultimaFechaSemana = diasProx[diasProx.length-1].fecha;
+    let valorActual = eventos[0].alt;
+    let fechaCursor = new Date(primeraFecha+"T12:00:00");
+    const valoresPorFecha = {[primeraFecha]: valorActual};
+    while(fechaCursor.toISOString().slice(0,10) < ultimaFechaSemana) {
+      fechaCursor.setDate(fechaCursor.getDate()+1);
+      const fStr = fechaCursor.toISOString().slice(0,10);
+      if(eventosPorFecha[fStr]) {
+        valorActual = eventosPorFecha[fStr].alt;
+      } else {
+        valorActual = Math.round((valorActual + tasaUsar)*10)/10;
+      }
+      valoresPorFecha[fStr] = valorActual;
+    }
+
+    const proj = diasProx.map(d=>({
+      ...d,
+      altProj: valoresPorFecha[d.fecha] !== undefined ? valoresPorFecha[d.fecha] : altBase,
+    }));
+    return {zona:z, tasaGlobal, tasaReal: ultimaTasaReal?ultimaTasaReal.tasa:null, diasUltimoIntervalo: ultimaTasaReal?ultimaTasaReal.dias:null, deltaUltimo: ultimaTasaReal?ultimaTasaReal.delta:null, altBase, fechaBase, baseOrigen, proj, categoria, datoPocoConfiable, diasDesdeBase};
   }).filter(Boolean);
 
   if(!zonasDatos.length) return null;
