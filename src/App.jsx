@@ -9884,7 +9884,7 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
       ...d,
       altProj: valoresPorFecha[d.fecha] !== undefined ? valoresPorFecha[d.fecha] : altBase,
     }));
-    return {zona:z, tasaGlobal, tasaReal: tasaUsar, diasUltimoIntervalo: ultimaTasaReal?ultimaTasaReal.dias:null, deltaUltimo: ultimaTasaReal?ultimaTasaReal.delta:null, altBase, fechaBase, baseOrigen, proj, categoria, datoPocoConfiable, diasDesdeBase};
+    return {zona:z, tasaGlobal, tasaReal: ultimaTasaReal?ultimaTasaReal.tasa:null, tasaProyeccion: tasaUsar, diasUltimoIntervalo: ultimaTasaReal?ultimaTasaReal.dias:null, deltaUltimo: ultimaTasaReal?ultimaTasaReal.delta:null, altBase, fechaBase, baseOrigen, proj, categoria, datoPocoConfiable, diasDesdeBase};
   }).filter(Boolean);
 
   if(!zonasDatos.length) return null;
