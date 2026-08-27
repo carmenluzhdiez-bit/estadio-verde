@@ -12712,7 +12712,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                             <div>
                               <label style={labelSt}>Altura de corte HOY (mm)</label>
-                              <input type="number" step="0.1" min="2" max="15"
+                              <input type="number" step="0.1" min="2" max="15" autoComplete="off" name="altura-corte-hoy-no-autofill"
                                 style={{...S.input,fontSize:14,fontWeight:700,color:"#34d399",borderColor:"rgba(52,211,153,0.3)"}}
                                 value={tareaForm.alturaCorte||""}
                                 onChange={e=>setTareaForm(p=>({...p,alturaCorte:e.target.value}))}
@@ -12721,7 +12721,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                             </div>
                             <div>
                               <label style={labelSt}>Próxima altura objetivo (mm)</label>
-                              <input type="number" step="0.1" min="2" max="15"
+                              <input type="number" step="0.1" min="2" max="15" autoComplete="off" name="altura-objetivo-no-autofill"
                                 style={{...S.input,fontSize:14,fontWeight:700,color:"#fbbf24",borderColor:"rgba(251,191,36,0.3)"}}
                                 value={tareaForm.alturaObjetivo||""}
                                 onChange={e=>setTareaForm(p=>({...p,alturaObjetivo:e.target.value}))}
@@ -12908,15 +12908,13 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
 
           {/* Ante-greens, Lomas, Macizos, Isla, Jaula */}
           {ZONAS_GOLF_EXTRA.map(zona=>{
-            const tareasZona = zona.id==="lomas"?TAREAS_LOMAS:TAREAS_MACIZOS;
-            const registros = (golfData[`zona_${zona.id}`]||[]);
             return (
               <div key={zona.id} style={{...S.card,padding:14,marginBottom:10,borderLeft:`3px solid ${zona.color}50`}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
                   <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:zona.color}}>{zona.icono} {zona.nombre}</div>
                   <button style={{...S.btn,fontSize:11,padding:"4px 12px",background:`${zona.color}15`,color:zona.color,border:`1px solid ${zona.color}40`}}
-                    onClick={()=>setSubTabZona(zona.id)}>
-                    Ver / Tareas
+                    onClick={()=>{setTareaForm({...emptyTarea,descripcion:zona.nombre,target:"zona",targetId:zona.id});setShowTareaForm("zona");}}>
+                    📋 Nueva tarea
                   </button>
                 </div>
               </div>
@@ -12972,7 +12970,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                 <div><label style={labelSt}>Tarea</label>
                   <select style={S.input} value={tareaForm.tipo} onChange={e=>setTareaForm(p=>({...p,tipo:e.target.value}))}>
                     <option value="">Seleccionar...</option>
-                    {TAREAS_MACIZOS.concat(TAREAS_EDIFICIO).filter((v,i,a)=>a.indexOf(v)===i).map(t=><option key={t}>{t}</option>)}
+                    {TAREAS_LOMAS.concat(TAREAS_MACIZOS).concat(TAREAS_EDIFICIO).filter((v,i,a)=>a.indexOf(v)===i).map(t=><option key={t}>{t}</option>)}
                     <option value="Otra">Otra...</option>
                   </select>
                 </div>
@@ -22444,7 +22442,7 @@ export default function App() {
               });
               const zonasConActividad = Object.entries(zonaMap).sort(([a],[b])=>a.localeCompare(b,"es",{sensitivity:"base"}));
 
-              const EC={hecha:{color:"#22c55e",icon:"✅",label:"Hecha"},completada:{color:"#22c55e",icon:"✅",label:"Hecha"},no_pudo:{color:"#ef4444",icon:"🔴",label:"No se pudo"},haciendose:{color:"#3b82f6",icon:"🔵",label:"Haciéndose"},en_curso:{color:"#3b82f6",icon:"🔵",label:"En curso"},pendiente:{color:"#f59e0b",icon:"N1",label:"Pendiente"},por_designar:{color:"#94a3b8",icon:"⬜",label:"Por designar"},cancelada:{color:"#ef4444",icon:"❌",label:"Cancelada"}};
+              const EC={hecha:{color:"#22c55e",icon:"✅",label:"Hecha"},completada:{color:"#22c55e",icon:"✅",label:"Hecha"},no_pudo:{color:"#ef4444",icon:"🔴",label:"No se pudo"},haciendose:{color:"#3b82f6",icon:"🔵",label:"Haciéndose"},en_curso:{color:"#3b82f6",icon:"🔵",label:"En curso"},pendiente:{color:"#f59e0b",icon:"⏳",label:"Pendiente"},por_designar:{color:"#94a3b8",icon:"⬜",label:"Por designar"},cancelada:{color:"#ef4444",icon:"❌",label:"Cancelada"}};
 
               return (
                 <>
