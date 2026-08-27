@@ -9781,6 +9781,8 @@ const PLANTILLA_PRE_TORNEO = {
 
 // ─── ANÁLISIS MEDICIONES GOLF ────────────────────────────────────────────────
 function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisisTasas, colorCategoria, S }) {
+  const [showHistCortes, setShowHistCortes] = React.useState(false);
+  const [showRegIndividuales, setShowRegIndividuales] = React.useState(false);
   const hoyProjStr = fechaLocal();
   const diasSemana = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
   // Semana calendario: lunes a domingo de la semana actual
@@ -9947,7 +9949,11 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
       </div>
       {todosLosCortes.length>0&&(
         <div style={{marginTop:16,paddingTop:14,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
-          <div style={{fontSize:12,fontWeight:700,color:"#60a5fa",marginBottom:2}}>✂️ Historial de cortes registrados</div>
+          <div onClick={()=>setShowHistCortes(p=>!p)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
+            <div style={{fontSize:12,fontWeight:700,color:"#60a5fa",marginBottom:2}}>✂️ Historial de cortes registrados</div>
+            <span style={{color:"#60a5fa",fontSize:12,transform:showHistCortes?"rotate(180deg)":"none",transition:"transform .2s"}}>▼</span>
+          </div>
+          {showHistCortes&&(<>
           <div style={{fontSize:10,color:"#5a9a7a",marginBottom:8}}>Para verificar que la altura y fecha de cada corte "Hecho" sean correctas — la proyección usa el corte más reciente de cada green.</div>
           <div style={{overflowX:"auto"}}>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
@@ -9968,6 +9974,7 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
               </tbody>
             </table>
           </div>
+          </>)}
         </div>
       )}
     </div>
@@ -9975,6 +9982,7 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
 }
 
 function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJefa, onBorrar, onBorrarTodo, tareasProg }) {
+  const [showRegIndividuales, setShowRegIndividuales] = React.useState(false);
   const ZONAS = [...GREENS_DEF,{id:"vivero",nombre:"Vivero",hoyos:"Vivero"}].map((g,gi)=>({id:g.id,nombre:g.nombre,hoyos:g.hoyos,color:["#34d399","#60a5fa","#f59e0b","#a78bfa","#f472b6","#22d3ee","#fb923c","#86efac","#fcd34d","#4ade80"][gi]||"#34d399"}));
   const COLORES_ZONA = {
     g1:"#34d399",g2:"#60a5fa",g3:"#f59e0b",g4:"#a78bfa",g5:"#f472b6",
@@ -10519,11 +10527,14 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
       </>)}
 
       {/* Historial individual con borrar */}
-      {/* Historial individual con borrar */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,marginTop:14}}>
-        <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:"#34d399"}}>📜 Registros individuales</div>
+      <div onClick={()=>setShowRegIndividuales(p=>!p)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,marginTop:14,cursor:"pointer"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:"#34d399"}}>📜 Registros individuales</div>
+          <span style={{color:"#34d399",fontSize:12,transform:showRegIndividuales?"rotate(180deg)":"none",transition:"transform .2s"}}>▼</span>
+        </div>
         <button style={{...S.btn,fontSize:11,padding:"4px 12px",background:"rgba(52,211,153,0.1)",color:"#34d399",border:"1px solid rgba(52,211,153,0.3)"}}
-          onClick={()=>{
+          onClick={(e)=>{
+            e.stopPropagation();
             const hoyR=new Date().toLocaleDateString("es-CL",{day:"2-digit",month:"long",year:"numeric"});
             const meds=[...mediciones].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
             const filas=meds.map(m=>{
@@ -10541,7 +10552,7 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
           }}>📋 Imprimir historial
         </button>
       </div>
-      {[...mediciones].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")).map(m=>(
+      {showRegIndividuales&&[...mediciones].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")).map(m=>(
         <div key={m.id} style={{...S.card,padding:14,marginBottom:8}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:8,marginBottom:6}}>
             <div>
