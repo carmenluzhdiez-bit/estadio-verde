@@ -9996,7 +9996,7 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
   };
   const MESES_LABEL = ["","Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 
-  const [vistaGrafico, setVistaGrafico] = React.useState("individual");
+  const [vistaGrafico, setVistaGrafico] = React.useState("tasas");
   const [zonaSelGrafico, setZonaSelGrafico] = React.useState("g1");
   const [zonasComparativas, setZonasComparativas] = React.useState(["g1","g3","vivero"]);
   const [confirmarBorrarTodo, setConfirmarBorrarTodo] = React.useState(false);
