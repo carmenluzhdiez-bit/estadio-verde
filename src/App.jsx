@@ -8358,8 +8358,10 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   };
 
   const guardarIgual = () => {
-    const doc = {...form, id:Date.now()};
-    set({compras:[doc,...compras]});
+    const docId = Date.now();
+    const doc = {...form, id:docId};
+    const notasVinculadas = form.notasVinculadas||[];
+    set({compras:[doc,...compras.map(compraC=>notasVinculadas.includes(compraC.id)?{...compraC,estado:"facturada",facturaId:docId}:compraC)]});
     // Igual que en guardar(): ingresar/descontar de bodega — esta función no lo
     // hacía, así que una compra confirmada como "posible duplicado" nunca
     // llegaba a generar su pendiente en Bodega (EPP u otra).
@@ -9254,6 +9256,14 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                             📅 {c.fecha} · 📄 {c.tipoDoc} {c.nDocumento} {c.responsable&&`· 👤 ${c.responsable}`}
                             {c.fechaPago&&<span style={{color:"#86efac"}}> · 💳 Pagado {c.fechaPago}</span>}
                           </div>
+                          {(()=>{
+                            const guiasVinc = compras.filter(np=>np.facturaId===c.id);
+                            return guiasVinc.length>0&&(
+                              <div style={{fontSize:11,color:"#fbbf24",marginBottom:4}}>
+                                🔗 {guiasVinc.length} documento{guiasVinc.length!==1?"s":""} vinculado{guiasVinc.length!==1?"s":""}: {guiasVinc.map(np=>`${np.tipoDoc==="Guía de Despacho"?"GD":"NP"} ${np.nDocumento}`).join(", ")}
+                              </div>
+                            );
+                          })()}
                           {/* Ítems */}
                           <div style={{fontSize:12,color:"#5a8a6a",cursor:"pointer"}} onClick={()=>setExpandDetalle(expandDetalle===c.id?null:c.id)}>
                             {items.length===1?items[0].descripcion:`${items.length} productos — clic para ver detalle`} {items.length>1&&(expandDetalle===c.id?"▲":"▼")}
