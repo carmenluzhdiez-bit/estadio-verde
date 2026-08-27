@@ -9838,7 +9838,16 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
     const tasaGlobal = anal ? anal.tasaGlobal : null;
     const tasasCalc = calcTasa(z.id);
     const ultimaTasaReal = tasasCalc && tasasCalc.length > 0 ? tasasCalc[tasasCalc.length-1] : null;
-    const tasaUsar = (ultimaTasaReal ? ultimaTasaReal.tasa : null) ?? (tasaGlobal || 0.4);
+    // Misma lógica que "⚡ Clasificación por tasa de crecimiento" (Últimos datos
+    // mm/día): promedio de las tasas de la última semana, no solo la última
+    // individual — para que ambas pantallas muestren el mismo número.
+    const hace7Tasa = new Date(hoyProjStr+"T12:00:00"); hace7Tasa.setDate(hace7Tasa.getDate()-7);
+    const hace7TasaStr = hace7Tasa.toISOString().slice(0,10);
+    const tasasUltSem = (tasasCalc||[]).filter(tc=>tc.fecha >= hace7TasaStr);
+    const tasasParaPromedio = tasasUltSem.length > 0 ? tasasUltSem : (ultimaTasaReal ? [ultimaTasaReal] : []);
+    const tasaUsar = tasasParaPromedio.length > 0
+      ? Math.round((tasasParaPromedio.reduce((s,tc)=>s+tc.tasa,0)/tasasParaPromedio.length)*100)/100
+      : (tasaGlobal || 0.4);
     const categoria = anal ? anal.categoria : "Sin datos";
 
     // Último evento conocido, para mostrar en la columna "Green"
@@ -9875,7 +9884,7 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
       ...d,
       altProj: valoresPorFecha[d.fecha] !== undefined ? valoresPorFecha[d.fecha] : altBase,
     }));
-    return {zona:z, tasaGlobal, tasaReal: ultimaTasaReal?ultimaTasaReal.tasa:null, diasUltimoIntervalo: ultimaTasaReal?ultimaTasaReal.dias:null, deltaUltimo: ultimaTasaReal?ultimaTasaReal.delta:null, altBase, fechaBase, baseOrigen, proj, categoria, datoPocoConfiable, diasDesdeBase};
+    return {zona:z, tasaGlobal, tasaReal: tasaUsar, diasUltimoIntervalo: ultimaTasaReal?ultimaTasaReal.dias:null, deltaUltimo: ultimaTasaReal?ultimaTasaReal.delta:null, altBase, fechaBase, baseOrigen, proj, categoria, datoPocoConfiable, diasDesdeBase};
   }).filter(Boolean);
 
   if(!zonasDatos.length) return null;
@@ -10207,7 +10216,7 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
     );
   };
 
-  const colorCategoria = (cat) => cat?.includes("Rápido")?"#ef4444":cat?.includes("Medio")?"#f59e0b":"#22c55e";
+  const colorCategoria = (cat) => cat?.includes("Rápido")?"#22c55e":cat?.includes("Medio")?"#f59e0b":"#ef4444";
 
   const generarInforme = () => {
     const win = window.open("","_blank","width=960,height=750");
@@ -10266,7 +10275,7 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
       const ultFecha = ultMed ? new Date(ultMed.fecha+"T12:00:00").toLocaleDateString("es-CL",{day:"2-digit",month:"short"}) : "—";
       const tasa = tasaData?.tasa;
       const cat = tasa===null?"Sin datos":Math.abs(tasa)<0.3?"🐢 Lento":Math.abs(tasa)<0.6?"➡️ Medio":"🚀 Rápido";
-      const colorTasa = tasa===null?"#888":tasa<0?"#60a5fa":tasa<0.3?"#22c55e":tasa<0.6?"#f59e0b":"#ef4444";
+      const colorTasa = tasa===null?"#888":tasa<0?"#60a5fa":tasa<0.3?"#ef4444":tasa<0.6?"#f59e0b":"#22c55e";
       const nMeds = tasaData?.nMeds||0;
       return `<tr>
         <td style="padding:7px 12px;font-weight:600;border-bottom:1px solid #e5e7eb">${z.nombre}</td>
@@ -10417,7 +10426,7 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
                         {medA.porEstacion.map(e=>(
                           <div key={e.est} style={{background:"rgba(255,255,255,0.04)",borderRadius:7,padding:"5px 10px",fontSize:11}}>
                             <span style={{color:"#5a9a7a",textTransform:"capitalize"}}>{e.est}: </span>
-                            <span style={{fontWeight:700,color:e.tasa>0.5?"#ef4444":e.tasa>0.3?"#f59e0b":"#22c55e"}}>{e.tasa>0?"+":""}{e.tasa} mm/d</span>
+                            <span style={{fontWeight:700,color:e.tasa>0.5?"#22c55e":e.tasa>0.3?"#f59e0b":"#ef4444"}}>{e.tasa>0?"+":""}{e.tasa} mm/d</span>
                           </div>
                         ))}
                       </div>
@@ -10431,7 +10440,7 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
                         {medA.porMes.map(m=>(
                           <div key={m.mes} style={{background:"rgba(255,255,255,0.04)",borderRadius:7,padding:"4px 8px",fontSize:11}}>
                             <span style={{color:"#5a9a7a"}}>{m.mes}: </span>
-                            <span style={{fontWeight:700,color:m.tasa>0.5?"#ef4444":m.tasa>0.3?"#f59e0b":"#22c55e"}}>{m.tasa>0?"+":""}{m.tasa}</span>
+                            <span style={{fontWeight:700,color:m.tasa>0.5?"#22c55e":m.tasa>0.3?"#f59e0b":"#ef4444"}}>{m.tasa>0?"+":""}{m.tasa}</span>
                           </div>
                         ))}
                       </div>
@@ -10497,7 +10506,7 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
                       const tasaDia = Math.round((tasasUsar.reduce((s,t)=>s+t.tasa,0)/tasasUsar.length)*100)/100;
                       const tasaMostrar = Math.round(tasaDia*factor*100)/100;
                       const barW = Math.min(Math.abs(tasaMostrar)/maxW*100,100);
-                      const catColor = tasaDia<0.3?"#22c55e":tasaDia<0.6?"#f59e0b":"#ef4444";
+                      const catColor = tasaDia<0.3?"#ef4444":tasaDia<0.6?"#f59e0b":"#22c55e";
                       const esSemReciente = tasasUltSem.length > 0;
                       return (
                         <div key={z.id} style={{display:"flex",alignItems:"center",gap:6}}>
@@ -10517,7 +10526,7 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
               ))}
             </div>
             <div style={{fontSize:10,color:"#5a9a7a",marginTop:10}}>
-              <span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:"#22c55e",marginRight:4,verticalAlign:"middle"}}/> Lento: &lt;0.3 mm/d · <span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:"#f59e0b",marginRight:4,verticalAlign:"middle"}}/> Medio: 0.3–0.6 mm/d · <span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:"#ef4444",marginRight:4,verticalAlign:"middle"}}/> Rápido: &gt;0.6 mm/d
+              <span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:"#ef4444",marginRight:4,verticalAlign:"middle"}}/> Lento: &lt;0.3 mm/d · <span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:"#f59e0b",marginRight:4,verticalAlign:"middle"}}/> Medio: 0.3–0.6 mm/d · <span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:"#22c55e",marginRight:4,verticalAlign:"middle"}}/> Rápido: &gt;0.6 mm/d
             </div>
           </div>
         )}
