@@ -1762,6 +1762,7 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
 
 
 function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa=false, puedeCrear=false, cierresTurno={}, onReabrirTurno }) {
+  const [diasAbiertosHist, setDiasAbiertosHist] = React.useState({});
   const [filtroDia,    setFiltroDia]    = React.useState("");
   const [filtroEstado, setFiltroEstado] = React.useState("todos");
   const [filtroTarea,  setFiltroTarea]  = React.useState("");
@@ -2114,13 +2115,14 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
         const esDom  = new Date(dia+"T12:00:00").getDay()===0;
         return (
           <div key={dia} style={{...S.card,padding:18,marginBottom:14}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:8}}>
+            <div onClick={()=>setDiasAbiertosHist(p=>({...p,[dia]:!p[dia]}))} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:8,cursor:"pointer"}}>
               <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                <span style={{fontSize:12,color:"#6aaa7a",transform:diasAbiertosHist[dia]?"rotate(90deg)":"none",transition:"transform .15s",display:"inline-block"}}>▶</span>
                 <span style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700}}>{dia}</span>
                 {esDom&&<span style={{fontSize:11,color:"#f59e0b",background:"rgba(245,158,11,0.12)",padding:"2px 8px",borderRadius:10}}>Domingo</span>}
                 <span style={{fontSize:12,color:"#6aaa7a"}}>{tdFiltradas.length}{tdFiltradas.length!==hpTd.length?` / ${hpTd.length}`:""} tareas</span>
               </div>
-              <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+              <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}} onClick={e=>e.stopPropagation()}>
                 <span style={{fontSize:12,color:"#22c55e"}}>✅ {hechas}</span>
                 {noPudo>0&&<span style={{fontSize:12,color:"#ef4444"}}>🔴 {noPudo}</span>}
                 {pend>0&&<span style={{fontSize:12,color:"#94a3b8"}}>⏳ {pend}</span>}
@@ -2139,6 +2141,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                 )}
               </div>
             </div>
+            {diasAbiertosHist[dia]&&(<>
             <div style={{background:"rgba(255,255,255,0.07)",borderRadius:4,height:6,marginBottom:12,overflow:"hidden"}}>
               <div style={{width:`${pct2}%`,height:"100%",background:pct2===100?"#22c55e":"#3b82f6",borderRadius:4}}/>
             </div>
@@ -2197,6 +2200,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                 );
               })}
             </div>
+            </>)}
           </div>
         );
       })}
@@ -3799,21 +3803,159 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
   return (
     <div className="ein">
       {/* Cabecera */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",marginBottom:18,flexWrap:"wrap",gap:12}}>
-        <div>
-          <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:900,marginBottom:3}}>Programación Diaria</h1>
-          <p style={{color:"#6aaa7a",fontSize:14}}>Asignación y seguimiento de tareas por día</p>
+      <div style={{marginBottom:14}}>
+        <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:900,marginBottom:3}}>Programación Diaria</h1>
+        <p style={{color:"#6aaa7a",fontSize:14}}>Asignación y seguimiento de tareas por día</p>
+      </div>
+      <ConfiguradorSemanal S={S} personal={personal} configSemanal={configSemanal||{}} setConfigSemanal={setConfigSemanal} esJefa={esJefa}/>
+
+      {/* ══════ SECCIÓN: Programar y Frecuencias — todas las macrozonas EXCEPTO GOLF ══════ */}
+      <div style={{border:"1px solid rgba(52,211,153,0.25)",borderRadius:12,padding:14,marginBottom:14,background:"rgba(52,211,153,0.03)"}}>
+        <div style={{fontSize:11,fontWeight:700,color:"#34d399",marginBottom:10,textTransform:"uppercase",letterSpacing:"0.5px"}}>
+          🌿 Programar — todas las macrozonas (excepto Golf)
         </div>
-        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-          <input type="date" value={fecha} onChange={e=>{
-              setFecha(e.target.value);
-              if(esDomingo(e.target.value)) setAviso("⚠️ El día seleccionado es domingo. Considera usar un día hábil.");
-              else if(e.target.value<=hoy) setAviso("ℹ️ Estás programando para hoy o una fecha pasada. Recuerda que lo ideal es programar con al menos un día de anticipación.");
-              else setAviso(null);
-            }}
-            style={{...S.input,width:"auto",fontSize:13,order:0}}/>
-          <button onClick={proponerTareas} style={{...S.btn,background:"rgba(59,130,246,0.2)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)",fontSize:13,order:1}}>✨ Proponer del día</button>
-          <button onClick={()=>setVista("golf")} style={{...S.btn,background:"rgba(52,211,153,0.15)",color:"#34d399",border:"1px solid rgba(52,211,153,0.3)",fontSize:13,order:2}}>⛳ Ir a Programar Golf</button>
+        <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
+          {[["programa","📆 Programar"],["frecuencias","🔄 Frecuencias"]].map(([t,l])=>(
+            <button key={t} className={`tab${tabProg===t?" on":""}`} onClick={()=>setTabProg(t)}>{l}</button>
+          ))}
+        </div>
+        {tabProg==="programa"&&(
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+            <input type="date" value={fecha} onChange={e=>{
+                setFecha(e.target.value);
+                if(esDomingo(e.target.value)) setAviso("⚠️ El día seleccionado es domingo. Considera usar un día hábil.");
+                else if(e.target.value<=hoy) setAviso("ℹ️ Estás programando para hoy o una fecha pasada. Recuerda que lo ideal es programar con al menos un día de anticipación.");
+                else setAviso(null);
+              }}
+              style={{...S.input,width:"auto",fontSize:13}}/>
+            <button onClick={proponerTareas} style={{...S.btn,background:"rgba(59,130,246,0.2)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)",fontSize:13}}>✨ Proponer del día</button>
+            <button onClick={()=>{
+              setNuevaTarea(p=>({...p,
+                zona:filtroZona!=="todas"&&filtroZona!=="Golf"?filtroZona:p.zona,
+                elemento:"",tarea:""
+              }));
+              setShowAgregar(true);
+            }} style={{...S.btn,background:"rgba(61,122,82,0.25)",color:"#90d0a0",border:"1px solid rgba(61,122,82,0.35)",fontSize:13}}>➕ Agregar tarea</button>
+            {esJefa&&(
+              <button onClick={()=>{
+                // MODO LLUVIA
+                const diaSemana = new Date(fecha+"T12:00:00").getDay();
+                const normArr = v=>Array.isArray(v)?v:Object.values(v||{});
+                const tareasHoy = normArr(tareas[fecha]||[]);
+
+                // Palabras clave de tareas que NO se cancelan por lluvia
+                const BAJO_TECHO = ["bajo techo","invernadero","vivero","bodega","sala","interior","oficina","taller"];
+                const EXTERIOR_CANCELAR = ["corte","poda","fumiga","fungicida","pestici","herbicida","siembra","plantaci","trasplant","aireaci","vertic","fertiliz","abono","soplad","barrido"];
+
+                const esBajoTecho = t => {
+                  // 1. Verificar campo condicion en data del elemento
+                  if(t.zona && t.elemento) {
+                    const zonaObj = MACROZONAS_BASE.find(z=>z.nombre===t.zona);
+                    if(zonaObj) {
+                      const zdat = getZD ? getZD(String(zonaObj.id)) : {};
+                      const elemBase = zdat.elementos?.[zonaObj.elementos?.find(e=>e.nombre===t.elemento)?.id];
+                      const elemCustom = (zdat.elementosCustom||[]).find(e=>e.nombre===t.elemento);
+                      const condicion = elemBase?.condicion || elemCustom?.condicion;
+                      if(condicion==="bajo_techo") return true;
+                      if(condicion==="exterior") return false;
+                      if(condicion==="mixto") return false; // mixto = revisar manual
+                    }
+                  }
+                  // 2. Fallback: keywords en texto
+                  return BAJO_TECHO.some(k=>(t.tarea+" "+(t.notas||"")).toLowerCase().includes(k));
+                };
+                const esExterior = t => EXTERIOR_CANCELAR.some(k=>(t.tarea||t.elemento||"").toLowerCase().includes(k));
+                const esRiego = t => (t.tarea||t.elemento||"").toLowerCase().includes("riego")||(t.tarea||t.elemento||"").toLowerCase().includes("regar");
+
+                const aPosponer = tareasHoy.filter(t=>
+                  normalizarEstado(t.estado)!=="hecha" &&
+                  !esBajoTecho(t) &&
+                  (esExterior(t) || (!esRiego(t) && !esBajoTecho(t)))
+                );
+
+                const aRevisar = tareasHoy.filter(t=>esRiego(t)&&normalizarEstado(t.estado)!=="hecha");
+
+                if(aPosponer.length===0&&aRevisar.length===0){
+                  alert("No hay tareas que posponer por lluvia."); return;
+                }
+
+                const msg = [
+                  aPosponer.length>0 ? aPosponer.length+" tarea(s) de exterior se marcarán como 'No se pudo (lluvia)' y se reprogramarán en 2 días hábiles." : "",
+                  aRevisar.length>0 ? aRevisar.length+" tarea(s) de riego requieren revisión manual (algunas pueden estar bajo techo)." : "",
+                ].filter(Boolean).join("\n");
+                if(!window.confirm("🌧️ MODO LLUVIA\n\n"+msg+"\n\n¿Continuar?")) return;
+                if(!window.confirm("Modo Lluvia: "+msg+" Continuar?")) return;
+
+                // Destino = +2 días hábiles (sin domingo)
+                const destino = diasHabiles(fecha, 2);
+
+                // Marcar como no_pudo y reprogramar
+                const nuevasTareasDestino = [];
+                setTareas(prev=>{
+                  const normA = v=>Array.isArray(v)?v:Object.values(v||{});
+                  const hoy = normA(prev[fecha]||[]).map(t=>{
+                    if(aPosponer.some(p=>p.id===t.id)){
+                      return {...t, estado:"no_pudo", notaWorker:"No se pudo — Lluvia"};
+                    }
+                    return t;
+                  });
+                  // Crear copias para el día destino
+                  aPosponer.forEach(t=>{
+                    nuevasTareasDestino.push({...t,
+                      id:Date.now()+Math.random(),
+                      fecha:destino,
+                      estado:"pendiente",
+                      notaWorker:"",
+                      notas:(t.notas?t.notas+" | ":"")+"Reprogramada por lluvia desde "+fecha,
+                    });
+                  });
+                  const destArr = [...normA(prev[destino]||[]),...nuevasTareasDestino];
+                  return {...prev,[fecha]:hoy,[destino]:destArr};
+                });
+
+                setTimeout(()=>alert("Modo lluvia aplicado. "+aPosponer.length+" tarea(s) reprogramadas para "+destino+". "+(aRevisar.length>0?aRevisar.length+" riego(s) a revisar manualmente.":"")),200);
+              }} style={{...S.btn,background:"rgba(96,165,250,0.1)",color:"#93c5fd",border:"1px solid rgba(96,165,250,0.2)",fontSize:11}}>
+                🌧️ Modo lluvia
+              </button>
+            )}
+            {esJefa&&(
+              <button onClick={()=>{
+                // Próximo día hábil (salta domingo)
+                const mananaStr = diasHabiles(fecha, 1);
+                // Obtener TODAS las tareas del día normalizando el array
+                const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+                const todasHoy = normArr(tareas[fecha]||[]);
+                console.log("Reprogramar: fecha="+fecha+" total="+todasHoy.length, todasHoy.map(t=>t.tarea+"→"+t.estado));
+                const pendientes = todasHoy.filter(t=>{
+                  const est = normalizarEstado(t.estado);
+                  return est!=="hecha" && est!=="no_pudo";
+                });
+                console.log("Pendientes:", pendientes.length);
+                if(pendientes.length===0) return alert("No hay tareas pendientes para reprogramar.");
+                const tareasManana = normArr(tareas[mananaStr]||[]);
+                const yaExisten = tareasManana.map(t=>t.zona+"_"+t.tarea);
+                const nuevas = pendientes
+                  .filter(t=>!yaExisten.includes(t.zona+"_"+t.tarea))
+                  .map(t=>({...t, id:Date.now()+Math.random(), fecha:mananaStr, estado:"pendiente"}));
+                if(nuevas.length===0) return alert("Todas las tareas pendientes ya existen para mañana.");
+                setTareasDelDia(mananaStr, [...normArr(tareas[mananaStr]||[]), ...nuevas]);
+                alert(`✅ ${nuevas.length} tarea(s) pendientes reprogramadas para ${mananaStr}`);
+              }} style={{...S.btn,background:"rgba(251,191,36,0.1)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.2)",fontSize:11}}>
+                📅 Reprogramar pendientes para mañana
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ══════ Enlace independiente a Golf — tiene su propio sistema completo ══════ */}
+      <div style={{border:"1px solid rgba(52,211,153,0.35)",borderRadius:12,padding:14,marginBottom:14,background:"rgba(52,211,153,0.08)",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
+        <div>
+          <div style={{fontSize:13,fontWeight:700,color:"#34d399"}}>⛳ Golf</div>
+          <div style={{fontSize:11,color:"#5a9a7a"}}>Golf tiene su propio módulo completo de programación — greens, frecuencias y semana Golf se gestionan ahí, no aquí.</div>
+        </div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <button onClick={()=>setVista("golf")} style={{...S.btn,background:"rgba(52,211,153,0.2)",color:"#34d399",border:"1px solid rgba(52,211,153,0.4)",fontSize:13}}>⛳ Ir a Programar Golf</button>
           {esJefa&&(
             <button onClick={()=>{
               if(!window.confirm("Esto actualizará Golf en Firebase con la nueva estructura (Tees 01A-09B, Fairways 01-09, Búnkers 01-05). Los elementos custom se mantendrán. ¿Continuar?")) return;
@@ -3826,134 +3968,19 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
               fbUpdate(ref(db, ROOT+"/data/31"), { elementos: nuevosElems })
                 .then(()=>alert("✅ Golf actualizado en Firebase con la nueva estructura"))
                 .catch(e=>alert("Error: "+e));
-            }} style={{...S.btn,background:"rgba(96,165,250,0.1)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.2)",fontSize:11,marginBottom:8,width:"100%",order:6}}>
+            }} style={{...S.btn,background:"rgba(96,165,250,0.1)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.2)",fontSize:11}}>
               🔄 Actualizar estructura Golf en Firebase
             </button>
           )}
-                              {esJefa&&(
-            <button onClick={()=>{
-              // MODO LLUVIA
-              const diaSemana = new Date(fecha+"T12:00:00").getDay();
-              const normArr = v=>Array.isArray(v)?v:Object.values(v||{});
-              const tareasHoy = normArr(tareas[fecha]||[]);
-              
-              // Palabras clave de tareas que NO se cancelan por lluvia
-              const BAJO_TECHO = ["bajo techo","invernadero","vivero","bodega","sala","interior","oficina","taller"];
-              const EXTERIOR_CANCELAR = ["corte","poda","fumiga","fungicida","pestici","herbicida","siembra","plantaci","trasplant","aireaci","vertic","fertiliz","abono","soplad","barrido"];
-              
-              const esBajoTecho = t => {
-                // 1. Verificar campo condicion en data del elemento
-                if(t.zona && t.elemento) {
-                  const zonaObj = MACROZONAS_BASE.find(z=>z.nombre===t.zona);
-                  if(zonaObj) {
-                    const zdat = getZD ? getZD(String(zonaObj.id)) : {};
-                    const elemBase = zdat.elementos?.[zonaObj.elementos?.find(e=>e.nombre===t.elemento)?.id];
-                    const elemCustom = (zdat.elementosCustom||[]).find(e=>e.nombre===t.elemento);
-                    const condicion = elemBase?.condicion || elemCustom?.condicion;
-                    if(condicion==="bajo_techo") return true;
-                    if(condicion==="exterior") return false;
-                    if(condicion==="mixto") return false; // mixto = revisar manual
-                  }
-                }
-                // 2. Fallback: keywords en texto
-                return BAJO_TECHO.some(k=>(t.tarea+" "+(t.notas||"")).toLowerCase().includes(k));
-              };
-              const esExterior = t => EXTERIOR_CANCELAR.some(k=>(t.tarea||t.elemento||"").toLowerCase().includes(k));
-              const esRiego = t => (t.tarea||t.elemento||"").toLowerCase().includes("riego")||(t.tarea||t.elemento||"").toLowerCase().includes("regar");
-              
-              const aPosponer = tareasHoy.filter(t=>
-                normalizarEstado(t.estado)!=="hecha" &&
-                !esBajoTecho(t) &&
-                (esExterior(t) || (!esRiego(t) && !esBajoTecho(t)))
-              );
-              
-              const aRevisar = tareasHoy.filter(t=>esRiego(t)&&normalizarEstado(t.estado)!=="hecha");
-              
-              if(aPosponer.length===0&&aRevisar.length===0){
-                alert("No hay tareas que posponer por lluvia."); return;
-              }
-              
-              const msg = [
-                aPosponer.length>0 ? aPosponer.length+" tarea(s) de exterior se marcarán como 'No se pudo (lluvia)' y se reprogramarán en 2 días hábiles." : "",
-                aRevisar.length>0 ? aRevisar.length+" tarea(s) de riego requieren revisión manual (algunas pueden estar bajo techo)." : "",
-              ].filter(Boolean).join("\n");
-              if(!window.confirm("🌧️ MODO LLUVIA\n\n"+msg+"\n\n¿Continuar?")) return;
-              if(!window.confirm("Modo Lluvia: "+msg+" Continuar?")) return;
-              
-              // Destino = +2 días hábiles (sin domingo)
-              const destino = diasHabiles(fecha, 2);
-              
-              // Marcar como no_pudo y reprogramar
-              const nuevasTareasDestino = [];
-              setTareas(prev=>{
-                const normA = v=>Array.isArray(v)?v:Object.values(v||{});
-                const hoy = normA(prev[fecha]||[]).map(t=>{
-                  if(aPosponer.some(p=>p.id===t.id)){
-                    return {...t, estado:"no_pudo", notaWorker:"No se pudo — Lluvia"};
-                  }
-                  return t;
-                });
-                // Crear copias para el día destino
-                aPosponer.forEach(t=>{
-                  nuevasTareasDestino.push({...t,
-                    id:Date.now()+Math.random(),
-                    fecha:destino,
-                    estado:"pendiente",
-                    notaWorker:"",
-                    notas:(t.notas?t.notas+" | ":"")+"Reprogramada por lluvia desde "+fecha,
-                  });
-                });
-                const destArr = [...normA(prev[destino]||[]),...nuevasTareasDestino];
-                return {...prev,[fecha]:hoy,[destino]:destArr};
-              });
-              
-              setTimeout(()=>alert("Modo lluvia aplicado. "+aPosponer.length+" tarea(s) reprogramadas para "+destino+". "+(aRevisar.length>0?aRevisar.length+" riego(s) a revisar manualmente.":"")),200);
-            }} style={{...S.btn,background:"rgba(96,165,250,0.1)",color:"#93c5fd",border:"1px solid rgba(96,165,250,0.2)",fontSize:11,order:4}}>
-              🌧️ Modo lluvia
-            </button>
-          )}
-          {esJefa&&(
-            <button onClick={()=>{
-              // Próximo día hábil (salta domingo)
-              const mananaStr = diasHabiles(fecha, 1);
-              // Obtener TODAS las tareas del día normalizando el array
-              const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-              const todasHoy = normArr(tareas[fecha]||[]);
-              console.log("Reprogramar: fecha="+fecha+" total="+todasHoy.length, todasHoy.map(t=>t.tarea+"→"+t.estado));
-              const pendientes = todasHoy.filter(t=>{
-                const est = normalizarEstado(t.estado);
-                return est!=="hecha" && est!=="no_pudo";
-              });
-              console.log("Pendientes:", pendientes.length);
-              if(pendientes.length===0) return alert("No hay tareas pendientes para reprogramar.");
-              const tareasManana = normArr(tareas[mananaStr]||[]);
-              const yaExisten = tareasManana.map(t=>t.zona+"_"+t.tarea);
-              const nuevas = pendientes
-                .filter(t=>!yaExisten.includes(t.zona+"_"+t.tarea))
-                .map(t=>({...t, id:Date.now()+Math.random(), fecha:mananaStr, estado:"pendiente"}));
-              if(nuevas.length===0) return alert("Todas las tareas pendientes ya existen para mañana.");
-              setTareasDelDia(mananaStr, [...normArr(tareas[mananaStr]||[]), ...nuevas]);
-              alert(`✅ ${nuevas.length} tarea(s) pendientes reprogramadas para ${mananaStr}`);
-            }} style={{...S.btn,background:"rgba(251,191,36,0.1)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.2)",fontSize:11,order:5}}>
-              📅 Reprogramar pendientes para mañana
-            </button>
-          )}
-          <button onClick={()=>{
-            setNuevaTarea(p=>({...p,
-              zona:filtroZona!=="todas"&&filtroZona!=="Golf"?filtroZona:p.zona,
-              elemento:"",tarea:""
-            }));
-            setShowAgregar(true);
-          }} style={{...S.btn,background:"rgba(61,122,82,0.25)",color:"#90d0a0",border:"1px solid rgba(61,122,82,0.35)",fontSize:13,order:3}}>➕ Agregar tarea</button>
         </div>
       </div>
-      <ConfiguradorSemanal S={S} personal={personal} configSemanal={configSemanal||{}} setConfigSemanal={setConfigSemanal} esJefa={esJefa}/>
 
-      {/* Tabs */}
-      <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
-        {[["programa","📆 Programar"],["frecuencias","🔄 Frecuencias"],["historial","📜 Historial"]].map(([t,l])=>(
-          <button key={t} className={`tab${tabProg===t?" on":""}`} onClick={()=>setTabProg(t)}>{l}</button>
-        ))}
+      {/* ══════ SECCIÓN: Historial — incluye TODAS las macrozonas (Golf incluido) ══════ */}
+      <div style={{border:"1px solid rgba(96,165,250,0.25)",borderRadius:12,padding:14,marginBottom:14,background:"rgba(96,165,250,0.03)"}}>
+        <div style={{fontSize:11,fontWeight:700,color:"#93c5fd",marginBottom:10,textTransform:"uppercase",letterSpacing:"0.5px"}}>
+          📜 Historial — incluye todas las macrozonas, incluido Golf
+        </div>
+        <button className={`tab${tabProg==="historial"?" on":""}`} onClick={()=>setTabProg("historial")}>📜 Ver Historial</button>
       </div>
 
       {/* ── FRECUENCIAS POR MACROZONA ── */}
