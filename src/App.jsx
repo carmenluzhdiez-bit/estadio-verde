@@ -10534,14 +10534,12 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
                   <div style={{fontSize:11,color:"#5a9a7a",marginBottom:8,fontWeight:600,letterSpacing:"0.5px",textTransform:"uppercase"}}>{label}</div>
                   <div style={{display:"flex",flexDirection:"column",gap:6}}>
                     {ZONAS.map(z=>{
-                      const hace7 = new Date(fechaLocal()+"T12:00:00");
-                      hace7.setDate(hace7.getDate()-7);
-                      const hace7str = hace7.toISOString().slice(0,10);
                       const tasasZ = calcTasa(z.id);
                       if(!tasasZ||!tasasZ.length) return null;
-                      const tasasUltSem = tasasZ.filter(t=>t.fecha >= hace7str);
-                      const tasasUsar = tasasUltSem.length > 0 ? tasasUltSem : [tasasZ[tasasZ.length-1]];
-                      const tasaDia = Math.round((tasasUsar.reduce((s,t)=>s+t.tasa,0)/tasasUsar.length)*100)/100;
+                      // Misma lógica que la tabla "Proyección semanal" (Tasa real):
+                      // el último intervalo real, no un promedio — para que ambos
+                      // lugares muestren siempre el mismo número.
+                      const tasaDia = tasasZ[tasasZ.length-1].tasa;
                       const tasaMostrar = Math.round(tasaDia*factor*100)/100;
                       const barW = Math.min(Math.abs(tasaMostrar)/maxW*100,100);
                       const catColor = tasaDia<0.3?"#ef4444":tasaDia<0.6?"#f59e0b":"#22c55e";
