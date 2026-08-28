@@ -11707,6 +11707,7 @@ function TareasGolfPanel({ tareasGolfHoy, hoy, esJefa, setTareasProg, tareasProg
 function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito, onCierreSectorial, onNuevaAlerta, configSemanal={}, setConfigSemanal, getAllElems, getZD, setElemFrecs, bodegasData, setBodegasData }) {
   const GOLF_ZONA_ID = 31; // ID macrozona Golf
   const [fechaProponerGolf, setFechaProponerGolf] = React.useState(fechaLocal());
+  const [buscarPreviewGolf, setBuscarPreviewGolf] = React.useState("");
   const sincronizarMacrozona = (tipo, detalle) => {
     if(!updateZona) return;
     const hoyFmt = new Date().toLocaleDateString("es-CL");
@@ -13508,26 +13509,36 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           </div>
           <div style={{fontSize:12,color:"#5a9a7a",marginBottom:18}}>Responsables fijos de la semana y altura de corte objetivo por superficie.</div>
 
-          {previewGolfProp&&(
+          {previewGolfProp&&(()=>{
+            const previewFiltrado = previewGolfProp.filter(p=>
+              !buscarPreviewGolf.trim() ||
+              (p.tarea+" "+p.elemento).toLowerCase().includes(buscarPreviewGolf.trim().toLowerCase())
+            );
+            return (
             <div style={{...S.card,padding:16,marginBottom:18,border:"1px solid rgba(96,165,250,0.3)"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-                <div style={{fontSize:13,fontWeight:700,color:"#60a5fa"}}>👁️ Vista previa — tareas para {hoy}</div>
+                <div style={{fontSize:13,fontWeight:700,color:"#60a5fa"}}>👁️ Vista previa — tareas para {fechaProponerGolf}</div>
                 <span style={{fontSize:11,color:"#5a9a7a"}}>{previewGolfProp.filter(p=>p.incluir).length}/{previewGolfProp.length} seleccionadas</span>
               </div>
-              <div style={{fontSize:11,color:"#5a9a7a",marginBottom:12}}>Desmarca las que no quieras enviar hoy. Quedarán como vencidas para el próximo Proponer del día.</div>
+              <div style={{fontSize:11,color:"#5a9a7a",marginBottom:10}}>Desmarca las que no quieras enviar hoy. Quedarán como vencidas para el próximo Proponer del día.</div>
+              <input placeholder="🔍 Buscar por tarea o elemento (ej: Basureros, Tee 03...)" value={buscarPreviewGolf} onChange={e=>setBuscarPreviewGolf(e.target.value)}
+                style={{...S.input,fontSize:12,marginBottom:10,width:"100%"}}/>
+              {buscarPreviewGolf.trim()&&<div style={{fontSize:11,color:"#5a9a7a",marginBottom:8}}>{previewFiltrado.length} de {previewGolfProp.length} coinciden</div>}
               <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:12}}>
-                {previewGolfProp.map((p,i)=>(
+                {previewFiltrado.map((p,i)=>{
+                  const iReal = previewGolfProp.indexOf(p);
+                  return (
                   <div key={p.id} style={{borderRadius:8,border:`1px solid ${p.incluir?"rgba(255,255,255,0.08)":"rgba(255,255,255,0.03)"}`,overflow:"hidden",opacity:p.incluir?1:0.5}}>
-                    <div onClick={()=>setPreviewGolfProp(prev=>prev.map((x,xi)=>xi===i?{...x,abierta:!x.abierta}:x))}
+                    <div onClick={()=>setPreviewGolfProp(prev=>prev.map((x,xi)=>xi===iReal?{...x,abierta:!x.abierta}:x))}
                       style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",cursor:"pointer",background:p.incluir?"rgba(255,255,255,0.03)":"transparent"}}>
-                      <input type="checkbox" checked={p.incluir} onClick={e=>e.stopPropagation()} onChange={()=>setPreviewGolfProp(prev=>prev.map((x,xi)=>xi===i?{...x,incluir:!x.incluir}:x))}/>
+                      <input type="checkbox" checked={p.incluir} onClick={e=>e.stopPropagation()} onChange={()=>setPreviewGolfProp(prev=>prev.map((x,xi)=>xi===iReal?{...x,incluir:!x.incluir}:x))}/>
                       <span style={{fontSize:10,color:"#5a9a7a",transform:p.abierta?"rotate(90deg)":"none",transition:"transform .15s",display:"inline-block"}}>▶</span>
                       <div style={{flex:1}}>
                         <span style={{fontSize:12,fontWeight:600}}>{p.tarea}</span>
                         <span style={{fontSize:11,color:"#5a9a7a",marginLeft:6}}>· {p.elemento}</span>
                         {p.diasVencida>0&&<span style={{fontSize:10,color:"#f87171",marginLeft:6,background:"rgba(248,113,113,0.1)",padding:"1px 6px",borderRadius:8}}>⚠️ {p.diasVencida}d vencida</span>}
                       </div>
-                      <select value={p.responsable||""} onClick={e=>e.stopPropagation()} onChange={e=>setPreviewGolfProp(prev=>prev.map((x,xi)=>xi===i?{...x,responsable:e.target.value,estado:e.target.value?"pendiente":"por_designar"}:x))}
+                      <select value={p.responsable||""} onClick={e=>e.stopPropagation()} onChange={e=>setPreviewGolfProp(prev=>prev.map((x,xi)=>xi===iReal?{...x,responsable:e.target.value,estado:e.target.value?"pendiente":"por_designar"}:x))}
                         style={{...S.input,fontSize:11,padding:"3px 7px",maxWidth:150}}>
                         <option value="">— Por designar —</option>
                         {listaPersonal.map(pp=><option key={pp.id} value={pp.nombre}>{pp.nombre}</option>)}
@@ -13541,14 +13552,15 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                       </div>
                     )}
                   </div>
-                ))}
+                );})}
               </div>
               <div style={{display:"flex",gap:8}}>
                 <button className="btn-p" style={S.btn} onClick={confirmarEnvioGolf}>✅ Confirmar y enviar al jardinero</button>
-                <button style={{...S.btn,background:"transparent",border:"1px solid rgba(255,255,255,0.15)",color:"#7aaa80"}} onClick={()=>setPreviewGolfProp(null)}>Cancelar</button>
+                <button style={{...S.btn,background:"transparent",border:"1px solid rgba(255,255,255,0.15)",color:"#7aaa80"}} onClick={()=>{setPreviewGolfProp(null);setBuscarPreviewGolf("");}}>Cancelar</button>
               </div>
             </div>
-          )}
+            );
+          })()}
 
           <div style={{...S.card,padding:16,marginBottom:18}}>
             <div style={{fontSize:13,fontWeight:700,color:"#34d399",marginBottom:4}}>👷 Responsable de Golf esta semana</div>
