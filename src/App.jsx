@@ -1778,7 +1778,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
     no_pudo:     {color:"#ef4444", icon:"🔴", label:"No se pudo"},
     haciendose:  {color:"#3b82f6", icon:"🔵", label:"Haciéndose"},
     en_curso:    {color:"#3b82f6", icon:"🔵", label:"En curso"},
-    pendiente:   {color:"#f59e0b", icon:"N1", label:"Pendiente"},
+    pendiente:   {color:"#f59e0b", icon:"⏳", label:"Pendiente"},
     por_designar:{color:"#94a3b8", icon:"⬜", label:"Por designar"},
     cancelada:   {color:"#ef4444", icon:"❌", label:"Cancelada"},
   };
