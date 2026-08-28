@@ -3819,7 +3819,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
             <button key={t} className={`tab${tabProg===t?" on":""}`} onClick={()=>setTabProg(t)}>{l}</button>
           ))}
         </div>
-        {tabProg==="programa"&&(
+        {tabProg==="programa"&&(<>
           <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
             <input type="date" value={fecha} onChange={e=>{
                 setFecha(e.target.value);
@@ -3945,7 +3945,64 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
               </button>
             )}
           </div>
-        )}
+
+          {stats.total > 0 && (
+            <div style={{...S.card,padding:"14px 18px",marginBottom:16,marginTop:12}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:8,flexWrap:"wrap",gap:8}}>
+                <div style={{display:"flex",gap:14,flexWrap:"wrap"}}>
+                  <span style={{fontSize:13}}><b style={{color:"#c0dac0"}}>{stats.total}</b> <span style={{color:"#6aaa7a"}}>tareas</span></span>
+                  <span style={{fontSize:13}}><b style={{color:"#22c55e"}}>{stats.completadas}</b> <span style={{color:"#6aaa7a"}}>completadas</span></span>
+                  <span style={{fontSize:13}}><b style={{color:"#3b82f6"}}>{stats.pendientes}</b> <span style={{color:"#6aaa7a"}}>en curso/pend.</span></span>
+                  <span style={{fontSize:13}}><b style={{color:"#94a3b8"}}>{stats.porDesignar}</b> <span style={{color:"#6aaa7a"}}>por designar</span></span>
+                </div>
+                <span style={{fontSize:13,fontWeight:700,color:pct===100?"#22c55e":pct>50?"#f59e0b":"#94a3b8"}}>{pct}%</span>
+              </div>
+              <div style={{background:"rgba(255,255,255,0.07)",borderRadius:6,height:8,overflow:"hidden"}}>
+                <div style={{width:`${pct}%`,height:"100%",background:pct===100?"#22c55e":pct>50?"#4ade80":"#3b82f6",borderRadius:6,transition:"width .4s"}}/>
+              </div>
+            </div>
+          )}
+
+          {stats.total > 0 && (
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              <select value={filtroEstado} onChange={e=>setFiltroEstado(e.target.value)} style={{...S.input,flex:"1 1 130px",maxWidth:180,fontSize:13}}>
+                <option value="todos">Todos los estados</option>
+                {Object.entries(ESTADOS_TAREA).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
+              </select>
+              <select value={filtroZona} onChange={e=>setFiltroZona(e.target.value)} style={{...S.input,flex:"1 1 160px",maxWidth:220,fontSize:13}}>
+                <option value="todas">📋 Todas las macrozonas</option>
+                {zonasEnProg.length>0&&<option disabled>── Filtrar por macrozona ──</option>}
+                {zonasEnProg.map(z=><option key={z} value={z}>{z==="Golf"?"⛳ "+z:z}</option>)}</select>
+              <select value={filtroCategoria} onChange={e=>setFiltroCategoria(e.target.value)} style={{...S.input,flex:"1 1 180px",maxWidth:220,fontSize:13}}>
+                <option value="todas">🏷️ Todas las tareas</option>
+                {tareasUnicasHoy.length>0&&<option disabled>── Filtrar por tarea ──</option>}
+                {tareasUnicasHoy.map(t=><option key={t} value={t}>{t}</option>)}
+              </select>
+              {(filtroEstado!=="todos"||filtroZona!=="todas"||filtroCategoria!=="todas"||filtroTrabajador!=="todos")&&(
+                <button onClick={()=>{setFiltroEstado("todos");setFiltroZona("todas");setFiltroCategoria("todas");setFiltroTrabajador("todos");}} style={{...S.btn,background:"transparent",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)",fontSize:12}}>✕ Limpiar</button>
+              )}
+              {/* Filtro por trabajador */}
+              <select value={filtroTrabajador} onChange={e=>setFiltroTrabajador(e.target.value)} style={{...S.input,fontSize:11,maxWidth:180}}>
+                <option value="todos">👷 Todos los trabajadores</option>
+                {(Array.isArray(personal)?personal:Object.values(personal||{}))
+                  .sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}))
+                  .map(p=>(
+                    <option key={p.id} value={p.nombre}>{getNombreRef(p.nombre)} {p.nombre.split(" ")[1]||""}</option>
+                  ))
+                }
+              </select>
+              {/* Toggle vista semanal */}
+              <button
+                onClick={()=>setVistaSemanal(v=>!v)}
+                style={{...S.btn,fontSize:11,padding:"4px 12px",
+                  background:vistaSemanal?"rgba(96,165,250,0.2)":"rgba(255,255,255,0.04)",
+                  color:vistaSemanal?"#60a5fa":"#5a9a7a",
+                  border:`1px solid ${vistaSemanal?"rgba(96,165,250,0.4)":"rgba(255,255,255,0.1)"}`}}>
+                {vistaSemanal?"📅 Semana":"📆 Día"}
+              </button>
+            </div>
+          )}
+        </>)}
       </div>
 
       {/* ══════ Enlace independiente a Golf — tiene su propio sistema completo ══════ */}
@@ -4021,63 +4078,6 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
               </div>
               <button onClick={()=>setFecha(hoy)} style={{...S.btn,background:"rgba(192,132,252,0.2)",color:"#c084fc",border:"1px solid rgba(192,132,252,0.3)",fontSize:12,flexShrink:0,padding:"6px 12px"}}>
                 Ir a hoy →
-              </button>
-            </div>
-          )}
-
-          {stats.total > 0 && (
-            <div style={{...S.card,padding:"14px 18px",marginBottom:16}}>
-              <div style={{display:"flex",justifyContent:"space-between",marginBottom:8,flexWrap:"wrap",gap:8}}>
-                <div style={{display:"flex",gap:14,flexWrap:"wrap"}}>
-                  <span style={{fontSize:13}}><b style={{color:"#c0dac0"}}>{stats.total}</b> <span style={{color:"#6aaa7a"}}>tareas</span></span>
-                  <span style={{fontSize:13}}><b style={{color:"#22c55e"}}>{stats.completadas}</b> <span style={{color:"#6aaa7a"}}>completadas</span></span>
-                  <span style={{fontSize:13}}><b style={{color:"#3b82f6"}}>{stats.pendientes}</b> <span style={{color:"#6aaa7a"}}>en curso/pend.</span></span>
-                  <span style={{fontSize:13}}><b style={{color:"#94a3b8"}}>{stats.porDesignar}</b> <span style={{color:"#6aaa7a"}}>por designar</span></span>
-                </div>
-                <span style={{fontSize:13,fontWeight:700,color:pct===100?"#22c55e":pct>50?"#f59e0b":"#94a3b8"}}>{pct}%</span>
-              </div>
-              <div style={{background:"rgba(255,255,255,0.07)",borderRadius:6,height:8,overflow:"hidden"}}>
-                <div style={{width:`${pct}%`,height:"100%",background:pct===100?"#22c55e":pct>50?"#4ade80":"#3b82f6",borderRadius:6,transition:"width .4s"}}/>
-              </div>
-            </div>
-          )}
-
-          {stats.total > 0 && (
-            <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
-              <select value={filtroEstado} onChange={e=>setFiltroEstado(e.target.value)} style={{...S.input,flex:"1 1 130px",maxWidth:180,fontSize:13}}>
-                <option value="todos">Todos los estados</option>
-                {Object.entries(ESTADOS_TAREA).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
-              </select>
-              <select value={filtroZona} onChange={e=>setFiltroZona(e.target.value)} style={{...S.input,flex:"1 1 160px",maxWidth:220,fontSize:13}}>
-                <option value="todas">📋 Todas las macrozonas</option>
-                {zonasEnProg.length>0&&<option disabled>── Filtrar por macrozona ──</option>}
-                {zonasEnProg.map(z=><option key={z} value={z}>{z==="Golf"?"⛳ "+z:z}</option>)}</select>
-              <select value={filtroCategoria} onChange={e=>setFiltroCategoria(e.target.value)} style={{...S.input,flex:"1 1 180px",maxWidth:220,fontSize:13}}>
-                <option value="todas">🏷️ Todas las tareas</option>
-                {tareasUnicasHoy.length>0&&<option disabled>── Filtrar por tarea ──</option>}
-                {tareasUnicasHoy.map(t=><option key={t} value={t}>{t}</option>)}
-              </select>
-              {(filtroEstado!=="todos"||filtroZona!=="todas"||filtroCategoria!=="todas"||filtroTrabajador!=="todos")&&(
-                <button onClick={()=>{setFiltroEstado("todos");setFiltroZona("todas");setFiltroCategoria("todas");setFiltroTrabajador("todos");}} style={{...S.btn,background:"transparent",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)",fontSize:12}}>✕ Limpiar</button>
-              )}
-              {/* Filtro por trabajador */}
-              <select value={filtroTrabajador} onChange={e=>setFiltroTrabajador(e.target.value)} style={{...S.input,fontSize:11,maxWidth:180}}>
-                <option value="todos">👷 Todos los trabajadores</option>
-                {(Array.isArray(personal)?personal:Object.values(personal||{}))
-                  .sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}))
-                  .map(p=>(
-                    <option key={p.id} value={p.nombre}>{getNombreRef(p.nombre)} {p.nombre.split(" ")[1]||""}</option>
-                  ))
-                }
-              </select>
-              {/* Toggle vista semanal */}
-              <button
-                onClick={()=>setVistaSemanal(v=>!v)}
-                style={{...S.btn,fontSize:11,padding:"4px 12px",
-                  background:vistaSemanal?"rgba(96,165,250,0.2)":"rgba(255,255,255,0.04)",
-                  color:vistaSemanal?"#60a5fa":"#5a9a7a",
-                  border:`1px solid ${vistaSemanal?"rgba(96,165,250,0.4)":"rgba(255,255,255,0.1)"}`}}>
-                {vistaSemanal?"📅 Semana":"📆 Día"}
               </button>
             </div>
           )}
