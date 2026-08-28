@@ -4005,41 +4005,6 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
         </>)}
       </div>
 
-      {/* ══════ Enlace independiente a Golf — tiene su propio sistema completo ══════ */}
-      <div style={{border:"1px solid rgba(52,211,153,0.35)",borderRadius:12,padding:14,marginBottom:14,background:"rgba(52,211,153,0.08)",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
-        <div>
-          <div style={{fontSize:13,fontWeight:700,color:"#34d399"}}>⛳ Golf</div>
-          <div style={{fontSize:11,color:"#5a9a7a"}}>Golf tiene su propio módulo completo de programación — greens, frecuencias y semana Golf se gestionan ahí, no aquí.</div>
-        </div>
-        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-          <button onClick={()=>setVista("golf")} style={{...S.btn,background:"rgba(52,211,153,0.2)",color:"#34d399",border:"1px solid rgba(52,211,153,0.4)",fontSize:13}}>⛳ Ir a Programar Golf</button>
-          {esJefa&&(
-            <button onClick={()=>{
-              if(!window.confirm("Esto actualizará Golf en Firebase con la nueva estructura (Tees 01A-09B, Fairways 01-09, Búnkers 01-05). Los elementos custom se mantendrán. ¿Continuar?")) return;
-              const golfBase = MACROZONAS_BASE.find(z=>z.id===31);
-              if(!golfBase) return;
-              const nuevosElems = {};
-              golfBase.elementos.forEach(e=>{
-                nuevosElems[e.id] = { estado:"bueno", notas:"", frecuencias:[] };
-              });
-              fbUpdate(ref(db, ROOT+"/data/31"), { elementos: nuevosElems })
-                .then(()=>alert("✅ Golf actualizado en Firebase con la nueva estructura"))
-                .catch(e=>alert("Error: "+e));
-            }} style={{...S.btn,background:"rgba(96,165,250,0.1)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.2)",fontSize:11}}>
-              🔄 Actualizar estructura Golf en Firebase
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* ══════ SECCIÓN: Historial — incluye TODAS las macrozonas (Golf incluido) ══════ */}
-      <div style={{border:"1px solid rgba(96,165,250,0.25)",borderRadius:12,padding:14,marginBottom:14,background:"rgba(96,165,250,0.03)"}}>
-        <div style={{fontSize:11,fontWeight:700,color:"#93c5fd",marginBottom:10,textTransform:"uppercase",letterSpacing:"0.5px"}}>
-          📜 Historial — incluye todas las macrozonas, incluido Golf
-        </div>
-        <button className={`tab${tabProg==="historial"?" on":""}`} onClick={()=>setTabProg("historial")}>📜 Ver Historial</button>
-      </div>
-
       {/* ── FRECUENCIAS POR MACROZONA ── */}
       {tabProg==="frecuencias"&&(
         <PanelFrecuenciasZona S={S} zonas={zonas.filter(z=>String(z.id)!=="31"&&!(z.nombre||"").toLowerCase().includes("golf"))} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} esJefa={esJefa}/>
@@ -4286,6 +4251,41 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           }
         </React.Fragment>
       )}
+
+      {/* ══════ Enlace independiente a Golf — tiene su propio sistema completo ══════ */}
+      <div style={{border:"1px solid rgba(52,211,153,0.35)",borderRadius:12,padding:14,marginTop:20,marginBottom:14,background:"rgba(52,211,153,0.08)",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
+        <div>
+          <div style={{fontSize:13,fontWeight:700,color:"#34d399"}}>⛳ Golf</div>
+          <div style={{fontSize:11,color:"#5a9a7a"}}>Golf tiene su propio módulo completo de programación — greens, frecuencias y semana Golf se gestionan ahí, no aquí.</div>
+        </div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <button onClick={()=>setVista("golf")} style={{...S.btn,background:"rgba(52,211,153,0.2)",color:"#34d399",border:"1px solid rgba(52,211,153,0.4)",fontSize:13}}>⛳ Ir a Programar Golf</button>
+          {esJefa&&(
+            <button onClick={()=>{
+              if(!window.confirm("Esto actualizará Golf en Firebase con la nueva estructura (Tees 01A-09B, Fairways 01-09, Búnkers 01-05). Los elementos custom se mantendrán. ¿Continuar?")) return;
+              const golfBase = MACROZONAS_BASE.find(z=>z.id===31);
+              if(!golfBase) return;
+              const nuevosElems = {};
+              golfBase.elementos.forEach(e=>{
+                nuevosElems[e.id] = { estado:"bueno", notas:"", frecuencias:[] };
+              });
+              fbUpdate(ref(db, ROOT+"/data/31"), { elementos: nuevosElems })
+                .then(()=>alert("✅ Golf actualizado en Firebase con la nueva estructura"))
+                .catch(e=>alert("Error: "+e));
+            }} style={{...S.btn,background:"rgba(96,165,250,0.1)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.2)",fontSize:11}}>
+              🔄 Actualizar estructura Golf en Firebase
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ══════ SECCIÓN: Historial — incluye TODAS las macrozonas (Golf incluido) ══════ */}
+      <div style={{border:"1px solid rgba(96,165,250,0.25)",borderRadius:12,padding:14,marginBottom:14,background:"rgba(96,165,250,0.03)"}}>
+        <div style={{fontSize:11,fontWeight:700,color:"#93c5fd",marginBottom:10,textTransform:"uppercase",letterSpacing:"0.5px"}}>
+          📜 Historial — incluye todas las macrozonas, incluido Golf
+        </div>
+        <button className={`tab${tabProg==="historial"?" on":""}`} onClick={()=>setTabProg("historial")}>📜 Ver Historial</button>
+      </div>
     </div>
   );
 }
