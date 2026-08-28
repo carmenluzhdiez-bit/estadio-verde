@@ -13460,6 +13460,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
 
       {/* ── PROGRAMACIÓN DE GOLF ── */}
       {subTab==="config_golf"&&rolLogueado!=="trabajador"&&(()=>{
+        const [fechaProponerGolf, setFechaProponerGolf] = React.useState(hoy);
         const setHoc=(superficie,est,valor)=>{const actual=golfData.hocConfig||{};setG({hocConfig:{...actual,[superficie]:{...(actual[superficie]||{}),[est]:valor}}});};
         const setRespSemanal=(tipoId,nombre)=>{if(!setConfigSemanal)return;setConfigSemanal(prev=>({...(prev||{}),[tipoId]:nombre}));};
         const proponerTareasGolf=()=>{
@@ -13467,42 +13468,43 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           const golfZonaObj=MACROZONAS_BASE.find(z=>z.id===31);if(!golfZonaObj)return;
           const zdatG=getZD(31);const nombreZona=zdatG.nombreCustom||golfZonaObj.nombre;
           const elems=getAllElems(31);
-          const tareasHoyArr=Array.isArray(tareasProg[hoy])?tareasProg[hoy]:Object.values(tareasProg[hoy]||{});
+          const tareasHoyArr=Array.isArray(tareasProg[fechaProponerGolf])?tareasProg[fechaProponerGolf]:Object.values(tareasProg[fechaProponerGolf]||{});
           const existentes=tareasHoyArr.map(t=>t.zona+"_"+t.elemento+"_"+t.tarea);
-          const estProp=estacionDeFecha(hoy);const propuestas=[];const vencidas=[];
+          const estProp=estacionDeFecha(fechaProponerGolf);const propuestas=[];const vencidas=[];
           elems.forEach(e=>{
             const zdatElem=zdatG.elementos?.[e.id]||(zdatG.elementosCustom||[]).find(x=>x.id===e.id);
             const frecs=zdatElem?.frecuencias||[];
             frecs.forEach(f=>{
               const key=nombreZona+"_"+e.nombre+"_"+f.tarea;
               if(existentes.includes(key))return;
-              const prox=calcProximaFrecGlobal(f,hoy);
+              const prox=calcProximaFrecGlobal(f,fechaProponerGolf);
               if(!prox||prox.diff>0)return;
               const esVencida=prox.diff<0;const diasVencida=Math.abs(prox.diff);
               const respDefault=configSemanal?.corte_golf||"";
               const notaAltura=f.alturaCorte?`Cortar a: ${f.alturaCorte} ${f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="pulgadas"?"pulgadas":"milímetros"}.`:"";
-              propuestas.push({id:Date.now()+Math.random(),fecha:hoy,zona:nombreZona,elemento:e.nombre,tarea:f.tarea,responsable:respDefault,estado:respDefault?"pendiente":"por_designar",notas:[notaAltura,f.obs].filter(Boolean).join(" "),alturaCorte:f.alturaCorte||"",unidadAlturaCorte:f.unidadAlturaCorte||"mm",estacion:estProp,auto:true,fechaCorrespondiente:prox.fecha,origenZid:"31",origenEid:e.id,origenFrecId:f.id,origenEsCustom:!!e.isCustom,diasVencida:esVencida?diasVencida:0});
+              propuestas.push({id:Date.now()+Math.random(),fecha:fechaProponerGolf,zona:nombreZona,elemento:e.nombre,tarea:f.tarea,responsable:respDefault,estado:respDefault?"pendiente":"por_designar",notas:[notaAltura,f.obs].filter(Boolean).join(" "),alturaCorte:f.alturaCorte||"",unidadAlturaCorte:f.unidadAlturaCorte||"mm",estacion:estProp,auto:true,fechaCorrespondiente:prox.fecha,origenZid:"31",origenEid:e.id,origenFrecId:f.id,origenEsCustom:!!e.isCustom,diasVencida:esVencida?diasVencida:0});
               if(esVencida)vencidas.push(e.nombre+" — "+f.tarea+" ("+diasVencida+"d vencida)");
             });
           });
-          if(propuestas.length===0){alert("No hay tareas de Golf pendientes según las frecuencias definidas para hoy.");return;}
+          if(propuestas.length===0){alert("No hay tareas de Golf pendientes según las frecuencias definidas para "+fechaProponerGolf+".");return;}
           const propOrdenadas=[...propuestas].sort((a,b)=>a.tarea.localeCompare(b.tarea,"es",{sensitivity:"base"}));
           setPreviewGolfProp(propOrdenadas.map(p=>({...p,incluir:true,abierta:false})));
         };
         const confirmarEnvioGolf=()=>{
           const aEnviar=(previewGolfProp||[]).filter(p=>p.incluir).map(({incluir,abierta,...t})=>t);
           if(aEnviar.length===0){setPreviewGolfProp(null);return;}
-          const tareasHoyArr=Array.isArray(tareasProg[hoy])?tareasProg[hoy]:Object.values(tareasProg[hoy]||{});
-          setTareasProg(prev=>({...prev,[hoy]:[...tareasHoyArr,...aEnviar]}));
+          const fechaDestinoGolf=aEnviar[0]?.fecha||fechaProponerGolf;
+          const tareasHoyArr=Array.isArray(tareasProg[fechaDestinoGolf])?tareasProg[fechaDestinoGolf]:Object.values(tareasProg[fechaDestinoGolf]||{});
+          setTareasProg(prev=>({...prev,[fechaDestinoGolf]:[...tareasHoyArr,...aEnviar]}));
           setPreviewGolfProp(null);
-          alert(`✅ ${aEnviar.length} tarea(s) de Golf enviadas al jardinero.`);
+          alert(`✅ ${aEnviar.length} tarea(s) de Golf enviadas al jardinero para el ${fechaDestinoGolf}.`);
         };
         return (
         <div className="ein">
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:4}}>
             <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,color:"#fbbf24"}}>⚙️ Programación de Golf</div>
-            <div style={{fontSize:11,color:"#7aaa80"}}>{hoy}</div>
-            <button className="btn-p" style={S.btn} onClick={proponerTareasGolf}>✨ Proponer del día</button>
+            <input type="date" value={fechaProponerGolf} onChange={e=>setFechaProponerGolf(e.target.value)} style={{...S.input,fontSize:12,padding:"6px 10px",width:"auto"}}/>
+            <button className="btn-p" style={S.btn} onClick={proponerTareasGolf}>✨ Proponer para {fechaProponerGolf===hoy?"hoy":fechaProponerGolf}</button>
           </div>
           <div style={{fontSize:12,color:"#5a9a7a",marginBottom:18}}>Responsables fijos de la semana y altura de corte objetivo por superficie.</div>
 
