@@ -11706,6 +11706,7 @@ function TareasGolfPanel({ tareasGolfHoy, hoy, esJefa, setTareasProg, tareasProg
 
 function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito, onCierreSectorial, onNuevaAlerta, configSemanal={}, setConfigSemanal, getAllElems, getZD, setElemFrecs, bodegasData, setBodegasData }) {
   const GOLF_ZONA_ID = 31; // ID macrozona Golf
+  const [fechaProponerGolf, setFechaProponerGolf] = React.useState(fechaLocal());
   const sincronizarMacrozona = (tipo, detalle) => {
     if(!updateZona) return;
     const hoyFmt = new Date().toLocaleDateString("es-CL");
@@ -13460,7 +13461,6 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
 
       {/* ── PROGRAMACIÓN DE GOLF ── */}
       {subTab==="config_golf"&&rolLogueado!=="trabajador"&&(()=>{
-        const [fechaProponerGolf, setFechaProponerGolf] = React.useState(hoy);
         const setHoc=(superficie,est,valor)=>{const actual=golfData.hocConfig||{};setG({hocConfig:{...actual,[superficie]:{...(actual[superficie]||{}),[est]:valor}}});};
         const setRespSemanal=(tipoId,nombre)=>{if(!setConfigSemanal)return;setConfigSemanal(prev=>({...(prev||{}),[tipoId]:nombre}));};
         const proponerTareasGolf=()=>{
