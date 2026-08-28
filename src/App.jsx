@@ -10543,7 +10543,8 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
                       const tasaMostrar = Math.round(tasaDia*factor*100)/100;
                       const barW = Math.min(Math.abs(tasaMostrar)/maxW*100,100);
                       const catColor = tasaDia<0.3?"#ef4444":tasaDia<0.6?"#f59e0b":"#22c55e";
-                      const esSemReciente = tasasUltSem.length > 0;
+                      const hace7Clasif = new Date(fechaLocal()+"T12:00:00"); hace7Clasif.setDate(hace7Clasif.getDate()-7);
+                      const esSemReciente = tasasZ[tasasZ.length-1].fecha >= hace7Clasif.toISOString().slice(0,10);
                       return (
                         <div key={z.id} style={{display:"flex",alignItems:"center",gap:6}}>
                           <div style={{width:70,fontSize:10,color:"#7aaa80",flexShrink:0,textAlign:"right"}}>{z.nombre}</div>
