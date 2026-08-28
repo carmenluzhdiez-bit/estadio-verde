@@ -13489,7 +13489,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           });
           if(propuestas.length===0){alert("No hay tareas de Golf pendientes según las frecuencias definidas para "+fechaProponerGolf+".");return;}
           const propOrdenadas=[...propuestas].sort((a,b)=>a.tarea.localeCompare(b.tarea,"es",{sensitivity:"base"}));
-          setPreviewGolfProp(propOrdenadas.map(p=>({...p,incluir:true,abierta:false})));
+          setPreviewGolfProp(propOrdenadas.map(p=>({...p,incluir:false,abierta:false})));
         };
         const confirmarEnvioGolf=()=>{
           const aEnviar=(previewGolfProp||[]).filter(p=>p.incluir).map(({incluir,abierta,...t})=>t);
@@ -13504,8 +13504,10 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
         <div className="ein">
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:4}}>
             <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,color:"#fbbf24"}}>⚙️ Programación de Golf</div>
-            <input type="date" value={fechaProponerGolf} onChange={e=>setFechaProponerGolf(e.target.value)} style={{...S.input,fontSize:12,padding:"6px 10px",width:"auto"}}/>
-            <button className="btn-p" style={S.btn} onClick={proponerTareasGolf}>✨ Proponer para {fechaProponerGolf===hoy?"hoy":fechaProponerGolf}</button>
+            <div style={{display:"flex",gap:8,alignItems:"center"}}>
+              <button className="btn-p" style={S.btn} onClick={proponerTareasGolf}>✨ Proponer para esta fecha</button>
+              <input type="date" value={fechaProponerGolf} onChange={e=>setFechaProponerGolf(e.target.value)} style={{...S.input,fontSize:12,padding:"6px 10px",width:"auto"}}/>
+            </div>
           </div>
           <div style={{fontSize:12,color:"#5a9a7a",marginBottom:18}}>Responsables fijos de la semana y altura de corte objetivo por superficie.</div>
 
@@ -13523,7 +13525,19 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               <div style={{fontSize:11,color:"#5a9a7a",marginBottom:10}}>Desmarca las que no quieras enviar hoy. Quedarán como vencidas para el próximo Proponer del día.</div>
               <input placeholder="🔍 Buscar por tarea o elemento (ej: Basureros, Tee 03...)" value={buscarPreviewGolf} onChange={e=>setBuscarPreviewGolf(e.target.value)}
                 style={{...S.input,fontSize:12,marginBottom:10,width:"100%"}}/>
-              {buscarPreviewGolf.trim()&&<div style={{fontSize:11,color:"#5a9a7a",marginBottom:8}}>{previewFiltrado.length} de {previewGolfProp.length} coinciden</div>}
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                {buscarPreviewGolf.trim()?<span style={{fontSize:11,color:"#5a9a7a"}}>{previewFiltrado.length} de {previewGolfProp.length} coinciden</span>:<span/>}
+                <div style={{display:"flex",gap:6}}>
+                  <button style={{...S.btn,fontSize:10,padding:"3px 9px",background:"rgba(34,197,94,0.1)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)"}}
+                    onClick={()=>{const idsVisibles=previewFiltrado.map(p=>p.id);setPreviewGolfProp(prev=>prev.map(x=>idsVisibles.includes(x.id)?{...x,incluir:true}:x));}}>
+                    ✓ Marcar {buscarPreviewGolf.trim()?"visibles":"todas"}
+                  </button>
+                  <button style={{...S.btn,fontSize:10,padding:"3px 9px",background:"transparent",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)"}}
+                    onClick={()=>{const idsVisibles=previewFiltrado.map(p=>p.id);setPreviewGolfProp(prev=>prev.map(x=>idsVisibles.includes(x.id)?{...x,incluir:false}:x));}}>
+                    ✕ Desmarcar {buscarPreviewGolf.trim()?"visibles":"todas"}
+                  </button>
+                </div>
+              </div>
               <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:12}}>
                 {previewFiltrado.map((p,i)=>{
                   const iReal = previewGolfProp.indexOf(p);
