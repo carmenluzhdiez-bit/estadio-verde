@@ -2846,7 +2846,7 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
     if(tareaObj.diaria === true) return true;
     const nombreED = (tareaObj.tarea||"").toLowerCase();
     const keywordsED = [
-      "limpieza tee","limpieza —","revisión estado general",
+      "limpieza tee","revisión estado general",
       "revisión estado fitosanitario","soplado/barrido","pediluvios",
       "orden y limpieza","registro diario"
     ];
@@ -12913,7 +12913,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
                   <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:zona.color}}>{zona.icono} {zona.nombre}</div>
                   <button style={{...S.btn,fontSize:11,padding:"4px 12px",background:`${zona.color}15`,color:zona.color,border:`1px solid ${zona.color}40`}}
-                    onClick={()=>{setTareaForm({...emptyTarea,descripcion:zona.nombre,target:"zona",targetId:zona.id});setShowTareaForm("zona");}}>
+                    onClick={()=>{setTareaForm({...emptyTarea,descripcion:zona.nombre,responsable:configSemanal?.corte_golf||"Osmar Bhalú Armijo Zúñiga",target:"zona",targetId:zona.id});setShowTareaForm("zona");}}>
                     📋 Nueva tarea
                   </button>
                 </div>
@@ -12931,8 +12931,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                   <div style={{fontSize:11,color:"#5a9a7a"}}>📍 {p.ubicacion}</div>
                 </div>
                 <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(249,168,212,0.12)",color:"#f9a8d4",border:"1px solid rgba(249,168,212,0.3)"}}
-                  onClick={()=>{setTareaForm({...emptyTarea,descripcion:p.nombre,target:"zona",targetId:p.id});setShowTareaForm("zona");}}>
-                  📋 Tarea
+                  onClick={()=>{setTareaForm({...emptyTarea,descripcion:p.nombre,responsable:configSemanal?.corte_golf||"Osmar Bhalú Armijo Zúñiga",target:"zona",targetId:p.id});setShowTareaForm("zona");}}>
+                  📋 Nueva tarea
                 </button>
               </div>
             </div>
@@ -12948,8 +12948,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                   <div style={{fontSize:11,color:"#5a9a7a"}}>📍 {e.piso}</div>
                 </div>
                 <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(196,181,253,0.12)",color:"#c4b5fd",border:"1px solid rgba(196,181,253,0.3)"}}
-                  onClick={()=>{setTareaForm({...emptyTarea,descripcion:e.nombre,target:"zona",targetId:e.id});setShowTareaForm("zona");}}>
-                  📋 Tarea
+                  onClick={()=>{setTareaForm({...emptyTarea,descripcion:e.nombre,responsable:configSemanal?.corte_golf||"Osmar Bhalú Armijo Zúñiga",target:"zona",targetId:e.id});setShowTareaForm("zona");}}>
+                  📋 Nueva tarea
                 </button>
               </div>
             </div>
