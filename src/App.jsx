@@ -10124,9 +10124,12 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
         }
       } else {
         // Sin días desde corte: buscar si hubo corte entre las dos mediciones
-        // IMPORTANTE: corte en la misma fecha que la medición anterior también cuenta
-        // (se mide primero, luego se corta el mismo día)
-        const corteEntremedias = todosCortes.find(c=>c.fecha>=pPrev.fecha && c.fecha<=svgP.fecha);
+        // IMPORTANTE: corte en la misma fecha que la medición ANTERIOR sí cuenta
+        // (se mide, luego se corta ese mismo día). Pero un corte en la misma
+        // fecha que la medición ACTUAL (svgP) NO cuenta como "ya ocurrido" —
+        // la medición se toma a primera hora, antes de que se ejecute el corte
+        // programado para ese día, así que el orden real es medición → corte.
+        const corteEntremedias = todosCortes.find(c=>c.fecha>=pPrev.fecha && c.fecha<svgP.fecha);
         if(corteEntremedias) {
           // Hubo corte: calcular desde el corte hasta la medición actual
           // Si el corte y la medición anterior son el mismo día, diasDesdeCorte = días entre corte y medición actual
