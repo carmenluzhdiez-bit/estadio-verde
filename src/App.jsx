@@ -3678,7 +3678,7 @@ function ZonaRow({ zona, tz, zonasColapsadas, toggleZonaColapso, MACROZONAS_BASE
 
 
 
-function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACROZONAS_BASE, tareas, setTareas, tareasZonaHoy=0, esJefa=false, configSemanal={}, setConfigSemanal, puedeCrear=false, cierresTurno={}, onReabrirTurno, getElemFrecs, setElemFrecs, aplicaciones=[], setAplicaciones, stockFito, setStockFito, crearNotificacion, fechaInicial=null, onIrARegistrarAplicacion=()=>{} }) {
+function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACROZONAS_BASE, tareas, setTareas, tareasZonaHoy=0, esJefa=false, configSemanal={}, setConfigSemanal, puedeCrear=false, cierresTurno={}, onReabrirTurno, getElemFrecs, setElemFrecs, aplicaciones=[], setAplicaciones, stockFito, setStockFito, crearNotificacion, fechaInicial=null, onIrARegistrarAplicacion=()=>{}, setVista=()=>{} }) {
   const hoy = fechaLocal();
   const [fecha, setFecha] = React.useState(fechaInicial||hoy);
   const [tabProg, setTabProg] = React.useState("programa");
@@ -3811,8 +3811,9 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
               else if(e.target.value<=hoy) setAviso("ℹ️ Estás programando para hoy o una fecha pasada. Recuerda que lo ideal es programar con al menos un día de anticipación.");
               else setAviso(null);
             }}
-            style={{...S.input,width:"auto",fontSize:13}}/>
-          <button onClick={proponerTareas} style={{...S.btn,background:"rgba(59,130,246,0.2)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)",fontSize:13}}>✨ Proponer del día</button>
+            style={{...S.input,width:"auto",fontSize:13,order:0}}/>
+          <button onClick={proponerTareas} style={{...S.btn,background:"rgba(59,130,246,0.2)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)",fontSize:13,order:1}}>✨ Proponer del día</button>
+          <button onClick={()=>setVista("golf")} style={{...S.btn,background:"rgba(52,211,153,0.15)",color:"#34d399",border:"1px solid rgba(52,211,153,0.3)",fontSize:13,order:2}}>⛳ Ir a Programar Golf</button>
           {esJefa&&(
             <button onClick={()=>{
               if(!window.confirm("Esto actualizará Golf en Firebase con la nueva estructura (Tees 01A-09B, Fairways 01-09, Búnkers 01-05). Los elementos custom se mantendrán. ¿Continuar?")) return;
@@ -3825,7 +3826,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
               fbUpdate(ref(db, ROOT+"/data/31"), { elementos: nuevosElems })
                 .then(()=>alert("✅ Golf actualizado en Firebase con la nueva estructura"))
                 .catch(e=>alert("Error: "+e));
-            }} style={{...S.btn,background:"rgba(96,165,250,0.1)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.2)",fontSize:11,marginBottom:8,width:"100%"}}>
+            }} style={{...S.btn,background:"rgba(96,165,250,0.1)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.2)",fontSize:11,marginBottom:8,width:"100%",order:6}}>
               🔄 Actualizar estructura Golf en Firebase
             </button>
           )}
@@ -3907,7 +3908,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
               });
               
               setTimeout(()=>alert("Modo lluvia aplicado. "+aPosponer.length+" tarea(s) reprogramadas para "+destino+". "+(aRevisar.length>0?aRevisar.length+" riego(s) a revisar manualmente.":"")),200);
-            }} style={{...S.btn,background:"rgba(96,165,250,0.1)",color:"#93c5fd",border:"1px solid rgba(96,165,250,0.2)",fontSize:11}}>
+            }} style={{...S.btn,background:"rgba(96,165,250,0.1)",color:"#93c5fd",border:"1px solid rgba(96,165,250,0.2)",fontSize:11,order:4}}>
               🌧️ Modo lluvia
             </button>
           )}
@@ -3933,7 +3934,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
               if(nuevas.length===0) return alert("Todas las tareas pendientes ya existen para mañana.");
               setTareasDelDia(mananaStr, [...normArr(tareas[mananaStr]||[]), ...nuevas]);
               alert(`✅ ${nuevas.length} tarea(s) pendientes reprogramadas para ${mananaStr}`);
-            }} style={{...S.btn,background:"rgba(251,191,36,0.1)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.2)",fontSize:11}}>
+            }} style={{...S.btn,background:"rgba(251,191,36,0.1)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.2)",fontSize:11,order:5}}>
               📅 Reprogramar pendientes para mañana
             </button>
           )}
@@ -3943,7 +3944,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
               elemento:"",tarea:""
             }));
             setShowAgregar(true);
-          }} style={{...S.btn,background:"rgba(61,122,82,0.25)",color:"#90d0a0",border:"1px solid rgba(61,122,82,0.35)",fontSize:13}}>➕ Agregar tarea</button>
+          }} style={{...S.btn,background:"rgba(61,122,82,0.25)",color:"#90d0a0",border:"1px solid rgba(61,122,82,0.35)",fontSize:13,order:3}}>➕ Agregar tarea</button>
         </div>
       </div>
       <ConfiguradorSemanal S={S} personal={personal} configSemanal={configSemanal||{}} setConfigSemanal={setConfigSemanal} esJefa={esJefa}/>
@@ -22483,6 +22484,7 @@ export default function App() {
             cierresTurno={cierresTurno}
             fechaInicial={fechaProgramaObjetivo}
             onIrARegistrarAplicacion={irARegistrarAplicacion}
+            setVista={setVista}
             onReabrirTurno={(fecha,nombre)=>{
               const key=`${fecha}_${nombre.split(" ")[0].toLowerCase()}`;
               setCierresTurno(prev=>{ const n={...prev}; delete n[key]; return n; });
