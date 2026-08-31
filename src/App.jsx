@@ -20934,6 +20934,10 @@ export default function App() {
     };
   };
 
+  // Normaliza el nombre para comparar duplicados: minúsculas, sin espacios extra,
+  // y unifica formas Unicode equivalentes (ej: "ñ" precompuesta vs. "n"+tilde
+  // combinante, que se ven idénticas pero el código las trata como distintas).
+  const normNombreZona = (n) => (n||"").normalize("NFC").toLowerCase().replace(/\s+/g," ").trim();
   const zonasDuplicadasExcluidas = React.useMemo(() => {
     const base = MACROZONAS_BASE.map(z=>{
       const zd = getZD(z.id);
@@ -20941,10 +20945,10 @@ export default function App() {
         ? {...z, nombre:zd.nombreCustom||z.nombre}
         : z;
     });
-    const nombresVistos = new Set(base.map(z=>z.nombre.toLowerCase().trim()));
+    const nombresVistos = new Set(base.map(z=>normNombreZona(z.nombre)));
     const duplicadas = [];
     macrozonasCust.forEach(z=>{
-      const clave = (z.nombre||"").toLowerCase().trim();
+      const clave = normNombreZona(z.nombre);
       if(nombresVistos.has(clave)) duplicadas.push(z);
       else nombresVistos.add(clave);
     });
