@@ -20935,24 +20935,40 @@ export default function App() {
   };
 
   // Normaliza el nombre para comparar duplicados: minúsculas, sin espacios extra,
-  // y unifica formas Unicode equivalentes (ej: "ñ" precompuesta vs. "n"+tilde
-  // combinante, que se ven idénticas pero el código las trata como distintas).
-  const normNombreZona = (n) => (n||"").normalize("NFC").toLowerCase().replace(/\s+/g," ").trim();
-  const zonasDuplicadasExcluidas = React.useMemo(() => {
+  // sin tildes/diéresis/ñ (para detectar duplicados aunque el acento se haya
+  // guardado con una codificación Unicode distinta o con un typo de tilde).
+  const normNombreZona = (n) => (n||"")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g,"") // quita todos los acentos/diacríticos
+    .toLowerCase().replace(/\s+/g," ").trim();
+  // Revisa TODAS las zonas entre sí (base incluida) — una zona base renombrada
+  // (nombreCustom) para coincidir con otra zona también genera un duplicado real,
+  // no solo las personalizadas nuevas.
+  const { zonasDuplicadasExcluidas, zonaBaseDuplicadaAviso } = React.useMemo(() => {
     const base = MACROZONAS_BASE.map(z=>{
       const zd = getZD(z.id);
       return zd.nombreCustom||zd.categoriaCustom||zd.iconoCustom
-        ? {...z, nombre:zd.nombreCustom||z.nombre}
-        : z;
+        ? {...z, nombre:zd.nombreCustom||z.nombre, esBase:true}
+        : {...z, esBase:true};
     });
-    const nombresVistos = new Set(base.map(z=>normNombreZona(z.nombre)));
+    const nombresVistos = new Map(); // clave normalizada -> zona ya vista
     const duplicadas = [];
+    let avisoBase = null;
+    base.forEach(z=>{
+      const clave = normNombreZona(z.nombre);
+      if(nombresVistos.has(clave)) {
+        // Dos zonas BASE (o una base renombrada) chocan de nombre — no se puede
+        // "eliminar" una zona base, pero sí avisar para que la renombren.
+        avisoBase = {nombre:z.nombre, original:MACROZONAS_BASE.find(b=>b.id===z.id)?.nombre, id:z.id};
+      } else {
+        nombresVistos.set(clave, z);
+      }
+    });
     macrozonasCust.forEach(z=>{
       const clave = normNombreZona(z.nombre);
       if(nombresVistos.has(clave)) duplicadas.push(z);
-      else nombresVistos.add(clave);
+      else nombresVistos.set(clave, z);
     });
-    return duplicadas;
+    return { zonasDuplicadasExcluidas: duplicadas, zonaBaseDuplicadaAviso: avisoBase };
   }, [macrozonasCust, MACROZONAS_BASE]);
   const todasLasZonas = (() => {
     const base = MACROZONAS_BASE.map(z=>{
@@ -22002,6 +22018,11 @@ export default function App() {
               <div>
                 <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:24,fontWeight:900}}>Macrozonas</h1>
                 <p style={{color:"#6aaa7a",fontSize:14}}>{filteredZonas.length} de {todasLasZonas.length} zonas</p>
+                {zonaBaseDuplicadaAviso&&(
+                  <div style={{marginTop:6,fontSize:12,color:"#f87171",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:8,padding:"10px 12px"}}>
+                    ⚠️ Una zona original fue renombrada y ahora choca con otra: <b>"{zonaBaseDuplicadaAviso.nombre}"</b> {zonaBaseDuplicadaAviso.original&&zonaBaseDuplicadaAviso.original!==zonaBaseDuplicadaAviso.nombre&&<>(su nombre original era <b>"{zonaBaseDuplicadaAviso.original}"</b>)</>}. Entra a esa zona → Editar, y cámbiale el nombre para que no se pisen.
+                  </div>
+                )}
                 {zonasDuplicadasExcluidas.length>0&&(
                   <div style={{marginTop:6,fontSize:12,color:"#fbbf24",background:"rgba(251,191,36,0.08)",border:"1px solid rgba(251,191,36,0.25)",borderRadius:8,padding:"10px 12px"}}>
                     <div style={{marginBottom:8}}>⚠️ {zonasDuplicadasExcluidas.length} macrozona{zonasDuplicadasExcluidas.length!==1?"s":""} personalizada{zonasDuplicadasExcluidas.length!==1?"s":""} con nombre repetido — no se muestra{zonasDuplicadasExcluidas.length!==1?"n":""} en la lista:</div>
