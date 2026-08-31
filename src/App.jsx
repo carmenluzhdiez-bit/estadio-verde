@@ -11707,6 +11707,7 @@ function TareasGolfPanel({ tareasGolfHoy, hoy, esJefa, setTareasProg, tareasProg
 function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito, onCierreSectorial, onNuevaAlerta, configSemanal={}, setConfigSemanal, getAllElems, getZD, setElemFrecs, bodegasData, setBodegasData }) {
   const GOLF_ZONA_ID = 31; // ID macrozona Golf
   const [fechaProponerGolf, setFechaProponerGolf] = React.useState(fechaLocal());
+  const [gruposAbiertosSemana, setGruposAbiertosSemana] = React.useState({});
   const [buscarPreviewGolf, setBuscarPreviewGolf] = React.useState("");
   const sincronizarMacrozona = (tipo, detalle) => {
     if(!updateZona) return;
@@ -12301,7 +12302,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
 
           {/* ── TAREAS GOLF HOY ── */}
           <TareasGolfPanel
-            tareasGolfHoy={(tareasProg[hoy]||[]).filter(t=>t.zona==="Golf")}
+            tareasGolfHoy={(tareasProg[hoy]||[]).filter(t=>t.zona==="Golf"||(t.zona||"").includes("Golf"))}
             hoy={hoy} esJefa={esJefa}
             setTareasProg={setTareasProg} tareasProg={tareasProg} S={S}
           />
@@ -13416,37 +13417,104 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                     <tbody>
                       {Object.entries(porResp).map(([resp,tareas])=>{
                         const tareasUnicas=[...new Set(tareas.map(t=>t.tarea))];
-                        return tareasUnicas.map((nombre,ti)=>{
-                          const isFirst=ti===0;
+                        const nombreBaseSem = (nombre) => (nombre||"").split(" · ")[0].trim();
+                        const basesUnicasSem = [...new Set(tareasUnicas.map(nombreBaseSem))];
+                        return basesUnicasSem.map((base,gi)=>{
+                          const nombresDelGrupo = tareasUnicas.filter(n=>nombreBaseSem(n)===base);
+                          const isFirstGrupo = gi===0;
+                          const grupoKey = resp+"__"+base;
+                          if(nombresDelGrupo.length===1) {
+                            // Sin agrupar: una sola tarea con ese nombre base — se muestra normal
+                            const nombre = nombresDelGrupo[0];
+                            return (
+                              <tr key={resp+nombre} style={{borderTop:"1px solid rgba(255,255,255,0.04)"}}>
+                                <td style={{padding:"5px 10px",borderRight:"1px solid rgba(255,255,255,0.06)"}}>
+                                  {isFirstGrupo&&<div style={{fontSize:10,color:"#fbbf24",fontWeight:700,marginBottom:1}}>👷 {resp.split(" ")[0]} {resp.split(" ")[1]||""}</div>}
+                                  <div style={{color:"#c0dac0",fontSize:11}}>{nombre}</div>
+                                </td>
+                                {dias7.map(d=>{
+                                  const tDia=tareas.find(t=>t.fechaDia===d&&t.tarea===nombre);
+                                  const est=tDia?(ESTADOS_TAREA_GLOBAL[normalizarEstado(tDia.estado)]||ESTADOS_TAREA_GLOBAL.pendiente):null;
+                                  return (
+                                    <td key={d} style={{padding:"4px 5px",textAlign:"center",background:d===hoy?"rgba(251,191,36,0.04)":"transparent"}}>
+                                      {tDia?(
+                                        <span title={`${est.label} — clic para eliminar`} onClick={()=>{
+                                          if(!window.confirm(`¿Eliminar la tarea "${tDia.tarea}" del ${d}?`)) return;
+                                          setTareasProg(prev=>{
+                                            const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+                                            const nuevaLista = normArr(prev[d]).filter(x=>x.id!==tDia.id);
+                                            return {...prev,[d]:nuevaLista};
+                                          });
+                                        }} style={{display:"inline-block",padding:"2px 7px",borderRadius:8,fontSize:10,fontWeight:600,background:est.bg,color:est.color,border:`1px solid ${est.color}30`,cursor:"pointer"}}>
+                                          {est.icon}
+                                        </span>
+                                      ):(
+                                        <span style={{color:"rgba(255,255,255,0.08)"}}>·</span>
+                                      )}
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            );
+                          }
+                          // Agrupado: varias tareas comparten el mismo nombre base (ej: "Corte de
+                          // greens HOC 5mm · Green 01/02/03...") — se colapsan bajo un solo título.
+                          const abierto = !!gruposAbiertosSemana[grupoKey];
                           return (
-                            <tr key={resp+nombre} style={{borderTop:"1px solid rgba(255,255,255,0.04)"}}>
-                              <td style={{padding:"5px 10px",borderRight:"1px solid rgba(255,255,255,0.06)"}}>
-                                {isFirst&&<div style={{fontSize:10,color:"#fbbf24",fontWeight:700,marginBottom:1}}>👷 {resp.split(" ")[0]} {resp.split(" ")[1]||""}</div>}
-                                <div style={{color:"#c0dac0",fontSize:11}}>{nombre}</div>
-                              </td>
-                              {dias7.map(d=>{
-                                const tDia=tareas.find(t=>t.fechaDia===d&&t.tarea===nombre);
-                                const est=tDia?(ESTADOS_TAREA_GLOBAL[normalizarEstado(tDia.estado)]||ESTADOS_TAREA_GLOBAL.pendiente):null;
-                                return (
-                                  <td key={d} style={{padding:"4px 5px",textAlign:"center",background:d===hoy?"rgba(251,191,36,0.04)":"transparent"}}>
-                                    {tDia?(
-                                      <span title={`${est.label} — clic para eliminar`} onClick={()=>{
-                                        if(!window.confirm(`¿Eliminar la tarea "${tDia.tarea}" del ${d}?`)) return;
-                                        setTareasProg(prev=>{
-                                          const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-                                          const nuevaLista = normArr(prev[d]).filter(x=>x.id!==tDia.id);
-                                          return {...prev,[d]:nuevaLista};
-                                        });
-                                      }} style={{display:"inline-block",padding:"2px 7px",borderRadius:8,fontSize:10,fontWeight:600,background:est.bg,color:est.color,border:`1px solid ${est.color}30`,cursor:"pointer"}}>
-                                        {est.icon}
+                            <React.Fragment key={grupoKey}>
+                              <tr style={{borderTop:"1px solid rgba(255,255,255,0.04)",cursor:"pointer"}} onClick={()=>setGruposAbiertosSemana(p=>({...p,[grupoKey]:!p[grupoKey]}))}>
+                                <td style={{padding:"5px 10px",borderRight:"1px solid rgba(255,255,255,0.06)"}}>
+                                  {isFirstGrupo&&<div style={{fontSize:10,color:"#fbbf24",fontWeight:700,marginBottom:1}}>👷 {resp.split(" ")[0]} {resp.split(" ")[1]||""}</div>}
+                                  <div style={{color:"#c0dac0",fontSize:11,display:"flex",alignItems:"center",gap:5}}>
+                                    <span style={{fontSize:9,color:"#5a9a7a",transform:abierto?"rotate(90deg)":"none",transition:"transform .15s",display:"inline-block"}}>▶</span>
+                                    {base} <span style={{color:"#5a9a7a",fontSize:10}}>({nombresDelGrupo.length})</span>
+                                  </div>
+                                </td>
+                                {dias7.map(d=>{
+                                  const tareasDelDiaGrupo = nombresDelGrupo.map(n=>tareas.find(t=>t.fechaDia===d&&t.tarea===n)).filter(Boolean);
+                                  if(tareasDelDiaGrupo.length===0) return <td key={d} style={{padding:"4px 5px",textAlign:"center",background:d===hoy?"rgba(251,191,36,0.04)":"transparent"}}><span style={{color:"rgba(255,255,255,0.08)"}}>·</span></td>;
+                                  const hechasGrupo = tareasDelDiaGrupo.filter(t=>normalizarEstado(t.estado)==="hecha").length;
+                                  const colorGrupo = hechasGrupo===tareasDelDiaGrupo.length?"#22c55e":hechasGrupo>0?"#60a5fa":"#f59e0b";
+                                  return (
+                                    <td key={d} style={{padding:"4px 5px",textAlign:"center",background:d===hoy?"rgba(251,191,36,0.04)":"transparent"}}>
+                                      <span style={{display:"inline-block",padding:"2px 7px",borderRadius:8,fontSize:10,fontWeight:600,background:`${colorGrupo}12`,color:colorGrupo,border:`1px solid ${colorGrupo}30`}}>
+                                        {hechasGrupo}/{tareasDelDiaGrupo.length}
                                       </span>
-                                    ):(
-                                      <span style={{color:"rgba(255,255,255,0.08)"}}>·</span>
-                                    )}
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                              {abierto&&nombresDelGrupo.map(nombre=>(
+                                <tr key={resp+nombre} style={{borderTop:"1px solid rgba(255,255,255,0.03)",background:"rgba(255,255,255,0.015)"}}>
+                                  <td style={{padding:"4px 10px 4px 26px",borderRight:"1px solid rgba(255,255,255,0.06)"}}>
+                                    <div style={{color:"#a0c0a0",fontSize:10}}>{nombre.replace(base,"").replace(/^\s*·\s*/,"")||nombre}</div>
                                   </td>
-                                );
-                              })}
-                            </tr>
+                                  {dias7.map(d=>{
+                                    const tDia=tareas.find(t=>t.fechaDia===d&&t.tarea===nombre);
+                                    const est=tDia?(ESTADOS_TAREA_GLOBAL[normalizarEstado(tDia.estado)]||ESTADOS_TAREA_GLOBAL.pendiente):null;
+                                    return (
+                                      <td key={d} style={{padding:"3px 5px",textAlign:"center",background:d===hoy?"rgba(251,191,36,0.04)":"transparent"}}>
+                                        {tDia?(
+                                          <span title={`${est.label} — clic para eliminar`} onClick={(e)=>{
+                                            e.stopPropagation();
+                                            if(!window.confirm(`¿Eliminar la tarea "${tDia.tarea}" del ${d}?`)) return;
+                                            setTareasProg(prev=>{
+                                              const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+                                              const nuevaLista = normArr(prev[d]).filter(x=>x.id!==tDia.id);
+                                              return {...prev,[d]:nuevaLista};
+                                            });
+                                          }} style={{display:"inline-block",padding:"1px 6px",borderRadius:7,fontSize:9,fontWeight:600,background:est.bg,color:est.color,border:`1px solid ${est.color}30`,cursor:"pointer"}}>
+                                            {est.icon}
+                                          </span>
+                                        ):(
+                                          <span style={{color:"rgba(255,255,255,0.08)"}}>·</span>
+                                        )}
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              ))}
+                            </React.Fragment>
                           );
                         });
                       })}
