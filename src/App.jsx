@@ -13492,7 +13492,16 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           setPreviewGolfProp(propOrdenadas.map(p=>({...p,incluir:false,abierta:false})));
         };
         const confirmarEnvioGolf=()=>{
-          const aEnviar=(previewGolfProp||[]).filter(p=>p.incluir).map(({incluir,abierta,...t})=>t);
+          const aEnviar=(previewGolfProp||[]).filter(p=>p.incluir).map(({incluir,abierta,...t})=>{
+            // Si editó la altura de corte en la vista previa, actualizar también
+            // el texto de la nota para que no quede desincronizado.
+            if(t.alturaCorte!==undefined&&t.alturaCorte!==""&&t.tarea.toLowerCase().includes("corte")) {
+              const notaAlturaNueva = `Cortar a: ${t.alturaCorte} ${t.unidadAlturaCorte==="cm"?"centímetros":t.unidadAlturaCorte==="pulgadas"?"pulgadas":"milímetros"}.`;
+              const notaSinAltura = (t.notas||"").replace(/Cortar a:[^.]*\./,"").trim();
+              return {...t, notas:[notaAlturaNueva,notaSinAltura].filter(Boolean).join(" ")};
+            }
+            return t;
+          });
           if(aEnviar.length===0){setPreviewGolfProp(null);return;}
           const fechaDestinoGolf=aEnviar[0]?.fecha||fechaProponerGolf;
           const tareasHoyArr=Array.isArray(tareasProg[fechaDestinoGolf])?tareasProg[fechaDestinoGolf]:Object.values(tareasProg[fechaDestinoGolf]||{});
@@ -13559,9 +13568,20 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                       </select>
                     </div>
                     {p.abierta&&(
-                      <div style={{padding:"6px 14px 10px 14px",background:"rgba(0,0,0,0.1)",fontSize:11,color:"#5a9a7a"}}>
-                        {p.notas&&<div>📋 {p.notas}</div>}
-                        {p.alturaCorte&&<div style={{color:"#fbbf24",fontWeight:600}}>✂️ Cortar a: {p.alturaCorte}{p.unidadAlturaCorte||"mm"}</div>}
+                      <div style={{padding:"6px 14px 10px 14px",background:"rgba(0,0,0,0.1)",fontSize:11,color:"#5a9a7a"}} onClick={e=>e.stopPropagation()}>
+                        {p.notas&&<div style={{marginBottom:6}}>📋 {p.notas}</div>}
+                        {(p.alturaCorte!==undefined&&p.alturaCorte!=="")||p.tarea.toLowerCase().includes("corte")?(
+                          <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:6}}>
+                            <span style={{color:"#fbbf24",fontWeight:600}}>✂️ Cortar a:</span>
+                            <input type="number" step="0.1" value={p.alturaCorte||""} placeholder="ej: 5"
+                              onChange={ev=>setPreviewGolfProp(prev=>prev.map(x=>x.id===p.id?{...x,alturaCorte:ev.target.value}:x))}
+                              style={{...S.input,width:70,fontSize:11,padding:"3px 6px",fontWeight:700,color:"#fbbf24"}}/>
+                            <select value={p.unidadAlturaCorte||"mm"} onChange={ev=>setPreviewGolfProp(prev=>prev.map(x=>x.id===p.id?{...x,unidadAlturaCorte:ev.target.value}:x))}
+                              style={{...S.input,fontSize:11,padding:"3px 6px",width:"auto"}}>
+                              <option value="mm">mm</option><option value="cm">cm</option><option value="pulgadas">pulgadas</option>
+                            </select>
+                          </div>
+                        ):null}
                         <div>📍 {p.zona} · {p.elemento}</div>
                       </div>
                     )}
@@ -21700,13 +21720,15 @@ export default function App() {
               const tdNorm=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
               const tdTareas=tdNorm(tareasProg[tdHoy]);
               const tdPersonal=Array.isArray(personal)?personal:Object.values(personal||{});
-              // Incluir también trabajadores con tareas de Golf (golfData)
+              // Incluir también trabajadores con tareas de Golf en golfData.tareasProg
+              // (fuente legacy) — pero SIN volver a contar las que ya están en
+              // tareasProg (la fuente principal, que ya incluye Golf), porque eso
+              // duplicaba el conteo total (ej: 34 tareas reales mostrándose como 68).
               const tdTareasGolf=(()=>{
                 const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
                 const deGolfData=normArr(golfData?.tareasProg?.[tdHoy]||[]);
-                const deProg=normArr(tareasProg[tdHoy]||[]).filter(t=>(t.zona||"").toLowerCase().includes("golf"));
-                const ids=new Set(deGolfData.map(t=>String(t.id)));
-                return [...deGolfData,...deProg.filter(t=>!ids.has(String(t.id)))];
+                const idsYaContadas=new Set(tdTareas.map(t=>String(t.id)));
+                return deGolfData.filter(t=>!idsYaContadas.has(String(t.id)));
               })();
               const tdTareasAll=[...tdTareas,...tdTareasGolf];
               const normaliz = s=>(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
