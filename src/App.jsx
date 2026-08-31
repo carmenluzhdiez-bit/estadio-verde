@@ -21858,7 +21858,7 @@ export default function App() {
               <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:26,fontWeight:900,marginBottom:3}}>Panel General</h1>
               <p style={{color:"#6aaa7a",fontSize:15}}>Estado global de las {stats.total} macrozonas</p>
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:14,marginBottom:28}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:14,marginBottom:14}}>
               {[{label:"Total Zonas",val:stats.total,color:"#c0dab0",icon:"🗺️"},{label:"Buen estado",val:stats.bueno,color:"#22c55e",icon:"✅"},{label:"Estado regular",val:stats.regular,color:"#f59e0b",icon:"⚠️"},{label:"Estado crítico",val:stats.critico,color:"#ef4444",icon:"🔴"},{label:"Total elementos",val:totalElems,color:"#a0c8e0",icon:"📋"},{label:"Elementos OK",val:elemsOk,color:"#22c55e",icon:"🌿"}].map(s=>(
                 <div key={s.label} style={{...S.card,padding:"18px 14px",textAlign:"center"}}>
                   <div style={{fontSize:24,marginBottom:4}}>{s.icon}</div>
@@ -21867,6 +21867,28 @@ export default function App() {
                 </div>
               ))}
             </div>
+            <div style={{fontSize:10,color:"#5a8a70",marginBottom:6,fontStyle:"italic"}}>↑ Estado visual (foto del momento) · ↓ Índice de salud operativa (comportamiento real: frecuencias, tareas vencidas, incidencias)</div>
+            {(()=>{
+              const zonasParaIndice = MACROZONAS_BASE.filter(z=>estadoZonaAuto(z.id)!=="mantenimiento");
+              const indices = zonasParaIndice.map(z=>calcIndiceSaludZona(z).indice);
+              const promedioIndice = indices.length>0 ? Math.round(indices.reduce((a,b)=>a+b,0)/indices.length) : 0;
+              const enRiesgo = indices.filter(i=>i<50).length;
+              const colorProm = promedioIndice>=75?"#22c55e":promedioIndice>=50?"#f59e0b":"#ef4444";
+              return (
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:14,marginBottom:22}}>
+                  <div style={{...S.card,padding:"18px 14px",textAlign:"center",border:`1px solid ${colorProm}30`}}>
+                    <div style={{fontSize:24,marginBottom:4}}>📊</div>
+                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:28,fontWeight:700,color:colorProm}}>{promedioIndice}</div>
+                    <div style={{fontSize:12,color:"#7aaa80"}}>Índice de salud promedio</div>
+                  </div>
+                  <div style={{...S.card,padding:"18px 14px",textAlign:"center",border:enRiesgo>0?"1px solid rgba(239,68,68,0.3)":undefined}}>
+                    <div style={{fontSize:24,marginBottom:4}}>⚠️</div>
+                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:28,fontWeight:700,color:enRiesgo>0?"#ef4444":"#22c55e"}}>{enRiesgo}</div>
+                    <div style={{fontSize:12,color:"#7aaa80"}}>Zonas en riesgo (índice &lt;50)</div>
+                  </div>
+                </div>
+              );
+            })()}
             {/* ── Tag Golf ── */}
             {(()=>{
               const estadoGolf = estadoZonaAuto("31");
@@ -21888,9 +21910,9 @@ export default function App() {
                   <div style={{flex:1}}>
                     <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,color:"#fbbf24"}}>Golf — Estadio Español</div>
                     <div style={{fontSize:12,color:colGolf,marginTop:2}}>{labelGolf}</div>
-                    {incidenciasFito.filter(i=>(i.estadoTratamiento||i.estado||"")!=="cerrada"&&(i.estadoTratamiento||i.estado||"")!=="resuelta").length>0&&(
+                    {incidenciasFito.filter(i=>(i.estadoTratamiento||i.estado||"")!=="cerrada"&&(i.estadoTratamiento||i.estado||"")!=="resuelta"&&!i.archivada).length>0&&(
                       <div style={{fontSize:11,color:"#f87171",marginTop:3}}>
-                        🦠 {incidenciasFito.filter(i=>(i.estadoTratamiento||i.estado||"")!=="cerrada").length} incidencia(s) fitosanitaria(s) activa(s)
+                        🦠 {incidenciasFito.filter(i=>(i.estadoTratamiento||i.estado||"")!=="cerrada"&&!i.archivada).length} incidencia(s) fitosanitaria(s) activa(s)
                       </div>
                     )}
                   </div>
@@ -21905,16 +21927,20 @@ export default function App() {
               );
             })()}
 
-            {stats.critico>0&&(
-              <div style={{background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:12,padding:16,marginBottom:22}}>
-                <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:10,color:"#fca5a5"}}>🚨 Zonas en Estado Crítico</div>
-                <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-                  {MACROZONAS_BASE.filter(z=>estadoZonaAuto(z.id)!=="mantenimiento"&&calcIndiceSaludZona(z).indice<50).map(z=>(
-                    <span key={z.id} onClick={()=>{setZonaId(String(z.id));setVista("zonas");setTab("elementos");}} style={{...S.chip,background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)",cursor:"pointer"}}>{z.icono} {z.nombre}</span>
-                  ))}
+            {(()=>{
+              const zonasIndiceBajo = MACROZONAS_BASE.filter(z=>estadoZonaAuto(z.id)!=="mantenimiento"&&calcIndiceSaludZona(z).indice<50);
+              if(zonasIndiceBajo.length===0) return null;
+              return (
+                <div style={{background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:12,padding:16,marginBottom:22}}>
+                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:10,color:"#fca5a5"}}>🚨 Zonas con índice de salud bajo (&lt;50)</div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+                    {zonasIndiceBajo.map(z=>(
+                      <span key={z.id} onClick={()=>{setZonaId(String(z.id));setVista("zonas");setTab("elementos");}} style={{...S.chip,background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)",cursor:"pointer"}}>{z.icono} {z.nombre} · {calcIndiceSaludZona(z).indice}</span>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
             {/* ── Turnos de trabajadores hoy ── */}
             {(()=>{
               const tdHoy=fechaLocal();  // fecha local correcta, evita problema de timezone
