@@ -20838,6 +20838,16 @@ export default function App() {
     return "bueno";
   };
 
+  const zonasDuplicadasExcluidas = React.useMemo(() => {
+    const base = MACROZONAS_BASE.map(z=>{
+      const zd = getZD(z.id);
+      return zd.nombreCustom||zd.categoriaCustom||zd.iconoCustom
+        ? {...z, nombre:zd.nombreCustom||z.nombre}
+        : z;
+    });
+    const nombresBase = new Set(base.map(z=>z.nombre.toLowerCase().trim()));
+    return macrozonasCust.filter(z=>nombresBase.has((z.nombre||"").toLowerCase().trim()));
+  }, [macrozonasCust, MACROZONAS_BASE]);
   const todasLasZonas = (() => {
     const base = MACROZONAS_BASE.map(z=>{
       const zd = getZD(z.id);
@@ -21887,6 +21897,11 @@ export default function App() {
               <div>
                 <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:24,fontWeight:900}}>Macrozonas</h1>
                 <p style={{color:"#6aaa7a",fontSize:14}}>{filteredZonas.length} de {todasLasZonas.length} zonas</p>
+                {zonasDuplicadasExcluidas.length>0&&(
+                  <div style={{marginTop:6,fontSize:12,color:"#fbbf24",background:"rgba(251,191,36,0.08)",border:"1px solid rgba(251,191,36,0.25)",borderRadius:8,padding:"6px 10px"}}>
+                    ⚠️ {zonasDuplicadasExcluidas.length} macrozona{zonasDuplicadasExcluidas.length!==1?"s":""} personalizada{zonasDuplicadasExcluidas.length!==1?"s":""} con el mismo nombre que una zona base — no se muestra{zonasDuplicadasExcluidas.length!==1?"n":""}: <b>{zonasDuplicadasExcluidas.map(z=>z.nombre).join(", ")}</b>. Renómbrala para que aparezca por separado.
+                  </div>
+                )}
               </div>
               {esJefa&&(
                 <button onClick={()=>setShowNuevaMacrozona(true)}
