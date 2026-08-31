@@ -6587,6 +6587,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
   const [incidPaso, setIncidPaso] = React.useState(1);
   const [incidError, setIncidError] = React.useState("");
   const [expandIncid, setExpandIncid] = React.useState(null);
+  const [mostrarArchivadasFito, setMostrarArchivadasFito] = React.useState(false);
 
   const RESPONSABLE_GOLF_DEFAULT = "Osmar Bhalú Armijo Zúñiga";
   const emptyIncid = {
@@ -7213,15 +7214,23 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
           )}
 
           {/* ── LISTADO DE INCIDENCIAS ── */}
-          {!showIncidForm&&incidencias.length===0&&(
+          {!showIncidForm&&incidencias.length>0&&incidencias.some(i=>i.archivada)&&(
+            <div style={{display:"flex",justifyContent:"flex-end",marginBottom:8}}>
+              <button style={{...S.btn,fontSize:11,padding:"5px 12px",background:mostrarArchivadasFito?"rgba(52,211,153,0.15)":"transparent",color:mostrarArchivadasFito?"#34d399":"#7aaa80",border:"1px solid rgba(52,211,153,0.3)"}}
+                onClick={()=>setMostrarArchivadasFito(p=>!p)}>
+                {mostrarArchivadasFito?"👁️ Viendo resueltas":"📁 Ver resueltas ("+incidencias.filter(i=>i.archivada).length+")"}
+              </button>
+            </div>
+          )}
+          {!showIncidForm&&incidencias.filter(i=>mostrarArchivadasFito?i.archivada:!i.archivada).length===0&&(
             <div style={{...S.card,padding:40,textAlign:"center",color:"#4a8a5a"}}>
               <div style={{fontSize:36,marginBottom:10}}>🏌️</div>
-              <div style={{fontFamily:"'Playfair Display',serif",fontSize:16}}>Sin incidencias registradas</div>
-              <div style={{fontSize:13,color:"#4a7a5a",marginTop:6}}>Registra observaciones, diagnósticos y cierres de cancha</div>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:16}}>{mostrarArchivadasFito?"Sin incidencias resueltas todavía":"Sin incidencias registradas"}</div>
+              <div style={{fontSize:13,color:"#4a7a5a",marginTop:6}}>{mostrarArchivadasFito?"":"Registra observaciones, diagnósticos y cierres de cancha"}</div>
             </div>
           )}
           <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:8}}>
-            {incidencias.map(inc=>{
+            {incidencias.filter(i=>mostrarArchivadasFito?i.archivada:!i.archivada).map(inc=>{
               const ESTADO_INC = {
                 observacion:{label:"⚠️ Observación pendiente",color:"#f59e0b",bg:"rgba(245,158,11,0.12)"},
                 cerrada:     {label:"🚫 Cancha cerrada",      color:"#ef4444",bg:"rgba(239,68,68,0.12)"},
@@ -7238,6 +7247,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                         <span style={{fontSize:18}}>{TIPO_INC[inc.tipoCierre]||"🚨"}</span>
                         <span style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700}}>{inc.agenteCausal||inc.diagnostico||"Incidencia registrada"}</span>
                         <span style={{...S.chip,background:est.bg,color:est.color,border:`1px solid ${est.color}40`,fontSize:11}}>{est.label}</span>
+                        {inc.archivada&&<span style={{...S.chip,background:"rgba(52,211,153,0.12)",color:"#34d399",border:"1px solid rgba(52,211,153,0.3)",fontSize:11}}>📁 Resuelta {inc.fechaArchivada}</span>}
                       </div>
                       <div style={{fontSize:12,color:"#7aaa80",marginBottom:4}}>
                         📅 {inc.fechaObservacion} {inc.horaObservacion&&`${inc.horaObservacion}`} · 👤 {inc.observador}
@@ -7286,6 +7296,15 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                         <button style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(34,197,94,0.15)",color:"#86efac",border:"1px solid rgba(34,197,94,0.3)"}}
                           onClick={()=>setIncidenciasFito(prev=>prev.map(x=>x.id===inc.id?{...x,estado:"reabierta"}:x))}>
                           ✅ Marcar reabierta
+                        </button>
+                      )}
+                      {inc.estado==="reabierta"&&!inc.archivada&&(
+                        <button style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(52,211,153,0.15)",color:"#34d399",border:"1px solid rgba(52,211,153,0.3)"}}
+                          onClick={()=>{
+                            if(!window.confirm("¿Dar por resuelta esta incidencia? Se archivará y dejará de aparecer en la lista activa.")) return;
+                            setIncidenciasFito(prev=>prev.map(x=>x.id===inc.id?{...x,archivada:true,fechaArchivada:fechaLocal()}:x));
+                          }}>
+                          ✅ Dar por resuelta / Archivar
                         </button>
                       )}
                       <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>setExpandIncid(expandIncid===inc.id?null:inc.id)}>
