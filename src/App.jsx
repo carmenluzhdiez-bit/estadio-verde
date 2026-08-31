@@ -20236,6 +20236,7 @@ export default function App() {
   const [filtroCat, setFiltroCat] = useState("Todas");
   const [macrozonasCust, setMacrozonasCust, macCustReady] = useFirebaseState("macrozonasCust", []);
   const [showNuevaMacrozona, setShowNuevaMacrozona] = useState(false);
+  const [categoriasAbiertas, setCategoriasAbiertas] = useState({});
   const [nuevaMacrozona, setNuevaMacrozona] = useState(()=>({nombre:"",categoria:"Calles y Accesos",icono:"🌿",descripcion:""}));
   const [filtroEst, setFiltroEst] = useState("Todos");
   const [busq, setBusq] = useState("");
@@ -21965,45 +21966,72 @@ export default function App() {
                 {Object.entries(ESTADOS_ZONA).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
               </select>
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(230px,1fr))",gap:14}}>
-              {filteredZonas.map(z=>{
-                const dzd=getZD(z.id); const est=ESTADOS_ZONA[estadoZonaAuto(z.id)];
-                const allElems=getAllElems(z.id);
-                const criticos=allElems.filter(e=>e.edData.estado==="critico").length;
-                const pendTareas=(dzd.tareas||[]).filter(t=>!t.completada).length;
+            {(()=>{
+              const porCategoriaZonas = {};
+              filteredZonas.forEach(z=>{
+                const cat = z.categoria||"Sin categoría";
+                if(!porCategoriaZonas[cat]) porCategoriaZonas[cat]=[];
+                porCategoriaZonas[cat].push(z);
+              });
+              return Object.entries(porCategoriaZonas).map(([cat,zonasCat])=>{
+                const abierta = !!categoriasAbiertas[cat];
+                const criticosCat = zonasCat.reduce((a,z)=>a+getAllElems(z.id).filter(e=>e.edData.estado==="critico").length,0);
                 return (
-                  <div key={z.id}
-                    style={{
-                      background:"rgba(255,255,255,0.025)",
-                      border:`1px solid ${criticos>0?"rgba(239,68,68,0.25)":pendTareas>0?"rgba(245,158,11,0.2)":"rgba(255,255,255,0.08)"}`,
-                      borderRadius:12,padding:14,cursor:"pointer",
-                      transition:"all .15s",overflow:"hidden",position:"relative",
-                    }}
-                    className="hov"
-                    onClick={()=>{setZonaId(String(z.id));setTab("elementos");setAiText("");}}>
-                    {/* Banda lateral de estado */}
-                    <div style={{position:"absolute",left:0,top:0,bottom:0,width:4,background:est.color,borderRadius:"12px 0 0 12px",opacity:0.8}}/>
-                    <div style={{paddingLeft:6}}>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
-                        <div style={{display:"flex",alignItems:"center",gap:8}}>
-                          <span style={{fontSize:22}}>{z.icono}</span>
-                          <div>
-                            <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,lineHeight:1.2}}>{getZD(z.id).nombreCustom||z.nombre}</div>
-                            <div style={{fontSize:10,color:"#5a8a6a",marginTop:1}}>{z.categoria}</div>
-                          </div>
-                        </div>
-                        <span style={{fontSize:10,fontWeight:600,color:est.color,background:est.bg,padding:"2px 7px",borderRadius:8,border:`1px solid ${est.color}35`,flexShrink:0}}>{est.label}</span>
+                  <div key={cat} style={{marginBottom:12}}>
+                    <div onClick={()=>setCategoriasAbiertas(p=>({...p,[cat]:!p[cat]}))}
+                      style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",padding:"10px 14px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:10,marginBottom:abierta?10:0}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <span style={{fontSize:12,color:"#6aaa7a",transform:abierta?"rotate(90deg)":"none",transition:"transform .15s",display:"inline-block"}}>▶</span>
+                        <span style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700}}>{cat}</span>
+                        <span style={{fontSize:11,color:"#5a9a7a"}}>({zonasCat.length})</span>
                       </div>
-                      <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
-                        <span style={{fontSize:10,color:"#5a8a70"}}>📋 {allElems.length}</span>
-                        {criticos>0&&<span style={{fontSize:10,color:"#fca5a5",fontWeight:600}}>🔴 {criticos}</span>}
-                        {pendTareas>0&&<span style={{fontSize:10,color:"#fcd34d"}}>⚠️ {pendTareas}</span>}
-                      </div>
+                      {criticosCat>0&&<span style={{fontSize:10,fontWeight:600,color:"#fca5a5",background:"rgba(239,68,68,0.1)",padding:"2px 8px",borderRadius:8}}>🔴 {criticosCat}</span>}
                     </div>
+                    {abierta&&(
+                      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(230px,1fr))",gap:14}}>
+                        {zonasCat.map(z=>{
+                          const dzd=getZD(z.id); const est=ESTADOS_ZONA[estadoZonaAuto(z.id)];
+                          const allElems=getAllElems(z.id);
+                          const criticos=allElems.filter(e=>e.edData.estado==="critico").length;
+                          const pendTareas=(dzd.tareas||[]).filter(t=>!t.completada).length;
+                          return (
+                            <div key={z.id}
+                              style={{
+                                background:"rgba(255,255,255,0.025)",
+                                border:`1px solid ${criticos>0?"rgba(239,68,68,0.25)":pendTareas>0?"rgba(245,158,11,0.2)":"rgba(255,255,255,0.08)"}`,
+                                borderRadius:12,padding:14,cursor:"pointer",
+                                transition:"all .15s",overflow:"hidden",position:"relative",
+                              }}
+                              className="hov"
+                              onClick={()=>{setZonaId(String(z.id));setTab("elementos");setAiText("");}}>
+                              {/* Banda lateral de estado */}
+                              <div style={{position:"absolute",left:0,top:0,bottom:0,width:4,background:est.color,borderRadius:"12px 0 0 12px",opacity:0.8}}/>
+                              <div style={{paddingLeft:6}}>
+                                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
+                                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                                    <span style={{fontSize:22}}>{z.icono}</span>
+                                    <div>
+                                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,lineHeight:1.2}}>{getZD(z.id).nombreCustom||z.nombre}</div>
+                                      <div style={{fontSize:10,color:"#5a8a6a",marginTop:1}}>{z.categoria}</div>
+                                    </div>
+                                  </div>
+                                  <span style={{fontSize:10,fontWeight:600,color:est.color,background:est.bg,padding:"2px 7px",borderRadius:8,border:`1px solid ${est.color}35`,flexShrink:0}}>{est.label}</span>
+                                </div>
+                                <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+                                  <span style={{fontSize:10,color:"#5a8a70"}}>📋 {allElems.length}</span>
+                                  {criticos>0&&<span style={{fontSize:10,color:"#fca5a5",fontWeight:600}}>🔴 {criticos}</span>}
+                                  {pendTareas>0&&<span style={{fontSize:10,color:"#fcd34d"}}>⚠️ {pendTareas}</span>}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 );
-              })}
-            </div>
+              });
+            })()}
           </div>
         )}
 
@@ -22182,31 +22210,40 @@ export default function App() {
                   const otrosElems = todosElems.filter(e=>!VEGE_KEYS.includes(e.tipo)&&!INFRA_KEYS.includes(e.tipo));
 
                   return (<>
-                    {/* ── VEGETACIÓN ── */}
+                    {/* ── VEGETACIÓN — colapsable ── */}
                     {vegeElems.length>0&&(
                       <div style={{marginBottom:20}}>
-                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12,paddingBottom:8,borderBottom:"1px solid rgba(34,197,94,0.2)"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:0,paddingBottom:8,borderBottom:"1px solid rgba(34,197,94,0.2)",cursor:"pointer",userSelect:"none"}}
+                          onClick={()=>{
+                            const el=document.getElementById(`vege-${zonaId}`);
+                            if(el) el.style.display=el.style.display==="none"?"block":"none";
+                            const arr=document.getElementById(`vege-arr-${zonaId}`);
+                            if(arr) arr.style.transform=arr.style.transform==="rotate(0deg)"?"rotate(-90deg)":"rotate(0deg)";
+                          }}>
                           <span style={{fontSize:18}}>🌿</span>
                           <span style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#86efac"}}>Vegetación</span>
                           <span style={{fontSize:11,color:"#4ade80",background:"rgba(34,197,94,0.1)",padding:"1px 8px",borderRadius:10}}>{vegeElems.length} elementos</span>
+                          <span id={`vege-arr-${zonaId}`} style={{marginLeft:"auto",fontSize:12,color:"#6aaa7a",transition:"transform .2s",display:"inline-block",transform:"rotate(-90deg)"}}>▼</span>
                         </div>
-                        {VEGE_KEYS.map(subKey=>{
-                          const subElems=vegeElems.filter(e=>e.tipo===subKey);
-                          if(subElems.length===0) return null;
-                          const subMeta=CATEGORIAS_ELEM[subKey];
-                          return (
-                            <div key={subKey} style={{marginBottom:12,paddingLeft:10,borderLeft:`2px solid ${subMeta.color}30`}}>
-                              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
-                                <span style={{fontSize:13}}>{subMeta.icon}</span>
-                                <span style={{fontSize:12,fontWeight:600,color:subMeta.color}}>{subMeta.label}</span>
-                                <span style={{fontSize:11,color:"#5aaa70"}}>({subElems.length})</span>
+                        <div id={`vege-${zonaId}`} style={{display:"none",marginTop:8}}>
+                          {VEGE_KEYS.map(subKey=>{
+                            const subElems=vegeElems.filter(e=>e.tipo===subKey);
+                            if(subElems.length===0) return null;
+                            const subMeta=CATEGORIAS_ELEM[subKey];
+                            return (
+                              <div key={subKey} style={{marginBottom:12,paddingLeft:10,borderLeft:`2px solid ${subMeta.color}30`}}>
+                                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                                  <span style={{fontSize:13}}>{subMeta.icon}</span>
+                                  <span style={{fontSize:12,fontWeight:600,color:subMeta.color}}>{subMeta.label}</span>
+                                  <span style={{fontSize:11,color:"#5aaa70"}}>({subElems.length})</span>
+                                </div>
+                                <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                                  {subElems.map(e=>renderElemCard(e))}
+                                </div>
                               </div>
-                              <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                                {subElems.map(e=>renderElemCard(e))}
-                              </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
                       </div>
                     )}
 
@@ -22255,11 +22292,22 @@ export default function App() {
                       </div>
                     )}
 
-                    {/* ── OTROS ── */}
+                    {/* ── OTROS — colapsable ── */}
                     {otrosElems.length>0&&(
                       <div style={{marginBottom:16}}>
-                        <div style={{fontSize:13,fontWeight:600,color:"#6aaa7a",marginBottom:8}}>🔹 Otros</div>
-                        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:0,paddingBottom:8,borderBottom:"1px solid rgba(255,255,255,0.08)",cursor:"pointer",userSelect:"none"}}
+                          onClick={()=>{
+                            const el=document.getElementById(`otros-${zonaId}`);
+                            if(el) el.style.display=el.style.display==="none"?"flex":"none";
+                            const arr=document.getElementById(`otros-arr-${zonaId}`);
+                            if(arr) arr.style.transform=arr.style.transform==="rotate(0deg)"?"rotate(-90deg)":"rotate(0deg)";
+                          }}>
+                          <span style={{fontSize:13}}>🔹</span>
+                          <span style={{fontSize:13,fontWeight:600,color:"#6aaa7a"}}>Otros</span>
+                          <span style={{fontSize:11,color:"#5a9a7a",background:"rgba(255,255,255,0.05)",padding:"1px 8px",borderRadius:10}}>{otrosElems.length}</span>
+                          <span id={`otros-arr-${zonaId}`} style={{marginLeft:"auto",fontSize:12,color:"#6aaa7a",transition:"transform .2s",display:"inline-block",transform:"rotate(-90deg)"}}>▼</span>
+                        </div>
+                        <div id={`otros-${zonaId}`} style={{display:"none",flexDirection:"column",gap:6,marginTop:8}}>
                           {otrosElems.map(e=>renderElemCard(e))}
                         </div>
                       </div>
