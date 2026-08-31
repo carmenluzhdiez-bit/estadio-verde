@@ -20838,6 +20838,83 @@ export default function App() {
     return "bueno";
   };
 
+  // ══════ Índice de salud operativa de la macrozona ══════
+  // No usa el estado de elementos (es estático) — se basa en el COMPORTAMIENTO real:
+  // cumplimiento de frecuencias, tareas vencidas, tasa de "no se pudo", incidencias
+  // recientes y frescura de actividad. Las tareas del "elemento crítico" de la zona
+  // pesan el doble en cumplimiento/vencidas.
+  const ELEMENTO_CRITICO_SUGERIDO = {
+    "Deportivo": "green",
+    "Acuático": "césped",
+    "Calles y Accesos": "maicillo",
+  };
+  const getElementoCriticoZona = (z) => {
+    const zd = getZD(z.id);
+    if (zd.elementoCriticoCustom!==undefined) return zd.elementoCriticoCustom; // "" = "Todo" explícito
+    if (z.elementoCriticoCustom!==undefined) return z.elementoCriticoCustom; // zonas personalizadas lo guardan en el propio objeto
+    if ((z.nombre||"").toLowerCase().includes("golf")) return "green";
+    return ELEMENTO_CRITICO_SUGERIDO[z.categoria] || "";
+  };
+  const calcIndiceSaludZona = (z) => {
+    const elemCritico = (getElementoCriticoZona(z)||"").toLowerCase();
+    const hoyISZ = fechaLocal();
+    const hace30 = new Date(hoyISZ+"T12:00:00"); hace30.setDate(hace30.getDate()-30);
+    const hace30Str = hace30.toISOString().slice(0,10);
+
+    // Todas las tareas históricas de esta zona (cualquier fecha)
+    const tareasZonaTodas = [];
+    Object.entries(tareasProg||{}).forEach(([fecha,tds])=>{
+      const arr = Array.isArray(tds)?tds:Object.values(tds||{});
+      arr.forEach(t=>{ if(t && t.zona===z.nombre) tareasZonaTodas.push({...t,fecha}); });
+    });
+    const pesoTarea = t => ((t.elemento||"").toLowerCase().includes(elemCritico)&&elemCritico) ? 2 : 1;
+
+    // 1) Cumplimiento de frecuencias (hechas a tiempo vs vencidas) — 35%
+    const conFrec = tareasZonaTodas.filter(t=>t.auto); // generadas por frecuencia
+    let pesoTotalFrec=0, pesoOkFrec=0;
+    conFrec.forEach(t=>{
+      const p=pesoTarea(t);
+      pesoTotalFrec+=p;
+      if(normalizarEstado(t.estado)==="hecha") pesoOkFrec+=p;
+    });
+    const scoreFrecuencias = pesoTotalFrec>0 ? (pesoOkFrec/pesoTotalFrec)*100 : 100;
+
+    // 2) Tareas vencidas/acumuladas (pendientes con fecha pasada) — 30%
+    const pendientesZona = tareasZonaTodas.filter(t=>["pendiente","por_designar"].includes(normalizarEstado(t.estado))&&t.fecha<hoyISZ);
+    let pesoTotalVenc=0, pesoVenc=0;
+    tareasZonaTodas.filter(t=>t.fecha<=hoyISZ).forEach(t=>{
+      const p=pesoTarea(t);
+      pesoTotalVenc+=p;
+      if(!(["pendiente","por_designar"].includes(normalizarEstado(t.estado))&&t.fecha<hoyISZ)) pesoVenc+=p;
+    });
+    const scoreVencidas = pesoTotalVenc>0 ? (pesoVenc/pesoTotalVenc)*100 : 100;
+
+    // 3) Tasa de "No se pudo" — 15%
+    const finalizadas = tareasZonaTodas.filter(t=>["hecha","no_pudo"].includes(normalizarEstado(t.estado)));
+    const noPudo = finalizadas.filter(t=>normalizarEstado(t.estado)==="no_pudo").length;
+    const scoreNoPudo = finalizadas.length>0 ? (1-(noPudo/finalizadas.length))*100 : 100;
+
+    // 4) Incidencias recientes (últimos 30 días) — 10%
+    const incidenciasZona = (incidencias||[]).filter(inc=>(inc.zonas||[]).includes(z.nombre)&&inc.fecha>=hace30Str);
+    const scoreIncidencias = Math.max(0, 100 - incidenciasZona.length*25);
+
+    // 5) Frescura de actividad (silencio total) — 10%
+    const fechasConActividad = tareasZonaTodas.map(t=>t.fecha).sort((a,b)=>b.localeCompare(a));
+    const diasSinActividad = fechasConActividad.length>0
+      ? Math.round((new Date(hoyISZ+"T12:00:00")-new Date(fechasConActividad[0]+"T12:00:00"))/(1000*60*60*24))
+      : 999;
+    const scoreFrescura = diasSinActividad<=7?100:diasSinActividad<=14?75:diasSinActividad<=30?40:diasSinActividad<=60?15:0;
+
+    const indice = Math.round(
+      scoreFrecuencias*0.35 + scoreVencidas*0.30 + scoreNoPudo*0.15 + scoreIncidencias*0.10 + scoreFrescura*0.10
+    );
+    return {
+      indice, elemCritico,
+      detalle:{scoreFrecuencias:Math.round(scoreFrecuencias), scoreVencidas:Math.round(scoreVencidas), scoreNoPudo:Math.round(scoreNoPudo), scoreIncidencias:Math.round(scoreIncidencias), scoreFrescura:Math.round(scoreFrescura)},
+      tareasVencidas:pendientesZona.length, incidenciasRecientes:incidenciasZona.length, diasSinActividad,
+    };
+  };
+
   const zonasDuplicadasExcluidas = React.useMemo(() => {
     const base = MACROZONAS_BASE.map(z=>{
       const zd = getZD(z.id);
@@ -22009,6 +22086,8 @@ export default function App() {
                           const allElems=getAllElems(z.id);
                           const criticos=allElems.filter(e=>e.edData.estado==="critico").length;
                           const pendTareas=(dzd.tareas||[]).filter(t=>!t.completada).length;
+                          const salud=calcIndiceSaludZona(z);
+                          const colorSalud=salud.indice>=75?"#22c55e":salud.indice>=50?"#f59e0b":"#ef4444";
                           return (
                             <div key={z.id}
                               style={{
@@ -22031,6 +22110,12 @@ export default function App() {
                                     </div>
                                   </div>
                                   <span style={{fontSize:10,fontWeight:600,color:est.color,background:est.bg,padding:"2px 7px",borderRadius:8,border:`1px solid ${est.color}35`,flexShrink:0}}>{est.label}</span>
+                                </div>
+                                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                                  <div style={{flex:1,height:5,background:"rgba(255,255,255,0.07)",borderRadius:3,overflow:"hidden"}}>
+                                    <div style={{width:`${salud.indice}%`,height:"100%",background:colorSalud,borderRadius:3}}/>
+                                  </div>
+                                  <span style={{fontSize:10,fontWeight:700,color:colorSalud}}>{salud.indice}</span>
                                 </div>
                                 <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
                                   <span style={{fontSize:10,color:"#5a8a70"}}>📋 {allElems.length}</span>
@@ -22071,7 +22156,7 @@ export default function App() {
                         <div>
                           <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:21,fontWeight:900,marginBottom:6,lineHeight:1.2}}>{zd.nombreCustom||zona.nombre}</h2>
                           {esJefa&&!editZonaForm&&(
-                            <button onClick={()=>setEditZonaForm({nombre:zd.nombreCustom||zona.nombre,icono:zd.iconoCustom||zona.icono,descripcion:zd.descripcion||zona.descripcion||"",categoria:zd.categoriaCustom||zona.categoria||""})}
+                            <button onClick={()=>setEditZonaForm({nombre:zd.nombreCustom||zona.nombre,icono:zd.iconoCustom||zona.icono,descripcion:zd.descripcion||zona.descripcion||"",categoria:zd.categoriaCustom||zona.categoria||"",elementoCritico:zd.elementoCriticoCustom??getElementoCriticoZona(zona)})}
                               style={{fontSize:11,padding:"2px 8px",borderRadius:5,cursor:"pointer",border:"1px solid rgba(96,165,250,0.3)",background:"rgba(96,165,250,0.08)",color:"#60a5fa"}}>
                               ✏️ Editar
                             </button>
@@ -22153,6 +22238,10 @@ export default function App() {
                   <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Descripción</label>
                   <input value={editZonaForm.descripcion} onChange={e=>setEditZonaForm(p=>({...p,descripcion:e.target.value}))} placeholder="Descripción breve..." style={S.input}/>
                 </div>
+                <div style={{marginBottom:8}}>
+                  <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>⭐ Elemento crítico (pesa el doble en el índice de salud)</label>
+                  <input value={editZonaForm.elementoCritico??""} onChange={e=>setEditZonaForm(p=>({...p,elementoCritico:e.target.value}))} placeholder="Ej: green, césped, maicillo — vacío = Todo por igual" style={S.input}/>
+                </div>
                 <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:10}}>
                   {["🌿","🌳","🌺","🌸","🏡","⛳","🏊","🏟️","🎾","🛤️","🌻","🌴","🏠","🌱","🍃","🏋️"].map(ico=>(
                     <button key={ico} onClick={()=>setEditZonaForm(p=>({...p,icono:ico}))}
@@ -22166,9 +22255,9 @@ export default function App() {
                 <div style={{display:"flex",gap:8}}>
                   <button onClick={()=>{
                     if(zona.esPersonalizada){
-                      setMacrozonasCust(prev=>prev.map(z=>z.id===zona.id?{...z,nombre:editZonaForm.nombre,icono:editZonaForm.icono,descripcion:editZonaForm.descripcion,categoria:editZonaForm.categoria}:z));
+                      setMacrozonasCust(prev=>prev.map(z=>z.id===zona.id?{...z,nombre:editZonaForm.nombre,icono:editZonaForm.icono,descripcion:editZonaForm.descripcion,categoria:editZonaForm.categoria,elementoCriticoCustom:editZonaForm.elementoCritico}:z));
                     } else {
-                      updateZona(zonaId,{nombreCustom:editZonaForm.nombre,iconoCustom:editZonaForm.icono,descripcion:editZonaForm.descripcion,categoriaCustom:editZonaForm.categoria});
+                      updateZona(zonaId,{nombreCustom:editZonaForm.nombre,iconoCustom:editZonaForm.icono,descripcion:editZonaForm.descripcion,categoriaCustom:editZonaForm.categoria,elementoCriticoCustom:editZonaForm.elementoCritico});
                     }
                     setEditZonaForm(null);
                   }} style={{...S.btn,background:"rgba(52,211,153,0.12)",color:"#34d399",border:"1px solid rgba(52,211,153,0.3)"}}>
