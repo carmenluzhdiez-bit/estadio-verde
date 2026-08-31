@@ -20922,8 +20922,14 @@ export default function App() {
         ? {...z, nombre:zd.nombreCustom||z.nombre}
         : z;
     });
-    const nombresBase = new Set(base.map(z=>z.nombre.toLowerCase().trim()));
-    return macrozonasCust.filter(z=>nombresBase.has((z.nombre||"").toLowerCase().trim()));
+    const nombresVistos = new Set(base.map(z=>z.nombre.toLowerCase().trim()));
+    const duplicadas = [];
+    macrozonasCust.forEach(z=>{
+      const clave = (z.nombre||"").toLowerCase().trim();
+      if(nombresVistos.has(clave)) duplicadas.push(z);
+      else nombresVistos.add(clave);
+    });
+    return duplicadas;
   }, [macrozonasCust, MACROZONAS_BASE]);
   const todasLasZonas = (() => {
     const base = MACROZONAS_BASE.map(z=>{
@@ -20932,8 +20938,8 @@ export default function App() {
         ? {...z, nombre:zd.nombreCustom||z.nombre, categoria:zd.categoriaCustom||z.categoria, icono:zd.iconoCustom||z.icono}
         : z;
     });
-    const nombresBase = new Set(base.map(z=>z.nombre.toLowerCase().trim()));
-    const custom = macrozonasCust.filter(z=>!nombresBase.has((z.nombre||"").toLowerCase().trim()));
+    const idsDuplicadas = new Set(zonasDuplicadasExcluidas.map(z=>z.id));
+    const custom = macrozonasCust.filter(z=>!idsDuplicadas.has(z.id));
     return [...base, ...custom];
   })();
   const filteredZonas = todasLasZonas.filter(z=>{
@@ -21975,8 +21981,21 @@ export default function App() {
                 <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:24,fontWeight:900}}>Macrozonas</h1>
                 <p style={{color:"#6aaa7a",fontSize:14}}>{filteredZonas.length} de {todasLasZonas.length} zonas</p>
                 {zonasDuplicadasExcluidas.length>0&&(
-                  <div style={{marginTop:6,fontSize:12,color:"#fbbf24",background:"rgba(251,191,36,0.08)",border:"1px solid rgba(251,191,36,0.25)",borderRadius:8,padding:"6px 10px"}}>
-                    ⚠️ {zonasDuplicadasExcluidas.length} macrozona{zonasDuplicadasExcluidas.length!==1?"s":""} personalizada{zonasDuplicadasExcluidas.length!==1?"s":""} con el mismo nombre que una zona base — no se muestra{zonasDuplicadasExcluidas.length!==1?"n":""}: <b>{zonasDuplicadasExcluidas.map(z=>z.nombre).join(", ")}</b>. Renómbrala para que aparezca por separado.
+                  <div style={{marginTop:6,fontSize:12,color:"#fbbf24",background:"rgba(251,191,36,0.08)",border:"1px solid rgba(251,191,36,0.25)",borderRadius:8,padding:"10px 12px"}}>
+                    <div style={{marginBottom:8}}>⚠️ {zonasDuplicadasExcluidas.length} macrozona{zonasDuplicadasExcluidas.length!==1?"s":""} personalizada{zonasDuplicadasExcluidas.length!==1?"s":""} con nombre repetido — no se muestra{zonasDuplicadasExcluidas.length!==1?"n":""} en la lista:</div>
+                    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                      {zonasDuplicadasExcluidas.map(z=>(
+                        <div key={z.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"rgba(0,0,0,0.15)",borderRadius:6,padding:"5px 10px"}}>
+                          <span><b>{z.nombre}</b> <span style={{color:"#a08050"}}>({z.categoria})</span></span>
+                          <button onClick={()=>{
+                            if(!window.confirm(`¿Eliminar definitivamente la macrozona personalizada "${z.nombre}" duplicada? Esta acción no se puede deshacer.`)) return;
+                            setMacrozonasCust(prev=>prev.filter(x=>x.id!==z.id));
+                          }} style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(239,68,68,0.12)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}}>
+                            🗑️ Eliminar
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
