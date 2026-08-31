@@ -20978,9 +20978,9 @@ export default function App() {
 
   const stats = {
     total: todasLasZonas.length,
-    bueno: todasLasZonas.filter(z=>estadoZonaAuto(z.id)==="bueno").length,
-    regular: MACROZONAS_BASE.filter(z=>estadoZonaAuto(z.id)==="regular").length,
-    critico: MACROZONAS_BASE.filter(z=>estadoZonaAuto(z.id)==="critico").length,
+    bueno: todasLasZonas.filter(z=>estadoZonaAuto(z.id)!=="mantenimiento"&&calcIndiceSaludZona(z).indice>=75).length,
+    regular: todasLasZonas.filter(z=>estadoZonaAuto(z.id)!=="mantenimiento"&&calcIndiceSaludZona(z).indice>=50&&calcIndiceSaludZona(z).indice<75).length,
+    critico: todasLasZonas.filter(z=>estadoZonaAuto(z.id)!=="mantenimiento"&&calcIndiceSaludZona(z).indice<50).length,
     mantenimiento: MACROZONAS_BASE.filter(z=>estadoZonaAuto(z.id)==="mantenimiento").length,
   };
   const totalElems = MACROZONAS_BASE.reduce((a,z)=>a+getAllElems(z.id).length,0);
@@ -21893,7 +21893,7 @@ export default function App() {
               <div style={{background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:12,padding:16,marginBottom:22}}>
                 <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:10,color:"#fca5a5"}}>🚨 Zonas en Estado Crítico</div>
                 <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-                  {MACROZONAS_BASE.filter(z=>estadoZonaAuto(z.id)==="critico").map(z=>(
+                  {MACROZONAS_BASE.filter(z=>estadoZonaAuto(z.id)!=="mantenimiento"&&calcIndiceSaludZona(z).indice<50).map(z=>(
                     <span key={z.id} onClick={()=>{setZonaId(String(z.id));setVista("zonas");setTab("elementos");}} style={{...S.chip,background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)",cursor:"pointer"}}>{z.icono} {z.nombre}</span>
                   ))}
                 </div>
@@ -21977,8 +21977,7 @@ export default function App() {
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(210px,1fr))",gap:12}}>
               {[...new Set(todasLasZonas.map(z=>z.categoria).filter(Boolean))].sort().map(cat=>{
                 const zc=todasLasZonas.filter(z=>z.categoria===cat).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
-                const ok=zc.filter(z=>estadoZonaAuto(String(z.id))!=="critico"&&estadoZonaAuto(String(z.id))!=="regular").length;
-                const pct=Math.round((ok/zc.length)*100);
+                const pct=zc.length>0 ? Math.round(zc.reduce((a,z)=>a+calcIndiceSaludZona(z).indice,0)/zc.length) : 0;
                 return (
                   <div key={cat} style={{...S.card,padding:16,cursor:"pointer"}} className="hov" onClick={()=>{setFiltroCat(cat);setVista("zonas");}}>
                     <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
@@ -21988,7 +21987,7 @@ export default function App() {
                     <div style={{background:"rgba(255,255,255,0.07)",borderRadius:4,height:7,overflow:"hidden",marginBottom:5}}>
                       <div style={{width:`${pct}%`,height:"100%",background:pct>70?"#22c55e":pct>40?"#f59e0b":"#ef4444",borderRadius:4,transition:"width .5s"}}/>
                     </div>
-                    <div style={{fontSize:12,color:"#6aaa7a"}}>{pct}% en buen estado</div>
+                    <div style={{fontSize:12,color:"#6aaa7a"}}>{pct} índice de salud promedio</div>
                   </div>
                 );
               })}
@@ -22282,7 +22281,24 @@ export default function App() {
                 </div>
                 <div style={{marginBottom:8}}>
                   <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>⭐ Elemento crítico (pesa el doble en el índice de salud)</label>
-                  <input value={editZonaForm.elementoCritico??""} onChange={e=>setEditZonaForm(p=>({...p,elementoCritico:e.target.value}))} placeholder="Ej: green, césped, maicillo — vacío = Todo por igual" style={S.input}/>
+                  {(()=>{
+                    const elemsDeZona = getAllElems(zonaId);
+                    // Agrupar por tipo (útil en zonas normales: árboles, césped, etc.)
+                    const tiposUnicos = [...new Set(elemsDeZona.map(e=>e.tipo).filter(Boolean))]
+                      .map(t=>({valor:t, label:CATEGORIAS_ELEM[t]?.label||t}));
+                    // Agrupar por "familia" de nombre quitando el número final (útil en Golf:
+                    // Green 01/02/03... → "Green", Tee 01A/01B... → "Tee")
+                    const familiasUnicas = [...new Set(elemsDeZona.map(e=>(e.nombre||"").replace(/\s*\d+[A-Za-z]?\s*$/,"").trim()).filter(Boolean))]
+                      .filter(f=>elemsDeZona.filter(e=>(e.nombre||"").startsWith(f)).length>1) // solo si agrupa 2+ elementos
+                      .map(f=>({valor:f.toLowerCase(), label:f}));
+                    const opciones = [...tiposUnicos, ...familiasUnicas.filter(f=>!tiposUnicos.some(t=>t.valor===f.valor))];
+                    return (
+                      <select value={editZonaForm.elementoCritico??""} onChange={e=>setEditZonaForm(p=>({...p,elementoCritico:e.target.value}))} style={S.input}>
+                        <option value="">— Todo por igual —</option>
+                        {opciones.map(o=><option key={o.valor} value={o.valor}>{o.label}</option>)}
+                      </select>
+                    );
+                  })()}
                 </div>
                 <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:10}}>
                   {["🌿","🌳","🌺","🌸","🏡","⛳","🏊","🏟️","🎾","🛤️","🌻","🌴","🏠","🌱","🍃","🏋️"].map(ico=>(
