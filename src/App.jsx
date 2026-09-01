@@ -2763,7 +2763,7 @@ const getNombreRef = (nombreCompleto) => {
   return nombreCompleto.trim().split(" ")[0]||nombreCompleto;
 };
 
-function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE, onAccesoRapido, onCambiarMetodo, cierresTurno={}, onCerrarTurno, onReabrirTurno, crearNotificacion, esJefaApp=false, onGuardarRutinas, onGuardarAlertaFito, onCrearAlertaCompleta=()=>{}, hojasSeguridad=[], personal=[] }) {
+function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE, onAccesoRapido, onCambiarMetodo, cierresTurno={}, onCerrarTurno, onReabrirTurno, crearNotificacion, esJefaApp=false, onGuardarRutinas, onGuardarAlertaFito, onCrearAlertaCompleta=()=>{}, hojasSeguridad=[], personal=[], bodegasData={}, ejecutarDescuentoStock=()=>{} }) {
   const [showProtocolosWorker, setShowProtocolosWorker] = React.useState(false);
   const hoy = fechaLocal();
   const [fechaVer, setFechaVer] = React.useState(fecha || hoy);
@@ -2785,6 +2785,135 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
   const [gastosCant, setGastosCant] = React.useState({}); // {tareaId: string}
   const [gastosUnid, setGastosUnid] = React.useState({}); // {tareaId: string}
   const [gastosObs,  setGastosObs]  = React.useState({}); // {tareaId: string}
+  const [arenaShow, setArenaShow] = React.useState({}); // {tareaId: bool}
+  const [arenaCant, setArenaCant] = React.useState({}); // {tareaId: string} — cantidad general (no-Golf)
+  const [arenaUnid, setArenaUnid] = React.useState({}); // {tareaId: string}
+  const [arenaFilas, setArenaFilas] = React.useState({}); // {tareaId: [{green,cantidad,unidad}]} — Golf, por green
+
+  const buscarItemArena = (bodegaId) => {
+    const items = bodegasData?.[bodegaId]?.items||[];
+    const norm = s=>(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
+    return items.find(i=>norm(i.nombre).includes("arena"));
+  };
+
+  // Bloque para registrar arena usada al completar una tarea de "Aireación con
+  // sacabocados" — descuenta automáticamente de Bodega Golf (si la tarea es de
+  // Golf) o de Bodega Materiales y Herramientas (cualquier otra macrozona), y
+  // queda en el historial de movimientos de esa bodega.
+  const renderBloqueArena = (t) => {
+    const textoLimpio=(t.tarea||"").replace(/\p{Emoji}/gu,"").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+    const esAireacionSacabocados = textoLimpio.includes("aireac") && textoLimpio.includes("sacabocado");
+    if(t.estado!=="hecha"||!esAireacionSacabocados) return null;
+    const tid=String(t.id);
+    const esGolf = t.zona==="Golf"||(t.zona||"").includes("Golf");
+    const bodegaId = esGolf?"b06":"b03";
+    const itemArena = buscarItemArena(bodegaId);
+    const nombreBodega = esGolf?"Bodega Golf":"Bodega Materiales y Herramientas";
+    const yaRegistrado = t.arenaRegistrada;
+    const show = arenaShow[tid]||false;
+
+    if(yaRegistrado){
+      return (
+        <div style={{marginTop:8,padding:"10px 12px",background:"rgba(217,119,6,0.06)",border:"1px solid rgba(217,119,6,0.25)",borderRadius:8}}>
+          <div style={{fontSize:11,color:"#d97706",fontWeight:600}}>
+            ✅ Arena registrada: {t.arenaDetalle||`${t.arenaCantidadTotal||""}`} — descontada de {nombreBodega}
+          </div>
+        </div>
+      );
+    }
+    if(!itemArena){
+      return (
+        <div style={{marginTop:8,padding:"10px 12px",background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:8}}>
+          <div style={{fontSize:11,color:"#f87171"}}>⚠️ No se encontró un ítem "Arena" en {nombreBodega}. Pide a la Jefa que lo cargue en Bodegas antes de registrar el gasto.</div>
+        </div>
+      );
+    }
+
+    const guardarGeneral = () => {
+      const cant = arenaCant[tid];
+      const unid = arenaUnid[tid]||"m³";
+      if(!cant||Number(cant)<=0) return;
+      ejecutarDescuentoStock([{
+        bodegaId, itemId: itemArena.id, cantidad: Number(cant), nombre: itemArena.nombre, unidad: unid, fecha: fechaVer,
+        motivo: `Aireación con sacabocados — ${t.zona||""}${t.elemento?" · "+t.elemento:""}`,
+      }]);
+      onUpdateTarea(fechaVer, t.id, {
+        arenaRegistrada:true, arenaCantidadTotal:`${cant} ${unid}`, arenaDetalle:`${cant} ${unid}`,
+      });
+    };
+
+    const agregarFilaGolf = () => setArenaFilas(p=>({...p,[tid]:[...(p[tid]||[]),{green:"",cantidad:"",unidad:"sacos"}]}));
+    const quitarFilaGolf = (i) => setArenaFilas(p=>({...p,[tid]:(p[tid]||[]).filter((_,j)=>j!==i)}));
+    const updateFilaGolf = (i,campo,valor) => setArenaFilas(p=>({...p,[tid]:(p[tid]||[]).map((f,j)=>j===i?{...f,[campo]:valor}:f)}));
+
+    const guardarGolf = () => {
+      const filas = (arenaFilas[tid]||[]).filter(f=>f.green.trim()&&Number(f.cantidad)>0);
+      if(filas.length===0) return;
+      // Agrupar por unidad para minimizar movimientos (un envío por unidad usada)
+      const porUnidad = {};
+      filas.forEach(f=>{ const u=f.unidad||"sacos"; porUnidad[u]=(porUnidad[u]||0)+Number(f.cantidad); });
+      const detalle = filas.map(f=>`${f.green}: ${f.cantidad} ${f.unidad}`).join(", ");
+      const descuentos = Object.entries(porUnidad).map(([unidad,cantidad])=>({
+        bodegaId, itemId: itemArena.id, cantidad, nombre: itemArena.nombre, unidad, fecha: fechaVer,
+        motivo: `Aireación con sacabocados Golf — ${detalle}`,
+      }));
+      ejecutarDescuentoStock(descuentos);
+      const totalTxt = Object.entries(porUnidad).map(([u,c])=>`${c} ${u}`).join(" + ");
+      onUpdateTarea(fechaVer, t.id, { arenaRegistrada:true, arenaDetalle:detalle, arenaCantidadTotal:totalTxt });
+    };
+
+    return (
+      <div style={{marginTop:8,padding:"10px 12px",background:"rgba(217,119,6,0.05)",border:"1px solid rgba(217,119,6,0.25)",borderRadius:8}}>
+        {!show?(
+          <button onClick={()=>setArenaShow(p=>({...p,[tid]:true}))}
+            style={{fontSize:12,padding:"6px 14px",borderRadius:6,border:"1px solid rgba(217,119,6,0.4)",background:"rgba(217,119,6,0.1)",color:"#d97706",cursor:"pointer",fontWeight:600}}>
+            🏖️ Registrar arena usada
+          </button>
+        ):esGolf?(
+          <div>
+            <div style={{fontSize:11,color:"#d97706",fontWeight:700,marginBottom:6}}>🏖️ Arena usada por green</div>
+            {(arenaFilas[tid]||[]).map((f,i)=>(
+              <div key={i} style={{display:"flex",gap:6,marginBottom:6,alignItems:"center"}}>
+                <input value={f.green} onChange={e=>updateFilaGolf(i,"green",e.target.value)} placeholder="ej: Green 04"
+                  style={{flex:1,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(217,119,6,0.3)",borderRadius:6,color:"#ede9e0",padding:"6px 10px",fontSize:13}}/>
+                <input type="number" step="0.1" value={f.cantidad} onChange={e=>updateFilaGolf(i,"cantidad",e.target.value)} placeholder="cant."
+                  style={{width:70,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(217,119,6,0.3)",borderRadius:6,color:"#ede9e0",padding:"6px 8px",fontSize:13}}/>
+                <select value={f.unidad} onChange={e=>updateFilaGolf(i,"unidad",e.target.value)}
+                  style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(217,119,6,0.3)",borderRadius:6,color:"#ede9e0",padding:"6px 6px",fontSize:12}}>
+                  {["sacos","m³","kg"].map(u=><option key={u}>{u}</option>)}
+                </select>
+                <button onClick={()=>quitarFilaGolf(i)} style={{color:"#f87171",background:"transparent",border:"none",cursor:"pointer",fontSize:16}}>✕</button>
+              </div>
+            ))}
+            <div style={{display:"flex",gap:6}}>
+              <button onClick={agregarFilaGolf} style={{fontSize:11,padding:"4px 10px",borderRadius:6,border:"1px solid rgba(217,119,6,0.3)",background:"transparent",color:"#d97706",cursor:"pointer"}}>+ Agregar green</button>
+              <button onClick={guardarGolf} style={{fontSize:11,padding:"5px 14px",borderRadius:6,border:"1px solid rgba(217,119,6,0.4)",background:"rgba(217,119,6,0.15)",color:"#d97706",cursor:"pointer",fontWeight:600}}>💾 Guardar</button>
+              <button onClick={()=>setArenaShow(p=>({...p,[tid]:false}))} style={{fontSize:11,padding:"5px 10px",borderRadius:6,border:"1px solid rgba(255,255,255,0.1)",background:"transparent",color:"#5a9a7a",cursor:"pointer"}}>Cancelar</button>
+            </div>
+          </div>
+        ):(
+          <div>
+            <div style={{fontSize:11,color:"#d97706",fontWeight:700,marginBottom:6}}>🏖️ ¿Cuánta arena se usó?</div>
+            <div style={{display:"flex",gap:8,alignItems:"flex-end",marginBottom:8}}>
+              <input type="number" step="0.1" value={arenaCant[tid]||""} onChange={e=>setArenaCant(p=>({...p,[tid]:e.target.value}))} placeholder="ej: 16"
+                style={{width:100,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(217,119,6,0.4)",borderRadius:6,color:"#ede9e0",padding:"7px 10px",fontSize:18,fontWeight:700}}/>
+              <select value={arenaUnid[tid]||"m³"} onChange={e=>setArenaUnid(p=>({...p,[tid]:e.target.value}))}
+                style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(217,119,6,0.3)",borderRadius:6,color:"#ede9e0",padding:"7px 10px",fontSize:13}}>
+                {["m³","sacos","kg"].map(u=><option key={u}>{u}</option>)}
+              </select>
+            </div>
+            <div style={{display:"flex",gap:6}}>
+              <button disabled={!arenaCant[tid]} onClick={guardarGeneral}
+                style={{fontSize:11,padding:"5px 14px",borderRadius:6,border:"1px solid rgba(217,119,6,0.4)",background:"rgba(217,119,6,0.15)",color:"#d97706",cursor:"pointer",fontWeight:600,opacity:arenaCant[tid]?1:0.4}}>
+                💾 Guardar
+              </button>
+              <button onClick={()=>setArenaShow(p=>({...p,[tid]:false}))} style={{fontSize:11,padding:"5px 10px",borderRadius:6,border:"1px solid rgba(255,255,255,0.1)",background:"transparent",color:"#5a9a7a",cursor:"pointer"}}>Cancelar</button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const renderBloqueGasto = (t) => {
     const textoLimpio=(t.tarea||"").replace(/\p{Emoji}/gu,"").trim().toLowerCase();
@@ -3212,6 +3341,7 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                           </div>
                         )}
                         {renderBloqueGasto(t)}
+                        {renderBloqueArena(t)}
                         {t.estado==="no_pudo"&&(
                           <div style={{marginTop:6}}>
                             <textarea rows={2} placeholder="¿Por qué no se pudo? (obligatorio)" value={t.notaWorker||""} onChange={e=>onUpdateTarea(fechaVer,t.id,{notaWorker:e.target.value})} style={{width:"100%",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:8,color:"#ede9e0",padding:"6px 10px",fontFamily:"'Georgia',serif",fontSize:12,resize:"vertical"}}/>
@@ -3484,6 +3614,7 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                                 </div>
                               )}
                               {renderBloqueGasto(t)}
+                              {renderBloqueArena(t)}
                             </div>
                           );
                         })}
@@ -20452,10 +20583,10 @@ export default function App() {
   const ejecutarDescuentoStock = (descuentos) => {
     if(!descuentos||!descuentos.length) return;
     const nuevoBodegasData = {...bodegasData};
-    descuentos.forEach(({bodegaId, itemId, cantidad, nombre, unidad, fecha})=>{
+    descuentos.forEach(({bodegaId, itemId, cantidad, nombre, unidad, fecha, motivo})=>{
       const bd = nuevoBodegasData[bodegaId]||{items:[],movimientos:[]};
       const items = (bd.items||[]).map(i=>String(i.id)===String(itemId)?{...i,stockActual:Math.max(0,(Number(i.stockActual)||0)-Number(cantidad))}:i);
-      const movimientos = [{id:Date.now()+Math.random(),fecha:fecha||new Date().toISOString().slice(0,10),tipo:"salida",cantidad:Number(cantidad),unidad:unidad||"unidad",motivo:"Tarea completada — uso en macrozona",itemId:String(itemId),itemNombre:nombre},...(bd.movimientos||[])].slice(0,200);
+      const movimientos = [{id:Date.now()+Math.random(),fecha:fecha||new Date().toISOString().slice(0,10),tipo:"salida",cantidad:Number(cantidad),unidad:unidad||"unidad",motivo:motivo||"Tarea completada — uso en macrozona",itemId:String(itemId),itemNombre:nombre},...(bd.movimientos||[])].slice(0,200);
       nuevoBodegasData[bodegaId] = {...bd,items,movimientos};
     });
     setBodegasData(nuevoBodegasData);
@@ -21942,6 +22073,8 @@ export default function App() {
                 S={S}
                 esJefaApp={true}
                 crearNotificacion={crearNotificacion}
+                bodegasData={bodegasData}
+                ejecutarDescuentoStock={ejecutarDescuentoStock}
                 onGuardarRutinas={(estado)=>{
                   const tId = workerLogueado;
                   if(!tId) return;
@@ -23150,6 +23283,8 @@ export default function App() {
                   onCrearAlertaCompleta={crearAlertaDesdeReporte}
                   hojasSeguridad={Array.isArray(hojasSeguridad)?hojasSeguridad:[]}
                   personal={personal}
+                  bodegasData={bodegasData}
+                  ejecutarDescuentoStock={ejecutarDescuentoStock}
                   onUpdateTarea={(fecha,tid,patch)=>{
                     const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
                     setTareasProg(prev=>{
