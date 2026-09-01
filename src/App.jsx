@@ -12012,6 +12012,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   const [fechaProponerGolf, setFechaProponerGolf] = React.useState(fechaLocal());
   const [gruposAbiertosSemana, setGruposAbiertosSemana] = React.useState({});
   const [buscarPreviewGolf, setBuscarPreviewGolf] = React.useState("");
+  const [gruposPreviewGolfAbiertos, setGruposPreviewGolfAbiertos] = React.useState({}); // {tarea: bool}
   const sincronizarMacrozona = (tipo, detalle) => {
     if(!updateZona) return;
     const hoyFmt = new Date().toLocaleDateString("es-CL");
@@ -13946,46 +13947,80 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                   </button>
                 </div>
               </div>
-              <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:12}}>
-                {previewFiltrado.map((p,i)=>{
-                  const iReal = previewGolfProp.indexOf(p);
-                  return (
-                  <div key={p.id} style={{borderRadius:8,border:`1px solid ${p.incluir?"rgba(255,255,255,0.08)":"rgba(255,255,255,0.03)"}`,overflow:"hidden",opacity:p.incluir?1:0.5}}>
-                    <div onClick={()=>setPreviewGolfProp(prev=>prev.map((x,xi)=>xi===iReal?{...x,abierta:!x.abierta}:x))}
-                      style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",cursor:"pointer",background:p.incluir?"rgba(255,255,255,0.03)":"transparent"}}>
-                      <input type="checkbox" checked={p.incluir} onClick={e=>e.stopPropagation()} onChange={()=>setPreviewGolfProp(prev=>prev.map((x,xi)=>xi===iReal?{...x,incluir:!x.incluir}:x))}/>
-                      <span style={{fontSize:10,color:"#5a9a7a",transform:p.abierta?"rotate(90deg)":"none",transition:"transform .15s",display:"inline-block"}}>▶</span>
-                      <div style={{flex:1}}>
-                        <span style={{fontSize:12,fontWeight:600}}>{p.tarea}</span>
-                        <span style={{fontSize:11,color:"#5a9a7a",marginLeft:6}}>· {p.elemento}</span>
-                        {p.diasVencida>0&&<span style={{fontSize:10,color:"#f87171",marginLeft:6,background:"rgba(248,113,113,0.1)",padding:"1px 6px",borderRadius:8}}>⚠️ {p.diasVencida}d vencida</span>}
-                      </div>
-                      <select value={p.responsable||""} onClick={e=>e.stopPropagation()} onChange={e=>setPreviewGolfProp(prev=>prev.map((x,xi)=>xi===iReal?{...x,responsable:e.target.value,estado:e.target.value?"pendiente":"por_designar"}:x))}
-                        style={{...S.input,fontSize:11,padding:"3px 7px",maxWidth:150}}>
-                        <option value="">— Por designar —</option>
-                        {listaPersonal.map(pp=><option key={pp.id} value={pp.nombre}>{pp.nombre}</option>)}
-                      </select>
-                    </div>
-                    {p.abierta&&(
-                      <div style={{padding:"6px 14px 10px 14px",background:"rgba(0,0,0,0.1)",fontSize:11,color:"#5a9a7a"}} onClick={e=>e.stopPropagation()}>
-                        {p.notas&&<div style={{marginBottom:6}}>📋 {p.notas}</div>}
-                        {(p.alturaCorte!==undefined&&p.alturaCorte!=="")||p.tarea.toLowerCase().includes("corte")?(
-                          <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:6}}>
-                            <span style={{color:"#fbbf24",fontWeight:600}}>✂️ Cortar a:</span>
-                            <input type="number" step="0.1" value={p.alturaCorte||""} placeholder="ej: 5"
-                              onChange={ev=>setPreviewGolfProp(prev=>prev.map(x=>x.id===p.id?{...x,alturaCorte:ev.target.value}:x))}
-                              style={{...S.input,width:70,fontSize:11,padding:"3px 6px",fontWeight:700,color:"#fbbf24"}}/>
-                            <select value={p.unidadAlturaCorte||"mm"} onChange={ev=>setPreviewGolfProp(prev=>prev.map(x=>x.id===p.id?{...x,unidadAlturaCorte:ev.target.value}:x))}
-                              style={{...S.input,fontSize:11,padding:"3px 6px",width:"auto"}}>
-                              <option value="mm">mm</option><option value="cm">cm</option><option value="pulgadas">pulgadas</option>
-                            </select>
+              <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
+                {(()=>{
+                  const grupos = {};
+                  previewFiltrado.forEach(p=>{
+                    const key = p.tarea||"(sin tarea)";
+                    if(!grupos[key]) grupos[key]=[];
+                    grupos[key].push(p);
+                  });
+                  const nombresGrupos = Object.keys(grupos).sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
+                  return nombresGrupos.map(nombreGrupo=>{
+                    const itemsGrupo = grupos[nombreGrupo];
+                    const seleccionadosGrupo = itemsGrupo.filter(p=>p.incluir).length;
+                    const abierto = buscarPreviewGolf.trim() ? true : (gruposPreviewGolfAbiertos[nombreGrupo]??false);
+                    const vencidasGrupo = itemsGrupo.filter(p=>p.diasVencida>0).length;
+                    return (
+                      <div key={nombreGrupo} style={{borderRadius:8,border:"1px solid rgba(255,255,255,0.08)",overflow:"hidden"}}>
+                        <div onClick={()=>setGruposPreviewGolfAbiertos(p=>({...p,[nombreGrupo]:!abierto}))}
+                          style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",cursor:"pointer",background:"rgba(96,165,250,0.06)"}}>
+                          <span style={{fontSize:10,color:"#5a9a7a",transform:abierto?"rotate(90deg)":"none",transition:"transform .15s",display:"inline-block"}}>▶</span>
+                          <span style={{fontSize:12,fontWeight:700,flex:1}}>{nombreGrupo}</span>
+                          {vencidasGrupo>0&&<span style={{fontSize:10,color:"#f87171",background:"rgba(248,113,113,0.1)",padding:"1px 6px",borderRadius:8}}>⚠️ {vencidasGrupo} vencida{vencidasGrupo!==1?"s":""}</span>}
+                          <span style={{fontSize:11,color:"#5a9a7a"}}>{seleccionadosGrupo}/{itemsGrupo.length} seleccionadas</span>
+                          <button onClick={e=>{e.stopPropagation();const ids=itemsGrupo.map(x=>x.id);setPreviewGolfProp(prev=>prev.map(x=>ids.includes(x.id)?{...x,incluir:true}:x));}}
+                            style={{...S.btn,fontSize:10,padding:"2px 8px",background:"rgba(34,197,94,0.1)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)"}}>✓</button>
+                          <button onClick={e=>{e.stopPropagation();const ids=itemsGrupo.map(x=>x.id);setPreviewGolfProp(prev=>prev.map(x=>ids.includes(x.id)?{...x,incluir:false}:x));}}
+                            style={{...S.btn,fontSize:10,padding:"2px 8px",background:"transparent",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)"}}>✕</button>
+                        </div>
+                        {abierto&&(
+                          <div style={{display:"flex",flexDirection:"column",gap:4,padding:"6px"}}>
+                            {itemsGrupo.map((p,i)=>{
+                              const iReal = previewGolfProp.indexOf(p);
+                              return (
+                              <div key={p.id} style={{borderRadius:8,border:`1px solid ${p.incluir?"rgba(255,255,255,0.08)":"rgba(255,255,255,0.03)"}`,overflow:"hidden",opacity:p.incluir?1:0.5}}>
+                                <div onClick={()=>setPreviewGolfProp(prev=>prev.map((x,xi)=>xi===iReal?{...x,abierta:!x.abierta}:x))}
+                                  style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",cursor:"pointer",background:p.incluir?"rgba(255,255,255,0.03)":"transparent"}}>
+                                  <input type="checkbox" checked={p.incluir} onClick={e=>e.stopPropagation()} onChange={()=>setPreviewGolfProp(prev=>prev.map((x,xi)=>xi===iReal?{...x,incluir:!x.incluir}:x))}/>
+                                  <span style={{fontSize:10,color:"#5a9a7a",transform:p.abierta?"rotate(90deg)":"none",transition:"transform .15s",display:"inline-block"}}>▶</span>
+                                  <div style={{flex:1}}>
+                                    <span style={{fontSize:12,fontWeight:600}}>{p.tarea}</span>
+                                    <span style={{fontSize:11,color:"#5a9a7a",marginLeft:6}}>· {p.elemento}</span>
+                                    {p.diasVencida>0&&<span style={{fontSize:10,color:"#f87171",marginLeft:6,background:"rgba(248,113,113,0.1)",padding:"1px 6px",borderRadius:8}}>⚠️ {p.diasVencida}d vencida</span>}
+                                  </div>
+                                  <select value={p.responsable||""} onClick={e=>e.stopPropagation()} onChange={e=>setPreviewGolfProp(prev=>prev.map((x,xi)=>xi===iReal?{...x,responsable:e.target.value,estado:e.target.value?"pendiente":"por_designar"}:x))}
+                                    style={{...S.input,fontSize:11,padding:"3px 7px",maxWidth:150}}>
+                                    <option value="">— Por designar —</option>
+                                    {listaPersonal.map(pp=><option key={pp.id} value={pp.nombre}>{pp.nombre}</option>)}
+                                  </select>
+                                </div>
+                                {p.abierta&&(
+                                  <div style={{padding:"6px 14px 10px 14px",background:"rgba(0,0,0,0.1)",fontSize:11,color:"#5a9a7a"}} onClick={e=>e.stopPropagation()}>
+                                    {p.notas&&<div style={{marginBottom:6}}>📋 {p.notas}</div>}
+                                    {(p.alturaCorte!==undefined&&p.alturaCorte!=="")||p.tarea.toLowerCase().includes("corte")?(
+                                      <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:6}}>
+                                        <span style={{color:"#fbbf24",fontWeight:600}}>✂️ Cortar a:</span>
+                                        <input type="number" step="0.1" value={p.alturaCorte||""} placeholder="ej: 5"
+                                          onChange={ev=>setPreviewGolfProp(prev=>prev.map(x=>x.id===p.id?{...x,alturaCorte:ev.target.value}:x))}
+                                          style={{...S.input,width:70,fontSize:11,padding:"3px 6px",fontWeight:700,color:"#fbbf24"}}/>
+                                        <select value={p.unidadAlturaCorte||"mm"} onChange={ev=>setPreviewGolfProp(prev=>prev.map(x=>x.id===p.id?{...x,unidadAlturaCorte:ev.target.value}:x))}
+                                          style={{...S.input,fontSize:11,padding:"3px 6px",width:"auto"}}>
+                                          <option value="mm">mm</option><option value="cm">cm</option><option value="pulgadas">pulgadas</option>
+                                        </select>
+                                      </div>
+                                    ):null}
+                                    <div>📍 {p.zona} · {p.elemento}</div>
+                                  </div>
+                                )}
+                              </div>
+                            );})}
                           </div>
-                        ):null}
-                        <div>📍 {p.zona} · {p.elemento}</div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                );})}
+                    );
+                  });
+                })()}
               </div>
               <div style={{display:"flex",gap:8}}>
                 <button className="btn-p" style={S.btn} onClick={confirmarEnvioGolf}>✅ Confirmar y enviar al jardinero</button>
