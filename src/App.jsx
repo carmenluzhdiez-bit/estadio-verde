@@ -11764,7 +11764,7 @@ function TareasGolfPanel({ tareasGolfHoy, hoy, esJefa, setTareasProg, tareasProg
 }
 
 
-function CorreccionMasivaFrecuenciasGolf({ S, getAllElems, getZD, setElemFrecs }) {
+function CorreccionMasivaFrecuenciasGolf({ S, getAllElems, getZD, setElemFrecs, setElemFrecsBulk }) {
   const ZID = "31";
   const [busqueda, setBusqueda] = React.useState("");
   const [nuevaFecha, setNuevaFecha] = React.useState(fechaLocal());
@@ -11803,20 +11803,29 @@ function CorreccionMasivaFrecuenciasGolf({ S, getAllElems, getZD, setElemFrecs }
     const filasAAplicar = filas.filter(r=>seleccionadas[r.key]);
     if(filasAAplicar.length===0){ alert("No hay filas seleccionadas."); return; }
     if(!window.confirm(`¿Fijar "Última realización" = ${nuevaFecha} en ${filasAAplicar.length} frecuencia(s) seleccionada(s)?`)) return;
-    // Agrupar por elemento para minimizar escrituras
+    // Agrupar por elemento
     const porElemento = {};
     filasAAplicar.forEach(r=>{
       const k = r.elementoId+"__"+(r.isCustom?"c":"b");
       if(!porElemento[k]) porElemento[k] = { elementoId:r.elementoId, isCustom:r.isCustom, frecIds:new Set() };
       porElemento[k].frecIds.add(r.frecId);
     });
-    Object.values(porElemento).forEach(({elementoId, isCustom, frecIds})=>{
+    const updates = Object.values(porElemento).map(({elementoId, isCustom, frecIds})=>{
       const frecsActuales = isCustom
         ? (zdat.elementosCustom||[]).find(x=>x.id===elementoId)?.frecuencias||[]
         : zdat.elementos?.[elementoId]?.frecuencias||[];
       const frecsActualizadas = frecsActuales.map(f => frecIds.has(f.id) ? {...f, ultimaVez: nuevaFecha} : f);
-      setElemFrecs(ZID, elementoId, isCustom, frecsActualizadas);
+      return { eid: elementoId, isCustom, frecuencias: frecsActualizadas };
     });
+    // Un solo envío a Firebase con TODOS los cambios juntos — evita que varias
+    // escrituras simultáneas se pisen entre sí (lo que causaba que solo se
+    // guardara una de las filas seleccionadas).
+    if(setElemFrecsBulk){
+      setElemFrecsBulk(ZID, updates);
+    } else {
+      // Fallback si no está disponible la versión masiva (no debería pasar)
+      updates.forEach(u=>setElemFrecs(ZID, u.eid, u.isCustom, u.frecuencias));
+    }
     setGuardadoMsg(`✅ ${filasAAplicar.length} frecuencia(s) actualizadas a ${nuevaFecha}.`);
     setSeleccionadas({});
     setTimeout(()=>setGuardadoMsg(""), 4000);
@@ -11862,7 +11871,7 @@ function CorreccionMasivaFrecuenciasGolf({ S, getAllElems, getZD, setElemFrecs }
   );
 }
 
-function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito, onCierreSectorial, onNuevaAlerta, configSemanal={}, setConfigSemanal, getAllElems, getZD, setElemFrecs, bodegasData, setBodegasData }) {
+function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito, onCierreSectorial, onNuevaAlerta, configSemanal={}, setConfigSemanal, getAllElems, getZD, setElemFrecs, setElemFrecsBulk, bodegasData, setBodegasData }) {
   const GOLF_ZONA_ID = 31; // ID macrozona Golf
   const [fechaProponerGolf, setFechaProponerGolf] = React.useState(fechaLocal());
   const [gruposAbiertosSemana, setGruposAbiertosSemana] = React.useState({});
@@ -13890,7 +13899,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       })()}
 
       {subTab==="correccion_masiva"&&rolLogueado!=="trabajador"&&(
-        <CorreccionMasivaFrecuenciasGolf S={S} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs}/>
+        <CorreccionMasivaFrecuenciasGolf S={S} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} setElemFrecsBulk={setElemFrecsBulk}/>
       )}
 
       {subTab==="eventos"&&rolLogueado!=="trabajador"&&(
@@ -20996,6 +21005,26 @@ export default function App() {
     if(isCustom){const arr=[...(data[zid]?.elementosCustom||[])];const i=arr.findIndex(e=>e.id===eid);if(i>=0){arr[i]={...arr[i],frecuencias};setData(p=>({...p,[zid]:{...p[zid],elementosCustom:arr}}));}}
     else{setData(p=>({...p,[zid]:{...p[zid],elementos:{...p[zid]?.elementos,[eid]:{...(p[zid]?.elementos?.[eid]||{}),frecuencias}}}}));}
   };
+  // Versión masiva: aplica frecuencias a VARIOS elementos de una zona en UN SOLO setData/escritura a Firebase.
+  // setElemFrecs llamado muchas veces seguidas dispara una escritura independiente por cada llamada — con
+  // varias en paralelo, pueden llegar desordenadas a Firebase y la última en llegar "gana", pisando a las demás.
+  // updates: [{eid, isCustom, frecuencias}, ...]
+  const setElemFrecsBulk = (zid, updates) => {
+    setData(p => {
+      const zonaData = { ...(p[zid]||{}) };
+      let elementos = { ...(zonaData.elementos||{}) };
+      let elementosCustom = [...(zonaData.elementosCustom||[])];
+      updates.forEach(({eid, isCustom, frecuencias}) => {
+        if(isCustom){
+          const i = elementosCustom.findIndex(e=>e.id===eid);
+          if(i>=0) elementosCustom[i] = {...elementosCustom[i], frecuencias};
+        } else {
+          elementos = {...elementos, [eid]: {...(elementos[eid]||{}), frecuencias}};
+        }
+      });
+      return {...p, [zid]: {...zonaData, elementos, elementosCustom}};
+    });
+  };
 
   const zona = zonasConCust.find(z=>String(z.id)===String(zonaId));
   const zd = zonaId ? getZD(zonaId) : null;
@@ -23194,7 +23223,7 @@ export default function App() {
 
         {/* GOLF */}
         {vista==="golf"&&(
-          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={esJefa&&!soloLectura} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial} setVista={setVista} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} onCierreSectorial={()=>setShowCierreSectorial(true)} onNuevaAlerta={()=>{setAutoOpenAlerta(true);setVista("notificaciones");}} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} bodegasData={bodegasData} setBodegasData={setBodegasData}
+          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={esJefa&&!soloLectura} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial} setVista={setVista} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} onCierreSectorial={()=>setShowCierreSectorial(true)} onNuevaAlerta={()=>{setAutoOpenAlerta(true);setVista("notificaciones");}} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} setElemFrecsBulk={setElemFrecsBulk} bodegasData={bodegasData} setBodegasData={setBodegasData}
             crearNotificacion={crearNotificacion}
             initialSubTab={golfInitTab}
             onRegistroGuardado={(tipo)=>{
