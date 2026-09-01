@@ -179,6 +179,41 @@ const calcProximaFrecGlobal = (f, refFecha) => {
   return { fecha: proxima.toISOString().slice(0,10), diff };
 };
 
+// ─── Actualiza/revierte "Última realización" de la frecuencia de origen de una tarea ───
+// Se llama SIEMPRE que cambia el estado de una tarea con origenZid/origenFrecId (venga de
+// Programación Diaria, Historial, o Programación de Golf) para que el comportamiento sea
+// idéntico en todos los caminos de la app.
+// - Ida (algo -> hecha/completada): fija ultimaVez = fecha de la tarea, guardando el valor previo.
+// - Vuelta (hecha/completada -> algo): si la frecuencia sigue apuntando a esta tarea, la revierte
+//   al valor previo (evita que quede "al día" una tarea que resultó incompleta).
+// Devuelve el patch (posiblemente con ultimaVezPrevia agregado) para que el llamador lo aplique a la tarea.
+const aplicarCambioFrecuencia = (tareaVieja, patch, getElemFrecs, setElemFrecs) => {
+  if(!tareaVieja || !patch || patch.estado===undefined) return patch;
+  if(!tareaVieja.origenZid || !tareaVieja.origenFrecId || !getElemFrecs || !setElemFrecs) return patch;
+  const estViejo = normalizarEstado(tareaVieja.estado);
+  const estNuevo = normalizarEstado(patch.estado);
+  const eraCompletada = estViejo==="hecha"||estViejo==="completada";
+  const esCompletada = estNuevo==="hecha"||estNuevo==="completada";
+  if(!eraCompletada && esCompletada){
+    const frecsActuales = getElemFrecs(tareaVieja.origenZid, tareaVieja.origenEid, null, tareaVieja.origenEsCustom);
+    const frecActual = frecsActuales.find(f=>f.id===tareaVieja.origenFrecId);
+    const valorPrevio = frecActual?.ultimaVez ?? null;
+    const frecsActualizadas = frecsActuales.map(f => f.id===tareaVieja.origenFrecId ? {...f, ultimaVez: tareaVieja.fecha} : f);
+    setElemFrecs(tareaVieja.origenZid, tareaVieja.origenEid, tareaVieja.origenEsCustom, frecsActualizadas);
+    return {...patch, ultimaVezPrevia: valorPrevio};
+  }
+  if(eraCompletada && !esCompletada){
+    const frecsActuales = getElemFrecs(tareaVieja.origenZid, tareaVieja.origenEid, null, tareaVieja.origenEsCustom);
+    const frecActual = frecsActuales.find(f=>f.id===tareaVieja.origenFrecId);
+    if(frecActual && frecActual.ultimaVez===tareaVieja.fecha){
+      const frecsActualizadas = frecsActuales.map(f=>f.id===tareaVieja.origenFrecId ? {...f, ultimaVez: tareaVieja.ultimaVezPrevia||f.ultimaVez} : f);
+      setElemFrecs(tareaVieja.origenZid, tareaVieja.origenEid, tareaVieja.origenEsCustom, frecsActualizadas);
+    }
+    return {...patch, ultimaVezPrevia: null};
+  }
+  return patch;
+};
+
 // ─── FRECUENCIAS DISPONIBLES ─────────────────────────────────────────────────
 const FRECUENCIAS = [
   { value:"diario",      label:"Diario",             dias:1   },
@@ -1761,7 +1796,7 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
 }
 
 
-function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa=false, puedeCrear=false, cierresTurno={}, onReabrirTurno }) {
+function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa=false, puedeCrear=false, cierresTurno={}, onReabrirTurno, getElemFrecs, setElemFrecs }) {
   const [diasAbiertosHist, setDiasAbiertosHist] = React.useState({});
   const [filtroDia,    setFiltroDia]    = React.useState("");
   const [filtroEstado, setFiltroEstado] = React.useState("todos");
@@ -2173,7 +2208,8 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                           <select value={hpTask.estado}
                             onChange={e=>{
                               const nA=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-                              setTareas(prev=>({...prev,[dia]:nA(prev[dia]).map(x=>x.id===hpTask.id?{...x,estado:e.target.value}:x)}));
+                              const patch=aplicarCambioFrecuencia(hpTask,{estado:e.target.value},getElemFrecs,setElemFrecs);
+                              setTareas(prev=>({...prev,[dia]:nA(prev[dia]).map(x=>x.id===hpTask.id?{...x,...patch}:x)}));
                             }}
                             style={{fontSize:11,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:6,color:"#ede9e0",padding:"3px 6px",cursor:"pointer"}}>
                             {Object.entries(EC).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
@@ -2288,7 +2324,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                                 </div>
                                 <div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
                                   <select value={hpTask.estado}
-                                    onChange={e=>{const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);setTareas(prev=>{const updated=nA2(prev[dia]).map(x=>x.id===hpTask.id?{...x,estado:e.target.value}:x);return {...prev,[dia]:updated.map(limpiarUndef)};});}}
+                                    onChange={e=>{const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);const patch=aplicarCambioFrecuencia(hpTask,{estado:e.target.value},getElemFrecs,setElemFrecs);setTareas(prev=>{const updated=nA2(prev[dia]).map(x=>x.id===hpTask.id?{...x,...patch}:x);return {...prev,[dia]:updated.map(limpiarUndef)};});}}
                                     style={{fontSize:10,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:5,color:"#ede9e0",padding:"2px 3px",cursor:"pointer"}}>
                                     {Object.entries(EC).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
                                   </select>
@@ -3723,14 +3759,8 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
   const updateTarea = (id, patch) => {
     const tareasDia = getTareasDelDia(fecha);
     const tarea = tareasDia.find(t=>t.id===id);
-    setTareasDelDia(fecha, tareasDia.map(t => t.id===id ? {...t,...patch} : t));
-    // Si la tarea pasa a completada/hecha y tiene origen de frecuencia, actualizar "Última realización" automáticamente
-    const pasaACompletada = (patch.estado==="completada"||patch.estado==="hecha") && tarea && tarea.estado!=="completada" && tarea.estado!=="hecha";
-    if(pasaACompletada && tarea.origenZid && tarea.origenFrecId && getElemFrecs && setElemFrecs){
-      const frecsActuales = getElemFrecs(tarea.origenZid, tarea.origenEid, null, tarea.origenEsCustom);
-      const frecsActualizadas = frecsActuales.map(f => f.id===tarea.origenFrecId ? {...f, ultimaVez: fecha} : f);
-      setElemFrecs(tarea.origenZid, tarea.origenEid, tarea.origenEsCustom, frecsActualizadas);
-    }
+    const patchFinal = patch.estado!==undefined ? aplicarCambioFrecuencia(tarea, patch, getElemFrecs, setElemFrecs) : patch;
+    setTareasDelDia(fecha, tareasDia.map(t => t.id===id ? {...t,...patchFinal} : t));
   };
   const deleteTarea = (id) => setTareasDelDia(fecha, getTareasDelDia(fecha).filter(t => t.id!==id));
 
@@ -4022,7 +4052,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
       )}
 
       {tabProg==="historial" && (
-        <HistorialProg tareas={tareas} setTareas={setTareas} MACROZONAS_BASE={MACROZONAS_BASE} zonas={zonas} S={S} esJefa={esJefa} puedeCrear={puedeCrear} cierresTurno={cierresTurno} onReabrirTurno={onReabrirTurno}/>
+        <HistorialProg tareas={tareas} setTareas={setTareas} MACROZONAS_BASE={MACROZONAS_BASE} zonas={zonas} S={S} esJefa={esJefa} puedeCrear={puedeCrear} cierresTurno={cierresTurno} onReabrirTurno={onReabrirTurno} getElemFrecs={getElemFrecs} setElemFrecs={setElemFrecs}/>
       )}
 
       {/* ── PROGRAMAR ── */}
@@ -13609,7 +13639,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           Object.values(noPudoPorClave).forEach(({tarea:t,fecha:fOrig})=>{
             const clave=t.zona+"_"+t.elemento+"_"+t.tarea;
             if(existentes.includes(clave)||clavesYaPropuestas.has(clave))return;
-            propuestas.push({id:Date.now()+Math.random(),fecha:fechaProponerGolf,zona:nombreZona,elemento:t.elemento,tarea:t.tarea,responsable:t.responsable||(configSemanal?.corte_golf||""),estado:(t.responsable||configSemanal?.corte_golf)?"pendiente":"por_designar",notas:(t.notas?t.notas+" | ":"")+"Reprogramada (no se pudo) desde "+fOrig,alturaCorte:t.alturaCorte||"",unidadAlturaCorte:t.unidadAlturaCorte||"mm",estacion:estProp,auto:true,origenNoPudo:true,fechaOrigenNoPudo:fOrig,diasVencida:0});
+            propuestas.push({id:Date.now()+Math.random(),fecha:fechaProponerGolf,zona:nombreZona,elemento:t.elemento,tarea:t.tarea,responsable:t.responsable||(configSemanal?.corte_golf||""),estado:(t.responsable||configSemanal?.corte_golf)?"pendiente":"por_designar",notas:(t.notas?t.notas+" | ":"")+"Reprogramada (no se pudo) desde "+fOrig,alturaCorte:t.alturaCorte||"",unidadAlturaCorte:t.unidadAlturaCorte||"mm",estacion:estProp,auto:true,origenNoPudo:true,fechaOrigenNoPudo:fOrig,diasVencida:0,origenZid:t.origenZid,origenEid:t.origenEid,origenFrecId:t.origenFrecId,origenEsCustom:t.origenEsCustom});
             clavesYaPropuestas.add(clave);
             vencidas.push(t.elemento+" — "+t.tarea+" (no se pudo el "+fOrig+")");
           });
