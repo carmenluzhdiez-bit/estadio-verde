@@ -9923,7 +9923,7 @@ const EDIFICIO_GOLF = [
 ];
 const TAREAS_BUNKERS    = ["Recortar bordes","Rastrillar y labrar arena","Rellenar con arena","Rastrillado superficial","Recoger piedras/escombros","Revisión estado"];
 const TAREAS_FAIRWAYS   = ["Corte","Riego","Reparar sistema de riego","Fertilización","Control malezas","Aireación con sacabocados fino","Aireación con sacabocados grueso","Aireación con púas finas","Aireación con púas gruesas","Resiembra","Soplado"];
-const TAREAS_LOMAS      = ["Corte","Desbrozado","Riego","Control malezas"];
+const TAREAS_LOMAS      = ["Corte","Desbrozado","Riego","Reparar sistema de riego","Control malezas"];
 const TAREAS_MACIZOS    = ["Poda","Riego","Fertilización","Control plagas","Limpieza","Reemplazo plantas","Mulching"];
 const TAREAS_EDIFICIO   = ["Riego","Fertilización","Cambio tierra","Poda/formación","Revisión estado","Limpieza macetas"];
 const TAREAS_ARBOLES_GENERALES = ["Poda formación","Poda sanitaria","Fertilización","Riego","Control plagas","Aplicación fungicida","Revisión estado"];
