@@ -9909,7 +9909,7 @@ const EDIFICIO_GOLF = [
   {id:"edif_2p_liquidambar",nombre:"Macetas Liquidámbar 2do Piso", piso:"2do piso"},
 ];
 const TAREAS_BUNKERS    = ["Recortar bordes","Rastrillar y labrar arena","Rellenar con arena","Rastrillado superficial","Recoger piedras/escombros","Revisión estado"];
-const TAREAS_FAIRWAYS   = ["Corte","Riego","Fertilización","Control malezas","Aireación","Resiembra","Soplado"];
+const TAREAS_FAIRWAYS   = ["Corte","Riego","Fertilización","Control malezas","Aireación con sacabocados fino","Aireación con sacabocados grueso","Aireación con púas finas","Aireación con púas gruesas","Resiembra","Soplado"];
 const TAREAS_LOMAS      = ["Corte","Desbrozado","Riego","Control malezas"];
 const TAREAS_MACIZOS    = ["Poda","Riego","Fertilización","Control plagas","Limpieza","Reemplazo plantas","Mulching"];
 const TAREAS_EDIFICIO   = ["Riego","Fertilización","Cambio tierra","Poda/formación","Revisión estado","Limpieza macetas"];
@@ -9939,7 +9939,10 @@ const TAREAS_GREENS_PERIODICAS = [
   "Control de plagas",
   "Control malezas",
   // ── Mantenimiento mayor ──
-  "Aireación",
+  "Aireación con sacabocados fino",
+  "Aireación con sacabocados grueso",
+  "Aireación con púas finas",
+  "Aireación con púas gruesas",
   "Escarificado",
   "Top dressing",
   "Resiembra / Reparación parches",
