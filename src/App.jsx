@@ -21169,7 +21169,7 @@ export default function App() {
       else nombresVistos.set(clave, z);
     });
     return { zonasDuplicadasExcluidas: duplicadas, zonaBaseDuplicadaAviso: avisoBase };
-  }, [macrozonasCust, MACROZONAS_BASE]);
+  }, [macrozonasCust, MACROZONAS_BASE, data]);
   const todasLasZonas = (() => {
     const base = MACROZONAS_BASE.map(z=>{
       const zd = getZD(z.id);
