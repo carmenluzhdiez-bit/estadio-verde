@@ -2836,6 +2836,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
       ejecutarDescuentoStock([{
         bodegaId, itemId: itemArena.id, cantidad: Number(cant), nombre: itemArena.nombre, unidad: unid, fecha: fechaVer,
         motivo: `Aireación con sacabocados — ${t.zona||""}${t.elemento?" · "+t.elemento:""}`,
+        responsable: trabajador?.nombre||t.responsable||"",
       }]);
       onUpdateTarea(fechaVer, t.id, {
         arenaRegistrada:true, arenaCantidadTotal:`${cant} ${unid}`, arenaDetalle:`${cant} ${unid}`,
@@ -2856,6 +2857,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
       const descuentos = Object.entries(porUnidad).map(([unidad,cantidad])=>({
         bodegaId, itemId: itemArena.id, cantidad, nombre: itemArena.nombre, unidad, fecha: fechaVer,
         motivo: `Aireación con sacabocados Golf — ${detalle}`,
+        responsable: trabajador?.nombre||t.responsable||"",
       }));
       ejecutarDescuentoStock(descuentos);
       const totalTxt = Object.entries(porUnidad).map(([u,c])=>`${c} ${u}`).join(" + ");
@@ -20586,10 +20588,10 @@ export default function App() {
   const ejecutarDescuentoStock = (descuentos) => {
     if(!descuentos||!descuentos.length) return;
     const nuevoBodegasData = {...bodegasData};
-    descuentos.forEach(({bodegaId, itemId, cantidad, nombre, unidad, fecha, motivo})=>{
+    descuentos.forEach(({bodegaId, itemId, cantidad, nombre, unidad, fecha, motivo, responsable})=>{
       const bd = nuevoBodegasData[bodegaId]||{items:[],movimientos:[]};
       const items = (bd.items||[]).map(i=>String(i.id)===String(itemId)?{...i,stockActual:Math.max(0,(Number(i.stockActual)||0)-Number(cantidad))}:i);
-      const movimientos = [{id:Date.now()+Math.random(),fecha:fecha||new Date().toISOString().slice(0,10),tipo:"salida",cantidad:Number(cantidad),unidad:unidad||"unidad",motivo:motivo||"Tarea completada — uso en macrozona",itemId:String(itemId),itemNombre:nombre},...(bd.movimientos||[])].slice(0,200);
+      const movimientos = [{id:Date.now()+Math.random(),fecha:fecha||new Date().toISOString().slice(0,10),tipo:"salida",cantidad:Number(cantidad),unidad:unidad||"unidad",motivo:motivo||"Tarea completada — uso en macrozona",itemId:String(itemId),itemNombre:nombre,responsable:responsable||""},...(bd.movimientos||[])].slice(0,200);
       nuevoBodegasData[bodegaId] = {...bd,items,movimientos};
     });
     setBodegasData(nuevoBodegasData);
