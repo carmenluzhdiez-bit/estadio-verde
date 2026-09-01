@@ -21155,10 +21155,17 @@ export default function App() {
     let avisoBase = null;
     base.forEach(z=>{
       const clave = normNombreZona(z.nombre);
-      if(nombresVistos.has(clave)) {
+      const otra = nombresVistos.get(clave);
+      if(otra) {
         // Dos zonas BASE (o una base renombrada) chocan de nombre — no se puede
         // "eliminar" una zona base, pero sí avisar para que la renombren.
-        avisoBase = {nombre:z.nombre, original:MACROZONAS_BASE.find(b=>b.id===z.id)?.nombre, id:z.id};
+        // Se reportan las DOS zonas en conflicto, cada una con su nombre real
+        // de catálogo (antes de cualquier renombre), para saber cuál corregir.
+        avisoBase = {
+          nombre: z.nombre,
+          zonaA: {id: otra.id, original: MACROZONAS_BASE.find(b=>b.id===otra.id)?.nombre},
+          zonaB: {id: z.id, original: MACROZONAS_BASE.find(b=>b.id===z.id)?.nombre},
+        };
       } else {
         nombresVistos.set(clave, z);
       }
@@ -22246,7 +22253,12 @@ export default function App() {
                 <p style={{color:"#6aaa7a",fontSize:14}}>{filteredZonas.length} de {todasLasZonas.length} zonas</p>
                 {zonaBaseDuplicadaAviso&&(
                   <div style={{marginTop:6,fontSize:12,color:"#f87171",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:8,padding:"10px 12px"}}>
-                    ⚠️ Una zona original fue renombrada y ahora choca con otra: <b>"{zonaBaseDuplicadaAviso.nombre}"</b> {zonaBaseDuplicadaAviso.original&&zonaBaseDuplicadaAviso.original!==zonaBaseDuplicadaAviso.nombre&&<>(su nombre original era <b>"{zonaBaseDuplicadaAviso.original}"</b>)</>}. Entra a esa zona → Editar, y cámbiale el nombre para que no se pisen.
+                    <div style={{marginBottom:6}}>⚠️ Dos zonas originales están chocando con el nombre <b>"{zonaBaseDuplicadaAviso.nombre}"</b>. Su nombre real de catálogo (antes de cualquier cambio) es:</div>
+                    <div style={{display:"flex",flexDirection:"column",gap:3,marginBottom:6}}>
+                      <div>• Zona id <b>{zonaBaseDuplicadaAviso.zonaA.id}</b> — nombre original: <b>"{zonaBaseDuplicadaAviso.zonaA.original}"</b>{zonaBaseDuplicadaAviso.zonaA.original===zonaBaseDuplicadaAviso.nombre?" (esta es probablemente la real)":" (¡esta es la que probablemente se renombró por error!)"}</div>
+                      <div>• Zona id <b>{zonaBaseDuplicadaAviso.zonaB.id}</b> — nombre original: <b>"{zonaBaseDuplicadaAviso.zonaB.original}"</b>{zonaBaseDuplicadaAviso.zonaB.original===zonaBaseDuplicadaAviso.nombre?" (esta es probablemente la real)":" (¡esta es la que probablemente se renombró por error!)"}</div>
+                    </div>
+                    Entra a la que tenga nombre original distinto de "{zonaBaseDuplicadaAviso.nombre}" → Editar, y cámbiale el nombre de vuelta a su original (o al que corresponda), para que no se pisen.
                   </div>
                 )}
                 {zonasDuplicadasExcluidas.length>0&&(
