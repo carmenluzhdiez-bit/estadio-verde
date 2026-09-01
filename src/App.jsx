@@ -11764,6 +11764,104 @@ function TareasGolfPanel({ tareasGolfHoy, hoy, esJefa, setTareasProg, tareasProg
 }
 
 
+function CorreccionMasivaFrecuenciasGolf({ S, getAllElems, getZD, setElemFrecs }) {
+  const ZID = "31";
+  const [busqueda, setBusqueda] = React.useState("");
+  const [nuevaFecha, setNuevaFecha] = React.useState(fechaLocal());
+  const [seleccionadas, setSeleccionadas] = React.useState({}); // key -> true
+  const [guardadoMsg, setGuardadoMsg] = React.useState("");
+
+  const elems = getAllElems ? getAllElems(ZID) : [];
+  const zdat = getZD ? getZD(ZID) : {};
+
+  // Aplanar: cada fila = una frecuencia (tarea) de un elemento de Golf
+  const filas = React.useMemo(()=>{
+    const out=[];
+    elems.forEach(e=>{
+      const frecs = e.isCustom
+        ? (zdat.elementosCustom||[]).find(x=>x.id===e.id)?.frecuencias||[]
+        : zdat.elementos?.[e.id]?.frecuencias||[];
+      frecs.forEach(f=>{
+        out.push({ key: e.id+"__"+f.id, elementoId:e.id, elementoNombre:e.nombre, isCustom:!!e.isCustom, frecId:f.id, tarea:f.tarea||"(sin nombre)", ultimaVez:f.ultimaVez||"—" });
+      });
+    });
+    return out.sort((a,b)=>a.elementoNombre.localeCompare(b.elementoNombre,"es",{sensitivity:"base"})||a.tarea.localeCompare(b.tarea,"es",{sensitivity:"base"}));
+  }, [elems, zdat]);
+
+  const filasFiltradas = busqueda.trim()
+    ? filas.filter(r => (r.elementoNombre+" "+r.tarea).toLowerCase().includes(busqueda.trim().toLowerCase()))
+    : filas;
+
+  const toggleFila = (key) => setSeleccionadas(p=>({...p,[key]:!p[key]}));
+  const marcarTodas = () => setSeleccionadas(p=>{ const n={...p}; filasFiltradas.forEach(r=>n[r.key]=true); return n; });
+  const desmarcarTodas = () => setSeleccionadas(p=>{ const n={...p}; filasFiltradas.forEach(r=>delete n[r.key]); return n; });
+
+  const totalSeleccionadas = filasFiltradas.filter(r=>seleccionadas[r.key]).length;
+
+  const aplicar = () => {
+    if(!nuevaFecha){ alert("Elige una fecha."); return; }
+    const filasAAplicar = filas.filter(r=>seleccionadas[r.key]);
+    if(filasAAplicar.length===0){ alert("No hay filas seleccionadas."); return; }
+    if(!window.confirm(`¿Fijar "Última realización" = ${nuevaFecha} en ${filasAAplicar.length} frecuencia(s) seleccionada(s)?`)) return;
+    // Agrupar por elemento para minimizar escrituras
+    const porElemento = {};
+    filasAAplicar.forEach(r=>{
+      const k = r.elementoId+"__"+(r.isCustom?"c":"b");
+      if(!porElemento[k]) porElemento[k] = { elementoId:r.elementoId, isCustom:r.isCustom, frecIds:new Set() };
+      porElemento[k].frecIds.add(r.frecId);
+    });
+    Object.values(porElemento).forEach(({elementoId, isCustom, frecIds})=>{
+      const frecsActuales = isCustom
+        ? (zdat.elementosCustom||[]).find(x=>x.id===elementoId)?.frecuencias||[]
+        : zdat.elementos?.[elementoId]?.frecuencias||[];
+      const frecsActualizadas = frecsActuales.map(f => frecIds.has(f.id) ? {...f, ultimaVez: nuevaFecha} : f);
+      setElemFrecs(ZID, elementoId, isCustom, frecsActualizadas);
+    });
+    setGuardadoMsg(`✅ ${filasAAplicar.length} frecuencia(s) actualizadas a ${nuevaFecha}.`);
+    setSeleccionadas({});
+    setTimeout(()=>setGuardadoMsg(""), 4000);
+  };
+
+  return (
+    <div className="ein">
+      <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,marginBottom:8,color:"#fbbf24"}}>🛠️ Corrección masiva — Última realización (Golf)</div>
+      <div style={{fontSize:12,color:"#5a9a7a",marginBottom:14}}>
+        Filtra, marca las filas que correspondan y escribe la fecha real una sola vez arriba. Solo cambia la fecha de la frecuencia — no crea ni borra tareas del programa.
+      </div>
+      <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"flex-end",marginBottom:12}}>
+        <div style={{flex:1,minWidth:200}}>
+          <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Buscar (elemento o tarea)</label>
+          <input style={S.input} placeholder="ej: Tee, Corte, Green 03..." value={busqueda} onChange={e=>setBusqueda(e.target.value)}/>
+        </div>
+        <div>
+          <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Nueva fecha (última realización)</label>
+          <input type="date" style={S.input} value={nuevaFecha} onChange={e=>setNuevaFecha(e.target.value)}/>
+        </div>
+        <button className="btn-g" style={S.btn} onClick={marcarTodas}>✓ Marcar todas (filtradas)</button>
+        <button className="btn-g" style={S.btn} onClick={desmarcarTodas}>✗ Desmarcar todas</button>
+        <button className="btn-p" style={S.btn} onClick={aplicar} disabled={totalSeleccionadas===0}>
+          Aplicar a {totalSeleccionadas} seleccionada{totalSeleccionadas!==1?"s":""}
+        </button>
+      </div>
+      {guardadoMsg&&<div style={{fontSize:12,color:"#22c55e",marginBottom:10}}>{guardadoMsg}</div>}
+      <div style={{fontSize:11,color:"#5a8a6a",marginBottom:6}}>{filasFiltradas.length} fila(s) — {totalSeleccionadas} seleccionada(s)</div>
+      <div style={{maxHeight:520,overflowY:"auto",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8}}>
+        {filasFiltradas.map(r=>(
+          <div key={r.key} onClick={()=>toggleFila(r.key)}
+            style={{display:"flex",alignItems:"center",gap:10,padding:"7px 10px",borderBottom:"1px solid rgba(255,255,255,0.05)",cursor:"pointer",background:seleccionadas[r.key]?"rgba(34,197,94,0.10)":"transparent"}}>
+            <input type="checkbox" checked={!!seleccionadas[r.key]} onChange={()=>toggleFila(r.key)} onClick={e=>e.stopPropagation()}/>
+            <div style={{flex:1,fontSize:12}}>
+              <strong>{r.elementoNombre}</strong> <span style={{color:"#5a8a6a"}}>· {r.tarea}</span>
+            </div>
+            <div style={{fontSize:11,color:"#94a3b8",flexShrink:0}}>Actual: {r.ultimaVez}</div>
+          </div>
+        ))}
+        {filasFiltradas.length===0&&<div style={{padding:20,textAlign:"center",color:"#5a8a6a",fontSize:12}}>Sin resultados.</div>}
+      </div>
+    </div>
+  );
+}
+
 function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito, onCierreSectorial, onNuevaAlerta, configSemanal={}, setConfigSemanal, getAllElems, getZD, setElemFrecs, bodegasData, setBodegasData }) {
   const GOLF_ZONA_ID = 31; // ID macrozona Golf
   const [fechaProponerGolf, setFechaProponerGolf] = React.useState(fechaLocal());
@@ -12144,7 +12242,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
         {(()=>{
           // Tabs según rol: trabajador solo ve lo que le corresponde
-          const todosTabs = [["panel","📊 Panel"],["greens","⛳ Greens"],["tees","🎯 Tees"],["bunkers","🏖️ Búnkers"],["fairways","🌾 Fairways"],["zonas","🌿 Zonas"],["arboles","🌳 Árboles"],["mediciones","📏 Alturas"],["humedad","💧 Humedad"],["eventos","🏆 Eventos"],["fitosanitario","⚗ Fitosanitario"],["programacion_golf","📅 Semana Golf"],["config_golf","⚙️ Programación Golf"]];
+          const todosTabs = [["panel","📊 Panel"],["greens","⛳ Greens"],["tees","🎯 Tees"],["bunkers","🏖️ Búnkers"],["fairways","🌾 Fairways"],["zonas","🌿 Zonas"],["arboles","🌳 Árboles"],["mediciones","📏 Alturas"],["humedad","💧 Humedad"],["eventos","🏆 Eventos"],["fitosanitario","⚗ Fitosanitario"],["programacion_golf","📅 Semana Golf"],["config_golf","⚙️ Programación Golf"],["correccion_masiva","🛠️ Corrección Fechas"]];
           const tabsWorker = [["mediciones","📏 Alturas"],["humedad","💧 Humedad"]];
           // Agregar Programación solo para jefa/supervisor
           const todosTabs2 = todosTabs;
@@ -13790,6 +13888,10 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
         </div>
         );
       })()}
+
+      {subTab==="correccion_masiva"&&rolLogueado!=="trabajador"&&(
+        <CorreccionMasivaFrecuenciasGolf S={S} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs}/>
+      )}
 
       {subTab==="eventos"&&rolLogueado!=="trabajador"&&(
         <div className="ein">
