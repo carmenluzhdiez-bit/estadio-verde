@@ -9902,6 +9902,7 @@ const BUNKERS_DEF = [
 const FAIRWAYS_DEF = Array.from({length:9},(_,i)=>({id:`fw${i+1}`,nombre:`Fairway ${String(i+1).padStart(2,"0")}`,hoyo:`Hoyo ${i+1}`}));
 const ZONAS_GOLF_EXTRA = [
   {id:"antegreen", nombre:"Ante-greens", icono:"🌿", color:"#6ee7b7"},
+  {id:"rough",     nombre:"Rough",       icono:"🌾", color:"#84cc16"},
   {id:"lomas",     nombre:"Lomas",       icono:"⛰️",  color:"#a3e635"},
   {id:"macizo_acceso",   nombre:"Macizo Acceso",   icono:"🌺", color:"#f9a8d4"},
   {id:"macizo_interior", nombre:"Macizo Interior",  icono:"🌺", color:"#f9a8d4"},
