@@ -262,6 +262,7 @@ const TAREAS_DEFAULT = {
   arboles: [
     { tarea:"Plantar desde Vivero", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
     { tarea:"Riego",               verano:"semanal",   otono:"quincenal",  invierno:"noaplica", primavera:"semanal"   },
+    { tarea:"Reparar sistema de riego", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
     { tarea:"Poda de limpieza",    verano:"mensual",   otono:"mensual",    invierno:"noaplica", primavera:"mensual"   },
     { tarea:"Poda de formación",   verano:"noaplica",  otono:"noaplica",   invierno:"mensual",  primavera:"noaplica"  },
     { tarea:"Fertilización",       verano:"mensual",   otono:"noaplica",   invierno:"noaplica", primavera:"mensual"   },
@@ -270,6 +271,7 @@ const TAREAS_DEFAULT = {
   arbustos: [
     { tarea:"Plantar desde Vivero", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
     { tarea:"Riego",               verano:"cada3dias", otono:"semanal",    invierno:"quincenal",primavera:"cada5dias" },
+    { tarea:"Reparar sistema de riego", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
     { tarea:"Poda de limpieza",    verano:"semanal",   otono:"quincenal",  invierno:"noaplica", primavera:"semanal"   },
     { tarea:"Poda de formación",   verano:"noaplica",  otono:"noaplica",   invierno:"semanal",  primavera:"noaplica"  },
     { tarea:"Fertilización",       verano:"mensual",   otono:"noaplica",   invierno:"noaplica", primavera:"mensual"   },
@@ -277,6 +279,7 @@ const TAREAS_DEFAULT = {
   ],
   cesped: [
     { tarea:"Riego",               verano:"cada2dias", otono:"cada5dias",  invierno:"noaplica", primavera:"cada3dias" },
+    { tarea:"Reparar sistema de riego", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
     { tarea:"Corte",               verano:"semanal",   otono:"quincenal",  invierno:"mensual",  primavera:"semanal"   },
     { tarea:"Fertilización",       verano:"mensual",   otono:"bimestral",  invierno:"noaplica", primavera:"mensual"   },
     { tarea:"Aireado / escarificado",verano:"noaplica",otono:"mensual",    invierno:"noaplica", primavera:"mensual"   },
@@ -285,6 +288,7 @@ const TAREAS_DEFAULT = {
   herbaceas: [
     { tarea:"Plantar desde Vivero", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
     { tarea:"Riego",               verano:"cada2dias", otono:"cada3dias",  invierno:"semanal",  primavera:"cada3dias" },
+    { tarea:"Reparar sistema de riego", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
     { tarea:"Deadheading (flores marchitas)", verano:"semanal", otono:"semanal", invierno:"noaplica", primavera:"semanal" },
     { tarea:"Fertilización",       verano:"quincenal", otono:"mensual",    invierno:"noaplica", primavera:"quincenal" },
     { tarea:"Control de plagas",   verano:"quincenal", otono:"mensual",    invierno:"noaplica", primavera:"quincenal" },
@@ -292,6 +296,7 @@ const TAREAS_DEFAULT = {
   trepadoras: [
     { tarea:"Plantar desde Vivero", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
     { tarea:"Riego",               verano:"cada3dias", otono:"semanal",    invierno:"quincenal",primavera:"cada5dias" },
+    { tarea:"Reparar sistema de riego", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
     { tarea:"Poda de limpieza",    verano:"mensual",   otono:"mensual",    invierno:"noaplica", primavera:"mensual"   },
     { tarea:"Poda de formación",   verano:"noaplica",  otono:"noaplica",   invierno:"mensual",  primavera:"noaplica"  },
     { tarea:"Guiado / tutoraje",   verano:"quincenal", otono:"mensual",    invierno:"noaplica", primavera:"quincenal" },
@@ -300,6 +305,7 @@ const TAREAS_DEFAULT = {
   rastreras: [
     { tarea:"Plantar desde Vivero", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
     { tarea:"Riego",               verano:"cada3dias", otono:"semanal",    invierno:"quincenal",primavera:"cada5dias" },
+    { tarea:"Reparar sistema de riego", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
     { tarea:"Poda de contención",  verano:"mensual",   otono:"mensual",    invierno:"noaplica", primavera:"mensual"   },
     { tarea:"Fertilización",       verano:"mensual",   otono:"noaplica",   invierno:"noaplica", primavera:"mensual"   },
     { tarea:"Control de malezas",  verano:"quincenal", otono:"mensual",    invierno:"noaplica", primavera:"quincenal" },
@@ -307,6 +313,7 @@ const TAREAS_DEFAULT = {
   jardineras: [
     { tarea:"Plantar desde Vivero", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
     { tarea:"Riego",               verano:"cada2dias", otono:"cada3dias",  invierno:"semanal",  primavera:"cada3dias" },
+    { tarea:"Reparar sistema de riego", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
     { tarea:"Poda / recorte",      verano:"quincenal", otono:"mensual",    invierno:"noaplica", primavera:"quincenal" },
     { tarea:"Fertilización",       verano:"quincenal", otono:"mensual",    invierno:"noaplica", primavera:"quincenal" },
     { tarea:"Cambio de sustrato",  verano:"noaplica",  otono:"noaplica",   invierno:"mensual",  primavera:"noaplica"  },
@@ -315,6 +322,7 @@ const TAREAS_DEFAULT = {
   macetas_piso: [
     { tarea:"Plantar desde Vivero", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
     { tarea:"Riego",               verano:"cada2dias", otono:"cada3dias",  invierno:"semanal",  primavera:"cada3dias" },
+    { tarea:"Reparar sistema de riego", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
     { tarea:"Poda / recorte",      verano:"quincenal", otono:"mensual",    invierno:"noaplica", primavera:"quincenal" },
     { tarea:"Fertilización",       verano:"quincenal", otono:"mensual",    invierno:"noaplica", primavera:"quincenal" },
     { tarea:"Cambio de sustrato",  verano:"noaplica",  otono:"noaplica",   invierno:"mensual",  primavera:"noaplica"  },
@@ -323,6 +331,7 @@ const TAREAS_DEFAULT = {
   colgantes: [
     { tarea:"Plantar desde Vivero", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
     { tarea:"Riego",               verano:"diario",    otono:"cada3dias",  invierno:"semanal",  primavera:"cada2dias" },
+    { tarea:"Reparar sistema de riego", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
     { tarea:"Poda / recorte",      verano:"quincenal", otono:"mensual",    invierno:"noaplica", primavera:"quincenal" },
     { tarea:"Fertilización",       verano:"quincenal", otono:"mensual",    invierno:"noaplica", primavera:"quincenal" },
     { tarea:"Cambio de sustrato",  verano:"noaplica",  otono:"noaplica",   invierno:"mensual",  primavera:"noaplica"  },
@@ -332,6 +341,7 @@ const TAREAS_DEFAULT = {
   rosales: [
     { tarea:"Plantar desde Vivero", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
     { tarea:"Riego",               verano:"cada3dias", otono:"semanal",    invierno:"quincenal",primavera:"cada5dias" },
+    { tarea:"Reparar sistema de riego", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
     { tarea:"Poda de limpieza",    verano:"semanal",   otono:"quincenal",  invierno:"noaplica", primavera:"semanal"   },
     { tarea:"Poda de formación",   verano:"noaplica",  otono:"noaplica",   invierno:"semanal",  primavera:"noaplica"  },
     { tarea:"Poda de mantenimiento (floración)", verano:"semanal", otono:"semanal", invierno:"noaplica", primavera:"semanal" },
@@ -9911,7 +9921,7 @@ const EDIFICIO_GOLF = [
   {id:"edif_2p_liquidambar",nombre:"Macetas Liquidámbar 2do Piso", piso:"2do piso"},
 ];
 const TAREAS_BUNKERS    = ["Recortar bordes","Rastrillar y labrar arena","Rellenar con arena","Rastrillado superficial","Recoger piedras/escombros","Revisión estado"];
-const TAREAS_FAIRWAYS   = ["Corte","Riego","Fertilización","Control malezas","Aireación con sacabocados fino","Aireación con sacabocados grueso","Aireación con púas finas","Aireación con púas gruesas","Resiembra","Soplado"];
+const TAREAS_FAIRWAYS   = ["Corte","Riego","Reparar sistema de riego","Fertilización","Control malezas","Aireación con sacabocados fino","Aireación con sacabocados grueso","Aireación con púas finas","Aireación con púas gruesas","Resiembra","Soplado"];
 const TAREAS_LOMAS      = ["Corte","Desbrozado","Riego","Control malezas"];
 const TAREAS_MACIZOS    = ["Poda","Riego","Fertilización","Control plagas","Limpieza","Reemplazo plantas","Mulching"];
 const TAREAS_EDIFICIO   = ["Riego","Fertilización","Cambio tierra","Poda/formación","Revisión estado","Limpieza macetas"];
@@ -9935,6 +9945,7 @@ const TAREAS_GREENS_PERIODICAS = [
   // ── Riego ──
   "Riego ligero (Syringing)",
   "Revisión riego automático",
+  "Reparar sistema de riego",
   // ── Medición y fitosanitario ──
   "Medición de altura",
   "Aplicación fungicida",
@@ -9958,7 +9969,7 @@ const TAREAS_GREENS_PERIODICAS = [
   "Cambio de banderas (post-torneo)",
   "Reparación pitch marks",
 ];
-const TAREAS_TEES = ["Limpieza","Corte y orillado","Riego","Reparación divots","Cambio de marcas","Posicionar tee markers","Corte rough","Corte calles","Corte lomas"];
+const TAREAS_TEES = ["Limpieza","Corte y orillado","Riego","Reparar sistema de riego","Reparación divots","Cambio de marcas","Posicionar tee markers","Corte rough","Corte calles","Corte lomas"];
 
 // Plantilla pre-torneo por día
 const PLANTILLA_PRE_TORNEO = {
