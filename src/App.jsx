@@ -3711,6 +3711,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
   const [vistaSemanal, setVistaSemanal] = React.useState(false);
   const [filtroTrabajador, setFiltroTrabajador] = React.useState("todos");
   const [aviso, setAviso] = React.useState(null);
+  const [fechaReprogramar, setFechaReprogramar] = React.useState(null); // null = usar próximo día hábil por defecto
 
   const esDomingo = (f) => new Date(f + "T12:00:00").getDay() === 0;
   const getTareasDelDia = (f) => tareas[f] || [];
@@ -3918,32 +3919,42 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                 🌧️ Modo lluvia
               </button>
             )}
-            {esJefa&&(
-              <button onClick={()=>{
-                // Próximo día hábil (salta domingo)
-                const mananaStr = diasHabiles(fecha, 1);
-                // Obtener TODAS las tareas del día normalizando el array
-                const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-                const todasHoy = normArr(tareas[fecha]||[]);
-                console.log("Reprogramar: fecha="+fecha+" total="+todasHoy.length, todasHoy.map(t=>t.tarea+"→"+t.estado));
-                const pendientes = todasHoy.filter(t=>{
-                  const est = normalizarEstado(t.estado);
-                  return est!=="hecha" && est!=="no_pudo";
-                });
-                console.log("Pendientes:", pendientes.length);
-                if(pendientes.length===0) return alert("No hay tareas pendientes para reprogramar.");
-                const tareasManana = normArr(tareas[mananaStr]||[]);
-                const yaExisten = tareasManana.map(t=>t.zona+"_"+t.tarea);
-                const nuevas = pendientes
-                  .filter(t=>!yaExisten.includes(t.zona+"_"+t.tarea))
-                  .map(t=>({...t, id:Date.now()+Math.random(), fecha:mananaStr, estado:"pendiente"}));
-                if(nuevas.length===0) return alert("Todas las tareas pendientes ya existen para mañana.");
-                setTareasDelDia(mananaStr, [...normArr(tareas[mananaStr]||[]), ...nuevas]);
-                alert(`✅ ${nuevas.length} tarea(s) pendientes reprogramadas para ${mananaStr}`);
-              }} style={{...S.btn,background:"rgba(251,191,36,0.1)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.2)",fontSize:11}}>
-                📅 Reprogramar pendientes para mañana
-              </button>
-            )}
+            {esJefa&&(()=>{
+              const destinoDefault = diasHabiles(fecha, 1);
+              const destinoElegido = fechaReprogramar || destinoDefault;
+              return (
+              <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                <input type="date" value={destinoElegido} onChange={e=>setFechaReprogramar(e.target.value)}
+                  style={{...S.input,fontSize:11,padding:"6px 8px",width:"auto"}} title="Fecha destino de la reprogramación"/>
+                <button onClick={()=>{
+                  // Obtener TODAS las tareas del día normalizando el array
+                  const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+                  const todasHoy = normArr(tareas[fecha]||[]);
+                  console.log("Reprogramar: fecha="+fecha+" destino="+destinoElegido+" total="+todasHoy.length, todasHoy.map(t=>t.tarea+"→"+t.estado));
+                  // Incluye "no se pudo" además de pendiente/haciéndose/etc — solo excluye lo ya "hecha".
+                  // Aplica a todas las zonas (incl. Golf, que comparte esta misma fuente tareasProg).
+                  const pendientes = todasHoy.filter(t=>{
+                    const est = normalizarEstado(t.estado);
+                    return est!=="hecha";
+                  });
+                  console.log("Pendientes (incl. no se pudo):", pendientes.length);
+                  if(pendientes.length===0) return alert("No hay tareas pendientes para reprogramar.");
+                  if(destinoElegido===fecha) return alert("Elige una fecha destino distinta a la fecha de origen.");
+                  const tareasDestino = normArr(tareas[destinoElegido]||[]);
+                  const yaExisten = tareasDestino.map(t=>t.zona+"_"+t.tarea);
+                  const nuevas = pendientes
+                    .filter(t=>!yaExisten.includes(t.zona+"_"+t.tarea))
+                    .map(t=>({...t, id:Date.now()+Math.random(), fecha:destinoElegido, estado:"pendiente", notaWorker:"",
+                      notas:(t.notas?t.notas+" | ":"")+(normalizarEstado(t.estado)==="no_pudo"?"Reprogramada (no se pudo) desde ":"Reprogramada desde ")+fecha}));
+                  if(nuevas.length===0) return alert("Todas las tareas pendientes ya existen para "+destinoElegido+".");
+                  setTareasDelDia(destinoElegido, [...normArr(tareas[destinoElegido]||[]), ...nuevas]);
+                  alert(`✅ ${nuevas.length} tarea(s) pendientes reprogramadas para ${destinoElegido}`);
+                }} style={{...S.btn,background:"rgba(251,191,36,0.1)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.2)",fontSize:11}}>
+                  📅 Reprogramar pendientes
+                </button>
+              </div>
+              );
+            })()}
           </div>
 
           {stats.total > 0 && (
@@ -13554,7 +13565,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
         const proponerTareasGolf=()=>{
           if(!getAllElems||!getZD||!setTareasProg)return;
           const golfZonaObj=MACROZONAS_BASE.find(z=>z.id===31);if(!golfZonaObj)return;
-          const zdatG=getZD(31);const nombreZona=zdatG.nombreCustom||golfZonaObj.nombre;
+          const zdatG=getZD(31);const nombreZona="Golf"; // siempre "Golf" — no usar nombreCustom, para no generar un segundo nombre de zona distinto al resto de las tareas de Golf
           const elems=getAllElems(31);
           const tareasHoyArr=Array.isArray(tareasProg[fechaProponerGolf])?tareasProg[fechaProponerGolf]:Object.values(tareasProg[fechaProponerGolf]||{});
           const existentes=tareasHoyArr.map(t=>t.zona+"_"+t.elemento+"_"+t.tarea);
@@ -13573,6 +13584,34 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               propuestas.push({id:Date.now()+Math.random(),fecha:fechaProponerGolf,zona:nombreZona,elemento:e.nombre,tarea:f.tarea,responsable:respDefault,estado:respDefault?"pendiente":"por_designar",notas:[notaAltura,f.obs].filter(Boolean).join(" "),alturaCorte:f.alturaCorte||"",unidadAlturaCorte:f.unidadAlturaCorte||"mm",estacion:estProp,auto:true,fechaCorrespondiente:prox.fecha,origenZid:"31",origenEid:e.id,origenFrecId:f.id,origenEsCustom:!!e.isCustom,diasVencida:esVencida?diasVencida:0});
               if(esVencida)vencidas.push(e.nombre+" — "+f.tarea+" ("+diasVencida+"d vencida)");
             });
+          });
+          // ── Carry-forward de tareas Golf marcadas "No se pudo" (cualquier origen: greens, tees, búnkers, fairways) ──
+          // Ventana de 14 días hacia atrás para no resucitar "no se pudo" muy antiguos.
+          const clavesYaPropuestas=new Set(propuestas.map(p=>p.zona+"_"+p.elemento+"_"+p.tarea));
+          const cutoff=new Date(fechaProponerGolf+"T12:00:00").getTime()-14*86400000;
+          const noPudoPorClave={};
+          Object.entries(tareasProg||{}).forEach(([f,arr])=>{
+            if(f>=fechaProponerGolf)return;
+            if(new Date(f+"T12:00:00").getTime()<cutoff)return;
+            const lista=Array.isArray(arr)?arr:Object.values(arr||{});
+            lista.forEach(t=>{
+              const esGolf=t.zona==="Golf"||(t.zona||"").includes("Golf");
+              if(!esGolf)return;
+              const clave=t.zona+"_"+t.elemento+"_"+t.tarea;
+              const est=normalizarEstado(t.estado);
+              if(est==="no_pudo"){
+                if(!noPudoPorClave[clave]||f>noPudoPorClave[clave].fecha)noPudoPorClave[clave]={tarea:t,fecha:f};
+              }else if(est==="hecha"){
+                if(noPudoPorClave[clave]&&f>noPudoPorClave[clave].fecha)delete noPudoPorClave[clave];
+              }
+            });
+          });
+          Object.values(noPudoPorClave).forEach(({tarea:t,fecha:fOrig})=>{
+            const clave=t.zona+"_"+t.elemento+"_"+t.tarea;
+            if(existentes.includes(clave)||clavesYaPropuestas.has(clave))return;
+            propuestas.push({id:Date.now()+Math.random(),fecha:fechaProponerGolf,zona:nombreZona,elemento:t.elemento,tarea:t.tarea,responsable:t.responsable||(configSemanal?.corte_golf||""),estado:(t.responsable||configSemanal?.corte_golf)?"pendiente":"por_designar",notas:(t.notas?t.notas+" | ":"")+"Reprogramada (no se pudo) desde "+fOrig,alturaCorte:t.alturaCorte||"",unidadAlturaCorte:t.unidadAlturaCorte||"mm",estacion:estProp,auto:true,origenNoPudo:true,fechaOrigenNoPudo:fOrig,diasVencida:0});
+            clavesYaPropuestas.add(clave);
+            vencidas.push(t.elemento+" — "+t.tarea+" (no se pudo el "+fOrig+")");
           });
           if(propuestas.length===0){alert("No hay tareas de Golf pendientes según las frecuencias definidas para "+fechaProponerGolf+".");return;}
           const propOrdenadas=[...propuestas].sort((a,b)=>a.tarea.localeCompare(b.tarea,"es",{sensitivity:"base"}));
