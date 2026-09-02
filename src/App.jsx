@@ -8989,6 +8989,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                         <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right">$${m.total.toLocaleString("es-CL")}</td>
                       </tr>`;
                     }).join("");
+                    const pendienteReembolsoResumen = fondo - Number(saldoAnterior||0);
                     const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Resumen Compras Dpto Areas Verdes</title>
                     <style>body{font-family:Arial,sans-serif;margin:25px;color:#1a1a1a;font-size:12px}
                     h1{font-size:17px;color:#1a5c2a;margin:0 0 3px}h2{font-size:12px;color:#333;margin:0}
@@ -9015,7 +9016,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                       <div class="box" style="border-color:#e65100"><div class="lbl">Comprometido</div><div class="val" style="color:#e65100">$${gastadoPendiente.toLocaleString("es-CL")}</div></div>
                       <div class="box" style="border-color:#1565c0"><div class="lbl">Total reembolsado</div><div class="val" style="color:#1565c0">$${totalReembolsado.toLocaleString("es-CL")}</div></div>
                     </div>
-                    ${Number(saldoAnterior)>0?"<div style='background:#fff8e1;border:1px solid #ffc107;border-radius:5px;padding:7px 12px;margin-bottom:14px;font-size:11px'>Saldo periodo anterior"+(periodoAnterior?" ("+periodoAnterior+")":"")+": <strong>$"+Number(saldoAnterior).toLocaleString("es-CL")+"</strong> — pendiente de reembolso.</div>":""}
+                    ${Number(saldoAnterior)>0?"<div style='background:#fff8e1;border:1px solid #ffc107;border-radius:5px;padding:7px 12px;margin-bottom:14px;font-size:11px'>Saldo real reportado al "+(periodoAnterior||"corte anterior")+": <strong>$"+Number(saldoAnterior).toLocaleString("es-CL")+"</strong>"+(pendienteReembolsoResumen>0?" — <strong style='color:#e65100'>$"+pendienteReembolsoResumen.toLocaleString("es-CL")+" pendiente de reembolso</strong> del Estadio.":" (fondo completo, sin reembolso pendiente).")+"</div>":""}
                     <!-- Por cuenta -->
                     <div class="sec">Gasto por Cuenta</div>
                     <table><thead><tr><th>Cuenta</th><th>Tipo</th><th style="text-align:center">N° Doc.</th><th style="text-align:right">Total</th><th style="text-align:right">% del total</th></tr></thead>
