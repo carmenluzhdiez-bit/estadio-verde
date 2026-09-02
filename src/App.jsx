@@ -3536,14 +3536,17 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
               {grupos.map(g=>{
                 const hechas=g.tareas.filter(t=>t.estado==="hecha").length;
                 const open=gruposAbiertos[g.key]===true;
-                const col=hechas===g.tareas.length?"#22c55e":"#34d399";
+                const completo = hechas===g.tareas.length;
+                const col = completo?"#22c55e":"#f59e0b";
+                const estadoIcon = completo?"✅":hechas>0?"◑":"○";
                 return (
-                  <div key={g.key} style={{marginBottom:8,border:`1px solid rgba(255,255,255,${hechas===g.tareas.length?0.1:0.07})`,borderRadius:10,overflow:"hidden"}}>
-                    <div onClick={()=>toggleGrupo(g.key)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 12px",background:"rgba(255,255,255,0.03)",cursor:"pointer",userSelect:"none"}}>
+                  <div key={g.key} style={{marginBottom:8,border:`1px solid ${completo?"rgba(34,197,94,0.3)":"rgba(245,158,11,0.3)"}`,borderRadius:10,overflow:"hidden"}}>
+                    <div onClick={()=>toggleGrupo(g.key)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 12px",background:completo?"rgba(34,197,94,0.06)":"rgba(245,158,11,0.06)",cursor:"pointer",userSelect:"none"}}>
                       <div style={{display:"flex",alignItems:"center",gap:7}}>
                         <span>{g.icon}</span>
                         <span style={{fontSize:13,fontWeight:600,color:col}}>{g.label}</span>
-                        <span style={{fontSize:10,color:"#5a9a7a",background:"rgba(255,255,255,0.05)",padding:"1px 6px",borderRadius:10}}>{hechas}/{g.tareas.length}</span>
+                        <span style={{fontSize:11}}>{estadoIcon}</span>
+                        <span style={{fontSize:10,fontWeight:700,color:col,background:`${col}18`,border:`1px solid ${col}35`,padding:"1px 7px",borderRadius:10}}>{hechas}/{g.tareas.length}</span>
                       </div>
                       <span style={{color:"#4a7a5a",fontSize:11,transform:open?"rotate(90deg)":"rotate(0deg)",transition:"transform .2s",display:"inline-block"}}>▶</span>
                     </div>
