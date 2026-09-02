@@ -1808,6 +1808,7 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
 
 function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa=false, puedeCrear=false, cierresTurno={}, onReabrirTurno, getElemFrecs, setElemFrecs }) {
   const [diasAbiertosHist, setDiasAbiertosHist] = React.useState({});
+  const [fechaReprogramarHist, setFechaReprogramarHist] = React.useState({}); // {dia: fechaDestino}
   const [filtroDia,    setFiltroDia]    = React.useState("");
   const [filtroEstado, setFiltroEstado] = React.useState("todos");
   const [filtroTarea,  setFiltroTarea]  = React.useState("");
@@ -2177,6 +2178,35 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                   style={{...S.btn,padding:"5px 12px",fontSize:12,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}}>
                   🖨️ Imprimir
                 </button>
+                {esJefa&&(()=>{
+                  const destinoDefault = diasHabiles(dia, 1);
+                  const destinoElegido = fechaReprogramarHist[dia] || destinoDefault;
+                  return (
+                    <>
+                      <input type="date" value={destinoElegido} onClick={e=>e.stopPropagation()}
+                        onChange={e=>setFechaReprogramarHist(p=>({...p,[dia]:e.target.value}))}
+                        style={{...S.input,fontSize:11,padding:"5px 8px",width:"auto"}} title="Fecha destino de la reprogramación"/>
+                      <button onClick={()=>{
+                        const normArrRp = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+                        const todasDia = normArrRp(tareas[dia]||[]);
+                        const pendientesRp = todasDia.filter(t=>normalizarEstado(t.estado)!=="hecha");
+                        if(pendientesRp.length===0) return alert("No hay tareas pendientes para reprogramar en "+dia+".");
+                        if(destinoElegido===dia) return alert("Elige una fecha destino distinta a la fecha de origen.");
+                        const tareasDestinoRp = normArrRp(tareas[destinoElegido]||[]);
+                        const yaExistenRp = tareasDestinoRp.map(t=>t.zona+"_"+t.tarea);
+                        const nuevasRp = pendientesRp
+                          .filter(t=>!yaExistenRp.includes(t.zona+"_"+t.tarea))
+                          .map(t=>({...t, id:Date.now()+Math.random(), fecha:destinoElegido, estado:"pendiente", notaWorker:"",
+                            notas:(t.notas?t.notas+" | ":"")+(normalizarEstado(t.estado)==="no_pudo"?"Reprogramada (no se pudo) desde ":"Reprogramada desde ")+dia}));
+                        if(nuevasRp.length===0) return alert("Todas las tareas pendientes ya existen para "+destinoElegido+".");
+                        setTareas(prev=>({...prev,[destinoElegido]:[...normArrRp(prev[destinoElegido]||[]), ...nuevasRp]}));
+                        alert(`✅ ${nuevasRp.length} tarea(s) pendientes reprogramadas para ${destinoElegido}`);
+                      }} style={{...S.btn,padding:"5px 12px",fontSize:12,background:"rgba(251,191,36,0.12)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.25)"}}>
+                        📅 Reprogramar pendientes
+                      </button>
+                    </>
+                  );
+                })()}
                 {(esJefa||puedeCrear)&&(
                   <button
                     onClick={()=>{if(window.confirm("¿Eliminar todas las tareas del día "+dia+"?"))setTareas(prev=>{const n={...prev};delete n[dia];return n;});}}
