@@ -22153,7 +22153,8 @@ export default function App() {
                     const lista=normArr(prev[fecha]);
                     const actualizadas=lista.map(t=>{
                       if(String(t.id)!==String(tid)) return t;
-                      const tActualizada = {...t,...patch};
+                      const patchFrec = patch.estado!==undefined ? aplicarCambioFrecuencia(t, patch, getElemFrecs, setElemFrecs) : patch;
+                      const tActualizada = {...t,...patchFrec};
 
                       // ── AUTO: si el corte Golf queda hecho con alturaCorteReal ──
                       // Se dispara cuando: (a) se marca hecha y ya tenía altura, o
@@ -23344,7 +23345,9 @@ export default function App() {
                     const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
                     setTareasProg(prev=>{
                       const tareasDelDia = normArr(prev[fecha]);
-                      const actualizadas = tareasDelDia.map(t=>String(t.id)===String(tid)?{...t,...patch}:t);
+                      const tareaVieja = tareasDelDia.find(t=>String(t.id)===String(tid));
+                      const patchFrec = (patch.estado!==undefined && tareaVieja) ? aplicarCambioFrecuencia(tareaVieja, patch, getElemFrecs, setElemFrecs) : patch;
+                      const actualizadas = tareasDelDia.map(t=>String(t.id)===String(tid)?{...t,...patchFrec}:t);
                       // Escribir solo la ruta de esa fecha en Firebase
                       fbUpdate(ref(db, `${ROOT}/prog`), {[fecha]: actualizadas.map(limpiarUndef)})
                         .catch(e=>console.error("Error:", e));
