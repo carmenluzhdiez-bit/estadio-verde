@@ -1967,7 +1967,8 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
       {/* Tabs */}
       <div style={{display:"flex",gap:6,marginBottom:14}}>
         {([["historial","📜 Historial"],["buscar","🔍 Consulta histórica"]]
-          .concat(esJefa?[["turnos","✏️ Ver/editar turnos"]]:[])).map(([t,l])=>(
+          .concat(esJefa?[["turnos","✏️ Ver/editar turnos"]]:[])
+          .concat(esJefa?[["renombrar","🏷️ Renombrar tareas"]]:[])).map(([t,l])=>(
           <button key={t} onClick={()=>setTabHist(t)}
             style={{cursor:"pointer",border:`1px solid ${tabHist===t?"#34d399":"rgba(255,255,255,0.12)"}`,
               borderRadius:8,padding:"5px 14px",fontSize:12,
@@ -1979,6 +1980,9 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
       </div>
 
       {/* ── Panel de consulta histórica ── */}
+      {tabHist==="renombrar"&&(
+        <RenombradorMasivoTareas S={S} tareasProg={tareas} setTareasProg={setTareas}/>
+      )}
       {tabHist==="buscar"&&(
         <div>
           <div style={{...S.card,padding:"12px 14px",marginBottom:12}}>
@@ -12517,7 +12521,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
         {(()=>{
           // Tabs según rol: trabajador solo ve lo que le corresponde
-          const todosTabs = [["panel","📊 Panel"],["greens","⛳ Greens"],["tees","🎯 Tees"],["bunkers","🏖️ Búnkers"],["fairways","🌾 Fairways"],["zonas","🌿 Zonas"],["arboles","🌳 Árboles"],["mediciones","📏 Alturas"],["humedad","💧 Humedad"],["eventos","🏆 Eventos"],["fitosanitario","⚗ Fitosanitario"],["programacion_golf","📅 Semana Golf"],["config_golf","⚙️ Programación Golf"],["correccion_masiva","🛠️ Corrección Fechas"],["renombrar_tareas","🏷️ Renombrar Tareas"]];
+          const todosTabs = [["panel","📊 Panel"],["greens","⛳ Greens"],["tees","🎯 Tees"],["bunkers","🏖️ Búnkers"],["fairways","🌾 Fairways"],["zonas","🌿 Zonas"],["arboles","🌳 Árboles"],["mediciones","📏 Alturas"],["humedad","💧 Humedad"],["eventos","🏆 Eventos"],["fitosanitario","⚗ Fitosanitario"],["programacion_golf","📅 Semana Golf"],["config_golf","⚙️ Programación Golf"],["correccion_masiva","🛠️ Corrección Fechas"]];
           const tabsWorker = [["mediciones","📏 Alturas"],["humedad","💧 Humedad"]];
           // Agregar Programación solo para jefa/supervisor
           const todosTabs2 = todosTabs;
@@ -14200,10 +14204,6 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
 
       {subTab==="correccion_masiva"&&rolLogueado!=="trabajador"&&(
         <CorreccionMasivaFrecuenciasGolf S={S} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} setElemFrecsBulk={setElemFrecsBulk}/>
-      )}
-
-      {subTab==="renombrar_tareas"&&rolLogueado!=="trabajador"&&(
-        <RenombradorMasivoTareas S={S} tareasProg={tareasProg} setTareasProg={setTareasProg}/>
       )}
 
       {subTab==="eventos"&&rolLogueado!=="trabajador"&&(
