@@ -14024,9 +14024,10 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           const clavesYaPropuestas=new Set(propuestas.map(p=>p.zona+"_"+p.elemento+"_"+p.tarea));
           const cutoff=new Date(fechaProponerGolf+"T12:00:00").getTime()-14*86400000;
           const noPudoPorClave={};
-          Object.entries(tareasProg||{}).forEach(([f,arr])=>{
-            if(f>=fechaProponerGolf)return;
-            if(new Date(f+"T12:00:00").getTime()<cutoff)return;
+          Object.entries(tareasProg||{})
+            .filter(([f])=>f<fechaProponerGolf && new Date(f+"T12:00:00").getTime()>=cutoff)
+            .sort(([fa],[fb])=>fa<fb?-1:fa>fb?1:0) // orden cronológico ascendente — para que un "Hecha" posterior siempre cancele un "No se pudo" anterior, sin depender del orden de iteración del objeto
+            .forEach(([f,arr])=>{
             const lista=Array.isArray(arr)?arr:Object.values(arr||{});
             lista.forEach(t=>{
               const esGolf=t.zona==="Golf"||(t.zona||"").includes("Golf");
