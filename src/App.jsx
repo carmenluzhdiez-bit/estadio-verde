@@ -1910,7 +1910,8 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
           const estCls = ["hecha","completada"].includes(hpTask.estado)?"est-ok":hpTask.estado==="no_pudo"?"est-bad":["haciendose","en_curso"].includes(hpTask.estado)?"est-blue":["pendiente"].includes(hpTask.estado)?"est-pend":"est-gray";
           const estLabel = EC[hpTask.estado]?.label || hpTask.estado;
           const icono = (zonas.find(z=>z.nombre===hpTask.zona)||MACROZONAS_BASE.find(z=>z.nombre===hpTask.zona))?.icono||""
-          return '<tr>'+'<td class="'+estCls+'">'+( EC[hpTask.estado]?.icon||"-")+" "+estLabel+"</td>"+'<td><b>'+hpTask.tarea+'</b></td>'+'<td>'+(hpTask.elemento||"-")+"</td>"+'<td>'+icono+" "+(hpTask.zona||"-")+"</td>"+'<td>'+(hpTask.responsable||"<i>Sin asignar</i>")+"</td>"+'<td>'+(hpTask.notaWorker?"⚠️ "+hpTask.notaWorker:"-")+"</td>"+'</tr>';
+          const obsTxtGen = [hpTask.notas?"📋 "+hpTask.notas:"",hpTask.notaWorker?"⚠️ "+hpTask.notaWorker:""].filter(Boolean).join("<br>")||"-";
+          return '<tr>'+'<td class="'+estCls+'">'+( EC[hpTask.estado]?.icon||"-")+" "+estLabel+"</td>"+'<td><b>'+hpTask.tarea+'</b></td>'+'<td>'+(hpTask.elemento||"-")+"</td>"+'<td>'+icono+" "+(hpTask.zona||"-")+"</td>"+'<td>'+(hpTask.responsable||"<i>Sin asignar</i>")+"</td>"+'<td>'+obsTxtGen+"</td>"+'</tr>';
         }).join("")}
       </tbody>
     </table>
@@ -1965,7 +1966,8 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
           const estCls = ["hecha","completada"].includes(hpTask.estado)?"est-ok":hpTask.estado==="no_pudo"?"est-bad":["haciendose","en_curso"].includes(hpTask.estado)?"est-blue":["pendiente"].includes(hpTask.estado)?"est-pend":"est-gray";
           const estLabel = EC[hpTask.estado]?.label || hpTask.estado;
           const icono = (zonas.find(z=>z.nombre===hpTask.zona)||MACROZONAS_BASE.find(z=>z.nombre===hpTask.zona))?.icono||""
-          return '<tr>'+'<td class="'+estCls+'">'+( EC[hpTask.estado]?.icon||"-")+" "+estLabel+"</td>"+'<td><b>'+hpTask.tarea+'</b></td>'+'<td>'+(hpTask.elemento||"-")+"</td>"+'<td>'+icono+" "+(hpTask.zona||"-")+"</td>"+'<td>'+(hpTask.notaWorker?"⚠️ "+hpTask.notaWorker:"-")+"</td>"+'</tr>';
+          const obsTxt = [hpTask.notas?"📋 "+hpTask.notas:"",hpTask.notaWorker?"⚠️ "+hpTask.notaWorker:""].filter(Boolean).join("<br>")||"-";
+          return '<tr>'+'<td class="'+estCls+'">'+( EC[hpTask.estado]?.icon||"-")+" "+estLabel+"</td>"+'<td><b>'+hpTask.tarea+'</b></td>'+'<td>'+(hpTask.elemento||"-")+"</td>"+'<td>'+icono+" "+(hpTask.zona||"-")+"</td>"+'<td>'+obsTxt+"</td>"+'</tr>';
         }).join("")}
       </tbody>
     </table>
