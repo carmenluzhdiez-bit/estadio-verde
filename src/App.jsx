@@ -2267,8 +2267,8 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                         const yaExistenRp = tareasDestinoRp.map(t=>t.zona+"_"+t.tarea);
                         const nuevasRp = pendientesRp
                           .filter(t=>!yaExistenRp.includes(t.zona+"_"+t.tarea))
-                          .map(t=>({...t, id:Date.now()+Math.random(), fecha:destinoElegido, estado:"pendiente", notaWorker:"",
-                            notas:(t.notas?t.notas+" | ":"")+(normalizarEstado(t.estado)==="no_pudo"?"Reprogramada (no se pudo) desde ":"Reprogramada desde ")+dia}));
+                          .map(t=>({...t, id:Date.now()+Math.random(), fecha:destinoElegido, estado:"pendiente",
+                            notas:(t.notas?t.notas+" | ":"")+(normalizarEstado(t.estado)==="no_pudo"?"Reprogramada (no se pudo) desde ":"Reprogramada desde ")+dia+(t.notaWorker?" — Obs. anterior: "+t.notaWorker:"")}));
                         if(nuevasRp.length===0) return alert("Todas las tareas pendientes ya existen para "+destinoElegido+".");
                         setTareas(prev=>({...prev,[destinoElegido]:[...normArrRp(prev[destinoElegido]||[]), ...nuevasRp]}));
                         alert(`✅ ${nuevasRp.length} tarea(s) pendientes reprogramadas para ${destinoElegido}`);
@@ -4183,8 +4183,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                       id:Date.now()+Math.random(),
                       fecha:destino,
                       estado:"pendiente",
-                      notaWorker:"",
-                      notas:(t.notas?t.notas+" | ":"")+"Reprogramada por lluvia desde "+fecha,
+                      notas:(t.notas?t.notas+" | ":"")+"Reprogramada por lluvia desde "+fecha+(t.notaWorker?" — Obs. anterior: "+t.notaWorker:""),
                     });
                   });
                   const destArr = [...normA(prev[destino]||[]),...nuevasTareasDestino];
@@ -4221,8 +4220,8 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                   const yaExisten = tareasDestino.map(t=>t.zona+"_"+t.tarea);
                   const nuevas = pendientes
                     .filter(t=>!yaExisten.includes(t.zona+"_"+t.tarea))
-                    .map(t=>({...t, id:Date.now()+Math.random(), fecha:destinoElegido, estado:"pendiente", notaWorker:"",
-                      notas:(t.notas?t.notas+" | ":"")+(normalizarEstado(t.estado)==="no_pudo"?"Reprogramada (no se pudo) desde ":"Reprogramada desde ")+fecha}));
+                    .map(t=>({...t, id:Date.now()+Math.random(), fecha:destinoElegido, estado:"pendiente",
+                      notas:(t.notas?t.notas+" | ":"")+(normalizarEstado(t.estado)==="no_pudo"?"Reprogramada (no se pudo) desde ":"Reprogramada desde ")+fecha+(t.notaWorker?" — Obs. anterior: "+t.notaWorker:"")}));
                   if(nuevas.length===0) return alert("Todas las tareas pendientes ya existen para "+destinoElegido+".");
                   setTareasDelDia(destinoElegido, [...normArr(tareas[destinoElegido]||[]), ...nuevas]);
                   alert(`✅ ${nuevas.length} tarea(s) pendientes reprogramadas para ${destinoElegido}`);
@@ -14111,7 +14110,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           Object.values(noPudoPorClave).forEach(({tarea:t,fecha:fOrig})=>{
             const clave=t.zona+"_"+t.elemento+"_"+t.tarea;
             if(existentes.includes(clave)||clavesYaPropuestas.has(clave))return;
-            propuestas.push({id:Date.now()+Math.random(),fecha:fechaProponerGolf,zona:nombreZona,elemento:t.elemento,tarea:t.tarea,responsable:t.responsable||(configSemanal?.corte_golf||""),estado:(t.responsable||configSemanal?.corte_golf)?"pendiente":"por_designar",notas:(t.notas?t.notas+" | ":"")+"Reprogramada (no se pudo) desde "+fOrig,alturaCorte:t.alturaCorte||"",unidadAlturaCorte:t.unidadAlturaCorte||"mm",estacion:estProp,auto:true,origenNoPudo:true,fechaOrigenNoPudo:fOrig,diasVencida:0,origenZid:t.origenZid,origenEid:t.origenEid,origenFrecId:t.origenFrecId,origenEsCustom:t.origenEsCustom});
+            propuestas.push({id:Date.now()+Math.random(),fecha:fechaProponerGolf,zona:nombreZona,elemento:t.elemento,tarea:t.tarea,responsable:t.responsable||(configSemanal?.corte_golf||""),estado:(t.responsable||configSemanal?.corte_golf)?"pendiente":"por_designar",notas:(t.notas?t.notas+" | ":"")+"Reprogramada (no se pudo) desde "+fOrig+(t.notaWorker?" — Obs. anterior: "+t.notaWorker:""),alturaCorte:t.alturaCorte||"",unidadAlturaCorte:t.unidadAlturaCorte||"mm",estacion:estProp,auto:true,origenNoPudo:true,fechaOrigenNoPudo:fOrig,diasVencida:0,origenZid:t.origenZid,origenEid:t.origenEid,origenFrecId:t.origenFrecId,origenEsCustom:t.origenEsCustom});
             clavesYaPropuestas.add(clave);
             vencidas.push(t.elemento+" — "+t.tarea+" (no se pudo el "+fOrig+")");
           });
