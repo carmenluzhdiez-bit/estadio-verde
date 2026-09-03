@@ -102,6 +102,7 @@ const CATEGORIAS_ELEM = {
   jardineras:      { label: "Jardineras",           color: "#f472b6", icon: "🪻", parent: "vegetacion" },
   macetas_piso:    { label: "Macetas a piso",       color: "#e879f9", icon: "🌷", parent: "vegetacion" },
   colgantes:       { label: "Colgantes",            color: "#c084fc", icon: "🌺", parent: "vegetacion" },
+  macizo:          { label: "Macizo",                color: "#fb7185", icon: "💐", parent: "vegetacion" },
   infraestructura: { label: "Estructuras y Construcciones", color: "#f59e0b", icon: "🏗️" },
   sistemas:        { label: "Sistemas",             color: "#3b82f6", icon: "⚙️" },
   pavimentos:      { label: "Pavimentos y Suelos",  color: "#a78bfa", icon: "🪨" },
@@ -111,7 +112,7 @@ const CATEGORIAS_ELEM = {
   maceteros:       { label: "Maceteros",              color: "#e879f9", icon: "🪴" },
   bodegas:         { label: "Bodegas",               color: "#94a3b8", icon: "🏚️" },
 };
-const VEGETACION_SUBS = ["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
+const VEGETACION_SUBS = ["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes","macizo"];
 const OTRAS_CATS      = ["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","maceteros","bodegas"];
 // ─── ESTACIONES ──────────────────────────────────────────────────────────────
 const limpiarUndef = (obj) => JSON.parse(JSON.stringify(obj, function(limpKey,limpVal){ return limpVal===undefined?null:limpVal; }));
@@ -336,6 +337,17 @@ const TAREAS_DEFAULT = {
     { tarea:"Fertilización",       verano:"quincenal", otono:"mensual",    invierno:"noaplica", primavera:"quincenal" },
     { tarea:"Cambio de sustrato",  verano:"noaplica",  otono:"noaplica",   invierno:"mensual",  primavera:"noaplica"  },
     { tarea:"Limpieza recipiente", verano:"mensual",   otono:"mensual",    invierno:"mensual",  primavera:"mensual"   },
+  ],
+  macizo: [
+    { tarea:"Plantar desde Vivero", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
+    { tarea:"Riego",               verano:"cada3dias", otono:"semanal",    invierno:"quincenal",primavera:"cada5dias" },
+    { tarea:"Reparar sistema de riego", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
+    { tarea:"Poda de limpieza",    verano:"quincenal", otono:"mensual",    invierno:"noaplica", primavera:"quincenal" },
+    { tarea:"Deadheading (flores marchitas)", verano:"semanal", otono:"semanal", invierno:"noaplica", primavera:"semanal" },
+    { tarea:"Fertilización",       verano:"mensual",   otono:"noaplica",   invierno:"noaplica", primavera:"mensual"   },
+    { tarea:"Control de malezas",  verano:"quincenal", otono:"mensual",    invierno:"noaplica", primavera:"quincenal" },
+    { tarea:"Reposición de plantas", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
+    { tarea:"Mulching",            verano:"noaplica",  otono:"semestral",  invierno:"noaplica", primavera:"noaplica"  },
   ],
   // Subcategorías especiales de arbustos — mismas frecuencias base pero con podas diferenciadas
   rosales: [
