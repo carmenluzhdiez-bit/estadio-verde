@@ -12058,8 +12058,8 @@ function CorreccionMasivaFrecuenciasGolf({ S, getAllElems, getZD, setElemFrecs, 
 
 function RenombradorMasivoTareas({ S, tareasProg, setTareasProg }) {
   const [busqueda, setBusqueda] = React.useState("");
-  const [seleccionado, setSeleccionado] = React.useState(null); // nombre exacto elegido
-  const [nuevoNombre, setNuevoNombre] = React.useState("");
+  const [seleccionadas, setSeleccionadas] = React.useState({}); // {nombre: true} — variantes marcadas para fusionar
+  const [correcto, setCorrecto] = React.useState(null); // nombre exacto elegido como el válido
   const [msg, setMsg] = React.useState("");
 
   // Contar apariciones exactas de cada nombre de tarea, en TODAS las fechas y zonas.
@@ -12081,41 +12081,52 @@ function RenombradorMasivoTareas({ S, tareasProg, setTareasProg }) {
     ? conteo.filter(c=>c.nombre.toLowerCase().includes(busqueda.trim().toLowerCase()))
     : conteo;
 
-  const elegir = (nombre) => { setSeleccionado(nombre); setNuevoNombre(nombre); setMsg(""); };
+  const toggleVariante = (nombre) => {
+    setSeleccionadas(p=>{
+      const n = {...p};
+      if(n[nombre]) delete n[nombre]; else n[nombre]=true;
+      return n;
+    });
+    setMsg("");
+    // Si se desmarca la que estaba elegida como correcta, o solo queda una, resetear
+    setCorrecto(c=>c===nombre ? null : c);
+  };
 
-  const aplicar = () => {
-    if(!seleccionado || !nuevoNombre.trim()) return;
-    if(nuevoNombre.trim()===seleccionado){ alert("El nombre nuevo es igual al actual."); return; }
-    const item = conteo.find(c=>c.nombre===seleccionado);
-    if(!window.confirm(`¿Renombrar "${seleccionado}" a "${nuevoNombre.trim()}" en ${item?.count||0} tarea(s), en todas las fechas donde aparezca?`)) return;
+  const nombresSeleccionados = Object.keys(seleccionadas);
+  const totalTareasSeleccion = conteo.filter(c=>seleccionadas[c.nombre]).reduce((s,c)=>s+c.count,0);
+
+  const fusionar = () => {
+    if(nombresSeleccionados.length<2||!correcto) return;
+    const aRenombrar = nombresSeleccionados.filter(n=>n!==correcto);
+    const totalCambios = conteo.filter(c=>aRenombrar.includes(c.nombre)).reduce((s,c)=>s+c.count,0);
+    if(!window.confirm(`¿Dejar todas estas variantes como "${correcto}"?\n\n${aRenombrar.map(n=>"• "+n).join("\n")}\n\nSe van a renombrar ${totalCambios} tarea(s), en todas las fechas donde aparezcan.`)) return;
     setTareasProg(prev=>{
       const nuevo = {};
       Object.entries(prev||{}).forEach(([fecha,arr])=>{
-        const esArray = Array.isArray(arr);
-        const lista = esArray?arr:Object.values(arr||{});
-        const listaNueva = lista.map(t => t&&t.tarea===seleccionado ? {...t, tarea:nuevoNombre.trim()} : t);
-        nuevo[fecha] = listaNueva;
+        const lista = Array.isArray(arr)?arr:Object.values(arr||{});
+        nuevo[fecha] = lista.map(t => t&&aRenombrar.includes(t.tarea) ? {...t, tarea:correcto} : t);
       });
       return nuevo;
     });
-    setMsg(`✅ Renombrado "${seleccionado}" → "${nuevoNombre.trim()}" en ${item?.count||0} tarea(s).`);
-    setSeleccionado(null); setNuevoNombre("");
+    setMsg(`✅ Unificadas ${aRenombrar.length} variante(s) en "${correcto}" — ${totalCambios} tarea(s) corregidas.`);
+    setSeleccionadas({}); setCorrecto(null);
   };
 
   return (
     <div className="ein">
-      <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,marginBottom:8,color:"#fbbf24"}}>🏷️ Renombrado masivo de tareas</div>
+      <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,marginBottom:8,color:"#fbbf24"}}>🏷️ Unificar nombres de tareas</div>
       <div style={{fontSize:12,color:"#5a9a7a",marginBottom:14}}>
-        Útil para corregir typos o nombres inconsistentes (ej. "Desmalezado llímites" vs "Desmalezado Límites") en tareas que ya quedaron creadas — busca el nombre exacto tal como está escrito, revisa cuántas hay y en qué zonas, y renómbralas todas de una vez, en cualquier fecha.
+        Para corregir typos o nombres inconsistentes (ej. "Desmalezado llímites" vs "Desmalezado Límites") sin tener que escribirlos a mano: marca las variantes que son la misma tarea, elige cuál de ellas es la correcta, y fusiona — el sistema copia el texto exacto de la que elijas, letra por letra.
       </div>
-      <input value={busqueda} onChange={e=>{setBusqueda(e.target.value);setSeleccionado(null);setMsg("");}} placeholder="Buscar por nombre de tarea (ej: desmalezado)"
+      <input value={busqueda} onChange={e=>setBusqueda(e.target.value)} placeholder="Buscar por nombre de tarea (ej: desmalezado)"
         style={{...S.input,marginBottom:12,width:"100%",maxWidth:420}}/>
       {msg&&<div style={{fontSize:12,color:"#22c55e",marginBottom:10}}>{msg}</div>}
-      <div style={{fontSize:11,color:"#5a8a6a",marginBottom:6}}>{filtrados.length} nombre(s) distinto(s) encontrado(s)</div>
-      <div style={{maxHeight:420,overflowY:"auto",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,marginBottom:16}}>
+      <div style={{fontSize:11,color:"#5a8a6a",marginBottom:6}}>{filtrados.length} nombre(s) distinto(s) encontrado(s) — marca 2 o más para fusionar</div>
+      <div style={{maxHeight:380,overflowY:"auto",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,marginBottom:16}}>
         {filtrados.map(c=>(
-          <div key={c.nombre} onClick={()=>elegir(c.nombre)}
-            style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderBottom:"1px solid rgba(255,255,255,0.05)",cursor:"pointer",background:seleccionado===c.nombre?"rgba(251,191,36,0.10)":"transparent"}}>
+          <div key={c.nombre} onClick={()=>toggleVariante(c.nombre)}
+            style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderBottom:"1px solid rgba(255,255,255,0.05)",cursor:"pointer",background:seleccionadas[c.nombre]?"rgba(251,191,36,0.10)":"transparent"}}>
+            <input type="checkbox" checked={!!seleccionadas[c.nombre]} onChange={()=>toggleVariante(c.nombre)} onClick={e=>e.stopPropagation()}/>
             <div style={{flex:1,fontSize:12}}>
               <strong>{c.nombre}</strong>
               <span style={{color:"#5a8a6a",marginLeft:8}}>· {[...c.zonas].slice(0,3).join(", ")}{c.zonas.size>3?" …":""}</span>
@@ -12125,14 +12136,25 @@ function RenombradorMasivoTareas({ S, tareasProg, setTareasProg }) {
         ))}
         {filtrados.length===0&&<div style={{padding:20,textAlign:"center",color:"#5a8a6a",fontSize:12}}>Sin resultados.</div>}
       </div>
-      {seleccionado&&(
+      {nombresSeleccionados.length>=2&&(
         <div style={{border:"1px solid rgba(251,191,36,0.3)",background:"rgba(251,191,36,0.06)",borderRadius:8,padding:12}}>
-          <div style={{fontSize:12,marginBottom:8}}>Renombrando: <b>"{seleccionado}"</b></div>
-          <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-            <input value={nuevoNombre} onChange={e=>setNuevoNombre(e.target.value)} placeholder="Nuevo nombre"
-              style={{...S.input,flex:1,minWidth:220}}/>
-            <button onClick={aplicar} style={{...S.btn,background:"rgba(251,191,36,0.15)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.4)",fontWeight:600}}>Renombrar todas</button>
-            <button onClick={()=>setSeleccionado(null)} style={{...S.btn,background:"transparent",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)"}}>Cancelar</button>
+          <div style={{fontSize:12,marginBottom:10}}>
+            {nombresSeleccionados.length} variantes marcadas ({totalTareasSeleccion} tarea{totalTareasSeleccion!==1?"s":""} en total) — ¿cuál es el nombre correcto?
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
+            {nombresSeleccionados.map(nombre=>(
+              <label key={nombre} onClick={e=>e.stopPropagation()} style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:13}}>
+                <input type="radio" name="correcto" checked={correcto===nombre} onChange={()=>setCorrecto(nombre)}/>
+                <span style={{fontWeight:correcto===nombre?700:400,color:correcto===nombre?"#fbbf24":"#c0dac0"}}>"{nombre}"</span>
+              </label>
+            ))}
+          </div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            <button disabled={!correcto} onClick={fusionar}
+              style={{...S.btn,background:"rgba(251,191,36,0.15)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.4)",fontWeight:600,opacity:correcto?1:0.4}}>
+              Fusionar en el nombre elegido
+            </button>
+            <button onClick={()=>{setSeleccionadas({});setCorrecto(null);}} style={{...S.btn,background:"transparent",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)"}}>Cancelar</button>
           </div>
         </div>
       )}
