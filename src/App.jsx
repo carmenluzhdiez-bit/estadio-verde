@@ -12136,6 +12136,11 @@ function RenombradorMasivoTareas({ S, tareasProg, setTareasProg }) {
         ))}
         {filtrados.length===0&&<div style={{padding:20,textAlign:"center",color:"#5a8a6a",fontSize:12}}>Sin resultados.</div>}
       </div>
+      {nombresSeleccionados.length===1&&(
+        <div style={{border:"1px solid rgba(96,165,250,0.3)",background:"rgba(96,165,250,0.06)",borderRadius:8,padding:12,fontSize:12,color:"#93c5fd"}}>
+          ☝️ Marcaste 1 nombre. Marca al menos <b>una variante más</b> (la otra forma en que quedó mal escrita) para que aparezcan las opciones de fusión.
+        </div>
+      )}
       {nombresSeleccionados.length>=2&&(
         <div style={{border:"1px solid rgba(251,191,36,0.3)",background:"rgba(251,191,36,0.06)",borderRadius:8,padding:12}}>
           <div style={{fontSize:12,marginBottom:10}}>
