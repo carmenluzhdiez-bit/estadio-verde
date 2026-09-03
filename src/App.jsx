@@ -1909,6 +1909,61 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
     win.document.close();
   };
 
+  const imprimirDiaPorTrabajador = (dia, responsable) => {
+    const normArrImp = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+    const hpTdArr = filtrarTareas(normArrImp(tareas[dia]||[])).filter(t=>(t.responsable||"")===responsable);
+    const hpTdLen = hpTdArr.length;
+    let hechas = 0; let noPudo = 0;
+    for(let hpII=0;hpII<hpTdLen;hpII++){
+      if(["hecha","completada"].includes(hpTdArr[hpII].estado)) hechas++;
+      if(hpTdArr[hpII].estado==="no_pudo") noPudo++;
+    }
+    const pct = hpTdLen ? Math.round((hechas/hpTdLen)*100) : 0;
+    const win = window.open("","_blank","width=800,height=600");
+    win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+    <title>Hoja de turno ${dia} — ${responsable} — Estadio Español</title>
+    <style>
+      body{font-family:Georgia,serif;color:#1a2e1a;padding:32px;max-width:750px;margin:0 auto}
+      h1{font-size:22px;margin-bottom:4px;color:#0d3320}
+      .sub{font-size:13px;color:#4a7a4a;margin-bottom:20px}
+      .stats{display:flex;gap:20px;margin-bottom:20px;padding:12px 16px;background:#f0f7f0;border-radius:8px;font-size:14px}
+      .stat-ok{color:#166534;font-weight:700} .stat-bad{color:#991b1b;font-weight:700} .stat-pct{color:#1e40af;font-weight:700}
+      table{width:100%;border-collapse:collapse;font-size:13px}
+      th{text-align:left;padding:8px 10px;background:#1a4a2e;color:#fff;font-size:11px;letter-spacing:0.8px;text-transform:uppercase}
+      tr:nth-child(even){background:#f5fbf5}
+      td{padding:8px 10px;border-bottom:1px solid #dce8dc;vertical-align:top}
+      .est-ok{color:#166534} .est-bad{color:#991b1b} .est-pend{color:#92400e} .est-blue{color:#1e40af} .est-gray{color:#4b5563}
+      .firma{margin-top:40px;display:flex;gap:60px}
+      .firma div{flex:1;border-top:1px solid #1a2e1a;padding-top:6px;font-size:11px;text-align:center;color:#4b5563}
+      .pie{margin-top:24px;font-size:11px;color:#6b7280;border-top:1px solid #dce8dc;padding-top:12px}
+      @media print{body{padding:16px}.pie{position:fixed;bottom:20px;width:100%}}
+    </style></head><body>
+    <h1>🧑‍🌾 Hoja de Turno — ${responsable}</h1>
+    <div class="sub">Fecha: <b>${dia}</b> · Generado: ${new Date().toLocaleDateString("es-CL")} ${new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"})}</div>
+    <div class="stats">
+      <span>Total: <b>${hpTdArr.length}</b></span>
+      <span class="stat-ok">✅ Hechas: ${hechas}</span>
+      ${noPudo>0?"<span class=\"stat-bad\">🔴 No pudieron: "+noPudo+"</span>":""}
+      <span class="stat-pct">${pct}% completado</span>
+    </div>
+    <table>
+      <thead><tr><th>Estado</th><th>Tarea</th><th>Elemento</th><th>Zona</th><th>Observación</th></tr></thead>
+      <tbody>
+        ${hpTdArr.map(hpTask => {
+          const estCls = ["hecha","completada"].includes(hpTask.estado)?"est-ok":hpTask.estado==="no_pudo"?"est-bad":["haciendose","en_curso"].includes(hpTask.estado)?"est-blue":["pendiente"].includes(hpTask.estado)?"est-pend":"est-gray";
+          const estLabel = EC[hpTask.estado]?.label || hpTask.estado;
+          const icono = (zonas.find(z=>z.nombre===hpTask.zona)||MACROZONAS_BASE.find(z=>z.nombre===hpTask.zona))?.icono||""
+          return '<tr>'+'<td class="'+estCls+'">'+( EC[hpTask.estado]?.icon||"-")+" "+estLabel+"</td>"+'<td><b>'+hpTask.tarea+'</b></td>'+'<td>'+(hpTask.elemento||"-")+"</td>"+'<td>'+icono+" "+(hpTask.zona||"-")+"</td>"+'<td>'+(hpTask.notaWorker?"⚠️ "+hpTask.notaWorker:"-")+"</td>"+'</tr>';
+        }).join("")}
+      </tbody>
+    </table>
+    <div class="firma"><div>Firma trabajador</div><div>Firma jefa / supervisor</div></div>
+    <div class="pie">Estadio Español de Las Condes · Departamento de Áreas Verdes</div>
+    <script>window.onload=()=>{window.print();}<\/script>
+    </body></html>`);
+    win.document.close();
+  };
+
   const hayFiltros = filtroEstado!=="todos"||filtroTarea||filtroZona!=="todas"||filtroDia||filtroResponsable!=="todos";
 
   // ── Calcular historial de zona+tipo para el buscador ──────────────
@@ -2182,6 +2237,18 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                   style={{...S.btn,padding:"5px 12px",fontSize:12,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}}>
                   🖨️ Imprimir
                 </button>
+                {(()=>{
+                  const responsablesDia = [...new Set(hpTd.map(t=>t.responsable).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
+                  if(responsablesDia.length===0) return null;
+                  return (
+                    <select defaultValue="" onClick={e=>e.stopPropagation()}
+                      onChange={e=>{ if(e.target.value){ imprimirDiaPorTrabajador(dia, e.target.value); e.target.value=""; } }}
+                      style={{...S.input,fontSize:12,padding:"5px 8px",width:"auto",color:"#93c5fd",background:"rgba(59,130,246,0.1)",border:"1px solid rgba(59,130,246,0.3)"}}>
+                      <option value="">🖨️ Imprimir por trabajador…</option>
+                      {responsablesDia.map(r=><option key={r} value={r}>{r}</option>)}
+                    </select>
+                  );
+                })()}
                 {esJefa&&(()=>{
                   const destinoDefault = diasHabiles(dia, 1);
                   const destinoElegido = fechaReprogramarHist[dia] || destinoDefault;
