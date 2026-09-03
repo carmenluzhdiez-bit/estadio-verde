@@ -12052,6 +12052,90 @@ function CorreccionMasivaFrecuenciasGolf({ S, getAllElems, getZD, setElemFrecs, 
   );
 }
 
+function RenombradorMasivoTareas({ S, tareasProg, setTareasProg }) {
+  const [busqueda, setBusqueda] = React.useState("");
+  const [seleccionado, setSeleccionado] = React.useState(null); // nombre exacto elegido
+  const [nuevoNombre, setNuevoNombre] = React.useState("");
+  const [msg, setMsg] = React.useState("");
+
+  // Contar apariciones exactas de cada nombre de tarea, en TODAS las fechas y zonas.
+  const conteo = React.useMemo(()=>{
+    const map = {};
+    Object.entries(tareasProg||{}).forEach(([fecha,arr])=>{
+      const lista = Array.isArray(arr)?arr:Object.values(arr||{});
+      lista.forEach(t=>{
+        if(!t||!t.tarea) return;
+        if(!map[t.tarea]) map[t.tarea] = {nombre:t.tarea, count:0, zonas:new Set()};
+        map[t.tarea].count++;
+        map[t.tarea].zonas.add(t.zona||"(sin zona)");
+      });
+    });
+    return Object.values(map).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+  }, [tareasProg]);
+
+  const filtrados = busqueda.trim()
+    ? conteo.filter(c=>c.nombre.toLowerCase().includes(busqueda.trim().toLowerCase()))
+    : conteo;
+
+  const elegir = (nombre) => { setSeleccionado(nombre); setNuevoNombre(nombre); setMsg(""); };
+
+  const aplicar = () => {
+    if(!seleccionado || !nuevoNombre.trim()) return;
+    if(nuevoNombre.trim()===seleccionado){ alert("El nombre nuevo es igual al actual."); return; }
+    const item = conteo.find(c=>c.nombre===seleccionado);
+    if(!window.confirm(`¿Renombrar "${seleccionado}" a "${nuevoNombre.trim()}" en ${item?.count||0} tarea(s), en todas las fechas donde aparezca?`)) return;
+    setTareasProg(prev=>{
+      const nuevo = {};
+      Object.entries(prev||{}).forEach(([fecha,arr])=>{
+        const esArray = Array.isArray(arr);
+        const lista = esArray?arr:Object.values(arr||{});
+        const listaNueva = lista.map(t => t&&t.tarea===seleccionado ? {...t, tarea:nuevoNombre.trim()} : t);
+        nuevo[fecha] = listaNueva;
+      });
+      return nuevo;
+    });
+    setMsg(`✅ Renombrado "${seleccionado}" → "${nuevoNombre.trim()}" en ${item?.count||0} tarea(s).`);
+    setSeleccionado(null); setNuevoNombre("");
+  };
+
+  return (
+    <div className="ein">
+      <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,marginBottom:8,color:"#fbbf24"}}>🏷️ Renombrado masivo de tareas</div>
+      <div style={{fontSize:12,color:"#5a9a7a",marginBottom:14}}>
+        Útil para corregir typos o nombres inconsistentes (ej. "Desmalezado llímites" vs "Desmalezado Límites") en tareas que ya quedaron creadas — busca el nombre exacto tal como está escrito, revisa cuántas hay y en qué zonas, y renómbralas todas de una vez, en cualquier fecha.
+      </div>
+      <input value={busqueda} onChange={e=>{setBusqueda(e.target.value);setSeleccionado(null);setMsg("");}} placeholder="Buscar por nombre de tarea (ej: desmalezado)"
+        style={{...S.input,marginBottom:12,width:"100%",maxWidth:420}}/>
+      {msg&&<div style={{fontSize:12,color:"#22c55e",marginBottom:10}}>{msg}</div>}
+      <div style={{fontSize:11,color:"#5a8a6a",marginBottom:6}}>{filtrados.length} nombre(s) distinto(s) encontrado(s)</div>
+      <div style={{maxHeight:420,overflowY:"auto",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,marginBottom:16}}>
+        {filtrados.map(c=>(
+          <div key={c.nombre} onClick={()=>elegir(c.nombre)}
+            style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderBottom:"1px solid rgba(255,255,255,0.05)",cursor:"pointer",background:seleccionado===c.nombre?"rgba(251,191,36,0.10)":"transparent"}}>
+            <div style={{flex:1,fontSize:12}}>
+              <strong>{c.nombre}</strong>
+              <span style={{color:"#5a8a6a",marginLeft:8}}>· {[...c.zonas].slice(0,3).join(", ")}{c.zonas.size>3?" …":""}</span>
+            </div>
+            <div style={{fontSize:11,color:"#94a3b8",flexShrink:0}}>{c.count} tarea{c.count!==1?"s":""}</div>
+          </div>
+        ))}
+        {filtrados.length===0&&<div style={{padding:20,textAlign:"center",color:"#5a8a6a",fontSize:12}}>Sin resultados.</div>}
+      </div>
+      {seleccionado&&(
+        <div style={{border:"1px solid rgba(251,191,36,0.3)",background:"rgba(251,191,36,0.06)",borderRadius:8,padding:12}}>
+          <div style={{fontSize:12,marginBottom:8}}>Renombrando: <b>"{seleccionado}"</b></div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+            <input value={nuevoNombre} onChange={e=>setNuevoNombre(e.target.value)} placeholder="Nuevo nombre"
+              style={{...S.input,flex:1,minWidth:220}}/>
+            <button onClick={aplicar} style={{...S.btn,background:"rgba(251,191,36,0.15)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.4)",fontWeight:600}}>Renombrar todas</button>
+            <button onClick={()=>setSeleccionado(null)} style={{...S.btn,background:"transparent",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)"}}>Cancelar</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito, onCierreSectorial, onNuevaAlerta, configSemanal={}, setConfigSemanal, getAllElems, getZD, setElemFrecs, setElemFrecsBulk, bodegasData, setBodegasData }) {
   const GOLF_ZONA_ID = 31; // ID macrozona Golf
   const [fechaProponerGolf, setFechaProponerGolf] = React.useState(fechaLocal());
@@ -12433,7 +12517,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
         {(()=>{
           // Tabs según rol: trabajador solo ve lo que le corresponde
-          const todosTabs = [["panel","📊 Panel"],["greens","⛳ Greens"],["tees","🎯 Tees"],["bunkers","🏖️ Búnkers"],["fairways","🌾 Fairways"],["zonas","🌿 Zonas"],["arboles","🌳 Árboles"],["mediciones","📏 Alturas"],["humedad","💧 Humedad"],["eventos","🏆 Eventos"],["fitosanitario","⚗ Fitosanitario"],["programacion_golf","📅 Semana Golf"],["config_golf","⚙️ Programación Golf"],["correccion_masiva","🛠️ Corrección Fechas"]];
+          const todosTabs = [["panel","📊 Panel"],["greens","⛳ Greens"],["tees","🎯 Tees"],["bunkers","🏖️ Búnkers"],["fairways","🌾 Fairways"],["zonas","🌿 Zonas"],["arboles","🌳 Árboles"],["mediciones","📏 Alturas"],["humedad","💧 Humedad"],["eventos","🏆 Eventos"],["fitosanitario","⚗ Fitosanitario"],["programacion_golf","📅 Semana Golf"],["config_golf","⚙️ Programación Golf"],["correccion_masiva","🛠️ Corrección Fechas"],["renombrar_tareas","🏷️ Renombrar Tareas"]];
           const tabsWorker = [["mediciones","📏 Alturas"],["humedad","💧 Humedad"]];
           // Agregar Programación solo para jefa/supervisor
           const todosTabs2 = todosTabs;
@@ -14116,6 +14200,10 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
 
       {subTab==="correccion_masiva"&&rolLogueado!=="trabajador"&&(
         <CorreccionMasivaFrecuenciasGolf S={S} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} setElemFrecsBulk={setElemFrecsBulk}/>
+      )}
+
+      {subTab==="renombrar_tareas"&&rolLogueado!=="trabajador"&&(
+        <RenombradorMasivoTareas S={S} tareasProg={tareasProg} setTareasProg={setTareasProg}/>
       )}
 
       {subTab==="eventos"&&rolLogueado!=="trabajador"&&(
