@@ -1,9 +1,7 @@
 // firebase-messaging-sw.js — Estadio Verde
 // Ubicación en el repo: raíz (junto a index.html) o public/
-
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
-
 firebase.initializeApp({
   apiKey: "AIzaSyBgxVOk_OAh2XTouD9gLw5rycaNF-OWlnU",
   authDomain: "riego-estadio-espanol.firebaseapp.com",
@@ -13,15 +11,14 @@ firebase.initializeApp({
   messagingSenderId: "972722300084",
   appId: "1:972722300084:web:0da9c37b416a050c3b63e1",
 });
-
 const messaging = firebase.messaging();
-
 // Responder al GET_TOKEN desde la app
 self.addEventListener("message", async (evt) => {
   if(evt.data?.type === "GET_TOKEN") {
     try {
       const token = await messaging.getToken({
-        vapidKey: evt.data.vapidKey
+        vapidKey: evt.data.vapidKey,
+        serviceWorkerRegistration: self.registration // ← evita que el SDK intente registrar su propio SW "por defecto" (eso fallaba dentro del contexto del SW)
       });
       // Devolver token a la app
       const clients = await self.clients.matchAll({ type: "window" });
@@ -31,7 +28,6 @@ self.addEventListener("message", async (evt) => {
     }
   }
 });
-
 // Notificaciones en background (app cerrada)
 messaging.onBackgroundMessage((payload) => {
   const { title, body, icon } = payload.notification || {};
@@ -47,7 +43,6 @@ messaging.onBackgroundMessage((payload) => {
     ]
   });
 });
-
 // Clic en notificación → abrir app
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
