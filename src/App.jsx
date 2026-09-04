@@ -21210,11 +21210,23 @@ export default function App() {
           enviarPushATodos(`🌬️ ${label} de viento (${kmhMax} km/h)`, cuerpo, "alerta").catch(()=>{});
           alertasNuevas.vientoNivel = nivelViento;
         }
-        // UV — desde 6 (Alto)
+        // UV — desde 6 (Alto), usando los mismos tramos y medidas acumuladas de la tabla "Índice UV y Medidas de Protección"
         if(uv>=6 && !yaEnviado.uv){
-          const cuerpo = `Índice UV ${uv} — Alto. Usar protector solar, sombrero/gorro y ropa manga larga. Evitar exposición prolongada entre 11:00 y 17:00.`;
-          crearNotificacion("alerta_clima", {titulo:`☀️ Radiación UV alta — índice ${uv}`, mensaje:cuerpo, prioridad:"media"});
-          enviarPushATodos(`☀️ Radiación UV alta (índice ${uv})`, cuerpo, "alerta").catch(()=>{});
+          const NIVEL_MODERADO = "Lentes de sol, sombrero ala ancha, protector solar FPS 30+";
+          let categoria, medidas;
+          if(uv>=11){
+            categoria = "Extremo";
+            medidas = `${NIVEL_MODERADO}, manga larga obligatoria. Evitar exposición 10:00–16:00h, cuello protegido, hidratación constante.`;
+          } else if(uv>=8){
+            categoria = "Muy alto";
+            medidas = `${NIVEL_MODERADO}, buscar sombra entre 11:00–15:00h. Manga larga obligatoria, reducir exposición 11:00–15:00h.`;
+          } else {
+            categoria = "Alto";
+            medidas = `${NIVEL_MODERADO}. Buscar sombra entre 11:00–15:00h, manga larga recomendada.`;
+          }
+          const cuerpo = `Índice UV ${uv} — ${categoria}. ${medidas}`;
+          crearNotificacion("alerta_clima", {titulo:`☀️ Radiación UV ${categoria} — índice ${uv}`, mensaje:cuerpo, prioridad:"media"});
+          enviarPushATodos(`☀️ Radiación UV ${categoria} (índice ${uv})`, cuerpo, "alerta").catch(()=>{});
           alertasNuevas.uv = true;
         }
         if(Object.keys(alertasNuevas).length>0){
@@ -22376,11 +22388,18 @@ export default function App() {
                 🌬️ {climaActual.nivelViento>=3?"ALERTA ALTA de viento":"Alerta media de viento"} — {Math.max(climaActual.velocidad,climaActual.rafaga)} km/h (vel./ráfaga)
               </div>
             )}
-            {climaActual.uv>=6&&(
-              <div style={{display:"flex",alignItems:"center",gap:8,fontSize:12.5,color:"#fbbf24",fontWeight:700}}>
-                ☀️ Radiación UV alta — índice {climaActual.uv}. Usar protector solar y evitar exposición prolongada.
-              </div>
-            )}
+            {climaActual.uv>=6&&(()=>{
+              const NIVEL_MODERADO = "Lentes de sol, sombrero ala ancha, protector solar FPS 30+";
+              let categoria, medidas;
+              if(climaActual.uv>=11){ categoria="Extremo"; medidas = `${NIVEL_MODERADO}, manga larga obligatoria. Evitar exposición 10:00–16:00h, cuello protegido, hidratación constante.`; }
+              else if(climaActual.uv>=8){ categoria="Muy alto"; medidas = `${NIVEL_MODERADO}, buscar sombra entre 11:00–15:00h. Manga larga obligatoria, reducir exposición 11:00–15:00h.`; }
+              else { categoria="Alto"; medidas = `${NIVEL_MODERADO}. Buscar sombra entre 11:00–15:00h, manga larga recomendada.`; }
+              return (
+                <div style={{display:"flex",alignItems:"center",gap:8,fontSize:12.5,color:"#fbbf24",fontWeight:700}}>
+                  ☀️ Radiación UV {categoria} — índice {climaActual.uv}. {medidas}
+                </div>
+              );
+            })()}
             <div style={{fontSize:10,color:"#c0dac0",opacity:0.8}}>Actualizado {climaActual.hora} · Open-Meteo</div>
           </div>
         )}
