@@ -21003,6 +21003,8 @@ export default function App() {
   const [eppFitTests, setEppFitTests] = useFirebaseState("epp_fit_tests", []);
   const [eppDisposiciones, setEppDisposiciones] = useFirebaseState("epp_disposiciones", []);
   const [tareasProg,     setTareasProg,     progReady]     = useFirebaseState("prog",           {});
+  const [climaActual, setClimaActual] = useFirebaseState("clima_actual", null);
+  const [climaAlertaEnviada, setClimaAlertaEnviada] = useFirebaseState("clima_alerta_enviada", {});
   const [stockFito, setStockFito]  = useFirebaseState("fung-stock", {});
   const [aplicaciones,   setAplicaciones,   aplReady]      = useFirebaseState("fungicidas",     []);
   const [incidenciasFito,setIncidenciasFito,incidReady]    = useFirebaseState("fung-incid",     []);
@@ -21161,6 +21163,69 @@ export default function App() {
       return [nueva, ...arr].slice(0, 100);
     });
   }, [setNotificaciones]);
+
+  // ── Chequeo automático de clima (viento/UV) ──────────────────────────────
+  // Corre para CUALQUIER usuario logueado (jardinero, supervisor, jefa) mientras
+  // tenga la app abierta. Si cruza el umbral, avisa por push a todos los
+  // dispositivos suscritos y deja una notificación visible en el feed
+  // compartido (🔔) para quien no tenga push activado. Se registra en Firebase
+  // qué alertas ya se mandaron hoy, para no repetir el aviso cada vez que
+  // alguien abre la app.
+  const climaAlertaEnviadaRef = React.useRef({});
+  React.useEffect(()=>{ climaAlertaEnviadaRef.current = climaAlertaEnviada||{}; }, [climaAlertaEnviada]);
+
+  React.useEffect(()=>{
+    let cancelado = false;
+    const chequearClima = async () => {
+      try {
+        const [resViento, resUv] = await Promise.all([
+          fetch("https://api.open-meteo.com/v1/forecast?latitude=-33.4127&longitude=-70.5775&current=wind_speed_10m,wind_gusts_10m&wind_speed_unit=kmh&timezone=America/Santiago&forecast_days=1"),
+          fetch("https://api.open-meteo.com/v1/forecast?latitude=-33.4127&longitude=-70.5775&current=uv_index&timezone=America/Santiago&forecast_days=1"),
+        ]);
+        if(!resViento.ok||!resUv.ok||cancelado) return;
+        const jViento = await resViento.json();
+        const jUv = await resUv.json();
+        if(cancelado) return;
+        const velocidad = Math.round(jViento.current.wind_speed_10m);
+        const rafaga = Math.round(jViento.current.wind_gusts_10m);
+        const kmhMax = Math.max(velocidad, rafaga);
+        const uv = Math.round(jUv.current.uv_index*10)/10;
+        const nivelViento = kmhMax>=82?3:kmhMax>=60?2:kmhMax>=40?1:0;
+        const hoy = new Date().toISOString().slice(0,10);
+
+        setClimaActual({velocidad, rafaga, uv, nivelViento, hora:new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"}), actualizado:Date.now()});
+
+        const yaEnviado = climaAlertaEnviadaRef.current?.[hoy] || {};
+        const alertasNuevas = {};
+
+        // Viento — desde Nivel 2 (60+ km/h velocidad o ráfaga)
+        if(nivelViento>=2 && (!yaEnviado.vientoNivel || yaEnviado.vientoNivel<nivelViento)){
+          const esNivel3 = nivelViento>=3;
+          const label = esNivel3?"Alerta ALTA":"Alerta media";
+          const acciones = esNivel3
+            ? ["EVACUACIÓN INMEDIATA de zonas verdes","Cerrar acceso a zonas deportivas","Activar protocolo de emergencia"]
+            : ["Suspender labores de jardinería en exterior","Retirar herramientas y equipos livianos","Encintar zonas de riesgo por caída de ramas"];
+          const cuerpo = `Viento ${kmhMax} km/h (vel./ráfaga) — ${label}. ${acciones.join(" · ")}.`;
+          crearNotificacion("alerta_clima", {titulo:`🌬️ ${label} de viento — ${kmhMax} km/h`, mensaje:cuerpo, prioridad:esNivel3?"alta":"media"});
+          enviarPushATodos(`🌬️ ${label} de viento (${kmhMax} km/h)`, cuerpo, "alerta").catch(()=>{});
+          alertasNuevas.vientoNivel = nivelViento;
+        }
+        // UV — desde 6 (Alto)
+        if(uv>=6 && !yaEnviado.uv){
+          const cuerpo = `Índice UV ${uv} — Alto. Usar protector solar, sombrero/gorro y ropa manga larga. Evitar exposición prolongada entre 11:00 y 17:00.`;
+          crearNotificacion("alerta_clima", {titulo:`☀️ Radiación UV alta — índice ${uv}`, mensaje:cuerpo, prioridad:"media"});
+          enviarPushATodos(`☀️ Radiación UV alta (índice ${uv})`, cuerpo, "alerta").catch(()=>{});
+          alertasNuevas.uv = true;
+        }
+        if(Object.keys(alertasNuevas).length>0){
+          setClimaAlertaEnviada(prev=>({...prev, [hoy]: {...((prev||{})[hoy]||{}), ...alertasNuevas}}));
+        }
+      } catch(e) { /* silencioso — si falla Open-Meteo no debe romper el resto de la app */ }
+    };
+    chequearClima();
+    const interval = setInterval(chequearClima, 20*60*1000); // reintenta cada 20 min mientras la app esté abierta
+    return () => { cancelado = true; clearInterval(interval); };
+  }, []);
 
   // Notificaciones no leídas para la jefa
   const notifNoLeidas = React.useMemo(() => {
@@ -22291,15 +22356,34 @@ export default function App() {
             </button>
           );
         })()}
-        {/* Botón activar push */}
-        {esJefa&&<div style={{padding:"4px 8px",flexShrink:0}}>
+        {/* Botón activar push — visible para todos los roles */}
+        <div style={{padding:"4px 8px",flexShrink:0}}>
           <button onClick={pushActivo?null:activarPush} title={pushActivo?"Notificaciones push activas en este dispositivo":"Activar notificaciones push"} style={{background:pushActivo?"rgba(52,211,153,0.15)":"rgba(251,191,36,0.1)",color:pushActivo?"#34d399":"#fbbf24",border:`1px solid ${pushActivo?"rgba(52,211,153,0.3)":"rgba(251,191,36,0.3)"}`,borderRadius:6,padding:"6px 10px",fontSize:10,cursor:pushActivo?"default":"pointer",whiteSpace:"nowrap"}}>
             {pushActivo?"🔔 Push ✓":"🔕 Push"}
           </button>
-        </div>}
+        </div>
       </div>
 
       <div style={S.main}>
+        {/* Banner de alerta de clima (viento/UV) — visible para todos los roles */}
+        {climaActual&&(climaActual.nivelViento>=2||climaActual.uv>=6)&&(
+          <div style={{
+            background: climaActual.nivelViento>=3?"rgba(239,68,68,0.12)":climaActual.nivelViento>=2?"rgba(249,115,22,0.12)":"rgba(245,158,11,0.12)",
+            border: `1px solid ${climaActual.nivelViento>=3?"rgba(239,68,68,0.4)":climaActual.nivelViento>=2?"rgba(249,115,22,0.4)":"rgba(245,158,11,0.4)"}`,
+            borderRadius:8,padding:"10px 16px",marginBottom:12,display:"flex",flexDirection:"column",gap:4}}>
+            {climaActual.nivelViento>=2&&(
+              <div style={{display:"flex",alignItems:"center",gap:8,fontSize:12.5,color:climaActual.nivelViento>=3?"#fca5a5":"#fdba74",fontWeight:700}}>
+                🌬️ {climaActual.nivelViento>=3?"ALERTA ALTA de viento":"Alerta media de viento"} — {Math.max(climaActual.velocidad,climaActual.rafaga)} km/h (vel./ráfaga)
+              </div>
+            )}
+            {climaActual.uv>=6&&(
+              <div style={{display:"flex",alignItems:"center",gap:8,fontSize:12.5,color:"#fbbf24",fontWeight:700}}>
+                ☀️ Radiación UV alta — índice {climaActual.uv}. Usar protector solar y evitar exposición prolongada.
+              </div>
+            )}
+            <div style={{fontSize:10,color:"#c0dac0",opacity:0.8}}>Actualizado {climaActual.hora} · Open-Meteo</div>
+          </div>
+        )}
         {/* Banner modo solo lectura para Gerencia */}
         {soloLectura&&(
           <div style={{background:"rgba(245,158,11,0.1)",border:"1px solid rgba(245,158,11,0.3)",borderRadius:8,padding:"8px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:10}}>
