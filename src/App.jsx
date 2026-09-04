@@ -137,6 +137,8 @@ const estacionDeFecha = (fechaStr) => {
   return [12,1,2].includes(mesNum)?"verano":[3,4,5].includes(mesNum)?"otono":[6,7,8].includes(mesNum)?"invierno":"primavera";
 };
 // Calcula la próxima fecha en que corresponde una tarea de frecuencia f, evaluada respecto a una fecha de referencia (refFecha, normalmente "hoy")
+// Regla general: si la fecha calculada cae domingo, se corre al sábado anterior (no se
+// pospone al lunes) — aplica a cualquier tarea con frecuencia, en cualquier macrozona.
 const calcProximaFrecGlobal = (f, refFecha) => {
   const ref = new Date(refFecha+"T12:00:00");
   if(f.modo==="diasSemana"){
@@ -147,10 +149,14 @@ const calcProximaFrecGlobal = (f, refFecha) => {
     const ultima = new Date(f.ultimaVez+"T12:00:00");
     let base = new Date(ultima.getTime() + minimoDias*24*60*60*1000);
     for(let i=0;i<400;i++){
-      const candidato = new Date(base.getTime() + i*24*60*60*1000);
+      let candidato = new Date(base.getTime() + i*24*60*60*1000);
       const dow = candidato.getDay();
       if(prohibidos.includes(dow)) continue;
       if(hayDiasEspecificos && !f.diasSemana.includes(dow)) continue;
+      // Si cae domingo y el domingo no fue elegido explícitamente, correr al sábado anterior
+      if(dow===0 && !(hayDiasEspecificos && f.diasSemana.includes(0)) && !prohibidos.includes(6)){
+        candidato = new Date(candidato.getTime() - 24*60*60*1000);
+      }
       const diff = Math.round((candidato-ref)/(24*60*60*1000));
       return { fecha: candidato.toISOString().slice(0,10), diff };
     }
@@ -175,7 +181,10 @@ const calcProximaFrecGlobal = (f, refFecha) => {
   if(!f.ultimaVez) return null;
   if(!dias) return null;
   const ultima = new Date(f.ultimaVez+"T12:00:00");
-  const proxima = new Date(ultima.getTime() + dias*24*60*60*1000);
+  let proxima = new Date(ultima.getTime() + dias*24*60*60*1000);
+  if(proxima.getDay()===0){ // domingo → correr al sábado anterior, no al lunes siguiente
+    proxima = new Date(proxima.getTime() - 24*60*60*1000);
+  }
   const diff = Math.round((proxima-ref)/(24*60*60*1000));
   return { fecha: proxima.toISOString().slice(0,10), diff };
 };
@@ -14084,10 +14093,16 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           const tareasHoyArr=Array.isArray(tareasProg[fechaProponerGolf])?tareasProg[fechaProponerGolf]:Object.values(tareasProg[fechaProponerGolf]||{});
           const existentes=tareasHoyArr.map(t=>t.zona+"_"+t.elemento+"_"+t.tarea);
           const estProp=estacionDeFecha(fechaProponerGolf);const propuestas=[];const vencidas=[];
+          const clavesTareaEnlazadaYaAgregada=new Set(); // dedup: una tarea enlazada solo se agrega una vez por fecha, no una vez por elemento
+          const TOLERANCIA_FERTILIZACION_DIAS=3; // margen de días para que Fertilización se adapte a la fecha de Corte más cercana
           elems.forEach(e=>{
             const zdatElem=zdatG.elementos?.[e.id]||(zdatG.elementosCustom||[]).find(x=>x.id===e.id);
             const frecs=zdatElem?.frecuencias||[];
             frecs.forEach(f=>{
+              // Regla especial: "Fertilización" enlazada a un Corte NO sigue su propio calendario —
+              // se genera aparte, el mismo día que el Corte, más abajo. Ver bloque siguiente.
+              const esFertilizAdaptada=(f.tarea||"").toLowerCase().includes("fertiliz")&&f.tareaEnlazada&&f.tareaEnlazada.trim();
+              if(esFertilizAdaptada)return;
               const key=nombreZona+"_"+e.nombre+"_"+f.tarea;
               if(existentes.includes(key))return;
               const prox=calcProximaFrecGlobal(f,fechaProponerGolf);
@@ -14097,6 +14112,40 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               const notaAltura=f.alturaCorte?`Cortar a: ${f.alturaCorte} ${f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="pulgadas"?"pulgadas":"milímetros"}.`:"";
               propuestas.push({id:Date.now()+Math.random(),fecha:fechaProponerGolf,zona:nombreZona,elemento:e.nombre,tarea:f.tarea,responsable:respDefault,estado:respDefault?"pendiente":"por_designar",notas:[notaAltura,f.obs].filter(Boolean).join(" "),alturaCorte:f.alturaCorte||"",unidadAlturaCorte:f.unidadAlturaCorte||"mm",estacion:estProp,auto:true,fechaCorrespondiente:prox.fecha,origenZid:"31",origenEid:e.id,origenFrecId:f.id,origenEsCustom:!!e.isCustom,diasVencida:esVencida?diasVencida:0});
               if(esVencida)vencidas.push(e.nombre+" — "+f.tarea+" ("+diasVencida+"d vencida)");
+              // ── Tarea enlazada genérica (ej. Bioestimulante → "Corte de greens + Vivero") ──
+              // Se agrega UNA vez por fecha (no una por elemento), ya que suele representar una tarea
+              // que cubre varios greens a la vez.
+              if(f.tareaEnlazada&&f.tareaEnlazada.trim()){
+                const claveEnlazada=nombreZona+"_"+f.tareaEnlazada.trim();
+                const yaExisteEnlazada=tareasHoyArr.some(t=>t.zona===nombreZona&&t.tarea===f.tareaEnlazada.trim());
+                if(!clavesTareaEnlazadaYaAgregada.has(claveEnlazada)&&!yaExisteEnlazada){
+                  clavesTareaEnlazadaYaAgregada.add(claveEnlazada);
+                  propuestas.push({id:Date.now()+Math.random(),fecha:fechaProponerGolf,zona:nombreZona,elemento:e.nombre,tarea:f.tareaEnlazada.trim(),responsable:respDefault,estado:respDefault?"pendiente":"por_designar",notas:`Enlazada con "${f.tarea}"`,estacion:estProp,auto:true,diasVencida:0});
+                }
+              }
+            });
+          });
+          // ── Fertilización adaptada a la fecha de Corte más cercana ──
+          // Regla especial y exclusiva de Fertilización: en vez de seguir su propio calendario, se
+          // genera EL MISMO DÍA que el Corte enlazado, siempre que Fertilización ya esté razonablemente
+          // cerca de su propia fecha de vencimiento (para no fertilizar de más si aún falta mucho).
+          elems.forEach(e=>{
+            const zdatElem=zdatG.elementos?.[e.id]||(zdatG.elementosCustom||[]).find(x=>x.id===e.id);
+            const frecs=zdatElem?.frecuencias||[];
+            frecs.forEach(f=>{
+              const esFertilizAdaptada=(f.tarea||"").toLowerCase().includes("fertiliz")&&f.tareaEnlazada&&f.tareaEnlazada.trim();
+              if(!esFertilizAdaptada)return;
+              const key=nombreZona+"_"+e.nombre+"_"+f.tarea;
+              if(existentes.includes(key))return;
+              // ¿Se propuso el Corte enlazado para este mismo elemento en esta misma corrida?
+              const corteHoy=propuestas.find(p=>p.zona===nombreZona&&p.elemento===e.nombre&&p.tarea.trim().toLowerCase()===f.tareaEnlazada.trim().toLowerCase());
+              if(!corteHoy)return; // no toca Corte hoy para este elemento — Fertilización espera
+              // ¿Fertilización ya está razonablemente cerca de su propia fecha de vencimiento?
+              const fertProx=calcProximaFrecGlobal(f,fechaProponerGolf);
+              const dentroDeTolerancia=!f.ultimaVez||(fertProx&&Math.abs(fertProx.diff)<=TOLERANCIA_FERTILIZACION_DIAS);
+              if(!dentroDeTolerancia)return; // aún falta mucho — no adelantar
+              const respDefault=configSemanal?.corte_golf||"";
+              propuestas.push({id:Date.now()+Math.random(),fecha:fechaProponerGolf,zona:nombreZona,elemento:e.nombre,tarea:f.tarea,responsable:respDefault,estado:respDefault?"pendiente":"por_designar",notas:`Adaptada a la fecha de Corte (${f.tareaEnlazada})`,estacion:estProp,auto:true,origenZid:"31",origenEid:e.id,origenFrecId:f.id,origenEsCustom:!!e.isCustom,diasVencida:0});
             });
           });
           // ── Carry-forward de tareas Golf marcadas "No se pudo" (cualquier origen: greens, tees, búnkers, fairways) ──
@@ -21164,80 +21213,11 @@ export default function App() {
     });
   }, [setNotificaciones]);
 
-  // ── Chequeo automático de clima (viento/UV) ──────────────────────────────
-  // Corre para CUALQUIER usuario logueado (jardinero, supervisor, jefa) mientras
-  // tenga la app abierta. Si cruza el umbral, avisa por push a todos los
-  // dispositivos suscritos y deja una notificación visible en el feed
-  // compartido (🔔) para quien no tenga push activado. Se registra en Firebase
-  // qué alertas ya se mandaron hoy, para no repetir el aviso cada vez que
-  // alguien abre la app.
-  const climaAlertaEnviadaRef = React.useRef({});
-  React.useEffect(()=>{ climaAlertaEnviadaRef.current = climaAlertaEnviada||{}; }, [climaAlertaEnviada]);
-
-  React.useEffect(()=>{
-    let cancelado = false;
-    const chequearClima = async () => {
-      try {
-        const [resViento, resUv] = await Promise.all([
-          fetch("https://api.open-meteo.com/v1/forecast?latitude=-33.4127&longitude=-70.5775&current=wind_speed_10m,wind_gusts_10m&wind_speed_unit=kmh&timezone=America/Santiago&forecast_days=1"),
-          fetch("https://api.open-meteo.com/v1/forecast?latitude=-33.4127&longitude=-70.5775&current=uv_index&timezone=America/Santiago&forecast_days=1"),
-        ]);
-        if(!resViento.ok||!resUv.ok||cancelado) return;
-        const jViento = await resViento.json();
-        const jUv = await resUv.json();
-        if(cancelado) return;
-        const velocidad = Math.round(jViento.current.wind_speed_10m);
-        const rafaga = Math.round(jViento.current.wind_gusts_10m);
-        const kmhMax = Math.max(velocidad, rafaga);
-        const uv = Math.round(jUv.current.uv_index*10)/10;
-        const nivelViento = kmhMax>=82?3:kmhMax>=60?2:kmhMax>=40?1:0;
-        const hoy = new Date().toISOString().slice(0,10);
-
-        setClimaActual({velocidad, rafaga, uv, nivelViento, hora:new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"}), actualizado:Date.now()});
-
-        const yaEnviado = climaAlertaEnviadaRef.current?.[hoy] || {};
-        const alertasNuevas = {};
-
-        // Viento — desde Nivel 2 (60+ km/h velocidad o ráfaga)
-        if(nivelViento>=2 && (!yaEnviado.vientoNivel || yaEnviado.vientoNivel<nivelViento)){
-          const esNivel3 = nivelViento>=3;
-          const label = esNivel3?"Alerta ALTA":"Alerta media";
-          const acciones = esNivel3
-            ? ["EVACUACIÓN INMEDIATA de zonas verdes","Cerrar acceso a zonas deportivas","Activar protocolo de emergencia"]
-            : ["Suspender labores de jardinería en exterior","Retirar herramientas y equipos livianos","Encintar zonas de riesgo por caída de ramas"];
-          const cuerpo = `Viento ${kmhMax} km/h (vel./ráfaga) — ${label}. ${acciones.join(" · ")}.`;
-          crearNotificacion("alerta_clima", {titulo:`🌬️ ${label} de viento — ${kmhMax} km/h`, mensaje:cuerpo, prioridad:esNivel3?"alta":"media"});
-          enviarPushATodos(`🌬️ ${label} de viento (${kmhMax} km/h)`, cuerpo, "alerta").catch(()=>{});
-          alertasNuevas.vientoNivel = nivelViento;
-        }
-        // UV — desde 6 (Alto), usando los mismos tramos y medidas acumuladas de la tabla "Índice UV y Medidas de Protección"
-        if(uv>=6 && !yaEnviado.uv){
-          const NIVEL_MODERADO = "Lentes de sol, sombrero ala ancha, protector solar FPS 30+";
-          let categoria, medidas;
-          if(uv>=11){
-            categoria = "Extremo";
-            medidas = `${NIVEL_MODERADO}, manga larga obligatoria. Evitar exposición 10:00–16:00h, cuello protegido, hidratación constante.`;
-          } else if(uv>=8){
-            categoria = "Muy alto";
-            medidas = `${NIVEL_MODERADO}, buscar sombra entre 11:00–15:00h. Manga larga obligatoria, reducir exposición 11:00–15:00h.`;
-          } else {
-            categoria = "Alto";
-            medidas = `${NIVEL_MODERADO}. Buscar sombra entre 11:00–15:00h, manga larga recomendada.`;
-          }
-          const cuerpo = `Índice UV ${uv} — ${categoria}. ${medidas}`;
-          crearNotificacion("alerta_clima", {titulo:`☀️ Radiación UV ${categoria} — índice ${uv}`, mensaje:cuerpo, prioridad:"media"});
-          enviarPushATodos(`☀️ Radiación UV ${categoria} (índice ${uv})`, cuerpo, "alerta").catch(()=>{});
-          alertasNuevas.uv = true;
-        }
-        if(Object.keys(alertasNuevas).length>0){
-          setClimaAlertaEnviada(prev=>({...prev, [hoy]: {...((prev||{})[hoy]||{}), ...alertasNuevas}}));
-        }
-      } catch(e) { /* silencioso — si falla Open-Meteo no debe romper el resto de la app */ }
-    };
-    chequearClima();
-    const interval = setInterval(chequearClima, 20*60*1000); // reintenta cada 20 min mientras la app esté abierta
-    return () => { cancelado = true; clearInterval(interval); };
-  }, []);
+  // ── Clima (viento/UV) ─────────────────────────────────────────────────
+  // El chequeo automático ahora corre en un Cloudflare Worker aparte (cron
+  // cada hora, no depende de que nadie tenga la app abierta). Acá solo se lee
+  // climaActual — que el Worker deja escrito en Firebase — para mostrar el
+  // banner visible en pantalla a quien tenga la app abierta en ese momento.
 
   // Notificaciones no leídas para la jefa
   const notifNoLeidas = React.useMemo(() => {
