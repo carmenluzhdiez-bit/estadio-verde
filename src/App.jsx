@@ -141,6 +141,23 @@ const estacionDeFecha = (fechaStr) => {
 // pospone al lunes) — aplica a cualquier tarea con frecuencia, en cualquier macrozona.
 const calcProximaFrecGlobal = (f, refFecha) => {
   const ref = new Date(refFecha+"T12:00:00");
+  const prohibidosGlobal = f.diasProhibidosGlobal||[];
+  // ── Modelo simple (nuevo): "cada X días" + fecha próxima editable a mano ──
+  if(f.intervaloDias){
+    if(!f.ultimaVez && !f.proximaFechaManual) return null;
+    let proxima = f.proximaFechaManual
+      ? new Date(f.proximaFechaManual+"T12:00:00")
+      : new Date(new Date(f.ultimaVez+"T12:00:00").getTime() + Number(f.intervaloDias)*24*60*60*1000);
+    // Si cae domingo (o un día prohibido), correr al día anterior válido — nunca posponer
+    for(let salvavidas=0;salvavidas<8;salvavidas++){
+      const dow=proxima.getDay();
+      if(dow===0 || prohibidosGlobal.includes(dow)){
+        proxima = new Date(proxima.getTime() - 24*60*60*1000);
+      } else break;
+    }
+    const diff = Math.round((proxima-ref)/(24*60*60*1000));
+    return { fecha: proxima.toISOString().slice(0,10), diff };
+  }
   if(f.modo==="diasSemana"){
     if(!f.ultimaVez) return null;
     const minimoDias = Number(f.diasMinimos)||0;
@@ -208,7 +225,7 @@ const aplicarCambioFrecuencia = (tareaVieja, patch, getElemFrecs, setElemFrecs) 
     const frecsActuales = getElemFrecs(tareaVieja.origenZid, tareaVieja.origenEid, null, tareaVieja.origenEsCustom);
     const frecActual = frecsActuales.find(f=>f.id===tareaVieja.origenFrecId);
     const valorPrevio = frecActual?.ultimaVez ?? null;
-    const frecsActualizadas = frecsActuales.map(f => f.id===tareaVieja.origenFrecId ? {...f, ultimaVez: tareaVieja.fecha} : f);
+    const frecsActualizadas = frecsActuales.map(f => f.id===tareaVieja.origenFrecId ? {...f, ultimaVez: tareaVieja.fecha, proximaFechaManual:""} : f);
     setElemFrecs(tareaVieja.origenZid, tareaVieja.origenEid, tareaVieja.origenEsCustom, frecsActualizadas);
     return {...patch, ultimaVezPrevia: valorPrevio};
   }
@@ -5660,10 +5677,7 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
   const addFila = () => {
     const nueva = {
       id:eid+"_"+Date.now(), tarea:"", ultimaVez:"",
-      verano:{tipo:"cadaXdias",cadaDias:"7",diasEspecificos:[]},
-      otono:{tipo:"cadaXdias",cadaDias:"15",diasEspecificos:[]},
-      invierno:{tipo:"noaplica",cadaDias:"",diasEspecificos:[]},
-      primavera:{tipo:"cadaXdias",cadaDias:"7",diasEspecificos:[]},
+      intervaloDias:"7", proximaFechaManual:"",
       tareaEnlazada:"",
     };
     setFrecLocal(arr=>[...arr, nueva]);
@@ -5809,95 +5823,53 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
                       {f.alturaCorte&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:4}}>Se anotará en la tarea: "Corte a: {f.alturaCorte} {f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="pulgadas"?"pulgadas":"milímetros"}"</div>}
                     </div>
                   )}
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
-                    {ESTACIONES_LIST.map(est=>{
-                      const cfg = getDiasConfig(f, est);
-                      const esActual = est===estActual;
-                      return (
-                        <div key={est} style={{border:`1px solid ${esActual?"rgba(52,211,153,0.4)":"rgba(255,255,255,0.08)"}`,borderRadius:8,padding:8,background:esActual?"rgba(52,211,153,0.04)":"rgba(255,255,255,0.02)"}}>
-                          <div style={{fontSize:10,fontWeight:700,color:esActual?"#34d399":"#6aaa7a",marginBottom:6}}>
-                            {ESTACIONES_LABEL[est]}{esActual&&" ← actual"}
-                          </div>
-                          {/* Tipo de frecuencia */}
-                          <div style={{display:"flex",gap:4,marginBottom:6}}>
-                            {[["cadaXdias","📏 Cada X días"],["porDiaSemana","📅 Por días/sem"],["noaplica","— No aplica"]].map(([t,l])=>(
-                              <button key={t} onClick={()=>updateEstacion(i,est,"tipo",t)}
-                                style={{flex:1,fontSize:9,padding:"3px 2px",borderRadius:4,cursor:"pointer",
-                                  border:`1px solid ${cfg.tipo===t?"rgba(52,211,153,0.5)":"rgba(255,255,255,0.1)"}`,
-                                  background:cfg.tipo===t?"rgba(52,211,153,0.1)":"transparent",
-                                  color:cfg.tipo===t?"#34d399":"#6aaa7a"}}>
-                                {l}
-                              </button>
-                            ))}
-                          </div>
-
-                          {/* CADA X DÍAS */}
-                          {cfg.tipo==="cadaXdias"&&(
-                            <div>
-                              <label style={labelSt}>Intervalo</label>
-                              <select value={cfg.cadaDias||"7"} onChange={e=>updateEstacion(i,est,"cadaDias",e.target.value)} style={{...inputSt,marginBottom:4}}>
-                                {FRECUENCIAS_OPTS.filter(o=>!["noaplica","segunecesidad"].includes(o.v)).map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
-                                <option value="segunecesidad">Según necesidad</option>
-                              </select>
-                              <label style={{...labelSt,marginTop:4}}>Días específicos (opcional — solo si debe ser justo ese día)</label>
-                              <div style={{display:"flex",gap:2,flexWrap:"wrap"}}>
-                                {DIAS_SEMANA.map(d=>{
-                                  const sel=(cfg.diasEspecificos||[]).includes(d.v);
-                                  return <button key={d.v} onClick={()=>updateEstacion(i,est,"diasEspecificos",sel?(cfg.diasEspecificos||[]).filter(x=>x!==d.v):[...(cfg.diasEspecificos||[]),d.v])}
-                                    style={{fontSize:9,padding:"2px 5px",borderRadius:4,cursor:"pointer",
-                                      border:`1px solid ${sel?"rgba(96,165,250,0.5)":"rgba(255,255,255,0.08)"}`,
-                                      background:sel?"rgba(96,165,250,0.1)":"transparent",
-                                      color:sel?"#60a5fa":"#6aaa7a"}}>{d.l}</button>;
-                                })}
-                              </div>
-                              <label style={{...labelSt,marginTop:6}}>Días que NUNCA debe hacerse (opcional)</label>
-                              <div style={{display:"flex",gap:2,flexWrap:"wrap"}}>
-                                {DIAS_SEMANA.map(d=>{
-                                  const sel=(cfg.diasProhibidos||[]).includes(d.v);
-                                  return <button key={d.v} onClick={()=>updateEstacion(i,est,"diasProhibidos",sel?(cfg.diasProhibidos||[]).filter(x=>x!==d.v):[...(cfg.diasProhibidos||[]),d.v])}
-                                    style={{fontSize:9,padding:"2px 5px",borderRadius:4,cursor:"pointer",
-                                      border:`1px solid ${sel?"rgba(239,68,68,0.5)":"rgba(255,255,255,0.08)"}`,
-                                      background:sel?"rgba(239,68,68,0.1)":"transparent",
-                                      color:sel?"#f87171":"#6aaa7a"}}>{d.l}</button>;
-                                })}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* POR DÍAS/SEMANA */}
-                          {cfg.tipo==="porDiaSemana"&&(
-                            <div>
-                              <label style={labelSt}>Días de la semana</label>
-                              <div style={{display:"flex",gap:2,flexWrap:"wrap",marginBottom:4}}>
-                                {DIAS_SEMANA.map(d=>{
-                                  const sel=(cfg.diasEspecificos||[]).includes(d.v);
-                                  return <button key={d.v} onClick={()=>updateEstacion(i,est,"diasEspecificos",sel?(cfg.diasEspecificos||[]).filter(x=>x!==d.v):[...(cfg.diasEspecificos||[]),d.v])}
-                                    style={{fontSize:9,padding:"3px 6px",borderRadius:4,cursor:"pointer",
-                                      border:`1px solid ${sel?"rgba(52,211,153,0.5)":"rgba(255,255,255,0.08)"}`,
-                                      background:sel?"rgba(52,211,153,0.12)":"transparent",
-                                      color:sel?"#34d399":"#6aaa7a",fontWeight:sel?700:400}}>{d.l}</button>;
-                                })}
-                              </div>
-                              <label style={labelSt}>Mínimo días entre repeticiones</label>
-                              <input type="number" min="1" max="60" value={cfg.cadaDias||"7"}
-                                onChange={e=>updateEstacion(i,est,"cadaDias",e.target.value)}
-                                style={{...inputSt,width:60}} placeholder="7"/>
-                              <label style={{...labelSt,marginTop:6}}>Días que NUNCA debe hacerse (opcional)</label>
-                              <div style={{display:"flex",gap:2,flexWrap:"wrap"}}>
-                                {DIAS_SEMANA.map(d=>{
-                                  const sel=(cfg.diasProhibidos||[]).includes(d.v);
-                                  return <button key={d.v} onClick={()=>updateEstacion(i,est,"diasProhibidos",sel?(cfg.diasProhibidos||[]).filter(x=>x!==d.v):[...(cfg.diasProhibidos||[]),d.v])}
-                                    style={{fontSize:9,padding:"2px 5px",borderRadius:4,cursor:"pointer",
-                                      border:`1px solid ${sel?"rgba(239,68,68,0.5)":"rgba(255,255,255,0.08)"}`,
-                                      background:sel?"rgba(239,68,68,0.1)":"transparent",
-                                      color:sel?"#f87171":"#6aaa7a"}}>{d.l}</button>;
-                                })}
-                              </div>
-                            </div>
-                          )}
+                  <div style={{border:"1px solid rgba(52,211,153,0.25)",borderRadius:8,padding:12,marginBottom:10,background:"rgba(52,211,153,0.03)"}}>
+                    <div style={{display:"flex",gap:14,alignItems:"flex-end",flexWrap:"wrap"}}>
+                      <div>
+                        <label style={labelSt}>Cada cuántos días</label>
+                        <input type="number" min="1" value={f.intervaloDias||""}
+                          onChange={e=>{
+                            const v=e.target.value;
+                            setFrecLocal(arr=>arr.map((ff,j)=>j===i?{...ff,intervaloDias:v,proximaFechaManual:""}:ff)); // al cambiar la frecuencia, se recalcula sola la próxima fecha
+                          }}
+                          placeholder="ej: 7"
+                          style={{...inputSt,width:90,fontSize:15,fontWeight:700}}/>
+                        <div style={{fontSize:9,color:"#5a9a7a",marginTop:2}}>1 = todos los días, 7 = semanal, 30 = mensual, 365 = una vez al año...</div>
+                      </div>
+                      <div>
+                        <label style={labelSt}>Próxima vez</label>
+                        <input type="date"
+                          value={f.proximaFechaManual || (f.ultimaVez && f.intervaloDias ? sumarDiasStr(f.ultimaVez, Number(f.intervaloDias)) : "")}
+                          onChange={e=>updateFila(i,"proximaFechaManual",e.target.value)}
+                          style={{...inputSt,width:"auto"}}/>
+                        <div style={{fontSize:9,color:"#5a9a7a",marginTop:2}}>Cámbiala para mover la tarea a otro día sin tocar la frecuencia.</div>
+                      </div>
+                      {Number(f.intervaloDias)===1&&(
+                        <div style={{fontSize:11,color:"#f59e0b",background:"rgba(245,158,11,0.1)",border:"1px solid rgba(245,158,11,0.3)",borderRadius:6,padding:"5px 10px"}}>
+                          ⚠️ Diaria — revisa si es correcto
                         </div>
-                      );
-                    })}
+                      )}
+                      {!f.intervaloDias&&(
+                        <div style={{fontSize:11,color:"#f87171",background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:6,padding:"5px 10px"}}>
+                          ⚠️ Sin frecuencia — no se propondrá sola
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Días que nunca debe hacerse (opcional, aplica siempre, no por estación) */}
+                  <div style={{marginBottom:10}}>
+                    <label style={labelSt}>Días que nunca debe hacerse (opcional)</label>
+                    <div style={{display:"flex",gap:2,flexWrap:"wrap"}}>
+                      {DIAS_SEMANA.map(d=>{
+                        const sel=(f.diasProhibidosGlobal||[]).includes(d.v);
+                        return <button key={d.v} onClick={()=>updateFila(i,"diasProhibidosGlobal",sel?(f.diasProhibidosGlobal||[]).filter(x=>x!==d.v):[...(f.diasProhibidosGlobal||[]),d.v])}
+                          style={{fontSize:9,padding:"2px 5px",borderRadius:4,cursor:"pointer",
+                            border:`1px solid ${sel?"rgba(239,68,68,0.5)":"rgba(255,255,255,0.08)"}`,
+                            background:sel?"rgba(239,68,68,0.1)":"transparent",
+                            color:sel?"#f87171":"#6aaa7a"}}>{d.l}</button>;
+                      })}
+                    </div>
                   </div>
 
                   {/* Tarea enlazada */}
@@ -12276,6 +12248,149 @@ function RenombradorMasivoTareas({ S, tareasProg, setTareasProg }) {
   );
 }
 
+function SimplificarFrecuenciasGolf({ S, getAllElems, getZD, setElemFrecsBulk }) {
+  const ZID = "31";
+  const [resultado, setResultado] = React.useState(null); // {migradas, revisar, estActual}
+  const [ediciones, setEdiciones] = React.useState({}); // {"elementoId_frecId": "valor"}
+  const [busqueda, setBusqueda] = React.useState("");
+  const [msg, setMsg] = React.useState("");
+
+  const elems = getAllElems ? getAllElems(ZID) : [];
+  const zdat = getZD ? getZD(ZID) : {};
+
+  const previsualizar = () => {
+    const hoy = fechaLocal();
+    const estActual = estacionDeFecha(hoy);
+    const diasMap = {diario:1,cada2dias:2,cada3dias:3,cada4dias:4,cada5dias:5,cada6dias:6,semanal:7,quincenal:15,cada21dias:21,mensual:30,bimestral:60,trimestral:90};
+    const migradas = [];
+    const revisar = [];
+    elems.forEach(e=>{
+      const frecs = e.isCustom
+        ? (zdat.elementosCustom||[]).find(x=>x.id===e.id)?.frecuencias||[]
+        : zdat.elementos?.[e.id]?.frecuencias||[];
+      frecs.forEach(f=>{
+        if(f.intervaloDias) return; // ya migrada antes — no tocar
+        const estVal = f[estActual];
+        let dias=null;
+        if(typeof estVal==="object"&&estVal!==null){
+          if(estVal.tipo!=="noaplica"&&estVal.tipo!=="segunecesidad"){
+            dias = Number(estVal.cadaDias)||diasMap[estVal.cadaDias]||null;
+          }
+        } else if(typeof estVal==="string"){
+          if(estVal&&!["noaplica","unavez","segunecesidad"].includes(estVal)){
+            dias = frecToDiasGlobal(estVal);
+          }
+        }
+        const item = {elementoId:e.id, elementoNombre:e.nombre, isCustom:!!e.isCustom, frecId:f.id, tarea:f.tarea, diasCalculados:dias};
+        if(!dias){ revisar.push({...item, motivo:"Sin frecuencia válida en la estación actual"}); }
+        else if(dias===1){ revisar.push({...item, motivo:"Quedaría diaria — revisar si corresponde"}); }
+        else { migradas.push(item); }
+      });
+    });
+    setResultado({migradas, revisar, estActual});
+    setMsg("");
+  };
+
+  const aplicarMigracion = () => {
+    if(!resultado) return;
+    const totalRevisadas = resultado.revisar.filter(item=>ediciones[item.elementoId+"_"+item.frecId]).length;
+    if(!window.confirm(`¿Migrar ${resultado.migradas.length} frecuencia(s) automáticamente${totalRevisadas?` + ${totalRevisadas} que revisaste a mano`:""}? Las que dejes sin revisar quedan igual que están (siguen funcionando con el sistema anterior).`)) return;
+    const porElemento = {};
+    resultado.migradas.forEach(item=>{
+      const key = item.elementoId+"__"+(item.isCustom?"c":"b");
+      if(!porElemento[key]) porElemento[key]={elementoId:item.elementoId,isCustom:item.isCustom,frecIds:new Map()};
+      porElemento[key].frecIds.set(item.frecId, item.diasCalculados);
+    });
+    resultado.revisar.forEach(item=>{
+      const valor = ediciones[item.elementoId+"_"+item.frecId];
+      if(valor && Number(valor)>0){
+        const key = item.elementoId+"__"+(item.isCustom?"c":"b");
+        if(!porElemento[key]) porElemento[key]={elementoId:item.elementoId,isCustom:item.isCustom,frecIds:new Map()};
+        porElemento[key].frecIds.set(item.frecId, Number(valor));
+      }
+    });
+    const updates = Object.values(porElemento).map(({elementoId,isCustom,frecIds})=>{
+      const frecsActuales = isCustom
+        ? (zdat.elementosCustom||[]).find(x=>x.id===elementoId)?.frecuencias||[]
+        : zdat.elementos?.[elementoId]?.frecuencias||[];
+      const frecsActualizadas = frecsActuales.map(f=>frecIds.has(f.id)?{...f,intervaloDias:String(frecIds.get(f.id))}:f);
+      return {eid:elementoId, isCustom, frecuencias:frecsActualizadas};
+    });
+    setElemFrecsBulk(ZID, updates);
+    setMsg(`✅ Migración aplicada — ${resultado.migradas.length + totalRevisadas} frecuencia(s) actualizadas al modelo simple.`);
+    setResultado(null); setEdiciones({});
+  };
+
+  const revisarFiltrado = resultado ? resultado.revisar.filter(item=>
+    !busqueda.trim() || (item.elementoNombre+" "+item.tarea).toLowerCase().includes(busqueda.trim().toLowerCase())
+  ) : [];
+
+  return (
+    <div className="ein">
+      <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,marginBottom:8,color:"#fbbf24"}}>🔧 Simplificar frecuencias</div>
+      <div style={{fontSize:12,color:"#5a9a7a",marginBottom:14}}>
+        Convierte las frecuencias por estación (4 casilleros) a un solo número — "cada X días" — usando el valor de la estación actual. No toca las que ya estén migradas. No se aplica nada hasta que aprietes "Aplicar migración" al final.
+      </div>
+      {msg&&<div style={{fontSize:12,color:"#22c55e",marginBottom:12}}>{msg}</div>}
+      {!resultado&&(
+        <button onClick={previsualizar} style={{...S.btn,background:"rgba(251,191,36,0.15)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.4)",fontWeight:600}}>
+          👁️ Previsualizar migración
+        </button>
+      )}
+      {resultado&&(
+        <div>
+          <div style={{display:"flex",gap:14,flexWrap:"wrap",marginBottom:16}}>
+            <div style={{background:"rgba(34,197,94,0.08)",border:"1px solid rgba(34,197,94,0.25)",borderRadius:8,padding:"10px 16px"}}>
+              <div style={{fontSize:20,fontWeight:700,color:"#22c55e"}}>{resultado.migradas.length}</div>
+              <div style={{fontSize:11,color:"#5a9a7a"}}>se migran solas (estación actual: {resultado.estActual})</div>
+            </div>
+            <div style={{background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.3)",borderRadius:8,padding:"10px 16px"}}>
+              <div style={{fontSize:20,fontWeight:700,color:"#f59e0b"}}>{resultado.revisar.length}</div>
+              <div style={{fontSize:11,color:"#5a9a7a"}}>necesitan que las revises (diarias o sin frecuencia válida)</div>
+            </div>
+          </div>
+
+          {resultado.revisar.length>0&&(
+            <>
+              <div style={{fontSize:13,fontWeight:700,color:"#f59e0b",marginBottom:8}}>⚠️ Para revisar</div>
+              <input value={busqueda} onChange={e=>setBusqueda(e.target.value)} placeholder="Buscar por elemento o tarea..."
+                style={{...S.input,marginBottom:10,width:"100%",maxWidth:400}}/>
+              <div style={{maxHeight:400,overflowY:"auto",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,marginBottom:16}}>
+                {revisarFiltrado.map(item=>{
+                  const key=item.elementoId+"_"+item.frecId;
+                  return (
+                    <div key={key} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                      <div style={{flex:1,fontSize:12}}>
+                        <strong>{item.elementoNombre}</strong> <span style={{color:"#5a8a6a"}}>· {item.tarea}</span>
+                        <div style={{fontSize:10,color:"#f59e0b"}}>{item.motivo}</div>
+                      </div>
+                      <input type="number" min="1" placeholder="días" value={ediciones[key]||""}
+                        onChange={e=>setEdiciones(p=>({...p,[key]:e.target.value}))}
+                        style={{...S.input,width:80,fontSize:12}}/>
+                    </div>
+                  );
+                })}
+                {revisarFiltrado.length===0&&<div style={{padding:16,textAlign:"center",color:"#5a8a6a",fontSize:12}}>Sin resultados.</div>}
+              </div>
+            </>
+          )}
+
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={aplicarMigracion} disabled={resultado.migradas.length===0&&Object.keys(ediciones).length===0}
+              style={{...S.btn,background:"rgba(34,197,94,0.15)",color:"#22c55e",border:"1px solid rgba(34,197,94,0.4)",fontWeight:600,
+                opacity:(resultado.migradas.length===0&&Object.keys(ediciones).length===0)?0.4:1}}>
+              ✅ Aplicar migración
+            </button>
+            <button onClick={()=>{setResultado(null);setEdiciones({});}} style={{...S.btn,background:"transparent",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)"}}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito, onCierreSectorial, onNuevaAlerta, configSemanal={}, setConfigSemanal, getAllElems, getZD, setElemFrecs, setElemFrecsBulk, bodegasData, setBodegasData }) {
   const GOLF_ZONA_ID = 31; // ID macrozona Golf
   const [fechaProponerGolf, setFechaProponerGolf] = React.useState(fechaLocal());
@@ -12659,7 +12774,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
         {(()=>{
           // Tabs según rol: trabajador solo ve lo que le corresponde
-          const todosTabs = [["panel","📊 Panel"],["greens","⛳ Greens"],["tees","🎯 Tees"],["bunkers","🏖️ Búnkers"],["fairways","🌾 Fairways"],["zonas","🌿 Zonas"],["arboles","🌳 Árboles"],["mediciones","📏 Alturas"],["humedad","💧 Humedad"],["eventos","🏆 Eventos"],["fitosanitario","⚗ Fitosanitario"],["programacion_golf","📅 Semana Golf"],["config_golf","⚙️ Programación Golf"],["correccion_masiva","🛠️ Corrección Fechas"]];
+          const todosTabs = [["panel","📊 Panel"],["greens","⛳ Greens"],["tees","🎯 Tees"],["bunkers","🏖️ Búnkers"],["fairways","🌾 Fairways"],["zonas","🌿 Zonas"],["arboles","🌳 Árboles"],["mediciones","📏 Alturas"],["humedad","💧 Humedad"],["eventos","🏆 Eventos"],["fitosanitario","⚗ Fitosanitario"],["programacion_golf","📅 Semana Golf"],["config_golf","⚙️ Programación Golf"],["correccion_masiva","🛠️ Corrección Fechas"],["simplificar_frecs","🔧 Simplificar Frecuencias"]];
           const tabsWorker = [["mediciones","📏 Alturas"],["humedad","💧 Humedad"]];
           // Agregar Programación solo para jefa/supervisor
           const todosTabs2 = todosTabs;
@@ -14414,6 +14529,10 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
 
       {subTab==="correccion_masiva"&&rolLogueado!=="trabajador"&&(
         <CorreccionMasivaFrecuenciasGolf S={S} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} setElemFrecsBulk={setElemFrecsBulk}/>
+      )}
+
+      {subTab==="simplificar_frecs"&&rolLogueado!=="trabajador"&&(
+        <SimplificarFrecuenciasGolf S={S} getAllElems={getAllElems} getZD={getZD} setElemFrecsBulk={setElemFrecsBulk}/>
       )}
 
       {subTab==="eventos"&&rolLogueado!=="trabajador"&&(
@@ -20931,6 +21050,13 @@ function PanelFitosanitarioGlobal({ S, MACROZONAS_BASE, getAllElems, personal, a
 
 
 // ─── HELPER: próximo día hábil (salta domingos) ──────────────────────────────
+// Suma N días a una fecha (string "YYYY-MM-DD") y devuelve el resultado en el mismo formato
+const sumarDiasStr = (fechaStr, dias) => {
+  if(!fechaStr||!dias) return "";
+  const d = new Date(fechaStr+"T12:00:00");
+  d.setDate(d.getDate()+Number(dias));
+  return d.toISOString().slice(0,10);
+};
 const diasHabiles = (fechaStr, n=1) => {
   const d = new Date(fechaStr+"T12:00:00");
   let sumados = 0;
