@@ -5753,13 +5753,30 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
     };
   };
 
+  // Calcula la próxima fecha (Date) ya con el ajuste de domingo/días prohibidos aplicado —
+  // debe dar el MISMO resultado que calcProximaFrecGlobal, para que la vista previa del
+  // editor no muestre un número distinto al que realmente se va a proponer.
+  const calcularProximaConAjuste = (f) => {
+    if(!f.intervaloDias) return null;
+    if(!f.ultimaVez && !f.proximaFechaManual) return null;
+    let proxima = f.proximaFechaManual
+      ? new Date(f.proximaFechaManual+"T12:00:00")
+      : new Date(new Date(f.ultimaVez+"T12:00:00").getTime() + Number(f.intervaloDias)*24*60*60*1000);
+    const prohibidosGlobal = f.diasProhibidosGlobal||[];
+    for(let salvavidas=0;salvavidas<8;salvavidas++){
+      const dow=proxima.getDay();
+      if(dow===0 || prohibidosGlobal.includes(dow)){
+        proxima = new Date(proxima.getTime() - 24*60*60*1000);
+      } else break;
+    }
+    return proxima;
+  };
+
   const getProximaDias = (f) => {
     // Modelo simple (nuevo): cada X días + fecha próxima editable a mano
     if(f.intervaloDias){
-      if(!f.ultimaVez && !f.proximaFechaManual) return null;
-      const proxima = f.proximaFechaManual
-        ? new Date(f.proximaFechaManual+"T12:00:00")
-        : new Date(new Date(f.ultimaVez+"T12:00:00").getTime() + Number(f.intervaloDias)*24*60*60*1000);
+      const proxima = calcularProximaConAjuste(f);
+      if(!proxima) return null;
       const hoy = new Date(); hoy.setHours(12,0,0,0);
       return Math.round((proxima-hoy)/(24*60*60*1000));
     }
@@ -5886,7 +5903,7 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
                       <div>
                         <label style={labelSt}>Próxima vez</label>
                         <input type="date"
-                          value={f.proximaFechaManual || (f.ultimaVez && f.intervaloDias ? sumarDiasStr(f.ultimaVez, Number(f.intervaloDias)) : "")}
+                          value={f.proximaFechaManual || (()=>{ const p=calcularProximaConAjuste(f); return p?p.toISOString().slice(0,10):""; })()}
                           onChange={e=>updateFila(i,"proximaFechaManual",e.target.value)}
                           style={{...inputSt,width:"auto"}}/>
                         <div style={{fontSize:9,color:"#5a9a7a",marginTop:2}}>Cámbiala para mover la tarea a otro día sin tocar la frecuencia.</div>
