@@ -12268,6 +12268,7 @@ function SimplificarFrecuenciasGolf({ S, getAllElems, getZD, setElemFrecsBulk })
     const diasMap = {diario:1,cada2dias:2,cada3dias:3,cada4dias:4,cada5dias:5,cada6dias:6,semanal:7,quincenal:15,cada21dias:21,mensual:30,bimestral:60,trimestral:90};
     const migradas = [];
     const revisar = [];
+    const segunNecesidad = [];
     elems.forEach(e=>{
       const frecs = e.isCustom
         ? (zdat.elementosCustom||[]).find(x=>x.id===e.id)?.frecuencias||[]
@@ -12276,22 +12277,26 @@ function SimplificarFrecuenciasGolf({ S, getAllElems, getZD, setElemFrecsBulk })
         if(f.intervaloDias) return; // ya migrada antes — no tocar
         const estVal = f[estActual];
         let dias=null;
+        let esSegunNecesidad=false;
         if(typeof estVal==="object"&&estVal!==null){
-          if(estVal.tipo!=="noaplica"&&estVal.tipo!=="segunecesidad"){
+          if(estVal.tipo==="segunecesidad") esSegunNecesidad=true;
+          else if(estVal.tipo!=="noaplica"){
             dias = Number(estVal.cadaDias)||diasMap[estVal.cadaDias]||null;
           }
         } else if(typeof estVal==="string"){
-          if(estVal&&!["noaplica","unavez","segunecesidad"].includes(estVal)){
+          if(estVal==="segunecesidad") esSegunNecesidad=true;
+          else if(estVal&&estVal!=="noaplica"&&estVal!=="unavez"){
             dias = frecToDiasGlobal(estVal);
           }
         }
         const item = {elementoId:e.id, elementoNombre:e.nombre, isCustom:!!e.isCustom, frecId:f.id, tarea:f.tarea, diasCalculados:dias};
-        if(!dias){ revisar.push({...item, motivo:"Sin frecuencia válida en la estación actual"}); }
+        if(esSegunNecesidad){ segunNecesidad.push(item); }
+        else if(!dias){ revisar.push({...item, motivo:"Sin frecuencia válida en la estación actual"}); }
         else if(dias===1){ revisar.push({...item, motivo:"Quedaría diaria — revisar si corresponde"}); }
         else { migradas.push(item); }
       });
     });
-    setResultado({migradas, revisar, estActual});
+    setResultado({migradas, revisar, segunNecesidad, estActual});
     setMsg("");
   };
 
@@ -12351,6 +12356,10 @@ function SimplificarFrecuenciasGolf({ S, getAllElems, getZD, setElemFrecsBulk })
             <div style={{background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.3)",borderRadius:8,padding:"10px 16px"}}>
               <div style={{fontSize:20,fontWeight:700,color:"#f59e0b"}}>{resultado.revisar.length}</div>
               <div style={{fontSize:11,color:"#5a9a7a"}}>necesitan que las revises (diarias o sin frecuencia válida)</div>
+            </div>
+            <div style={{background:"rgba(148,163,184,0.08)",border:"1px solid rgba(148,163,184,0.25)",borderRadius:8,padding:"10px 16px"}}>
+              <div style={{fontSize:20,fontWeight:700,color:"#94a3b8"}}>{resultado.segunNecesidad?.length||0}</div>
+              <div style={{fontSize:11,color:"#5a9a7a"}}>"Según necesidad" — no requieren nada, siguen siendo manuales (ej. Reparar sistema de riego)</div>
             </div>
           </div>
 
