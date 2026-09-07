@@ -1846,6 +1846,7 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
 
 function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa=false, puedeCrear=false, cierresTurno={}, onReabrirTurno, getElemFrecs, setElemFrecs }) {
   const [diasAbiertosHist, setDiasAbiertosHist] = React.useState({});
+  const [gruposHistAbiertos, setGruposHistAbiertos] = React.useState({}); // {"dia__nombreTarea": bool}
   const [fechaReprogramarHist, setFechaReprogramarHist] = React.useState({}); // {dia: fechaDestino}
   const [filtroDia,    setFiltroDia]    = React.useState("");
   const [filtroEstado, setFiltroEstado] = React.useState("todos");
@@ -2336,7 +2337,33 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
               <div style={{width:`${pct2}%`,height:"100%",background:pct2===100?"#22c55e":"#3b82f6",borderRadius:4}}/>
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:6}}>
-              {tdFiltradas.map(hpTask=>{
+              {(()=>{
+                const gruposHist = {};
+                tdFiltradas.forEach(t=>{
+                  const key = t.tarea||"(sin tarea)";
+                  if(!gruposHist[key]) gruposHist[key]=[];
+                  gruposHist[key].push(t);
+                });
+                const nombresGruposHist = Object.keys(gruposHist).sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
+                return nombresGruposHist.map(nombreGrupoHist=>{
+                  const itemsGrupoHist = gruposHist[nombreGrupoHist];
+                  const hechasGrupoHist = itemsGrupoHist.filter(t=>t.estado==="hecha"||t.estado==="completada").length;
+                  const claveGrupoHist = dia+"__"+nombreGrupoHist;
+                  const abiertoGrupoHist = gruposHistAbiertos[claveGrupoHist]===true;
+                  const completoGrupoHist = hechasGrupoHist===itemsGrupoHist.length;
+                  return (
+                    <div key={nombreGrupoHist} style={{border:`1px solid ${completoGrupoHist?"rgba(34,197,94,0.25)":"rgba(255,255,255,0.08)"}`,borderRadius:8,overflow:"hidden"}}>
+                      <div onClick={()=>setGruposHistAbiertos(p=>({...p,[claveGrupoHist]:!abiertoGrupoHist}))}
+                        style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",cursor:"pointer",background:completoGrupoHist?"rgba(34,197,94,0.05)":"rgba(255,255,255,0.03)"}}>
+                        <span style={{fontSize:10,color:"#5a9a7a",transform:abiertoGrupoHist?"rotate(90deg)":"none",transition:"transform .15s",display:"inline-block"}}>▶</span>
+                        <span style={{fontSize:13,fontWeight:600,flex:1}}>{nombreGrupoHist}</span>
+                        <span style={{fontSize:11,fontWeight:700,color:completoGrupoHist?"#22c55e":"#f59e0b",background:completoGrupoHist?"rgba(34,197,94,0.1)":"rgba(245,158,11,0.1)",padding:"1px 8px",borderRadius:10}}>
+                          {hechasGrupoHist}/{itemsGrupoHist.length}
+                        </span>
+                      </div>
+                      {abiertoGrupoHist&&(
+                        <div style={{display:"flex",flexDirection:"column",gap:6,padding:"6px 8px"}}>
+              {itemsGrupoHist.map(hpTask=>{
                 const est=EC[hpTask.estado]||EC.pendiente;
                 return (
                   <div key={hpTask.id} style={{display:"flex",gap:10,padding:"8px 10px",borderRadius:8,background:"rgba(255,255,255,0.04)",borderLeft:`3px solid ${est.color}40`}}>
@@ -2390,6 +2417,12 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                   </div>
                 );
               })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
             </div>
             </>)}
           </div>
