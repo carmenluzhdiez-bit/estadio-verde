@@ -22163,7 +22163,7 @@ export default function App() {
                   value={editElem.tipoEdit!==undefined?editElem.tipoEdit:e.tipo}
                   onChange={ev=>setEditElem(p=>({...p,tipoEdit:ev.target.value}))}>
                   {(()=>{
-                    const vk=["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
+                    const vk=VEGETACION_SUBS;
                     const ok=["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","maceteros","bodegas"];
                     return(<>
                       <optgroup label="🌿 Vegetación">{vk.map(k=><option key={k} value={k}>{CATEGORIAS_ELEM[k].icon} {CATEGORIAS_ELEM[k].label}</option>)}</optgroup>
@@ -23503,7 +23503,7 @@ export default function App() {
                           style={{...S.input,flex:"2 1 200px"}}/>
                         <div style={{flex:"1 1 150px",maxWidth:220}}>
                           {(()=>{
-                            const vk=["arboles","arbustos","cesped","herbaceas","trepadoras","rastreras","jardineras","macetas_piso","colgantes"];
+                            const vk=VEGETACION_SUBS;
                             const ok=["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","maceteros","bodegas"];
                             const esVege = vk.includes(newElem.tipo);
                             return (<>
