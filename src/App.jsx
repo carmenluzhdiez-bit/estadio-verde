@@ -78,9 +78,9 @@ function useFirebaseState(path, defaultValue) {
     valueRef.current = resolved;
     setValueLocal(resolved);
     pendingRef.current = true;
-    fbSet(ref(db, fullPath), resolved)
-      .then(() => { setTimeout(() => { pendingRef.current = false; }, 3000); })
-      .catch(() => { pendingRef.current = false; });
+    return fbSet(ref(db, fullPath), resolved)
+      .then(() => { setTimeout(() => { pendingRef.current = false; }, 3000); return true; })
+      .catch((err) => { pendingRef.current = false; console.error("Error al guardar en Firebase:", fullPath, err); return false; });
   };
 
   const setValueLocalOnly = (newVal) => {
@@ -5670,7 +5670,18 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
   };
 
   const removeFila = (i) => { setFrecLocal(arr=>arr.filter((_,j)=>j!==i)); if(expandida===i) setExpandida(null); };
-  const guardarFrecuencias = () => { setFrecs(zid,eid,isCustom,frecLocal); setGuardado(true); setTimeout(()=>setGuardado(false),2000); };
+  const [errorGuardado, setErrorGuardado] = React.useState(false);
+  const guardarFrecuencias = async () => {
+    setErrorGuardado(false);
+    const ok = await setFrecs(zid,eid,isCustom,frecLocal);
+    if(ok===false){
+      setErrorGuardado(true);
+      setTimeout(()=>setErrorGuardado(false),5000);
+    } else {
+      setGuardado(true);
+      setTimeout(()=>setGuardado(false),2000);
+    }
+  };
 
   const fpMes = new Date().getMonth()+1;
   const estActual = [12,1,2].includes(fpMes)?"verano":[3,4,5].includes(fpMes)?"otono":[6,7,8].includes(fpMes)?"invierno":"primavera";
@@ -5936,19 +5947,20 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
         })}
       </div>
 
-      <div style={{display:"flex",gap:8}}>
+      <div style={{display:"flex",gap:8,alignItems:"center"}}>
         <button onClick={addFila}
           style={{flex:1,padding:"9px 0",borderRadius:8,cursor:"pointer",border:"1px dashed rgba(52,211,153,0.3)",background:"rgba(52,211,153,0.05)",color:"#34d399",fontSize:12}}>
           ＋ Agregar tarea
         </button>
         <button onClick={guardarFrecuencias}
           style={{...S.btn,padding:"9px 18px",fontWeight:700,fontSize:13,
-            background:guardado?"rgba(34,197,94,0.15)":"rgba(52,211,153,0.12)",
-            color:guardado?"#22c55e":"#34d399",
-            border:`1px solid ${guardado?"rgba(34,197,94,0.4)":"rgba(52,211,153,0.3)"}`}}>
-          {guardado?"✅ Guardado":"💾 Guardar frecuencias"}
+            background:errorGuardado?"rgba(239,68,68,0.15)":guardado?"rgba(34,197,94,0.15)":"rgba(52,211,153,0.12)",
+            color:errorGuardado?"#f87171":guardado?"#22c55e":"#34d399",
+            border:`1px solid ${errorGuardado?"rgba(239,68,68,0.4)":guardado?"rgba(34,197,94,0.4)":"rgba(52,211,153,0.3)"}`}}>
+          {errorGuardado?"⚠️ No se pudo guardar — reintenta":guardado?"✅ Guardado":"💾 Guardar frecuencias"}
         </button>
       </div>
+      {errorGuardado&&<div style={{fontSize:11,color:"#f87171",marginTop:6}}>Hubo un problema de conexión al guardar. Revisa tu internet y aprieta "Guardar frecuencias" de nuevo antes de salir de esta pantalla.</div>}
     </div>
   );
 }
@@ -10995,18 +11007,20 @@ function ZonaGolfSimple({ S, labelSt, zonas, tareas, titulo, colorAcento, golfDa
 
   const guardar = () => {
     if(!form.tipo) return;
-    const reg = {...form,id:Date.now()};
+    const nombreTareaZGS = form.tipo==="Otra" ? (form.tipoOtro||"").trim() : form.tipo;
+    if(form.tipo==="Otra"&&!nombreTareaZGS){ alert("Escribe el nombre de la tarea en el cuadro que aparece debajo de \"Otra...\"."); return; }
+    const reg = {...form,tipo:nombreTareaZGS,id:Date.now()};
     setG({[clave]:[reg,...registros].slice(0,100)});
     // Enviar al programa
     if(form.responsable&&form.fecha) {
       setTareasProg(p=>({...p,[form.fecha]:[...(p[form.fecha]||[]),{
         id:Date.now()+1,fecha:form.fecha,zona:"Golf",
         elemento:zonas.find(z=>z.id===selZona)?.nombre||selZona,
-        tarea:`⛳ ${form.tipo}${form.descripcion?" — "+form.descripcion:""} · ${zonas.find(z=>z.id===selZona)?.nombre||selZona}`,
+        tarea:`⛳ ${nombreTareaZGS}${form.descripcion?" — "+form.descripcion:""} · ${zonas.find(z=>z.id===selZona)?.nombre||selZona}`,
         responsable:form.responsable,estado:"pendiente",notas:form.obs||"",auto:false,
       }]}));
     }
-    sincronizarMacrozona(form.tipo, zonas.find(z=>z.id===selZona)?.nombre||selZona);
+    sincronizarMacrozona(nombreTareaZGS, zonas.find(z=>z.id===selZona)?.nombre||selZona);
     setForm({fecha:hoy,tipo:"",responsable:"",descripcion:"",obs:""});
     setShowForm(false);
   };
@@ -11046,6 +11060,11 @@ function ZonaGolfSimple({ S, labelSt, zonas, tareas, titulo, colorAcento, golfDa
                 {(Array.isArray(tareas)?tareas:[]).map(t=><option key={t}>{t}</option>)}
                 <option value="Otra">Otra...</option>
               </select>
+              {form.tipo==="Otra"&&(
+                <input style={{...S.input,marginTop:6}} value={form.tipoOtro||""} autoFocus
+                  onChange={e=>setForm(p=>({...p,tipoOtro:e.target.value}))}
+                  placeholder="Escribe el nombre de la tarea..."/>
+              )}
             </div>
             <div><label style={labelSt}>Descripción</label><input style={S.input} value={form.descripcion} onChange={e=>setForm(p=>({...p,descripcion:e.target.value}))} placeholder="Detalles..."/></div>
             <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observaciones</label><input style={S.input} value={form.obs} onChange={e=>setForm(p=>({...p,obs:e.target.value}))}/></div>
@@ -12461,17 +12480,19 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   // ── Guardar tarea Golf → Programa ────────────────────────────────────────
   const guardarTareaGolf = () => {
     if(!tareaForm.tipo||!tareaForm.fecha) return;
+    const nombreTareaGTG = tareaForm.tipo==="Otra" ? (tareaForm.tipoCustom||"").trim() : tareaForm.tipo;
+    if(tareaForm.tipo==="Otra"&&!nombreTareaGTG){ alert("Escribe el nombre de la tarea en el cuadro que aparece debajo de \"Otra...\"."); return; }
     const target = tareaForm.target==="green" ? GREENS_DEF.find(g=>g.id===tareaForm.targetId)?.nombre :
                    tareaForm.target==="tee"   ? TEES_DEF.find(t=>t.id===tareaForm.targetId)?.nombre :
                    tareaForm.target==="arbol" ? (arboles.find(a=>String(a.id)===tareaForm.targetId)?.nombre||"Árbol") : "Todos";
-    const textoTarea = `⛳ Golf — ${tareaForm.tipo}${target&&target!=="Todos"?" ("+target+")":""}${tareaForm.descripcion?" — "+tareaForm.descripcion:""}`;
+    const textoTarea = `⛳ Golf — ${nombreTareaGTG}${target&&target!=="Todos"?" ("+target+")":""}${tareaForm.descripcion?" — "+tareaForm.descripcion:""}`;
     if(tareaForm.responsable&&tareaForm.fecha) {
       setTareasProg(p=>({...p,[tareaForm.fecha]:[...(p[tareaForm.fecha]||[]),{
         id:Date.now(),fecha:tareaForm.fecha,zona:"Golf",elemento:target||"",
         tarea:textoTarea,responsable:tareaForm.responsable,estado:tareaForm.responsable?"pendiente":"por_designar",notas:tareaForm.obs||"",auto:false,
       }]}));
     }
-    sincronizarMacrozona("Tarea programada", `${tareaForm.tipo} — ${tareaForm.responsable||"Sin asignar"}`);
+    sincronizarMacrozona("Tarea programada", `${nombreTareaGTG} — ${tareaForm.responsable||"Sin asignar"}`);
     setTareaForm(emptyTarea); setShowTareaForm(null);
   };
 
@@ -12941,6 +12962,11 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                           <option value="Fertilización Vivero">🌿 Fertilización Vivero</option>
                           <option value="Otra">Otra...</option>
                         </select>
+                        {tareaForm.tipo==="Otra"&&(
+                          <input style={{...S.input,marginTop:6}} value={tareaForm.tipoCustom||""} autoFocus
+                            onChange={e=>setTareaForm(p=>({...p,tipoCustom:e.target.value}))}
+                            placeholder="Escribe el nombre de la tarea..."/>
+                        )}
                       </div>
                       {(tareaForm.tipo||"").toLowerCase().includes("corte")&&(
                         <div style={{gridColumn:"1/-1",display:"flex",gap:8,alignItems:"center",background:"rgba(52,211,153,0.06)",border:"1px solid rgba(52,211,153,0.15)",borderRadius:8,padding:"8px 12px"}}>
@@ -12954,7 +12980,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                     <div style={{display:"flex",gap:8}}>
                       <button className="btn-p" style={S.btn} onClick={()=>{
                         if(!tareaForm.tipo){alert("⚠️ Falta elegir el tipo de tarea.");return;}
-                        const nombreTarea=tareaForm.tipo==="Otra"?tareaForm.tipoCustom||"Tarea":tareaForm.tipo;
+                        const nombreTarea=tareaForm.tipo==="Otra"?(tareaForm.tipoCustom||"").trim():tareaForm.tipo;
+                        if(tareaForm.tipo==="Otra"&&!nombreTarea){alert("Escribe el nombre de la tarea en el cuadro que aparece debajo de \"Otra...\".");return;}
                         const notaAltura=tareaForm.alturaObjetivo?`Cortar a: ${tareaForm.alturaObjetivo}mm.`:"";
                         const notas=[notaAltura,tareaForm.descripcion].filter(Boolean).join(" ");
                         const nueva={id:Date.now()+Math.random(),fecha:tareaForm.fecha,zona:"Golf",elemento:"Vivero Golf",tarea:nombreTarea,responsable:tareaForm.responsable,estado:tareaForm.responsable?"pendiente":"por_designar",notas,alturaCorte:tareaForm.alturaObjetivo||"",unidadAlturaCorte:"mm"};
@@ -13217,6 +13244,11 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                           <optgroup label="── Diarias ──">{TAREAS_GREENS_DIARIAS.map(t=><option key={t}>{t}</option>)}</optgroup>
                           <option value="Otra">Otra...</option>
                         </select>
+                        {tareaForm.tipo==="Otra"&&(
+                          <input style={{...S.input,marginTop:6}} value={tareaForm.tipoOtro||""} autoFocus
+                            onChange={e=>setTareaForm(p=>({...p,tipoOtro:e.target.value}))}
+                            placeholder="Escribe el nombre de la tarea..."/>
+                        )}
                       </div>
                       <div><label style={labelSt}>Aplicar a</label>
                         <select style={S.input} value={tareaForm.target} onChange={e=>setTareaForm(p=>({...p,target:e.target.value,greensSeleccionados:e.target.value==="todos"?GREENS_DEF.map(g=>g.id):e.target.value==="green"?[selectedGreen]:e.target.value==="vivero"?["vivero"]:e.target.value==="todos_vivero"?[...GREENS_DEF.map(g=>g.id),"vivero"]:[selectedGreen]}))}>
@@ -13269,6 +13301,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
 
                     {/* Vista previa de zonas a aplicar */}
                     {tareaForm.tipo&&tareaForm.target&&(()=>{
+                      const nombreTareaFinal2 = tareaForm.tipo==="Otra" ? (tareaForm.tipoOtro||"") : tareaForm.tipo;
                       const zonas = tareaForm.target==="seleccion"
                         ? (tareaForm.greensSeleccionados||[])
                         : tareaForm.target==="todos"
@@ -13282,7 +13315,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                       return (
                         <div style={{background:"rgba(52,211,153,0.06)",borderRadius:8,padding:"8px 12px",marginBottom:10,border:"1px solid rgba(52,211,153,0.15)"}}>
                           <div style={{fontSize:11,color:"#34d399",fontWeight:600,marginBottom:4}}>
-                            📋 Se generarán {zonas.length} tarea{zonas.length!==1?"s":""}: <strong>{tareaForm.tipo}</strong>
+                            📋 Se generarán {zonas.length} tarea{zonas.length!==1?"s":""}: <strong>{nombreTareaFinal2||"(escribe el nombre arriba)"}</strong>
                           </div>
                           <div style={{fontSize:11,color:"#5a9a7a"}}>
                             {zonas.map(id=>id==="vivero"?"🌱 Vivero":GREENS_DEF.find(g=>g.id===id)?.nombre||id).join(" · ")}
@@ -13346,7 +13379,9 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                           : tareaForm.target==="vivero"
                           ? ["vivero"]
                           : [selectedGreen];
+                        const nombreTareaFinal = tareaForm.tipo==="Otra" ? (tareaForm.tipoOtro||"").trim() : tareaForm.tipo;
                         if(!zonas.length||!tareaForm.tipo) return;
+                        if(tareaForm.tipo==="Otra"&&!nombreTareaFinal){ alert("Escribe el nombre de la tarea en el cuadro que aparece debajo de \"Otra...\"."); return; }
                         // Generar una tarea por cada zona
                         const nuevasTareas = zonas.map(id=>{
                           const nombreZona = id==="vivero"?"Vivero":GREENS_DEF.find(g=>g.id===id)?.nombre||id;
@@ -13356,7 +13391,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                             fecha:tareaForm.fecha,
                             zona:"Golf",
                             elemento:nombreZona+(hoyosZona?` (${hoyosZona})`:""),
-                            tarea:`⛳ ${tareaForm.tipo}${tareaForm.alturaCorte?" HOC "+tareaForm.alturaCorte+"mm":""}${tareaForm.descripcion?" — "+tareaForm.descripcion:""} · ${nombreZona}`,
+                            tarea:`⛳ ${nombreTareaFinal}${tareaForm.alturaCorte?" HOC "+tareaForm.alturaCorte+"mm":""}${tareaForm.descripcion?" — "+tareaForm.descripcion:""} · ${nombreZona}`,
                             responsable:tareaForm.responsable,
                             estado:tareaForm.responsable?"pendiente":"por_designar",
                             notas:tareaForm.obs||"",
@@ -13373,7 +13408,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                           });
                           return nuevo;
                         });
-                        sincronizarMacrozona("Tarea programada", `${tareaForm.tipo} — ${zonas.length} zonas`);
+                        sincronizarMacrozona("Tarea programada", `${nombreTareaFinal} — ${zonas.length} zonas`);
                         setTareaForm(emptyTarea);
                         setShowTareaForm(null);
                       }}>✓ Guardar {(()=>{const pgNT=tareaForm.target==="todos"?9:tareaForm.target==="todos_vivero"?10:tareaForm.target==="vivero"?1:tareaForm.target==="seleccion"?(tareaForm.greensSeleccionados||[]).length:1;return pgNT>1?`(${pgNT} tareas)`:"";})()} y enviar al programa</button>
@@ -13449,6 +13484,11 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                           {TAREAS_TEES.map(t=><option key={t}>{t}</option>)}
                           <option value="Otra">Otra...</option>
                         </select>
+                        {tareaForm.tipo==="Otra"&&(
+                          <input style={{...S.input,marginTop:6}} value={tareaForm.tipoCustom||""} autoFocus
+                            onChange={e=>setTareaForm(p=>({...p,tipoCustom:e.target.value}))}
+                            placeholder="Escribe el nombre de la tarea..."/>
+                        )}
                       </div>
                       <div><label style={labelSt}>Aplicar a</label>
                         <select style={S.input} value={tareaForm.target} onChange={e=>setTareaForm(p=>({...p,target:e.target.value}))}>
@@ -13559,15 +13599,22 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                     {TAREAS_LOMAS.concat(TAREAS_MACIZOS).concat(TAREAS_EDIFICIO).filter((v,i,a)=>a.indexOf(v)===i).map(t=><option key={t}>{t}</option>)}
                     <option value="Otra">Otra...</option>
                   </select>
+                  {tareaForm.tipo==="Otra"&&(
+                    <input style={{...S.input,marginTop:6}} value={tareaForm.tipoCustom||""} autoFocus
+                      onChange={e=>setTareaForm(p=>({...p,tipoCustom:e.target.value}))}
+                      placeholder="Escribe el nombre de la tarea..."/>
+                  )}
                 </div>
                 <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Descripción</label><input style={S.input} value={tareaForm.obs} onChange={e=>setTareaForm(p=>({...p,obs:e.target.value}))}/></div>
               </div>
               <div style={{display:"flex",gap:8}}>
                 <button className="btn-p" style={S.btn} onClick={()=>{
                   if(!tareaForm.tipo) return;
+                  const nombreTareaZE = tareaForm.tipo==="Otra" ? (tareaForm.tipoCustom||"").trim() : tareaForm.tipo;
+                  if(tareaForm.tipo==="Otra"&&!nombreTareaZE){ alert("Escribe el nombre de la tarea en el cuadro que aparece debajo de \"Otra...\"."); return; }
                   setTareasProg(p=>({...p,[tareaForm.fecha]:[...(p[tareaForm.fecha]||[]),{
                     id:Date.now(),fecha:tareaForm.fecha,zona:"Golf",elemento:tareaForm.descripcion,
-                    tarea:`⛳ ${tareaForm.tipo} — ${tareaForm.descripcion}`,
+                    tarea:`⛳ ${nombreTareaZE} — ${tareaForm.descripcion}`,
                     responsable:tareaForm.responsable,
                     estado:tareaForm.responsable?"pendiente":"por_designar",
                     notas:tareaForm.obs||"",auto:false,
@@ -13660,6 +13707,11 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                     <optgroup label="── Hoja persistente ──">{TAREAS_HOJA_PERSISTENTE.map(t=><option key={t}>{t}</option>)}</optgroup>
                     <option value="Otra">Otra...</option>
                   </select>
+                  {tareaForm.tipo==="Otra"&&(
+                    <input style={{...S.input,marginTop:6}} value={tareaForm.tipoCustom||""} autoFocus
+                      onChange={e=>setTareaForm(p=>({...p,tipoCustom:e.target.value}))}
+                      placeholder="Escribe el nombre de la tarea..."/>
+                  )}
                 </div>
                 <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Descripción</label><input style={S.input} value={tareaForm.descripcion} onChange={e=>setTareaForm(p=>({...p,descripcion:e.target.value}))}/></div>
               </div>
@@ -18136,7 +18188,7 @@ function PanelFrecuenciasZona({ S, zonas, getAllElems, getZD, setElemFrecs, esJe
               : zdActFrec.elementos?.[elemActFrec.id]?.frecuencias||[]
           }
           setFrecs={(zidArg, eidArg, isCustomArg, nuevasFrecs)=>{
-            setElemFrecs(String(zonaActFrec.id), elemActFrec.id, elemActFrec.isCustom||false, nuevasFrecs);
+            return setElemFrecs(String(zonaActFrec.id), elemActFrec.id, elemActFrec.isCustom||false, nuevasFrecs);
           }}
         />
       )}
@@ -21471,15 +21523,15 @@ export default function App() {
     return TAREAS_DEFAULT[tipo] ? TAREAS_DEFAULT[tipo].map(t=>({...t,id:eid+"_"+t.tarea})) : [];
   };
   const setElemFrecs = (zid, eid, isCustom, frecuencias) => {
-    if(isCustom){const arr=[...(data[zid]?.elementosCustom||[])];const i=arr.findIndex(e=>e.id===eid);if(i>=0){arr[i]={...arr[i],frecuencias};setData(p=>({...p,[zid]:{...p[zid],elementosCustom:arr}}));}}
-    else{setData(p=>({...p,[zid]:{...p[zid],elementos:{...p[zid]?.elementos,[eid]:{...(p[zid]?.elementos?.[eid]||{}),frecuencias}}}}));}
+    if(isCustom){const arr=[...(data[zid]?.elementosCustom||[])];const i=arr.findIndex(e=>e.id===eid);if(i>=0){arr[i]={...arr[i],frecuencias};return setData(p=>({...p,[zid]:{...p[zid],elementosCustom:arr}}));}return Promise.resolve(false);}
+    else{return setData(p=>({...p,[zid]:{...p[zid],elementos:{...p[zid]?.elementos,[eid]:{...(p[zid]?.elementos?.[eid]||{}),frecuencias}}}}));}
   };
   // Versión masiva: aplica frecuencias a VARIOS elementos de una zona en UN SOLO setData/escritura a Firebase.
   // setElemFrecs llamado muchas veces seguidas dispara una escritura independiente por cada llamada — con
   // varias en paralelo, pueden llegar desordenadas a Firebase y la última en llegar "gana", pisando a las demás.
   // updates: [{eid, isCustom, frecuencias}, ...]
   const setElemFrecsBulk = (zid, updates) => {
-    setData(p => {
+    return setData(p => {
       const zonaData = { ...(p[zid]||{}) };
       let elementos = { ...(zonaData.elementos||{}) };
       let elementosCustom = [...(zonaData.elementosCustom||[])];
