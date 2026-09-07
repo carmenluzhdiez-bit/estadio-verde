@@ -5754,6 +5754,16 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
   };
 
   const getProximaDias = (f) => {
+    // Modelo simple (nuevo): cada X días + fecha próxima editable a mano
+    if(f.intervaloDias){
+      if(!f.ultimaVez && !f.proximaFechaManual) return null;
+      const proxima = f.proximaFechaManual
+        ? new Date(f.proximaFechaManual+"T12:00:00")
+        : new Date(new Date(f.ultimaVez+"T12:00:00").getTime() + Number(f.intervaloDias)*24*60*60*1000);
+      const hoy = new Date(); hoy.setHours(12,0,0,0);
+      return Math.round((proxima-hoy)/(24*60*60*1000));
+    }
+    // Modelo viejo (4 estaciones) — se mantiene por compatibilidad con lo que aún no se migra
     if(!f.ultimaVez) return null;
     const cfg = getDiasConfig(f, estActual);
     if(!cfg||cfg.tipo==="noaplica"||cfg.tipo==="segunecesidad") return null;
