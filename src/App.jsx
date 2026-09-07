@@ -1853,7 +1853,9 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
   const [filtroZona,   setFiltroZona]   = React.useState("todas");
   const [filtroResponsable, setFiltroResponsable] = React.useState("todos");
   const [diaImpresion, setDiaImpresion] = React.useState("");
-  const [tabHist,      setTabHist]      = React.useState("historial"); // "historial" | "buscar"
+  const [tabHist,      setTabHist]      = React.useState("historial_macro"); // "historial_macro" | "historial_golf" | "buscar" | "turnos" | "renombrar"
+  const esGolfZonaHist = (zona) => zona==="Golf"||(zona||"").includes("Golf");
+  const zonaFijaActual = tabHist==="historial_golf" ? "golf" : tabHist==="historial_macro" ? "no-golf" : null;
   const [buscarZona,   setBuscarZona]   = React.useState("");
   const [buscarTipo,   setBuscarTipo]   = React.useState("");
 
@@ -1878,6 +1880,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
   const diasOrdenados = Object.keys(tareas)
     .filter(dKey => (tareas[dKey]||[]).length > 0)
     .filter(dKey => !filtroDia || dKey === filtroDia)
+    .filter(dKey => !zonaFijaActual || (tareas[dKey]||[]).some(t=>zonaFijaActual==="golf"?esGolfZonaHist(t.zona):!esGolfZonaHist(t.zona)))
     .sort((dA,dB)=>dB.localeCompare(dA));
 
   function filtrarTareasHist(tArr, filtroEstado, filtroTarea, filtroZona) {
@@ -1888,7 +1891,8 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
       const okTar = !filtroTarea || histItem.tarea===filtroTarea;
       const okZon = filtroZona==="todas" || histItem.zona===filtroZona;
       const okResp = filtroResponsable==="todos" || histItem.responsable===filtroResponsable;
-      if(okEst && okTar && okZon && okResp) resultado.push(histItem);
+      const okZonaFija = !zonaFijaActual || (zonaFijaActual==="golf" ? esGolfZonaHist(histItem.zona) : !esGolfZonaHist(histItem.zona));
+      if(okEst && okTar && okZon && okResp && okZonaFija) resultado.push(histItem);
     }
     return resultado;
   }
@@ -2061,7 +2065,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
     <div className="ein">
       {/* Tabs */}
       <div style={{display:"flex",gap:6,marginBottom:14}}>
-        {([["historial","📜 Historial"],["buscar","🔍 Consulta histórica"]]
+        {([["historial_macro","📜 Historial Macrozonas"],["historial_golf","⛳ Historial Golf"],["buscar","🔍 Consulta histórica"]]
           .concat(esJefa?[["turnos","✏️ Ver/editar turnos"]]:[])
           .concat(esJefa?[["renombrar","🏷️ Renombrar tareas"]]:[])).map(([t,l])=>(
           <button key={t} onClick={()=>setTabHist(t)}
@@ -2187,7 +2191,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
       )}
 
       {/* ── Historial normal (solo si tab es historial) ── */}
-      {tabHist==="historial"&&(<>
+      {(tabHist==="historial_macro"||tabHist==="historial_golf")&&(<>
       {/* Filtros */}
       <div style={{...S.card,padding:16,marginBottom:18}}>
         <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:12,color:"#a0d8b0"}}>🔍 Filtros</div>
@@ -2300,8 +2304,8 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                       <button onClick={()=>{
                         const normArrRp = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
                         const todasDia = normArrRp(tareas[dia]||[]);
-                        const pendientesRp = todasDia.filter(t=>normalizarEstado(t.estado)!=="hecha"&&t.zona!=="Golf"&&!(t.zona||"").includes("Golf"));
-                        if(pendientesRp.length===0) return alert("No hay tareas pendientes para reprogramar en "+dia+" (Golf no se incluye — usa \"Proponer para esta fecha\" en Golf).");
+                        const pendientesRp = todasDia.filter(t=>normalizarEstado(t.estado)!=="hecha"&&(zonaFijaActual==="golf"?esGolfZonaHist(t.zona):!esGolfZonaHist(t.zona)));
+                        if(pendientesRp.length===0) return alert(`No hay tareas pendientes para reprogramar en ${dia}${zonaFijaActual==="golf"?"":" (Golf no se incluye acá — usa \"Historial Golf\")"}.`);
                         if(destinoElegido===dia) return alert("Elige una fecha destino distinta a la fecha de origen.");
                         const tareasDestinoRp = normArrRp(tareas[destinoElegido]||[]);
                         const yaExistenRp = tareasDestinoRp.map(t=>t.zona+"_"+t.tarea);
