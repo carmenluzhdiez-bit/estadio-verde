@@ -2283,8 +2283,8 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                       <button onClick={()=>{
                         const normArrRp = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
                         const todasDia = normArrRp(tareas[dia]||[]);
-                        const pendientesRp = todasDia.filter(t=>normalizarEstado(t.estado)!=="hecha");
-                        if(pendientesRp.length===0) return alert("No hay tareas pendientes para reprogramar en "+dia+".");
+                        const pendientesRp = todasDia.filter(t=>normalizarEstado(t.estado)!=="hecha"&&t.zona!=="Golf"&&!(t.zona||"").includes("Golf"));
+                        if(pendientesRp.length===0) return alert("No hay tareas pendientes para reprogramar en "+dia+" (Golf no se incluye — usa \"Proponer para esta fecha\" en Golf).");
                         if(destinoElegido===dia) return alert("Elige una fecha destino distinta a la fecha de origen.");
                         const tareasDestinoRp = normArrRp(tareas[destinoElegido]||[]);
                         const yaExistenRp = tareasDestinoRp.map(t=>t.zona+"_"+t.tarea);
@@ -4231,13 +4231,14 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                   const todasHoy = normArr(tareas[fecha]||[]);
                   console.log("Reprogramar: fecha="+fecha+" destino="+destinoElegido+" total="+todasHoy.length, todasHoy.map(t=>t.tarea+"→"+t.estado));
                   // Incluye "no se pudo" además de pendiente/haciéndose/etc — solo excluye lo ya "hecha".
-                  // Aplica a todas las zonas (incl. Golf, que comparte esta misma fuente tareasProg).
+                  // Excluye Golf: tiene su propio sistema de arrastre dentro de "Proponer para esta fecha".
                   const pendientes = todasHoy.filter(t=>{
                     const est = normalizarEstado(t.estado);
-                    return est!=="hecha";
+                    const esGolfRp = t.zona==="Golf"||(t.zona||"").includes("Golf");
+                    return est!=="hecha" && !esGolfRp;
                   });
-                  console.log("Pendientes (incl. no se pudo):", pendientes.length);
-                  if(pendientes.length===0) return alert("No hay tareas pendientes para reprogramar.");
+                  console.log("Pendientes (incl. no se pudo, sin Golf):", pendientes.length);
+                  if(pendientes.length===0) return alert("No hay tareas pendientes para reprogramar (Golf no se incluye — usa \"Proponer para esta fecha\" en Golf).");
                   if(destinoElegido===fecha) return alert("Elige una fecha destino distinta a la fecha de origen.");
                   const tareasDestino = normArr(tareas[destinoElegido]||[]);
                   const yaExisten = tareasDestino.map(t=>t.zona+"_"+t.tarea);
