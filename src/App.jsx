@@ -4337,7 +4337,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
 
   const esDomingo = (f) => new Date(f + "T12:00:00").getDay() === 0;
   const getTareasDelDia = (f) => tareas[f] || [];
-  const setTareasDelDia = (f, arr) => setTareas(p => ({ ...p, [f]: arr }));
+  const setTareasDelDia = (f, arr) => setTareas(p => ({ ...p, [f]: arr.map(limpiarUndef) }));
   const addTarea = (t) => {
     setTareasDelDia(fecha, [...getTareasDelDia(fecha), { ...t, id: Date.now(), fecha }]);
     if (esDomingo(fecha)) setAviso("⚠️ El día seleccionado es domingo. Considera mover esta tarea a otro día.");
@@ -4382,7 +4382,8 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
             ? configSemanal?.corte_golf||"Osmar Bhalú Armijo Zúñiga"
             : getResponsablePorTipo(f.tarea, configSemanal, nombreZona)||"";
           const notaAltura = f.alturaCorte ? `Cortar a: ${f.alturaCorte} ${f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="pulgadas"?"pulgadas":"milímetros"}.` : "";
-          const item = { id: Date.now()+Math.random(), fecha, zona:nombreZona, elemento:e.nombre, tarea:f.tarea, responsable:respDefault, estado:respDefault?"pendiente":"por_designar", notas:[notaAltura,f.obs].filter(Boolean).join(" "), alturaCorte:f.alturaCorte||"", unidadAlturaCorte:f.unidadAlturaCorte||"mm", frecuencia:f.modo==="diasSemana"?`cada ${f.diasMinimos||"?"} días`:f[estProp], estacion:estProp, auto:true, fechaCorrespondiente:prox.fecha, origenZid:String(z.id), origenEid:e.id, origenFrecId:f.id, origenEsCustom:!!e.isCustom, diasVencida:esVencida?Math.abs(prox.diff):0, incluir:true, abierta:false };
+          const etiquetaFrec = f.modo==="diasSemana" ? `cada ${f.diasMinimos||"?"} días` : f.intervaloDias ? `cada ${f.intervaloDias} días` : (f[estProp]||"");
+          const item = { id: Date.now()+Math.random(), fecha, zona:nombreZona, elemento:e.nombre, tarea:f.tarea, responsable:respDefault, estado:respDefault?"pendiente":"por_designar", notas:[notaAltura,f.obs].filter(Boolean).join(" "), alturaCorte:f.alturaCorte||"", unidadAlturaCorte:f.unidadAlturaCorte||"mm", frecuencia:etiquetaFrec, estacion:estProp, auto:true, fechaCorrespondiente:prox.fecha, origenZid:String(z.id), origenEid:e.id, origenFrecId:f.id, origenEsCustom:!!e.isCustom, diasVencida:esVencida?Math.abs(prox.diff):0, incluir:true, abierta:false };
           propuestas.push(item);
           if(esVencida) { const vKey=`${nombreZona} — ${f.tarea}`; if(!vencidas.includes(vKey)) vencidas.push(vKey); }
         });
@@ -4396,13 +4397,15 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
   };
 
   const confirmarPreviewProp = () => {
-    const aEnviar = (previewProp||[]).filter(p=>p.incluir).map(({incluir,abierta,...t})=>t);
-    if(aEnviar.length===0){ alert("No hay tareas seleccionadas."); return; }
-    setTareasDelDia(fecha, [...getTareasDelDia(fecha), ...aEnviar]);
+    const yaExistenConfirm = getTareasDelDia(fecha).map(t=>t.zona+"_"+t.elemento+"_"+t.tarea);
+    const aEnviar = (previewProp||[]).filter(p=>p.incluir && !yaExistenConfirm.includes(p.zona+"_"+p.elemento+"_"+p.tarea)).map(({incluir,abierta,...t})=>t);
+    const yaEstabanConfirm = (previewProp||[]).filter(p=>p.incluir).length - aEnviar.length;
+    if(aEnviar.length===0 && yaEstabanConfirm===0){ alert("No hay tareas seleccionadas."); return; }
+    if(aEnviar.length>0) setTareasDelDia(fecha, [...getTareasDelDia(fecha), ...aEnviar]);
     const vencidasCount = aEnviar.filter(t=>t.diasVencida>0).length;
     if(esDomingo(fecha)) setAviso("⚠️ El día seleccionado es domingo. Las tareas fueron cargadas igual, pero considera mover la programación a otro día.");
-    else setAviso(`✅ ${aEnviar.length} tarea(s) confirmadas y asignadas para ${fecha}.${vencidasCount>0?` ${vencidasCount} estaban vencidas.`:""}`);
-    // Solo se quitan de la vista previa las que se enviaron — las que quedaron desmarcadas siguen ahí, esperando.
+    else setAviso(`✅ ${aEnviar.length} tarea(s) confirmadas y asignadas para ${fecha}.${vencidasCount>0?` ${vencidasCount} estaban vencidas.`:""}${yaEstabanConfirm>0?` (${yaEstabanConfirm} ya estaban agregadas — no se duplicaron.)`:""}`);
+    // Se quitan de la vista previa TODAS las marcadas (enviadas ahora o que ya estaban) — las desmarcadas siguen ahí, esperando.
     setPreviewProp(prev=>{
       const restantes = prev.filter(p=>!p.incluir);
       return restantes.length>0 ? restantes : null;
@@ -4413,8 +4416,13 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     const item = (previewProp||[]).find(p=>p.id===id);
     if(!item) return;
     const { incluir, abierta, ...tarea } = item;
-    setTareasDelDia(fecha, [...getTareasDelDia(fecha), tarea]);
-    setAviso(`✅ "${tarea.tarea}" (${tarea.elemento}) confirmada y asignada a ${tarea.responsable||"sin asignar"}.`);
+    const yaExisteUna = getTareasDelDia(fecha).some(t=>t.zona===tarea.zona&&t.elemento===tarea.elemento&&t.tarea===tarea.tarea);
+    if(!yaExisteUna){
+      setTareasDelDia(fecha, [...getTareasDelDia(fecha), tarea]);
+      setAviso(`✅ "${tarea.tarea}" (${tarea.elemento}) confirmada y asignada a ${tarea.responsable||"sin asignar"}.`);
+    } else {
+      setAviso(`ℹ️ "${tarea.tarea}" (${tarea.elemento}) ya estaba agregada — no se duplicó.`);
+    }
     setPreviewProp(prev=>{
       const restantes = prev.filter(p=>p.id!==id);
       return restantes.length>0 ? restantes : null;
@@ -4425,9 +4433,11 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     if(idsGrupo.length===0) return;
     const items = (previewProp||[]).filter(p=>idsGrupo.includes(p.id));
     if(items.length===0) return;
-    const aEnviar = items.map(({incluir,abierta,...t})=>t);
-    setTareasDelDia(fecha, [...getTareasDelDia(fecha), ...aEnviar]);
-    setAviso(`✅ ${aEnviar.length} tarea(s) de "${aEnviar[0].tarea}" confirmadas y enviadas.`);
+    const yaExistenGrupo = getTareasDelDia(fecha).map(t=>t.zona+"_"+t.elemento+"_"+t.tarea);
+    const aEnviar = items.filter(p=>!yaExistenGrupo.includes(p.zona+"_"+p.elemento+"_"+p.tarea)).map(({incluir,abierta,...t})=>t);
+    if(aEnviar.length>0) setTareasDelDia(fecha, [...getTareasDelDia(fecha), ...aEnviar]);
+    const yaEstabanGrupo = items.length - aEnviar.length;
+    setAviso(`✅ ${aEnviar.length} tarea(s) de "${items[0].tarea}" confirmadas y enviadas.${yaEstabanGrupo>0?` (${yaEstabanGrupo} ya estaban agregadas.)`:""}`);
     setPreviewProp(prev=>{
       const restantes = prev.filter(p=>!idsGrupo.includes(p.id));
       return restantes.length>0 ? restantes : null;
