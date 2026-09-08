@@ -4478,13 +4478,16 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
         </div>
         {tabProg==="programa"&&(<>
           <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-            <input type="date" value={fecha} onChange={e=>{
-                setFecha(e.target.value);
-                if(esDomingo(e.target.value)) setAviso("⚠️ El día seleccionado es domingo. Considera usar un día hábil.");
-                else if(e.target.value<=hoy) setAviso("ℹ️ Estás programando para hoy o una fecha pasada. Recuerda que lo ideal es programar con al menos un día de anticipación.");
-                else setAviso(null);
-              }}
-              style={{...S.input,width:"auto",fontSize:13}}/>
+            <div>
+              <label style={{fontSize:9,color:"#5a9a7a",display:"block",marginBottom:2,textTransform:"uppercase",letterSpacing:"0.5px"}}>Viendo/programando</label>
+              <input type="date" value={fecha} onChange={e=>{
+                  setFecha(e.target.value);
+                  if(esDomingo(e.target.value)) setAviso("⚠️ El día seleccionado es domingo. Considera usar un día hábil.");
+                  else if(e.target.value<=hoy) setAviso("ℹ️ Estás programando para hoy o una fecha pasada. Recuerda que lo ideal es programar con al menos un día de anticipación.");
+                  else setAviso(null);
+                }}
+                style={{...S.input,width:"auto",fontSize:13}}/>
+            </div>
             <button onClick={proponerTareas} style={{...S.btn,background:"rgba(59,130,246,0.2)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)",fontSize:13}}>✨ Proponer del día</button>
             <button onClick={()=>{
               setNuevaTarea(p=>({...p,
@@ -4579,8 +4582,11 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
               const destinoElegido = fechaReprogramar || destinoDefault;
               return (
               <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-                <input type="date" value={destinoElegido} onChange={e=>setFechaReprogramar(e.target.value)}
-                  style={{...S.input,fontSize:11,padding:"6px 8px",width:"auto"}} title="Fecha destino de la reprogramación"/>
+                <div>
+                  <label style={{fontSize:9,color:"#fbbf24",display:"block",marginBottom:2,textTransform:"uppercase",letterSpacing:"0.5px"}}>Destino a reprogramar</label>
+                  <input type="date" value={destinoElegido} onChange={e=>setFechaReprogramar(e.target.value)}
+                    style={{...S.input,fontSize:11,padding:"6px 8px",width:"auto"}} title="Fecha destino de la reprogramación"/>
+                </div>
                 <button onClick={()=>{
                   // Obtener TODAS las tareas del día normalizando el array
                   const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
