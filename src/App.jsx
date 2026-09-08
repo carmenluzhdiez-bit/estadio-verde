@@ -4042,7 +4042,269 @@ function ZonaRow({ zona, tz, zonasColapsadas, toggleZonaColapso, MACROZONAS_BASE
 
 
 
-function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACROZONAS_BASE, tareas, setTareas, tareasZonaHoy=0, esJefa=false, configSemanal={}, setConfigSemanal, puedeCrear=false, cierresTurno={}, onReabrirTurno, getElemFrecs, setElemFrecs, aplicaciones=[], setAplicaciones, stockFito, setStockFito, crearNotificacion, fechaInicial=null, onIrARegistrarAplicacion=()=>{}, setVista=()=>{} }) {
+function CorreccionMasivaFrecuenciasGeneral({ S, zonas, getAllElems, getZD, setElemFrecsBulk }) {
+  const [zonaSelId, setZonaSelId] = React.useState(zonas[0] ? String(zonas[0].id) : "");
+  const [busqueda, setBusqueda] = React.useState("");
+  const [nuevaFecha, setNuevaFecha] = React.useState(fechaLocal());
+  const [seleccionadas, setSeleccionadas] = React.useState({});
+  const [guardadoMsg, setGuardadoMsg] = React.useState("");
+
+  const zonaObj = zonas.find(z=>String(z.id)===zonaSelId);
+  const elems = zonaObj ? (getAllElems ? getAllElems(zonaSelId) : []) : [];
+  const zdat = zonaObj ? (getZD ? getZD(zonaSelId) : {}) : {};
+
+  const filas = React.useMemo(()=>{
+    const out=[];
+    elems.forEach(e=>{
+      const frecs = e.isCustom
+        ? (zdat.elementosCustom||[]).find(x=>x.id===e.id)?.frecuencias||[]
+        : zdat.elementos?.[e.id]?.frecuencias||[];
+      frecs.forEach(f=>{
+        out.push({ key: e.id+"__"+f.id, elementoId:e.id, elementoNombre:e.nombre, isCustom:!!e.isCustom, frecId:f.id, tarea:f.tarea||"(sin nombre)", ultimaVez:f.ultimaVez||"—" });
+      });
+    });
+    return out.sort((a,b)=>a.elementoNombre.localeCompare(b.elementoNombre,"es",{sensitivity:"base"})||a.tarea.localeCompare(b.tarea,"es",{sensitivity:"base"}));
+  }, [elems, zdat]);
+
+  const filasFiltradas = busqueda.trim()
+    ? filas.filter(r => (r.elementoNombre+" "+r.tarea).toLowerCase().includes(busqueda.trim().toLowerCase()))
+    : filas;
+
+  const toggleFila = (key) => setSeleccionadas(p=>({...p,[key]:!p[key]}));
+  const marcarTodas = () => setSeleccionadas(p=>{ const n={...p}; filasFiltradas.forEach(r=>n[r.key]=true); return n; });
+  const desmarcarTodas = () => setSeleccionadas(p=>{ const n={...p}; filasFiltradas.forEach(r=>delete n[r.key]); return n; });
+  const totalSeleccionadas = filasFiltradas.filter(r=>seleccionadas[r.key]).length;
+
+  const aplicar = () => {
+    if(!nuevaFecha){ alert("Elige una fecha."); return; }
+    const filasAAplicar = filas.filter(r=>seleccionadas[r.key]);
+    if(filasAAplicar.length===0){ alert("No hay filas seleccionadas."); return; }
+    if(!window.confirm(`¿Fijar "Última realización" = ${nuevaFecha} en ${filasAAplicar.length} frecuencia(s) de "${zonaObj?.nombre}"?`)) return;
+    const porElemento = {};
+    filasAAplicar.forEach(r=>{
+      const k = r.elementoId+"__"+(r.isCustom?"c":"b");
+      if(!porElemento[k]) porElemento[k] = { elementoId:r.elementoId, isCustom:r.isCustom, frecIds:new Set() };
+      porElemento[k].frecIds.add(r.frecId);
+    });
+    const updates = Object.values(porElemento).map(({elementoId, isCustom, frecIds})=>{
+      const frecsActuales = isCustom
+        ? (zdat.elementosCustom||[]).find(x=>x.id===elementoId)?.frecuencias||[]
+        : zdat.elementos?.[elementoId]?.frecuencias||[];
+      const frecsActualizadas = frecsActuales.map(f => frecIds.has(f.id) ? {...f, ultimaVez: nuevaFecha} : f);
+      return { eid: elementoId, isCustom, frecuencias: frecsActualizadas };
+    });
+    setElemFrecsBulk(zonaSelId, updates);
+    setGuardadoMsg(`✅ ${filasAAplicar.length} frecuencia(s) actualizadas a ${nuevaFecha}.`);
+    setSeleccionadas({});
+    setTimeout(()=>setGuardadoMsg(""), 4000);
+  };
+
+  return (
+    <div className="ein">
+      <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,marginBottom:8,color:"#fbbf24"}}>🛠️ Corrección masiva — Última realización</div>
+      <div style={{fontSize:12,color:"#5a9a7a",marginBottom:14}}>
+        Elige una macrozona, filtra, marca las filas que correspondan y escribe la fecha real una sola vez arriba. Solo cambia la fecha de la frecuencia — no crea ni borra tareas del programa.
+      </div>
+      <div style={{marginBottom:12}}>
+        <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Macrozona</label>
+        <select value={zonaSelId} onChange={e=>{setZonaSelId(e.target.value);setSeleccionadas({});setBusqueda("");}} style={{...S.input,maxWidth:340}}>
+          {zonas.map(z=><option key={z.id} value={String(z.id)}>{z.icono?z.icono+" ":""}{z.nombre}</option>)}
+        </select>
+      </div>
+      <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"flex-end",marginBottom:12}}>
+        <div style={{flex:1,minWidth:200}}>
+          <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Buscar (elemento o tarea)</label>
+          <input style={S.input} placeholder="ej: Riego, Corte, Green 03..." value={busqueda} onChange={e=>setBusqueda(e.target.value)}/>
+        </div>
+        <div>
+          <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Nueva fecha (última realización)</label>
+          <input type="date" style={S.input} value={nuevaFecha} onChange={e=>setNuevaFecha(e.target.value)}/>
+        </div>
+        <button className="btn-g" style={S.btn} onClick={marcarTodas}>✓ Marcar todas (filtradas)</button>
+        <button className="btn-g" style={S.btn} onClick={desmarcarTodas}>✗ Desmarcar todas</button>
+        <button className="btn-p" style={S.btn} onClick={aplicar} disabled={totalSeleccionadas===0}>
+          Aplicar a {totalSeleccionadas} seleccionada{totalSeleccionadas!==1?"s":""}
+        </button>
+      </div>
+      {guardadoMsg&&<div style={{fontSize:12,color:"#22c55e",marginBottom:10}}>{guardadoMsg}</div>}
+      <div style={{fontSize:11,color:"#5a8a6a",marginBottom:6}}>{filasFiltradas.length} fila(s) — {totalSeleccionadas} seleccionada(s)</div>
+      <div style={{maxHeight:520,overflowY:"auto",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8}}>
+        {filasFiltradas.map(r=>(
+          <div key={r.key} onClick={()=>toggleFila(r.key)}
+            style={{display:"flex",alignItems:"center",gap:10,padding:"7px 10px",borderBottom:"1px solid rgba(255,255,255,0.05)",cursor:"pointer",background:seleccionadas[r.key]?"rgba(34,197,94,0.10)":"transparent"}}>
+            <input type="checkbox" checked={!!seleccionadas[r.key]} onChange={()=>toggleFila(r.key)} onClick={e=>e.stopPropagation()}/>
+            <div style={{flex:1,fontSize:12}}>
+              <strong>{r.elementoNombre}</strong> <span style={{color:"#5a8a6a"}}>· {r.tarea}</span>
+            </div>
+            <div style={{fontSize:11,color:"#94a3b8",flexShrink:0}}>Actual: {r.ultimaVez}</div>
+          </div>
+        ))}
+        {filasFiltradas.length===0&&<div style={{padding:20,textAlign:"center",color:"#5a8a6a",fontSize:12}}>Sin resultados.</div>}
+      </div>
+    </div>
+  );
+}
+
+function SimplificarFrecuenciasGeneral({ S, zonas, getAllElems, getZD, setElemFrecsBulk }) {
+  const [zonaSelId, setZonaSelId] = React.useState(zonas[0] ? String(zonas[0].id) : "");
+  const [resultado, setResultado] = React.useState(null);
+  const [ediciones, setEdiciones] = React.useState({});
+  const [busqueda, setBusqueda] = React.useState("");
+  const [msg, setMsg] = React.useState("");
+
+  const zonaObj = zonas.find(z=>String(z.id)===zonaSelId);
+  const elems = zonaObj ? (getAllElems ? getAllElems(zonaSelId) : []) : [];
+  const zdat = zonaObj ? (getZD ? getZD(zonaSelId) : {}) : {};
+
+  const previsualizar = () => {
+    const hoy = fechaLocal();
+    const estActual = estacionDeFecha(hoy);
+    const diasMap = {diario:1,cada2dias:2,cada3dias:3,cada4dias:4,cada5dias:5,cada6dias:6,semanal:7,quincenal:15,cada21dias:21,mensual:30,bimestral:60,trimestral:90};
+    const migradas = [];
+    const revisar = [];
+    const segunNecesidad = [];
+    elems.forEach(e=>{
+      const frecs = e.isCustom
+        ? (zdat.elementosCustom||[]).find(x=>x.id===e.id)?.frecuencias||[]
+        : zdat.elementos?.[e.id]?.frecuencias||[];
+      frecs.forEach(f=>{
+        if(f.intervaloDias) return;
+        const estVal = f[estActual];
+        let dias=null;
+        let esSegunNecesidad=false;
+        if(typeof estVal==="object"&&estVal!==null){
+          if(estVal.tipo==="segunecesidad") esSegunNecesidad=true;
+          else if(estVal.tipo!=="noaplica"){
+            dias = Number(estVal.cadaDias)||diasMap[estVal.cadaDias]||null;
+          }
+        } else if(typeof estVal==="string"){
+          if(estVal==="segunecesidad") esSegunNecesidad=true;
+          else if(estVal&&estVal!=="noaplica"&&estVal!=="unavez"){
+            dias = frecToDiasGlobal(estVal);
+          }
+        }
+        const item = {elementoId:e.id, elementoNombre:e.nombre, isCustom:!!e.isCustom, frecId:f.id, tarea:f.tarea, diasCalculados:dias};
+        if(esSegunNecesidad){ segunNecesidad.push(item); }
+        else if(!dias){ revisar.push({...item, motivo:"Sin frecuencia válida en la estación actual"}); }
+        else if(dias===1){ revisar.push({...item, motivo:"Quedaría diaria — revisar si corresponde"}); }
+        else { migradas.push(item); }
+      });
+    });
+    setResultado({migradas, revisar, segunNecesidad, estActual});
+    setMsg("");
+  };
+
+  const aplicarMigracion = () => {
+    if(!resultado) return;
+    const totalRevisadas = resultado.revisar.filter(item=>ediciones[item.elementoId+"_"+item.frecId]).length;
+    if(!window.confirm(`¿Migrar ${resultado.migradas.length} frecuencia(s) automáticamente${totalRevisadas?` + ${totalRevisadas} que revisaste a mano`:""} de "${zonaObj?.nombre}"?`)) return;
+    const porElemento = {};
+    resultado.migradas.forEach(item=>{
+      const key = item.elementoId+"__"+(item.isCustom?"c":"b");
+      if(!porElemento[key]) porElemento[key]={elementoId:item.elementoId,isCustom:item.isCustom,frecIds:new Map()};
+      porElemento[key].frecIds.set(item.frecId, item.diasCalculados);
+    });
+    resultado.revisar.forEach(item=>{
+      const valor = ediciones[item.elementoId+"_"+item.frecId];
+      if(valor && Number(valor)>0){
+        const key = item.elementoId+"__"+(item.isCustom?"c":"b");
+        if(!porElemento[key]) porElemento[key]={elementoId:item.elementoId,isCustom:item.isCustom,frecIds:new Map()};
+        porElemento[key].frecIds.set(item.frecId, Number(valor));
+      }
+    });
+    const updates = Object.values(porElemento).map(({elementoId,isCustom,frecIds})=>{
+      const frecsActuales = isCustom
+        ? (zdat.elementosCustom||[]).find(x=>x.id===elementoId)?.frecuencias||[]
+        : zdat.elementos?.[elementoId]?.frecuencias||[];
+      const frecsActualizadas = frecsActuales.map(f=>frecIds.has(f.id)?{...f,intervaloDias:String(frecIds.get(f.id))}:f);
+      return {eid:elementoId, isCustom, frecuencias:frecsActualizadas};
+    });
+    setElemFrecsBulk(zonaSelId, updates);
+    setMsg(`✅ Migración aplicada — ${resultado.migradas.length + totalRevisadas} frecuencia(s) actualizadas al modelo simple.`);
+    setResultado(null); setEdiciones({});
+  };
+
+  const revisarFiltrado = resultado ? resultado.revisar.filter(item=>
+    !busqueda.trim() || (item.elementoNombre+" "+item.tarea).toLowerCase().includes(busqueda.trim().toLowerCase())
+  ) : [];
+
+  return (
+    <div className="ein">
+      <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,marginBottom:8,color:"#fbbf24"}}>🔧 Simplificar frecuencias</div>
+      <div style={{fontSize:12,color:"#5a9a7a",marginBottom:14}}>
+        Convierte las frecuencias por estación (4 casilleros) a un solo número — "cada X días" — usando el valor de la estación actual. No toca las que ya estén migradas. No se aplica nada hasta que aprietes "Aplicar migración".
+      </div>
+      <div style={{marginBottom:14}}>
+        <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Macrozona</label>
+        <select value={zonaSelId} onChange={e=>{setZonaSelId(e.target.value);setResultado(null);setEdiciones({});}} style={{...S.input,maxWidth:340}}>
+          {zonas.map(z=><option key={z.id} value={String(z.id)}>{z.icono?z.icono+" ":""}{z.nombre}</option>)}
+        </select>
+      </div>
+      {msg&&<div style={{fontSize:12,color:"#22c55e",marginBottom:12}}>{msg}</div>}
+      {!resultado&&(
+        <button onClick={previsualizar} style={{...S.btn,background:"rgba(251,191,36,0.15)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.4)",fontWeight:600}}>
+          👁️ Previsualizar migración
+        </button>
+      )}
+      {resultado&&(
+        <div>
+          <div style={{display:"flex",gap:14,flexWrap:"wrap",marginBottom:16}}>
+            <div style={{background:"rgba(34,197,94,0.08)",border:"1px solid rgba(34,197,94,0.25)",borderRadius:8,padding:"10px 16px"}}>
+              <div style={{fontSize:20,fontWeight:700,color:"#22c55e"}}>{resultado.migradas.length}</div>
+              <div style={{fontSize:11,color:"#5a9a7a"}}>se migran solas (estación actual: {resultado.estActual})</div>
+            </div>
+            <div style={{background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.3)",borderRadius:8,padding:"10px 16px"}}>
+              <div style={{fontSize:20,fontWeight:700,color:"#f59e0b"}}>{resultado.revisar.length}</div>
+              <div style={{fontSize:11,color:"#5a9a7a"}}>necesitan que las revises (diarias o sin frecuencia válida)</div>
+            </div>
+            <div style={{background:"rgba(148,163,184,0.08)",border:"1px solid rgba(148,163,184,0.25)",borderRadius:8,padding:"10px 16px"}}>
+              <div style={{fontSize:20,fontWeight:700,color:"#94a3b8"}}>{resultado.segunNecesidad?.length||0}</div>
+              <div style={{fontSize:11,color:"#5a9a7a"}}>"Según necesidad" — no requieren nada, siguen siendo manuales</div>
+            </div>
+          </div>
+
+          {resultado.revisar.length>0&&(
+            <>
+              <div style={{fontSize:13,fontWeight:700,color:"#f59e0b",marginBottom:8}}>⚠️ Para revisar</div>
+              <input value={busqueda} onChange={e=>setBusqueda(e.target.value)} placeholder="Buscar por elemento o tarea..."
+                style={{...S.input,marginBottom:10,width:"100%",maxWidth:400}}/>
+              <div style={{maxHeight:400,overflowY:"auto",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,marginBottom:16}}>
+                {revisarFiltrado.map(item=>{
+                  const key=item.elementoId+"_"+item.frecId;
+                  return (
+                    <div key={key} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                      <div style={{flex:1,fontSize:12}}>
+                        <strong>{item.elementoNombre}</strong> <span style={{color:"#5a8a6a"}}>· {item.tarea}</span>
+                        <div style={{fontSize:10,color:"#f59e0b"}}>{item.motivo}</div>
+                      </div>
+                      <input type="number" min="1" placeholder="días" value={ediciones[key]||""}
+                        onChange={e=>setEdiciones(p=>({...p,[key]:e.target.value}))}
+                        style={{...S.input,width:80,fontSize:12}}/>
+                    </div>
+                  );
+                })}
+                {revisarFiltrado.length===0&&<div style={{padding:16,textAlign:"center",color:"#5a8a6a",fontSize:12}}>Sin resultados.</div>}
+              </div>
+            </>
+          )}
+
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={aplicarMigracion} disabled={resultado.migradas.length===0&&Object.keys(ediciones).length===0}
+              style={{...S.btn,background:"rgba(34,197,94,0.15)",color:"#22c55e",border:"1px solid rgba(34,197,94,0.4)",fontWeight:600,
+                opacity:(resultado.migradas.length===0&&Object.keys(ediciones).length===0)?0.4:1}}>
+              ✅ Aplicar migración
+            </button>
+            <button onClick={()=>{setResultado(null);setEdiciones({});}} style={{...S.btn,background:"transparent",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)"}}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACROZONAS_BASE, tareas, setTareas, tareasZonaHoy=0, esJefa=false, configSemanal={}, setConfigSemanal, puedeCrear=false, cierresTurno={}, onReabrirTurno, getElemFrecs, setElemFrecs, setElemFrecsBulk, aplicaciones=[], setAplicaciones, stockFito, setStockFito, crearNotificacion, fechaInicial=null, onIrARegistrarAplicacion=()=>{}, setVista=()=>{} }) {
   const hoy = fechaLocal();
   const [fecha, setFecha] = React.useState(fechaInicial||hoy);
   const [tabProg, setTabProg] = React.useState("programa");
@@ -4170,7 +4432,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           🌿 Programar — todas las macrozonas (excepto Golf)
         </div>
         <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
-          {[["programa","📆 Programar"],["frecuencias","🔄 Frecuencias"]].map(([t,l])=>(
+          {[["programa","📆 Programar"],["frecuencias","🔄 Frecuencias"],["correccion_gral","🛠️ Corrección Fechas"],["simplificar_gral","🔧 Simplificar Frecuencias"]].map(([t,l])=>(
             <button key={t} className={`tab${tabProg===t?" on":""}`} onClick={()=>setTabProg(t)}>{l}</button>
           ))}
         </div>
@@ -4373,6 +4635,14 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
       {/* ── FRECUENCIAS POR MACROZONA ── */}
       {tabProg==="frecuencias"&&(
         <PanelFrecuenciasZona S={S} zonas={zonas.filter(z=>String(z.id)!=="31"&&!(z.nombre||"").toLowerCase().includes("golf"))} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} esJefa={esJefa}/>
+      )}
+
+      {tabProg==="correccion_gral"&&(
+        <CorreccionMasivaFrecuenciasGeneral S={S} zonas={zonas.filter(z=>String(z.id)!=="31"&&!(z.nombre||"").toLowerCase().includes("golf"))} getAllElems={getAllElems} getZD={getZD} setElemFrecsBulk={setElemFrecsBulk}/>
+      )}
+
+      {tabProg==="simplificar_gral"&&(
+        <SimplificarFrecuenciasGeneral S={S} zonas={zonas.filter(z=>String(z.id)!=="31"&&!(z.nombre||"").toLowerCase().includes("golf"))} getAllElems={getAllElems} getZD={getZD} setElemFrecsBulk={setElemFrecsBulk}/>
       )}
 
       {tabProg==="historial" && (
@@ -23851,7 +24121,7 @@ export default function App() {
         {/* PROGRAMACIÓN */}
         {vista==="programacion"&&(
           <ProgramacionDiaria key={"prog-"+progNonce} S={S} zonas={zonasConCust} data={data} personal={personal} getZD={getZD} getAllElems={getAllElems} MACROZONAS_BASE={MACROZONAS_BASE} tareas={tareasProg} setTareas={setTareasProg} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal}
-            getElemFrecs={getElemFrecs} setElemFrecs={setElemFrecs} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} stockFito={stockFito} setStockFito={setStockFito} crearNotificacion={crearNotificacion}
+            getElemFrecs={getElemFrecs} setElemFrecs={setElemFrecs} setElemFrecsBulk={setElemFrecsBulk} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} stockFito={stockFito} setStockFito={setStockFito} crearNotificacion={crearNotificacion}
             tareasZonaHoy={(tareasProg[new Date().toISOString().slice(0,10)]||[]).filter(t=>t.origenZona&&t.estado==="por_designar").length}
             esJefa={esJefa}
             puedeCrear={rolLogueado==="jefa"||rolLogueado==="supervisor"||esJefa}
