@@ -4647,21 +4647,24 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
                 {(()=>{
+                  const normClaveGrupoProp = (s) => (s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim().replace(/\s+/g," ");
                   const gruposProp = {};
+                  const nombresOriginalesProp = {};
                   previewFiltradoProp.forEach(p=>{
-                    const key = p.tarea||"(sin tarea)";
-                    if(!gruposProp[key]) gruposProp[key]=[];
+                    const key = normClaveGrupoProp(p.tarea) || "(sin tarea)";
+                    if(!gruposProp[key]){ gruposProp[key]=[]; nombresOriginalesProp[key]=p.tarea||"(sin tarea)"; }
                     gruposProp[key].push(p);
                   });
-                  const nombresGruposProp = Object.keys(gruposProp).sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
-                  return nombresGruposProp.map(nombreGrupoProp=>{
-                    const itemsGrupoProp = gruposProp[nombreGrupoProp];
+                  const nombresGruposProp = Object.keys(gruposProp).sort((a,b)=>nombresOriginalesProp[a].localeCompare(nombresOriginalesProp[b],"es",{sensitivity:"base"}));
+                  return nombresGruposProp.map(claveGrupoProp=>{
+                    const nombreGrupoProp = nombresOriginalesProp[claveGrupoProp];
+                    const itemsGrupoProp = gruposProp[claveGrupoProp];
                     const seleccionadosGrupoProp = itemsGrupoProp.filter(p=>p.incluir).length;
-                    const abiertoGrupoProp = gruposPreviewPropAbiertos[nombreGrupoProp]===true;
+                    const abiertoGrupoProp = gruposPreviewPropAbiertos[claveGrupoProp]===true;
                     const vencidasGrupoProp = itemsGrupoProp.filter(p=>p.diasVencida>0).length;
                     return (
-                      <div key={nombreGrupoProp} style={{borderRadius:8,border:"1px solid rgba(255,255,255,0.08)",overflow:"hidden"}}>
-                        <div onClick={()=>setGruposPreviewPropAbiertos(p=>({...p,[nombreGrupoProp]:!abiertoGrupoProp}))}
+                      <div key={claveGrupoProp} style={{borderRadius:8,border:"1px solid rgba(255,255,255,0.08)",overflow:"hidden"}}>
+                        <div onClick={()=>setGruposPreviewPropAbiertos(p=>({...p,[claveGrupoProp]:!abiertoGrupoProp}))}
                           style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",cursor:"pointer",background:"rgba(96,165,250,0.06)"}}>
                           <span style={{fontSize:10,color:"#5a9a7a",transform:abiertoGrupoProp?"rotate(90deg)":"none",transition:"transform .15s",display:"inline-block"}}>▶</span>
                           <span style={{fontSize:12,fontWeight:700,flex:1}}>{nombreGrupoProp}</span>
@@ -14893,21 +14896,24 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
                 {(()=>{
+                  const normClaveGrupoGolf = (s) => (s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim().replace(/\s+/g," ");
                   const grupos = {};
+                  const nombresOriginalesGolf = {}; // clave normalizada -> nombre real (tal como aparece en la primera tarea del grupo)
                   previewFiltrado.forEach(p=>{
-                    const key = p.tarea||"(sin tarea)";
-                    if(!grupos[key]) grupos[key]=[];
+                    const key = normClaveGrupoGolf(p.tarea) || "(sin tarea)";
+                    if(!grupos[key]){ grupos[key]=[]; nombresOriginalesGolf[key]=p.tarea||"(sin tarea)"; }
                     grupos[key].push(p);
                   });
-                  const nombresGrupos = Object.keys(grupos).sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
-                  return nombresGrupos.map(nombreGrupo=>{
-                    const itemsGrupo = grupos[nombreGrupo];
+                  const nombresGrupos = Object.keys(grupos).sort((a,b)=>nombresOriginalesGolf[a].localeCompare(nombresOriginalesGolf[b],"es",{sensitivity:"base"}));
+                  return nombresGrupos.map(claveGrupo=>{
+                    const nombreGrupo = nombresOriginalesGolf[claveGrupo];
+                    const itemsGrupo = grupos[claveGrupo];
                     const seleccionadosGrupo = itemsGrupo.filter(p=>p.incluir).length;
-                    const abierto = buscarPreviewGolf.trim() ? true : (gruposPreviewGolfAbiertos[nombreGrupo]??false);
+                    const abierto = buscarPreviewGolf.trim() ? true : (gruposPreviewGolfAbiertos[claveGrupo]??false);
                     const vencidasGrupo = itemsGrupo.filter(p=>p.diasVencida>0).length;
                     return (
-                      <div key={nombreGrupo} style={{borderRadius:8,border:"1px solid rgba(255,255,255,0.08)",overflow:"hidden"}}>
-                        <div onClick={()=>setGruposPreviewGolfAbiertos(p=>({...p,[nombreGrupo]:!abierto}))}
+                      <div key={claveGrupo} style={{borderRadius:8,border:"1px solid rgba(255,255,255,0.08)",overflow:"hidden"}}>
+                        <div onClick={()=>setGruposPreviewGolfAbiertos(p=>({...p,[claveGrupo]:!abierto}))}
                           style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",cursor:"pointer",background:"rgba(96,165,250,0.06)"}}>
                           <span style={{fontSize:10,color:"#5a9a7a",transform:abierto?"rotate(90deg)":"none",transition:"transform .15s",display:"inline-block"}}>▶</span>
                           <span style={{fontSize:12,fontWeight:700,flex:1}}>{nombreGrupo}</span>
