@@ -4402,7 +4402,36 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     const vencidasCount = aEnviar.filter(t=>t.diasVencida>0).length;
     if(esDomingo(fecha)) setAviso("⚠️ El día seleccionado es domingo. Las tareas fueron cargadas igual, pero considera mover la programación a otro día.");
     else setAviso(`✅ ${aEnviar.length} tarea(s) confirmadas y asignadas para ${fecha}.${vencidasCount>0?` ${vencidasCount} estaban vencidas.`:""}`);
-    setPreviewProp(null);
+    // Solo se quitan de la vista previa las que se enviaron — las que quedaron desmarcadas siguen ahí, esperando.
+    setPreviewProp(prev=>{
+      const restantes = prev.filter(p=>!p.incluir);
+      return restantes.length>0 ? restantes : null;
+    });
+  };
+
+  const enviarUnaPreviewProp = (id) => {
+    const item = (previewProp||[]).find(p=>p.id===id);
+    if(!item) return;
+    const { incluir, abierta, ...tarea } = item;
+    setTareasDelDia(fecha, [...getTareasDelDia(fecha), tarea]);
+    setAviso(`✅ "${tarea.tarea}" (${tarea.elemento}) confirmada y asignada a ${tarea.responsable||"sin asignar"}.`);
+    setPreviewProp(prev=>{
+      const restantes = prev.filter(p=>p.id!==id);
+      return restantes.length>0 ? restantes : null;
+    });
+  };
+
+  const enviarGrupoPreviewProp = (idsGrupo) => {
+    if(idsGrupo.length===0) return;
+    const items = (previewProp||[]).filter(p=>idsGrupo.includes(p.id));
+    if(items.length===0) return;
+    const aEnviar = items.map(({incluir,abierta,...t})=>t);
+    setTareasDelDia(fecha, [...getTareasDelDia(fecha), ...aEnviar]);
+    setAviso(`✅ ${aEnviar.length} tarea(s) de "${aEnviar[0].tarea}" confirmadas y enviadas.`);
+    setPreviewProp(prev=>{
+      const restantes = prev.filter(p=>!idsGrupo.includes(p.id));
+      return restantes.length>0 ? restantes : null;
+    });
   };
 
     const ESTADOS_TAREA = ESTADOS_TAREA_GLOBAL;
@@ -4626,6 +4655,10 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                             style={{...S.btn,fontSize:10,padding:"2px 8px",background:"rgba(34,197,94,0.1)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)"}}>✓</button>
                           <button onClick={e=>{e.stopPropagation();const ids=itemsGrupoProp.map(x=>x.id);setPreviewProp(prev=>prev.map(x=>ids.includes(x.id)?{...x,incluir:false}:x));}}
                             style={{...S.btn,fontSize:10,padding:"2px 8px",background:"transparent",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)"}}>✕</button>
+                          <button onClick={e=>{e.stopPropagation();enviarGrupoPreviewProp(itemsGrupoProp.map(x=>x.id));}} title="Enviar todo este grupo al programa ahora"
+                            style={{...S.btn,fontSize:10,padding:"2px 10px",background:"rgba(34,197,94,0.15)",color:"#4ade80",border:"1px solid rgba(34,197,94,0.35)",fontWeight:600,whiteSpace:"nowrap"}}>
+                            ✓ Enviar grupo
+                          </button>
                         </div>
                         {abiertoGrupoProp&&(
                           <div style={{display:"flex",flexDirection:"column",gap:4,padding:"6px"}}>
@@ -4645,6 +4678,10 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                                     <option value="">— Por designar —</option>
                                     {(Array.isArray(personal)?personal:Object.values(personal||{})).map(pp=><option key={pp.id} value={pp.nombre}>{pp.nombre}</option>)}
                                   </select>
+                                  <button onClick={()=>enviarUnaPreviewProp(p.id)} title="Enviar solo esta tarea al programa"
+                                    style={{...S.btn,fontSize:10,padding:"3px 10px",background:"rgba(34,197,94,0.12)",color:"#4ade80",border:"1px solid rgba(34,197,94,0.3)",whiteSpace:"nowrap"}}>
+                                    ✓ Enviar
+                                  </button>
                                 </div>
                               </div>
                             );})}
@@ -4656,7 +4693,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                 })()}
               </div>
               <div style={{display:"flex",gap:8}}>
-                <button className="btn-p" style={S.btn} onClick={confirmarPreviewProp}>✓ Confirmar y enviar al programa</button>
+                <button className="btn-p" style={S.btn} onClick={confirmarPreviewProp}>✓ Confirmar y enviar seleccionadas</button>
                 <button className="btn-g" style={S.btn} onClick={()=>setPreviewProp(null)}>Cancelar</button>
               </div>
             </div>
