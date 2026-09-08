@@ -4350,6 +4350,9 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
   };
   const deleteTarea = (id) => setTareasDelDia(fecha, getTareasDelDia(fecha).filter(t => t.id!==id));
 
+  const [previewProp, setPreviewProp] = React.useState(null);
+  const [buscarPreviewProp, setBuscarPreviewProp] = React.useState("");
+  const [gruposPreviewPropAbiertos, setGruposPreviewPropAbiertos] = React.useState({});
   const proponerTareas = () => {
     const estProp = estacionDeFecha(fecha);
     const propuestas = [];
@@ -4379,7 +4382,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
             ? configSemanal?.corte_golf||"Osmar Bhalú Armijo Zúñiga"
             : getResponsablePorTipo(f.tarea, configSemanal, nombreZona)||"";
           const notaAltura = f.alturaCorte ? `Cortar a: ${f.alturaCorte} ${f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="pulgadas"?"pulgadas":"milímetros"}.` : "";
-          const item = { id: Date.now()+Math.random(), fecha, zona:nombreZona, elemento:e.nombre, tarea:f.tarea, responsable:respDefault, estado:respDefault?"pendiente":"por_designar", notas:[notaAltura,f.obs].filter(Boolean).join(" "), alturaCorte:f.alturaCorte||"", unidadAlturaCorte:f.unidadAlturaCorte||"mm", frecuencia:f.modo==="diasSemana"?`cada ${f.diasMinimos||"?"} días`:f[estProp], estacion:estProp, auto:true, fechaCorrespondiente:prox.fecha, origenZid:String(z.id), origenEid:e.id, origenFrecId:f.id, origenEsCustom:!!e.isCustom };
+          const item = { id: Date.now()+Math.random(), fecha, zona:nombreZona, elemento:e.nombre, tarea:f.tarea, responsable:respDefault, estado:respDefault?"pendiente":"por_designar", notas:[notaAltura,f.obs].filter(Boolean).join(" "), alturaCorte:f.alturaCorte||"", unidadAlturaCorte:f.unidadAlturaCorte||"mm", frecuencia:f.modo==="diasSemana"?`cada ${f.diasMinimos||"?"} días`:f[estProp], estacion:estProp, auto:true, fechaCorrespondiente:prox.fecha, origenZid:String(z.id), origenEid:e.id, origenFrecId:f.id, origenEsCustom:!!e.isCustom, diasVencida:esVencida?Math.abs(prox.diff):0, incluir:true, abierta:false };
           propuestas.push(item);
           if(esVencida) { const vKey=`${nombreZona} — ${f.tarea}`; if(!vencidas.includes(vKey)) vencidas.push(vKey); }
         });
@@ -4389,9 +4392,17 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     const diaSemana = new Date(fecha+"T12:00:00").getDay();
     if(diaSemana===0) return alert("⚠️ Es domingo. Las tareas no se programan automáticamente en domingo. Agrégalas manualmente si hay turno especial.");
     if(propuestas.length===0) return alert("No hay tareas pendientes según las frecuencias definidas para esta fecha.\n\nRevisa que las macrozonas tengan 'Última realización' registrada en sus frecuencias.");
-    setTareasDelDia(fecha, [...getTareasDelDia(fecha), ...propuestas]);
+    setPreviewProp(propuestas);
+  };
+
+  const confirmarPreviewProp = () => {
+    const aEnviar = (previewProp||[]).filter(p=>p.incluir).map(({incluir,abierta,...t})=>t);
+    if(aEnviar.length===0){ alert("No hay tareas seleccionadas."); return; }
+    setTareasDelDia(fecha, [...getTareasDelDia(fecha), ...aEnviar]);
+    const vencidasCount = aEnviar.filter(t=>t.diasVencida>0).length;
     if(esDomingo(fecha)) setAviso("⚠️ El día seleccionado es domingo. Las tareas fueron cargadas igual, pero considera mover la programación a otro día.");
-    else if(vencidas.length>0) setAviso(`✅ ${propuestas.length} tarea(s) propuestas. ${vencidas.length} estaban vencidas y se programaron para hoy: ${vencidas.slice(0,3).join(" · ")}${vencidas.length>3?" y más...":""}`);
+    else setAviso(`✅ ${aEnviar.length} tarea(s) confirmadas y asignadas para ${fecha}.${vencidasCount>0?` ${vencidasCount} estaban vencidas.`:""}`);
+    setPreviewProp(null);
   };
 
     const ESTADOS_TAREA = ESTADOS_TAREA_GLOBAL;
@@ -4572,6 +4583,85 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
               );
             })()}
           </div>
+
+          {previewProp&&(()=>{
+            const previewFiltradoProp = previewProp.filter(p=>
+              !buscarPreviewProp.trim() || (p.tarea+" "+p.elemento+" "+p.zona).toLowerCase().includes(buscarPreviewProp.trim().toLowerCase())
+            );
+            return (
+            <div style={{...S.card,padding:16,marginBottom:16,marginTop:12,border:"1px solid rgba(96,165,250,0.3)",background:"rgba(96,165,250,0.03)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#93c5fd"}}>👁️ Vista previa — tareas para {fecha}</div>
+                <span style={{fontSize:11,color:"#5a9a7a"}}>{previewProp.filter(p=>p.incluir).length}/{previewProp.length} seleccionadas</span>
+              </div>
+              <div style={{fontSize:11,color:"#5a9a7a",marginBottom:10}}>Revisa el responsable de cada tarea antes de confirmar. Desmarca las que no quieras enviar hoy.</div>
+              <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap",alignItems:"center"}}>
+                <input style={{...S.input,flex:1,minWidth:200}} placeholder="🔍 Buscar por tarea, elemento o zona..." value={buscarPreviewProp} onChange={e=>setBuscarPreviewProp(e.target.value)}/>
+                <button className="btn-g" style={{...S.btn,fontSize:11}} onClick={()=>setPreviewProp(prev=>prev.map(p=>previewFiltradoProp.some(f=>f.id===p.id)?{...p,incluir:true}:p))}>✓ Marcar todas</button>
+                <button className="btn-g" style={{...S.btn,fontSize:11}} onClick={()=>setPreviewProp(prev=>prev.map(p=>previewFiltradoProp.some(f=>f.id===p.id)?{...p,incluir:false}:p))}>✗ Desmarcar todas</button>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
+                {(()=>{
+                  const gruposProp = {};
+                  previewFiltradoProp.forEach(p=>{
+                    const key = p.tarea||"(sin tarea)";
+                    if(!gruposProp[key]) gruposProp[key]=[];
+                    gruposProp[key].push(p);
+                  });
+                  const nombresGruposProp = Object.keys(gruposProp).sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
+                  return nombresGruposProp.map(nombreGrupoProp=>{
+                    const itemsGrupoProp = gruposProp[nombreGrupoProp];
+                    const seleccionadosGrupoProp = itemsGrupoProp.filter(p=>p.incluir).length;
+                    const abiertoGrupoProp = gruposPreviewPropAbiertos[nombreGrupoProp]===true;
+                    const vencidasGrupoProp = itemsGrupoProp.filter(p=>p.diasVencida>0).length;
+                    return (
+                      <div key={nombreGrupoProp} style={{borderRadius:8,border:"1px solid rgba(255,255,255,0.08)",overflow:"hidden"}}>
+                        <div onClick={()=>setGruposPreviewPropAbiertos(p=>({...p,[nombreGrupoProp]:!abiertoGrupoProp}))}
+                          style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",cursor:"pointer",background:"rgba(96,165,250,0.06)"}}>
+                          <span style={{fontSize:10,color:"#5a9a7a",transform:abiertoGrupoProp?"rotate(90deg)":"none",transition:"transform .15s",display:"inline-block"}}>▶</span>
+                          <span style={{fontSize:12,fontWeight:700,flex:1}}>{nombreGrupoProp}</span>
+                          {vencidasGrupoProp>0&&<span style={{fontSize:10,color:"#f87171",background:"rgba(248,113,113,0.1)",padding:"1px 6px",borderRadius:8}}>⚠️ {vencidasGrupoProp} vencida{vencidasGrupoProp!==1?"s":""}</span>}
+                          <span style={{fontSize:11,color:"#5a9a7a"}}>{seleccionadosGrupoProp}/{itemsGrupoProp.length} seleccionadas</span>
+                          <button onClick={e=>{e.stopPropagation();const ids=itemsGrupoProp.map(x=>x.id);setPreviewProp(prev=>prev.map(x=>ids.includes(x.id)?{...x,incluir:true}:x));}}
+                            style={{...S.btn,fontSize:10,padding:"2px 8px",background:"rgba(34,197,94,0.1)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)"}}>✓</button>
+                          <button onClick={e=>{e.stopPropagation();const ids=itemsGrupoProp.map(x=>x.id);setPreviewProp(prev=>prev.map(x=>ids.includes(x.id)?{...x,incluir:false}:x));}}
+                            style={{...S.btn,fontSize:10,padding:"2px 8px",background:"transparent",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)"}}>✕</button>
+                        </div>
+                        {abiertoGrupoProp&&(
+                          <div style={{display:"flex",flexDirection:"column",gap:4,padding:"6px"}}>
+                            {itemsGrupoProp.map(p=>{
+                              const iRealProp = previewProp.indexOf(p);
+                              return (
+                              <div key={p.id} style={{borderRadius:8,border:`1px solid ${p.incluir?"rgba(255,255,255,0.08)":"rgba(255,255,255,0.03)"}`,overflow:"hidden",opacity:p.incluir?1:0.5}}>
+                                <div style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:p.incluir?"rgba(255,255,255,0.03)":"transparent"}}>
+                                  <input type="checkbox" checked={p.incluir} onChange={()=>setPreviewProp(prev=>prev.map((x,xi)=>xi===iRealProp?{...x,incluir:!x.incluir}:x))}/>
+                                  <div style={{flex:1}}>
+                                    <span style={{fontSize:12,fontWeight:600}}>{p.zona}</span>
+                                    <span style={{fontSize:11,color:"#5a9a7a",marginLeft:6}}>· {p.elemento}</span>
+                                    {p.diasVencida>0&&<span style={{fontSize:10,color:"#f87171",marginLeft:6,background:"rgba(248,113,113,0.1)",padding:"1px 6px",borderRadius:8}}>⚠️ {p.diasVencida}d vencida</span>}
+                                  </div>
+                                  <select value={p.responsable||""} onChange={e=>setPreviewProp(prev=>prev.map((x,xi)=>xi===iRealProp?{...x,responsable:e.target.value,estado:e.target.value?"pendiente":"por_designar"}:x))}
+                                    style={{...S.input,fontSize:11,padding:"3px 7px",maxWidth:170}}>
+                                    <option value="">— Por designar —</option>
+                                    {(Array.isArray(personal)?personal:Object.values(personal||{})).map(pp=><option key={pp.id} value={pp.nombre}>{pp.nombre}</option>)}
+                                  </select>
+                                </div>
+                              </div>
+                            );})}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button className="btn-p" style={S.btn} onClick={confirmarPreviewProp}>✓ Confirmar y enviar al programa</button>
+                <button className="btn-g" style={S.btn} onClick={()=>setPreviewProp(null)}>Cancelar</button>
+              </div>
+            </div>
+            );
+          })()}
 
           {stats.total > 0 && (
             <div style={{...S.card,padding:"14px 18px",marginBottom:16,marginTop:12}}>
