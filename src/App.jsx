@@ -8820,7 +8820,7 @@ const AGENTES_RIESGO_EPP = [
   { id:"altura", label:"Caída de altura", presencia:"Poda y manejo arbóreo en altura",
     epp:["Arnés de cuerpo completo","Cabos de posicionamiento","Casco con barbiquejo","Línea de vida certificada"] },
   { id:"ergonomico", label:"Riesgo ergonómico (posturas, carga manual)", presencia:"Uso prolongado de herramientas, carga de materiales",
-    epp:[], sinEppFisico:true, medidas:"Herramientas ergonómicas cuando sea posible, rotación de tareas, capacitación en manejo manual de carga" },
+    epp:["Arnés medio cuerpo (soporte de orilladora)"], medidas:"Herramientas ergonómicas cuando sea posible, rotación de tareas, capacitación en manejo manual de carga" },
   { id:"golpes", label:"Golpes / atrapamiento", presencia:"Uso de trituradoras, maquinaria con partes móviles",
     epp:["Guantes reforzados","Calzado de seguridad","Resguardos de máquina"] },
 ];
@@ -9961,13 +9961,20 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                     </div>
                     {item.bodegaDestino&&(()=>{
                       const bodSel = BODEGAS_DEF.find(b=>b.id===item.bodegaDestino);
+                      const esOtroCategoria = item.categoriaBodega && !(bodSel?.categorias||[]).includes(item.categoriaBodega);
                       return bodSel&&(bodSel.categorias||[]).length>0&&(
                         <div style={{marginTop:8}}>
                           <label style={{...labelSt,color:"#86efac"}}>🏷️ Categoría en {bodSel.nombre}</label>
-                          <select style={{...S.input,fontSize:12}} value={item.categoriaBodega||""} onChange={e=>updateItem(idx,{categoriaBodega:e.target.value})}>
+                          <select style={{...S.input,fontSize:12}} value={esOtroCategoria?"Otro":(item.categoriaBodega||"")} onChange={e=>updateItem(idx,{categoriaBodega:e.target.value==="Otro"?" ":e.target.value})}>
                             <option value="">Seleccionar...</option>
                             {bodSel.categorias.map(c=><option key={c} value={c}>{c}</option>)}
+                            <option value="Otro">Otro (escribir)...</option>
                           </select>
+                          {esOtroCategoria&&(
+                            <input style={{...S.input,fontSize:12,marginTop:6}} autoFocus placeholder="Escribe la categoría/EPP..."
+                              value={item.categoriaBodega.trim()===""?"":item.categoriaBodega}
+                              onChange={e=>updateItem(idx,{categoriaBodega:e.target.value})}/>
+                          )}
                         </div>
                       );
                     })()}
