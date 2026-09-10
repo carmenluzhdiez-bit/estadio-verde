@@ -116,6 +116,13 @@ const VEGETACION_SUBS = ["arboles","arbustos","cesped","herbaceas","trepadoras",
 const OTRAS_CATS      = ["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","maceteros","bodegas"];
 // ─── ESTACIONES ──────────────────────────────────────────────────────────────
 const limpiarUndef = (obj) => JSON.parse(JSON.stringify(obj, function(limpKey,limpVal){ return limpVal===undefined?null:limpVal; }));
+// Formatea una cantidad de stock evitando errores de coma flotante de JS (ej. 172.79999999999998 → 172.8)
+const fmtStock = (n) => {
+  const num = Number(n);
+  if(!isFinite(num)) return n;
+  const redondeado = Math.round(num*100)/100; // 2 decimales máximo
+  return redondeado % 1 === 0 ? redondeado.toString() : redondeado.toFixed(2).replace(/0$/,"");
+};
 
 const ESTACIONES = {
   verano:    { label:"Verano",    icon:"☀️",  color:"#f59e0b", meses:"Dic–Feb" },
@@ -8505,7 +8512,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                       </div>
                       <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
                         <span style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:900,color}}>
-                          {item.stockActual} <span style={{fontSize:13,fontWeight:400}}>{item.unidad}</span>
+                          {fmtStock(item.stockActual)} <span style={{fontSize:13,fontWeight:400}}>{item.unidad}</span>
                         </span>
                         <span style={{...S.chip,background:bg,color,border:`1px solid ${color}40`,fontSize:11}}>
                           {agotado?"⛔ Agotado":bajo?"⚠️ Stock bajo":"✅ OK"}
@@ -16525,7 +16532,42 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                 const mesLabel=new Date(mesActual+"-15").toLocaleDateString("es-CL",{month:"long",year:"numeric"});
                 return (
                   <div style={{...S.card,padding:14,marginBottom:14,borderLeft:"3px solid #f97316",background:"rgba(249,115,22,0.04)"}}>
-                    <div style={{fontSize:12,fontWeight:700,color:"#f97316",marginBottom:8}}>⛽ Gasto en Bencina (desde Compras)</div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                      <div style={{fontSize:12,fontWeight:700,color:"#f97316"}}>⛽ Gasto en Bencina (desde Compras)</div>
+                      <button onClick={()=>{
+                        const win=window.open("","_blank");
+                        const filasMeses=Object.keys(porMes).sort().reverse().map(mes=>{
+                          const lbl=new Date(mes+"-15").toLocaleDateString("es-CL",{month:"long",year:"numeric"});
+                          const pxL=porMes[mes].litros>0?Math.round(porMes[mes].monto/porMes[mes].litros):null;
+                          return `<tr><td style="padding:5px 10px;border:1px solid #e0e0e0;font-size:12px">${lbl}</td><td style="padding:5px 10px;border:1px solid #e0e0e0;font-size:12px;text-align:right">${porMes[mes].litros>0?porMes[mes].litros.toFixed(1)+" L":"—"}</td><td style="padding:5px 10px;border:1px solid #e0e0e0;font-size:12px;text-align:right;font-weight:600">$${porMes[mes].monto.toLocaleString("es-CL")}</td><td style="padding:5px 10px;border:1px solid #e0e0e0;font-size:12px;text-align:right">${pxL?"$"+pxL.toLocaleString("es-CL"):"—"}</td><td style="padding:5px 10px;border:1px solid #e0e0e0;font-size:12px;text-align:right">${porMes[mes].n}</td></tr>`;
+                        }).join("");
+                        win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Gasto en Bencina</title>
+                          <style>body{font-family:Calibri,Arial,sans-serif;padding:24px;color:#1a1a2e}
+                          h1{font-size:16px;color:#c07a00;margin-bottom:4px}
+                          .sub{font-size:11px;color:#888;margin-bottom:18px}
+                          table{width:80%;border-collapse:collapse;margin-bottom:14px}
+                          th{background:#fef3c7;padding:6px 10px;text-align:left;font-size:11px}
+                          .box{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+                          .card{background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;padding:10px 14px}
+                          .lbl{font-size:9px;color:#888;text-transform:uppercase;margin-bottom:4px}
+                          .lts{font-size:16px;font-weight:700;color:#d97706}
+                          .mto{font-size:15px;font-weight:700;color:#92400e}
+                          @media print{.no-print{display:none}}</style></head><body>
+                          <button onclick="window.print()" class="no-print" style="float:right;padding:6px 14px;background:#c07a00;color:#fff;border:none;border-radius:5px;cursor:pointer">🖨️ Imprimir / PDF</button>
+                          <h1>⛽ Gasto en Bencina (desde Compras)</h1>
+                          <div class="sub">Estadio Español de Las Condes · Departamento de Áreas Verdes · ${hoy}</div>
+                          <div class="box">
+                            <div class="card"><div class="lbl">Este mes (${mesLabel})</div>${totalLtsMes>0?`<div class="lts">${totalLtsMes.toFixed(1)} L</div>`:""}<div class="mto">$${totalMontoMes.toLocaleString("es-CL")}</div>${totalLtsMes>0?`<div style="font-size:9px;color:#888">$${Math.round(totalMontoMes/totalLtsMes).toLocaleString("es-CL")}/L promedio</div>`:""}<div style="font-size:9px;color:#888">${estesMes.length} compra${estesMes.length!==1?"s":""}</div></div>
+                            <div class="card"><div class="lbl">Acumulado total</div>${totalLtsAcum>0?`<div class="lts">${totalLtsAcum.toFixed(1)} L</div>`:""}<div class="mto">$${totalMontoAcum.toLocaleString("es-CL")}</div>${totalLtsAcum>0?`<div style="font-size:9px;color:#888">$${Math.round(totalMontoAcum/totalLtsAcum).toLocaleString("es-CL")}/L promedio</div>`:""}<div style="font-size:9px;color:#888">${comprasBenc.length} compra${comprasBenc.length!==1?"s":""}</div></div>
+                          </div>
+                          <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Historial mensual</div>
+                          <table><thead><tr><th>Mes</th><th style="text-align:right">Litros</th><th style="text-align:right">Gasto</th><th style="text-align:right">$/L</th><th style="text-align:right">Compras</th></tr></thead><tbody>${filasMeses}</tbody></table>
+                        </body></html>`);
+                        win.document.close();win.focus();
+                      }} style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(249,115,22,0.12)",color:"#fb923c",border:"1px solid rgba(249,115,22,0.3)"}}>
+                        🖨️ Imprimir solo esto
+                      </button>
+                    </div>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
                       <div style={{background:"rgba(255,255,255,0.04)",borderRadius:8,padding:"8px 12px"}}>
                         <div style={{fontSize:10,color:"#7aaa80",textTransform:"uppercase",marginBottom:2}}>Este mes ({mesLabel})</div>
@@ -16702,7 +16744,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                                 return`<tr style="background:${idx%2?"#fafafa":"#fff"}">
                                   <td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px;overflow:hidden;text-overflow:ellipsis"><b>${it.nombre}</b>${it.obs?`<br><span style="font-size:9px;color:#888;font-style:italic">${it.obs}</span>`:""}</td>
                                   ${extraTd}
-                                  <td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:12px;text-align:right;font-weight:700;color:#1a5c2a">${it.stockActual} <span style="font-size:10px;font-weight:400;color:#666">${it.unidad||""}</span></td>
+                                  <td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:12px;text-align:right;font-weight:700;color:#1a5c2a">${fmtStock(it.stockActual)} <span style="font-size:10px;font-weight:400;color:#666">${it.unidad||""}</span></td>
                                   <td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px;text-align:center;color:${estColor};font-weight:600">${estTxt}</td>
                                 </tr>`;
                               }).join("")}
@@ -16731,7 +16773,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                           ${itemsHTML}
                           ${(()=>{
                             const nombreItem = (id)=>(bd.items||[]).find(i=>String(i.id)===String(id))?.nombre||"—";
-                            const movsRecientes = (bd.movimientos||[]).slice(0,50);
+                            const movsRecientes = (bd.movimientos||[]).filter(m=>!m.itemId||itemsParaInf.some(i=>String(i.id)===String(m.itemId))).slice(0,50);
                             const traslRecientes = (bd.traslados||[]).slice(0,50);
                             const filasMov = movsRecientes.map(m=>`<tr>
                               <td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px">${m.fecha||"—"}</td>
@@ -16792,7 +16834,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                                         </div>
                                         <div style={{display:"flex",gap:14,flexWrap:"wrap",fontSize:12,color:"#7aaa80"}}>
                                           {item.ubicacion&&<span>📍 {item.ubicacion}</span>}
-                                          <span style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color}}>{item.stockActual} <span style={{fontSize:12,fontWeight:400}}>{item.unidad}</span></span>
+                                          <span style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color}}>{fmtStock(item.stockActual)} <span style={{fontSize:12,fontWeight:400}}>{item.unidad}</span></span>
                                           {Number(item.stockMinimo)>0&&<span style={{fontSize:11,color:"#5a8a6a"}}>mín: {item.stockMinimo}</span>}
                                         </div>
                                         {bodegaActiva==="b04"&&(item.marca||item.horasUso)&&(
@@ -17408,7 +17450,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                                 </span>
                               </div>
                               <div style={{display:"flex",gap:12,fontSize:11,color:"#7aaa80",flexWrap:"wrap"}}>
-                                <span style={{fontWeight:700,color,fontSize:15}}>{item.stockActual} <span style={{fontSize:11,fontWeight:400}}>{item.unidad}</span></span>
+                                <span style={{fontWeight:700,color,fontSize:15}}>{fmtStock(item.stockActual)} <span style={{fontSize:11,fontWeight:400}}>{item.unidad}</span></span>
                                 {Number(item.stockMinimo)>0&&<span>mín: {item.stockMinimo}</span>}
                                 {item.obs&&<span style={{fontStyle:"italic",color:"#5a8a6a"}}>{item.obs}</span>}
                               </div>
