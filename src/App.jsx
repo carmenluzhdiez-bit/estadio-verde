@@ -9070,6 +9070,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   const [gastoPeriodo, setGastoPeriodo] = React.useState("mensual");
   const [gastoAnio, setGastoAnio] = React.useState(String(new Date().getFullYear()));
   const [gastoMesesSel, setGastoMesesSel] = React.useState([]); // ["2026-06","2026-09",...] para comparar meses específicos, incluso de años distintos
+  const [gastoAniosSel, setGastoAniosSel] = React.useState([]); // [] = todos los años (comportamiento por defecto); si eliges algunos, solo se comparan esos
   const [showForm, setShowForm] = React.useState(false);
   const [showRendForm, setShowRendForm] = React.useState(false);
   const [showReembolsoForm, setShowReembolsoForm] = React.useState(false);
@@ -10216,7 +10217,8 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
               return {periodo:MESES_NOM[i],monto,cant,ndocs:cMes.length};
             }).filter(f=>f.ndocs>0||f.monto!==0);
           } else if(gastoPeriodo==="anual") {
-            const anios = [...new Set(compras.map(c=>c.fecha?.slice(0,4)).filter(Boolean))].sort();
+            const todosLosAnios = [...new Set(compras.map(c=>c.fecha?.slice(0,4)).filter(Boolean))].sort();
+            const anios = gastoAniosSel.length>0 ? todosLosAnios.filter(a=>gastoAniosSel.includes(a)) : todosLosAnios;
             filasDatos = anios.map(a=>{
               const cAnio = compras.filter(c=>c.fecha?.startsWith(a)&&(c.items||[]).some(it=>(it.categoria||"Sin categoría")===gastoItemSel));
               const monto = cAnio.reduce((s,c)=>{
@@ -10363,6 +10365,28 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                         })}
                       </div>
                       {gastoMesesSel.length===0&&<div style={{fontSize:11,color:"#f59e0b",marginTop:8}}>Elige al menos un mes arriba para ver la comparación.</div>}
+                    </div>
+                  );
+                })()}
+                {gastoPeriodo==="anual"&&(()=>{
+                  const aniosDisponibles = [...new Set(compras.map(c=>c.fecha?.slice(0,4)).filter(Boolean))].sort().reverse();
+                  if(aniosDisponibles.length<=1) return null;
+                  return (
+                    <div style={{...S.card,padding:12,marginBottom:12}}>
+                      <div style={{fontSize:11,color:"#6aaa7a",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.5px"}}>Años a comparar (vacío = todos)</div>
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                        {aniosDisponibles.map(a=>{
+                          const sel = gastoAniosSel.includes(a);
+                          return (
+                            <button key={a} onClick={()=>setGastoAniosSel(p=>sel?p.filter(x=>x!==a):[...p,a])}
+                              style={{fontSize:11,padding:"4px 10px",borderRadius:6,cursor:"pointer",
+                                border:`1px solid ${sel?"rgba(52,211,153,0.5)":"rgba(255,255,255,0.1)"}`,
+                                background:sel?"rgba(52,211,153,0.15)":"transparent",
+                                color:sel?"#34d399":"#7aaa80",fontWeight:sel?700:400}}>{a}</button>
+                          );
+                        })}
+                        {gastoAniosSel.length>0&&<button onClick={()=>setGastoAniosSel([])} style={{fontSize:11,padding:"4px 10px",borderRadius:6,cursor:"pointer",border:"1px solid rgba(255,255,255,0.1)",background:"transparent",color:"#7aaa80"}}>✕ Ver todos</button>}
+                      </div>
                     </div>
                   );
                 })()}
