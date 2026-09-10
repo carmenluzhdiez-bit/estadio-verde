@@ -2958,7 +2958,7 @@ const getNombreRef = (nombreCompleto) => {
   return nombreCompleto.trim().split(" ")[0]||nombreCompleto;
 };
 
-function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE, onAccesoRapido, onCambiarMetodo, cierresTurno={}, onCerrarTurno, onReabrirTurno, crearNotificacion, esJefaApp=false, onGuardarRutinas, onGuardarAlertaFito, onCrearAlertaCompleta=()=>{}, hojasSeguridad=[], personal=[], bodegasData={}, ejecutarDescuentoStock=()=>{} }) {
+function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE, onAccesoRapido, onCambiarMetodo, cierresTurno={}, onCerrarTurno, onReabrirTurno, crearNotificacion, esJefaApp=false, onGuardarRutinas, onGuardarAlertaFito, onCrearAlertaCompleta=()=>{}, hojasSeguridad=[], personal=[], bodegasData={}, setBodegasData=()=>{}, ejecutarDescuentoStock=()=>{} }) {
   const [showProtocolosWorker, setShowProtocolosWorker] = React.useState(false);
   const hoy = fechaLocal();
   const [fechaVer, setFechaVer] = React.useState(fecha || hoy);
@@ -3105,6 +3105,108 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
                 💾 Guardar
               </button>
               <button onClick={()=>setArenaShow(p=>({...p,[tid]:false}))} style={{fontSize:11,padding:"5px 10px",borderRadius:6,border:"1px solid rgba(255,255,255,0.1)",background:"transparent",color:"#5a9a7a",cursor:"pointer"}}>Cancelar</button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const [equipoShow, setEquipoShow] = React.useState({});
+  const [equipoValor1, setEquipoValor1] = React.useState({});
+  const [equipoValor2, setEquipoValor2] = React.useState({});
+  const renderBloqueEquipoMant = (t) => {
+    if(t.estado!=="hecha"||!t.tipoRegistroEquipo) return null;
+    const tid=String(t.id);
+    const yaRegistrado = t.equipoMantRegistrada;
+    const show = equipoShow[tid]||false;
+    const bodegaEq = bodegasData?.b04;
+    const itemEq = (bodegaEq?.items||[]).find(i=>String(i.id)===String(t.equipoId));
+
+    if(yaRegistrado){
+      return (
+        <div style={{marginTop:8,padding:"10px 12px",background:"rgba(96,165,250,0.06)",border:"1px solid rgba(96,165,250,0.25)",borderRadius:8}}>
+          <div style={{fontSize:11,color:"#60a5fa",fontWeight:600}}>✅ {t.equipoMantDetalle}</div>
+        </div>
+      );
+    }
+    if(!itemEq){
+      return (
+        <div style={{marginTop:8,padding:"10px 12px",background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:8}}>
+          <div style={{fontSize:11,color:"#f87171"}}>⚠️ No se encontró el equipo en Bodega Maquinaria y Equipos.</div>
+        </div>
+      );
+    }
+
+    const esHoras = t.tipoRegistroEquipo==="horas";
+
+    const guardar = () => {
+      const hoy = fecha;
+      let detalle="";
+      let patchItem={};
+      if(esHoras){
+        const horas = equipoValor1[tid];
+        if(!horas||Number(horas)<0) return;
+        detalle = `Horómetro: ${horas} h`;
+        patchItem = {horometro:Number(horas), ultimaVezHoras:hoy};
+      } else {
+        const nivel = equipoValor1[tid]||"Normal";
+        const calidad = equipoValor2[tid]||"Bueno";
+        detalle = `Aceite — Nivel: ${nivel} · Calidad: ${calidad}`;
+        patchItem = {nivelAceite:nivel, calidadAceite:calidad, ultimaVezAceite:hoy};
+      }
+      setBodegasData(prev=>{
+        const items = (prev.b04?.items||[]).map(i=>String(i.id)===String(t.equipoId)?{...i,...patchItem}:i);
+        return {...prev, b04:{...(prev.b04||{}), items}};
+      });
+      onUpdateTarea(fecha, t.id, {equipoMantRegistrada:true, equipoMantDetalle:detalle});
+    };
+
+    return (
+      <div style={{marginTop:8,padding:"10px 12px",background:"rgba(96,165,250,0.05)",border:"1px solid rgba(96,165,250,0.25)",borderRadius:8}}>
+        {!show?(
+          <button onClick={()=>setEquipoShow(p=>({...p,[tid]:true}))}
+            style={{fontSize:12,padding:"6px 14px",borderRadius:6,border:"1px solid rgba(96,165,250,0.4)",background:"rgba(96,165,250,0.1)",color:"#60a5fa",cursor:"pointer",fontWeight:600}}>
+            {esHoras?"⏱️ Registrar horómetro":"🛢️ Registrar aceite"}
+          </button>
+        ):esHoras?(
+          <div>
+            <div style={{fontSize:11,color:"#60a5fa",fontWeight:700,marginBottom:6}}>⏱️ Horas actuales del horómetro — {itemEq.nombre}</div>
+            <input type="number" min="0" value={equipoValor1[tid]||""} onChange={e=>setEquipoValor1(p=>({...p,[tid]:e.target.value}))} placeholder="ej: 342"
+              style={{width:120,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(96,165,250,0.4)",borderRadius:6,color:"#ede9e0",padding:"7px 10px",fontSize:18,fontWeight:700,marginBottom:8}}/>
+            <div style={{display:"flex",gap:6}}>
+              <button disabled={!equipoValor1[tid]} onClick={guardar}
+                style={{fontSize:11,padding:"5px 14px",borderRadius:6,border:"1px solid rgba(96,165,250,0.4)",background:"rgba(96,165,250,0.15)",color:"#60a5fa",cursor:"pointer",fontWeight:600,opacity:equipoValor1[tid]?1:0.4}}>
+                💾 Guardar
+              </button>
+              <button onClick={()=>setEquipoShow(p=>({...p,[tid]:false}))} style={{fontSize:11,padding:"5px 10px",borderRadius:6,border:"1px solid rgba(255,255,255,0.1)",background:"transparent",color:"#5a9a7a",cursor:"pointer"}}>Cancelar</button>
+            </div>
+          </div>
+        ):(
+          <div>
+            <div style={{fontSize:11,color:"#60a5fa",fontWeight:700,marginBottom:6}}>🛢️ Aceite — {itemEq.nombre}</div>
+            <div style={{display:"flex",gap:8,marginBottom:8}}>
+              <div>
+                <div style={{fontSize:10,color:"#7aaa80",marginBottom:3}}>Nivel</div>
+                <select value={equipoValor1[tid]||"Normal"} onChange={e=>setEquipoValor1(p=>({...p,[tid]:e.target.value}))}
+                  style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(96,165,250,0.3)",borderRadius:6,color:"#ede9e0",padding:"7px 8px",fontSize:13}}>
+                  {["Bajo","Normal","Alto"].map(v=><option key={v}>{v}</option>)}
+                </select>
+              </div>
+              <div>
+                <div style={{fontSize:10,color:"#7aaa80",marginBottom:3}}>Calidad</div>
+                <select value={equipoValor2[tid]||"Bueno"} onChange={e=>setEquipoValor2(p=>({...p,[tid]:e.target.value}))}
+                  style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(96,165,250,0.3)",borderRadius:6,color:"#ede9e0",padding:"7px 8px",fontSize:13}}>
+                  {["Bueno","Cambiar pronto","Cambiar ahora"].map(v=><option key={v}>{v}</option>)}
+                </select>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:6}}>
+              <button onClick={guardar}
+                style={{fontSize:11,padding:"5px 14px",borderRadius:6,border:"1px solid rgba(96,165,250,0.4)",background:"rgba(96,165,250,0.15)",color:"#60a5fa",cursor:"pointer",fontWeight:600}}>
+                💾 Guardar
+              </button>
+              <button onClick={()=>setEquipoShow(p=>({...p,[tid]:false}))} style={{fontSize:11,padding:"5px 10px",borderRadius:6,border:"1px solid rgba(255,255,255,0.1)",background:"transparent",color:"#5a9a7a",cursor:"pointer"}}>Cancelar</button>
             </div>
           </div>
         )}
@@ -3539,6 +3641,7 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                         )}
                         {renderBloqueGasto(t)}
                         {renderBloqueArena(t)}
+                        {renderBloqueEquipoMant(t)}
                         {t.estado==="no_pudo"&&(
                           <div style={{marginTop:6}}>
                             <textarea rows={2} placeholder="¿Por qué no se pudo? (obligatorio)" value={t.notaWorker||""} onChange={e=>onUpdateTarea(fechaVer,t.id,{notaWorker:e.target.value})} style={{width:"100%",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:8,color:"#ede9e0",padding:"6px 10px",fontFamily:"'Georgia',serif",fontSize:12,resize:"vertical"}}/>
@@ -3815,6 +3918,7 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                               )}
                               {renderBloqueGasto(t)}
                               {renderBloqueArena(t)}
+                              {renderBloqueEquipoMant(t)}
                             </div>
                           );
                         })}
@@ -16448,6 +16552,26 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
               ➕ {bodegaActiva==="b04"?"Nueva máquina":"Nuevo ítem"}
             </button>}
             {esJefa&&<button style={{...S.btn,background:"rgba(167,139,250,0.15)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.3)"}} onClick={()=>{setShowInventForm(p=>!p);setShowItemForm(false);setShowMovForm(false);}}>📋 Inventario inicial</button>}
+            {esJefa&&bodegaActiva==="b04"&&<button style={{...S.btn,background:"rgba(96,165,250,0.15)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.3)"}} onClick={()=>{
+              const hoyMant = fechaLocal();
+              const items = (bodegasData?.b04?.items||[]).filter(i=>i.categoria!=="Combustible");
+              const yaEnPrograma = (Array.isArray(tareasProg[hoyMant])?tareasProg[hoyMant]:Object.values(tareasProg[hoyMant]||{}));
+              const diasDesde = (fechaStr) => fechaStr ? Math.floor((new Date(hoyMant+"T12:00:00")-new Date(fechaStr+"T12:00:00"))/(24*60*60*1000)) : Infinity;
+              const nuevas = [];
+              items.forEach(it=>{
+                const yaHoras = yaEnPrograma.some(t=>t.equipoId===String(it.id)&&t.tipoRegistroEquipo==="horas");
+                if(!yaHoras && diasDesde(it.ultimaVezHoras)>=30){
+                  nuevas.push({id:Date.now()+Math.random(),fecha:hoyMant,zona:"Maquinaria y Equipos",elemento:it.nombre,tarea:"⏱️ Registrar horas de uso",responsable:"",estado:"por_designar",notas:"",equipoId:String(it.id),tipoRegistroEquipo:"horas",auto:true});
+                }
+                const yaAceite = yaEnPrograma.some(t=>t.equipoId===String(it.id)&&t.tipoRegistroEquipo==="aceite");
+                if(!yaAceite && diasDesde(it.ultimaVezAceite)>=30){
+                  nuevas.push({id:Date.now()+Math.random(),fecha:hoyMant,zona:"Maquinaria y Equipos",elemento:it.nombre,tarea:"🛢️ Revisar aceite y nivel",responsable:"",estado:"por_designar",notas:"",equipoId:String(it.id),tipoRegistroEquipo:"aceite",auto:true});
+                }
+              });
+              if(nuevas.length===0){ alert("No hay mantenciones pendientes por ahora (todas están dentro de los 30 días)."); return; }
+              setTareasProg(prev=>({...prev,[hoyMant]:[...(Array.isArray(prev[hoyMant])?prev[hoyMant]:Object.values(prev[hoyMant]||{})),...nuevas]}));
+              alert(`✅ ${nuevas.length} tarea(s) de mantención generadas para hoy (${hoyMant}). Asígnalas a un jardinero o supervisor en Programa → Programar.`);
+            }}>🔧 Proponer mantenciones de equipos</button>}
           </div>
 
           {/* Inventario inicial */}
@@ -23392,6 +23516,7 @@ export default function App() {
                 esJefaApp={true}
                 crearNotificacion={crearNotificacion}
                 bodegasData={bodegasData}
+                setBodegasData={setBodegasData}
                 ejecutarDescuentoStock={ejecutarDescuentoStock}
                 onGuardarRutinas={(estado)=>{
                   const tId = workerLogueado;
@@ -24603,6 +24728,7 @@ export default function App() {
                   hojasSeguridad={Array.isArray(hojasSeguridad)?hojasSeguridad:[]}
                   personal={personal}
                   bodegasData={bodegasData}
+                  setBodegasData={setBodegasData}
                   ejecutarDescuentoStock={ejecutarDescuentoStock}
                   onUpdateTarea={(fecha,tid,patch)=>{
                     const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
