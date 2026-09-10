@@ -9761,7 +9761,9 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
         <div className="ein">
           <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
             <button className="btn-p" style={S.btn} onClick={()=>{setForm(emptyForm);setEditId(null);setShowForm(true);}}>➕ Nueva compra</button>
-            {seleccionadas.length>0&&<button style={{...S.btn,background:"rgba(167,139,250,0.2)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.35)",fontSize:12}} onClick={()=>setShowRendForm(true)}>📤 Rendir ({seleccionadas.length})</button>}
+            {seleccionadas.length>0
+              ? <button style={{...S.btn,background:"rgba(167,139,250,0.2)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.35)",fontSize:12}} onClick={()=>setShowRendForm(true)}>📤 Rendir ({seleccionadas.length})</button>
+              : <span style={{fontSize:11,color:"#6aaa7a",fontStyle:"italic"}}>☑️ Marca compras abajo para habilitar "Rendir"</span>}
             <button style={{...S.btn,fontSize:11,background:mostrarFacturadas?"rgba(6,182,212,0.15)":"rgba(255,255,255,0.05)",color:mostrarFacturadas?"#22d3ee":"#5a8a6a",border:`1px solid ${mostrarFacturadas?"rgba(6,182,212,0.3)":"rgba(255,255,255,0.1)"}`}} onClick={()=>setMostrarFacturadas(p=>!p)}>
               {mostrarFacturadas?"Ocultar NP facturadas":"Mostrar NP facturadas"}
             </button>
