@@ -3962,7 +3962,7 @@ Una vez cerrado no podrás modificar las tareas. Solo la jefa puede reabrir el t
 }
 
 // Componente auxiliar para cada fila de zona en Programa
-function ZonaRow({ zona, tz, zonasColapsadas, toggleZonaColapso, MACROZONAS_BASE, zonas=[], ESTADOS_TAREA, EC, updateTarea, deleteTarea, puedeCrear, personal=[], S }) {
+function ZonaRow({ zona, tz, zonasColapsadas, toggleZonaColapso, MACROZONAS_BASE, zonas=[], ESTADOS_TAREA, EC, updateTarea, deleteTarea, asignarATodos, puedeCrear, personal=[], S }) {
   const zonaColapso = zonasColapsadas.__init ? true : zonasColapsadas[zona]!==false;
   const hechasZona = tz.filter(t=>["hecha","completada"].includes(t.estado)).length;
   const icono = (zonas.find(z=>z.nombre===zona)||MACROZONAS_BASE.find(z=>z.nombre===zona)||{icono:"📍"}).icono;
@@ -5088,6 +5088,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
               EC={EC}
               updateTarea={updateTarea}
               deleteTarea={deleteTarea}
+              asignarATodos={asignarATodos}
               puedeCrear={puedeCrear}
               personal={personal}
               S={S}
