@@ -9069,6 +9069,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   const [gastoItemSel, setGastoItemSel] = React.useState("");
   const [gastoPeriodo, setGastoPeriodo] = React.useState("mensual");
   const [gastoAnio, setGastoAnio] = React.useState(String(new Date().getFullYear()));
+  const [gastoMesesSel, setGastoMesesSel] = React.useState([]); // ["2026-06","2026-09",...] para comparar meses específicos, incluso de años distintos
   const [showForm, setShowForm] = React.useState(false);
   const [showRendForm, setShowRendForm] = React.useState(false);
   const [showReembolsoForm, setShowReembolsoForm] = React.useState(false);
@@ -10228,6 +10229,21 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
               totalSel += monto;
               return {periodo:a,monto,cant,ndocs:cAnio.length};
             }).filter(f=>f.ndocs>0);
+          } else if(gastoPeriodo==="meses") {
+            // Comparar meses específicos elegidos a mano, sin importar si son del mismo año o de años distintos
+            filasDatos = gastoMesesSel.map(ym=>{
+              const cMes = compras.filter(c=>c.fecha?.slice(0,7)===ym&&(c.items||[]).some(it=>(it.categoria||"Sin categoría")===gastoItemSel));
+              const monto = cMes.reduce((s,c)=>{
+                const signo = c.tipoDoc==="Nota de Crédito"?-1:1;
+                return s+signo*(c.items||[]).filter(it=>(it.categoria||"Sin categoría")===gastoItemSel)
+                  .reduce((ss,it)=>ss+Number(it.totalBruto||it.totalNeto||0),0);
+              },0);
+              const cant = cMes.reduce((s,c)=>(c.items||[]).filter(it=>(it.categoria||"Sin categoría")===gastoItemSel)
+                .reduce((ss,it)=>ss+Number(it.cantidad||0),s),0);
+              totalSel += monto;
+              const [ay,am] = ym.split("-");
+              return {periodo:MESES_NOM[Number(am)-1]+" "+ay, monto, cant, ndocs:cMes.length};
+            });
           }
         }
 
@@ -10244,11 +10260,12 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
               <div>
                 <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Período</label>
                 <select style={S.input} value={gastoPeriodo} onChange={e=>{setGastoPeriodo(e.target.value);setGastoItemSel("");}}>
-                  <option value="mensual">Mensual</option>
+                  <option value="mensual">Mensual (un año)</option>
                   <option value="anual">Comparar años</option>
+                  <option value="meses">Comparar meses específicos</option>
                 </select>
               </div>
-              {gastoPeriodo!=="anual"&&(
+              {gastoPeriodo==="mensual"&&(
                 <div>
                   <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Año</label>
                   <select style={S.input} value={gastoAnio} onChange={e=>{setGastoAnio(e.target.value);setGastoItemSel("");}}>
@@ -10321,6 +10338,29 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                   <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700}}>{gastoItemSel}</div>
                   <button onClick={()=>setGastoItemSel("")} style={{...S.btn,fontSize:11,padding:"3px 10px"}}>← Volver</button>
                 </div>
+                {gastoPeriodo==="meses"&&(()=>{
+                  const mesesDisponibles = [...new Set(compras.map(c=>c.fecha?.slice(0,7)).filter(Boolean))].sort().reverse();
+                  return (
+                    <div style={{...S.card,padding:12,marginBottom:12}}>
+                      <div style={{fontSize:11,color:"#6aaa7a",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.5px"}}>Elige los meses a comparar (pueden ser de años distintos)</div>
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                        {mesesDisponibles.map(ym=>{
+                          const [ay,am] = ym.split("-");
+                          const label = MESES_NOM[Number(am)-1].slice(0,3)+" "+ay;
+                          const sel = gastoMesesSel.includes(ym);
+                          return (
+                            <button key={ym} onClick={()=>setGastoMesesSel(p=>sel?p.filter(x=>x!==ym):[...p,ym])}
+                              style={{fontSize:11,padding:"4px 10px",borderRadius:6,cursor:"pointer",
+                                border:`1px solid ${sel?"rgba(52,211,153,0.5)":"rgba(255,255,255,0.1)"}`,
+                                background:sel?"rgba(52,211,153,0.15)":"transparent",
+                                color:sel?"#34d399":"#7aaa80",fontWeight:sel?700:400}}>{label}</button>
+                          );
+                        })}
+                      </div>
+                      {gastoMesesSel.length===0&&<div style={{fontSize:11,color:"#f59e0b",marginTop:8}}>Elige al menos un mes arriba para ver la comparación.</div>}
+                    </div>
+                  );
+                })()}
                 {filasDatos.length===0
                   ? <div style={{color:"#5a9a7a",fontSize:12,textAlign:"center",padding:20}}>Sin gastos en esta categoría para el período seleccionado</div>
                   : <>
@@ -10347,6 +10387,34 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                         </tbody>
                       </table>
                     </div>
+                    {/* Gráfico de barras — comparación visual entre períodos */}
+                    {filasDatos.length>1&&(()=>{
+                      const maxMonto = Math.max(...filasDatos.map(f=>Math.abs(f.monto)), 1);
+                      const anchoBarra = 100/filasDatos.length;
+                      return (
+                        <div style={{...S.card,padding:16,marginBottom:12}}>
+                          <div style={{fontSize:11,color:"#6aaa7a",marginBottom:12,textTransform:"uppercase",letterSpacing:"0.5px"}}>📊 Comparación visual</div>
+                          <div style={{display:"flex",alignItems:"flex-end",gap:4,height:180,padding:"0 4px"}}>
+                            {filasDatos.map((f,i)=>{
+                              const alturaPct = Math.max((Math.abs(f.monto)/maxMonto)*100, 2);
+                              const esNegativo = f.monto<0;
+                              return (
+                                <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",height:"100%",minWidth:0}}>
+                                  <div style={{fontSize:9,color:esNegativo?"#f87171":"#34d399",fontWeight:700,marginBottom:3,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>
+                                    {f.monto>=1000000?fmt(f.monto).replace("CLP","").trim().slice(0,-3)+"k":fmt(f.monto)}
+                                  </div>
+                                  <div style={{width:"100%",maxWidth:44,height:alturaPct+"%",minHeight:3,borderRadius:"4px 4px 0 0",
+                                    background:esNegativo?"rgba(248,113,113,0.6)":"linear-gradient(180deg, rgba(52,211,153,0.9), rgba(52,211,153,0.4))"}}/>
+                                  <div style={{fontSize:9,color:"#5a9a7a",marginTop:6,textAlign:"center",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>
+                                    {f.periodo}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </>
                 }
               </div>
