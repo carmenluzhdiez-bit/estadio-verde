@@ -5253,6 +5253,7 @@ function VistaDesignacion({ S, tareasProg, setTareasProg, personal, MACROZONAS_B
   const [expandida, setExpandida] = React.useState(null); // tid expanded
   const [cancelando, setCancelando] = React.useState(null); // tid being cancelled
   const [motivoCancelacion, setMotivoCancelacion] = React.useState("");
+  const [gruposVDAbiertos, setGruposVDAbiertos] = React.useState({}); // "seccion__tarea" -> bool
 
   const tareasDelDia = [...(tareasProg[fecha]||[])].sort((a,b)=>(a.zona||"").localeCompare(b.zona||"","es",{sensitivity:"base"}));
   const sinAsignar = tareasDelDia.filter(t=>t.estado==="por_designar");
@@ -5533,8 +5534,32 @@ function VistaDesignacion({ S, tareasProg, setTareasProg, personal, MACROZONAS_B
         {asignadas.length>0&&(
           <div style={{marginBottom:20}}>
             <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:10,color:"#86efac"}}>✅ Asignadas ({asignadas.length})</div>
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              {asignadas.map(t=>renderTarea(t,false))}
+            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              {(()=>{
+                const gruposAsig = {};
+                asignadas.forEach(t=>{ const k=t.tarea||"(sin tarea)"; if(!gruposAsig[k]) gruposAsig[k]=[]; gruposAsig[k].push(t); });
+                return Object.keys(gruposAsig).sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"})).map(nombreG=>{
+                  const items=gruposAsig[nombreG];
+                  const clave="asig__"+nombreG;
+                  const abierto=gruposVDAbiertos[clave]===true;
+                  const hechas=items.filter(t=>["hecha","completada"].includes(t.estado)).length;
+                  return (
+                    <div key={clave} style={{border:`1px solid ${hechas===items.length?"rgba(34,197,94,0.25)":"rgba(255,255,255,0.08)"}`,borderRadius:10,overflow:"hidden"}}>
+                      <div onClick={()=>setGruposVDAbiertos(p=>({...p,[clave]:!abierto}))}
+                        style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",cursor:"pointer",background:hechas===items.length?"rgba(34,197,94,0.05)":"rgba(255,255,255,0.03)"}}>
+                        <span style={{fontSize:10,color:"#5a9a7a",transform:abierto?"rotate(90deg)":"none",transition:"transform .15s",display:"inline-block"}}>▶</span>
+                        <span style={{fontSize:13,fontWeight:600,flex:1}}>{nombreG}</span>
+                        <span style={{fontSize:11,fontWeight:700,color:hechas===items.length?"#22c55e":"#f59e0b",background:hechas===items.length?"rgba(34,197,94,0.1)":"rgba(245,158,11,0.1)",padding:"1px 8px",borderRadius:10}}>{hechas}/{items.length}</span>
+                      </div>
+                      {abierto&&(
+                        <div style={{display:"flex",flexDirection:"column",gap:6,padding:"6px 8px"}}>
+                          {items.map(t=>renderTarea(t,false))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
             </div>
           </div>
         )}
@@ -5543,8 +5568,31 @@ function VistaDesignacion({ S, tareasProg, setTareasProg, personal, MACROZONAS_B
         {sinAsignar.length>0&&(
           <div>
             <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:10,color:"#fcd34d"}}>⬜ Por Designar ({sinAsignar.length})</div>
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              {sinAsignar.map(t=>renderTarea(t,true))}
+            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              {(()=>{
+                const gruposSin = {};
+                sinAsignar.forEach(t=>{ const k=t.tarea||"(sin tarea)"; if(!gruposSin[k]) gruposSin[k]=[]; gruposSin[k].push(t); });
+                return Object.keys(gruposSin).sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"})).map(nombreG=>{
+                  const items=gruposSin[nombreG];
+                  const clave="sin__"+nombreG;
+                  const abierto=gruposVDAbiertos[clave]===true;
+                  return (
+                    <div key={clave} style={{border:"1px solid rgba(252,211,77,0.25)",borderRadius:10,overflow:"hidden"}}>
+                      <div onClick={()=>setGruposVDAbiertos(p=>({...p,[clave]:!abierto}))}
+                        style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",cursor:"pointer",background:"rgba(252,211,77,0.05)"}}>
+                        <span style={{fontSize:10,color:"#fcd34d",transform:abierto?"rotate(90deg)":"none",transition:"transform .15s",display:"inline-block"}}>▶</span>
+                        <span style={{fontSize:13,fontWeight:600,flex:1}}>{nombreG}</span>
+                        <span style={{fontSize:11,fontWeight:700,color:"#fcd34d",background:"rgba(252,211,77,0.1)",padding:"1px 8px",borderRadius:10}}>{items.length}</span>
+                      </div>
+                      {abierto&&(
+                        <div style={{display:"flex",flexDirection:"column",gap:6,padding:"6px 8px"}}>
+                          {items.map(t=>renderTarea(t,true))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
             </div>
           </div>
         )}
