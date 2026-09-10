@@ -5117,6 +5117,8 @@ function VistaDesignacion({ S, tareasProg, setTareasProg, personal, MACROZONAS_B
   const [fecha, setFecha] = React.useState(hoy);
   const [showAgregar, setShowAgregar] = React.useState(false);
   const [nuevaTarea, setNuevaTarea] = React.useState({ zona:"", tarea:"", elemento:"" });
+  const [modoVariosJardinerosVD, setModoVariosJardinerosVD] = React.useState(false);
+  const [responsablesMultipleVD, setResponsablesMultipleVD] = React.useState([]);
   const [expandida, setExpandida] = React.useState(null); // tid expanded
   const [cancelando, setCancelando] = React.useState(null); // tid being cancelled
   const [motivoCancelacion, setMotivoCancelacion] = React.useState("");
@@ -5149,14 +5151,24 @@ function VistaDesignacion({ S, tareasProg, setTareasProg, personal, MACROZONAS_B
 
   const agregarTarea = () => {
     if(!nuevaTarea.zona||!nuevaTarea.tarea) return;
-    const nueva = {
-      id: Date.now()+Math.random(), fecha,
-      zona: nuevaTarea.zona, elemento: nuevaTarea.elemento,
-      tarea: nuevaTarea.tarea, responsable:"", estado:"por_designar",
-      notas:"", supervisorAgregada: true,
-    };
-    setDia([...(tareasProg[fecha]||[]), nueva]);
+    if(modoVariosJardinerosVD&&responsablesMultipleVD.length===0) return;
+    const nuevas = modoVariosJardinerosVD
+      ? responsablesMultipleVD.map(resp=>({
+          id: Date.now()+Math.random(), fecha,
+          zona: nuevaTarea.zona, elemento: nuevaTarea.elemento,
+          tarea: nuevaTarea.tarea, responsable:resp, estado:"pendiente",
+          notas:"", supervisorAgregada: true,
+        }))
+      : [{
+          id: Date.now()+Math.random(), fecha,
+          zona: nuevaTarea.zona, elemento: nuevaTarea.elemento,
+          tarea: nuevaTarea.tarea, responsable:"", estado:"por_designar",
+          notas:"", supervisorAgregada: true,
+        }];
+    setDia([...(tareasProg[fecha]||[]), ...nuevas]);
     setNuevaTarea({zona:"",tarea:"",elemento:""});
+    setModoVariosJardinerosVD(false);
+    setResponsablesMultipleVD([]);
     setShowAgregar(false);
   };
 
@@ -5330,9 +5342,30 @@ function VistaDesignacion({ S, tareasProg, setTareasProg, personal, MACROZONAS_B
                   </div>
                 )}
               </div>
+              <div style={{marginBottom:10}}>
+                <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"#7aaa80",marginBottom:6,cursor:"pointer"}}>
+                  <input type="checkbox" checked={modoVariosJardinerosVD} onChange={e=>{setModoVariosJardinerosVD(e.target.checked);if(!e.target.checked)setResponsablesMultipleVD([]);}}/>
+                  👥 Asignar directamente a varios jardineros (crea una copia ya asignada para cada uno)
+                </label>
+                {modoVariosJardinerosVD&&(
+                  <div style={{display:"flex",gap:5,flexWrap:"wrap",padding:"8px 10px",background:"rgba(255,255,255,0.03)",borderRadius:8,border:"1px solid rgba(255,255,255,0.08)"}}>
+                    {(Array.isArray(personal)?personal:Object.values(personal||{})).map(p=>{
+                      const sel = responsablesMultipleVD.includes(p.nombre);
+                      return (
+                        <button key={p.id} onClick={()=>setResponsablesMultipleVD(prev=>sel?prev.filter(x=>x!==p.nombre):[...prev,p.nombre])}
+                          style={{fontSize:11,padding:"4px 10px",borderRadius:6,cursor:"pointer",
+                            border:`1px solid ${sel?"rgba(52,211,153,0.5)":"rgba(255,255,255,0.1)"}`,
+                            background:sel?"rgba(52,211,153,0.15)":"transparent",
+                            color:sel?"#34d399":"#7aaa80",fontWeight:sel?700:400}}>{p.nombre}</button>
+                      );
+                    })}
+                    {responsablesMultipleVD.length===0&&<div style={{fontSize:11,color:"#f59e0b",width:"100%"}}>Elige al menos uno.</div>}
+                  </div>
+                )}
+              </div>
               <div style={{display:"flex",gap:8}}>
                 <button onClick={agregarTarea} style={{...S.btn,background:"#2563eb",color:"#fff",fontSize:13,padding:"8px 16px"}}>✓ Agregar</button>
-                <button onClick={()=>{setShowAgregar(false);setNuevaTarea({zona:"",tarea:"",elemento:"",responsable:"",notas:"",estado:"por_designar"});}} style={{...S.btn,background:"transparent",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)",fontSize:13}}>Cancelar</button>
+                <button onClick={()=>{setShowAgregar(false);setNuevaTarea({zona:"",tarea:"",elemento:"",responsable:"",notas:"",estado:"por_designar"});setModoVariosJardinerosVD(false);setResponsablesMultipleVD([]);}} style={{...S.btn,background:"transparent",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)",fontSize:13}}>Cancelar</button>
               </div>
             </div>
           )}
@@ -13109,6 +13142,43 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   // Formulario tarea
   const emptyTarea = {fecha:hoy,tipo:"",descripcion:"",responsable:"",target:"todos",targetId:"",obs:""};
   const [tareaForm, setTareaForm] = React.useState(emptyTarea);
+  const [modoVariosJardinerosGolf, setModoVariosJardinerosGolf] = React.useState(false);
+  const [responsablesMultipleGolf, setResponsablesMultipleGolf] = React.useState([]);
+  // Selector de responsable reutilizable en los formularios de "Nueva tarea" de Golf:
+  // según el modo, muestra el desplegable normal o un checklist de varios jardineros.
+  const SelectorResponsableGolf = () => (
+    <div>
+      <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>Responsable</label>
+      <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"#7aaa80",marginBottom:6,cursor:"pointer"}}>
+        <input type="checkbox" checked={modoVariosJardinerosGolf} onChange={e=>{setModoVariosJardinerosGolf(e.target.checked);if(!e.target.checked)setResponsablesMultipleGolf([]);}}/>
+        👥 Asignar a varios jardineros (crea una copia para cada uno)
+      </label>
+      {modoVariosJardinerosGolf ? (
+        <div style={{display:"flex",gap:5,flexWrap:"wrap",padding:"8px 10px",background:"rgba(255,255,255,0.03)",borderRadius:8,border:"1px solid rgba(255,255,255,0.08)"}}>
+          {(Array.isArray(personal)?personal:Object.values(personal||{})).map(p=>{
+            const sel = responsablesMultipleGolf.includes(p.nombre);
+            return (
+              <button key={p.id} type="button" onClick={()=>setResponsablesMultipleGolf(prev=>sel?prev.filter(x=>x!==p.nombre):[...prev,p.nombre])}
+                style={{fontSize:11,padding:"4px 10px",borderRadius:6,cursor:"pointer",
+                  border:`1px solid ${sel?"rgba(52,211,153,0.5)":"rgba(255,255,255,0.1)"}`,
+                  background:sel?"rgba(52,211,153,0.15)":"transparent",
+                  color:sel?"#34d399":"#7aaa80",fontWeight:sel?700:400}}>{p.nombre}</button>
+            );
+          })}
+          {responsablesMultipleGolf.length===0&&<div style={{fontSize:11,color:"#f59e0b",width:"100%"}}>Elige al menos uno.</div>}
+        </div>
+      ) : (
+        <select style={S.input} value={tareaForm.responsable} onChange={e=>setTareaForm(p=>({...p,responsable:e.target.value}))}>
+          <option value="">— Por designar —</option>
+          {(Array.isArray(personal)?personal:Object.values(personal||{})).map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+        </select>
+      )}
+    </div>
+  );
+  // Devuelve la lista de responsables a usar al guardar: [""] si no hay modo varios (usa tareaForm.responsable tal cual),
+  // o la lista elegida si el modo está activo. Sirve para generar N copias de la tarea, una por responsable.
+  const responsablesParaGuardarGolf = () => modoVariosJardinerosGolf ? responsablesMultipleGolf : [tareaForm.responsable];
+  const resetModoVariosJardinerosGolf = () => { setModoVariosJardinerosGolf(false); setResponsablesMultipleGolf([]); };
 
   // Formulario tarea diaria
   const emptyDiaria = {fecha:hoy,responsable:BHALÚ,tareas:{},obs:""};
@@ -13241,14 +13311,17 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                    tareaForm.target==="tee"   ? TEES_DEF.find(t=>t.id===tareaForm.targetId)?.nombre :
                    tareaForm.target==="arbol" ? (arboles.find(a=>String(a.id)===tareaForm.targetId)?.nombre||"Árbol") : "Todos";
     const textoTarea = `⛳ Golf — ${nombreTareaGTG}${target&&target!=="Todos"?" ("+target+")":""}${tareaForm.descripcion?" — "+tareaForm.descripcion:""}`;
-    if(tareaForm.responsable&&tareaForm.fecha) {
-      setTareasProg(p=>({...p,[tareaForm.fecha]:[...(p[tareaForm.fecha]||[]),{
-        id:Date.now(),fecha:tareaForm.fecha,zona:"Golf",elemento:target||"",
-        tarea:textoTarea,responsable:tareaForm.responsable,estado:tareaForm.responsable?"pendiente":"por_designar",notas:tareaForm.obs||"",auto:false,
-      }]}));
+    const respsGTG = responsablesParaGuardarGolf().filter(Boolean);
+    if(modoVariosJardinerosGolf&&respsGTG.length===0){ alert("Elige al menos un jardinero."); return; }
+    if(respsGTG.length>0 && tareaForm.fecha) {
+      const nuevasGTG = respsGTG.map(resp=>({
+        id:Date.now()+Math.random(),fecha:tareaForm.fecha,zona:"Golf",elemento:target||"",
+        tarea:textoTarea,responsable:resp,estado:resp?"pendiente":"por_designar",notas:tareaForm.obs||"",auto:false,
+      }));
+      setTareasProg(p=>({...p,[tareaForm.fecha]:[...(p[tareaForm.fecha]||[]),...nuevasGTG]}));
     }
-    sincronizarMacrozona("Tarea programada", `${nombreTareaGTG} — ${tareaForm.responsable||"Sin asignar"}`);
-    setTareaForm(emptyTarea); setShowTareaForm(null);
+    sincronizarMacrozona("Tarea programada", `${nombreTareaGTG} — ${respsGTG.join(", ")||"Sin asignar"}`);
+    setTareaForm(emptyTarea); setShowTareaForm(null); resetModoVariosJardinerosGolf();
   };
 
   // ── Guardar registro diario ──────────────────────────────────────────────
@@ -13701,12 +13774,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                     <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#4ade80",marginBottom:12}}>📋 Nueva tarea — Vivero</div>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
                       <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={tareaForm.fecha} onChange={e=>setTareaForm(p=>({...p,fecha:e.target.value}))}/></div>
-                      <div><label style={labelSt}>Responsable</label>
-                        <select style={S.input} value={tareaForm.responsable} onChange={e=>setTareaForm(p=>({...p,responsable:e.target.value}))}>
-                          <option value="">Seleccionar...</option>
-                          {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
-                        </select>
-                      </div>
+                      <SelectorResponsableGolf/>
                       <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Tarea</label>
                         <select style={S.input} value={tareaForm.tipo} onChange={e=>setTareaForm(p=>({...p,tipo:e.target.value}))}>
                           <option value="">Seleccionar tipo...</option>
@@ -13737,11 +13805,13 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                         if(!tareaForm.tipo){alert("⚠️ Falta elegir el tipo de tarea.");return;}
                         const nombreTarea=tareaForm.tipo==="Otra"?(tareaForm.tipoCustom||"").trim():tareaForm.tipo;
                         if(tareaForm.tipo==="Otra"&&!nombreTarea){alert("Escribe el nombre de la tarea en el cuadro que aparece debajo de \"Otra...\".");return;}
+                        const respsViv = responsablesParaGuardarGolf();
+                        if(modoVariosJardinerosGolf&&respsViv.length===0){alert("Elige al menos un jardinero.");return;}
                         const notaAltura=tareaForm.alturaObjetivo?`Cortar a: ${tareaForm.alturaObjetivo}mm.`:"";
                         const notas=[notaAltura,tareaForm.descripcion].filter(Boolean).join(" ");
-                        const nueva={id:Date.now()+Math.random(),fecha:tareaForm.fecha,zona:"Golf",elemento:"Vivero Golf",tarea:nombreTarea,responsable:tareaForm.responsable,estado:tareaForm.responsable?"pendiente":"por_designar",notas,alturaCorte:tareaForm.alturaObjetivo||"",unidadAlturaCorte:"mm"};
-                        setTareasProg(prev=>{const arr=Array.isArray(prev[tareaForm.fecha])?prev[tareaForm.fecha]:Object.values(prev[tareaForm.fecha]||{});return {...prev,[tareaForm.fecha]:[...arr,nueva]};});
-                        setTareaForm(emptyTarea);setShowTareaForm(null);
+                        const nuevas=respsViv.map(resp=>({id:Date.now()+Math.random(),fecha:tareaForm.fecha,zona:"Golf",elemento:"Vivero Golf",tarea:nombreTarea,responsable:resp,estado:resp?"pendiente":"por_designar",notas,alturaCorte:tareaForm.alturaObjetivo||"",unidadAlturaCorte:"mm"}));
+                        setTareasProg(prev=>{const arr=Array.isArray(prev[tareaForm.fecha])?prev[tareaForm.fecha]:Object.values(prev[tareaForm.fecha]||{});return {...prev,[tareaForm.fecha]:[...arr,...nuevas]};});
+                        setTareaForm(emptyTarea);setShowTareaForm(null);resetModoVariosJardinerosGolf();
                       }}>✓ Guardar y enviar al programa</button>
                       <button className="btn-g" style={S.btn} onClick={()=>setShowTareaForm(null)}>Cancelar</button>
                     </div>
@@ -13978,12 +14048,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                     <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#34d399",marginBottom:12}}>📋 Nueva tarea — Greens</div>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
                       <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={tareaForm.fecha} onChange={e=>setTareaForm(p=>({...p,fecha:e.target.value}))}/></div>
-                      <div><label style={labelSt}>Responsable</label>
-                        <select style={S.input} value={tareaForm.responsable} onChange={e=>setTareaForm(p=>({...p,responsable:e.target.value}))}>
-                          <option value="">Seleccionar...</option>
-                          {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
-                        </select>
-                      </div>
+                      <SelectorResponsableGolf/>
                       <div><label style={labelSt}>Tarea</label>
                         <select style={S.input} value={tareaForm.tipo} onChange={e=>{
                           const nuevoTipo=e.target.value;
@@ -14137,23 +14202,28 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                         const nombreTareaFinal = tareaForm.tipo==="Otra" ? (tareaForm.tipoOtro||"").trim() : tareaForm.tipo;
                         if(!zonas.length||!tareaForm.tipo) return;
                         if(tareaForm.tipo==="Otra"&&!nombreTareaFinal){ alert("Escribe el nombre de la tarea en el cuadro que aparece debajo de \"Otra...\"."); return; }
-                        // Generar una tarea por cada zona
-                        const nuevasTareas = zonas.map(id=>{
+                        const respsGreens = responsablesParaGuardarGolf();
+                        if(modoVariosJardinerosGolf&&respsGreens.length===0){ alert("Elige al menos un jardinero."); return; }
+                        // Generar una tarea por cada combinación zona × responsable
+                        const nuevasTareas = [];
+                        zonas.forEach(id=>{
                           const nombreZona = id==="vivero"?"Vivero":GREENS_DEF.find(g=>g.id===id)?.nombre||id;
                           const hoyosZona = id==="vivero"?"":GREENS_DEF.find(g=>g.id===id)?.hoyos||"";
-                          return {
-                            id:Date.now()+Math.random(),
-                            fecha:tareaForm.fecha,
-                            zona:"Golf",
-                            elemento:nombreZona+(hoyosZona?` (${hoyosZona})`:""),
-                            tarea:`⛳ ${nombreTareaFinal}${tareaForm.alturaCorte?" HOC "+tareaForm.alturaCorte+"mm":""}${tareaForm.descripcion?" — "+tareaForm.descripcion:""} · ${nombreZona}`,
-                            responsable:tareaForm.responsable,
-                            estado:tareaForm.responsable?"pendiente":"por_designar",
-                            notas:tareaForm.obs||"",
-                            alturaCorte:tareaForm.alturaCorte||null,
-                            alturaObjetivo:tareaForm.alturaObjetivo||null,
-                            auto:false,
-                          };
+                          respsGreens.forEach(resp=>{
+                            nuevasTareas.push({
+                              id:Date.now()+Math.random(),
+                              fecha:tareaForm.fecha,
+                              zona:"Golf",
+                              elemento:nombreZona+(hoyosZona?` (${hoyosZona})`:""),
+                              tarea:`⛳ ${nombreTareaFinal}${tareaForm.alturaCorte?" HOC "+tareaForm.alturaCorte+"mm":""}${tareaForm.descripcion?" — "+tareaForm.descripcion:""} · ${nombreZona}`,
+                              responsable:resp,
+                              estado:resp?"pendiente":"por_designar",
+                              notas:tareaForm.obs||"",
+                              alturaCorte:tareaForm.alturaCorte||null,
+                              alturaObjetivo:tareaForm.alturaObjetivo||null,
+                              auto:false,
+                            });
+                          });
                         });
                         setTareasProg(p=>{
                           const nuevo={...p};
@@ -14166,7 +14236,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                         sincronizarMacrozona("Tarea programada", `${nombreTareaFinal} — ${zonas.length} zonas`);
                         setTareaForm(emptyTarea);
                         setShowTareaForm(null);
-                      }}>✓ Guardar {(()=>{const pgNT=tareaForm.target==="todos"?9:tareaForm.target==="todos_vivero"?10:tareaForm.target==="vivero"?1:tareaForm.target==="seleccion"?(tareaForm.greensSeleccionados||[]).length:1;return pgNT>1?`(${pgNT} tareas)`:"";})()} y enviar al programa</button>
+                        resetModoVariosJardinerosGolf();
+                      }}>✓ Guardar {(()=>{const pgNT=(tareaForm.target==="todos"?9:tareaForm.target==="todos_vivero"?10:tareaForm.target==="vivero"?1:tareaForm.target==="seleccion"?(tareaForm.greensSeleccionados||[]).length:1)*responsablesParaGuardarGolf().length;return pgNT>1?`(${pgNT} tareas)`:"";})()} y enviar al programa</button>
                       <button className="btn-g" style={S.btn} onClick={()=>setShowTareaForm(null)}>Cancelar</button>
                     </div>
                   </div>
@@ -14227,12 +14298,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                     <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#34d399",marginBottom:12}}>📋 Nueva tarea — {tee.nombre}</div>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
                       <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={tareaForm.fecha} onChange={e=>setTareaForm(p=>({...p,fecha:e.target.value}))}/></div>
-                      <div><label style={labelSt}>Responsable</label>
-                        <select style={S.input} value={tareaForm.responsable} onChange={e=>setTareaForm(p=>({...p,responsable:e.target.value}))}>
-                          <option value="">Seleccionar...</option>
-                          {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
-                        </select>
-                      </div>
+                      <SelectorResponsableGolf/>
                       <div><label style={labelSt}>Tarea</label>
                         <select style={S.input} value={tareaForm.tipo} onChange={e=>setTareaForm(p=>({...p,tipo:e.target.value}))}>
                           <option value="">Seleccionar...</option>
@@ -14342,12 +14408,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#34d399",marginBottom:12}}>📋 Nueva tarea — {tareaForm.descripcion}</div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
                 <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={tareaForm.fecha} onChange={e=>setTareaForm(p=>({...p,fecha:e.target.value}))}/></div>
-                <div><label style={labelSt}>Responsable</label>
-                  <select style={S.input} value={tareaForm.responsable} onChange={e=>setTareaForm(p=>({...p,responsable:e.target.value}))}>
-                    <option value="">Seleccionar...</option>
-                    {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
-                  </select>
-                </div>
+                <SelectorResponsableGolf/>
                 <div><label style={labelSt}>Tarea</label>
                   <select style={S.input} value={tareaForm.tipo} onChange={e=>setTareaForm(p=>({...p,tipo:e.target.value}))}>
                     <option value="">Seleccionar...</option>
@@ -14367,14 +14428,17 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                   if(!tareaForm.tipo) return;
                   const nombreTareaZE = tareaForm.tipo==="Otra" ? (tareaForm.tipoCustom||"").trim() : tareaForm.tipo;
                   if(tareaForm.tipo==="Otra"&&!nombreTareaZE){ alert("Escribe el nombre de la tarea en el cuadro que aparece debajo de \"Otra...\"."); return; }
-                  setTareasProg(p=>({...p,[tareaForm.fecha]:[...(p[tareaForm.fecha]||[]),{
-                    id:Date.now(),fecha:tareaForm.fecha,zona:"Golf",elemento:tareaForm.descripcion,
+                  const respsZE = responsablesParaGuardarGolf();
+                  if(modoVariosJardinerosGolf&&respsZE.length===0){ alert("Elige al menos un jardinero."); return; }
+                  const nuevasZE = respsZE.map(resp=>({
+                    id:Date.now()+Math.random(),fecha:tareaForm.fecha,zona:"Golf",elemento:tareaForm.descripcion,
                     tarea:`⛳ ${nombreTareaZE} — ${tareaForm.descripcion}`,
-                    responsable:tareaForm.responsable,
-                    estado:tareaForm.responsable?"pendiente":"por_designar",
+                    responsable:resp,
+                    estado:resp?"pendiente":"por_designar",
                     notas:tareaForm.obs||"",auto:false,
-                  }]}));
-                  setShowTareaForm(null);setTareaForm(emptyTarea);
+                  }));
+                  setTareasProg(p=>({...p,[tareaForm.fecha]:[...(p[tareaForm.fecha]||[]),...nuevasZE]}));
+                  setShowTareaForm(null);setTareaForm(emptyTarea);resetModoVariosJardinerosGolf();
                 }}>✓ Enviar al programa</button>
                 <button className="btn-g" style={S.btn} onClick={()=>setShowTareaForm(null)}>Cancelar</button>
               </div>
@@ -14434,12 +14498,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#4ade80",marginBottom:12}}>📋 Nueva tarea — Árboles</div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
                 <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={tareaForm.fecha} onChange={e=>setTareaForm(p=>({...p,fecha:e.target.value}))}/></div>
-                <div><label style={labelSt}>Responsable</label>
-                  <select style={S.input} value={tareaForm.responsable} onChange={e=>setTareaForm(p=>({...p,responsable:e.target.value}))}>
-                    <option value="">Seleccionar...</option>
-                    {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
-                  </select>
-                </div>
+                <SelectorResponsableGolf/>
                 <div><label style={labelSt}>Aplicar a</label>
                   <select style={S.input} value={tareaForm.target} onChange={e=>setTareaForm(p=>({...p,target:e.target.value,targetId:""}))}>
                     <option value="todos">Todos los árboles</option>
