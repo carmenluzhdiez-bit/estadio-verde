@@ -4014,9 +4014,13 @@ function ZonaRow({ zona, tz, zonasColapsadas, toggleZonaColapso, MACROZONAS_BASE
                         {t.elemento && <div style={{fontSize:11,color:"#5a8a6a"}}>{t.elemento}</div>}
                         <div style={{marginTop:4,display:"flex",alignItems:"center",gap:6}}>
                           <span style={{fontSize:11,color:"#7aaaba"}}>👤</span>
-                          <select value={t.responsable||""} onChange={e=>updateTarea(t.id,{responsable:e.target.value,estado:e.target.value?(t.estado==="por_designar"?"pendiente":t.estado):"por_designar"})}
+                          <select value={t.responsable||""} onChange={e=>{
+                              if(e.target.value==="__todos__"){ asignarATodos(t.id); return; }
+                              updateTarea(t.id,{responsable:e.target.value,estado:e.target.value?(t.estado==="por_designar"?"pendiente":t.estado):"por_designar"});
+                            }}
                             style={{background:t.responsable?"rgba(255,255,255,0.05)":"rgba(245,158,11,0.1)",border:`1px solid ${t.responsable?"rgba(255,255,255,0.12)":"rgba(245,158,11,0.35)"}`,borderRadius:6,color:t.responsable?"#c0dac0":"#fbbf24",padding:"3px 7px",fontFamily:"'Georgia',serif",fontSize:11,outline:"none",cursor:"pointer",maxWidth:180}}>
                             <option value="">⬜ Por designar...</option>
+                            <option value="__todos__">👥 Todos (crea una copia c/u)</option>
                             {t.responsable&&!listaPersonalZR.some(p=>p.nombre===t.responsable)&&(
                               <option value={t.responsable}>⚠️ {t.responsable}</option>
                             )}
@@ -4356,6 +4360,16 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     const tarea = tareasDia.find(t=>t.id===id);
     const patchFinal = patch.estado!==undefined ? aplicarCambioFrecuencia(tarea, patch, getElemFrecs, setElemFrecs) : patch;
     setTareasDelDia(fecha, tareasDia.map(t => t.id===id ? {...t,...patchFinal} : t));
+  };
+  // Convierte una tarea existente (con un solo responsable) en una copia por cada persona del equipo.
+  const asignarATodos = (id) => {
+    const tareasDia = getTareasDelDia(fecha);
+    const tarea = tareasDia.find(t=>t.id===id);
+    if(!tarea) return;
+    const listaTodos = Array.isArray(personal)?personal:Object.values(personal||{});
+    if(listaTodos.length===0) return;
+    const copias = listaTodos.map(p=>({...tarea, id:Date.now()+Math.random(), responsable:p.nombre, estado:"pendiente"}));
+    setTareasDelDia(fecha, [...tareasDia.filter(t=>t.id!==id), ...copias]);
   };
   const deleteTarea = (id) => setTareasDelDia(fecha, getTareasDelDia(fecha).filter(t => t.id!==id));
 
@@ -4701,9 +4715,21 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                                     <span style={{fontSize:11,color:"#5a9a7a",marginLeft:6}}>· {p.elemento}</span>
                                     {p.diasVencida>0&&<span style={{fontSize:10,color:"#f87171",marginLeft:6,background:"rgba(248,113,113,0.1)",padding:"1px 6px",borderRadius:8}}>⚠️ {p.diasVencida}d vencida</span>}
                                   </div>
-                                  <select value={p.responsable||""} onChange={e=>setPreviewProp(prev=>prev.map((x,xi)=>xi===iRealProp?{...x,responsable:e.target.value,estado:e.target.value?"pendiente":"por_designar"}:x))}
+                                  <select value={p.responsable||""} onChange={e=>{
+                                      if(e.target.value==="__todos__"){
+                                        const listaTodosProp = Array.isArray(personal)?personal:Object.values(personal||{});
+                                        setPreviewProp(prev=>{
+                                          const sinEsta = prev.filter((x,xi)=>xi!==iRealProp);
+                                          const copias = listaTodosProp.map(pp2=>({...p,id:Date.now()+Math.random(),responsable:pp2.nombre,estado:"pendiente"}));
+                                          return [...sinEsta, ...copias];
+                                        });
+                                        return;
+                                      }
+                                      setPreviewProp(prev=>prev.map((x,xi)=>xi===iRealProp?{...x,responsable:e.target.value,estado:e.target.value?"pendiente":"por_designar"}:x));
+                                    }}
                                     style={{...S.input,fontSize:11,padding:"3px 7px",maxWidth:170}}>
                                     <option value="">— Por designar —</option>
+                                    <option value="__todos__">👥 Todos (crea c/u)</option>
                                     {(Array.isArray(personal)?personal:Object.values(personal||{})).map(pp=><option key={pp.id} value={pp.nombre}>{pp.nombre}</option>)}
                                   </select>
                                   <button onClick={()=>enviarUnaPreviewProp(p.id)} title="Enviar solo esta tarea al programa"
@@ -15148,9 +15174,21 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                                     <span style={{fontSize:11,color:"#5a9a7a",marginLeft:6}}>· {p.elemento}</span>
                                     {p.diasVencida>0&&<span style={{fontSize:10,color:"#f87171",marginLeft:6,background:"rgba(248,113,113,0.1)",padding:"1px 6px",borderRadius:8}}>⚠️ {p.diasVencida}d vencida</span>}
                                   </div>
-                                  <select value={p.responsable||""} onClick={e=>e.stopPropagation()} onChange={e=>setPreviewGolfProp(prev=>prev.map((x,xi)=>xi===iReal?{...x,responsable:e.target.value,estado:e.target.value?"pendiente":"por_designar"}:x))}
+                                  <select value={p.responsable||""} onClick={e=>e.stopPropagation()} onChange={e=>{
+                                      if(e.target.value==="__todos__"){
+                                        const listaTodosGolf = Array.isArray(personal)?personal:Object.values(personal||{});
+                                        setPreviewGolfProp(prev=>{
+                                          const sinEsta = prev.filter((x,xi)=>xi!==iReal);
+                                          const copias = listaTodosGolf.map(pp2=>({...p,id:Date.now()+Math.random(),responsable:pp2.nombre,estado:"pendiente"}));
+                                          return [...sinEsta, ...copias];
+                                        });
+                                        return;
+                                      }
+                                      setPreviewGolfProp(prev=>prev.map((x,xi)=>xi===iReal?{...x,responsable:e.target.value,estado:e.target.value?"pendiente":"por_designar"}:x));
+                                    }}
                                     style={{...S.input,fontSize:11,padding:"3px 7px",maxWidth:150}}>
                                     <option value="">— Por designar —</option>
+                                    <option value="__todos__">👥 Todos (crea c/u)</option>
                                     {listaPersonal.map(pp=><option key={pp.id} value={pp.nombre}>{pp.nombre}</option>)}
                                   </select>
                                 </div>
