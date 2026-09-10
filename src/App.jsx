@@ -116,6 +116,22 @@ const VEGETACION_SUBS = ["arboles","arbustos","cesped","herbaceas","trepadoras",
 const OTRAS_CATS      = ["infraestructura","sistemas","pavimentos","cesped_sintetico","canchas","mobiliario","maceteros","bodegas"];
 // ─── ESTACIONES ──────────────────────────────────────────────────────────────
 const limpiarUndef = (obj) => JSON.parse(JSON.stringify(obj, function(limpKey,limpVal){ return limpVal===undefined?null:limpVal; }));
+// Cuando una tarea de un lote "Todos" (mismo loteTodosId) se marca Hecha, cierra también las
+// demás copias del mismo lote que sigan pendientes — para que no queden colgadas esperando
+// que cada persona la marque por separado.
+const cerrarLoteSiCorresponde = (tareasDia, tid, patchFinal) => {
+  let resultado = tareasDia.map(t => String(t.id)===String(tid) ? {...t,...patchFinal} : t);
+  const esHecha = ["hecha","completada"].includes(patchFinal.estado);
+  const tareaMod = resultado.find(t=>String(t.id)===String(tid));
+  if(esHecha && tareaMod?.loteTodosId){
+    resultado = resultado.map(t=>
+      t.loteTodosId===tareaMod.loteTodosId && String(t.id)!==String(tid) && !["hecha","completada"].includes(t.estado)
+        ? {...t, estado:"hecha", notaJefa:(t.notaJefa?t.notaJefa+" · ":"")+`Cumplida por ${tareaMod.responsable||"otro"}`}
+        : t
+    );
+  }
+  return resultado;
+};
 // Formatea una cantidad de stock evitando errores de coma flotante de JS (ej. 172.79999999999998 → 172.8)
 const fmtStock = (n) => {
   const num = Number(n);
@@ -2398,7 +2414,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                             onChange={e=>{
                               const nA=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
                               const patch=aplicarCambioFrecuencia(hpTask,{estado:e.target.value},getElemFrecs,setElemFrecs);
-                              setTareas(prev=>({...prev,[dia]:nA(prev[dia]).map(x=>x.id===hpTask.id?{...x,...patch}:x)}));
+                              setTareas(prev=>({...prev,[dia]:cerrarLoteSiCorresponde(nA(prev[dia]), hpTask.id, patch)}));
                             }}
                             style={{fontSize:11,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:6,color:"#ede9e0",padding:"3px 6px",cursor:"pointer"}}>
                             {Object.entries(EC).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
@@ -2519,7 +2535,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                                 </div>
                                 <div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
                                   <select value={hpTask.estado}
-                                    onChange={e=>{const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);const patch=aplicarCambioFrecuencia(hpTask,{estado:e.target.value},getElemFrecs,setElemFrecs);setTareas(prev=>{const updated=nA2(prev[dia]).map(x=>x.id===hpTask.id?{...x,...patch}:x);return {...prev,[dia]:updated.map(limpiarUndef)};});}}
+                                    onChange={e=>{const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);const patch=aplicarCambioFrecuencia(hpTask,{estado:e.target.value},getElemFrecs,setElemFrecs);setTareas(prev=>{const updated=cerrarLoteSiCorresponde(nA2(prev[dia]), hpTask.id, patch);return {...prev,[dia]:updated.map(limpiarUndef)};});}}
                                     style={{fontSize:10,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:5,color:"#ede9e0",padding:"2px 3px",cursor:"pointer"}}>
                                     {Object.entries(EC).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
                                   </select>
@@ -4463,7 +4479,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     const tareasDia = getTareasDelDia(fecha);
     const tarea = tareasDia.find(t=>t.id===id);
     const patchFinal = patch.estado!==undefined ? aplicarCambioFrecuencia(tarea, patch, getElemFrecs, setElemFrecs) : patch;
-    setTareasDelDia(fecha, tareasDia.map(t => t.id===id ? {...t,...patchFinal} : t));
+    setTareasDelDia(fecha, cerrarLoteSiCorresponde(tareasDia, id, patchFinal));
   };
   // Convierte una tarea existente (con un solo responsable) en una copia por cada persona del equipo.
   const asignarATodos = (id) => {
@@ -4472,7 +4488,8 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     if(!tarea) return;
     const listaTodos = Array.isArray(personal)?personal:Object.values(personal||{});
     if(listaTodos.length===0) return;
-    const copias = listaTodos.map(p=>({...tarea, id:Date.now()+Math.random(), responsable:p.nombre, estado:"pendiente"}));
+    const loteId = "lote_"+Date.now()+"_"+Math.random().toString(36).slice(2);
+    const copias = listaTodos.map(p=>({...tarea, id:Date.now()+Math.random(), responsable:p.nombre, estado:"pendiente", loteTodosId:loteId}));
     setTareasDelDia(fecha, [...tareasDia.filter(t=>t.id!==id), ...copias]);
   };
   const deleteTarea = (id) => setTareasDelDia(fecha, getTareasDelDia(fecha).filter(t => t.id!==id));
@@ -4824,7 +4841,8 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                                         const listaTodosProp = Array.isArray(personal)?personal:Object.values(personal||{});
                                         setPreviewProp(prev=>{
                                           const sinEsta = prev.filter((x,xi)=>xi!==iRealProp);
-                                          const copias = listaTodosProp.map(pp2=>({...p,id:Date.now()+Math.random(),responsable:pp2.nombre,estado:"pendiente"}));
+                                          const loteId = "lote_"+Date.now()+"_"+Math.random().toString(36).slice(2);
+                                          const copias = listaTodosProp.map(pp2=>({...p,id:Date.now()+Math.random(),responsable:pp2.nombre,estado:"pendiente",loteTodosId:loteId}));
                                           return [...sinEsta, ...copias];
                                         });
                                         return;
@@ -5158,8 +5176,9 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                   if(!nuevaTarea.zona||!nuevaTarea.tarea||nuevaTarea.tarea==="__otro__") return;
                   if(modoVariosJardineros){
                     if(responsablesMultiple.length===0) return;
+                    const loteId = "lote_"+Date.now()+"_"+Math.random().toString(36).slice(2);
                     responsablesMultiple.forEach(nombre=>{
-                      addTarea({...nuevaTarea, responsable:nombre, estado:"pendiente"});
+                      addTarea({...nuevaTarea, responsable:nombre, estado:"pendiente", loteTodosId:loteId});
                     });
                   } else {
                     addTarea(nuevaTarea);
@@ -5268,9 +5287,7 @@ function VistaDesignacion({ S, tareasProg, setTareasProg, personal, MACROZONAS_B
   };
 
   const cambiarEstadoVD = (tid, estado) => {
-    setDia((tareasProg[fecha]||[]).map(t=>
-      t.id===tid ? {...t, estado} : t
-    ));
+    setDia(cerrarLoteSiCorresponde(tareasProg[fecha]||[], tid, {estado}));
   };
 
   const iniciarCancelacion = (tid) => {
@@ -5290,12 +5307,13 @@ function VistaDesignacion({ S, tareasProg, setTareasProg, personal, MACROZONAS_B
   const agregarTarea = () => {
     if(!nuevaTarea.zona||!nuevaTarea.tarea) return;
     if(modoVariosJardinerosVD&&responsablesMultipleVD.length===0) return;
+    const loteIdVD = "lote_"+Date.now()+"_"+Math.random().toString(36).slice(2);
     const nuevas = modoVariosJardinerosVD
       ? responsablesMultipleVD.map(resp=>({
           id: Date.now()+Math.random(), fecha,
           zona: nuevaTarea.zona, elemento: nuevaTarea.elemento,
           tarea: nuevaTarea.tarea, responsable:resp, estado:"pendiente",
-          notas:"", supervisorAgregada: true,
+          notas:"", supervisorAgregada: true, loteTodosId:loteIdVD,
         }))
       : [{
           id: Date.now()+Math.random(), fecha,
@@ -13512,9 +13530,10 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
     const respsGTG = responsablesParaGuardarGolf().filter(Boolean);
     if(modoVariosJardinerosGolf&&respsGTG.length===0){ alert("Elige al menos un jardinero."); return; }
     if(respsGTG.length>0 && tareaForm.fecha) {
+      const loteIdGTG = "lote_"+Date.now()+"_"+Math.random().toString(36).slice(2);
       const nuevasGTG = respsGTG.map(resp=>({
         id:Date.now()+Math.random(),fecha:tareaForm.fecha,zona:"Golf",elemento:target||"",
-        tarea:textoTarea,responsable:resp,estado:resp?"pendiente":"por_designar",notas:tareaForm.obs||"",auto:false,
+        tarea:textoTarea,responsable:resp,estado:resp?"pendiente":"por_designar",notas:tareaForm.obs||"",auto:false,loteTodosId:loteIdGTG,
       }));
       setTareasProg(p=>({...p,[tareaForm.fecha]:[...(p[tareaForm.fecha]||[]),...nuevasGTG]}));
     }
@@ -14007,7 +14026,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                         if(modoVariosJardinerosGolf&&respsViv.length===0){alert("Elige al menos un jardinero.");return;}
                         const notaAltura=tareaForm.alturaObjetivo?`Cortar a: ${tareaForm.alturaObjetivo}mm.`:"";
                         const notas=[notaAltura,tareaForm.descripcion].filter(Boolean).join(" ");
-                        const nuevas=respsViv.map(resp=>({id:Date.now()+Math.random(),fecha:tareaForm.fecha,zona:"Golf",elemento:"Vivero Golf",tarea:nombreTarea,responsable:resp,estado:resp?"pendiente":"por_designar",notas,alturaCorte:tareaForm.alturaObjetivo||"",unidadAlturaCorte:"mm"}));
+                        const loteIdViv = "lote_"+Date.now()+"_"+Math.random().toString(36).slice(2);
+                        const nuevas=respsViv.map(resp=>({id:Date.now()+Math.random(),fecha:tareaForm.fecha,zona:"Golf",elemento:"Vivero Golf",tarea:nombreTarea,responsable:resp,estado:resp?"pendiente":"por_designar",notas,alturaCorte:tareaForm.alturaObjetivo||"",unidadAlturaCorte:"mm",loteTodosId:loteIdViv}));
                         setTareasProg(prev=>{const arr=Array.isArray(prev[tareaForm.fecha])?prev[tareaForm.fecha]:Object.values(prev[tareaForm.fecha]||{});return {...prev,[tareaForm.fecha]:[...arr,...nuevas]};});
                         setTareaForm(emptyTarea);setShowTareaForm(null);resetModoVariosJardinerosGolf();
                       }}>✓ Guardar y enviar al programa</button>
@@ -14407,6 +14427,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                         zonas.forEach(id=>{
                           const nombreZona = id==="vivero"?"Vivero":GREENS_DEF.find(g=>g.id===id)?.nombre||id;
                           const hoyosZona = id==="vivero"?"":GREENS_DEF.find(g=>g.id===id)?.hoyos||"";
+                          const loteIdGreen = "lote_"+Date.now()+"_"+Math.random().toString(36).slice(2)+"_"+id;
                           respsGreens.forEach(resp=>{
                             nuevasTareas.push({
                               id:Date.now()+Math.random(),
@@ -14420,6 +14441,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                               alturaCorte:tareaForm.alturaCorte||null,
                               alturaObjetivo:tareaForm.alturaObjetivo||null,
                               auto:false,
+                              loteTodosId:loteIdGreen,
                             });
                           });
                         });
@@ -14628,12 +14650,13 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                   if(tareaForm.tipo==="Otra"&&!nombreTareaZE){ alert("Escribe el nombre de la tarea en el cuadro que aparece debajo de \"Otra...\"."); return; }
                   const respsZE = responsablesParaGuardarGolf();
                   if(modoVariosJardinerosGolf&&respsZE.length===0){ alert("Elige al menos un jardinero."); return; }
+                  const loteIdZE = "lote_"+Date.now()+"_"+Math.random().toString(36).slice(2);
                   const nuevasZE = respsZE.map(resp=>({
                     id:Date.now()+Math.random(),fecha:tareaForm.fecha,zona:"Golf",elemento:tareaForm.descripcion,
                     tarea:`⛳ ${nombreTareaZE} — ${tareaForm.descripcion}`,
                     responsable:resp,
                     estado:resp?"pendiente":"por_designar",
-                    notas:tareaForm.obs||"",auto:false,
+                    notas:tareaForm.obs||"",auto:false,loteTodosId:loteIdZE,
                   }));
                   setTareasProg(p=>({...p,[tareaForm.fecha]:[...(p[tareaForm.fecha]||[]),...nuevasZE]}));
                   setShowTareaForm(null);setTareaForm(emptyTarea);resetModoVariosJardinerosGolf();
@@ -15351,7 +15374,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                                         const listaTodosGolf = Array.isArray(personal)?personal:Object.values(personal||{});
                                         setPreviewGolfProp(prev=>{
                                           const sinEsta = prev.filter((x,xi)=>xi!==iReal);
-                                          const copias = listaTodosGolf.map(pp2=>({...p,id:Date.now()+Math.random(),responsable:pp2.nombre,estado:"pendiente"}));
+                                          const loteId = "lote_"+Date.now()+"_"+Math.random().toString(36).slice(2);
+                                        const copias = listaTodosGolf.map(pp2=>({...p,id:Date.now()+Math.random(),responsable:pp2.nombre,estado:"pendiente",loteTodosId:loteId}));
                                           return [...sinEsta, ...copias];
                                         });
                                         return;
@@ -23676,8 +23700,10 @@ export default function App() {
                       }
                       return tActualizada;
                     });
-                    fbUpdate(ref(db,`${ROOT}/prog`),{[fecha]:actualizadas.map(limpiarUndef)}).catch(e=>console.error(e));
-                    return {...prev,[fecha]:actualizadas};
+                    const estadoFinalTid = actualizadas.find(t=>String(t.id)===String(tid))?.estado;
+                    const actualizadasConLote = cerrarLoteSiCorresponde(actualizadas, tid, {estado:estadoFinalTid});
+                    fbUpdate(ref(db,`${ROOT}/prog`),{[fecha]:actualizadasConLote.map(limpiarUndef)}).catch(e=>console.error(e));
+                    return {...prev,[fecha]:actualizadasConLote};
                   });
                 }}
                 onAddTarea={(t)=>{
@@ -24814,7 +24840,7 @@ export default function App() {
                       const tareasDelDia = normArr(prev[fecha]);
                       const tareaVieja = tareasDelDia.find(t=>String(t.id)===String(tid));
                       const patchFrec = (patch.estado!==undefined && tareaVieja) ? aplicarCambioFrecuencia(tareaVieja, patch, getElemFrecs, setElemFrecs) : patch;
-                      const actualizadas = tareasDelDia.map(t=>String(t.id)===String(tid)?{...t,...patchFrec}:t);
+                      const actualizadas = cerrarLoteSiCorresponde(tareasDelDia, tid, patchFrec);
                       // Escribir solo la ruta de esa fecha en Firebase
                       fbUpdate(ref(db, `${ROOT}/prog`), {[fecha]: actualizadas.map(limpiarUndef)})
                         .catch(e=>console.error("Error:", e));
