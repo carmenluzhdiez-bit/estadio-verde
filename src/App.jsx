@@ -16573,7 +16573,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                 return (<>
                   {esMaq&&(bd.items||[]).length>0&&(
                     <div style={{fontSize:11,color:"#7aaa80",marginBottom:8,display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-                      <span>Selecciona equipos para el informe:</span>
+                      <span>Selecciona equipos para el informe (marca cada uno con su casilla, o usa este botón para todos):</span>
                       <button style={{...S.btn,fontSize:10,padding:"2px 8px",background:selMaq.length===(bd.items||[]).length?"rgba(249,115,22,0.15)":"transparent",border:"1px solid rgba(249,115,22,0.3)",color:"#f97316"}}
                         onClick={()=>setSelMaq(selMaq.length===(bd.items||[]).length?[]:(bd.items||[]).map(i=>i.id))}>
                         {selMaq.length===(bd.items||[]).length?"Deseleccionar todos":"Seleccionar todos"}
@@ -16735,7 +16735,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                   )}
                   {cats.map(cat=>{
                     const its=(bd.items||[]).filter(i=>(i.categoria||"Sin categoría")===cat).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
-                    const abierta=catsAb[cat]===true;
+                    const abierta = esMaq ? (catsAb[cat]!==false) : (catsAb[cat]===true);
                     return (
                       <div key={cat} style={{marginBottom:10}}>
                         <div onClick={()=>setCatsAb(p=>({...p,[cat]:!abierta}))}
