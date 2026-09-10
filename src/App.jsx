@@ -4317,6 +4317,8 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     return {...rest, [zona]:!estaColapso};
   });
   const [nuevaTarea, setNuevaTarea] = React.useState({ zona:"", elemento:"", tarea:"", responsable:"", estado:"por_designar", notas:"" });
+  const [modoVariosJardineros, setModoVariosJardineros] = React.useState(false);
+  const [responsablesMultiple, setResponsablesMultiple] = React.useState([]); // nombres elegidos cuando modoVariosJardineros está activo
   // Cálculos para formulario de agregar tarea (dependen de nuevaTarea.zona/elemento)
   const _zonasSinGolf = [...zonas].filter(z=>!z.nombre.toLowerCase().includes("golf")).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
   const _zonaObj = _zonasSinGolf.find(z=>z.nombre===nuevaTarea.zona);
@@ -4975,13 +4977,33 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                 </div>
                 <div>
                   <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>RESPONSABLE</label>
-                  <ResponsableSelector
-                    value={nuevaTarea.responsable}
-                    personal={personal}
-                    onChange={v=>setNuevaTarea(p=>({...p,responsable:v,estado:v?"pendiente":"por_designar"}))}
-                    S={S}
-                    fontSize={13}
-                  />
+                  <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"#7aaa80",marginBottom:6,cursor:"pointer"}}>
+                    <input type="checkbox" checked={modoVariosJardineros} onChange={e=>{setModoVariosJardineros(e.target.checked);if(!e.target.checked)setResponsablesMultiple([]);}}/>
+                    👥 Asignar a varios jardineros (crea una copia de la tarea para cada uno)
+                  </label>
+                  {modoVariosJardineros ? (
+                    <div style={{display:"flex",gap:5,flexWrap:"wrap",padding:"8px 10px",background:"rgba(255,255,255,0.03)",borderRadius:8,border:"1px solid rgba(255,255,255,0.08)"}}>
+                      {(Array.isArray(personal)?personal:Object.values(personal||{})).map(p=>{
+                        const sel = responsablesMultiple.includes(p.nombre);
+                        return (
+                          <button key={p.id} onClick={()=>setResponsablesMultiple(prev=>sel?prev.filter(x=>x!==p.nombre):[...prev,p.nombre])}
+                            style={{fontSize:11,padding:"4px 10px",borderRadius:6,cursor:"pointer",
+                              border:`1px solid ${sel?"rgba(52,211,153,0.5)":"rgba(255,255,255,0.1)"}`,
+                              background:sel?"rgba(52,211,153,0.15)":"transparent",
+                              color:sel?"#34d399":"#7aaa80",fontWeight:sel?700:400}}>{p.nombre}</button>
+                        );
+                      })}
+                      {responsablesMultiple.length===0&&<div style={{fontSize:11,color:"#f59e0b",width:"100%"}}>Elige al menos uno.</div>}
+                    </div>
+                  ) : (
+                    <ResponsableSelector
+                      value={nuevaTarea.responsable}
+                      personal={personal}
+                      onChange={v=>setNuevaTarea(p=>({...p,responsable:v,estado:v?"pendiente":"por_designar"}))}
+                      S={S}
+                      fontSize={13}
+                    />
+                  )}
                 </div>
                 <div>
                   <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>ESTADO</label>
@@ -4997,8 +5019,17 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
               <div style={{display:"flex",gap:8}}>
                 <button className="btn-p" style={S.btn} onClick={()=>{
                   if(!nuevaTarea.zona||!nuevaTarea.tarea||nuevaTarea.tarea==="__otro__") return;
-                  addTarea(nuevaTarea);
+                  if(modoVariosJardineros){
+                    if(responsablesMultiple.length===0) return;
+                    responsablesMultiple.forEach(nombre=>{
+                      addTarea({...nuevaTarea, responsable:nombre, estado:"pendiente"});
+                    });
+                  } else {
+                    addTarea(nuevaTarea);
+                  }
                   setNuevaTarea({zona:"",elemento:"",tarea:"",responsable:"",estado:"por_designar",notas:""});
+                  setModoVariosJardineros(false);
+                  setResponsablesMultiple([]);
                   setShowAgregar(false);
                 }}>✓ Agregar</button>
                 <button className="btn-g" style={S.btn} onClick={()=>setShowAgregar(false)}>Cancelar</button>
