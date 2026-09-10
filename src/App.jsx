@@ -10265,6 +10265,11 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                   <option value="meses">Comparar meses específicos</option>
                 </select>
               </div>
+              {gastoPeriodo==="meses"&&!gastoItemSel&&(
+                <div style={{gridColumn:"1/-1",fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.08)",border:"1px solid rgba(251,191,36,0.25)",borderRadius:6,padding:"6px 10px"}}>
+                  👇 Primero haz clic en una categoría de la lista de abajo — ahí van a aparecer los botones para elegir los meses (de cualquier año) que quieras comparar.
+                </div>
+              )}
               {gastoPeriodo==="mensual"&&(
                 <div>
                   <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Año</label>
