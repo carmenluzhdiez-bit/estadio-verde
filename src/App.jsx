@@ -3148,7 +3148,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
         const horas = equipoValor1[tid];
         if(!horas||Number(horas)<0) return;
         detalle = `Horómetro: ${horas} h`;
-        patchItem = {horometro:Number(horas), ultimaVezHoras:hoy};
+        patchItem = {horasUso:Number(horas), ultimaVezHoras:hoy};
       } else {
         const nivel = equipoValor1[tid]||"Normal";
         const calidad = equipoValor2[tid]||"Bueno";
@@ -5266,6 +5266,12 @@ function VistaDesignacion({ S, tareasProg, setTareasProg, personal, MACROZONAS_B
     ));
   };
 
+  const cambiarEstadoVD = (tid, estado) => {
+    setDia((tareasProg[fecha]||[]).map(t=>
+      t.id===tid ? {...t, estado} : t
+    ));
+  };
+
   const iniciarCancelacion = (tid) => {
     setCancelando(tid);
     setMotivoCancelacion("");
@@ -5359,6 +5365,19 @@ function VistaDesignacion({ S, tareasProg, setTareasProg, personal, MACROZONAS_B
                   style={{...S.input,fontSize:13,background:t.responsable?"rgba(61,122,82,0.2)":"rgba(148,163,184,0.1)",color:t.responsable?"#c0e0c0":"#94a3b8",border:`1px solid ${t.responsable?"rgba(61,122,82,0.4)":"rgba(148,163,184,0.3)"}`}}>
                   <option value="">{t.responsable?"↺ Reasignar...":"👤 Seleccionar responsable..."}</option>
                   {listaPersonal.map(p=><option key={p.id} value={p.nombre}>{p.nombre}{p.cargo?" · "+p.cargo:""}</option>)}
+                </select>
+              </div>
+            )}
+            {/* Marcar estado — para cerrar tareas propias o de cualquiera directo desde aquí */}
+            {!cancelada&&t.responsable&&(
+              <div style={{marginBottom:10}}>
+                <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>ESTADO</label>
+                <select value={t.estado||"pendiente"} onChange={e=>cambiarEstadoVD(t.id,e.target.value)}
+                  style={{...S.input,fontSize:13}}>
+                  <option value="pendiente">🟡 Pendiente</option>
+                  <option value="haciendose">🔵 Haciéndose</option>
+                  <option value="hecha">✅ Hecha</option>
+                  <option value="no_pudo">🔴 No se pudo</option>
                 </select>
               </div>
             )}
@@ -15859,7 +15878,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
   const [tareaForm, setTareaForm] = React.useState(emptyTarea);
   const emptyTrasl = {fecha:hoy,itemId:"",cantidad:1,destino:"",motivo:"",conRegreso:true,fechaRegreso:"",responsable:"",obs:"",estado:"en_camino"};
   const [traslForm, setTraslForm] = React.useState(emptyTrasl);
-  const emptyMaq = {marca:"",modelo:"",patente:"",horasUso:0,nivelAceite:"OK",nivelCombustible:"OK",proxMantención:""};
+  const emptyMaq = {marca:"",modelo:"",patente:"",horasUso:0,nivelAceite:"OK",nivelCombustible:"OK",proxMantención:"",trackHoras:false,trackAceite:false};
   const [maqForm, setMaqForm] = React.useState(emptyMaq);
 
   const guardarInventario = () => {
@@ -16554,17 +16573,18 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
             {esJefa&&<button style={{...S.btn,background:"rgba(167,139,250,0.15)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.3)"}} onClick={()=>{setShowInventForm(p=>!p);setShowItemForm(false);setShowMovForm(false);}}>📋 Inventario inicial</button>}
             {esJefa&&bodegaActiva==="b04"&&<button style={{...S.btn,background:"rgba(96,165,250,0.15)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.3)"}} onClick={()=>{
               const hoyMant = fechaLocal();
-              const items = (bodegasData?.b04?.items||[]).filter(i=>i.categoria!=="Combustible");
+              const itemsConTrack = (bodegasData?.b04?.items||[]).filter(i=>i.trackHoras||i.trackAceite);
+              if(itemsConTrack.length===0){ alert("Ningún equipo tiene marcado \"Registra horas de uso\" o \"Registra aceite\". Edítalos y marca los checkboxes correspondientes antes de proponer mantenciones."); return; }
               const yaEnPrograma = (Array.isArray(tareasProg[hoyMant])?tareasProg[hoyMant]:Object.values(tareasProg[hoyMant]||{}));
               const diasDesde = (fechaStr) => fechaStr ? Math.floor((new Date(hoyMant+"T12:00:00")-new Date(fechaStr+"T12:00:00"))/(24*60*60*1000)) : Infinity;
               const nuevas = [];
-              items.forEach(it=>{
+              itemsConTrack.forEach(it=>{
                 const yaHoras = yaEnPrograma.some(t=>t.equipoId===String(it.id)&&t.tipoRegistroEquipo==="horas");
-                if(!yaHoras && diasDesde(it.ultimaVezHoras)>=30){
+                if(it.trackHoras && !yaHoras && diasDesde(it.ultimaVezHoras)>=30){
                   nuevas.push({id:Date.now()+Math.random(),fecha:hoyMant,zona:"Maquinaria y Equipos",elemento:it.nombre,tarea:"⏱️ Registrar horas de uso",responsable:"",estado:"por_designar",notas:"",equipoId:String(it.id),tipoRegistroEquipo:"horas",auto:true});
                 }
                 const yaAceite = yaEnPrograma.some(t=>t.equipoId===String(it.id)&&t.tipoRegistroEquipo==="aceite");
-                if(!yaAceite && diasDesde(it.ultimaVezAceite)>=30){
+                if(it.trackAceite && !yaAceite && diasDesde(it.ultimaVezAceite)>=30){
                   nuevas.push({id:Date.now()+Math.random(),fecha:hoyMant,zona:"Maquinaria y Equipos",elemento:it.nombre,tarea:"🛢️ Revisar aceite y nivel",responsable:"",estado:"por_designar",notas:"",equipoId:String(it.id),tipoRegistroEquipo:"aceite",auto:true});
                 }
               });
@@ -16707,6 +16727,16 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                             </select>
                           </div>
                           <div><label style={labelSt}>Próx. mantención (horas)</label><input type="number" min={0} style={S.input} value={maqForm.proxMantención} onChange={e=>setMaqForm(p=>({...p,proxMantención:e.target.value}))}/></div>
+                        </div>
+                        <div style={{display:"flex",gap:16,marginTop:12,paddingTop:10,borderTop:"1px solid rgba(249,115,22,0.15)"}}>
+                          <label style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"#c0dac0",cursor:"pointer"}}>
+                            <input type="checkbox" checked={!!maqForm.trackHoras} onChange={e=>setMaqForm(p=>({...p,trackHoras:e.target.checked}))}/>
+                            ⏱️ Este equipo registra horas de uso (genera tarea cada 30 días)
+                          </label>
+                          <label style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"#c0dac0",cursor:"pointer"}}>
+                            <input type="checkbox" checked={!!maqForm.trackAceite} onChange={e=>setMaqForm(p=>({...p,trackAceite:e.target.checked}))}/>
+                            🛢️ Este equipo registra aceite (genera tarea cada 30 días)
+                          </label>
                         </div>
                       </div>
                     )}
@@ -17085,7 +17115,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                                       {esJefa&&(
                                         <div style={{display:"flex",gap:6,flexShrink:0}}>
                                           <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(34,197,94,0.12)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)"}} onClick={()=>{setMovForm({...emptyMov,itemId:String(item.id),unidad:item.unidad||"unidad"});setShowMovForm(true);setSubTab("movimientos");}}>± Mov.</button>
-                                          <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>{setItemForm({nombre:item.nombre,categoria:item.categoria||"",descripcion:item.descripcion||"",unidad:item.unidad||"unidad",stockActual:item.stockActual||0,stockMinimo:item.stockMinimo||0,ubicacion:item.ubicacion||"",obs:item.obs||"",vencimiento:item.vencimiento||"",tiempoReingreso:item.tiempoReingreso||"",tiempoReingresoUnidad:item.tiempoReingresoUnidad||"horas",maquinaAsociada:item.maquinaAsociada||""});setMaqForm({marca:item.marca||"",modelo:item.modelo||"",patente:item.patente||"",horasUso:item.horasUso||0,nivelAceite:item.nivelAceite||"OK",nivelCombustible:item.nivelCombustible||"OK",proxMantención:item.proxMantención||""});setEditItemId(item.id);setShowItemForm(true);}}>✏️</button>
+                                          <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>{setItemForm({nombre:item.nombre,categoria:item.categoria||"",descripcion:item.descripcion||"",unidad:item.unidad||"unidad",stockActual:item.stockActual||0,stockMinimo:item.stockMinimo||0,ubicacion:item.ubicacion||"",obs:item.obs||"",vencimiento:item.vencimiento||"",tiempoReingreso:item.tiempoReingreso||"",tiempoReingresoUnidad:item.tiempoReingresoUnidad||"horas",maquinaAsociada:item.maquinaAsociada||""});setMaqForm({marca:item.marca||"",modelo:item.modelo||"",patente:item.patente||"",horasUso:item.horasUso||0,nivelAceite:item.nivelAceite||"OK",nivelCombustible:item.nivelCombustible||"OK",proxMantención:item.proxMantención||"",trackHoras:!!item.trackHoras,trackAceite:!!item.trackAceite});setEditItemId(item.id);setShowItemForm(true);}}>✏️</button>
                                           <button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>eliminarItem(item.id)}>🗑</button>
                                         </div>
                                       )}
