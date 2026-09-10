@@ -9219,9 +9219,15 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
 
   const registrarReembolso = (rendId) => {
     if(!reembolsoForm.monto) return;
+    const rendicionesActualizadas = rendiciones.map(r=>r.id===rendId?{...r,reembolso:true,estado:"reembolsada",montoReembolso:Number(reembolsoForm.monto),fechaReembolso:reembolsoForm.fecha,nTransReembolso:reembolsoForm.nTransferencia,bancoReembolso:reembolsoForm.banco,obsReembolso:reembolsoForm.obs}:r);
+    // Si con este reembolso ya no queda ninguna rendición pendiente, el fondo vuelve a estar completo:
+    // se actualiza el "saldo período anterior" a la fecha de este reembolso, en vez de dejarlo
+    // pegado en la última vez que hubo una diferencia real que registrar.
+    const quedaAlgunaPendiente = rendicionesActualizadas.some(r=>!r.reembolso);
     set({
-      rendiciones:rendiciones.map(r=>r.id===rendId?{...r,reembolso:true,estado:"reembolsada",montoReembolso:Number(reembolsoForm.monto),fechaReembolso:reembolsoForm.fecha,nTransReembolso:reembolsoForm.nTransferencia,bancoReembolso:reembolsoForm.banco,obsReembolso:reembolsoForm.obs}:r),
+      rendiciones: rendicionesActualizadas,
       compras:compras.map(compraC=>rendiciones.find(r=>r.id===rendId)?.items?.includes(compraC.id)?{...compraC,estado:"rendida"}:compraC),
+      ...(!quedaAlgunaPendiente ? { saldoAnterior: fondo, periodoAnterior: reembolsoForm.fecha } : {}),
     });
     setReembolsoForm({fecha:hoy.toISOString().slice(0,10),monto:"",banco:"",nTransferencia:"",obs:""});
     setShowReembolsoForm(false);
