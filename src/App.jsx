@@ -23580,7 +23580,7 @@ export default function App() {
           {(fbRol==="jefa"||fbRol==="programador"
             ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["compras","🛒","Compras"],["bodegas","🏪","Bodegas"],["golf","🏌️","Golf"],["personal","👷","Personal"],["memos","📝","Memos"],["protocolos","📋","Protocolos"]]
             : fbRol==="supervisor"
-            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["programacion","📆","Programa"],["reporte","📋","Reporte"],["golf","🏌️","Golf"],["bodegas","🏪","Bodegas"],["protocolos","📋","Protocolos"],["notificaciones","🔔","Alertas"],["miturno","🌿","Mi Turno"]]
+            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["programacion","📆","Programa"],["reporte","📋","Reporte"],["golf","🏌️","Golf"],["bodegas","🏪","Bodegas"],["memos","📝","Memos"],["protocolos","📋","Protocolos"],["notificaciones","🔔","Alertas"],["miturno","🌿","Mi Turno"]]
             : fbRol==="gerencia"
             ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["compras","🛒","Compras"],["bodegas","🏪","Bodegas"],["golf","🏌️","Golf"],["memos","📝","Memos"],["protocolos","📋","Protocolos"],["notificaciones","🔔","Alertas"]]
             : [["miturno","🌿","Mi Turno"]]
