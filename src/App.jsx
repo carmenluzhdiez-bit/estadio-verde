@@ -24844,7 +24844,7 @@ export default function App() {
                     +".pie{margin-top:24px;font-size:11px;color:#6b7280;border-top:1px solid #dce8dc;padding-top:12px;display:flex;justify-content:space-between}"
                     +"@media print{body{padding:16px}}"
                     +"</style></head><body>"
-                    +"<h1>📋 Reporte General de Áreas Verdes — Estadio Español</h1>"
+                    +"<div style='display:flex;align-items:center;gap:14px;margin-bottom:4px'><img src='"+LOGO_AREAS_VERDES_B64+"' style='height:52px;flex-shrink:0'/><h1 style='margin:0'>📋 Reporte General de Áreas Verdes — Estadio Español</h1></div>"
                     +"<div class='sub'>Fecha del reporte: "+new Date(fechaReporte+"T12:00:00").toLocaleDateString("es-CL",{weekday:"long",year:"numeric",month:"long",day:"numeric"})+" · Generado: "+new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"})+"</div>"
                     +"<div class='stats'>"+estadoStats+" &nbsp;·&nbsp; <b>Total zonas: "+MACROZONAS_BASE.length+"</b></div>"
                     +"<table><thead><tr><th>Zona</th><th>Categoría</th><th>Estado</th><th>Elementos</th><th>Críticos</th><th>Últ. Mant.</th><th>Próx. Mant.</th><th>Tareas Pend.</th></tr></thead><tbody>"+zonaRows+"</tbody></table>"
