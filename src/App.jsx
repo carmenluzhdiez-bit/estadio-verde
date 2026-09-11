@@ -23287,22 +23287,22 @@ export default function App() {
 
   const setElemCondicion = (zid,eid,isCustom,condicion) => {
     if(isCustom){ updateCustomElemField(zid,eid,{condicion}); return; }
-    // Actualizar estado local
-    setDataLocal(prev=>{
+    // Actualizar estado local con protección (evita que una snapshot vieja de Firebase pise este cambio)
+    setData(prev=>{
       const zidStr=String(zid);
       const ex=prev[zidStr]||{};
       const exElems=ex.elementos||{};
       return {...prev,[zidStr]:{...ex,elementos:{...exElems,[eid]:{...exElems[eid],condicion}}}};
     });
-    // Escribir en Firebase con path notation para no sobreescribir otros campos
+    // Escribir también con path notation para no sobreescribir otros campos que puedan cambiar mientras tanto
     fbUpdate(ref(db, ROOT+"/data/"+String(zid)+"/elementos/"+eid), {condicion})
       .catch(e=>console.error("setElemCondicion error:",e));
   };
 
   const setElemEstado = (zid,eid,isCustom,estado) => {
     if(isCustom){ updateCustomElemField(zid,eid,{estado}); return; }
-    // Actualizar local y Firebase con path específico
-    setDataLocal(prev=>{
+    // Actualizar local (con protección) y Firebase con path específico
+    setData(prev=>{
       const zidStr=String(zid);
       const ex=prev[zidStr]||{};
       const exElems=ex.elementos||{};
