@@ -20728,6 +20728,145 @@ class ErrorBoundary extends React.Component {
 }
 
 // ─── PANEL PROTOCOLOS ─────────────────────────────────────────────────────────
+function PanelMemos({ S, memosData=[], setMemosData, esJefa, personal=[] }) {
+  const hoyMemo = fechaLocal();
+  const emptyMemo = { fecha:hoyMemo, de:"Carmen Luz Hermosilla Diez — Jefa Departamento de Áreas Verdes", para:"Gerencia General y Administración", asunto:"", cuerpo:"" };
+  const [showForm, setShowForm] = React.useState(false);
+  const [form, setForm] = React.useState(emptyMemo);
+  const [editId, setEditId] = React.useState(null);
+  const [busqueda, setBusqueda] = React.useState("");
+
+  const memos = Array.isArray(memosData) ? memosData : Object.values(memosData||{});
+  const ordenados = [...memos].sort((a,b)=>(b.numero||0)-(a.numero||0));
+  const filtrados = busqueda.trim()
+    ? ordenados.filter(m=>(m.asunto+" "+m.para+" "+m.numero).toLowerCase().includes(busqueda.trim().toLowerCase()))
+    : ordenados;
+
+  const guardar = () => {
+    if(!form.asunto.trim()||!form.cuerpo.trim()){ alert("Falta el asunto o el cuerpo del memo."); return; }
+    if(editId){
+      setMemosData(memos.map(m=>m.id===editId?{...m,...form}:m));
+    } else {
+      const maxNumero = memos.reduce((mx,m)=>Math.max(mx,m.numero||0),0);
+      const nuevo = { id:Date.now()+Math.random(), numero:maxNumero+1, ...form };
+      setMemosData([...memos, nuevo]);
+    }
+    setForm(emptyMemo); setEditId(null); setShowForm(false);
+  };
+
+  const eliminar = (id) => {
+    if(!window.confirm("¿Eliminar este memo? No se puede deshacer.")) return;
+    setMemosData(memos.filter(m=>m.id!==id));
+  };
+
+  const numFmt = (n) => String(n).padStart(3,"0");
+
+  const imprimirMemo = (m) => {
+    const win = window.open("","_blank");
+    const cuerpoHtml = (m.cuerpo||"").split("\n").map(p=>`<p style="margin:0 0 10px;line-height:1.6">${p||"&nbsp;"}</p>`).join("");
+    win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Memo N° ${numFmt(m.numero)}</title>
+      <style>
+        body{font-family:Calibri,Arial,sans-serif;padding:40px 56px;color:#1a1a2e;max-width:720px;margin:0 auto}
+        .cab{border-bottom:3px solid #1a5c2a;padding-bottom:14px;margin-bottom:26px}
+        .titulo{font-size:20px;font-weight:700;color:#1a5c2a;margin-bottom:2px}
+        .sub{font-size:12px;color:#555}
+        .campos{margin-bottom:22px;font-size:13px}
+        .campos div{margin-bottom:4px}
+        .campos b{display:inline-block;width:80px}
+        .asunto{font-size:14px;font-weight:700;margin-bottom:20px;border-bottom:1px solid #ccc;padding-bottom:10px}
+        .cuerpo{font-size:13px;margin-bottom:40px}
+        .firma{margin-top:60px;font-size:13px}
+        .linea-firma{border-top:1px solid #333;width:240px;margin-top:50px;padding-top:6px}
+        @media print{.no-print{display:none}}
+      </style></head><body>
+      <button onclick="window.print()" class="no-print" style="float:right;padding:6px 14px;background:#1a5c2a;color:#fff;border:none;border-radius:5px;cursor:pointer;margin-bottom:10px">🖨️ Imprimir / PDF</button>
+      <div class="cab">
+        <div class="titulo">MEMO N° ${numFmt(m.numero)}</div>
+        <div class="sub">Departamento de Áreas Verdes · Estadio Español de Las Condes</div>
+      </div>
+      <div class="campos">
+        <div><b>Fecha:</b> ${new Date(m.fecha+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"})}</div>
+        <div><b>De:</b> ${m.de}</div>
+        <div><b>Para:</b> ${m.para}</div>
+      </div>
+      <div class="asunto">ASUNTO: ${m.asunto}</div>
+      <div class="cuerpo">${cuerpoHtml}</div>
+      <div class="firma">
+        <div class="linea-firma">${(m.de||"").split(" — ")[0]}</div>
+      </div>
+      </body></html>`);
+    win.document.close(); win.focus();
+  };
+
+  return (
+    <div className="ein">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:8}}>
+        <div>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:700}}>📝 Memos</div>
+          <div style={{fontSize:12,color:"#5a9a7a"}}>Departamento de Áreas Verdes · Estadio Español de Las Condes</div>
+        </div>
+        {esJefa&&!showForm&&(
+          <button className="btn-p" style={S.btn} onClick={()=>{setForm(emptyMemo);setEditId(null);setShowForm(true);}}>➕ Nuevo Memo</button>
+        )}
+      </div>
+
+      {showForm&&(
+        <div style={{...S.card,padding:16,marginBottom:16,border:"1px solid rgba(52,211,153,0.3)"}}>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,marginBottom:12}}>
+            {editId?`Editar Memo N° ${numFmt(form.numero)}`:"Nuevo Memo"}
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+            <div><label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>FECHA</label>
+              <input type="date" style={S.input} value={form.fecha} onChange={e=>setForm(p=>({...p,fecha:e.target.value}))}/>
+            </div>
+            <div><label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>PARA</label>
+              <input style={S.input} value={form.para} onChange={e=>setForm(p=>({...p,para:e.target.value}))} placeholder="ej: Gerencia General y Administración"/>
+            </div>
+          </div>
+          <div style={{marginBottom:10}}>
+            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>DE</label>
+            <input style={S.input} value={form.de} onChange={e=>setForm(p=>({...p,de:e.target.value}))}/>
+          </div>
+          <div style={{marginBottom:10}}>
+            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>ASUNTO</label>
+            <input style={S.input} value={form.asunto} onChange={e=>setForm(p=>({...p,asunto:e.target.value}))} placeholder="ej: Solicitud de reposición de fondo fijo"/>
+          </div>
+          <div style={{marginBottom:14}}>
+            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>CUERPO DEL MEMO</label>
+            <textarea rows={8} style={{...S.input,fontFamily:"Calibri,Arial,sans-serif",resize:"vertical"}} value={form.cuerpo} onChange={e=>setForm(p=>({...p,cuerpo:e.target.value}))} placeholder="Escribe el contenido del memo..."/>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button className="btn-p" style={S.btn} onClick={guardar}>💾 Guardar {editId?"cambios":"Memo"}</button>
+            <button className="btn-g" style={S.btn} onClick={()=>{setShowForm(false);setEditId(null);setForm(emptyMemo);}}>Cancelar</button>
+          </div>
+        </div>
+      )}
+
+      <input style={{...S.input,marginBottom:12,maxWidth:400}} placeholder="🔍 Buscar por N°, asunto o destinatario..." value={busqueda} onChange={e=>setBusqueda(e.target.value)}/>
+
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {filtrados.map(m=>(
+          <div key={m.id} style={{...S.card,padding:"12px 16px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,color:"#34d399",minWidth:70}}>N° {numFmt(m.numero)}</div>
+            <div style={{flex:1,minWidth:200}}>
+              <div style={{fontSize:13,fontWeight:600}}>{m.asunto}</div>
+              <div style={{fontSize:11,color:"#5a9a7a"}}>{new Date(m.fecha+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"short",year:"numeric"})} · Para: {m.para}</div>
+            </div>
+            <button onClick={()=>imprimirMemo(m)} style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(96,165,250,0.12)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.3)"}}>🖨️ Ver/Imprimir</button>
+            {esJefa&&<button onClick={()=>{setForm({fecha:m.fecha,de:m.de,para:m.para,asunto:m.asunto,cuerpo:m.cuerpo,numero:m.numero});setEditId(m.id);setShowForm(true);}} style={{...S.btn,fontSize:11,padding:"5px 10px"}}>✏️</button>}
+            {esJefa&&<button onClick={()=>eliminar(m.id)} style={{...S.btn,fontSize:11,padding:"5px 10px",background:"rgba(239,68,68,0.1)",color:"#f87171",border:"1px solid rgba(239,68,68,0.3)"}}>🗑️</button>}
+          </div>
+        ))}
+        {filtrados.length===0&&(
+          <div style={{textAlign:"center",padding:40,color:"#5a9a7a",fontSize:13}}>
+            {memos.length===0?"Sin memos aún. Crea el primero con \"➕ Nuevo Memo\".":"Sin resultados para esa búsqueda."}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function PanelProtocolos({ S, personal, esJefa, crearNotificacion }) {
   const [tabProt, setTabProt] = React.useState("docs_seguridad");
 
@@ -22240,6 +22379,7 @@ export default function App() {
   const [hojasSeguridad, setHojasSeguridad]               = useFirebaseState(`${ROOT}/hojas_seguridad_pesticidas`, []);
   const [comprasData,    setComprasData,    comprasReady]  = useFirebaseState("compras",  {compras:[],cuentas:CUENTAS_DEFAULT});
   const [bodegasData,    setBodegasData,    bodegasReady]  = useFirebaseState("bodegas",  {});
+  const [memosData,      setMemosData]                     = useFirebaseState(`${ROOT}/memos`, []);
   const [golfData,       setGolfData,       golfReady]     = useFirebaseState("golf", {greens:{},tees:{},arboles:[],eventos:[],mediciones:[]});
   const [bonosConfig,    setBonosConfig,    bonosReady]    = useFirebaseState("bonos-config", {
     pctFondo:50, pctEjecutor:50, pctAyudante:30, pctApoyo:20, año:new Date().getFullYear()
@@ -23438,11 +23578,11 @@ export default function App() {
         </div>
         <div style={S.headerNav} className="headerNav">
           {(fbRol==="jefa"||fbRol==="programador"
-            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["compras","🛒","Compras"],["bodegas","🏪","Bodegas"],["golf","🏌️","Golf"],["personal","👷","Personal"],["protocolos","📋","Protocolos"]]
+            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["compras","🛒","Compras"],["bodegas","🏪","Bodegas"],["golf","🏌️","Golf"],["personal","👷","Personal"],["memos","📝","Memos"],["protocolos","📋","Protocolos"]]
             : fbRol==="supervisor"
             ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["programacion","📆","Programa"],["reporte","📋","Reporte"],["golf","🏌️","Golf"],["bodegas","🏪","Bodegas"],["protocolos","📋","Protocolos"],["notificaciones","🔔","Alertas"],["miturno","🌿","Mi Turno"]]
             : fbRol==="gerencia"
-            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["compras","🛒","Compras"],["bodegas","🏪","Bodegas"],["golf","🏌️","Golf"],["protocolos","📋","Protocolos"],["notificaciones","🔔","Alertas"]]
+            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["compras","🛒","Compras"],["bodegas","🏪","Bodegas"],["golf","🏌️","Golf"],["memos","📝","Memos"],["protocolos","📋","Protocolos"],["notificaciones","🔔","Alertas"]]
             : [["miturno","🌿","Mi Turno"]]
           ).map(([v,ico,lbl])=>(
             <button key={v} onClick={()=>{setVista(v);setZonaId(null);setAiText("");if(v==="notificaciones")setTimeout(marcarTodasLeidas,4000);}} style={{cursor:"pointer",border:"none",background:"transparent",color:vista===v?"#fff":"#7aaa80",fontFamily:"'Georgia',serif",fontSize:12,padding:"10px 14px",borderBottom:vista===v?"2px solid #4a9a64":"2px solid transparent",transition:"all .15s",whiteSpace:"nowrap",display:"flex",flexDirection:"column",alignItems:"center",gap:2,flexShrink:0,position:"relative"}}>
@@ -25164,6 +25304,9 @@ export default function App() {
         )}
 
         {/* ── ALERTAS / NOTIFICACIONES ── */}
+          {vista==="memos"&&(
+            <PanelMemos S={S} memosData={memosData} setMemosData={setMemosData} esJefa={esJefa&&!soloLectura} personal={personal}/>
+          )}
           {vista==="protocolos"&&(
             <PanelProtocolos S={S} personal={personal} esJefa={esJefa&&!soloLectura} crearNotificacion={crearNotificacion} rolLogueado={rolLogueado}/>
           )}
