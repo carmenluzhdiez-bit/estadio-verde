@@ -9570,16 +9570,14 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
 
   // ── Ingreso automático a bodega ───────────────────────────────────────────
   const ingresarItemsABodega = (docFecha, docRef, items, compraId, proveedorDoc="") => {
-    console.log("🔍 ingresarItemsABodega llamada con:", {docFecha, docRef, compraId, items});
     const porBodega = {};
     const itemsEPP = [];
     items.forEach(it=>{
-      if(!it.bodegaDestino||!it.descripcion?.trim()) { console.log("🔍 ítem SALTADO (sin bodegaDestino o descripción):", it); return; }
+      if(!it.bodegaDestino||!it.descripcion?.trim()) { return; }
       if(it.bodegaDestino==="b08") { itemsEPP.push(it); return; }
       if(!porBodega[it.bodegaDestino]) porBodega[it.bodegaDestino]=[];
       porBodega[it.bodegaDestino].push(it);
     });
-    console.log("🔍 porBodega agrupado:", porBodega);
     // EPP no es stock genérico — crea un borrador de "Entrega EPP" pendiente de
     // asignar a un trabajador específico, en vez de un ítem de inventario normal.
     if(itemsEPP.length) {
@@ -9611,7 +9609,6 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
         const cant = Number(it.cantidad)||1;
         // Evitar duplicados: verificar si ya existe movimiento de esta compra+ítem
         const yaIngresado = nuevosMovs.some(m=>m.docRef===docRef&&m.itemNombre?.toLowerCase()===it.descripcion.trim().toLowerCase());
-        console.log("🔍 procesando ítem:", it.descripcion, "bodega:", bodId, "yaIngresado:", yaIngresado);
         if(yaIngresado) return;
         const idx = nuevosItems.findIndex(i=>i.nombre.trim().toLowerCase()===it.descripcion.trim().toLowerCase());
         if(idx>=0) {
@@ -9624,9 +9621,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
       });
       nuevoBodegasData[bodId] = {...bd, items:nuevosItems, movimientos:nuevosMovs.slice(0,200)};
     });
-    console.log("🔍 nuevoBodegasData antes de guardar:", nuevoBodegasData);
     setBodegasData(nuevoBodegasData);
-    console.log("🔍 setBodegasData ejecutado");
     // Guardar asignación en la compra para que persista al volver
     if(compraId) set({compras:compras.map(compraC=>compraC.id===compraId?{...compraC,items:(compraC.items||[]).map((it,i)=>({...it,bodegaDestino:items[i]?.bodegaDestino||it.bodegaDestino||""}))}:compraC)});
   };
@@ -16991,6 +16986,33 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
               setTareasProg(prev=>({...prev,[hoyMant]:[...(Array.isArray(prev[hoyMant])?prev[hoyMant]:Object.values(prev[hoyMant]||{})),...nuevas]}));
               alert(`✅ ${nuevas.length} tarea(s) de mantención generadas para hoy (${hoyMant}). Asígnalas a un jardinero o supervisor en Programa → Programar.`);
             }}>🔧 Proponer mantenciones de equipos</button>}
+            {esJefa&&<button style={{...S.btn,background:"rgba(245,158,11,0.15)",color:"#fbbf24",border:"1px solid rgba(245,158,11,0.3)"}} onClick={()=>{
+              const bd = bodegasData?.[bodegaActiva]||{items:[],movimientos:[]};
+              const items = bd.items||[];
+              const movs = bd.movimientos||[];
+              // Buscar nombres de ítem que aparecen en movimientos pero no existen en la lista de ítems actual
+              const nombresEnItems = new Set(items.map(i=>i.nombre.trim().toLowerCase()));
+              const nombresFaltantes = new Set();
+              movs.forEach(m=>{
+                if(m.itemNombre && !nombresEnItems.has(m.itemNombre.trim().toLowerCase())) {
+                  nombresFaltantes.add(m.itemNombre.trim());
+                }
+              });
+              if(nombresFaltantes.size===0){ alert("✅ No se encontraron movimientos huérfanos — todo el stock está consistente en esta bodega."); return; }
+              const nuevosItems=[...items];
+              const reparados=[];
+              nombresFaltantes.forEach(nombre=>{
+                // Recalcular stock sumando todos los movimientos (entrada suma, salida resta) de ese nombre
+                const movsDeEsteItem = movs.filter(m=>m.itemNombre?.trim().toLowerCase()===nombre.toLowerCase());
+                const stockCalc = movsDeEsteItem.reduce((s,m)=>s+(m.tipo==="entrada"?Number(m.cantidad)||0:-(Number(m.cantidad)||0)),0);
+                const unidad = movsDeEsteItem[0]?.unidad||"unidad";
+                const categoriaInferida = movsDeEsteItem[0]?.categoriaBodega||"";
+                nuevosItems.push({id:Date.now()+Math.random(), nombre, categoria:categoriaInferida, unidad, stockActual:Math.max(0,stockCalc), stockMinimo:0, ubicacion:"", obs:"Recreado por reparación — stock recalculado desde movimientos"});
+                reparados.push(`${nombre} (${Math.max(0,stockCalc)} ${unidad})`);
+              });
+              setBodegasData(prev=>({...prev,[bodegaActiva]:{...(prev[bodegaActiva]||{}),items:nuevosItems}}));
+              alert(`✅ Se recrearon ${reparados.length} ítem(s) que tenían movimiento pero no stock:\n\n${reparados.join("\n")}`);
+            }}>🔧 Reparar stock desde movimientos</button>}
           </div>
 
           {/* Inventario inicial */}
