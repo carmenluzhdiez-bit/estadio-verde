@@ -1455,7 +1455,7 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
   // ── HTML para reportes ───────────────────────────────────────────────
   const V="#1a5c35", VL="#d4edda", BO="#ccddcc";
 
-  const hEnc=(titulo,sub)=>`<div style="text-align:center;margin-bottom:20px;border-bottom:3px solid ${V};padding-bottom:12px"><div style="font-size:22px;font-weight:700;color:${V}">Estadio Español · Áreas Verdes</div><div style="font-size:16px;font-weight:600;color:#333;margin-top:4px">${titulo}</div><div style="font-size:13px;color:#555;margin-top:2px">${sub||periodoLabel}</div><div style="font-size:11px;color:#888;margin-top:2px">Generado el ${new Date().toLocaleDateString("es-CL",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div></div>`;
+  const hEnc=(titulo,sub)=>`<div style="text-align:center;margin-bottom:20px;border-bottom:3px solid ${V};padding-bottom:12px"><img src="${LOGO_AREAS_VERDES_B64}" style="height:50px;margin-bottom:6px"/><div style="font-size:22px;font-weight:700;color:${V}">Estadio Español · Áreas Verdes</div><div style="font-size:16px;font-weight:600;color:#333;margin-top:4px">${titulo}</div><div style="font-size:13px;color:#555;margin-top:2px">${sub||periodoLabel}</div><div style="font-size:11px;color:#888;margin-top:2px">Generado el ${new Date().toLocaleDateString("es-CL",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div></div>`;
 
   const hKpi=(st)=>`<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:16px">${[["Total",st.total,"#1a5c35"],["Realizadas",st.hechas,"#166534"],["No realizadas",st.noPudo,"#991b1b"],["Pendientes",st.pend,"#92400e"],["Cumplimiento",st.pct+"%",st.pct>=80?"#166534":st.pct>=50?"#92400e":"#991b1b"]].map(([l,v,c])=>`<div style="border:1px solid ${BO};border-radius:8px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:700;color:${c}">${v}</div><div style="font-size:10px;color:#555">${l}</div></div>`).join("")}</div>`;
 
@@ -1996,7 +1996,10 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
       .pie{margin-top:24px;font-size:11px;color:#6b7280;border-top:1px solid #dce8dc;padding-top:12px}
       @media print{body{padding:16px}.pie{position:fixed;bottom:20px;width:100%}}
     </style></head><body>
-    <h1>📋 Programación Diaria — Estadio Español</h1>
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:2px">
+      <img src="${LOGO_AREAS_VERDES_B64}" style="height:48px;flex-shrink:0"/>
+      <h1 style="margin:0">📋 Programación Diaria — Estadio Español</h1>
+    </div>
     <div class="sub">Fecha: <b>${dia}</b>${hpTdArr.length !== (tareas[dia]||[]).length ? " (filtrado)" : ""} · Generado: ${new Date().toLocaleDateString("es-CL")} ${new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"})}</div>
     <div class="stats">
       <span>Total: <b>${hpTdArr.length}</b></span>
@@ -2052,7 +2055,10 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
       .pie{margin-top:24px;font-size:11px;color:#6b7280;border-top:1px solid #dce8dc;padding-top:12px}
       @media print{body{padding:16px}.pie{position:fixed;bottom:20px;width:100%}}
     </style></head><body>
-    <h1>🧑‍🌾 Hoja de Turno — ${responsable}</h1>
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:2px">
+      <img src="${LOGO_AREAS_VERDES_B64}" style="height:48px;flex-shrink:0"/>
+      <h1 style="margin:0">🧑‍🌾 Hoja de Turno — ${responsable}</h1>
+    </div>
     <div class="sub">Fecha: <b>${dia}</b> · Generado: ${new Date().toLocaleDateString("es-CL")} ${new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"})}</div>
     <div class="stats">
       <span>Total: <b>${hpTdArr.length}</b></span>
@@ -6803,13 +6809,16 @@ function TipoEventoSelector({ value, onChange, S, TIPO_EVENTO }) {
 }
 
 function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDeleteEvento, onUpdateEvento, esProgramador=false,
-  eppEntregas=[], eppFiltros=[], eppVidaUtil=[], eppFitTests=[]
+  eppEntregas=[], eppFiltros=[], eppVidaUtil=[], eppFitTests=[],
+  bodegasData={}, setBodegasData=()=>{}, herramientasCustodia=[], setHerramientasCustodia=()=>{}, esJefa=false
 } ) {
   const [tab, setTab] = React.useState("ficha");
   const [showNuevoEvento, setShowNuevoEvento] = React.useState(false);
   const [nuevoEvento, setNuevoEvento] = React.useState({ tipo:"permiso", fecha:"", fechaFin:"", horas:"", descripcion:"", estado:"pendiente" });
   const [editEventoId, setEditEventoId] = React.useState(null);
   const [editEventoForm, setEditEventoForm] = React.useState({});
+  const [showAsignarHerr, setShowAsignarHerr] = React.useState(false);
+  const [herrForm, setHerrForm] = React.useState({bodegaId:"",itemId:"",cantidad:"",fecha:fechaLocal(),obs:""});
 
   const abrirEditEvento = (ev) => { setEditEventoId(ev.id); setEditEventoForm({...ev}); setShowNuevoEvento(false); };
   const guardarEditEvento = () => { onUpdateEvento(editEventoId, editEventoForm); setEditEventoId(null); };
@@ -6872,7 +6881,7 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
       </div>
 
       <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
-        {[["ficha","📋 Ficha"],["eventos","📅 Eventos"],["bonos","💰 Bonos"],["epp","🦺 EPP"],["resumen","📊 Resumen"]].map(([tb,lb])=>(
+        {[["ficha","📋 Ficha"],["eventos","📅 Eventos"],["bonos","💰 Bonos"],["epp","🦺 EPP"],["herramientas","🔧 Herramientas"],["resumen","📊 Resumen"]].map(([tb,lb])=>(
           <button key={tb} className={`tab${tab===tb?" on":""}`} onClick={()=>setTab(tb)}>{lb}</button>
         ))}
       </div>
@@ -7387,6 +7396,178 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
                 ))
               }
             </div>
+          </div>
+        );
+      })()}
+
+      {tab==="herramientas"&&(()=>{
+        const misHerramientas = (Array.isArray(herramientasCustodia)?herramientasCustodia:[]).filter(h=>String(h.trabajadorId)===String(t.id));
+        const enCustodia = misHerramientas.filter(h=>h.estado!=="devuelta");
+        const devueltas = misHerramientas.filter(h=>h.estado==="devuelta");
+        const hoyHerr = fechaLocal();
+
+        const asignarHerramienta = () => {
+          if(!herrForm.bodegaId||!herrForm.itemId||!herrForm.cantidad||Number(herrForm.cantidad)<=0){ alert("Elige la bodega, el ítem y una cantidad válida."); return; }
+          const bd = bodegasData?.[herrForm.bodegaId];
+          const item = (bd?.items||[]).find(i=>String(i.id)===String(herrForm.itemId));
+          if(!item){ alert("No se encontró el ítem seleccionado."); return; }
+          if(Number(herrForm.cantidad)>Number(item.stockActual||0)){ alert(`Solo hay ${item.stockActual||0} disponible(s) en bodega.`); return; }
+          // Descontar de bodega + registrar movimiento de salida
+          setBodegasData(prev=>{
+            const bdPrev = prev?.[herrForm.bodegaId]||{items:[],movimientos:[]};
+            const items = (bdPrev.items||[]).map(i=>String(i.id)===String(item.id)?{...i,stockActual:Math.max(0,Number(i.stockActual||0)-Number(herrForm.cantidad))}:i);
+            const movimientos = [{id:Date.now()+Math.random(),fecha:herrForm.fecha||hoyHerr,tipo:"salida",cantidad:Number(herrForm.cantidad),unidad:item.unidad||"unidad",motivo:`Entrega a cargo de ${t.nombre}`,itemId:String(item.id),itemNombre:item.nombre,responsable:t.nombre},...(bdPrev.movimientos||[])].slice(0,200);
+            return {...prev,[herrForm.bodegaId]:{...bdPrev,items,movimientos}};
+          });
+          const nueva = {
+            id:Date.now()+Math.random(), trabajadorId:t.id, bodegaId:herrForm.bodegaId,
+            itemId:String(item.id), itemNombre:item.nombre, cantidad:Number(herrForm.cantidad), unidad:item.unidad||"unidad",
+            fechaEntrega:herrForm.fecha||hoyHerr, estado:"en_custodia", firmaRecepcion:false, obs:herrForm.obs||"",
+          };
+          setHerramientasCustodia([nueva, ...(Array.isArray(herramientasCustodia)?herramientasCustodia:[])]);
+          setHerrForm({bodegaId:"",itemId:"",cantidad:"",fecha:hoyHerr,obs:""});
+          setShowAsignarHerr(false);
+        };
+
+        const marcarFirmaHerr = (id) => {
+          setHerramientasCustodia((Array.isArray(herramientasCustodia)?herramientasCustodia:[]).map(h=>h.id===id?{...h,firmaRecepcion:true,fechaFirma:hoyHerr}:h));
+        };
+
+        const devolverHerramienta = (h) => {
+          if(!window.confirm(`¿Confirmar devolución de "${h.itemNombre}" (${h.cantidad} ${h.unidad}) a bodega?`)) return;
+          setBodegasData(prev=>{
+            const bdPrev = prev?.[h.bodegaId]||{items:[],movimientos:[]};
+            const items = (bdPrev.items||[]).map(i=>String(i.id)===String(h.itemId)?{...i,stockActual:Number(i.stockActual||0)+Number(h.cantidad)}:i);
+            const movimientos = [{id:Date.now()+Math.random(),fecha:hoyHerr,tipo:"entrada",cantidad:Number(h.cantidad),unidad:h.unidad||"unidad",motivo:`Devolución de ${t.nombre}`,itemId:String(h.itemId),itemNombre:h.itemNombre,responsable:t.nombre},...(bdPrev.movimientos||[])].slice(0,200);
+            return {...prev,[h.bodegaId]:{...bdPrev,items,movimientos}};
+          });
+          setHerramientasCustodia((Array.isArray(herramientasCustodia)?herramientasCustodia:[]).map(x=>x.id===h.id?{...x,estado:"devuelta",fechaDevolucion:hoyHerr}:x));
+        };
+
+        const imprimirActaHerramienta = (h) => {
+          const win = window.open("","_blank");
+          win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Acta de Entrega — ${h.itemNombre}</title>
+            <style>
+              body{font-family:Calibri,Arial,sans-serif;padding:40px 56px;color:#1a1a2e;max-width:720px;margin:0 auto}
+              .cab{border-bottom:3px solid #1a5c2a;padding-bottom:14px;margin-bottom:26px;display:flex;align-items:center;gap:14px}
+              .titulo{font-size:20px;font-weight:700;color:#1a5c2a;margin-bottom:2px}
+              .sub{font-size:12px;color:#555}
+              .campos{margin-bottom:22px;font-size:13px}
+              .campos div{margin-bottom:6px}
+              .campos b{display:inline-block;width:160px}
+              .cuerpo{font-size:13px;margin-bottom:40px;line-height:1.6}
+              .firmas{display:flex;justify-content:space-between;margin-top:70px}
+              .firma{text-align:center;width:45%}
+              .linea-firma{border-top:1px solid #333;padding-top:6px;margin-top:50px;font-size:12px}
+              @media print{.no-print{display:none}}
+            </style></head><body>
+            <button onclick="window.print()" class="no-print" style="float:right;padding:6px 14px;background:#1a5c2a;color:#fff;border:none;border-radius:5px;cursor:pointer">🖨️ Imprimir / PDF</button>
+            <div class="cab">
+              <img src="${LOGO_AREAS_VERDES_B64}" style="height:56px;flex-shrink:0"/>
+              <div>
+                <div class="titulo">ACTA DE ENTREGA DE HERRAMIENTA</div>
+                <div class="sub">Departamento de Áreas Verdes · Estadio Español de Las Condes</div>
+              </div>
+            </div>
+            <div class="campos">
+              <div><b>Fecha de entrega:</b> ${new Date(h.fechaEntrega+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"})}</div>
+              <div><b>Trabajador:</b> ${t.nombre}</div>
+              <div><b>Cargo:</b> ${t.cargo||"—"}</div>
+              <div><b>Herramienta/Equipo:</b> ${h.itemNombre}</div>
+              <div><b>Cantidad:</b> ${h.cantidad} ${h.unidad}</div>
+              ${h.obs?`<div><b>Observaciones:</b> ${h.obs}</div>`:""}
+            </div>
+            <div class="cuerpo">
+              Por medio del presente documento se deja constancia de que el Departamento de Áreas Verdes del Estadio Español de Las Condes
+              entrega a <b>${t.nombre}</b> la herramienta/equipo detallado(a) arriba, quedando ésta bajo su cuidado y responsabilidad
+              mientras se mantenga en su custodia. El trabajador se compromete a darle buen uso, cuidarla adecuadamente y devolverla
+              en las mismas condiciones al Departamento cuando corresponda o cuando le sea solicitada.
+            </div>
+            <div class="firmas">
+              <div class="firma"><div class="linea-firma">Entrega — Jefatura Áreas Verdes</div></div>
+              <div class="firma"><div class="linea-firma">Recibe — ${t.nombre}</div></div>
+            </div>
+            </body></html>`);
+          win.document.close(); win.focus();
+        };
+
+        return (
+          <div className="ein" style={{display:"flex",flexDirection:"column",gap:14}}>
+            {esJefa&&(
+              <div style={{...S.card,padding:16}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:showAsignarHerr?12:0}}>
+                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#38bdf8"}}>🔧 Asignar herramienta desde bodega</div>
+                  <button className="btn-p" style={S.btn} onClick={()=>setShowAsignarHerr(p=>!p)}>{showAsignarHerr?"✕ Cerrar":"➕ Asignar"}</button>
+                </div>
+                {showAsignarHerr&&(
+                  <div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                      <div>
+                        <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>BODEGA</label>
+                        <select style={S.input} value={herrForm.bodegaId} onChange={e=>setHerrForm(p=>({...p,bodegaId:e.target.value,itemId:""}))}>
+                          <option value="">Seleccionar bodega...</option>
+                          {BODEGAS_DEF.map(b=><option key={b.id} value={b.id}>{b.icono} {b.nombre}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>ÍTEM (con stock disponible)</label>
+                        <select style={S.input} value={herrForm.itemId} onChange={e=>setHerrForm(p=>({...p,itemId:e.target.value}))} disabled={!herrForm.bodegaId}>
+                          <option value="">Seleccionar ítem...</option>
+                          {((bodegasData?.[herrForm.bodegaId]?.items)||[]).filter(i=>Number(i.stockActual||0)>0).map(i=>
+                            <option key={i.id} value={i.id}>{i.nombre} — {i.stockActual} {i.unidad} disponibles</option>
+                          )}
+                        </select>
+                      </div>
+                    </div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                      <div>
+                        <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>CANTIDAD A ENTREGAR</label>
+                        <input type="number" min="1" style={S.input} value={herrForm.cantidad} onChange={e=>setHerrForm(p=>({...p,cantidad:e.target.value}))}/>
+                      </div>
+                      <div>
+                        <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>FECHA DE ENTREGA</label>
+                        <input type="date" style={S.input} value={herrForm.fecha} onChange={e=>setHerrForm(p=>({...p,fecha:e.target.value}))}/>
+                      </div>
+                    </div>
+                    <div style={{marginBottom:12}}>
+                      <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>OBSERVACIONES (opcional)</label>
+                      <input style={S.input} value={herrForm.obs} onChange={e=>setHerrForm(p=>({...p,obs:e.target.value}))} placeholder="ej: Estado usado, con detalles menores..."/>
+                    </div>
+                    <button className="btn-p" style={S.btn} onClick={asignarHerramienta}>💾 Confirmar entrega</button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div style={{...S.card,padding:16}}>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#38bdf8",marginBottom:10}}>🧰 Herramientas actualmente a su cargo ({enCustodia.length})</div>
+              {enCustodia.length===0?<div style={{fontSize:12,color:"#4a7a5a"}}>Sin herramientas asignadas actualmente.</div>:
+                enCustodia.map(h=>(
+                  <div key={h.id} style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",padding:"8px 0",borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+                    <div style={{flex:1,minWidth:180}}>
+                      <div style={{fontSize:13,fontWeight:600}}>{h.itemNombre} <span style={{fontSize:11,color:"#5a9a7a"}}>· {h.cantidad} {h.unidad}</span></div>
+                      <div style={{fontSize:11,color:"#5a9a7a"}}>Entregado {new Date(h.fechaEntrega+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"short",year:"numeric"})}
+                        {h.firmaRecepcion?<span style={{color:"#4ade80"}}> · ✅ Firmado</span>:<span style={{color:"#f59e0b"}}> · ⏳ Sin firmar</span>}
+                      </div>
+                    </div>
+                    <button onClick={()=>imprimirActaHerramienta(h)} style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(96,165,250,0.12)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.3)"}}>🖨️ Acta</button>
+                    {esJefa&&!h.firmaRecepcion&&<button onClick={()=>marcarFirmaHerr(h.id)} style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(34,197,94,0.12)",color:"#4ade80",border:"1px solid rgba(34,197,94,0.3)"}}>✅ Marcar firmado</button>}
+                    {esJefa&&<button onClick={()=>devolverHerramienta(h)} style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(245,158,11,0.12)",color:"#fbbf24",border:"1px solid rgba(245,158,11,0.3)"}}>↩️ Devolver</button>}
+                  </div>
+                ))
+              }
+            </div>
+
+            {devueltas.length>0&&(
+              <div style={{...S.card,padding:16}}>
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:13,color:"#94a3b8",marginBottom:10}}>📜 Historial de devoluciones ({devueltas.length})</div>
+                {devueltas.map(h=>(
+                  <div key={h.id} style={{fontSize:12,color:"#7a9a8a",padding:"5px 0",borderTop:"1px solid rgba(255,255,255,0.05)"}}>
+                    {h.itemNombre} ({h.cantidad} {h.unidad}) — entregado {h.fechaEntrega}, devuelto {h.fechaDevolucion}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         );
       })()}
@@ -9947,7 +10128,10 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                     .footer{margin-top:20px;padding-top:8px;border-top:1px solid #ccc;font-size:9px;color:#888;text-align:center}
                     @media print{.noprint{display:none}}</style></head><body>
                     <div class="hdr">
-                      <div><h1>Resumen de Compras y Rendicion</h1><h2>Departamento de Areas Verdes · Estadio Espanol de Las Condes</h2></div>
+                      <div style="display:flex;align-items:center;gap:14px">
+                        <img src="${LOGO_AREAS_VERDES_B64}" style="height:48px;flex-shrink:0"/>
+                        <div><h1>Resumen de Compras y Rendicion</h1><h2>Departamento de Areas Verdes · Estadio Espanol de Las Condes</h2></div>
+                      </div>
                       <div style="text-align:right;font-size:10px;color:#666">Emitido: <strong>${fechaHoy}</strong><br>Periodo: <strong>${mesActual}</strong></div>
                     </div>
                     <!-- KPIs -->
@@ -10031,7 +10215,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                     table{width:100%;border-collapse:collapse}th{background:#1a5c2a;color:#fff;padding:8px 8px;font-size:11px;text-align:left}
                     th.num{text-align:right}tr:nth-child(even){background:#fafafa}
                     .noprint{display:block}@media print{.noprint{display:none}}</style></head><body>
-                    <h1>📊 Informe de Gastos por Categoría — ${anioActual}</h1>
+                    <h1 style="margin:0"><img src="${LOGO_AREAS_VERDES_B64}" style="height:40px;vertical-align:middle;margin-right:10px"/>📊 Informe de Gastos por Categoría — ${anioActual}</h1>
                     <h2>Departamento de Áreas Verdes · Estadio Español de Las Condes · Generado el ${hoy}</h2>
                     <table>
                       <thead><tr>
@@ -10636,7 +10820,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                   .total{font-weight:700;color:#065f46}.footer{margin-top:24px;font-size:10px;color:#9ca3af;text-align:center}
                   @media print{.no-print{display:none}}</style></head><body>
                   <button onclick="window.print()" class="no-print" style="float:right;padding:6px 14px;background:#065f46;color:#fff;border:none;border-radius:5px;cursor:pointer">🖨️ Imprimir / PDF</button>
-                  <h1>📊 Informe de Gastos por Categoría — ${anioActual}</h1>
+                  <h1 style="display:flex;align-items:center;gap:10px"><img src="${LOGO_AREAS_VERDES_B64}" style="height:36px"/>📊 Informe de Gastos por Categoría — ${anioActual}</h1>
                   <p style="font-size:12px;color:#6b7280">Estadio Español de Las Condes · Departamento de Áreas Verdes</p>
                   <table><thead><tr><th>Categoría</th><th>N° docs</th><th>Monto total</th><th>% del total</th><th>Distribución</th></tr></thead><tbody>
                   ${catsSorted.map(([cat,v])=>`
@@ -11592,7 +11776,7 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
     th.r{text-align:center}tr:nth-child(even){background:#f9fafb}
     .footer{margin-top:16px;font-size:11px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:10px}
     @media print{button{display:none}}</style></head><body>
-    <h1>⛳ Informe de Crecimiento — Greens y Vivero</h1>
+    <div style="display:flex;align-items:center;gap:12px"><img src="${LOGO_AREAS_VERDES_B64}" style="height:44px"/><h1 style="margin:0">⛳ Informe de Crecimiento — Greens y Vivero</h1></div>
     <h2>Estadio Español de Las Condes · Generado el ${hoy}</h2>
     <div class="periodo">📅 Período: ${periodoLabel} · ${medsFiltradas.length} medición(es) incluida(s)</div>
     <table>
@@ -11850,7 +12034,7 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
               return `<tr><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;font-weight:600">${m.fecha}</td><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;color:#6b7280">${m.responsable||"—"}</td><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;font-size:12px">${alts}</td><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;font-size:11px;color:#888">${obsCompleta}</td></tr>`;
             }).join("");
             const win=window.open("","_blank","width=1000,height=700");
-            win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Registros Greens</title><style>body{font-family:Calibri,Arial,sans-serif;padding:28px;font-size:13px;color:#222}h1{font-size:18px;color:#14532d;margin-bottom:2px}h2{font-size:12px;color:#888;font-weight:normal;margin-top:0}table{width:100%;border-collapse:collapse}th{background:#14532d;color:#fff;padding:8px 10px;font-size:11px;text-align:left}tr:nth-child(even){background:#f9fafb}@media print{button{display:none}}</style></head><body><h1>⛳ Registros de Medición — Greens y Vivero</h1><h2>Estadio Español · ${hoyR} · ${meds.length} medición(es)</h2><table><thead><tr><th>Fecha</th><th>Responsable</th><th>Alturas</th><th>Obs.</th></tr></thead><tbody>${filas}</tbody></table><div style="margin-top:14px;text-align:center"><button onclick="window.print()" style="background:#14532d;color:#fff;border:none;padding:9px 22px;border-radius:6px;cursor:pointer">🖨️ Imprimir / PDF</button></div></body></html>`);
+            win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Registros Greens</title><style>body{font-family:Calibri,Arial,sans-serif;padding:28px;font-size:13px;color:#222}h1{font-size:18px;color:#14532d;margin-bottom:2px}h2{font-size:12px;color:#888;font-weight:normal;margin-top:0}table{width:100%;border-collapse:collapse}th{background:#14532d;color:#fff;padding:8px 10px;font-size:11px;text-align:left}tr:nth-child(even){background:#f9fafb}@media print{button{display:none}}</style></head><body><div style="display:flex;align-items:center;gap:12px"><img src="${LOGO_AREAS_VERDES_B64}" style="height:42px"/><div><h1>⛳ Registros de Medición — Greens y Vivero</h1><h2>Estadio Español · ${hoyR} · ${meds.length} medición(es)</h2></div></div><table><thead><tr><th>Fecha</th><th>Responsable</th><th>Alturas</th><th>Obs.</th></tr></thead><tbody>${filas}</tbody></table><div style="margin-top:14px;text-align:center"><button onclick="window.print()" style="background:#14532d;color:#fff;border:none;padding:9px 22px;border-radius:6px;cursor:pointer">🖨️ Imprimir / PDF</button></div></body></html>`);
             win.document.close();
           }}>📋 Imprimir historial
         </button>
@@ -11867,7 +12051,7 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
                 onClick={()=>{
                   const win=window.open("","_blank","width=700,height=500");
                   const alts=[...GREENS_DEF.map(g=>m.alturas?.[g.id]?`<tr><td style="padding:7px 12px;border-bottom:1px solid #f0f0f0;font-weight:600">${g.nombre}</td><td style="padding:7px 12px;border-bottom:1px solid #f0f0f0;text-align:center;font-weight:700;color:#14532d">${m.alturas[g.id]} mm</td><td style="padding:7px 12px;border-bottom:1px solid #f0f0f0;font-size:11px;color:#888">${m.obsGreen?.[g.id]||""}</td></tr>`:"").filter(Boolean),m.alturas?.vivero?`<tr><td style="padding:7px 12px;border-bottom:1px solid #f0f0f0;font-weight:600">Vivero</td><td style="padding:7px 12px;border-bottom:1px solid #f0f0f0;text-align:center;font-weight:700;color:#4ade80">${m.alturas.vivero} mm</td><td style="padding:7px 12px;border-bottom:1px solid #f0f0f0;font-size:11px;color:#888">${m.obsGreen?.vivero||""}</td></tr>`:""].filter(Boolean).join("");
-                  win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Medición ${m.fecha}</title><style>body{font-family:Calibri,Arial,sans-serif;padding:28px;font-size:13px;color:#222}h1{font-size:17px;color:#14532d;margin-bottom:2px}h2{font-size:12px;color:#888;font-weight:normal;margin-top:0}table{width:100%;border-collapse:collapse;max-width:480px}th{background:#14532d;color:#fff;padding:8px 12px;font-size:11px;text-align:left}tr:nth-child(even){background:#f9fafb}@media print{button{display:none}}</style></head><body><h1>⛳ Registro de Medición — ${m.fecha}</h1><h2>Responsable: ${m.responsable||"—"} · Tipo: ${m.tipo==="semanal"?"Semanal":m.tipo==="siembra"?"Post siembra":"Puntual"}</h2><table><thead><tr><th>Green / Zona</th><th style="text-align:center">Altura (mm)</th><th>Obs.</th></tr></thead><tbody>${alts}</tbody></table>${m.obs?`<div style="margin-top:12px;padding:10px 14px;background:#fefce8;border-left:3px solid #ca8a04;border-radius:4px;font-size:12px"><b>Obs. general:</b> ${m.obs}</div>`:""}<div style="margin-top:14px;text-align:center"><button onclick="window.print()" style="background:#14532d;color:#fff;border:none;padding:9px 22px;border-radius:6px;cursor:pointer">🖨️ Imprimir / PDF</button></div></body></html>`);
+                  win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Medición ${m.fecha}</title><style>body{font-family:Calibri,Arial,sans-serif;padding:28px;font-size:13px;color:#222}h1{font-size:17px;color:#14532d;margin-bottom:2px}h2{font-size:12px;color:#888;font-weight:normal;margin-top:0}table{width:100%;border-collapse:collapse;max-width:480px}th{background:#14532d;color:#fff;padding:8px 12px;font-size:11px;text-align:left}tr:nth-child(even){background:#f9fafb}@media print{button{display:none}}</style></head><body><div style="display:flex;align-items:center;gap:12px"><img src="${LOGO_AREAS_VERDES_B64}" style="height:40px"/><div><h1>⛳ Registro de Medición — ${m.fecha}</h1><h2>Responsable: ${m.responsable||"—"} · Tipo: ${m.tipo==="semanal"?"Semanal":m.tipo==="siembra"?"Post siembra":"Puntual"}</h2></div></div><table><thead><tr><th>Green / Zona</th><th style="text-align:center">Altura (mm)</th><th>Obs.</th></tr></thead><tbody>${alts}</tbody></table>${m.obs?`<div style="margin-top:12px;padding:10px 14px;background:#fefce8;border-left:3px solid #ca8a04;border-radius:4px;font-size:12px"><b>Obs. general:</b> ${m.obs}</div>`:""}<div style="margin-top:14px;text-align:center"><button onclick="window.print()" style="background:#14532d;color:#fff;border:none;padding:9px 22px;border-radius:6px;cursor:pointer">🖨️ Imprimir / PDF</button></div></body></html>`);
                   win.document.close();
                 }}>📋 Guardar</button>
               {esJefa&&<button className="btn-d" style={{...S.btn,fontSize:11,padding:"3px 8px"}} onClick={()=>onBorrar(m.id)}>🗑</button>}
@@ -15875,10 +16059,13 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
     </style></head><body>
     <div class="pagina">
       <div class="hdr">
-        <div>
-          <h1>Comprobante de Entrega de EPP</h1>
-          <h2>Programa de Protección Personal · Departamento de Áreas Verdes</h2>
-          <h2>Estadio Español de Las Condes</h2>
+        <div style="display:flex;align-items:center;gap:12px">
+          <img src="${LOGO_AREAS_VERDES_B64}" style="height:44px;flex-shrink:0"/>
+          <div>
+            <h1>Comprobante de Entrega de EPP</h1>
+            <h2>Programa de Protección Personal · Departamento de Áreas Verdes</h2>
+            <h2>Estadio Español de Las Condes</h2>
+          </div>
         </div>
         <div style="text-align:right;font-size:12px;color:#555">
           <div>Fecha entrega: <strong>${fechaEnt}</strong></div>
@@ -17696,7 +17883,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                       .ok{color:#2e7d32;font-weight:600}.warn{color:#e65100;font-weight:600}.venc{color:#c62828;font-weight:600}
                       @media print{.noprint{display:none}@page{margin:1.5cm}}</style></head><body>
                       <button onclick="window.print()" class="noprint" style="float:right;padding:7px 16px;background:#1a5c2a;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">🖨️ Imprimir / PDF</button>
-                      <h1>Horómetro — ${eq.nombre}</h1>
+                      <h1 style="display:flex;align-items:center;gap:10px;margin:0 0 3px"><img src="${LOGO_AREAS_VERDES_B64}" style="height:34px"/>Horómetro — ${eq.nombre}</h1>
                       <div class="sub">Maquinaria · Áreas Verdes Estadio Español · ${new Date().toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"})} · Total acumulado: <strong>${totalH.toFixed(1)} h</strong></div>
                       <h3>Plan de Mantenimiento</h3>
                       <table><col style="width:45%"><col style="width:15%"><col style="width:15%"><col style="width:15%"><col style="width:10%">
@@ -18252,9 +18439,12 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
 
       return `<div class="pagina">
         <div class="hdr">
-          <div><h1>${titulo||"Informe de Personal"} — ${mesRendicion}</h1>
-          <h2>Departamento de Áreas Verdes · Estadio Español de Las Condes</h2>
-          <h2>Para: Recursos Humanos / Remuneraciones</h2></div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <img src="${LOGO_AREAS_VERDES_B64}" style="height:44px;flex-shrink:0"/>
+            <div><h1>${titulo||"Informe de Personal"} — ${mesRendicion}</h1>
+            <h2>Departamento de Áreas Verdes · Estadio Español de Las Condes</h2>
+            <h2>Para: Recursos Humanos / Remuneraciones</h2></div>
+          </div>
           <div style="text-align:right;font-size:12px;color:#555">Emisión: <strong>${fechaHoy2}</strong></div>
         </div>
         <div style="background:#f0f7f0;border:1px solid #a5d6a7;border-radius:8px;padding:14px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
@@ -18642,10 +18832,13 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
     const paginas = (bono.participantes||[]).map(p=>`
       <div class="pagina">
         <div class="hdr">
-          <div>
-            <h1>Comprobante de Bono por Tarea Especial</h1>
-            <h2>Departamento de Áreas Verdes · Estadio Español de Las Condes</h2>
-            <h2>Para: Recursos Humanos / Remuneraciones</h2>
+          <div style="display:flex;align-items:center;gap:12px">
+            <img src="${LOGO_AREAS_VERDES_B64}" style="height:44px;flex-shrink:0"/>
+            <div>
+              <h1>Comprobante de Bono por Tarea Especial</h1>
+              <h2>Departamento de Áreas Verdes · Estadio Español de Las Condes</h2>
+              <h2>Para: Recursos Humanos / Remuneraciones</h2>
+            </div>
           </div>
           <div style="text-align:right;font-size:12px;color:#555">
             <div>Fecha tarea: <strong>${fechaBono}</strong></div>
@@ -20022,8 +20215,8 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
     const tareasHtml = (inc.tareas||[]).map(t=>`<tr><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0">${t.texto}</td><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;text-align:center;color:${t.estado==="hecha"?"#16a34a":"#ca8a04"}">${t.estado==="hecha"?"✅ Hecha":"⏳ Pendiente"}</td><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;color:#6b7280">${t.responsable||"—"}</td></tr>`).join("");
     const histHtml = (inc.historial||[]).map(h=>`<tr><td style="padding:5px 10px;border-bottom:1px solid #f0f0f0;font-size:12px">${h.fecha} ${h.hora||""}</td><td style="padding:5px 10px;border-bottom:1px solid #f0f0f0;font-size:12px">${h.accion}</td><td style="padding:5px 10px;border-bottom:1px solid #f0f0f0;font-size:12px;color:#6b7280">${h.responsable||"—"}</td></tr>`).join("");
     win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Reporte Incidencia</title><style>body{font-family:Calibri,Arial,sans-serif;color:#222;padding:32px;font-size:13px}h1{font-size:19px;color:#14532d;margin-bottom:2px}h2{font-size:12px;color:#888;font-weight:normal;margin-top:0}h3{font-size:13px;color:#14532d;margin:16px 0 6px}table{width:100%;border-collapse:collapse}th{background:#14532d;color:#fff;padding:7px 10px;text-align:left;font-size:11px}tr:nth-child(even){background:#f9fafb}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:14px 0;background:#f9fafb;padding:14px;border-radius:8px}.campo strong{font-size:10px;color:#888;display:block;margin-bottom:2px}@media print{button{display:none}}</style></head><body>
-    <h1>${inc.tipoIcon} Reporte de Incidencia — ${inc.tipoLabel}</h1>
-    <h2>Estadio Español de Las Condes · Depto. Áreas Verdes</h2>
+    <div style="display:flex;align-items:center;gap:12px"><img src="${LOGO_AREAS_VERDES_B64}" style="height:42px"/><div><h1 style="margin:0">${inc.tipoIcon} Reporte de Incidencia — ${inc.tipoLabel}</h1>
+    <h2 style="margin:0">Estadio Español de Las Condes · Depto. Áreas Verdes</h2></div></div>
     <div class="grid">
       <div class="campo"><strong>ESTADO</strong>${inc.estado==="resuelta"?"✅ Resuelta":"🔴 Activa"}</div>
       <div class="campo"><strong>ZONA(S)</strong>${inc.zonas?.join(", ")||"—"}</div>
@@ -20047,7 +20240,7 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
     const hoy = new Date().toLocaleDateString("es-CL",{day:"2-digit",month:"long",year:"numeric"});
     const filas = notifSorted.map(n=>`<tr><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;font-size:11px">${n.fecha||"—"} ${n.hora||""}</td><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;font-weight:600">${n.titulo||"—"}</td><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;font-size:11px;color:#6b7280">${n.mensaje||"—"}</td></tr>`).join("");
     win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Registros</title><style>body{font-family:Calibri,Arial,sans-serif;padding:28px;font-size:13px}h1{font-size:18px;color:#14532d;margin-bottom:2px}h2{font-size:12px;color:#888;font-weight:normal;margin-top:0}table{width:100%;border-collapse:collapse}th{background:#14532d;color:#fff;padding:8px 10px;font-size:11px;text-align:left}tr:nth-child(even){background:#f9fafb}@media print{button{display:none}}</style></head><body>
-    <h1>🔔 Registros del Sistema</h1><h2>Estadio Español · Áreas Verdes · ${hoy}</h2>
+    <div style="display:flex;align-items:center;gap:12px"><img src="${LOGO_AREAS_VERDES_B64}" style="height:40px"/><div><h1 style="margin:0">🔔 Registros del Sistema</h1><h2 style="margin:0">Estadio Español · Áreas Verdes · ${hoy}</h2></div></div>
     <table><thead><tr><th>Fecha/Hora</th><th>Título</th><th>Detalle</th></tr></thead><tbody>${filas||"<tr><td colspan=3 style='padding:12px;color:#888'>Sin registros</td></tr>"}</tbody></table>
     <div style="margin-top:14px;text-align:center"><button onclick="window.print()" style="background:#14532d;color:#fff;border:none;padding:9px 22px;border-radius:6px;cursor:pointer">🖨️ Imprimir / PDF</button></div>
     </body></html>`);
@@ -21383,7 +21576,7 @@ function ChecklistEsmeril({ S, personal, esJefa }) {
       </style>
     </head><body>
       <button onclick="window.print()" class="no-print" style="float:right;padding:8px 16px;background:#065f46;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">🖨️ Imprimir / Guardar PDF</button>
-      <h1>Estadio Español · DAV</h1>
+      <div style="display:flex;align-items:center;gap:10px"><img src="${LOGO_AREAS_VERDES_B64}" style="height:36px"/><h1 style="margin:0">Estadio Español · DAV</h1></div>
       <div style="font-size:13px;color:#065f46;font-weight:600;margin-bottom:2px">Lista de Verificación Pre-Uso — Esmeril Angular (Galletera)</div>
       <div style="font-size:11px;color:#6b7280;margin-bottom:2px">Afilado de herramientas: Palas · Chuzos · Podadoras</div>
       <div class="meta"><b>Fecha:</b> ${r.fecha} &nbsp;·&nbsp; <b>Hora:</b> ${r.hora||"—"} &nbsp;·&nbsp; <b>Operador:</b> ${r.operador||"—"}</div>
@@ -21740,7 +21933,7 @@ function ProtocoloPodaAltura({ S, personal, esJefa, crearNotificacion, rolLoguea
       </style>
     </head><body>
       <button onclick="window.print()" class="no-print" style="float:right;padding:8px 16px;background:#065f46;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">🖨️ Imprimir / Guardar PDF</button>
-      <h1>Estadio Español · DAV</h1>
+      <div style="display:flex;align-items:center;gap:10px"><img src="${LOGO_AREAS_VERDES_B64}" style="height:36px"/><h1 style="margin:0">Estadio Español · DAV</h1></div>
       <div style="font-size:13px;color:#065f46;font-weight:600;margin-bottom:2px">Protocolo de Subida — Poda en Altura</div>
       <div class="meta">
         <b>Fecha:</b> ${r.fecha} &nbsp;·&nbsp;
@@ -22449,6 +22642,7 @@ export default function App() {
   const [comprasData,    setComprasData,    comprasReady]  = useFirebaseState("compras",  {compras:[],cuentas:CUENTAS_DEFAULT});
   const [bodegasData,    setBodegasData,    bodegasReady]  = useFirebaseState("bodegas",  {});
   const [memosData,      setMemosData]                     = useFirebaseState(`${ROOT}/memos`, []);
+  const [herramientasCustodia, setHerramientasCustodia]    = useFirebaseState(`${ROOT}/herramientas_custodia`, []);
   const [golfData,       setGolfData,       golfReady]     = useFirebaseState("golf", {greens:{},tees:{},arboles:[],eventos:[],mediciones:[]});
   const [bonosConfig,    setBonosConfig,    bonosReady]    = useFirebaseState("bonos-config", {
     pctFondo:50, pctEjecutor:50, pctAyudante:30, pctApoyo:20, año:new Date().getFullYear()
@@ -25369,6 +25563,9 @@ export default function App() {
             onDeleteEvento={(eid)=>deleteEvento(personalId,eid)}
             onUpdateEvento={(eid,patch)=>setPersonal(p=>(Array.isArray(p)?p:Object.values(p||{})).map(t=>t.id===personalId?{...t,eventos:(t.eventos||[]).map(e=>e.id===eid?{...e,...patch}:e)}:t))}
             eppEntregas={eppEntregas} eppFiltros={eppFiltros} eppVidaUtil={eppVidaUtil} eppFitTests={eppFitTests}
+            bodegasData={bodegasData} setBodegasData={setBodegasData}
+            herramientasCustodia={herramientasCustodia} setHerramientasCustodia={setHerramientasCustodia}
+            esJefa={esJefa&&!soloLectura}
           />
         )}
 
