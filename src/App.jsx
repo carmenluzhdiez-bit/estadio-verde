@@ -410,6 +410,52 @@ const TAREAS_DEFAULT = {
     { tarea:"Fertilización",       verano:"quincenal", otono:"noaplica",   invierno:"noaplica", primavera:"quincenal" },
     { tarea:"Control de hongos",   verano:"quincenal", otono:"mensual",    invierno:"noaplica", primavera:"quincenal" },
   ],
+  // ── Categorías no-vegetación (Estructuras, Sistemas, Pavimentos, etc.) ──
+  // La mayoría son "según necesidad" o revisiones periódicas simples, sin diferenciar tanto por estación.
+  sistemas: [
+    { tarea:"Revisión sistema de riego", verano:"mensual", otono:"mensual", invierno:"bimestral", primavera:"mensual" },
+    { tarea:"Reparar sistema de riego", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
+    { tarea:"Revisión y limpieza de filtros", verano:"mensual", otono:"mensual", invierno:"bimestral", primavera:"mensual" },
+    { tarea:"Purga de aire en la red", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
+    { tarea:"Revisión luminarias", verano:"mensual", otono:"mensual", invierno:"mensual", primavera:"mensual" },
+    { tarea:"Cambio de ampolletas / focos", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
+  ],
+  infraestructura: [
+    { tarea:"Revisión estructural", verano:"trimestral", otono:"trimestral", invierno:"trimestral", primavera:"trimestral" },
+    { tarea:"Reparación", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
+    { tarea:"Pintura / retoque", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
+    { tarea:"Limpieza", verano:"mensual", otono:"mensual", invierno:"mensual", primavera:"mensual" },
+  ],
+  pavimentos: [
+    { tarea:"Revisión de pavimento", verano:"mensual", otono:"mensual", invierno:"mensual", primavera:"mensual" },
+    { tarea:"Reparación de pavimento", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
+    { tarea:"Limpieza", verano:"semanal", otono:"semanal", invierno:"semanal", primavera:"semanal" },
+  ],
+  cesped_sintetico: [
+    { tarea:"Cepillado / peinado", verano:"semanal", otono:"semanal", invierno:"quincenal", primavera:"semanal" },
+    { tarea:"Relleno de material (caucho/sílice)", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
+    { tarea:"Limpieza profunda", verano:"mensual", otono:"mensual", invierno:"bimestral", primavera:"mensual" },
+    { tarea:"Revisión de costuras", verano:"mensual", otono:"mensual", invierno:"mensual", primavera:"mensual" },
+  ],
+  canchas: [
+    { tarea:"Revisión de línea / marcaje", verano:"mensual", otono:"mensual", invierno:"mensual", primavera:"mensual" },
+    { tarea:"Revisión de redes / arcos", verano:"mensual", otono:"mensual", invierno:"mensual", primavera:"mensual" },
+    { tarea:"Reparación", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
+  ],
+  mobiliario: [
+    { tarea:"Revisión de mobiliario", verano:"mensual", otono:"mensual", invierno:"mensual", primavera:"mensual" },
+    { tarea:"Reparación", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
+    { tarea:"Pintura / retoque", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
+  ],
+  maceteros: [
+    { tarea:"Revisión de maceteros", verano:"mensual", otono:"mensual", invierno:"mensual", primavera:"mensual" },
+    { tarea:"Reparación", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
+  ],
+  bodegas: [
+    { tarea:"Orden y limpieza", verano:"semanal", otono:"semanal", invierno:"semanal", primavera:"semanal" },
+    { tarea:"Revisión de stock", verano:"mensual", otono:"mensual", invierno:"mensual", primavera:"mensual" },
+    { tarea:"Mantención de estructura", verano:"segunecesidad", otono:"segunecesidad", invierno:"segunecesidad", primavera:"segunecesidad" },
+  ],
 };
 
 // ─── ESTADOS DE ELEMENTO ─────────────────────────────────────────────────────
@@ -23384,7 +23430,7 @@ export default function App() {
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&display=swap');*{box-sizing:border-box;margin:0;padding:0}`}</style>
       <div style={{background:"#0f2517",border:"1px solid #1e3a22",borderRadius:20,padding:40,width:"100%",maxWidth:420,boxShadow:"0 20px 60px rgba(0,0,0,0.5)"}}>
         <div style={{textAlign:"center",marginBottom:28}}>
-          <div style={{fontSize:52,marginBottom:12}}>🌿</div>
+          <img src={LOGO_AREAS_VERDES_B64} style={{height:64,marginBottom:12}}/>
           <div style={{fontFamily:"'Playfair Display',serif",fontSize:26,fontWeight:900,color:"#ede9e0",marginBottom:4}}>Estadio Español</div>
           <div style={{fontSize:12,color:"#4a8a5a",letterSpacing:"2px",textTransform:"uppercase"}}>Gestión · Áreas Verdes</div>
         </div>
@@ -23569,7 +23615,7 @@ export default function App() {
       <div style={S.header}>
         <div style={S.headerTop}>
           <div style={S.logo}>
-            <div style={S.logoCircle}>🌿</div>
+            <div style={{...S.logoCircle,background:"transparent",padding:0}}><img src={LOGO_AREAS_VERDES_B64} style={{width:34,height:34,objectFit:"contain"}}/></div>
             <div>
               <div style={S.logoTitle}>Estadio Español</div>
               <div style={S.logoSub}>Gestión · Áreas Verdes</div>
