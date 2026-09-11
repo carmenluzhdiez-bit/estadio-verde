@@ -2053,7 +2053,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
       Revisión:["revisi"], Orillado:["orill"],
     };
     const getTipo = (t) => {
-      const tl=(hpTask.tarea||"").toLowerCase();
+      const tl=(t.tarea||"").toLowerCase();
       for(const [k,kws] of Object.entries(CATS_TIPO)){
         if(kws.some(kw=>tl.includes(kw))) return k;
       }
@@ -2065,8 +2065,8 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
     Object.entries(tareas).sort((entA,entB)=>entB[0].localeCompare(entA[0])).forEach(([fecha, ts])=>{
       normT(ts).forEach(hpTask=>{
         const zonaOk = !buscarZona || (hpTask.zona||"").toLowerCase().includes(buscarZona.toLowerCase());
-        const tipoOk = !buscarTipo || getTipo(t)===buscarTipo || (hpTask.tarea||"").toLowerCase().includes(buscarTipo.toLowerCase());
-        if(zonaOk && tipoOk) resultados.push({...t, fecha});
+        const tipoOk = !buscarTipo || getTipo(hpTask)===buscarTipo || (hpTask.tarea||"").toLowerCase().includes(buscarTipo.toLowerCase());
+        if(zonaOk && tipoOk) resultados.push({...hpTask, fecha});
       });
     });
     // Separar pasadas y futuras
