@@ -9491,14 +9491,16 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
 
   // ── Ingreso automático a bodega ───────────────────────────────────────────
   const ingresarItemsABodega = (docFecha, docRef, items, compraId, proveedorDoc="") => {
+    console.log("🔍 ingresarItemsABodega llamada con:", {docFecha, docRef, compraId, items});
     const porBodega = {};
     const itemsEPP = [];
     items.forEach(it=>{
-      if(!it.bodegaDestino||!it.descripcion?.trim()) return;
+      if(!it.bodegaDestino||!it.descripcion?.trim()) { console.log("🔍 ítem SALTADO (sin bodegaDestino o descripción):", it); return; }
       if(it.bodegaDestino==="b08") { itemsEPP.push(it); return; }
       if(!porBodega[it.bodegaDestino]) porBodega[it.bodegaDestino]=[];
       porBodega[it.bodegaDestino].push(it);
     });
+    console.log("🔍 porBodega agrupado:", porBodega);
     // EPP no es stock genérico — crea un borrador de "Entrega EPP" pendiente de
     // asignar a un trabajador específico, en vez de un ítem de inventario normal.
     if(itemsEPP.length) {
@@ -9530,6 +9532,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
         const cant = Number(it.cantidad)||1;
         // Evitar duplicados: verificar si ya existe movimiento de esta compra+ítem
         const yaIngresado = nuevosMovs.some(m=>m.docRef===docRef&&m.itemNombre?.toLowerCase()===it.descripcion.trim().toLowerCase());
+        console.log("🔍 procesando ítem:", it.descripcion, "bodega:", bodId, "yaIngresado:", yaIngresado);
         if(yaIngresado) return;
         const idx = nuevosItems.findIndex(i=>i.nombre.trim().toLowerCase()===it.descripcion.trim().toLowerCase());
         if(idx>=0) {
@@ -9542,7 +9545,9 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
       });
       nuevoBodegasData[bodId] = {...bd, items:nuevosItems, movimientos:nuevosMovs.slice(0,200)};
     });
+    console.log("🔍 nuevoBodegasData antes de guardar:", nuevoBodegasData);
     setBodegasData(nuevoBodegasData);
+    console.log("🔍 setBodegasData ejecutado");
     // Guardar asignación en la compra para que persista al volver
     if(compraId) set({compras:compras.map(compraC=>compraC.id===compraId?{...compraC,items:(compraC.items||[]).map((it,i)=>({...it,bodegaDestino:items[i]?.bodegaDestino||it.bodegaDestino||""}))}:compraC)});
   };
