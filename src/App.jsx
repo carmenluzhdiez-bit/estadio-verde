@@ -6818,7 +6818,7 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
   const [editEventoId, setEditEventoId] = React.useState(null);
   const [editEventoForm, setEditEventoForm] = React.useState({});
   const [showAsignarHerr, setShowAsignarHerr] = React.useState(false);
-  const [herrForm, setHerrForm] = React.useState({bodegaId:"",itemId:"",cantidad:"",fecha:fechaLocal(),obs:""});
+  const [herrForm, setHerrForm] = React.useState({fecha:fechaLocal(),obs:"",lineas:[{bodegaId:"",itemId:"",cantidad:""}]});
 
   const abrirEditEvento = (ev) => { setEditEventoId(ev.id); setEditEventoForm({...ev}); setShowNuevoEvento(false); };
   const guardarEditEvento = () => { onUpdateEvento(editEventoId, editEventoForm); setEditEventoId(null); };
@@ -7407,26 +7407,42 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
         const hoyHerr = fechaLocal();
 
         const asignarHerramienta = () => {
-          if(!herrForm.bodegaId||!herrForm.itemId||!herrForm.cantidad||Number(herrForm.cantidad)<=0){ alert("Elige la bodega, el ítem y una cantidad válida."); return; }
-          const bd = bodegasData?.[herrForm.bodegaId];
-          const item = (bd?.items||[]).find(i=>String(i.id)===String(herrForm.itemId));
-          if(!item){ alert("No se encontró el ítem seleccionado."); return; }
-          if(Number(herrForm.cantidad)>Number(item.stockActual||0)){ alert(`Solo hay ${item.stockActual||0} disponible(s) en bodega.`); return; }
-          // Descontar de bodega + registrar movimiento de salida
+          const lineasValidas = herrForm.lineas.filter(l=>l.bodegaId&&l.itemId&&l.cantidad&&Number(l.cantidad)>0);
+          if(lineasValidas.length===0){ alert("Agrega al menos una herramienta con bodega, ítem y cantidad válida."); return; }
+          // Validar stock disponible de cada línea antes de aplicar nada
+          for(const l of lineasValidas){
+            const bd = bodegasData?.[l.bodegaId];
+            const item = (bd?.items||[]).find(i=>String(i.id)===String(l.itemId));
+            if(!item){ alert("No se encontró uno de los ítems seleccionados."); return; }
+            if(Number(l.cantidad)>Number(item.stockActual||0)){ alert(`"${item.nombre}": solo hay ${item.stockActual||0} disponible(s) en bodega.`); return; }
+          }
+          const loteEntregaId = "entrega_"+Date.now()+"_"+Math.random().toString(36).slice(2);
+          // Descontar todas las bodegas afectadas en una sola actualización
           setBodegasData(prev=>{
-            const bdPrev = prev?.[herrForm.bodegaId]||{items:[],movimientos:[]};
-            const items = (bdPrev.items||[]).map(i=>String(i.id)===String(item.id)?{...i,stockActual:Math.max(0,Number(i.stockActual||0)-Number(herrForm.cantidad))}:i);
-            const movimientos = [{id:Date.now()+Math.random(),fecha:herrForm.fecha||hoyHerr,tipo:"salida",cantidad:Number(herrForm.cantidad),unidad:item.unidad||"unidad",motivo:`Entrega a cargo de ${t.nombre}`,itemId:String(item.id),itemNombre:item.nombre,responsable:t.nombre},...(bdPrev.movimientos||[])].slice(0,200);
-            return {...prev,[herrForm.bodegaId]:{...bdPrev,items,movimientos}};
+            const nuevo = {...prev};
+            lineasValidas.forEach(l=>{
+              const bdPrev = nuevo[l.bodegaId]||{items:[],movimientos:[]};
+              const item = (bdPrev.items||[]).find(i=>String(i.id)===String(l.itemId));
+              const items = (bdPrev.items||[]).map(i=>String(i.id)===String(l.itemId)?{...i,stockActual:Math.max(0,Number(i.stockActual||0)-Number(l.cantidad))}:i);
+              const movimientos = [{id:Date.now()+Math.random(),fecha:herrForm.fecha||hoyHerr,tipo:"salida",cantidad:Number(l.cantidad),unidad:item?.unidad||"unidad",motivo:`Entrega a cargo de ${t.nombre}`,itemId:String(l.itemId),itemNombre:item?.nombre||"",responsable:t.nombre},...(bdPrev.movimientos||[])].slice(0,200);
+              nuevo[l.bodegaId] = {...bdPrev,items,movimientos};
+            });
+            return nuevo;
           });
-          const nueva = {
-            id:Date.now()+Math.random(), trabajadorId:t.id, bodegaId:herrForm.bodegaId,
-            itemId:String(item.id), itemNombre:item.nombre, cantidad:Number(herrForm.cantidad), unidad:item.unidad||"unidad",
-            fechaEntrega:herrForm.fecha||hoyHerr, estado:"en_custodia", firmaRecepcion:false, obs:herrForm.obs||"",
-          };
-          setHerramientasCustodia([nueva, ...(Array.isArray(herramientasCustodia)?herramientasCustodia:[])]);
-          setHerrForm({bodegaId:"",itemId:"",cantidad:"",fecha:hoyHerr,obs:""});
+          const nuevas = lineasValidas.map(l=>{
+            const item = (bodegasData?.[l.bodegaId]?.items||[]).find(i=>String(i.id)===String(l.itemId));
+            return {
+              id:Date.now()+Math.random(), trabajadorId:t.id, bodegaId:l.bodegaId,
+              itemId:String(l.itemId), itemNombre:item?.nombre||"", cantidad:Number(l.cantidad), unidad:item?.unidad||"unidad",
+              fechaEntrega:herrForm.fecha||hoyHerr, estado:"en_custodia", firmaRecepcion:false, obs:herrForm.obs||"",
+              loteEntregaId,
+            };
+          });
+          setHerramientasCustodia([...nuevas, ...(Array.isArray(herramientasCustodia)?herramientasCustodia:[])]);
+          setHerrForm({fecha:hoyHerr,obs:"",lineas:[{bodegaId:"",itemId:"",cantidad:""}]});
           setShowAsignarHerr(false);
+          if(nuevas.length>1) imprimirActaLote(nuevas);
+          else imprimirActaHerramienta(nuevas[0]);
         };
 
         const marcarFirmaHerr = (id) => {
@@ -7442,6 +7458,55 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
             return {...prev,[h.bodegaId]:{...bdPrev,items,movimientos}};
           });
           setHerramientasCustodia((Array.isArray(herramientasCustodia)?herramientasCustodia:[]).map(x=>x.id===h.id?{...x,estado:"devuelta",fechaDevolucion:hoyHerr}:x));
+        };
+
+        const imprimirActaLote = (items) => {
+          const win = window.open("","_blank");
+          const filas = items.map(h=>`<tr><td style="padding:7px 10px;border-bottom:1px solid #e5e7eb">${h.itemNombre}</td><td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;text-align:center">${h.cantidad} ${h.unidad}</td></tr>`).join("");
+          win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Acta de Entrega — ${t.nombre}</title>
+            <style>
+              body{font-family:Calibri,Arial,sans-serif;padding:40px 56px;color:#1a1a2e;max-width:720px;margin:0 auto}
+              .cab{border-bottom:3px solid #1a5c2a;padding-bottom:14px;margin-bottom:26px;display:flex;align-items:center;gap:14px}
+              .titulo{font-size:20px;font-weight:700;color:#1a5c2a;margin-bottom:2px}
+              .sub{font-size:12px;color:#555}
+              .campos{margin-bottom:18px;font-size:13px}
+              .campos div{margin-bottom:6px}
+              .campos b{display:inline-block;width:160px}
+              table{width:100%;border-collapse:collapse;margin-bottom:22px}
+              th{background:#f0fdf4;padding:7px 10px;text-align:left;font-size:11px;text-transform:uppercase;color:#065f46}
+              .cuerpo{font-size:13px;margin-bottom:40px;line-height:1.6}
+              .firmas{display:flex;justify-content:space-between;margin-top:70px}
+              .firma{text-align:center;width:45%}
+              .linea-firma{border-top:1px solid #333;padding-top:6px;margin-top:50px;font-size:12px}
+              @media print{.no-print{display:none}}
+            </style></head><body>
+            <button onclick="window.print()" class="no-print" style="float:right;padding:6px 14px;background:#1a5c2a;color:#fff;border:none;border-radius:5px;cursor:pointer">🖨️ Imprimir / PDF</button>
+            <div class="cab">
+              <img src="${LOGO_AREAS_VERDES_B64}" style="height:56px;flex-shrink:0"/>
+              <div>
+                <div class="titulo">ACTA DE ENTREGA DE HERRAMIENTAS</div>
+                <div class="sub">Departamento de Áreas Verdes · Estadio Español de Las Condes</div>
+              </div>
+            </div>
+            <div class="campos">
+              <div><b>Fecha de entrega:</b> ${new Date((items[0].fechaEntrega)+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"})}</div>
+              <div><b>Trabajador:</b> ${t.nombre}</div>
+              <div><b>Cargo:</b> ${t.cargo||"—"}</div>
+              ${items[0].obs?`<div><b>Observaciones:</b> ${items[0].obs}</div>`:""}
+            </div>
+            <table><thead><tr><th>Herramienta/Equipo</th><th style="text-align:center">Cantidad</th></tr></thead><tbody>${filas}</tbody></table>
+            <div class="cuerpo">
+              Por medio del presente documento se deja constancia de que el Departamento de Áreas Verdes del Estadio Español de Las Condes
+              entrega a <b>${t.nombre}</b> las herramientas/equipos detallados arriba, quedando éstas bajo su cuidado y responsabilidad
+              mientras se mantengan en su custodia. El trabajador se compromete a darles buen uso, cuidarlas adecuadamente y devolverlas
+              en las mismas condiciones al Departamento cuando corresponda o cuando le sean solicitadas.
+            </div>
+            <div class="firmas">
+              <div class="firma"><div class="linea-firma">Entrega — Jefatura Áreas Verdes</div></div>
+              <div class="firma"><div class="linea-firma">Recibe — ${t.nombre}</div></div>
+            </div>
+            </body></html>`);
+          win.document.close(); win.focus();
         };
 
         const imprimirActaHerramienta = (h) => {
@@ -7501,39 +7566,53 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
                 </div>
                 {showAsignarHerr&&(
                   <div>
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-                      <div>
-                        <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>BODEGA</label>
-                        <select style={S.input} value={herrForm.bodegaId} onChange={e=>setHerrForm(p=>({...p,bodegaId:e.target.value,itemId:""}))}>
-                          <option value="">Seleccionar bodega...</option>
-                          {BODEGAS_DEF.map(b=><option key={b.id} value={b.id}>{b.icono} {b.nombre}</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>ÍTEM (con stock disponible)</label>
-                        <select style={S.input} value={herrForm.itemId} onChange={e=>setHerrForm(p=>({...p,itemId:e.target.value}))} disabled={!herrForm.bodegaId}>
-                          <option value="">Seleccionar ítem...</option>
-                          {((bodegasData?.[herrForm.bodegaId]?.items)||[]).filter(i=>Number(i.stockActual||0)>0).map(i=>
-                            <option key={i.id} value={i.id}>{i.nombre} — {i.stockActual} {i.unidad} disponibles</option>
+                    <div style={{fontSize:11,color:"#5a9a7a",marginBottom:8}}>FECHA DE ENTREGA (aplica a toda la entrega)</div>
+                    <input type="date" style={{...S.input,maxWidth:200,marginBottom:14}} value={herrForm.fecha} onChange={e=>setHerrForm(p=>({...p,fecha:e.target.value}))}/>
+
+                    {herrForm.lineas.map((linea,li)=>(
+                      <div key={li} style={{border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,padding:12,marginBottom:10,background:"rgba(255,255,255,0.02)"}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                          <div style={{fontSize:11,color:"#38bdf8",fontWeight:600}}>Herramienta #{li+1}</div>
+                          {herrForm.lineas.length>1&&(
+                            <button onClick={()=>setHerrForm(p=>({...p,lineas:p.lineas.filter((_,i)=>i!==li)}))}
+                              style={{...S.btn,fontSize:10,padding:"2px 8px",background:"rgba(239,68,68,0.1)",color:"#f87171",border:"1px solid rgba(239,68,68,0.3)"}}>🗑 Quitar</button>
                           )}
-                        </select>
+                        </div>
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                          <div>
+                            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>BODEGA</label>
+                            <select style={S.input} value={linea.bodegaId} onChange={e=>setHerrForm(p=>({...p,lineas:p.lineas.map((l,i)=>i===li?{...l,bodegaId:e.target.value,itemId:""}:l)}))}>
+                              <option value="">Seleccionar bodega...</option>
+                              {BODEGAS_DEF.map(b=><option key={b.id} value={b.id}>{b.icono} {b.nombre}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>ÍTEM (con stock disponible)</label>
+                            <select style={S.input} value={linea.itemId} onChange={e=>setHerrForm(p=>({...p,lineas:p.lineas.map((l,i)=>i===li?{...l,itemId:e.target.value}:l)}))} disabled={!linea.bodegaId}>
+                              <option value="">Seleccionar ítem...</option>
+                              {((bodegasData?.[linea.bodegaId]?.items)||[]).filter(i=>Number(i.stockActual||0)>0).map(i=>
+                                <option key={i.id} value={i.id}>{i.nombre} — {i.stockActual} {i.unidad} disponibles</option>
+                              )}
+                            </select>
+                          </div>
+                        </div>
+                        <div>
+                          <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>CANTIDAD A ENTREGAR</label>
+                          <input type="number" min="1" style={{...S.input,maxWidth:140}} value={linea.cantidad} onChange={e=>setHerrForm(p=>({...p,lineas:p.lineas.map((l,i)=>i===li?{...l,cantidad:e.target.value}:l)}))}/>
+                        </div>
                       </div>
-                    </div>
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-                      <div>
-                        <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>CANTIDAD A ENTREGAR</label>
-                        <input type="number" min="1" style={S.input} value={herrForm.cantidad} onChange={e=>setHerrForm(p=>({...p,cantidad:e.target.value}))}/>
-                      </div>
-                      <div>
-                        <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>FECHA DE ENTREGA</label>
-                        <input type="date" style={S.input} value={herrForm.fecha} onChange={e=>setHerrForm(p=>({...p,fecha:e.target.value}))}/>
-                      </div>
-                    </div>
+                    ))}
+
+                    <button onClick={()=>setHerrForm(p=>({...p,lineas:[...p.lineas,{bodegaId:"",itemId:"",cantidad:""}]}))}
+                      style={{...S.btn,fontSize:12,padding:"6px 14px",background:"rgba(96,165,250,0.1)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.3)",marginBottom:14}}>
+                      ➕ Agregar otra herramienta a esta entrega
+                    </button>
+
                     <div style={{marginBottom:12}}>
-                      <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>OBSERVACIONES (opcional)</label>
+                      <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3}}>OBSERVACIONES (opcional, aplica a toda la entrega)</label>
                       <input style={S.input} value={herrForm.obs} onChange={e=>setHerrForm(p=>({...p,obs:e.target.value}))} placeholder="ej: Estado usado, con detalles menores..."/>
                     </div>
-                    <button className="btn-p" style={S.btn} onClick={asignarHerramienta}>💾 Confirmar entrega</button>
+                    <button className="btn-p" style={S.btn} onClick={asignarHerramienta}>💾 Confirmar entrega{herrForm.lineas.length>1?` (${herrForm.lineas.length} herramientas)`:""}</button>
                   </div>
                 )}
               </div>
