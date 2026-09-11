@@ -1516,7 +1516,7 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
       (sG.total>0?hKpi(sG)+hTipos(sG)+hNoPudo(sG)+hCierres({...sG,cierres:sG.cierres||[]},"Cierres y restricciones en Golf")+hFito():"<p style='color:#888;font-size:12px'>Sin tareas en el período.</p>")+
       sep+h2("⚽ Cancha de Fútbol")+
       (sF.total>0?hKpi(sF)+hTipos(sF)+hNoPudo(sF)+hCierres(sF):"<p style='color:#888;font-size:12px'>Sin tareas en el período.</p>");
-    const winP1=window.open("","_blank","width=960,height=750"); winP1.document.write(wrap(cuerpo)); w.document.close();
+    const winP1=window.open("","_blank","width=960,height=750"); winP1.document.write(wrap(cuerpo)); winP1.document.close();
   };
 
   const imprimirGeneral = () => {
@@ -1527,7 +1527,7 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
       hNoPudo(statsGeneral)+
       hCierres(statsGeneral,"Cierres y restricciones sectoriales")+
       hFito();
-    const winP2=window.open("","_blank","width=960,height=750"); winP2.document.write(wrap(cuerpo)); w.document.close();
+    const winP2=window.open("","_blank","width=960,height=750"); winP2.document.write(wrap(cuerpo)); winP2.document.close();
   };
 
   const imprimirJefa = () => {
@@ -1535,7 +1535,7 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
       h2("🏌️ Golf + ⚽ Fútbol")+hKpi(statsDeportes)+hTrab(statsDeportes)+hTipos(statsDeportes)+
       sep+h2("🌿 Áreas Generales")+hKpi(statsGeneral)+hTrab(statsGeneral)+hCats(statsGeneral,"Detalle por categoría y tipo de actividad")+
       hNoPudo(statsTotal)+hCierres(statsTotal)+hFito();
-    const winP3=window.open("","_blank","width=960,height=750"); winP3.document.write(wrap(cuerpo)); w.document.close();
+    const winP3=window.open("","_blank","width=960,height=750"); winP3.document.write(wrap(cuerpo)); winP3.document.close();
   };
 
   const kpiCard=(st,titulo,color)=>(
@@ -4495,6 +4495,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     return {...rest, [zona]:!estaColapso};
   });
   const [nuevaTarea, setNuevaTarea] = React.useState({ zona:"", elemento:"", tarea:"", responsable:"", estado:"por_designar", notas:"" });
+  const [escribiendoOtra, setEscribiendoOtra] = React.useState(false);
   const [modoVariosJardineros, setModoVariosJardineros] = React.useState(false);
   const [responsablesMultiple, setResponsablesMultiple] = React.useState([]); // nombres elegidos cuando modoVariosJardineros está activo
   // Cálculos para formulario de agregar tarea (dependen de nuevaTarea.zona/elemento)
@@ -5126,6 +5127,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                   <select style={{...S.input,fontSize:13}} value={nuevaTarea.zona}
                     onChange={e=>setNuevaTarea(p=>{
                         const esGolf = (e.target.value||"").toLowerCase().includes("golf");
+                        setEscribiendoOtra(false);
                         return {...p, zona:e.target.value, elemento:"", tarea:"",
                           responsable: esGolf ? "Osmar Bhalú Armijo Zúñiga" : (p.responsable||"")
                         };
@@ -5141,7 +5143,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                   <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>ELEMENTO</label>
                   {_elemsZona.length>0?(
                     <select style={{...S.input,fontSize:13}} value={nuevaTarea.elemento}
-                      onChange={e=>setNuevaTarea(p=>({...p,elemento:e.target.value,tarea:""}))}>
+                      onChange={e=>{setEscribiendoOtra(false);setNuevaTarea(p=>({...p,elemento:e.target.value,tarea:""}));}}>
                       <option value="">General / Todos</option>
                       {_elemsZona.map(e=><option key={e.id} value={e.nombre}>{e.nombre}</option>)}
                     </select>
@@ -5152,22 +5154,26 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                 </div>
                 <div style={{gridColumn:"1/-1"}}>
                   <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>TAREA</label>
-                  <select style={{...S.input,fontSize:13}} value={nuevaTarea.tarea}
-                    onChange={e=>setNuevaTarea(p=>{
-                      const nuevoResp=p.responsable||(getResponsablePorTipo(e.target.value==="__otro__"?"":e.target.value,configSemanal)||"");
-                      return {...p,tarea:e.target.value==="__otro__"?"":e.target.value,responsable:nuevoResp,estado:nuevoResp?"pendiente":p.estado};
-                    })}>
+                  <select style={{...S.input,fontSize:13}} value={escribiendoOtra?"__otro__":nuevaTarea.tarea}
+                    onChange={e=>{
+                      const esOtra = e.target.value==="__otro__";
+                      setEscribiendoOtra(esOtra);
+                      setNuevaTarea(p=>{
+                        const nuevoResp=p.responsable||(getResponsablePorTipo(esOtra?"":e.target.value,configSemanal)||"");
+                        return {...p,tarea:esOtra?"":e.target.value,responsable:nuevoResp,estado:nuevoResp?"pendiente":p.estado};
+                      });
+                    }}>
                     <option value="">Seleccionar tarea...</option>
                     {_tareasDisp.map(t=><option key={t} value={t}>{t}</option>)}
                     <option value="__otro__">✏️ Escribir otra...</option>
                   </select>
-                  {(nuevaTarea.tarea===""||nuevaTarea.tarea==="__otro__")&&(
+                  {(escribiendoOtra||nuevaTarea.tarea==="")&&(
                     <input style={{...S.input,fontSize:13,marginTop:6}} autoFocus
                       placeholder="Describir tarea..."
-                      value={nuevaTarea.tarea==="__otro__"?"":nuevaTarea.tarea}
+                      value={nuevaTarea.tarea}
                       onChange={e=>{const v=e.target.value;setNuevaTarea(p=>{
                         const nuevoResp=p.responsable||(getResponsablePorTipo(v,configSemanal)||"");
-                        return {...p,tarea:v||"__otro__",responsable:nuevoResp,estado:nuevoResp?"pendiente":p.estado};
+                        return {...p,tarea:v,responsable:nuevoResp,estado:nuevoResp?"pendiente":p.estado};
                       });}}/>
                   )}
                   {nuevaTarea.tarea==="Plantar desde Vivero"&&(
@@ -18318,7 +18324,7 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
     <div class="noprint" style="text-align:center;padding:20px;background:#f5f5f5">
       <button onclick="window.print()" style="background:#1a5c2a;color:#fff;border:none;padding:10px 28px;border-radius:7px;font-size:13px;cursor:pointer">🖨️ Imprimir / Guardar PDF</button>
     </div></body></html>`;
-    const winB=window.open("","_blank"); winB.document.write(html); w.document.close();
+    const winB=window.open("","_blank"); winB.document.write(html); winB.document.close();
   };
 
   const confirmarRendicion = () => {
@@ -18697,7 +18703,7 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
       <p style="font-size:12px;color:#666;margin-top:8px">Se imprimirá un comprobante por página para cada trabajador</p>
     </div>
     </body></html>`;
-    const winB2=window.open("","_blank"); winB2.document.write(html); w.document.close();
+    const winB2=window.open("","_blank"); winB2.document.write(html); winB2.document.close();
   };
 
   const guardar = () => {
