@@ -165,7 +165,7 @@ const estacionDeFecha = (fechaStr) => {
 // pospone al lunes) — aplica a cualquier tarea con frecuencia, en cualquier macrozona.
 const calcProximaFrecGlobal = (f, refFecha) => {
   const ref = new Date(refFecha+"T12:00:00");
-  const prohibidosGlobal = f.diasProhibidosGlobal||[];
+  const prohibidosGlobal = (f.diasProhibidosGlobal||[]).map(Number);
   // ── Modelo simple (nuevo): "cada X días" + fecha próxima editable a mano ──
   if(f.intervaloDias){
     if(!f.ultimaVez && !f.proximaFechaManual) return null;
@@ -185,17 +185,18 @@ const calcProximaFrecGlobal = (f, refFecha) => {
   if(f.modo==="diasSemana"){
     if(!f.ultimaVez) return null;
     const minimoDias = Number(f.diasMinimos)||0;
-    const prohibidos = f.diasProhibidos||[];
-    const hayDiasEspecificos = f.diasSemana && f.diasSemana.length>0;
+    const prohibidos = (f.diasProhibidos||[]).map(Number);
+    const diasSemanaNum = (f.diasSemana||[]).map(Number);
+    const hayDiasEspecificos = diasSemanaNum.length>0;
     const ultima = new Date(f.ultimaVez+"T12:00:00");
     let base = new Date(ultima.getTime() + minimoDias*24*60*60*1000);
     for(let i=0;i<400;i++){
       let candidato = new Date(base.getTime() + i*24*60*60*1000);
       const dow = candidato.getDay();
       if(prohibidos.includes(dow)) continue;
-      if(hayDiasEspecificos && !f.diasSemana.includes(dow)) continue;
+      if(hayDiasEspecificos && !diasSemanaNum.includes(dow)) continue;
       // Si cae domingo y el domingo no fue elegido explícitamente, correr al sábado anterior
-      if(dow===0 && !(hayDiasEspecificos && f.diasSemana.includes(0)) && !prohibidos.includes(6)){
+      if(dow===0 && !(hayDiasEspecificos && diasSemanaNum.includes(0)) && !prohibidos.includes(6)){
         candidato = new Date(candidato.getTime() - 24*60*60*1000);
       }
       const diff = Math.round((candidato-ref)/(24*60*60*1000));
@@ -6527,7 +6528,7 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
     let proxima = f.proximaFechaManual
       ? new Date(f.proximaFechaManual+"T12:00:00")
       : new Date(new Date(f.ultimaVez+"T12:00:00").getTime() + Number(f.intervaloDias)*24*60*60*1000);
-    const prohibidosGlobal = f.diasProhibidosGlobal||[];
+    const prohibidosGlobal = (f.diasProhibidosGlobal||[]).map(Number);
     for(let salvavidas=0;salvavidas<8;salvavidas++){
       const dow=proxima.getDay();
       if(dow===0 || prohibidosGlobal.includes(dow)){
@@ -6691,7 +6692,7 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
                     <label style={labelSt}>Días que nunca debe hacerse (opcional)</label>
                     <div style={{display:"flex",gap:2,flexWrap:"wrap"}}>
                       {DIAS_SEMANA.map(d=>{
-                        const sel=(f.diasProhibidosGlobal||[]).includes(d.v);
+                        const sel=(f.diasProhibidosGlobal||[]).map(Number).includes(d.v);
                         return <button key={d.v} onClick={()=>updateFila(i,"diasProhibidosGlobal",sel?(f.diasProhibidosGlobal||[]).filter(x=>x!==d.v):[...(f.diasProhibidosGlobal||[]),d.v])}
                           style={{fontSize:9,padding:"2px 5px",borderRadius:4,cursor:"pointer",
                             border:`1px solid ${sel?"rgba(239,68,68,0.5)":"rgba(255,255,255,0.08)"}`,
