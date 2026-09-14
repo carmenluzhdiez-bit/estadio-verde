@@ -15501,7 +15501,15 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           const zdatG=getZD(31);const nombreZona="Golf"; // siempre "Golf" — no usar nombreCustom, para no generar un segundo nombre de zona distinto al resto de las tareas de Golf
           const elems=getAllElems(31);
           const tareasHoyArr=Array.isArray(tareasProg[fechaProponerGolf])?tareasProg[fechaProponerGolf]:Object.values(tareasProg[fechaProponerGolf]||{});
-          const existentes=tareasHoyArr.map(t=>t.zona+"_"+t.elemento+"_"+t.tarea);
+          const norm=s=>(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"");
+          // Ya existe si hay una tarea de la misma zona, cuyo elemento empieza por el nombre del elemento
+          // (tolera el sufijo "(Hoyo N)" que agrega el formulario manual de Greens) y cuya tarea CONTIENE
+          // el nombre de la tarea de la frecuencia (tolera el texto extra: emoji, HOC, nombre de zona, etc.).
+          const yaExisteTarea = (nombreElem, nombreTarea) => tareasHoyArr.some(t=>
+            t.zona===nombreZona &&
+            norm(t.elemento).startsWith(norm(nombreElem)) &&
+            norm(t.tarea).includes(norm(nombreTarea))
+          );
           const estProp=estacionDeFecha(fechaProponerGolf);const propuestas=[];const vencidas=[];
           const clavesTareaEnlazadaYaAgregada=new Set(); // dedup: una tarea enlazada solo se agrega una vez por fecha, no una vez por elemento
           const TOLERANCIA_FERTILIZACION_DIAS=3; // margen de días para que Fertilización se adapte a la fecha de Corte más cercana
@@ -15513,8 +15521,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               // se genera aparte, el mismo día que el Corte, más abajo. Ver bloque siguiente.
               const esFertilizAdaptada=(f.tarea||"").toLowerCase().includes("fertiliz")&&f.tareaEnlazada&&f.tareaEnlazada.trim();
               if(esFertilizAdaptada)return;
-              const key=nombreZona+"_"+e.nombre+"_"+f.tarea;
-              if(existentes.includes(key))return;
+              if(yaExisteTarea(e.nombre,f.tarea))return;
               const prox=calcProximaFrecGlobal(f,fechaProponerGolf);
               if(!prox||prox.diff>0)return;
               const esVencida=prox.diff<0;const diasVencida=Math.abs(prox.diff);
@@ -15527,7 +15534,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               // que cubre varios greens a la vez.
               if(f.tareaEnlazada&&f.tareaEnlazada.trim()){
                 const claveEnlazada=nombreZona+"_"+f.tareaEnlazada.trim();
-                const yaExisteEnlazada=tareasHoyArr.some(t=>t.zona===nombreZona&&t.tarea===f.tareaEnlazada.trim());
+                const yaExisteEnlazada=tareasHoyArr.some(t=>t.zona===nombreZona&&norm(t.tarea).includes(norm(f.tareaEnlazada.trim())));
                 if(!clavesTareaEnlazadaYaAgregada.has(claveEnlazada)&&!yaExisteEnlazada){
                   clavesTareaEnlazadaYaAgregada.add(claveEnlazada);
                   propuestas.push({id:Date.now()+Math.random(),fecha:fechaProponerGolf,zona:nombreZona,elemento:e.nombre,tarea:f.tareaEnlazada.trim(),responsable:respDefault,estado:respDefault?"pendiente":"por_designar",notas:`Enlazada con "${f.tarea}"`,estacion:estProp,auto:true,diasVencida:0});
@@ -15545,8 +15552,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             frecs.forEach(f=>{
               const esFertilizAdaptada=(f.tarea||"").toLowerCase().includes("fertiliz")&&f.tareaEnlazada&&f.tareaEnlazada.trim();
               if(!esFertilizAdaptada)return;
-              const key=nombreZona+"_"+e.nombre+"_"+f.tarea;
-              if(existentes.includes(key))return;
+              if(yaExisteTarea(e.nombre,f.tarea))return;
               // ¿Se propuso el Corte enlazado para este mismo elemento en esta misma corrida?
               const corteHoy=propuestas.find(p=>p.zona===nombreZona&&p.elemento===e.nombre&&p.tarea.trim().toLowerCase()===f.tareaEnlazada.trim().toLowerCase());
               if(!corteHoy)return; // no toca Corte hoy para este elemento — Fertilización espera
