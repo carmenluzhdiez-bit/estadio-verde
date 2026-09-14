@@ -24255,6 +24255,41 @@ export default function App() {
               <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:26,fontWeight:900,marginBottom:3}}>Panel General</h1>
               <p style={{color:"#6aaa7a",fontSize:15}}>Estado global de las {stats.total} macrozonas</p>
             </div>
+            {(()=>{
+              const hoyPG = fechaLocal();
+              const normArrPG = v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+              const pendientesAnteriores = [];
+              Object.keys(tareasProg||{}).forEach(fechaK=>{
+                if(fechaK>=hoyPG) return; // solo días anteriores a hoy
+                normArrPG(tareasProg[fechaK]).forEach(t=>{
+                  if(!["hecha","completada","cancelada"].includes(t.estado)){
+                    pendientesAnteriores.push({...t, fecha:fechaK});
+                  }
+                });
+              });
+              if(pendientesAnteriores.length===0) return null;
+              const porFecha = {};
+              pendientesAnteriores.forEach(t=>{ if(!porFecha[t.fecha]) porFecha[t.fecha]=[]; porFecha[t.fecha].push(t); });
+              const fechasOrdenadas = Object.keys(porFecha).sort((a,b)=>b.localeCompare(a));
+              return (
+                <div style={{...S.card,padding:16,marginBottom:20,border:"1px solid rgba(245,158,11,0.35)",background:"rgba(245,158,11,0.05)"}}>
+                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,color:"#fbbf24",marginBottom:8}}>
+                    ⚠️ {pendientesAnteriores.length} tarea(s) de días anteriores sin marcar
+                  </div>
+                  <div style={{fontSize:12,color:"#c0a06a",marginBottom:10}}>
+                    Quedaron pendientes/sin cerrar en días ya pasados — revísalas en Historial antes de que se acumulen.
+                  </div>
+                  <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:180,overflowY:"auto"}}>
+                    {fechasOrdenadas.map(fk=>(
+                      <div key={fk} style={{fontSize:12,color:"#e0c080"}}>
+                        <b>{new Date(fk+"T12:00:00").toLocaleDateString("es-CL",{weekday:"long",day:"numeric",month:"short"})}</b>
+                        {" — "}{porFecha[fk].length} tarea(s): {porFecha[fk].slice(0,4).map(t=>t.tarea).join(", ")}{porFecha[fk].length>4?"…":""}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:14,marginBottom:14}}>
               {[{label:"Total Zonas",val:stats.total,color:"#c0dab0",icon:"🗺️"},{label:"Buen estado",val:stats.bueno,color:"#22c55e",icon:"✅"},{label:"Estado regular",val:stats.regular,color:"#f59e0b",icon:"⚠️"},{label:"Estado crítico",val:stats.critico,color:"#ef4444",icon:"🔴"},{label:"Total elementos",val:totalElems,color:"#a0c8e0",icon:"📋"},{label:"Elementos OK",val:elemsOk,color:"#22c55e",icon:"🌿"}].map(s=>(
                 <div key={s.label} style={{...S.card,padding:"18px 14px",textAlign:"center"}}>
