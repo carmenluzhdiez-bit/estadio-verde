@@ -5321,7 +5321,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
 // ─── CONFIGURADOR DE PIN POR ROL ─────────────────────────────────────────────
 
 // ─── VISTA DESIGNACIÓN (SUPERVISOR) ─────────────────────────────────────────
-function VistaDesignacion({ S, tareasProg, setTareasProg, personal, MACROZONAS_BASE, zonas=[], onSalir }) {
+function VistaDesignacion({ S, tareasProg, setTareasProg, personal, MACROZONAS_BASE, zonas=[], onSalir, getElemFrecs=()=>({}), setElemFrecs=()=>{} }) {
   const hoy = fechaLocal();
   const [fecha, setFecha] = React.useState(hoy);
   const [showAgregar, setShowAgregar] = React.useState(false);
@@ -5346,7 +5346,10 @@ function VistaDesignacion({ S, tareasProg, setTareasProg, personal, MACROZONAS_B
   };
 
   const cambiarEstadoVD = (tid, estado) => {
-    setDia(cerrarLoteSiCorresponde(tareasProg[fecha]||[], tid, {estado}));
+    const tareasDia = tareasProg[fecha]||[];
+    const tareaVieja = tareasDia.find(t=>t.id===tid);
+    const patchFinal = aplicarCambioFrecuencia(tareaVieja, {estado}, getElemFrecs, setElemFrecs);
+    setDia(cerrarLoteSiCorresponde(tareasDia, tid, patchFinal));
   };
 
   const iniciarCancelacion = (tid) => {
@@ -25353,6 +25356,8 @@ export default function App() {
                 personal={personal}
                 MACROZONAS_BASE={MACROZONAS_BASE}
                 zonas={zonasConCust}
+                getElemFrecs={getElemFrecs}
+                setElemFrecs={setElemFrecs}
                 onSalir={()=>{esLocalRef.current=false;signOut(auth).catch(()=>{});setWorkerLogueado(null);setFbRol(null);setFbUser(null);setVistaWorker(false);}}
               />
             )}
