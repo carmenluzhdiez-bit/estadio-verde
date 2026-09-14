@@ -15533,6 +15533,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           const zdatG=getZD(31);const nombreZona="Golf"; // siempre "Golf" — no usar nombreCustom, para no generar un segundo nombre de zona distinto al resto de las tareas de Golf
           const elems=getAllElems(31);
           const tareasHoyArr=Array.isArray(tareasProg[fechaProponerGolf])?tareasProg[fechaProponerGolf]:Object.values(tareasProg[fechaProponerGolf]||{});
+          const existentes=tareasHoyArr.map(t=>t.zona+"_"+t.elemento+"_"+t.tarea);
           const norm=s=>(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"");
           // Ya existe si hay una tarea de la misma zona, cuyo elemento empieza por el nombre del elemento
           // (tolera el sufijo "(Hoyo N)" que agrega el formulario manual de Greens) y cuya tarea CONTIENE
