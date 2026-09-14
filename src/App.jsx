@@ -2228,10 +2228,10 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                   <div style={{fontSize:12,fontWeight:600,color:"#60a5fa",marginBottom:8}}>📅 Programadas a futuro ({resHistorial.futuras.length})</div>
                   {resHistorial.futuras.slice(0,10).map((t,i)=>(
                     <div key={i} style={{fontSize:11,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,0.04)",display:"flex",gap:10}}>
-                      <span style={{color:"#60a5fa",minWidth:80}}>{hpTask.fecha}</span>
-                      <span style={{color:"#ede9e0",flex:1}}>{hpTask.tarea}</span>
-                      <span style={{color:"#5a9a7a"}}>{hpTask.zona}</span>
-                      <span style={{color:"#9ca3af"}}>{hpTask.responsable||""}</span>
+                      <span style={{color:"#60a5fa",minWidth:80}}>{t.fecha}</span>
+                      <span style={{color:"#ede9e0",flex:1}}>{t.tarea}</span>
+                      <span style={{color:"#5a9a7a"}}>{t.zona}</span>
+                      <span style={{color:"#9ca3af"}}>{t.responsable||""}</span>
                     </div>
                   ))}
                 </div>
@@ -2243,11 +2243,11 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                   <div style={{fontSize:12,fontWeight:600,color:"#22c55e",marginBottom:8}}>✅ Últimas ejecuciones realizadas ({resHistorial.pasadas.length})</div>
                   {resHistorial.pasadas.slice(0,15).map((t,i)=>(
                     <div key={i} style={{fontSize:11,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,0.04)",display:"flex",gap:10}}>
-                      <span style={{color:"#6aaa7a",minWidth:80}}>{hpTask.fecha}</span>
-                      <span style={{color:"#ede9e0",flex:1}}>{hpTask.tarea}</span>
-                      <span style={{color:"#5a9a7a"}}>{hpTask.zona}</span>
-                      <span style={{color:"#9ca3af"}}>{hpTask.responsable||""}</span>
-                      {hpTask.notas&&<span style={{color:"#4a7a5a",fontStyle:"italic",fontSize:10}}>{hpTask.notas}</span>}
+                      <span style={{color:"#6aaa7a",minWidth:80}}>{t.fecha}</span>
+                      <span style={{color:"#ede9e0",flex:1}}>{t.tarea}</span>
+                      <span style={{color:"#5a9a7a"}}>{t.zona}</span>
+                      <span style={{color:"#9ca3af"}}>{t.responsable||""}</span>
+                      {t.notas&&<span style={{color:"#4a7a5a",fontStyle:"italic",fontSize:10}}>{t.notas}</span>}
                     </div>
                   ))}
                 </div>
