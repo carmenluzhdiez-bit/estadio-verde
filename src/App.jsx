@@ -12204,10 +12204,11 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
 }
 
 // ─── ZONA GOLF SIMPLE (Búnkers, Fairways) ────────────────────────────────────
-function ZonaGolfSimple({ S, labelSt, zonas, tareas, titulo, colorAcento, golfData, setG, listaPersonal, setTareasProg, sincronizarMacrozona }) {
+function ZonaGolfSimple({ S, labelSt, zonas, tareas, titulo, colorAcento, golfData, setG, listaPersonal, setTareasProg, sincronizarMacrozona, tareasProgTodas={}, aplicaciones=[] }) {
   const hoy = fechaLocal();
   const [selZona, setSelZona] = React.useState(zonas[0]?.id||"");
   const [showForm, setShowForm] = React.useState(false);
+  const [showHistZGS, setShowHistZGS] = React.useState(false);
   const [form, setForm] = React.useState({fecha:hoy,tipo:"",responsable:"",descripcion:"",obs:""});
   const clave = `registros_${selZona}`;
   const registros = Array.isArray(golfData[clave])?golfData[clave]:Object.values(golfData[clave]||{});
@@ -12236,7 +12237,13 @@ function ZonaGolfSimple({ S, labelSt, zonas, tareas, titulo, colorAcento, golfDa
     <div className="ein">
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:8}}>
         <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:18,color:colorAcento,margin:0}}>{titulo}</h2>
-        <button className="btn-p" style={S.btn} onClick={()=>setShowForm(true)}>📋 Nueva tarea</button>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={()=>setShowHistZGS(p=>!p)}
+            style={{...S.btn,fontSize:11,padding:"6px 12px",background:showHistZGS?"rgba(167,139,250,0.2)":"rgba(167,139,250,0.1)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.35)"}}>
+            📜 Historial del elemento
+          </button>
+          <button className="btn-p" style={S.btn} onClick={()=>setShowForm(true)}>📋 Nueva tarea</button>
+        </div>
       </div>
       {/* Selector zona */}
       <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
@@ -12247,6 +12254,7 @@ function ZonaGolfSimple({ S, labelSt, zonas, tareas, titulo, colorAcento, golfDa
           </button>
         ))}
       </div>
+      {showHistZGS&&<HistorialElementoGolf S={S} nombreElemento={zonas.find(z=>z.id===selZona)?.nombre||""} tareasProg={tareasProgTodas} aplicaciones={aplicaciones}/>}
       {/* Formulario */}
       {showForm&&(
         <div style={{...S.card,padding:16,marginBottom:12,background:`${colorAcento}08`,borderColor:`${colorAcento}25`}} className="ein">
@@ -13649,8 +13657,21 @@ function HistorialElementoGolf({ S, nombreElemento, tareasProg, aplicaciones=[] 
     .flatMap(([fecha,ts])=>(Array.isArray(ts)?ts:Object.values(ts||{})).map(t=>({...t,fecha})))
     .filter(t=>t.zona==="Golf" && esDeEsteElemento(t.elemento,t.tarea))
     .map(t=>({tipo:"tarea",fecha:t.fecha,titulo:t.tarea,detalle:t.responsable||"",estado:t.estado,notas:t.notas||""}));
+  const coincideSector = (s) => {
+    const sN = normHE(s);
+    if(!sN) return false;
+    return sN.startsWith(nombreGNorm) || sN.includes("todoslosgreens") || sN.includes("todoslostees") || sN.includes("todoslosfairways") || sN.includes("completotodoelcampo");
+  };
   const aplicacionesElemento = (aplicaciones||[])
-    .filter(a=>(a.sectoresSeleccionados||[]).some(s=>normHE(s).startsWith(nombreGNorm)||normHE(s).includes("todoslosgreens")||normHE(s).includes("todoslostees")||normHE(s).includes("todoslosfairways")))
+    .filter(a=>{
+      // Revisa todos los lugares donde podría haber quedado guardado el sector de esta aplicación
+      const camposSector = [
+        ...(Array.isArray(a.sectoresSeleccionados)?a.sectoresSeleccionados:[]),
+        ...(a.sectorFinal||"").split(","),
+        a.sectorDetalle, a.superficie, a.sectorGrupo, a.sectorCustom,
+      ].filter(Boolean);
+      return camposSector.some(coincideSector);
+    })
     .map(a=>({tipo:"aplicacion",fecha:a.fecha,titulo:`🧪 ${a.producto}${a.dosis?" · "+a.dosis:""}`,detalle:a.responsable||"",estado:null,notas:a.obs||""}));
   const combinadoTotal = [...tareasElemento,...aplicacionesElemento].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
   const busq = normHE(buscarHE);
@@ -13926,23 +13947,24 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   };
 
   // ── Guardar tarea Golf → Programa ────────────────────────────────────────
-  const guardarTareaGolf = () => {
-    if(!tareaForm.tipo||!tareaForm.fecha) return;
-    const nombreTareaGTG = tareaForm.tipo==="Otra" ? (tareaForm.tipoCustom||"").trim() : tareaForm.tipo;
-    if(tareaForm.tipo==="Otra"&&!nombreTareaGTG){ alert("Escribe el nombre de la tarea en el cuadro que aparece debajo de \"Otra...\"."); return; }
-    const target = tareaForm.target==="green" ? GREENS_DEF.find(g=>g.id===tareaForm.targetId)?.nombre :
-                   tareaForm.target==="tee"   ? TEES_DEF.find(t=>t.id===tareaForm.targetId)?.nombre :
-                   tareaForm.target==="arbol" ? (arboles.find(a=>String(a.id)===tareaForm.targetId)?.nombre||"Árbol") : "Todos";
-    const textoTarea = `⛳ Golf — ${nombreTareaGTG}${target&&target!=="Todos"?" ("+target+")":""}${tareaForm.descripcion?" — "+tareaForm.descripcion:""}`;
+  const guardarTareaGolf = (overrides={}) => {
+    const tf = {...tareaForm, ...overrides};
+    if(!tf.tipo||!tf.fecha) return;
+    const nombreTareaGTG = tf.tipo==="Otra" ? (tf.tipoCustom||"").trim() : tf.tipo;
+    if(tf.tipo==="Otra"&&!nombreTareaGTG){ alert("Escribe el nombre de la tarea en el cuadro que aparece debajo de \"Otra...\"."); return; }
+    const target = tf.target==="green" ? GREENS_DEF.find(g=>g.id===tf.targetId)?.nombre :
+                   tf.target==="tee"   ? TEES_DEF.find(t=>t.id===tf.targetId)?.nombre :
+                   tf.target==="arbol" ? (arboles.find(a=>String(a.id)===tf.targetId)?.nombre||"Árbol") : "Todos";
+    const textoTarea = `⛳ Golf — ${nombreTareaGTG}${target&&target!=="Todos"?" ("+target+")":""}${tf.descripcion?" — "+tf.descripcion:""}`;
     const respsGTG = responsablesParaGuardarGolf().filter(Boolean);
     if(modoVariosJardinerosGolf&&respsGTG.length===0){ alert("Elige al menos un jardinero."); return; }
-    if(respsGTG.length>0 && tareaForm.fecha) {
+    if(respsGTG.length>0 && tf.fecha) {
       const loteIdGTG = "lote_"+Date.now()+"_"+Math.random().toString(36).slice(2);
       const nuevasGTG = respsGTG.map(resp=>({
-        id:Date.now()+Math.random(),fecha:tareaForm.fecha,zona:"Golf",elemento:target||"",
-        tarea:textoTarea,responsable:resp,estado:resp?"pendiente":"por_designar",notas:tareaForm.obs||"",auto:false,loteTodosId:loteIdGTG,
+        id:Date.now()+Math.random(),fecha:tf.fecha,zona:"Golf",elemento:target||"",
+        tarea:textoTarea,responsable:resp,estado:resp?"pendiente":"por_designar",notas:tf.obs||"",auto:false,loteTodosId:loteIdGTG,
       }));
-      setTareasProg(p=>({...p,[tareaForm.fecha]:[...(p[tareaForm.fecha]||[]),...nuevasGTG]}));
+      setTareasProg(p=>({...p,[tf.fecha]:[...(p[tf.fecha]||[]),...nuevasGTG]}));
     }
     sincronizarMacrozona("Tarea programada", `${nombreTareaGTG} — ${respsGTG.join(", ")||"Sin asignar"}`);
     setTareaForm(emptyTarea); setShowTareaForm(null); resetModoVariosJardinerosGolf();
@@ -14968,7 +14990,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                       <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Descripción</label><input style={S.input} value={tareaForm.descripcion} onChange={e=>setTareaForm(p=>({...p,descripcion:e.target.value}))}/></div>
                     </div>
                     <div style={{display:"flex",gap:8}}>
-                      <button className="btn-p" style={S.btn} onClick={()=>{setTareaForm(p=>({...p,targetId:selectedTee,target:"tee"}));guardarTareaGolf();}}>✓ Guardar y enviar al programa</button>
+                      <button className="btn-p" style={S.btn} onClick={()=>guardarTareaGolf({targetId:selectedTee,target:"tee"})}>✓ Guardar y enviar al programa</button>
                       <button className="btn-g" style={S.btn} onClick={()=>setShowTareaForm(null)}>Cancelar</button>
                     </div>
                   </div>
@@ -14985,7 +15007,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
         <ZonaGolfSimple S={S} labelSt={labelSt} zonas={BUNKERS_DEF} tareas={TAREAS_BUNKERS}
           titulo="🏖️ Búnkers" colorAcento="#fde68a"
           golfData={golfData} setG={setG} listaPersonal={listaPersonal}
-          setTareasProg={setTareasProg} sincronizarMacrozona={sincronizarMacrozona}/>
+          setTareasProg={setTareasProg} sincronizarMacrozona={sincronizarMacrozona}
+          tareasProgTodas={tareasProg} aplicaciones={aplicaciones}/>
       )}
 
       {/* ── FAIRWAYS ── */}
@@ -14993,7 +15016,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
         <ZonaGolfSimple S={S} labelSt={labelSt} zonas={FAIRWAYS_DEF} tareas={TAREAS_FAIRWAYS}
           titulo="🌾 Fairways" colorAcento="#a3e635"
           golfData={golfData} setG={setG} listaPersonal={listaPersonal}
-          setTareasProg={setTareasProg} sincronizarMacrozona={sincronizarMacrozona}/>
+          setTareasProg={setTareasProg} sincronizarMacrozona={sincronizarMacrozona}
+          tareasProgTodas={tareasProg} aplicaciones={aplicaciones}/>
       )}
 
       {/* ── ZONAS ESPECIALES ── */}
