@@ -13634,6 +13634,49 @@ function SimplificarFrecuenciasGolf({ S, getAllElems, getZD, setElemFrecsBulk })
   );
 }
 
+// Historial combinado (tareas + aplicaciones fitosanitarias) de un elemento de Golf específico
+// (un green, un tee, el vivero, o una zona especial) — usado en la ficha de cada uno.
+function HistorialElementoGolf({ S, nombreElemento, tareasProg, aplicaciones=[] }) {
+  const normHE=s=>(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"");
+  const nombreGNorm = normHE(nombreElemento);
+  const esDeEsteElemento = (elemento,tarea) => {
+    const eN=normHE(elemento), tN=normHE(tarea);
+    return eN.startsWith(nombreGNorm)||tN.includes(nombreGNorm)||eN.includes("todoslosgreens")||tN.includes("todoslosgreens")
+      ||eN.includes("todoslostees")||tN.includes("todoslostees")||eN.includes("todoslosfairways")||tN.includes("todoslosfairways");
+  };
+  const tareasElemento = Object.entries(tareasProg||{})
+    .flatMap(([fecha,ts])=>(Array.isArray(ts)?ts:Object.values(ts||{})).map(t=>({...t,fecha})))
+    .filter(t=>t.zona==="Golf" && esDeEsteElemento(t.elemento,t.tarea))
+    .map(t=>({tipo:"tarea",fecha:t.fecha,titulo:t.tarea,detalle:t.responsable||"",estado:t.estado,notas:t.notas||""}));
+  const aplicacionesElemento = (aplicaciones||[])
+    .filter(a=>(a.sectoresSeleccionados||[]).some(s=>normHE(s).startsWith(nombreGNorm)||normHE(s).includes("todoslosgreens")||normHE(s).includes("todoslostees")||normHE(s).includes("todoslosfairways")))
+    .map(a=>({tipo:"aplicacion",fecha:a.fecha,titulo:`🧪 ${a.producto}${a.dosis?" · "+a.dosis:""}`,detalle:a.responsable||"",estado:null,notas:a.obs||""}));
+  const combinado = [...tareasElemento,...aplicacionesElemento].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
+  return (
+    <div style={{...S.card,padding:"12px 16px",marginBottom:12,borderLeft:"3px solid rgba(167,139,250,0.4)"}}>
+      <div style={{fontSize:12,fontWeight:700,color:"#c4b5fd",marginBottom:8}}>📜 Historial completo — {nombreElemento} ({combinado.length})</div>
+      {combinado.length===0?(
+        <div style={{fontSize:12,color:"#4a7a5a"}}>Sin tareas ni aplicaciones registradas todavía para este elemento.</div>
+      ):(
+        <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:400,overflowY:"auto"}}>
+          {combinado.map((h,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"start",gap:8,padding:"6px 8px",background:h.tipo==="aplicacion"?"rgba(167,139,250,0.06)":"rgba(255,255,255,0.03)",borderRadius:6}}>
+              <span style={{fontSize:11,color:"#5a9a7a",minWidth:78,flexShrink:0}}>{h.fecha}</span>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:12,color:"#ede9e0"}}>{h.titulo}</div>
+                <div style={{fontSize:10,color:"#5a9a7a"}}>
+                  {h.tipo==="aplicacion"?"Aplicación fitosanitaria":({hecha:"✅ Hecha",completada:"✅ Hecha",no_pudo:"🔴 No se pudo",pendiente:"🟡 Pendiente",por_designar:"⬜ Por designar",haciendose:"🔵 Haciéndose"}[h.estado]||h.estado)} · {h.detalle}
+                  {h.notas?` · ${h.notas}`:""}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito, onCierreSectorial, onNuevaAlerta, configSemanal={}, setConfigSemanal, getAllElems, getZD, setElemFrecs, setElemFrecsBulk, bodegasData, setBodegasData }) {
   const GOLF_ZONA_ID = 31; // ID macrozona Golf
   const [fechaProponerGolf, setFechaProponerGolf] = React.useState(fechaLocal());
@@ -13693,6 +13736,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   const [humForm,        setHumForm]        = React.useState(emptyHumForm);
   const [selectedGreen,  setSelectedGreen]  = React.useState("g1");
   const [showHistorialElemento, setShowHistorialElemento] = React.useState(false);
+  const [historialZonaAbierta, setHistorialZonaAbierta] = React.useState(null); // id de la fila con historial desplegado, en Zonas Especiales
   const [selectedTee,    setSelectedTee]    = React.useState("tee_01a");
 
   // Formulario medición semanal
@@ -14326,10 +14370,14 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                         <div style={{fontSize:10,color:"#5a9a7a",marginBottom:2}}>ALTURA</div>
                         <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:700,color:"#4ade80"}}>{altViv}mm</div>
                       </div>}
-
+                      <button onClick={()=>setShowHistorialElemento(p=>!p)}
+                        style={{...S.btn,fontSize:11,padding:"6px 12px",height:"fit-content",background:showHistorialElemento?"rgba(167,139,250,0.2)":"rgba(167,139,250,0.1)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.35)"}}>
+                        📜 Historial del elemento
+                      </button>
                     </div>
                   </div>
                 </div>
+                {showHistorialElemento&&<HistorialElementoGolf S={S} nombreElemento="Vivero" tareasProg={tareasProg} aplicaciones={aplicaciones}/>}
                 {/* Botones de acción para Vivero */}
                 {esJefa&&(
                   <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
@@ -14497,47 +14545,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                   </div>
                 </div>
 
-                {/* ── Historial combinado: tareas + aplicaciones fitosanitarias de este elemento ── */}
-                {showHistorialElemento&&(()=>{
-                  const nombreG = pgG.nombre;
-                  const normHE=s=>(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"");
-                  const nombreGNorm = normHE(nombreG);
-                  const esDeEsteElemento = (elemento,tarea) => {
-                    const eN=normHE(elemento), tN=normHE(tarea);
-                    return eN.startsWith(nombreGNorm)||tN.includes(nombreGNorm)||eN.includes("todoslosgreens")||tN.includes("todoslosgreens")||eN==="green"&&tN.includes(nombreGNorm);
-                  };
-                  const tareasElemento = Object.entries(tareasProg)
-                    .flatMap(([fecha,ts])=>(Array.isArray(ts)?ts:Object.values(ts||{})).map(t=>({...t,fecha})))
-                    .filter(t=>t.zona==="Golf" && esDeEsteElemento(t.elemento,t.tarea))
-                    .map(t=>({tipo:"tarea",fecha:t.fecha,titulo:t.tarea,detalle:t.responsable||"",estado:t.estado,notas:t.notas||""}));
-                  const aplicacionesElemento = (aplicaciones||[])
-                    .filter(a=>(a.sectoresSeleccionados||[]).some(s=>normHE(s).startsWith(nombreGNorm)||normHE(s).includes("todoslosgreens")))
-                    .map(a=>({tipo:"aplicacion",fecha:a.fecha,titulo:`🧪 ${a.producto}${a.dosis?" · "+a.dosis:""}`,detalle:a.responsable||"",estado:null,notas:a.obs||""}));
-                  const combinado = [...tareasElemento,...aplicacionesElemento].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
-                  return (
-                    <div style={{...S.card,padding:"12px 16px",marginBottom:12,borderLeft:"3px solid rgba(167,139,250,0.4)"}}>
-                      <div style={{fontSize:12,fontWeight:700,color:"#c4b5fd",marginBottom:8}}>📜 Historial completo — {nombreG} ({combinado.length})</div>
-                      {combinado.length===0?(
-                        <div style={{fontSize:12,color:"#4a7a5a"}}>Sin tareas ni aplicaciones registradas todavía para este elemento.</div>
-                      ):(
-                        <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:400,overflowY:"auto"}}>
-                          {combinado.map((h,i)=>(
-                            <div key={i} style={{display:"flex",alignItems:"start",gap:8,padding:"6px 8px",background:h.tipo==="aplicacion"?"rgba(167,139,250,0.06)":"rgba(255,255,255,0.03)",borderRadius:6}}>
-                              <span style={{fontSize:11,color:"#5a9a7a",minWidth:78,flexShrink:0}}>{h.fecha}</span>
-                              <div style={{flex:1,minWidth:0}}>
-                                <div style={{fontSize:12,color:"#ede9e0"}}>{h.titulo}</div>
-                                <div style={{fontSize:10,color:"#5a9a7a"}}>
-                                  {h.tipo==="aplicacion"?"Aplicación fitosanitaria":({hecha:"✅ Hecha",completada:"✅ Hecha",no_pudo:"🔴 No se pudo",pendiente:"🟡 Pendiente",por_designar:"⬜ Por designar",haciendose:"🔵 Haciéndose"}[h.estado]||h.estado)} · {h.detalle}
-                                  {h.notas?` · ${h.notas}`:""}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
+                {showHistorialElemento&&<HistorialElementoGolf S={S} nombreElemento={pgG.nombre} tareasProg={tareasProg} aplicaciones={aplicaciones}/>}
 
                 {/* ── Últimos cortes registrados para este green ── */}
                 {(()=>{
@@ -14912,9 +14920,18 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             return (
               <div>
                 <div style={{...S.card,padding:14,marginBottom:12,borderLeft:"3px solid rgba(52,211,153,0.4)"}}>
-                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700}}>{tee.nombre}</div>
-                  <div style={{fontSize:12,color:"#5a9a7a"}}>{tee.hoyo}</div>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+                    <div>
+                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700}}>{tee.nombre}</div>
+                      <div style={{fontSize:12,color:"#5a9a7a"}}>{tee.hoyo}</div>
+                    </div>
+                    <button onClick={()=>setShowHistorialElemento(p=>!p)}
+                      style={{...S.btn,fontSize:11,padding:"6px 12px",background:showHistorialElemento?"rgba(167,139,250,0.2)":"rgba(167,139,250,0.1)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.35)"}}>
+                      📜 Historial del elemento
+                    </button>
+                  </div>
                 </div>
+                {showHistorialElemento&&<HistorialElementoGolf S={S} nombreElemento={tee.nombre} tareasProg={tareasProg} aplicaciones={aplicaciones}/>}
                 {showTareaForm==="tee"&&(
                   <div style={{...S.card,padding:16,marginBottom:12}} className="ein">
                     <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#34d399",marginBottom:12}}>📋 Nueva tarea — {tee.nombre}</div>
@@ -14977,52 +14994,80 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
 
           {/* Ante-greens, Lomas, Macizos, Isla, Jaula */}
           {ZONAS_GOLF_EXTRA.map(zona=>{
+            const abierta=historialZonaAbierta===("z_"+zona.id);
             return (
               <div key={zona.id} style={{...S.card,padding:14,marginBottom:10,borderLeft:`3px solid ${zona.color}50`}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
                   <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:zona.color}}>{zona.icono} {zona.nombre}</div>
-                  <button style={{...S.btn,fontSize:11,padding:"4px 12px",background:`${zona.color}15`,color:zona.color,border:`1px solid ${zona.color}40`}}
-                    onClick={()=>{setTareaForm({...emptyTarea,descripcion:zona.nombre,responsable:configSemanal?.corte_golf||"Osmar Bhalú Armijo Zúñiga",target:"zona",targetId:zona.id});setShowTareaForm("zona");}}>
-                    📋 Nueva tarea
-                  </button>
+                  <div style={{display:"flex",gap:6}}>
+                    <button onClick={()=>setHistorialZonaAbierta(abierta?null:"z_"+zona.id)}
+                      style={{...S.btn,fontSize:11,padding:"4px 10px",background:abierta?"rgba(167,139,250,0.2)":"rgba(167,139,250,0.1)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.35)"}}>
+                      📜 Historial
+                    </button>
+                    <button style={{...S.btn,fontSize:11,padding:"4px 12px",background:`${zona.color}15`,color:zona.color,border:`1px solid ${zona.color}40`}}
+                      onClick={()=>{setTareaForm({...emptyTarea,descripcion:zona.nombre,responsable:configSemanal?.corte_golf||"Osmar Bhalú Armijo Zúñiga",target:"zona",targetId:zona.id});setShowTareaForm("zona");}}>
+                      📋 Nueva tarea
+                    </button>
+                  </div>
                 </div>
+                {abierta&&<div style={{marginTop:10}}><HistorialElementoGolf S={S} nombreElemento={zona.nombre} tareasProg={tareasProg} aplicaciones={aplicaciones}/></div>}
               </div>
             );
           })}
 
           {/* Plantas ornamentales */}
           <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:"#f9a8d4",margin:"16px 0 8px"}}>🌸 Plantas Ornamentales</div>
-          {PLANTAS_GOLF.map(p=>(
+          {PLANTAS_GOLF.map(p=>{
+            const abierta=historialZonaAbierta===("p_"+p.id);
+            return (
             <div key={p.id} style={{...S.card,padding:"10px 14px",marginBottom:6,borderLeft:"3px solid rgba(249,168,212,0.4)"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
                 <div>
                   <div style={{fontSize:13,fontWeight:600}}>{p.nombre}</div>
                   <div style={{fontSize:11,color:"#5a9a7a"}}>📍 {p.ubicacion}</div>
                 </div>
-                <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(249,168,212,0.12)",color:"#f9a8d4",border:"1px solid rgba(249,168,212,0.3)"}}
-                  onClick={()=>{setTareaForm({...emptyTarea,descripcion:p.nombre,responsable:configSemanal?.corte_golf||"Osmar Bhalú Armijo Zúñiga",target:"zona",targetId:p.id});setShowTareaForm("zona");}}>
-                  📋 Nueva tarea
-                </button>
+                <div style={{display:"flex",gap:6}}>
+                  <button onClick={()=>setHistorialZonaAbierta(abierta?null:"p_"+p.id)}
+                    style={{...S.btn,fontSize:11,padding:"4px 10px",background:abierta?"rgba(167,139,250,0.2)":"rgba(167,139,250,0.1)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.35)"}}>
+                    📜 Historial
+                  </button>
+                  <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(249,168,212,0.12)",color:"#f9a8d4",border:"1px solid rgba(249,168,212,0.3)"}}
+                    onClick={()=>{setTareaForm({...emptyTarea,descripcion:p.nombre,responsable:configSemanal?.corte_golf||"Osmar Bhalú Armijo Zúñiga",target:"zona",targetId:p.id});setShowTareaForm("zona");}}>
+                    📋 Nueva tarea
+                  </button>
+                </div>
               </div>
+              {abierta&&<div style={{marginTop:10}}><HistorialElementoGolf S={S} nombreElemento={p.nombre} tareasProg={tareasProg} aplicaciones={aplicaciones}/></div>}
             </div>
-          ))}
+            );
+          })}
 
           {/* Edificio Golf */}
           <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:"#c4b5fd",margin:"16px 0 8px"}}>🏢 Edificio Golf</div>
-          {EDIFICIO_GOLF.map(e=>(
+          {EDIFICIO_GOLF.map(e=>{
+            const abierta=historialZonaAbierta===("e_"+e.id);
+            return (
             <div key={e.id} style={{...S.card,padding:"10px 14px",marginBottom:6,borderLeft:"3px solid rgba(196,181,253,0.4)"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
                 <div>
                   <div style={{fontSize:13,fontWeight:600}}>{e.nombre}</div>
                   <div style={{fontSize:11,color:"#5a9a7a"}}>📍 {e.piso}</div>
                 </div>
-                <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(196,181,253,0.12)",color:"#c4b5fd",border:"1px solid rgba(196,181,253,0.3)"}}
-                  onClick={()=>{setTareaForm({...emptyTarea,descripcion:e.nombre,responsable:configSemanal?.corte_golf||"Osmar Bhalú Armijo Zúñiga",target:"zona",targetId:e.id});setShowTareaForm("zona");}}>
-                  📋 Nueva tarea
-                </button>
+                <div style={{display:"flex",gap:6}}>
+                  <button onClick={()=>setHistorialZonaAbierta(abierta?null:"e_"+e.id)}
+                    style={{...S.btn,fontSize:11,padding:"4px 10px",background:abierta?"rgba(167,139,250,0.2)":"rgba(167,139,250,0.1)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.35)"}}>
+                    📜 Historial
+                  </button>
+                  <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(196,181,253,0.12)",color:"#c4b5fd",border:"1px solid rgba(196,181,253,0.3)"}}
+                    onClick={()=>{setTareaForm({...emptyTarea,descripcion:e.nombre,responsable:configSemanal?.corte_golf||"Osmar Bhalú Armijo Zúñiga",target:"zona",targetId:e.id});setShowTareaForm("zona");}}>
+                    📋 Nueva tarea
+                  </button>
+                </div>
               </div>
+              {abierta&&<div style={{marginTop:10}}><HistorialElementoGolf S={S} nombreElemento={e.nombre} tareasProg={tareasProg} aplicaciones={aplicaciones}/></div>}
             </div>
-          ))}
+            );
+          })}
 
           {/* Formulario tarea zona */}
           {showTareaForm==="zona"&&(
