@@ -13644,14 +13644,25 @@ function SimplificarFrecuenciasGolf({ S, getAllElems, getZD, setElemFrecsBulk })
 
 // Historial combinado (tareas + aplicaciones fitosanitarias) de un elemento de Golf específico
 // (un green, un tee, el vivero, o una zona especial) — usado en la ficha de cada uno.
-function HistorialElementoGolf({ S, nombreElemento, tareasProg, aplicaciones=[] }) {
+function HistorialElementoGolf({ S, nombreElemento, hoyoElemento="", tareasProg, aplicaciones=[] }) {
   const [buscarHE, setBuscarHE] = React.useState("");
   const normHE=s=>(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"");
   const nombreGNorm = normHE(nombreElemento);
+  // Número de hoyo del elemento actual (ej. "Hoyo 02" → "02"), para reconocer formatos antiguos
+  // como "Tee Hoyo 02" que no coinciden por nombre exacto pero son del mismo hoyo.
+  const extraerHoyo = s => { const m=(s||"").match(/hoyo\s*0*(\d+)/i); return m?m[1].padStart(2,"0"):null; };
+  const hoyoActual = extraerHoyo(hoyoElemento) || extraerHoyo(nombreElemento);
+  const esTeeGenerico = normHE(nombreElemento).startsWith("tee") || normHE(hoyoElemento).startsWith("tee");
   const esDeEsteElemento = (elemento,tarea) => {
     const eN=normHE(elemento), tN=normHE(tarea);
-    return eN.startsWith(nombreGNorm)||tN.includes(nombreGNorm)||eN.includes("todoslosgreens")||tN.includes("todoslosgreens")
-      ||eN.includes("todoslostees")||tN.includes("todoslostees")||eN.includes("todoslosfairways")||tN.includes("todoslosfairways");
+    if(eN.startsWith(nombreGNorm)||tN.includes(nombreGNorm)) return true;
+    if(eN.includes("todoslosgreens")||tN.includes("todoslosgreens")) return true;
+    if(eN.includes("todoslostees")||tN.includes("todoslostees")) return true;
+    if(eN.includes("todoslosfairways")||tN.includes("todoslosfairways")) return true;
+    // Coincidencia por hoyo (ej. este es "Tee 02A" y la tarea dice "Tee Hoyo 02", o viceversa)
+    if(hoyoActual && esTeeGenerico && normHE(elemento).includes("tee") && extraerHoyo(elemento)===hoyoActual) return true;
+    if(hoyoActual && esTeeGenerico && normHE(tarea).includes("tee") && extraerHoyo(tarea)===hoyoActual) return true;
+    return false;
   };
   const tareasElemento = Object.entries(tareasProg||{})
     .flatMap(([fecha,ts])=>(Array.isArray(ts)?ts:Object.values(ts||{})).map(t=>({...t,fecha})))
@@ -14132,7 +14143,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
         {(()=>{
           // Tabs según rol: trabajador solo ve lo que le corresponde
-          const todosTabs = [["panel","📊 Panel"],["greens","⛳ Greens"],["tees","🎯 Tees"],["bunkers","🏖️ Búnkers"],["fairways","🌾 Fairways"],["zonas","🌿 Zonas"],["arboles","🌳 Árboles"],["mediciones","📏 Alturas"],["humedad","💧 Humedad"],["eventos","🏆 Eventos"],["fitosanitario","⚗ Fitosanitario"],["programacion_golf","📅 Semana Golf"],["config_golf","⚙️ Programación Golf"],["correccion_masiva","🛠️ Corrección Fechas"],["simplificar_frecs","🔧 Simplificar Frecuencias"]];
+          const todosTabs = [["panel","📊 Panel"],["greens","⛳ Greens"],["tees","🎯 Tees"],["bunkers","🏖️ Búnkers"],["fairways","🌾 Fairways"],["zonas","🌿 Zonas"],["arboles","🌳 Árboles"],["mediciones","📏 Alturas"],["humedad","💧 Humedad"],["eventos","🏆 Eventos"],["fitosanitario","⚗ Fitosanitario"],["programacion_golf","📅 Semana Golf"],["config_golf","⚙️ Programación Golf"],["correccion_masiva","🛠️ Corrección Fechas"],["simplificar_frecs","🔧 Simplificar Frecuencias"],["comparar_nombres","🔀 Comparar Nombres"]];
           const tabsWorker = [["mediciones","📏 Alturas"],["humedad","💧 Humedad"]];
           // Agregar Programación solo para jefa/supervisor
           const todosTabs2 = todosTabs;
@@ -15005,7 +15016,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                     </button>
                   </div>
                 </div>
-                {showHistorialElemento&&<HistorialElementoGolf S={S} nombreElemento={tee.nombre} tareasProg={tareasProg} aplicaciones={aplicaciones}/>}
+                {showHistorialElemento&&<HistorialElementoGolf S={S} nombreElemento={tee.nombre} hoyoElemento={tee.hoyo} tareasProg={tareasProg} aplicaciones={aplicaciones}/>}
                 {showTareaForm==="tee"&&(
                   <div style={{...S.card,padding:16,marginBottom:12}} className="ein">
                     <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#34d399",marginBottom:12}}>📋 Nueva tarea — {tee.nombre}</div>
@@ -16020,6 +16031,70 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       {subTab==="simplificar_frecs"&&rolLogueado!=="trabajador"&&(
         <SimplificarFrecuenciasGolf S={S} getAllElems={getAllElems} getZD={getZD} setElemFrecsBulk={setElemFrecsBulk}/>
       )}
+
+      {subTab==="comparar_nombres"&&rolLogueado!=="trabajador"&&(()=>{
+        const normCN=s=>(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"");
+        const oficiales = [
+          ...GREENS_DEF.map(g=>g.nombre), ...TEES_DEF.map(t=>t.nombre), ...BUNKERS_DEF.map(b=>b.nombre),
+          ...FAIRWAYS_DEF.map(f=>f.nombre), ...ZONAS_GOLF_EXTRA.map(z=>z.nombre),
+          ...PLANTAS_GOLF.map(p=>p.nombre), ...EDIFICIO_GOLF.map(e=>e.nombre), "Vivero Golf",
+        ];
+        const oficialesNorm = oficiales.map(o=>({original:o, norm:normCN(o)}));
+        const extraerHoyoCN = s => { const m=(s||"").match(/hoyo\s*0*(\d+)/i); return m?m[1].padStart(2,"0"):null; };
+        const elementosMacro = getAllElems(31); // zona Golf, id 31
+        const comparacion = elementosMacro.map(e=>{
+          const nNorm = normCN(e.nombre);
+          const exacto = oficialesNorm.find(o=>o.norm===nNorm);
+          if(exacto) return {nombreMacro:e.nombre, estado:"ok", sugerencia:null};
+          // Buscar coincidencia por número de hoyo, si el nombre lo menciona
+          const hoyoE = extraerHoyoCN(e.nombre);
+          let sugerencia = null;
+          if(hoyoE){
+            const candidatos = oficialesNorm.filter(o=>extraerHoyoCN(o.original)===hoyoE);
+            if(candidatos.length===1) sugerencia = candidatos[0].original;
+            else if(candidatos.length>1) sugerencia = candidatos.map(c=>c.original).join(" o ");
+          }
+          if(!sugerencia){
+            // Buscar por substring parcial (ej. "Tee" en común, o "Green")
+            const parcial = oficialesNorm.find(o=>o.norm.includes(nNorm)||nNorm.includes(o.norm));
+            if(parcial) sugerencia = parcial.original;
+          }
+          return {nombreMacro:e.nombre, estado:sugerencia?"revisar":"sin_match", sugerencia};
+        });
+        const conProblema = comparacion.filter(c=>c.estado!=="ok");
+        return (
+          <div className="ein">
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,marginBottom:6}}>🔀 Comparación de nombres — Macrozonas vs Módulo Golf</div>
+            <div style={{fontSize:12,color:"#5a9a7a",marginBottom:16}}>
+              Compara cada elemento de la zona "Golf" en Macrozonas contra el catálogo oficial del Módulo Golf (Greens, Tees, Búnkers, Fairways, Zonas, Plantas, Edificio).
+            </div>
+            <div style={{display:"flex",gap:16,marginBottom:16}}>
+              <div style={{fontSize:13,color:"#4ade80"}}>✅ {comparacion.length-conProblema.length} coinciden exacto</div>
+              <div style={{fontSize:13,color:"#fbbf24"}}>⚠️ {conProblema.length} con diferencias</div>
+            </div>
+            {conProblema.length===0?(
+              <div style={{...S.card,padding:20,textAlign:"center",color:"#4ade80"}}>✅ Todos los nombres coinciden perfectamente. No hay nada que corregir.</div>
+            ):(
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {conProblema.map((c,i)=>(
+                  <div key={i} style={{...S.card,padding:"10px 14px",borderLeft:`3px solid ${c.estado==="revisar"?"rgba(245,158,11,0.5)":"rgba(239,68,68,0.5)"}`}}>
+                    <div style={{fontSize:13,fontWeight:600}}>{c.nombreMacro}</div>
+                    <div style={{fontSize:12,color:c.estado==="revisar"?"#fbbf24":"#f87171",marginTop:2}}>
+                      {c.sugerencia
+                        ? <>No coincide exacto — el nombre oficial más parecido es: <b>{c.sugerencia}</b></>
+                        : <>No se encontró ningún nombre parecido en el catálogo oficial del Módulo Golf.</>
+                      }
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{marginTop:20,fontSize:11,color:"#4a7a5a"}}>
+              Nota: esta comparación es de solo lectura — no corrige nada automáticamente. Para renombrar un elemento, ve a Macrozonas → zona Golf → Elementos → edítalo desde ahí.
+            </div>
+          </div>
+        );
+      })()}
 
       {subTab==="eventos"&&rolLogueado!=="trabajador"&&(
         <div className="ein">
