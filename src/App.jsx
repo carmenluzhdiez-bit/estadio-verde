@@ -12204,7 +12204,13 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
 }
 
 // ─── ZONA GOLF SIMPLE (Búnkers, Fairways) ────────────────────────────────────
-function ZonaGolfSimple({ S, labelSt, zonas, tareas, titulo, colorAcento, golfData, setG, listaPersonal, setTareasProg, sincronizarMacrozona, tareasProgTodas={}, aplicaciones=[] }) {
+function ZonaGolfSimple({ S, labelSt, zonas, tareas, titulo, colorAcento, golfData, setG, listaPersonal, setTareasProg, sincronizarMacrozona, tareasProgTodas={}, aplicaciones=[], getAllElems=()=>[] }) {
+  const normZGS = s => (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"");
+  const getElementoCanonicoZGS = (nombreDefault) => {
+    if(!nombreDefault) return nombreDefault;
+    const exacto = getAllElems(31).find(e=>normZGS(e.nombre)===normZGS(nombreDefault));
+    return exacto ? exacto.nombre : nombreDefault;
+  };
   const hoy = fechaLocal();
   const [selZona, setSelZona] = React.useState(zonas[0]?.id||"");
   const [showForm, setShowForm] = React.useState(false);
@@ -12223,7 +12229,7 @@ function ZonaGolfSimple({ S, labelSt, zonas, tareas, titulo, colorAcento, golfDa
     if(form.responsable&&form.fecha) {
       setTareasProg(p=>({...p,[form.fecha]:[...(p[form.fecha]||[]),{
         id:Date.now()+1,fecha:form.fecha,zona:"Golf",
-        elemento:zonas.find(z=>z.id===selZona)?.nombre||selZona,
+        elemento:getElementoCanonicoZGS(zonas.find(z=>z.id===selZona)?.nombre||selZona),
         tarea:`⛳ ${nombreTareaZGS}${form.descripcion?" — "+form.descripcion:""} · ${zonas.find(z=>z.id===selZona)?.nombre||selZona}`,
         responsable:form.responsable,estado:"pendiente",notas:form.obs||"",auto:false,
       }]}));
@@ -13718,6 +13724,26 @@ function HistorialElementoGolf({ S, nombreElemento, hoyoElemento="", tareasProg,
 
 function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito, onCierreSectorial, onNuevaAlerta, configSemanal={}, setConfigSemanal, getAllElems, getZD, setElemFrecs, setElemFrecsBulk, bodegasData, setBodegasData }) {
   const GOLF_ZONA_ID = 31; // ID macrozona Golf
+  // Alinea el nombre de un elemento con el catálogo configurado en Macrozonas → zona Golf → Frecuencias,
+  // para que las tareas creadas desde el Módulo Golf usen exactamente el mismo nombre que ahí (evita
+  // desajustes como "Tee Hoyo 02" vs "Tee 02A" que antes hacían que el historial no las reconociera).
+  // Si no encuentra una coincidencia clara, devuelve el nombre por defecto sin cambios.
+  const normPG = s => (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"");
+  const extraerHoyoPG = s => { const m=(s||"").match(/hoyo\s*0*(\d+)/i); return m?m[1].padStart(2,"0"):null; };
+  const getElementoCanonico = (nombreDefault) => {
+    if(!nombreDefault) return nombreDefault;
+    const elementosMacro = getAllElems(GOLF_ZONA_ID);
+    const nNorm = normPG(nombreDefault);
+    const exacto = elementosMacro.find(e=>normPG(e.nombre)===nNorm);
+    if(exacto) return exacto.nombre;
+    const hoyoDef = extraerHoyoPG(nombreDefault);
+    if(hoyoDef){
+      const tipoBase = nNorm.replace(/\d+/g,"").replace(/hoyo/g,"");
+      const porHoyo = elementosMacro.filter(e=>extraerHoyoPG(e.nombre)===hoyoDef && normPG(e.nombre).includes(tipoBase));
+      if(porHoyo.length===1) return porHoyo[0].nombre;
+    }
+    return nombreDefault;
+  };
   const [fechaProponerGolf, setFechaProponerGolf] = React.useState(fechaLocal());
   const [gruposAbiertosSemana, setGruposAbiertosSemana] = React.useState({});
   const [buscarPreviewGolf, setBuscarPreviewGolf] = React.useState("");
@@ -13972,7 +13998,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
     if(respsGTG.length>0 && tf.fecha) {
       const loteIdGTG = "lote_"+Date.now()+"_"+Math.random().toString(36).slice(2);
       const nuevasGTG = respsGTG.map(resp=>({
-        id:Date.now()+Math.random(),fecha:tf.fecha,zona:"Golf",elemento:target||"",
+        id:Date.now()+Math.random(),fecha:tf.fecha,zona:"Golf",elemento:getElementoCanonico(target)||"",
         tarea:textoTarea,responsable:resp,estado:resp?"pendiente":"por_designar",notas:tf.obs||"",auto:false,loteTodosId:loteIdGTG,
       }));
       setTareasProg(p=>({...p,[tf.fecha]:[...(p[tf.fecha]||[]),...nuevasGTG]}));
@@ -14471,7 +14497,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                         const notaAltura=tareaForm.alturaObjetivo?`Cortar a: ${tareaForm.alturaObjetivo}mm.`:"";
                         const notas=[notaAltura,tareaForm.descripcion].filter(Boolean).join(" ");
                         const loteIdViv = "lote_"+Date.now()+"_"+Math.random().toString(36).slice(2);
-                        const nuevas=respsViv.map(resp=>({id:Date.now()+Math.random(),fecha:tareaForm.fecha,zona:"Golf",elemento:"Vivero Golf",tarea:nombreTarea,responsable:resp,estado:resp?"pendiente":"por_designar",notas,alturaCorte:tareaForm.alturaObjetivo||"",unidadAlturaCorte:"mm",loteTodosId:loteIdViv}));
+                        const nuevas=respsViv.map(resp=>({id:Date.now()+Math.random(),fecha:tareaForm.fecha,zona:"Golf",elemento:getElementoCanonico("Vivero Golf"),tarea:nombreTarea,responsable:resp,estado:resp?"pendiente":"por_designar",notas,alturaCorte:tareaForm.alturaObjetivo||"",unidadAlturaCorte:"mm",loteTodosId:loteIdViv}));
                         setTareasProg(prev=>{const arr=Array.isArray(prev[tareaForm.fecha])?prev[tareaForm.fecha]:Object.values(prev[tareaForm.fecha]||{});return {...prev,[tareaForm.fecha]:[...arr,...nuevas]};});
                         setTareaForm(emptyTarea);setShowTareaForm(null);resetModoVariosJardinerosGolf();
                       }}>✓ Guardar y enviar al programa</button>
@@ -14885,7 +14911,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                               id:Date.now()+Math.random(),
                               fecha:tareaForm.fecha,
                               zona:"Golf",
-                              elemento:nombreZona+(hoyosZona?` (${hoyosZona})`:""),
+                              elemento:getElementoCanonico(nombreZona)+(hoyosZona?` (${hoyosZona})`:""),
                               tarea:`⛳ ${nombreTareaFinal}${tareaForm.alturaCorte?" HOC "+tareaForm.alturaCorte+"mm":""}${tareaForm.descripcion?" — "+tareaForm.descripcion:""} · ${nombreZona}`,
                               responsable:resp,
                               estado:resp?"pendiente":"por_designar",
@@ -15062,7 +15088,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           titulo="🏖️ Búnkers" colorAcento="#fde68a"
           golfData={golfData} setG={setG} listaPersonal={listaPersonal}
           setTareasProg={setTareasProg} sincronizarMacrozona={sincronizarMacrozona}
-          tareasProgTodas={tareasProg} aplicaciones={aplicaciones}/>
+          tareasProgTodas={tareasProg} aplicaciones={aplicaciones} getAllElems={getAllElems}/>
       )}
 
       {/* ── FAIRWAYS ── */}
@@ -15071,7 +15097,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           titulo="🌾 Fairways" colorAcento="#a3e635"
           golfData={golfData} setG={setG} listaPersonal={listaPersonal}
           setTareasProg={setTareasProg} sincronizarMacrozona={sincronizarMacrozona}
-          tareasProgTodas={tareasProg} aplicaciones={aplicaciones}/>
+          tareasProgTodas={tareasProg} aplicaciones={aplicaciones} getAllElems={getAllElems}/>
       )}
 
       {/* ── ZONAS ESPECIALES ── */}
@@ -15109,7 +15135,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                   if(modoVariosJardinerosGolf&&respsZE.length===0){ alert("Elige al menos un jardinero."); return; }
                   const loteIdZE = "lote_"+Date.now()+"_"+Math.random().toString(36).slice(2);
                   const nuevasZE = respsZE.map(resp=>({
-                    id:Date.now()+Math.random(),fecha:tareaForm.fecha,zona:"Golf",elemento:tareaForm.descripcion,
+                    id:Date.now()+Math.random(),fecha:tareaForm.fecha,zona:"Golf",elemento:getElementoCanonico(tareaForm.descripcion),
                     tarea:`⛳ ${nombreTareaZE} — ${tareaForm.descripcion}`,
                     responsable:resp,
                     estado:resp?"pendiente":"por_designar",
