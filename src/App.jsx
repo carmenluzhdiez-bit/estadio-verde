@@ -13637,6 +13637,7 @@ function SimplificarFrecuenciasGolf({ S, getAllElems, getZD, setElemFrecsBulk })
 // Historial combinado (tareas + aplicaciones fitosanitarias) de un elemento de Golf específico
 // (un green, un tee, el vivero, o una zona especial) — usado en la ficha de cada uno.
 function HistorialElementoGolf({ S, nombreElemento, tareasProg, aplicaciones=[] }) {
+  const [buscarHE, setBuscarHE] = React.useState("");
   const normHE=s=>(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"");
   const nombreGNorm = normHE(nombreElemento);
   const esDeEsteElemento = (elemento,tarea) => {
@@ -13651,12 +13652,18 @@ function HistorialElementoGolf({ S, nombreElemento, tareasProg, aplicaciones=[] 
   const aplicacionesElemento = (aplicaciones||[])
     .filter(a=>(a.sectoresSeleccionados||[]).some(s=>normHE(s).startsWith(nombreGNorm)||normHE(s).includes("todoslosgreens")||normHE(s).includes("todoslostees")||normHE(s).includes("todoslosfairways")))
     .map(a=>({tipo:"aplicacion",fecha:a.fecha,titulo:`🧪 ${a.producto}${a.dosis?" · "+a.dosis:""}`,detalle:a.responsable||"",estado:null,notas:a.obs||""}));
-  const combinado = [...tareasElemento,...aplicacionesElemento].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
+  const combinadoTotal = [...tareasElemento,...aplicacionesElemento].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
+  const busq = normHE(buscarHE);
+  const combinado = busq ? combinadoTotal.filter(h=>normHE(h.titulo).includes(busq)||normHE(h.notas).includes(busq)||normHE(h.detalle).includes(busq)) : combinadoTotal;
   return (
     <div style={{...S.card,padding:"12px 16px",marginBottom:12,borderLeft:"3px solid rgba(167,139,250,0.4)"}}>
-      <div style={{fontSize:12,fontWeight:700,color:"#c4b5fd",marginBottom:8}}>📜 Historial completo — {nombreElemento} ({combinado.length})</div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:8}}>
+        <div style={{fontSize:12,fontWeight:700,color:"#c4b5fd"}}>📜 Historial completo — {nombreElemento} ({combinado.length}{busq?` de ${combinadoTotal.length}`:""})</div>
+        <input value={buscarHE} onChange={ev=>setBuscarHE(ev.target.value)} placeholder="🔍 Buscar (ej: fertilización, fumigación...)"
+          style={{...S.input,fontSize:11,padding:"5px 10px",maxWidth:220}}/>
+      </div>
       {combinado.length===0?(
-        <div style={{fontSize:12,color:"#4a7a5a"}}>Sin tareas ni aplicaciones registradas todavía para este elemento.</div>
+        <div style={{fontSize:12,color:"#4a7a5a"}}>{busq?"Sin resultados para esa búsqueda.":"Sin tareas ni aplicaciones registradas todavía para este elemento."}</div>
       ):(
         <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:400,overflowY:"auto"}}>
           {combinado.map((h,i)=>(
@@ -14551,15 +14558,17 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                 {(()=>{
                   const nombreG = pgG.nombre;
                   const hoyStr = new Date().toISOString().slice(0,10);
+                  const normUC=s=>(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"");
+                  const nombreGNormUC=normUC(nombreG);
                   const cortesEsteGreen = Object.entries(tareasProg)
                     .flatMap(([fecha,ts])=>(Array.isArray(ts)?ts:Object.values(ts||{})).map(t=>({...t,fecha})))
                     .filter(t=>
                       t.zona==="Golf" &&
                       t.fecha<=hoyStr &&
                       ["hecha","completada"].includes(t.estado) &&
-                      (t.tarea?.toLowerCase().includes("corte")||t.tipo?.toLowerCase().includes("corte"))&&
-                      (t.elemento?.includes(nombreG)||t.tarea?.includes(nombreG)||
-                       t.elemento?.toLowerCase().includes("todos")||t.tarea?.toLowerCase().includes("todos")))
+                      normUC(t.tarea).includes("corte")&&
+                      (normUC(t.elemento).startsWith(nombreGNormUC)||normUC(t.tarea).includes(nombreGNormUC)||
+                       normUC(t.elemento).includes("todoslosgreens")||normUC(t.tarea).includes("todoslosgreens")))
                     .sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""))
                     .slice(0,5);
                   if(!cortesEsteGreen.length) return null;
