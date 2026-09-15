@@ -14934,6 +14934,49 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       {/* ── TEES ── */}
       {subTab==="tees"&&rolLogueado!=="trabajador"&&(
         <div className="ein">
+          {(()=>{
+            const teesSueltas = Object.entries(tareasProg)
+              .flatMap(([fecha,ts])=>(Array.isArray(ts)?ts:Object.values(ts||{})).map(t=>({...t,fecha})))
+              .filter(t=>t.zona==="Golf" && (t.tarea||"").startsWith("⛳ Golf — ") && !t.elemento);
+            if(teesSueltas.length===0) return null;
+            return (
+              <div style={{...S.card,padding:14,marginBottom:14,border:"1px solid rgba(245,158,11,0.35)",background:"rgba(245,158,11,0.05)"}}>
+                <div style={{fontSize:13,fontWeight:700,color:"#fbbf24",marginBottom:8}}>
+                  ⚠️ {teesSueltas.length} tarea(s) de Tees quedaron sin tee asignado (por el bug ya corregido)
+                </div>
+                <div style={{fontSize:11,color:"#c0a06a",marginBottom:10}}>
+                  Elige a qué tee corresponde cada una para corregirla, o "Ignorar" si en realidad era para todos los tees.
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {teesSueltas.map(t=>(
+                    <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",padding:"6px 8px",background:"rgba(255,255,255,0.03)",borderRadius:6}}>
+                      <span style={{fontSize:11,color:"#5a9a7a",minWidth:78}}>{t.fecha}</span>
+                      <span style={{fontSize:12,flex:1,minWidth:180}}>{t.tarea} <span style={{color:"#5a9a7a"}}>· {t.responsable||"sin responsable"}</span></span>
+                      <select style={{...S.input,fontSize:11,padding:"4px 8px",maxWidth:160}} defaultValue=""
+                        onChange={e=>{
+                          const val=e.target.value;
+                          if(!val) return;
+                          setTareasProg(p=>{
+                            const arr=Array.isArray(p[t.fecha])?p[t.fecha]:Object.values(p[t.fecha]||{});
+                            return {...p,[t.fecha]:arr.map(x=>{
+                              if(x.id!==t.id) return x;
+                              if(val==="__todos__") return {...x, elemento:"Todos"};
+                              const teeNombre=TEES_DEF.find(tt=>tt.id===val)?.nombre||"";
+                              const tareaBase=x.tarea.replace(/\s*\([^)]*\)\s*$/,""); // quita cualquier "(...)" final previo
+                              return {...x, elemento:teeNombre, tarea:`${tareaBase} (${teeNombre})`};
+                            })};
+                          });
+                        }}>
+                        <option value="">Asignar a...</option>
+                        <option value="__todos__">Todos los tees</option>
+                        {TEES_DEF.map(tt=><option key={tt.id} value={tt.id}>{tt.nombre}</option>)}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
           <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
             {esJefa&&<button className="btn-p" style={S.btn} onClick={()=>setShowTareaForm("tee")}>📋 Nueva tarea tees</button>}
           </div>
