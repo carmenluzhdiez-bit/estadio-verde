@@ -15075,91 +15075,13 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       )}
 
       {/* ── ZONAS ESPECIALES ── */}
-      {subTab==="zonas"&&rolLogueado!=="trabajador"&&(
-        <div className="ein">
-          <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:18,marginBottom:16,color:"#34d399"}}>🌿 Zonas Especiales Golf</h2>
-
-          {/* Ante-greens, Lomas, Macizos, Isla, Jaula */}
-          {ZONAS_GOLF_EXTRA.map(zona=>{
-            const abierta=historialZonaAbierta===("z_"+zona.id);
-            return (
-              <div key={zona.id} style={{...S.card,padding:14,marginBottom:10,borderLeft:`3px solid ${zona.color}50`}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
-                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:zona.color}}>{zona.icono} {zona.nombre}</div>
-                  <div style={{display:"flex",gap:6}}>
-                    <button onClick={()=>setHistorialZonaAbierta(abierta?null:"z_"+zona.id)}
-                      style={{...S.btn,fontSize:11,padding:"4px 10px",background:abierta?"rgba(167,139,250,0.2)":"rgba(167,139,250,0.1)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.35)"}}>
-                      📜 Historial
-                    </button>
-                    <button style={{...S.btn,fontSize:11,padding:"4px 12px",background:`${zona.color}15`,color:zona.color,border:`1px solid ${zona.color}40`}}
-                      onClick={()=>{console.log("🔍 Click Nueva tarea zona:",zona.nombre,zona.id);setTareaForm({...emptyTarea,descripcion:zona.nombre,responsable:configSemanal?.corte_golf||"Osmar Bhalú Armijo Zúñiga",target:"zona",targetId:zona.id});setShowTareaForm("zona");console.log("🔍 showTareaForm después de set:","zona (queda async, revisar próximo render)");}}>
-                      📋 Nueva tarea
-                    </button>
-                  </div>
-                </div>
-                {abierta&&<div style={{marginTop:10}}><HistorialElementoGolf S={S} nombreElemento={zona.nombre} tareasProg={tareasProg} aplicaciones={aplicaciones}/></div>}
-              </div>
-            );
-          })}
-
-          {/* Plantas ornamentales */}
-          <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:"#f9a8d4",margin:"16px 0 8px"}}>🌸 Plantas Ornamentales</div>
-          {PLANTAS_GOLF.map(p=>{
-            const abierta=historialZonaAbierta===("p_"+p.id);
-            return (
-            <div key={p.id} style={{...S.card,padding:"10px 14px",marginBottom:6,borderLeft:"3px solid rgba(249,168,212,0.4)"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
-                <div>
-                  <div style={{fontSize:13,fontWeight:600}}>{p.nombre}</div>
-                  <div style={{fontSize:11,color:"#5a9a7a"}}>📍 {p.ubicacion}</div>
-                </div>
-                <div style={{display:"flex",gap:6}}>
-                  <button onClick={()=>setHistorialZonaAbierta(abierta?null:"p_"+p.id)}
-                    style={{...S.btn,fontSize:11,padding:"4px 10px",background:abierta?"rgba(167,139,250,0.2)":"rgba(167,139,250,0.1)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.35)"}}>
-                    📜 Historial
-                  </button>
-                  <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(249,168,212,0.12)",color:"#f9a8d4",border:"1px solid rgba(249,168,212,0.3)"}}
-                    onClick={()=>{setTareaForm({...emptyTarea,descripcion:p.nombre,responsable:configSemanal?.corte_golf||"Osmar Bhalú Armijo Zúñiga",target:"zona",targetId:p.id});setShowTareaForm("zona");}}>
-                    📋 Nueva tarea
-                  </button>
-                </div>
-              </div>
-              {abierta&&<div style={{marginTop:10}}><HistorialElementoGolf S={S} nombreElemento={p.nombre} tareasProg={tareasProg} aplicaciones={aplicaciones}/></div>}
-            </div>
-            );
-          })}
-
-          {/* Edificio Golf */}
-          <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:"#c4b5fd",margin:"16px 0 8px"}}>🏢 Edificio Golf</div>
-          {EDIFICIO_GOLF.map(e=>{
-            const abierta=historialZonaAbierta===("e_"+e.id);
-            return (
-            <div key={e.id} style={{...S.card,padding:"10px 14px",marginBottom:6,borderLeft:"3px solid rgba(196,181,253,0.4)"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
-                <div>
-                  <div style={{fontSize:13,fontWeight:600}}>{e.nombre}</div>
-                  <div style={{fontSize:11,color:"#5a9a7a"}}>📍 {e.piso}</div>
-                </div>
-                <div style={{display:"flex",gap:6}}>
-                  <button onClick={()=>setHistorialZonaAbierta(abierta?null:"e_"+e.id)}
-                    style={{...S.btn,fontSize:11,padding:"4px 10px",background:abierta?"rgba(167,139,250,0.2)":"rgba(167,139,250,0.1)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.35)"}}>
-                    📜 Historial
-                  </button>
-                  <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(196,181,253,0.12)",color:"#c4b5fd",border:"1px solid rgba(196,181,253,0.3)"}}
-                    onClick={()=>{setTareaForm({...emptyTarea,descripcion:e.nombre,responsable:configSemanal?.corte_golf||"Osmar Bhalú Armijo Zúñiga",target:"zona",targetId:e.id});setShowTareaForm("zona");}}>
-                    📋 Nueva tarea
-                  </button>
-                </div>
-              </div>
-              {abierta&&<div style={{marginTop:10}}><HistorialElementoGolf S={S} nombreElemento={e.nombre} tareasProg={tareasProg} aplicaciones={aplicaciones}/></div>}
-            </div>
-            );
-          })}
-
-          {/* Formulario tarea zona */}
-          {console.log("🔍 Render zonas — showTareaForm actual:", showTareaForm, "tareaForm.descripcion:", tareaForm.descripcion)}
-          {showTareaForm==="zona"&&(
-            <div style={{...S.card,padding:16,marginBottom:12}} className="ein">
+      {subTab==="zonas"&&rolLogueado!=="trabajador"&&(()=>{
+        // Formulario "Nueva tarea" — se dibuja inline, justo debajo de la fila del ítem que se tocó
+        // (antes vivía una sola vez al final de toda la página, y por eso no se veía sin bajar mucho).
+        const renderFormZonaInline = (itemId) => {
+          if(showTareaForm!=="zona" || tareaForm.targetId!==itemId) return null;
+          return (
+            <div style={{...S.card,padding:16,marginTop:10}} className="ein">
               <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#34d399",marginBottom:12}}>📋 Nueva tarea — {tareaForm.descripcion}</div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
                 <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={tareaForm.fecha} onChange={e=>setTareaForm(p=>({...p,fecha:e.target.value}))}/></div>
@@ -15199,9 +15121,96 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                 <button className="btn-g" style={S.btn} onClick={()=>setShowTareaForm(null)}>Cancelar</button>
               </div>
             </div>
-          )}
+          );
+        };
+        return (
+        <div className="ein">
+          <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:18,marginBottom:16,color:"#34d399"}}>🌿 Zonas Especiales Golf</h2>
+
+          {/* Ante-greens, Lomas, Macizos, Isla, Jaula */}
+          {ZONAS_GOLF_EXTRA.map(zona=>{
+            const abierta=historialZonaAbierta===("z_"+zona.id);
+            return (
+              <div key={zona.id} style={{...S.card,padding:14,marginBottom:10,borderLeft:`3px solid ${zona.color}50`}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:zona.color}}>{zona.icono} {zona.nombre}</div>
+                  <div style={{display:"flex",gap:6}}>
+                    <button onClick={()=>setHistorialZonaAbierta(abierta?null:"z_"+zona.id)}
+                      style={{...S.btn,fontSize:11,padding:"4px 10px",background:abierta?"rgba(167,139,250,0.2)":"rgba(167,139,250,0.1)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.35)"}}>
+                      📜 Historial
+                    </button>
+                    <button style={{...S.btn,fontSize:11,padding:"4px 12px",background:`${zona.color}15`,color:zona.color,border:`1px solid ${zona.color}40`}}
+                      onClick={()=>{setTareaForm({...emptyTarea,descripcion:zona.nombre,responsable:configSemanal?.corte_golf||"Osmar Bhalú Armijo Zúñiga",target:"zona",targetId:zona.id});setShowTareaForm("zona");}}>
+                      📋 Nueva tarea
+                    </button>
+                  </div>
+                </div>
+                {abierta&&<div style={{marginTop:10}}><HistorialElementoGolf S={S} nombreElemento={zona.nombre} tareasProg={tareasProg} aplicaciones={aplicaciones}/></div>}
+                {renderFormZonaInline(zona.id)}
+              </div>
+            );
+          })}
+
+          {/* Plantas ornamentales */}
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:"#f9a8d4",margin:"16px 0 8px"}}>🌸 Plantas Ornamentales</div>
+          {PLANTAS_GOLF.map(p=>{
+            const abierta=historialZonaAbierta===("p_"+p.id);
+            return (
+            <div key={p.id} style={{...S.card,padding:"10px 14px",marginBottom:6,borderLeft:"3px solid rgba(249,168,212,0.4)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+                <div>
+                  <div style={{fontSize:13,fontWeight:600}}>{p.nombre}</div>
+                  <div style={{fontSize:11,color:"#5a9a7a"}}>📍 {p.ubicacion}</div>
+                </div>
+                <div style={{display:"flex",gap:6}}>
+                  <button onClick={()=>setHistorialZonaAbierta(abierta?null:"p_"+p.id)}
+                    style={{...S.btn,fontSize:11,padding:"4px 10px",background:abierta?"rgba(167,139,250,0.2)":"rgba(167,139,250,0.1)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.35)"}}>
+                    📜 Historial
+                  </button>
+                  <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(249,168,212,0.12)",color:"#f9a8d4",border:"1px solid rgba(249,168,212,0.3)"}}
+                    onClick={()=>{setTareaForm({...emptyTarea,descripcion:p.nombre,responsable:configSemanal?.corte_golf||"Osmar Bhalú Armijo Zúñiga",target:"zona",targetId:p.id});setShowTareaForm("zona");}}>
+                    📋 Nueva tarea
+                  </button>
+                </div>
+              </div>
+              {abierta&&<div style={{marginTop:10}}><HistorialElementoGolf S={S} nombreElemento={p.nombre} tareasProg={tareasProg} aplicaciones={aplicaciones}/></div>}
+              {renderFormZonaInline(p.id)}
+            </div>
+            );
+          })}
+
+          {/* Edificio Golf */}
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:"#c4b5fd",margin:"16px 0 8px"}}>🏢 Edificio Golf</div>
+          {EDIFICIO_GOLF.map(e=>{
+            const abierta=historialZonaAbierta===("e_"+e.id);
+            return (
+            <div key={e.id} style={{...S.card,padding:"10px 14px",marginBottom:6,borderLeft:"3px solid rgba(196,181,253,0.4)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+                <div>
+                  <div style={{fontSize:13,fontWeight:600}}>{e.nombre}</div>
+                  <div style={{fontSize:11,color:"#5a9a7a"}}>📍 {e.piso}</div>
+                </div>
+                <div style={{display:"flex",gap:6}}>
+                  <button onClick={()=>setHistorialZonaAbierta(abierta?null:"e_"+e.id)}
+                    style={{...S.btn,fontSize:11,padding:"4px 10px",background:abierta?"rgba(167,139,250,0.2)":"rgba(167,139,250,0.1)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.35)"}}>
+                    📜 Historial
+                  </button>
+                  <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(196,181,253,0.12)",color:"#c4b5fd",border:"1px solid rgba(196,181,253,0.3)"}}
+                    onClick={()=>{setTareaForm({...emptyTarea,descripcion:e.nombre,responsable:configSemanal?.corte_golf||"Osmar Bhalú Armijo Zúñiga",target:"zona",targetId:e.id});setShowTareaForm("zona");}}>
+                    📋 Nueva tarea
+                  </button>
+                </div>
+              </div>
+              {abierta&&<div style={{marginTop:10}}><HistorialElementoGolf S={S} nombreElemento={e.nombre} tareasProg={tareasProg} aplicaciones={aplicaciones}/></div>}
+              {renderFormZonaInline(e.id)}
+            </div>
+            );
+          })}
+
+          {/* El formulario "Nueva tarea" ahora aparece inline, justo debajo de la fila que se tocó — ver renderFormZonaInline */}
         </div>
-      )}
+        );
+      })()}
 
       {/* ── ÁRBOLES ── */}
       {subTab==="arboles"&&rolLogueado!=="trabajador"&&(
