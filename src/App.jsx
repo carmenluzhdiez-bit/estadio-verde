@@ -15092,7 +15092,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                       📜 Historial
                     </button>
                     <button style={{...S.btn,fontSize:11,padding:"4px 12px",background:`${zona.color}15`,color:zona.color,border:`1px solid ${zona.color}40`}}
-                      onClick={()=>{setTareaForm({...emptyTarea,descripcion:zona.nombre,responsable:configSemanal?.corte_golf||"Osmar Bhalú Armijo Zúñiga",target:"zona",targetId:zona.id});setShowTareaForm("zona");}}>
+                      onClick={()=>{console.log("🔍 Click Nueva tarea zona:",zona.nombre,zona.id);setTareaForm({...emptyTarea,descripcion:zona.nombre,responsable:configSemanal?.corte_golf||"Osmar Bhalú Armijo Zúñiga",target:"zona",targetId:zona.id});setShowTareaForm("zona");console.log("🔍 showTareaForm después de set:","zona (queda async, revisar próximo render)");}}>
                       📋 Nueva tarea
                     </button>
                   </div>
