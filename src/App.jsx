@@ -13692,6 +13692,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   const emptyHumForm = {fecha:hoy,hora:new Date().toTimeString().slice(0,5),motivo:"rutina",responsable:"",valores:{},valorVivero:"",decision:"sin-cambio",obs:"",generarTarea:false};
   const [humForm,        setHumForm]        = React.useState(emptyHumForm);
   const [selectedGreen,  setSelectedGreen]  = React.useState("g1");
+  const [showHistorialElemento, setShowHistorialElemento] = React.useState(false);
   const [selectedTee,    setSelectedTee]    = React.useState("tee_01a");
 
   // Formulario medición semanal
@@ -14487,10 +14488,56 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                         {alt&&Number(alt)<rango.min&&<div style={{fontSize:10,color:"#3b82f6"}}>▼ Bajo rango</div>}
                         {alt&&Number(alt)>rango.max&&<div style={{fontSize:10,color:"#ef4444"}}>▲ Sobre rango</div>}
                       </div>
+                      <button onClick={()=>setShowHistorialElemento(p=>!p)}
+                        style={{...S.btn,fontSize:11,padding:"6px 12px",height:"fit-content",background:showHistorialElemento?"rgba(167,139,250,0.2)":"rgba(167,139,250,0.1)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.35)"}}>
+                        📜 Historial del elemento
+                      </button>
 
                     </div>
                   </div>
                 </div>
+
+                {/* ── Historial combinado: tareas + aplicaciones fitosanitarias de este elemento ── */}
+                {showHistorialElemento&&(()=>{
+                  const nombreG = pgG.nombre;
+                  const normHE=s=>(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"");
+                  const nombreGNorm = normHE(nombreG);
+                  const esDeEsteElemento = (elemento,tarea) => {
+                    const eN=normHE(elemento), tN=normHE(tarea);
+                    return eN.startsWith(nombreGNorm)||tN.includes(nombreGNorm)||eN.includes("todoslosgreens")||tN.includes("todoslosgreens")||eN==="green"&&tN.includes(nombreGNorm);
+                  };
+                  const tareasElemento = Object.entries(tareasProg)
+                    .flatMap(([fecha,ts])=>(Array.isArray(ts)?ts:Object.values(ts||{})).map(t=>({...t,fecha})))
+                    .filter(t=>t.zona==="Golf" && esDeEsteElemento(t.elemento,t.tarea))
+                    .map(t=>({tipo:"tarea",fecha:t.fecha,titulo:t.tarea,detalle:t.responsable||"",estado:t.estado,notas:t.notas||""}));
+                  const aplicacionesElemento = (aplicaciones||[])
+                    .filter(a=>(a.sectoresSeleccionados||[]).some(s=>normHE(s).startsWith(nombreGNorm)||normHE(s).includes("todoslosgreens")))
+                    .map(a=>({tipo:"aplicacion",fecha:a.fecha,titulo:`🧪 ${a.producto}${a.dosis?" · "+a.dosis:""}`,detalle:a.responsable||"",estado:null,notas:a.obs||""}));
+                  const combinado = [...tareasElemento,...aplicacionesElemento].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
+                  return (
+                    <div style={{...S.card,padding:"12px 16px",marginBottom:12,borderLeft:"3px solid rgba(167,139,250,0.4)"}}>
+                      <div style={{fontSize:12,fontWeight:700,color:"#c4b5fd",marginBottom:8}}>📜 Historial completo — {nombreG} ({combinado.length})</div>
+                      {combinado.length===0?(
+                        <div style={{fontSize:12,color:"#4a7a5a"}}>Sin tareas ni aplicaciones registradas todavía para este elemento.</div>
+                      ):(
+                        <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:400,overflowY:"auto"}}>
+                          {combinado.map((h,i)=>(
+                            <div key={i} style={{display:"flex",alignItems:"start",gap:8,padding:"6px 8px",background:h.tipo==="aplicacion"?"rgba(167,139,250,0.06)":"rgba(255,255,255,0.03)",borderRadius:6}}>
+                              <span style={{fontSize:11,color:"#5a9a7a",minWidth:78,flexShrink:0}}>{h.fecha}</span>
+                              <div style={{flex:1,minWidth:0}}>
+                                <div style={{fontSize:12,color:"#ede9e0"}}>{h.titulo}</div>
+                                <div style={{fontSize:10,color:"#5a9a7a"}}>
+                                  {h.tipo==="aplicacion"?"Aplicación fitosanitaria":({hecha:"✅ Hecha",completada:"✅ Hecha",no_pudo:"🔴 No se pudo",pendiente:"🟡 Pendiente",por_designar:"⬜ Por designar",haciendose:"🔵 Haciéndose"}[h.estado]||h.estado)} · {h.detalle}
+                                  {h.notas?` · ${h.notas}`:""}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* ── Últimos cortes registrados para este green ── */}
                 {(()=>{
