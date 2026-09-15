@@ -15157,6 +15157,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           })}
 
           {/* Formulario tarea zona */}
+          {console.log("🔍 Render zonas — showTareaForm actual:", showTareaForm, "tareaForm.descripcion:", tareaForm.descripcion)}
           {showTareaForm==="zona"&&(
             <div style={{...S.card,padding:16,marginBottom:12}} className="ein">
               <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#34d399",marginBottom:12}}>📋 Nueva tarea — {tareaForm.descripcion}</div>
