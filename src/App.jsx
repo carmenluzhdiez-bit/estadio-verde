@@ -12204,13 +12204,17 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
 }
 
 // ─── ZONA GOLF SIMPLE (Búnkers, Fairways) ────────────────────────────────────
-function ZonaGolfSimple({ S, labelSt, zonas, tareas, titulo, colorAcento, golfData, setG, listaPersonal, setTareasProg, sincronizarMacrozona, tareasProgTodas={}, aplicaciones=[], getAllElems=()=>[] }) {
+function ZonaGolfSimple({ S, labelSt, zonas, tareas, titulo, colorAcento, golfData, setG, listaPersonal, setTareasProg, sincronizarMacrozona, tareasProgTodas={}, aplicaciones=[], getAllElems=()=>[], elementosExtra=[] }) {
   const normZGS = s => (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"");
   const getElementoCanonicoZGS = (nombreDefault) => {
     if(!nombreDefault) return nombreDefault;
     const exacto = getAllElems(31).find(e=>normZGS(e.nombre)===normZGS(nombreDefault));
     return exacto ? exacto.nombre : nombreDefault;
   };
+  // Lista completa: los elementos fijos del catálogo interno + cualquier extra que exista en
+  // Macrozonas y no esté ya representado aquí (ej. búnkers o fairways configurados ahí que no
+  // están en el catálogo interno).
+  const zonasExtendidas = [...zonas, ...elementosExtra.map(el=>({id:"macro_"+el.id, nombre:el.nombre, esExtraMacro:true}))];
   const hoy = fechaLocal();
   const [selZona, setSelZona] = React.useState(zonas[0]?.id||"");
   const [showForm, setShowForm] = React.useState(false);
@@ -12229,12 +12233,12 @@ function ZonaGolfSimple({ S, labelSt, zonas, tareas, titulo, colorAcento, golfDa
     if(form.responsable&&form.fecha) {
       setTareasProg(p=>({...p,[form.fecha]:[...(p[form.fecha]||[]),{
         id:Date.now()+1,fecha:form.fecha,zona:"Golf",
-        elemento:getElementoCanonicoZGS(zonas.find(z=>z.id===selZona)?.nombre||selZona),
-        tarea:`⛳ ${nombreTareaZGS}${form.descripcion?" — "+form.descripcion:""} · ${zonas.find(z=>z.id===selZona)?.nombre||selZona}`,
+        elemento:getElementoCanonicoZGS(zonasExtendidas.find(z=>z.id===selZona)?.nombre||selZona),
+        tarea:`⛳ ${nombreTareaZGS}${form.descripcion?" — "+form.descripcion:""} · ${zonasExtendidas.find(z=>z.id===selZona)?.nombre||selZona}`,
         responsable:form.responsable,estado:"pendiente",notas:form.obs||"",auto:false,
       }]}));
     }
-    sincronizarMacrozona(nombreTareaZGS, zonas.find(z=>z.id===selZona)?.nombre||selZona);
+    sincronizarMacrozona(nombreTareaZGS, zonasExtendidas.find(z=>z.id===selZona)?.nombre||selZona);
     setForm({fecha:hoy,tipo:"",responsable:"",descripcion:"",obs:""});
     setShowForm(false);
   };
@@ -12253,19 +12257,19 @@ function ZonaGolfSimple({ S, labelSt, zonas, tareas, titulo, colorAcento, golfDa
       </div>
       {/* Selector zona */}
       <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
-        {zonas.map(z=>(
+        {zonasExtendidas.map(z=>(
           <button key={z.id} onClick={()=>setSelZona(z.id)}
             style={{background:selZona===z.id?`${colorAcento}20`:"rgba(255,255,255,0.04)",border:`1px solid ${selZona===z.id?colorAcento+"60":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"6px 12px",color:selZona===z.id?colorAcento:"#5a9a7a",fontSize:11,cursor:"pointer"}}>
             {z.nombre}{z.hoyo&&<><br/><span style={{fontSize:9,color:"#5a9a7a"}}>{z.hoyo}</span></>}
           </button>
         ))}
       </div>
-      {showHistZGS&&<HistorialElementoGolf S={S} nombreElemento={zonas.find(z=>z.id===selZona)?.nombre||""} tareasProg={tareasProgTodas} aplicaciones={aplicaciones}/>}
+      {showHistZGS&&<HistorialElementoGolf S={S} nombreElemento={zonasExtendidas.find(z=>z.id===selZona)?.nombre||""} tareasProg={tareasProgTodas} aplicaciones={aplicaciones}/>}
       {/* Formulario */}
       {showForm&&(
         <div style={{...S.card,padding:16,marginBottom:12,background:`${colorAcento}08`,borderColor:`${colorAcento}25`}} className="ein">
           <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:colorAcento,marginBottom:12}}>
-            📋 Nueva tarea — {zonas.find(z=>z.id===selZona)?.nombre}
+            📋 Nueva tarea — {zonasExtendidas.find(z=>z.id===selZona)?.nombre}
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
             <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={form.fecha} onChange={e=>setForm(p=>({...p,fecha:e.target.value}))}/></div>
@@ -12297,7 +12301,7 @@ function ZonaGolfSimple({ S, labelSt, zonas, tareas, titulo, colorAcento, golfDa
         </div>
       )}
       {/* Historial */}
-      <div style={{fontFamily:"'Playfair Display',serif",fontSize:13,fontWeight:700,marginBottom:8,color:colorAcento}}>📜 Últimos registros — {zonas.find(z=>z.id===selZona)?.nombre}</div>
+      <div style={{fontFamily:"'Playfair Display',serif",fontSize:13,fontWeight:700,marginBottom:8,color:colorAcento}}>📜 Últimos registros — {zonasExtendidas.find(z=>z.id===selZona)?.nombre}</div>
       {registros.length===0&&!showForm&&(
         <div style={{...S.card,padding:32,textAlign:"center",color:"#3a7a5a"}}>Sin registros</div>
       )}
@@ -13744,6 +13748,106 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
     }
     return nombreDefault;
   };
+  // Clasifica cada elemento real de Macrozonas (zona Golf) por categoría, según su nombre.
+  // "otro" agrupa todo lo que no es green/tee/búnker/fairway — este es el universo real que
+  // debería poder elegirse en "Zonas Especiales" (hoy con lista fija que puede quedar corta,
+  // ej. un solo "Ante-greens" genérico cuando en Macrozonas hay 10 individuales).
+  const categorizarElementoGolf = (nombre) => {
+    const n = normPG(nombre);
+    if(n.startsWith("green")||n.includes("greenszonageneral")) return "green";
+    if(n.startsWith("tee")) return "tee";
+    if(n.startsWith("bunker")||n.startsWith("bunker")) return "bunker";
+    if(n.startsWith("fairway")) return "fairway";
+    return "otro";
+  };
+  const getElementosMacroPorCategoria = (categoria) => getAllElems(GOLF_ZONA_ID).filter(e=>categorizarElementoGolf(e.nombre)===categoria);
+  // Formulario "Nueva tarea" reutilizable para cualquier elemento con target:"zona" — se dibuja inline,
+  // justo debajo de la fila del ítem que se tocó (Zonas Especiales, y los elementos extra de
+  // Macrozonas que se agregan en Greens/Tees/Búnkers/Fairways).
+  const renderFormZonaInline = (itemId) => {
+    if(showTareaForm!=="zona" || String(tareaForm.targetId)!==String(itemId)) return null;
+    return (
+      <div style={{...S.card,padding:16,marginTop:10}} className="ein">
+        <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#34d399",marginBottom:12}}>📋 Nueva tarea — {tareaForm.descripcion}</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+          <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={tareaForm.fecha} onChange={e=>setTareaForm(p=>({...p,fecha:e.target.value}))}/></div>
+          <SelectorResponsableGolf/>
+          <div><label style={labelSt}>Tarea</label>
+            <select style={S.input} value={tareaForm.tipo} onChange={e=>setTareaForm(p=>({...p,tipo:e.target.value}))}>
+              <option value="">Seleccionar...</option>
+              {TAREAS_LOMAS.concat(TAREAS_MACIZOS).concat(TAREAS_EDIFICIO).filter((v,i,a)=>a.indexOf(v)===i).map(t=><option key={t}>{t}</option>)}
+              <option value="Otra">Otra...</option>
+            </select>
+            {tareaForm.tipo==="Otra"&&(
+              <input style={{...S.input,marginTop:6}} value={tareaForm.tipoCustom||""} autoFocus
+                onChange={e=>setTareaForm(p=>({...p,tipoCustom:e.target.value}))}
+                placeholder="Escribe el nombre de la tarea..."/>
+            )}
+          </div>
+          <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Descripción</label><input style={S.input} value={tareaForm.obs} onChange={e=>setTareaForm(p=>({...p,obs:e.target.value}))}/></div>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <button className="btn-p" style={S.btn} onClick={()=>{
+            if(!tareaForm.tipo) return;
+            const nombreTareaZE = tareaForm.tipo==="Otra" ? (tareaForm.tipoCustom||"").trim() : tareaForm.tipo;
+            if(tareaForm.tipo==="Otra"&&!nombreTareaZE){ alert("Escribe el nombre de la tarea en el cuadro que aparece debajo de \"Otra...\"."); return; }
+            const respsZE = responsablesParaGuardarGolf();
+            if(modoVariosJardinerosGolf&&respsZE.length===0){ alert("Elige al menos un jardinero."); return; }
+            const loteIdZE = "lote_"+Date.now()+"_"+Math.random().toString(36).slice(2);
+            const nuevasZE = respsZE.map(resp=>({
+              id:Date.now()+Math.random(),fecha:tareaForm.fecha,zona:"Golf",elemento:getElementoCanonico(tareaForm.descripcion),
+              tarea:`⛳ ${nombreTareaZE} — ${tareaForm.descripcion}`,
+              responsable:resp,
+              estado:resp?"pendiente":"por_designar",
+              notas:tareaForm.obs||"",auto:false,loteTodosId:loteIdZE,
+            }));
+            setTareasProg(p=>({...p,[tareaForm.fecha]:[...(p[tareaForm.fecha]||[]),...nuevasZE]}));
+            setShowTareaForm(null);setTareaForm(emptyTarea);resetModoVariosJardinerosGolf();
+          }}>✓ Enviar al programa</button>
+          <button className="btn-g" style={S.btn} onClick={()=>setShowTareaForm(null)}>Cancelar</button>
+        </div>
+      </div>
+    );
+  };
+  // Sección reutilizable: lista los elementos de Macrozonas de una categoría que no están ya
+  // representados en el catálogo interno (nombresConocidos), con su botón de Historial y Nueva tarea.
+  const renderSeccionElementosExtra = (categoria, nombresConocidos) => {
+    const nombresSet = new Set(nombresConocidos.map(n=>normPG(n)));
+    const extras = getElementosMacroPorCategoria(categoria).filter(el=>!nombresSet.has(normPG(el.nombre)));
+    if(extras.length===0) return null;
+    return (
+      <div style={{marginTop:20}}>
+        <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:"#38bdf8",marginBottom:6}}>
+          🔗 Otros elementos (desde Macrozonas) — {extras.length}
+        </div>
+        <div style={{fontSize:11,color:"#5a9a7a",marginBottom:10}}>
+          Elementos configurados en Macrozonas → zona Golf que no están en el catálogo interno de esta pestaña.
+        </div>
+        {extras.map(el=>{
+          const abierta=historialZonaAbierta===("macro_"+el.id);
+          return (
+            <div key={el.id} style={{...S.card,padding:"10px 14px",marginBottom:6,borderLeft:"3px solid rgba(56,189,248,0.4)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+                <div style={{fontSize:13,fontWeight:600}}>{el.nombre}</div>
+                <div style={{display:"flex",gap:6}}>
+                  <button onClick={()=>setHistorialZonaAbierta(abierta?null:"macro_"+el.id)}
+                    style={{...S.btn,fontSize:11,padding:"4px 10px",background:abierta?"rgba(167,139,250,0.2)":"rgba(167,139,250,0.1)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.35)"}}>
+                    📜 Historial
+                  </button>
+                  <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(56,189,248,0.12)",color:"#38bdf8",border:"1px solid rgba(56,189,248,0.3)"}}
+                    onClick={()=>{setTareaForm({...emptyTarea,descripcion:el.nombre,responsable:configSemanal?.corte_golf||"Osmar Bhalú Armijo Zúñiga",target:"zona",targetId:el.id});setShowTareaForm("zona");}}>
+                    📋 Nueva tarea
+                  </button>
+                </div>
+              </div>
+              {abierta&&<div style={{marginTop:10}}><HistorialElementoGolf S={S} nombreElemento={el.nombre} tareasProg={tareasProg} aplicaciones={aplicaciones}/></div>}
+              {renderFormZonaInline(el.id)}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
   const [fechaProponerGolf, setFechaProponerGolf] = React.useState(fechaLocal());
   const [gruposAbiertosSemana, setGruposAbiertosSemana] = React.useState({});
   const [buscarPreviewGolf, setBuscarPreviewGolf] = React.useState("");
@@ -14417,10 +14521,45 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               style={{background:selectedGreen==="vivero"?"rgba(74,222,128,0.2)":"rgba(255,255,255,0.04)",border:`1px solid ${selectedGreen==="vivero"?"rgba(74,222,128,0.5)":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"6px 12px",color:selectedGreen==="vivero"?"#4ade80":"#5a9a7a",fontSize:11,cursor:"pointer",fontFamily:"'Georgia',serif"}}>
               🌱 Vivero<br/><span style={{fontSize:9,color:"#5a9a7a"}}>Césped parche</span>
             </button>
+            {/* Elementos "green" que existen en Macrozonas pero no en el catálogo interno (ej. ante-greens, "Greens zona general") */}
+            {getElementosMacroPorCategoria("green").filter(el=>!GREENS_DEF.some(g=>normPG(g.nombre)===normPG(el.nombre))&&normPG(el.nombre)!=="viverogolf").map(el=>{
+              const idMacro="macro_"+el.id;
+              return (
+                <button key={idMacro} onClick={()=>setSelectedGreen(idMacro)}
+                  style={{background:selectedGreen===idMacro?"rgba(56,189,248,0.2)":"rgba(255,255,255,0.04)",border:`1px solid ${selectedGreen===idMacro?"rgba(56,189,248,0.5)":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"6px 12px",color:selectedGreen===idMacro?"#38bdf8":"#5a9a7a",fontSize:11,cursor:"pointer",fontFamily:"'Georgia',serif"}}>
+                  🔗 {el.nombre}
+                </button>
+              );
+            })}
           </div>
 
           {/* Detalle green o vivero seleccionado */}
-          {selectedGreen==="vivero"?(()=>{
+          {String(selectedGreen).startsWith("macro_")?(()=>{
+            const elMacro = getElementosMacroPorCategoria("green").find(el=>"macro_"+el.id===selectedGreen);
+            if(!elMacro) return <div style={{...S.card,padding:20,textAlign:"center",color:"#5a9a7a"}}>Elemento no encontrado.</div>;
+            const abierta = historialZonaAbierta===selectedGreen;
+            return (
+              <div>
+                <div style={{...S.card,padding:14,marginBottom:12,borderLeft:"3px solid rgba(56,189,248,0.4)"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700}}>{elMacro.nombre}</div>
+                    <div style={{display:"flex",gap:8}}>
+                      <button onClick={()=>setHistorialZonaAbierta(abierta?null:selectedGreen)}
+                        style={{...S.btn,fontSize:11,padding:"6px 12px",background:abierta?"rgba(167,139,250,0.2)":"rgba(167,139,250,0.1)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.35)"}}>
+                        📜 Historial del elemento
+                      </button>
+                      <button className="btn-p" style={S.btn} onClick={()=>{setTareaForm({...emptyTarea,descripcion:elMacro.nombre,responsable:configSemanal?.corte_golf||"Osmar Bhalú Armijo Zúñiga",target:"zona",targetId:elMacro.id});setShowTareaForm("zona");}}>📋 Nueva tarea</button>
+                    </div>
+                  </div>
+                  <div style={{fontSize:11,color:"#5a9a7a",marginTop:6}}>
+                    Elemento configurado en Macrozonas — sin ficha de altura/humedad propia (esa función está disponible solo para los 9 greens del catálogo interno).
+                  </div>
+                </div>
+                {abierta&&<HistorialElementoGolf S={S} nombreElemento={elMacro.nombre} tareasProg={tareasProg} aplicaciones={aplicaciones}/>}
+                {renderFormZonaInline(elMacro.id)}
+              </div>
+            );
+          })():selectedGreen==="vivero"?(()=>{
             const altViv = ultimaMed?.alturas?.vivero;
             return (
               <div>
@@ -15024,8 +15163,39 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                 {t.nombre}<br/><span style={{fontSize:9}}>{t.hoyo}</span>
               </button>
             ))}
+            {getElementosMacroPorCategoria("tee").filter(el=>!TEES_DEF.some(t=>normPG(t.nombre)===normPG(el.nombre))).map(el=>{
+              const idMacro="macro_"+el.id;
+              return (
+                <button key={idMacro} onClick={()=>setSelectedTee(idMacro)}
+                  style={{background:selectedTee===idMacro?"rgba(56,189,248,0.2)":"rgba(255,255,255,0.04)",border:`1px solid ${selectedTee===idMacro?"rgba(56,189,248,0.5)":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"5px 10px",color:selectedTee===idMacro?"#38bdf8":"#5a9a7a",fontSize:11,cursor:"pointer"}}>
+                  🔗 {el.nombre}
+                </button>
+              );
+            })}
           </div>
-          {(()=>{
+          {String(selectedTee).startsWith("macro_")?(()=>{
+            const elMacro = getElementosMacroPorCategoria("tee").find(el=>"macro_"+el.id===selectedTee);
+            if(!elMacro) return <div style={{...S.card,padding:20,textAlign:"center",color:"#5a9a7a"}}>Elemento no encontrado.</div>;
+            const abierta = historialZonaAbierta===selectedTee;
+            return (
+              <div>
+                <div style={{...S.card,padding:14,marginBottom:12,borderLeft:"3px solid rgba(56,189,248,0.4)"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700}}>{elMacro.nombre}</div>
+                    <div style={{display:"flex",gap:8}}>
+                      <button onClick={()=>setHistorialZonaAbierta(abierta?null:selectedTee)}
+                        style={{...S.btn,fontSize:11,padding:"6px 12px",background:abierta?"rgba(167,139,250,0.2)":"rgba(167,139,250,0.1)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.35)"}}>
+                        📜 Historial del elemento
+                      </button>
+                      <button className="btn-p" style={S.btn} onClick={()=>{setTareaForm({...emptyTarea,descripcion:elMacro.nombre,responsable:configSemanal?.corte_golf||"Osmar Bhalú Armijo Zúñiga",target:"zona",targetId:elMacro.id});setShowTareaForm("zona");}}>📋 Nueva tarea</button>
+                    </div>
+                  </div>
+                </div>
+                {abierta&&<HistorialElementoGolf S={S} nombreElemento={elMacro.nombre} tareasProg={tareasProg} aplicaciones={aplicaciones}/>}
+                {renderFormZonaInline(elMacro.id)}
+              </div>
+            );
+          })():(()=>{
             const tee=TEES_DEF.find(x=>x.id===selectedTee);
             const tareasT=(golfData.tareasTee||[]).filter(t=>t.teeId===selectedTee);
             return (
@@ -15088,7 +15258,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           titulo="🏖️ Búnkers" colorAcento="#fde68a"
           golfData={golfData} setG={setG} listaPersonal={listaPersonal}
           setTareasProg={setTareasProg} sincronizarMacrozona={sincronizarMacrozona}
-          tareasProgTodas={tareasProg} aplicaciones={aplicaciones} getAllElems={getAllElems}/>
+          tareasProgTodas={tareasProg} aplicaciones={aplicaciones} getAllElems={getAllElems}
+          elementosExtra={getElementosMacroPorCategoria("bunker").filter(el=>!BUNKERS_DEF.some(b=>normPG(b.nombre)===normPG(el.nombre)))}/>
       )}
 
       {/* ── FAIRWAYS ── */}
@@ -15097,58 +15268,12 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           titulo="🌾 Fairways" colorAcento="#a3e635"
           golfData={golfData} setG={setG} listaPersonal={listaPersonal}
           setTareasProg={setTareasProg} sincronizarMacrozona={sincronizarMacrozona}
-          tareasProgTodas={tareasProg} aplicaciones={aplicaciones} getAllElems={getAllElems}/>
+          tareasProgTodas={tareasProg} aplicaciones={aplicaciones} getAllElems={getAllElems}
+          elementosExtra={getElementosMacroPorCategoria("fairway").filter(el=>!FAIRWAYS_DEF.some(f=>normPG(f.nombre)===normPG(el.nombre)))}/>
       )}
 
       {/* ── ZONAS ESPECIALES ── */}
       {subTab==="zonas"&&rolLogueado!=="trabajador"&&(()=>{
-        // Formulario "Nueva tarea" — se dibuja inline, justo debajo de la fila del ítem que se tocó
-        // (antes vivía una sola vez al final de toda la página, y por eso no se veía sin bajar mucho).
-        const renderFormZonaInline = (itemId) => {
-          if(showTareaForm!=="zona" || tareaForm.targetId!==itemId) return null;
-          return (
-            <div style={{...S.card,padding:16,marginTop:10}} className="ein">
-              <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#34d399",marginBottom:12}}>📋 Nueva tarea — {tareaForm.descripcion}</div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-                <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={tareaForm.fecha} onChange={e=>setTareaForm(p=>({...p,fecha:e.target.value}))}/></div>
-                <SelectorResponsableGolf/>
-                <div><label style={labelSt}>Tarea</label>
-                  <select style={S.input} value={tareaForm.tipo} onChange={e=>setTareaForm(p=>({...p,tipo:e.target.value}))}>
-                    <option value="">Seleccionar...</option>
-                    {TAREAS_LOMAS.concat(TAREAS_MACIZOS).concat(TAREAS_EDIFICIO).filter((v,i,a)=>a.indexOf(v)===i).map(t=><option key={t}>{t}</option>)}
-                    <option value="Otra">Otra...</option>
-                  </select>
-                  {tareaForm.tipo==="Otra"&&(
-                    <input style={{...S.input,marginTop:6}} value={tareaForm.tipoCustom||""} autoFocus
-                      onChange={e=>setTareaForm(p=>({...p,tipoCustom:e.target.value}))}
-                      placeholder="Escribe el nombre de la tarea..."/>
-                  )}
-                </div>
-                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Descripción</label><input style={S.input} value={tareaForm.obs} onChange={e=>setTareaForm(p=>({...p,obs:e.target.value}))}/></div>
-              </div>
-              <div style={{display:"flex",gap:8}}>
-                <button className="btn-p" style={S.btn} onClick={()=>{
-                  if(!tareaForm.tipo) return;
-                  const nombreTareaZE = tareaForm.tipo==="Otra" ? (tareaForm.tipoCustom||"").trim() : tareaForm.tipo;
-                  if(tareaForm.tipo==="Otra"&&!nombreTareaZE){ alert("Escribe el nombre de la tarea en el cuadro que aparece debajo de \"Otra...\"."); return; }
-                  const respsZE = responsablesParaGuardarGolf();
-                  if(modoVariosJardinerosGolf&&respsZE.length===0){ alert("Elige al menos un jardinero."); return; }
-                  const loteIdZE = "lote_"+Date.now()+"_"+Math.random().toString(36).slice(2);
-                  const nuevasZE = respsZE.map(resp=>({
-                    id:Date.now()+Math.random(),fecha:tareaForm.fecha,zona:"Golf",elemento:getElementoCanonico(tareaForm.descripcion),
-                    tarea:`⛳ ${nombreTareaZE} — ${tareaForm.descripcion}`,
-                    responsable:resp,
-                    estado:resp?"pendiente":"por_designar",
-                    notas:tareaForm.obs||"",auto:false,loteTodosId:loteIdZE,
-                  }));
-                  setTareasProg(p=>({...p,[tareaForm.fecha]:[...(p[tareaForm.fecha]||[]),...nuevasZE]}));
-                  setShowTareaForm(null);setTareaForm(emptyTarea);resetModoVariosJardinerosGolf();
-                }}>✓ Enviar al programa</button>
-                <button className="btn-g" style={S.btn} onClick={()=>setShowTareaForm(null)}>Cancelar</button>
-              </div>
-            </div>
-          );
-        };
         return (
         <div className="ein">
           <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:18,marginBottom:16,color:"#34d399"}}>🌿 Zonas Especiales Golf</h2>
@@ -15232,6 +15357,10 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             </div>
             );
           })}
+
+          {/* Otros elementos configurados en Macrozonas (zona Golf) que no están en las listas fijas de arriba
+              — ej. si en Macrozonas hay 10 "Ante-green" individuales pero aquí solo existía uno genérico. */}
+          {renderSeccionElementosExtra("otro", [...ZONAS_GOLF_EXTRA,...PLANTAS_GOLF,...EDIFICIO_GOLF].map(x=>x.nombre))}
 
           {/* El formulario "Nueva tarea" ahora aparece inline, justo debajo de la fila que se tocó — ver renderFormZonaInline */}
         </div>
