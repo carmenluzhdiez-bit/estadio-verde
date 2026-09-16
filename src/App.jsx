@@ -2392,8 +2392,12 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                         const yaExistenRp = tareasDestinoRp.map(t=>t.zona+"_"+t.tarea);
                         const nuevasRp = pendientesRp
                           .filter(t=>!yaExistenRp.includes(t.zona+"_"+t.tarea))
-                          .map(t=>({...t, id:Date.now()+Math.random(), fecha:destinoElegido, estado:"pendiente",
-                            notas:(t.notas?t.notas+" | ":"")+(normalizarEstado(t.estado)==="no_pudo"?"Reprogramada (no se pudo) desde ":"Reprogramada desde ")+dia+(t.notaWorker?" — Obs. anterior: "+t.notaWorker:"")}));
+                          .map(t=>{
+                            const estOriginalRp = normalizarEstado(t.estado);
+                            const estNuevoRp = estOriginalRp==="en_curso" ? "en_curso" : "pendiente";
+                            return {...t, id:Date.now()+Math.random(), fecha:destinoElegido, estado:estNuevoRp,
+                              notas:(t.notas?t.notas+" | ":"")+(estOriginalRp==="no_pudo"?"Reprogramada (no se pudo) desde ":estOriginalRp==="en_curso"?"Continúa (estaba en curso) desde ":"Reprogramada desde ")+dia+(t.notaWorker?" — Obs. anterior: "+t.notaWorker:"")};
+                          });
                         if(nuevasRp.length===0) return alert("Todas las tareas pendientes ya existen para "+destinoElegido+".");
                         setTareas(prev=>({...prev,[destinoElegido]:[...normArrRp(prev[destinoElegido]||[]), ...nuevasRp]}));
                         alert(`✅ ${nuevasRp.length} tarea(s) pendientes reprogramadas para ${destinoElegido}`);
@@ -4850,8 +4854,14 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                   const yaExisten = tareasDestino.map(t=>t.zona+"_"+t.tarea);
                   const nuevas = pendientes
                     .filter(t=>!yaExisten.includes(t.zona+"_"+t.tarea))
-                    .map(t=>({...t, id:Date.now()+Math.random(), fecha:destinoElegido, estado:"pendiente",
-                      notas:(t.notas?t.notas+" | ":"")+(normalizarEstado(t.estado)==="no_pudo"?"Reprogramada (no se pudo) desde ":"Reprogramada desde ")+fecha+(t.notaWorker?" — Obs. anterior: "+t.notaWorker:"")}));
+                    .map(t=>{
+                      const estOriginal = normalizarEstado(t.estado);
+                      // Si estaba "en curso", se mantiene en curso (y con el mismo responsable) —
+                      // solo las pendientes o "no se pudo" vuelven a quedar como pendiente.
+                      const estNuevo = estOriginal==="en_curso" ? "en_curso" : "pendiente";
+                      return {...t, id:Date.now()+Math.random(), fecha:destinoElegido, estado:estNuevo,
+                        notas:(t.notas?t.notas+" | ":"")+(estOriginal==="no_pudo"?"Reprogramada (no se pudo) desde ":estOriginal==="en_curso"?"Continúa (estaba en curso) desde ":"Reprogramada desde ")+fecha+(t.notaWorker?" — Obs. anterior: "+t.notaWorker:"")};
+                    });
                   if(nuevas.length===0) return alert("Todas las tareas pendientes ya existen para "+destinoElegido+".");
                   setTareasDelDia(destinoElegido, [...normArr(tareas[destinoElegido]||[]), ...nuevas]);
                   alert(`✅ ${nuevas.length} tarea(s) pendientes reprogramadas para ${destinoElegido}`);
