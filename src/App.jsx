@@ -247,21 +247,24 @@ const aplicarCambioFrecuencia = (tareaVieja, patch, getElemFrecs, setElemFrecs) 
   const eraCompletada = estViejo==="hecha"||estViejo==="completada";
   const esCompletada = estNuevo==="hecha"||estNuevo==="completada";
   if(!eraCompletada && esCompletada){
+    // Usar la fecha real de HOY (cuando se marca), no tareaVieja.fecha — que puede ser un día atrasado
+    // que ya pasó, y dejaría el ciclo de la frecuencia arrancando desde ese día viejo en vez de hoy.
+    const hoyFrec = fechaLocal();
     const frecsActuales = getElemFrecs(tareaVieja.origenZid, tareaVieja.origenEid, null, tareaVieja.origenEsCustom);
     const frecActual = frecsActuales.find(f=>f.id===tareaVieja.origenFrecId);
     const valorPrevio = frecActual?.ultimaVez ?? null;
-    const frecsActualizadas = frecsActuales.map(f => f.id===tareaVieja.origenFrecId ? {...f, ultimaVez: tareaVieja.fecha, proximaFechaManual:""} : f);
+    const frecsActualizadas = frecsActuales.map(f => f.id===tareaVieja.origenFrecId ? {...f, ultimaVez: hoyFrec, proximaFechaManual:""} : f);
     setElemFrecs(tareaVieja.origenZid, tareaVieja.origenEid, tareaVieja.origenEsCustom, frecsActualizadas);
-    return {...patch, ultimaVezPrevia: valorPrevio};
+    return {...patch, ultimaVezPrevia: valorPrevio, ultimaVezAplicada: hoyFrec};
   }
   if(eraCompletada && !esCompletada){
     const frecsActuales = getElemFrecs(tareaVieja.origenZid, tareaVieja.origenEid, null, tareaVieja.origenEsCustom);
     const frecActual = frecsActuales.find(f=>f.id===tareaVieja.origenFrecId);
-    if(frecActual && frecActual.ultimaVez===tareaVieja.fecha){
+    if(frecActual && frecActual.ultimaVez===(tareaVieja.ultimaVezAplicada||tareaVieja.fecha)){
       const frecsActualizadas = frecsActuales.map(f=>f.id===tareaVieja.origenFrecId ? {...f, ultimaVez: tareaVieja.ultimaVezPrevia||f.ultimaVez} : f);
       setElemFrecs(tareaVieja.origenZid, tareaVieja.origenEid, tareaVieja.origenEsCustom, frecsActualizadas);
     }
-    return {...patch, ultimaVezPrevia: null};
+    return {...patch, ultimaVezPrevia: null, ultimaVezAplicada: null};
   }
   return patch;
 };
