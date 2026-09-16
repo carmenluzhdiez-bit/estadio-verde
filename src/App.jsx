@@ -5296,6 +5296,12 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
             </div>
           )}
 
+          {tareasHoy.length>0&&(
+            <div style={{fontSize:12,fontWeight:700,color:"#93c5fd",marginBottom:10,padding:"6px 12px",background:"rgba(96,165,250,0.08)",border:"1px solid rgba(96,165,250,0.25)",borderRadius:8,display:"inline-block"}}>
+              📅 Mostrando tareas de: {new Date(fecha+"T12:00:00").toLocaleDateString("es-CL",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}
+            </div>
+          )}
+
           {Object.entries(porZona).sort(([a],[b])=>a.localeCompare(b,"es")).map(([zona,tz])=>(
             <ZonaRow key={zona} zona={zona} tz={tz}
               zonasColapsadas={zonasColapsadas}
