@@ -4548,7 +4548,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     const tareasDia = getTareasDelDia(fecha);
     const tarea = tareasDia.find(t=>t.id===id);
     if(!tarea) return;
-    const listaTodos = Array.isArray(personal)?personal:Object.values(personal||{});
+    const listaTodos = (Array.isArray(personal)?personal:Object.values(personal||{})).filter(p=>!(p.cargo||"").toLowerCase().includes("jefa"));
     if(listaTodos.length===0) return;
     const loteId = "lote_"+Date.now()+"_"+Math.random().toString(36).slice(2);
     const copias = listaTodos.map(p=>({...tarea, id:Date.now()+Math.random(), responsable:p.nombre, estado:"pendiente", loteTodosId:loteId}));
@@ -4938,7 +4938,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                                   </div>
                                   <select value={p.responsable||""} onChange={e=>{
                                       if(e.target.value==="__todos__"){
-                                        const listaTodosProp = Array.isArray(personal)?personal:Object.values(personal||{});
+                                        const listaTodosProp = (Array.isArray(personal)?personal:Object.values(personal||{})).filter(p=>!(p.cargo||"").toLowerCase().includes("jefa"));
                                         setPreviewProp(prev=>{
                                           const sinEsta = prev.filter((x,xi)=>xi!==iRealProp);
                                           const loteId = "lote_"+Date.now()+"_"+Math.random().toString(36).slice(2);
@@ -16117,7 +16117,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                                   </div>
                                   <select value={p.responsable||""} onClick={e=>e.stopPropagation()} onChange={e=>{
                                       if(e.target.value==="__todos__"){
-                                        const listaTodosGolf = Array.isArray(personal)?personal:Object.values(personal||{});
+                                        const listaTodosGolf = (Array.isArray(personal)?personal:Object.values(personal||{})).filter(p=>!(p.cargo||"").toLowerCase().includes("jefa"));
                                         setPreviewGolfProp(prev=>{
                                           const sinEsta = prev.filter((x,xi)=>xi!==iReal);
                                           const loteId = "lote_"+Date.now()+"_"+Math.random().toString(36).slice(2);
