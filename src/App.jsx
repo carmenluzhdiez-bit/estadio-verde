@@ -24727,7 +24727,7 @@ export default function App() {
               <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:26,fontWeight:900,marginBottom:3}}>Panel General</h1>
               <p style={{color:"#6aaa7a",fontSize:15}}>Estado global de las {stats.total} macrozonas</p>
             </div>
-            {(()=>{
+            {(fbRol==="jefa"||fbRol==="supervisor"||fbRol==="programador")&&(()=>{
               const hoyPG = fechaLocal();
               const normArrPG = v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
               const pendientesAnteriores = [];
@@ -24751,7 +24751,7 @@ export default function App() {
                   <div style={{fontSize:12,color:"#c0a06a",marginBottom:10}}>
                     Quedaron pendientes/sin cerrar en días ya pasados — revísalas en Historial antes de que se acumulen.
                   </div>
-                  <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:180,overflowY:"auto"}}>
+                  <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:180,overflowY:"auto",marginBottom:12}}>
                     {fechasOrdenadas.map(fk=>(
                       <div key={fk} style={{fontSize:12,color:"#e0c080"}}>
                         <b>{new Date(fk+"T12:00:00").toLocaleDateString("es-CL",{weekday:"long",day:"numeric",month:"short"})}</b>
@@ -24759,6 +24759,32 @@ export default function App() {
                       </div>
                     ))}
                   </div>
+                  {(fbRol==="jefa"||fbRol==="programador")&&(
+                    <div style={{borderTop:"1px solid rgba(245,158,11,0.2)",paddingTop:10,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                      <span style={{fontSize:11,color:"#c0a06a"}}>Eliminar todo lo pendiente anterior a:</span>
+                      <input type="date" id="limpiarFechaCorte" defaultValue={hoyPG}
+                        style={{...S.input,fontSize:11,padding:"4px 8px",maxWidth:160}}/>
+                      <button onClick={()=>{
+                        const fechaCorte = document.getElementById("limpiarFechaCorte").value;
+                        if(!fechaCorte) return;
+                        const aEliminar = pendientesAnteriores.filter(t=>t.fecha<fechaCorte);
+                        if(aEliminar.length===0){ alert("No hay tareas pendientes antes de esa fecha."); return; }
+                        if(!window.confirm(`¿Eliminar ${aEliminar.length} tarea(s) pendiente(s) de días anteriores al ${fechaCorte}?\n\nEsta acción no se puede deshacer.`)) return;
+                        setTareasProg(prev=>{
+                          const nuevo={...prev};
+                          Object.keys(nuevo).forEach(fk=>{
+                            if(fk>=fechaCorte) return;
+                            const arr = normArrPG(nuevo[fk]);
+                            nuevo[fk] = arr.filter(t=>["hecha","completada","cancelada"].includes(t.estado));
+                          });
+                          return nuevo;
+                        });
+                        alert(`✅ ${aEliminar.length} tarea(s) eliminada(s).`);
+                      }} style={{...S.btn,fontSize:11,padding:"5px 14px",background:"rgba(239,68,68,0.12)",color:"#f87171",border:"1px solid rgba(239,68,68,0.3)"}}>
+                        🗑️ Eliminar
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })()}
