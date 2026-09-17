@@ -61,16 +61,26 @@ function useFirebaseState(path, defaultValue) {
   const pendingRef = useRef(false); // hay una escritura pendiente
 
   useEffect(() => {
-    const fbRef = ref(db, fullPath);
-    const unsub = onValue(fbRef, (snap) => {
-      if (pendingRef.current) return; // ignorar actualizaciones mientras escribimos
-      const snapV = snap.val();
-      const newVal = snapV !== null && snapV !== undefined ? snapV : defaultValue;
-      valueRef.current = newVal;
-      setValueLocal(newVal);
-      setReady(true);
+    // Esperar a que la autenticación (anónima o con email) esté realmente establecida antes
+    // de suscribirse — si nos suscribimos antes de tener auth, Firebase puede rechazar la
+    // lectura por permisos y quedarse pegado sin datos hasta que algo más "despierte" la
+    // conexión (ej. otro usuario escribiendo). Esto afectaba sobre todo a Supervisor, que
+    // inicia sesión anónima recién al apretar "Entrar" con su PIN.
+    let unsubValue = null;
+    const unsubAuth = onAuthStateChanged(auth, (user) => {
+      if(!user) return; // aún no hay sesión (ni anónima ni con email) — no suscribirse todavía
+      if(unsubValue) return; // ya suscrito, no duplicar
+      const fbRef = ref(db, fullPath);
+      unsubValue = onValue(fbRef, (snap) => {
+        if (pendingRef.current) return; // ignorar actualizaciones mientras escribimos
+        const snapV = snap.val();
+        const newVal = snapV !== null && snapV !== undefined ? snapV : defaultValue;
+        valueRef.current = newVal;
+        setValueLocal(newVal);
+        setReady(true);
+      });
     });
-    return () => unsub();
+    return () => { unsubAuth(); if(unsubValue) unsubValue(); };
   }, [fullPath]);
 
   const setValue = (newVal) => {
@@ -24258,7 +24268,7 @@ export default function App() {
                   👤 Jardinero / Supervisor
                 </button>
                 <button onClick={()=>setModoLogin("admin")} style={{flex:1,padding:"8px",borderRadius:8,border:`1px solid ${modoLogin==="admin"?"rgba(167,139,250,0.4)":"rgba(255,255,255,0.1)"}`,background:modoLogin==="admin"?"rgba(167,139,250,0.1)":"transparent",color:modoLogin==="admin"?"#a78bfa":"#6aaa7a",fontSize:12,cursor:"pointer",fontFamily:"'Georgia',serif"}}>
-                  🔐 Supervisor / Jefa / Gerencia / Programador
+                  🔐 Jefa / Gerencia / Programador
                 </button>
               </div>
 
@@ -24336,6 +24346,9 @@ export default function App() {
               {/* Modo admin: email + contraseña */}
               {modoLogin==="admin"&&(
                 <div style={{display:"flex",flexDirection:"column",gap:14}}>
+                  <div style={{fontSize:11,color:"#93c5fd",background:"rgba(147,197,253,0.08)",border:"1px solid rgba(147,197,253,0.25)",borderRadius:8,padding:"8px 12px"}}>
+                    👷 ¿Eres Supervisor? Entra por la pestaña "👤 Jardinero / Supervisor" con tu nombre y PIN — no por aquí.
+                  </div>
                   <div>
                     <label style={{fontSize:11,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:6,textTransform:"uppercase"}}>Correo electrónico</label>
                     <input type="email" autoComplete="email" style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"12px 14px",color:"#ede9e0",fontSize:14,outline:"none"}}
