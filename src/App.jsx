@@ -3594,6 +3594,9 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                           onChange={e=>setRutinasGolfState(p=>({...p,fito_obs:e.target.value}))}
                           style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(167,139,250,0.3)",borderRadius:6,color:"#ede9e0",padding:"5px 8px",fontSize:11,boxSizing:"border-box"}}/>
                         {rutinasGolfState.fito_obs?.trim()&&rutinasGolfState.fito_obs.toLowerCase()!=="sin novedad"&&(
+                          rutinasGolfState["fito_obs_alertaEnviada"]?(
+                            <div style={{marginTop:6,fontSize:11,color:"#4ade80",fontWeight:600}}>✅ Alerta enviada a la jefa</div>
+                          ):(
                           <button onClick={()=>{
                             onCrearAlertaCompleta({
                               obs: rutinasGolfState.fito_obs,
@@ -3601,10 +3604,11 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                               fecha: fechaVer,
                               zona: "Golf",
                             });
-                            alert("⚠️ Alerta fitosanitaria generada y enviada a la jefa.");
+                            setRutinasGolfState(p=>({...p,fito_obs_alertaEnviada:true}));
                           }} style={{marginTop:6,fontSize:11,padding:"3px 10px",borderRadius:5,border:"1px solid rgba(239,68,68,0.4)",background:"rgba(239,68,68,0.1)",color:"#fca5a5",cursor:"pointer"}}>
                             🚨 Generar alerta fitosanitaria
                           </button>
+                          )
                         )}
                       </div>
                     )}
@@ -3736,6 +3740,9 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                               style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(167,139,250,0.3)",borderRadius:6,color:"#ede9e0",padding:"6px 10px",fontSize:12,fontFamily:"'Georgia',serif",boxSizing:"border-box"}}/>
                             <div style={{fontSize:10,color:"#7a6a9a",marginTop:3}}>Si hay novedad, se generará una alerta fitosanitaria automáticamente.</div>
                             {t.notaFito?.trim()&&t.notaFito.toLowerCase()!=="sin novedad"&&(
+                              t.alertaFitoEnviada?(
+                                <div style={{marginTop:6,fontSize:11,color:"#4ade80",fontWeight:600}}>✅ Alerta enviada a la jefa</div>
+                              ):(
                               <button onClick={()=>{
                                 onCrearAlertaCompleta({
                                   obs: t.notaFito,
@@ -3743,10 +3750,11 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                                   fecha: fechaVer,
                                   zona: "Golf",
                                 });
-                                alert("⚠️ Alerta fitosanitaria generada y enviada a la jefa.");
+                                onUpdateTarea(fechaVer,t.id,{alertaFitoEnviada:true});
                               }} style={{marginTop:6,fontSize:11,padding:"4px 12px",borderRadius:6,border:"1px solid rgba(239,68,68,0.4)",background:"rgba(239,68,68,0.1)",color:"#fca5a5",cursor:"pointer"}}>
                                 🚨 Generar alerta fitosanitaria
                               </button>
+                              )
                             )}
                           </div>
                         )}
