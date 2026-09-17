@@ -1932,6 +1932,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
   const [diasAbiertosHist, setDiasAbiertosHist] = React.useState({});
   const [gruposHistAbiertos, setGruposHistAbiertos] = React.useState({}); // {"dia__nombreTarea": bool}
   const [fechaReprogramarHist, setFechaReprogramarHist] = React.useState({}); // {dia: fechaDestino}
+  const [previewReprogramarHist, setPreviewReprogramarHist] = React.useState(null); // {dia, destino, tareas:[{...t,seleccionada}]}
   const [filtroDia,    setFiltroDia]    = React.useState("");
   const [filtroEstado, setFiltroEstado] = React.useState("todos");
   const [filtroTarea,  setFiltroTarea]  = React.useState("");
@@ -2400,20 +2401,51 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                         if(destinoElegido===dia) return alert("Elige una fecha destino distinta a la fecha de origen.");
                         const tareasDestinoRp = normArrRp(tareas[destinoElegido]||[]);
                         const yaExistenRp = tareasDestinoRp.map(t=>t.zona+"_"+t.tarea);
-                        const nuevasRp = pendientesRp
-                          .filter(t=>!yaExistenRp.includes(t.zona+"_"+t.tarea))
-                          .map(t=>{
-                            const estOriginalRp = normalizarEstado(t.estado);
-                            const estNuevoRp = estOriginalRp==="en_curso" ? "en_curso" : "pendiente";
-                            return {...t, id:Date.now()+Math.random(), fecha:destinoElegido, estado:estNuevoRp,
-                              notas:(t.notas?t.notas+" | ":"")+(estOriginalRp==="no_pudo"?"Reprogramada (no se pudo) desde ":estOriginalRp==="en_curso"?"Continúa (estaba en curso) desde ":"Reprogramada desde ")+dia+(t.notaWorker?" — Obs. anterior: "+t.notaWorker:"")};
-                          });
-                        if(nuevasRp.length===0) return alert("Todas las tareas pendientes ya existen para "+destinoElegido+".");
-                        setTareas(prev=>({...prev,[destinoElegido]:[...normArrRp(prev[destinoElegido]||[]), ...nuevasRp]}));
-                        alert(`✅ ${nuevasRp.length} tarea(s) pendientes reprogramadas para ${destinoElegido}`);
+                        const candidatasRp = pendientesRp.filter(t=>!yaExistenRp.includes(t.zona+"_"+t.tarea));
+                        if(candidatasRp.length===0) return alert("Todas las tareas pendientes ya existen para "+destinoElegido+".");
+                        setPreviewReprogramarHist({dia, destino:destinoElegido, tareas:candidatasRp.map(t=>({...t,seleccionada:true}))});
                       }} style={{...S.btn,padding:"5px 12px",fontSize:12,background:"rgba(251,191,36,0.12)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.25)"}}>
                         📅 Reprogramar pendientes
                       </button>
+                      {previewReprogramarHist&&previewReprogramarHist.dia===dia&&(
+                        <div onClick={e=>e.stopPropagation()} style={{...S.card,padding:14,marginTop:8,border:"1px solid rgba(251,191,36,0.35)",width:"100%"}}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,flexWrap:"wrap",gap:6}}>
+                            <div style={{fontSize:13,fontWeight:700,color:"#fbbf24"}}>📅 Elige qué reprogramar → {previewReprogramarHist.destino}</div>
+                            <div style={{display:"flex",gap:6}}>
+                              <button onClick={()=>setPreviewReprogramarHist(p=>({...p,tareas:p.tareas.map(t=>({...t,seleccionada:true}))}))} style={{...S.btn,fontSize:10,padding:"3px 8px"}}>Marcar todas</button>
+                              <button onClick={()=>setPreviewReprogramarHist(p=>({...p,tareas:p.tareas.map(t=>({...t,seleccionada:false}))}))} style={{...S.btn,fontSize:10,padding:"3px 8px"}}>Desmarcar todas</button>
+                            </div>
+                          </div>
+                          <div style={{fontSize:10,color:"#c0a06a",marginBottom:8}}>Destilda las que ya asignaste aparte o quieras dejar pendientes en {dia}.</div>
+                          <div style={{display:"flex",flexDirection:"column",gap:3,maxHeight:280,overflowY:"auto",marginBottom:10}}>
+                            {previewReprogramarHist.tareas.map((t,i)=>(
+                              <label key={t.id} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 6px",background:t.seleccionada?"rgba(251,191,36,0.06)":"transparent",borderRadius:5,cursor:"pointer"}}>
+                                <input type="checkbox" checked={t.seleccionada} onChange={()=>setPreviewReprogramarHist(p=>({...p,tareas:p.tareas.map((x,xi)=>xi===i?{...x,seleccionada:!x.seleccionada}:x)}))}/>
+                                <span style={{fontSize:11,flex:1}}>{t.zona} — {t.tarea}</span>
+                                <span style={{fontSize:10,color:"#5a9a7a"}}>{t.responsable||"Sin asignar"}</span>
+                              </label>
+                            ))}
+                          </div>
+                          <div style={{display:"flex",gap:8}}>
+                            <button className="btn-p" style={{...S.btn,fontSize:11,padding:"5px 12px"}} onClick={()=>{
+                              const normArrRp2 = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+                              const seleccionadasRp = previewReprogramarHist.tareas.filter(t=>t.seleccionada);
+                              if(seleccionadasRp.length===0){ alert("No marcaste ninguna tarea."); return; }
+                              const nuevasRp = seleccionadasRp.map(t=>{
+                                const estOriginalRp = normalizarEstado(t.estado);
+                                const estNuevoRp = estOriginalRp==="en_curso" ? "en_curso" : "pendiente";
+                                const {seleccionada, ...tSinFlag} = t;
+                                return {...tSinFlag, id:Date.now()+Math.random(), fecha:previewReprogramarHist.destino, estado:estNuevoRp,
+                                  notas:(t.notas?t.notas+" | ":"")+(estOriginalRp==="no_pudo"?"Reprogramada (no se pudo) desde ":estOriginalRp==="en_curso"?"Continúa (estaba en curso) desde ":"Reprogramada desde ")+dia+(t.notaWorker?" — Obs. anterior: "+t.notaWorker:"")};
+                              });
+                              setTareas(prev=>({...prev,[previewReprogramarHist.destino]:[...normArrRp2(prev[previewReprogramarHist.destino]||[]), ...nuevasRp]}));
+                              setPreviewReprogramarHist(null);
+                              alert(`✅ ${nuevasRp.length} tarea(s) reprogramadas para ${previewReprogramarHist.destino}`);
+                            }}>✓ Confirmar ({previewReprogramarHist.tareas.filter(t=>t.seleccionada).length})</button>
+                            <button className="btn-g" style={{...S.btn,fontSize:11,padding:"5px 12px"}} onClick={()=>setPreviewReprogramarHist(null)}>Cancelar</button>
+                          </div>
+                        </div>
+                      )}
                     </>
                   );
                 })()}
@@ -4575,6 +4607,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
   const deleteTarea = (id) => setTareasDelDia(fecha, getTareasDelDia(fecha).filter(t => t.id!==id));
 
   const [previewProp, setPreviewProp] = React.useState(null);
+  const [previewReprogramar, setPreviewReprogramar] = React.useState(null); // [{...tarea, seleccionada:true}]
   const [buscarPreviewProp, setBuscarPreviewProp] = React.useState("");
   const [gruposPreviewPropAbiertos, setGruposPreviewPropAbiertos] = React.useState({});
   const proponerTareas = () => {
@@ -4857,7 +4890,6 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                   // Obtener TODAS las tareas del día normalizando el array
                   const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
                   const todasHoy = normArr(tareas[fecha]||[]);
-                  console.log("Reprogramar: fecha="+fecha+" destino="+destinoElegido+" total="+todasHoy.length, todasHoy.map(t=>t.tarea+"→"+t.estado));
                   // Incluye "no se pudo" además de pendiente/haciéndose/etc — solo excluye lo ya "hecha".
                   // Excluye Golf: tiene su propio sistema de arrastre dentro de "Proponer para esta fecha".
                   const pendientes = todasHoy.filter(t=>{
@@ -4865,24 +4897,13 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                     const esGolfRp = t.zona==="Golf"||(t.zona||"").includes("Golf");
                     return est!=="hecha" && !esGolfRp;
                   });
-                  console.log("Pendientes (incl. no se pudo, sin Golf):", pendientes.length);
                   if(pendientes.length===0) return alert("No hay tareas pendientes para reprogramar (Golf no se incluye — usa \"Proponer para esta fecha\" en Golf).");
                   if(destinoElegido===fecha) return alert("Elige una fecha destino distinta a la fecha de origen.");
                   const tareasDestino = normArr(tareas[destinoElegido]||[]);
                   const yaExisten = tareasDestino.map(t=>t.zona+"_"+t.tarea);
-                  const nuevas = pendientes
-                    .filter(t=>!yaExisten.includes(t.zona+"_"+t.tarea))
-                    .map(t=>{
-                      const estOriginal = normalizarEstado(t.estado);
-                      // Si estaba "en curso", se mantiene en curso (y con el mismo responsable) —
-                      // solo las pendientes o "no se pudo" vuelven a quedar como pendiente.
-                      const estNuevo = estOriginal==="en_curso" ? "en_curso" : "pendiente";
-                      return {...t, id:Date.now()+Math.random(), fecha:destinoElegido, estado:estNuevo,
-                        notas:(t.notas?t.notas+" | ":"")+(estOriginal==="no_pudo"?"Reprogramada (no se pudo) desde ":estOriginal==="en_curso"?"Continúa (estaba en curso) desde ":"Reprogramada desde ")+fecha+(t.notaWorker?" — Obs. anterior: "+t.notaWorker:"")};
-                    });
-                  if(nuevas.length===0) return alert("Todas las tareas pendientes ya existen para "+destinoElegido+".");
-                  setTareasDelDia(destinoElegido, [...normArr(tareas[destinoElegido]||[]), ...nuevas]);
-                  alert(`✅ ${nuevas.length} tarea(s) pendientes reprogramadas para ${destinoElegido}`);
+                  const candidatas = pendientes.filter(t=>!yaExisten.includes(t.zona+"_"+t.tarea));
+                  if(candidatas.length===0) return alert("Todas las tareas pendientes ya existen para "+destinoElegido+".");
+                  setPreviewReprogramar(candidatas.map(t=>({...t, seleccionada:true})));
                 }} style={{...S.btn,background:"rgba(251,191,36,0.1)",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.2)",fontSize:11}}>
                   📅 Reprogramar pendientes
                 </button>
@@ -4890,6 +4911,53 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
               );
             })()}
           </div>
+
+          {previewReprogramar&&(
+            <div style={{...S.card,padding:16,marginBottom:16,border:"1px solid rgba(251,191,36,0.35)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:8}}>
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,color:"#fbbf24"}}>
+                  📅 Elige qué reprogramar de {fecha} → {destinoElegido}
+                </div>
+                <div style={{display:"flex",gap:6}}>
+                  <button onClick={()=>setPreviewReprogramar(p=>p.map(t=>({...t,seleccionada:true})))} style={{...S.btn,fontSize:11,padding:"4px 10px"}}>Marcar todas</button>
+                  <button onClick={()=>setPreviewReprogramar(p=>p.map(t=>({...t,seleccionada:false})))} style={{...S.btn,fontSize:11,padding:"4px 10px"}}>Desmarcar todas</button>
+                </div>
+              </div>
+              <div style={{fontSize:11,color:"#c0a06a",marginBottom:10}}>
+                Destilda las que quieras dejar pendientes en {fecha} (ej. porque ya las asignaste aparte a alguien) — solo se copian las marcadas.
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:320,overflowY:"auto",marginBottom:12}}>
+                {previewReprogramar.map((t,i)=>(
+                  <label key={t.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",background:t.seleccionada?"rgba(251,191,36,0.06)":"transparent",borderRadius:6,cursor:"pointer"}}>
+                    <input type="checkbox" checked={t.seleccionada} onChange={()=>setPreviewReprogramar(p=>p.map((x,xi)=>xi===i?{...x,seleccionada:!x.seleccionada}:x))}/>
+                    <span style={{fontSize:12,flex:1}}>{t.zona} — {t.tarea}</span>
+                    <span style={{fontSize:11,color:"#5a9a7a"}}>{t.responsable||"Sin asignar"}</span>
+                    <span style={{fontSize:10,color:normalizarEstado(t.estado)==="no_pudo"?"#f87171":normalizarEstado(t.estado)==="en_curso"?"#60a5fa":"#94a3b8"}}>
+                      {normalizarEstado(t.estado)==="no_pudo"?"No se pudo":normalizarEstado(t.estado)==="en_curso"?"En curso":"Pendiente"}
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button className="btn-p" style={S.btn} onClick={()=>{
+                  const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+                  const seleccionadas = previewReprogramar.filter(t=>t.seleccionada);
+                  if(seleccionadas.length===0){ alert("No marcaste ninguna tarea."); return; }
+                  const nuevas = seleccionadas.map(t=>{
+                    const estOriginal = normalizarEstado(t.estado);
+                    const estNuevo = estOriginal==="en_curso" ? "en_curso" : "pendiente";
+                    const {seleccionada, ...tSinFlag} = t;
+                    return {...tSinFlag, id:Date.now()+Math.random(), fecha:destinoElegido, estado:estNuevo,
+                      notas:(t.notas?t.notas+" | ":"")+(estOriginal==="no_pudo"?"Reprogramada (no se pudo) desde ":estOriginal==="en_curso"?"Continúa (estaba en curso) desde ":"Reprogramada desde ")+fecha+(t.notaWorker?" — Obs. anterior: "+t.notaWorker:"")};
+                  });
+                  setTareasDelDia(destinoElegido, [...normArr(tareas[destinoElegido]||[]), ...nuevas]);
+                  setPreviewReprogramar(null);
+                  alert(`✅ ${nuevas.length} tarea(s) reprogramadas para ${destinoElegido}`);
+                }}>✓ Confirmar reprogramación ({previewReprogramar.filter(t=>t.seleccionada).length})</button>
+                <button className="btn-g" style={S.btn} onClick={()=>setPreviewReprogramar(null)}>Cancelar</button>
+              </div>
+            </div>
+          )}
 
           {previewProp&&(()=>{
             const previewFiltradoProp = previewProp.filter(p=>
