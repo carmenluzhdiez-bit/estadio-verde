@@ -2025,7 +2025,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
     <table>
       <thead><tr><th>Estado</th><th>Tarea</th><th>Elemento</th><th>Zona</th><th>Responsable</th><th>Observación</th></tr></thead>
       <tbody>
-        ${hpTdArr.map(hpTask => {
+        ${[...hpTdArr].sort((a,b)=>(a.tarea||"").localeCompare(b.tarea||"","es",{sensitivity:"base"})||(a.zona||"").localeCompare(b.zona||"","es",{sensitivity:"base"})).map(hpTask => {
           const estCls = ["hecha","completada"].includes(hpTask.estado)?"est-ok":hpTask.estado==="no_pudo"?"est-bad":["haciendose","en_curso"].includes(hpTask.estado)?"est-blue":["pendiente"].includes(hpTask.estado)?"est-pend":"est-gray";
           const estLabel = EC[hpTask.estado]?.label || hpTask.estado;
           const icono = (zonas.find(z=>z.nombre===hpTask.zona)||MACROZONAS_BASE.find(z=>z.nombre===hpTask.zona))?.icono||""
@@ -2084,7 +2084,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
     <table>
       <thead><tr><th>Estado</th><th>Tarea</th><th>Elemento</th><th>Zona</th><th>Observación</th></tr></thead>
       <tbody>
-        ${hpTdArr.map(hpTask => {
+        ${[...hpTdArr].sort((a,b)=>(a.tarea||"").localeCompare(b.tarea||"","es",{sensitivity:"base"})||(a.zona||"").localeCompare(b.zona||"","es",{sensitivity:"base"})).map(hpTask => {
           const estCls = ["hecha","completada"].includes(hpTask.estado)?"est-ok":hpTask.estado==="no_pudo"?"est-bad":["haciendose","en_curso"].includes(hpTask.estado)?"est-blue":["pendiente"].includes(hpTask.estado)?"est-pend":"est-gray";
           const estLabel = EC[hpTask.estado]?.label || hpTask.estado;
           const icono = (zonas.find(z=>z.nombre===hpTask.zona)||MACROZONAS_BASE.find(z=>z.nombre===hpTask.zona))?.icono||""
