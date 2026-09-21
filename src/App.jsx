@@ -24753,7 +24753,7 @@ export default function App() {
           {(fbRol==="jefa"||fbRol==="programador"
             ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["compras","🛒","Compras"],["bodegas","🏪","Bodegas"],["golf","🏌️","Golf"],["personal","👷","Personal"],["memos","📝","Memos"],["protocolos","📋","Protocolos"]]
             : fbRol==="supervisor"
-            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["programacion","📆","Programa"],["reporte","📋","Reporte"],["golf","🏌️","Golf"],["bodegas","🏪","Bodegas"],["memos","📝","Memos"],["protocolos","📋","Protocolos"],["notificaciones","🔔","Alertas"],["miturno","🌿","Mi Turno"]]
+            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["programacion","📆","Programa"],["reporte","📋","Reporte"],["golf","🏌️","Golf"],["bodegas","🏪","Bodegas"],["memos","📝","Memos"],["protocolos","📋","Protocolos"],["notificaciones","🔔","Alertas"],["designacion","📋","Designación"],["miturno","🌿","Mi Turno"]]
             : fbRol==="gerencia"
             ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["compras","🛒","Compras"],["bodegas","🏪","Bodegas"],["golf","🏌️","Golf"],["memos","📝","Memos"],["protocolos","📋","Protocolos"],["notificaciones","🔔","Alertas"]]
             : [["miturno","🌿","Mi Turno"]]
@@ -26172,25 +26172,43 @@ export default function App() {
         )}
 
         {/* MI TURNO */}
+        {vista==="designacion"&&rolLogueado==="supervisor"&&(
+          <div className="ein">
+            <VistaDesignacion
+              S={S}
+              tareasProg={tareasProg}
+              setTareasProg={setTareasProg}
+              personal={personal}
+              MACROZONAS_BASE={MACROZONAS_BASE}
+              zonas={zonasConCust}
+              getElemFrecs={getElemFrecs}
+              setElemFrecs={setElemFrecs}
+              onSalir={()=>{esLocalRef.current=false;signOut(auth).catch(()=>{});setWorkerLogueado(null);setFbRol(null);setFbUser(null);setVistaWorker(false);}}
+            />
+          </div>
+        )}
+
         {vista==="miturno"&&(
           <div className="ein">
-            {/* ── Logged in as supervisor ── */}
-            {rolLogueado==="supervisor"&&(
-              <VistaDesignacion
-                S={S}
-                tareasProg={tareasProg}
-                setTareasProg={setTareasProg}
-                personal={personal}
-                MACROZONAS_BASE={MACROZONAS_BASE}
-                zonas={zonasConCust}
-                getElemFrecs={getElemFrecs}
-                setElemFrecs={setElemFrecs}
-                onSalir={()=>{esLocalRef.current=false;signOut(auth).catch(()=>{});setWorkerLogueado(null);setFbRol(null);setFbUser(null);setVistaWorker(false);}}
-              />
+            {/* ── Logged in as supervisor: sin ficha propia encontrada (ni por workerLogueado ni por email) ── */}
+            {rolLogueado==="supervisor"&&!(()=>{
+              const arr=Array.isArray(personal)?personal:Object.values(personal||{});
+              return workerLogueado
+                ? arr.find(x=>String(x.id)===String(workerLogueado))
+                : fbUser && arr.find(x=>x.email?.toLowerCase()===fbUser.email?.toLowerCase());
+            })()&&(
+              <div style={{...S.card,padding:24,textAlign:"center",color:"#5a9a7a"}}>
+                No encontré tu propia ficha en Personal (buscando por tu sesión de acceso) — sin eso no puedo mostrarte tus tareas asignadas por nombre. Pídele al Programador que revise tu ficha en Personal.
+              </div>
             )}
 
-            {/* ── Logged in as worker ── */}
-            {rolLogueado==="trabajador"&&(vistaWorker||fbUser)&&(
+            {/* ── Logged in as worker (o supervisor viendo su propio turno) ── */}
+            {(rolLogueado==="trabajador"&&(vistaWorker||fbUser))||rolLogueado==="supervisor"&&(()=>{
+              const arr=Array.isArray(personal)?personal:Object.values(personal||{});
+              return workerLogueado
+                ? arr.find(x=>String(x.id)===String(workerLogueado))
+                : fbUser && arr.find(x=>x.email?.toLowerCase()===fbUser.email?.toLowerCase());
+            })()?(
               <div>
                 <button className="btn-g" style={{...S.btn,marginBottom:16}} onClick={()=>{esLocalRef.current=false;signOut(auth).catch(()=>{});setVistaWorker(false);setWorkerLogueado(null);setFbRol(null);setFbUser(null);}}>← Salir</button>
                 <VistaWorker
@@ -26279,7 +26297,7 @@ export default function App() {
                   }}
                 />
               </div>
-            )}
+            ):null}
 
           </div>
         )}
