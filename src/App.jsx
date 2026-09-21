@@ -4627,10 +4627,12 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
         if(frecs.length===0) return; // solo proponer si hay frecuencias — incluye Golf
         frecs.forEach(f => {
           const key = nombreZona+"_"+e.nombre+"_"+f.tarea;
-          if(existentes.includes(key) || propuestas.some(p=>p.zona===nombreZona&&p.elemento===e.nombre&&p.tarea.trim().toLowerCase()===f.tarea.trim().toLowerCase())) return;
+          const yaExisteEsteMismo = existentes.includes(key) || propuestas.some(p=>p.zona===nombreZona&&p.elemento===e.nombre&&p.tarea.trim().toLowerCase()===f.tarea.trim().toLowerCase());
           const prox = calcProximaFrecGlobal(f, fecha);
           if(!prox) return; // sin frecuencia activa, sin última realización registrada, o "según necesidad"/"una vez"
-          // Solo proponer si la fecha calculada ya llegó (vencida o es hoy) — no proponer tareas futuras todavía lejanas
+          // Solo seguir si la fecha calculada ya llegó (vencida o es hoy) — ni ella ni su enlazada se
+          // disparan si todavía falta. Esto se evalúa SIEMPRE, exista ya la tarea o no — para que el
+          // enlace (más abajo) funcione también cuando "Corte" ya estaba creada de antes.
           if(prox.diff > 0) return;
           const esVencida = prox.diff < 0;
           // Asignar responsable por defecto según zona y tipo de tarea
@@ -4640,10 +4642,14 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
             : getResponsablePorTipo(f.tarea, configSemanal, nombreZona)||"";
           const notaAltura = f.alturaCorte ? `Cortar a: ${f.alturaCorte} ${f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="pulgadas"?"pulgadas":"milímetros"}.` : "";
           const etiquetaFrec = f.modo==="diasSemana" ? `cada ${f.diasMinimos||"?"} días` : f.intervaloDias ? `cada ${f.intervaloDias} días` : (f[estProp]||"");
-          const item = { id: Date.now()+Math.random(), fecha, zona:nombreZona, elemento:e.nombre, tarea:f.tarea, responsable:respDefault, estado:respDefault?"pendiente":"por_designar", notas:[notaAltura,f.obs].filter(Boolean).join(" "), alturaCorte:f.alturaCorte||"", unidadAlturaCorte:f.unidadAlturaCorte||"mm", frecuencia:etiquetaFrec, estacion:estProp, auto:true, fechaCorrespondiente:prox.fecha, origenZid:String(z.id), origenEid:e.id, origenFrecId:f.id, origenEsCustom:!!e.isCustom, diasVencida:esVencida?Math.abs(prox.diff):0, incluir:true, abierta:false };
-          propuestas.push(item);
-          if(esVencida) { const vKey=`${nombreZona} — ${f.tarea}`; if(!vencidas.includes(vKey)) vencidas.push(vKey); }
+          if(!yaExisteEsteMismo){
+            const item = { id: Date.now()+Math.random(), fecha, zona:nombreZona, elemento:e.nombre, tarea:f.tarea, responsable:respDefault, estado:respDefault?"pendiente":"por_designar", notas:[notaAltura,f.obs].filter(Boolean).join(" "), alturaCorte:f.alturaCorte||"", unidadAlturaCorte:f.unidadAlturaCorte||"mm", frecuencia:etiquetaFrec, estacion:estProp, auto:true, fechaCorrespondiente:prox.fecha, origenZid:String(z.id), origenEid:e.id, origenFrecId:f.id, origenEsCustom:!!e.isCustom, diasVencida:esVencida?Math.abs(prox.diff):0, incluir:true, abierta:false };
+            propuestas.push(item);
+            if(esVencida) { const vKey=`${nombreZona} — ${f.tarea}`; if(!vencidas.includes(vKey)) vencidas.push(vKey); }
+          }
           // ── Tarea enlazada (ej. Corte de césped → adelanta Orillado si le toca esta misma semana) ──
+          // Se evalúa siempre que la que manda esté vencida/hoy (arriba), sin importar si ya existía o
+          // se acaba de proponer recién — así funciona también cuando Corte ya estaba creada de antes.
           if(f.tareaEnlazada && f.tareaEnlazada.trim()){
             const nombreEnlazada = f.tareaEnlazada.trim();
             const yaExisteEnlazada = existentes.includes(nombreZona+"_"+e.nombre+"_"+nombreEnlazada)
@@ -16003,15 +16009,18 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               // se genera aparte, el mismo día que el Corte, más abajo. Ver bloque siguiente.
               const esFertilizAdaptada=(f.tarea||"").toLowerCase().includes("fertiliz")&&f.tareaEnlazada&&f.tareaEnlazada.trim();
               if(esFertilizAdaptada)return;
-              if(yaExisteTarea(e.nombre,f.tarea))return;
+              const yaExisteEsteMismoGolf = yaExisteTarea(e.nombre,f.tarea);
               const prox=calcProximaFrecGlobal(f,fechaProponerGolf);
               if(!prox||prox.diff>0)return;
               const esVencida=prox.diff<0;const diasVencida=Math.abs(prox.diff);
               const respDefault=configSemanal?.corte_golf||"";
               const notaAltura=f.alturaCorte?`Cortar a: ${f.alturaCorte} ${f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="pulgadas"?"pulgadas":"milímetros"}.`:"";
-              propuestas.push({id:Date.now()+Math.random(),fecha:fechaProponerGolf,zona:nombreZona,elemento:e.nombre,tarea:f.tarea,responsable:respDefault,estado:respDefault?"pendiente":"por_designar",notas:[notaAltura,f.obs].filter(Boolean).join(" "),alturaCorte:f.alturaCorte||"",unidadAlturaCorte:f.unidadAlturaCorte||"mm",estacion:estProp,auto:true,fechaCorrespondiente:prox.fecha,origenZid:"31",origenEid:e.id,origenFrecId:f.id,origenEsCustom:!!e.isCustom,diasVencida:esVencida?diasVencida:0});
-              if(esVencida)vencidas.push(e.nombre+" — "+f.tarea+" ("+diasVencida+"d vencida)");
+              if(!yaExisteEsteMismoGolf){
+                propuestas.push({id:Date.now()+Math.random(),fecha:fechaProponerGolf,zona:nombreZona,elemento:e.nombre,tarea:f.tarea,responsable:respDefault,estado:respDefault?"pendiente":"por_designar",notas:[notaAltura,f.obs].filter(Boolean).join(" "),alturaCorte:f.alturaCorte||"",unidadAlturaCorte:f.unidadAlturaCorte||"mm",estacion:estProp,auto:true,fechaCorrespondiente:prox.fecha,origenZid:"31",origenEid:e.id,origenFrecId:f.id,origenEsCustom:!!e.isCustom,diasVencida:esVencida?diasVencida:0});
+                if(esVencida)vencidas.push(e.nombre+" — "+f.tarea+" ("+diasVencida+"d vencida)");
+              }
               // ── Tarea enlazada genérica (ej. Bioestimulante → "Corte de greens + Vivero") ──
+              // Se evalúa siempre que la que manda esté vencida/hoy, exista ya o se acabe de proponer.
               // Se agrega UNA vez por fecha (no una por elemento), ya que suele representar una tarea
               // que cubre varios greens a la vez. Solo se adelanta si, según su propia frecuencia,
               // le toca esta misma semana (lunes a sábado) — si está atrasada, sigue sola; si es para
@@ -16056,8 +16065,9 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               const esFertilizAdaptada=(f.tarea||"").toLowerCase().includes("fertiliz")&&f.tareaEnlazada&&f.tareaEnlazada.trim();
               if(!esFertilizAdaptada)return;
               if(yaExisteTarea(e.nombre,f.tarea))return;
-              // ¿Se propuso el Corte enlazado para este mismo elemento en esta misma corrida?
-              const corteHoy=propuestas.find(p=>p.zona===nombreZona&&p.elemento===e.nombre&&p.tarea.trim().toLowerCase()===f.tareaEnlazada.trim().toLowerCase());
+              // ¿Se propuso el Corte enlazado para este mismo elemento en esta misma corrida, O ya existía de antes?
+              const corteHoy=propuestas.find(p=>p.zona===nombreZona&&p.elemento===e.nombre&&p.tarea.trim().toLowerCase()===f.tareaEnlazada.trim().toLowerCase())
+                || tareasHoyArr.find(t=>t.zona===nombreZona&&norm(t.elemento).startsWith(norm(e.nombre))&&norm(t.tarea).includes(norm(f.tareaEnlazada.trim())));
               if(!corteHoy)return; // no toca Corte hoy para este elemento — Fertilización espera
               // ¿Fertilización ya está razonablemente cerca de su propia fecha de vencimiento?
               const fertProx=calcProximaFrecGlobal(f,fechaProponerGolf);
