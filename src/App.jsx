@@ -11506,7 +11506,27 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
     ).map(t=>({fecha, alturaCorte:t.alturaCorteReal?Number(t.alturaCorteReal):(t.alturaCorte?Number(t.alturaCorte):null), unidad:t.unidadAlturaCorte||"mm", tarea:t.tarea||"", elemento:t.elemento||"", responsable:t.responsable||""}));
   }).sort((a,b)=>b.fecha.localeCompare(a.fecha));
 
-  const zonasDatos = ZONAS.map(z=>{
+  const simularProyeccion = (eventos, tasaUsar, ultimaFechaSemana) => {
+    const eventosPorFecha = {};
+    eventos.forEach(e=>{ eventosPorFecha[e.fecha] = e; });
+    const primeraFecha = eventos[0].fecha;
+    let valorActual = eventos[0].alt;
+    let fechaCursor = new Date(primeraFecha+"T12:00:00");
+    const valoresPorFecha = {[primeraFecha]: valorActual};
+    while(fechaCursor.toISOString().slice(0,10) < ultimaFechaSemana) {
+      fechaCursor.setDate(fechaCursor.getDate()+1);
+      const fStr = fechaCursor.toISOString().slice(0,10);
+      if(eventosPorFecha[fStr]) {
+        valorActual = eventosPorFecha[fStr].alt;
+      } else {
+        valorActual = Math.round((valorActual + tasaUsar)*10)/10;
+      }
+      valoresPorFecha[fStr] = valorActual;
+    }
+    return valoresPorFecha;
+  };
+
+  const datosCrudos = ZONAS.map(z=>{
     const anal = analisisTasas(z.id);
     const zonaNum = z.id.replace(/[^0-9]/g,"");
 
@@ -11560,34 +11580,35 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
     const diasDesdeBase = Math.round((new Date(hoyProjStr+"T12:00:00")-new Date(fechaBase+"T12:00:00"))/(1000*60*60*24));
     const datoPocoConfiable = diasDesdeBase > 10;
 
-    // Simulación día por día desde el primer evento conocido hasta el domingo de
-    // la semana mostrada — igual que las columnas de tu Excel: cada día = el
-    // anterior + tasa, salvo que ese día tenga un evento real (corte/medición),
-    // en cuyo caso ese valor manda y se sigue acumulando desde ahí.
-    const eventosPorFecha = {};
-    eventos.forEach(e=>{ eventosPorFecha[e.fecha] = e; }); // si hay corte y medición el mismo día, el corte queda (por el sort)
-    const primeraFecha = eventos[0].fecha;
-    const ultimaFechaSemana = diasProx[diasProx.length-1].fecha;
-    let valorActual = eventos[0].alt;
-    let fechaCursor = new Date(primeraFecha+"T12:00:00");
-    const valoresPorFecha = {[primeraFecha]: valorActual};
-    while(fechaCursor.toISOString().slice(0,10) < ultimaFechaSemana) {
-      fechaCursor.setDate(fechaCursor.getDate()+1);
-      const fStr = fechaCursor.toISOString().slice(0,10);
-      if(eventosPorFecha[fStr]) {
-        valorActual = eventosPorFecha[fStr].alt;
-      } else {
-        valorActual = Math.round((valorActual + tasaUsar)*10)/10;
-      }
-      valoresPorFecha[fStr] = valorActual;
-    }
+    // ¿Tiene una medición fresca (posterior al último corte)? Si el último evento es un corte
+    // (nunca se volvió a medir después), la tasa que tenemos es de ANTES de ese corte — no
+    // comparable con el rebrote real. Se marca para reemplazarla por el promedio de las zonas
+    // que sí tengan dato fresco (ver más abajo).
+    const ultimoCorte = cortesZona.length ? cortesZona[cortesZona.length-1] : null;
+    const esFresco = ultEvento.tipo==="medicion" && (!ultimoCorte || ultEvento.fecha > ultimoCorte.fecha);
 
-    const proj = diasProx.map(d=>({
-      ...d,
-      altProj: valoresPorFecha[d.fecha] !== undefined ? valoresPorFecha[d.fecha] : altBase,
-    }));
-    return {zona:z, tasaGlobal, tasaReal: ultimaTasaReal?ultimaTasaReal.tasa:null, tasaProyeccion: tasaUsar, diasUltimoIntervalo: ultimaTasaReal?ultimaTasaReal.dias:null, deltaUltimo: ultimaTasaReal?ultimaTasaReal.delta:null, altBase, fechaBase, baseOrigen, proj, categoria, datoPocoConfiable, diasDesdeBase};
+    return {z, tasaGlobal, tasaReal: ultimaTasaReal?ultimaTasaReal.tasa:null, tasaProyeccion: tasaUsar, diasUltimoIntervalo: ultimaTasaReal?ultimaTasaReal.dias:null, deltaUltimo: ultimaTasaReal?ultimaTasaReal.delta:null, altBase, fechaBase, baseOrigen, categoria, datoPocoConfiable, diasDesdeBase, eventos, esFresco};
   }).filter(Boolean);
+
+  // Promedio de la tasa de rebrote real entre las zonas que SÍ tienen medición fresca
+  // (posterior a su último corte) — se usa como mejor estimación para las que no la tienen,
+  // en vez de su tasa vieja (de antes de cortar).
+  const frescos = datosCrudos.filter(d=>d.esFresco);
+  const promedioFresco = frescos.length>0
+    ? Math.round((frescos.reduce((s,d)=>s+d.tasaProyeccion,0)/frescos.length)*100)/100
+    : null;
+
+  const ultimaFechaSemanaGreens = diasProx[diasProx.length-1].fecha;
+  const zonasDatos = datosCrudos.map(d=>{
+    const usoPromedioOtros = !d.esFresco && promedioFresco!==null;
+    const tasaFinal = usoPromedioOtros ? promedioFresco : d.tasaProyeccion;
+    const valoresPorFecha = simularProyeccion(d.eventos, tasaFinal, ultimaFechaSemanaGreens);
+    const proj = diasProx.map(dd=>({
+      ...dd,
+      altProj: valoresPorFecha[dd.fecha] !== undefined ? valoresPorFecha[dd.fecha] : d.altBase,
+    }));
+    return {zona:d.z, tasaGlobal:d.tasaGlobal, tasaReal:d.tasaReal, tasaProyeccion:tasaFinal, diasUltimoIntervalo:d.diasUltimoIntervalo, deltaUltimo:d.deltaUltimo, altBase:d.altBase, fechaBase:d.fechaBase, baseOrigen:d.baseOrigen, proj, categoria:d.categoria, datoPocoConfiable:d.datoPocoConfiable, diasDesdeBase:d.diasDesdeBase, usoPromedioOtros};
+  });
 
   if(!zonasDatos.length) return null;
 
@@ -11611,7 +11632,7 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
             </tr>
           </thead>
           <tbody>
-            {zonasDatos.map(({zona,tasaGlobal,tasaReal,diasUltimoIntervalo,deltaUltimo,altBase,fechaBase,baseOrigen,proj,categoria,datoPocoConfiable,diasDesdeBase})=>(
+            {zonasDatos.map(({zona,tasaGlobal,tasaReal,tasaProyeccion,diasUltimoIntervalo,deltaUltimo,altBase,fechaBase,baseOrigen,proj,categoria,datoPocoConfiable,diasDesdeBase,usoPromedioOtros})=>(
               <tr key={zona.id} style={{borderTop:"1px solid rgba(255,255,255,0.05)"}}>
                 <td style={{padding:"7px 10px",fontWeight:600,fontSize:12}}>
                   {zona.nombre}
@@ -11620,6 +11641,7 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
                   </span>
                   <span style={{fontSize:9,display:"block",color:"#4a7a5a"}}>{altBase}mm · {fechaBase}</span>
                   {datoPocoConfiable&&<span style={{fontSize:9,display:"block",color:"#f59e0b",fontWeight:700}}>⚠️ Dato de hace {diasDesdeBase} días — poco confiable</span>}
+                  {usoPromedioOtros&&<span style={{fontSize:9,display:"block",color:"#38bdf8",fontWeight:700}}>🔗 Sin medición propia post-corte — usando promedio de rebrote de los otros greens ({tasaProyeccion>0?"+":""}{tasaProyeccion}mm/d) para proyectar</span>}
                 </td>
                 <td style={{padding:"7px 8px",textAlign:"center",fontSize:12,fontWeight:700}}>
                   {tasaReal!==null
