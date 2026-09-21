@@ -19326,9 +19326,32 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
                     </button>
                   )}
                   {r.anulada&&(
-                    <span style={{fontSize:11,color:"#ef4444",padding:"4px 10px",background:"rgba(239,68,68,0.08)",borderRadius:6,border:"1px solid rgba(239,68,68,0.2)"}}>
-                      Anulada: {r.fechaAnulacion}
-                    </span>
+                    <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                      <span style={{fontSize:11,color:"#ef4444",padding:"4px 10px",background:"rgba(239,68,68,0.08)",borderRadius:6,border:"1px solid rgba(239,68,68,0.2)"}}>
+                        Anulada: {r.fechaAnulacion}
+                      </span>
+                      <button style={{...S.btn,fontSize:12,background:"rgba(52,211,153,0.1)",color:"#6ee7b7",border:"1px solid rgba(52,211,153,0.25)"}}
+                        onClick={()=>{
+                          if(!window.confirm(`¿Recuperar la rendición de ${r.mes}?\n\nSe deshace la anulación: vuelve a quedar activa, y sus bonos/eventos vuelven a estado "Rendido".\n\nSi ya generaste otra rendición nueva con alguno de esos mismos ítems mientras tanto, revísalo a mano después — podrían quedar duplicados.`)) return;
+                          // Desmarcar la rendición como anulada
+                          setRendicionesRRHH(p=>(Array.isArray(p)?p:Object.values(p||{})).map(x=>x.id===r.id?{...x,anulada:false,fechaAnulacion:null,fechaRecuperacion:new Date().toLocaleDateString("es-CL")}:x));
+                          // Volver a marcar los bonos de esta rendición como "rendido"
+                          const idsBonosRend = (r.bonos||[]).map(b=>b.id);
+                          setBonosMasivos(p=>(Array.isArray(p)?p:Object.values(p||{})).map(b=>idsBonosRend.includes(b.id)?{...b,estado:"rendido",fechaRendicion:r.fecha}:b));
+                          // Volver a marcar los eventos individuales de esta rendición como "rendido"
+                          const evSel = r.eventosSeleccionados||{};
+                          if(Object.keys(evSel).length>0) {
+                            setPersonal(p=>(Array.isArray(p)?p:Object.values(p||{})).map(t=>({
+                              ...t, eventos:(t.eventos||[]).map(e=>{
+                                const key = sanitizeKey(`${t.id}_${e.id}`);
+                                return evSel[key]&&e.estado==="pendiente"?{...e,estado:"rendido"}:e;
+                              })
+                            })));
+                          }
+                        }}>
+                        ↩️ Recuperar
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
