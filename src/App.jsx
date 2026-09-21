@@ -19050,7 +19050,8 @@ function TareaPlantacion({ modo, zona, zonaId, bodegasData, setBodegasData, tare
 function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, rendicionesRRHH, setRendicionesRRHH, onVolver }) {
   const hoy = new Date();
   const fechaHoyStr = hoy.toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"});
-  const mesRendicion = hoy.toLocaleDateString("es-CL",{month:"long",year:"numeric"});
+  const mesActualDefault = hoy.toLocaleDateString("es-CL",{month:"long",year:"numeric"});
+  const [mesRendicion, setMesRendicion] = React.useState(mesActualDefault); // editable — por si se genera atrasada (ej. agosto en septiembre)
   const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
   const bonosArr = Array.isArray(bonosMasivos)?bonosMasivos:Object.values(bonosMasivos||{});
   const rendArr = Array.isArray(rendicionesRRHH)?rendicionesRRHH:Object.values(rendicionesRRHH||{});
@@ -19063,10 +19064,27 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
   const [mostrarRendidos, setMostrarRendidos] = React.useState(false);
   const bonosPendientes = bonosArr.filter(b=>b.estado!=="rendido");
   const bonosRendidos   = bonosArr.filter(b=>b.estado==="rendido");
+  // Eventos "bono" individuales que YA están representados por un bono masivo pendiente
+  // (bonosPendientes) — sea porque están enlazados por bonoId (bonos nuevos) o porque
+  // coinciden por descripción con uno no seleccionado (bonos antiguos, sin enlace).
+  // Se excluyen de la lista por trabajador para no mostrar un checkbox aparte y
+  // redundante — el bono masivo de arriba ya es la única fuente de verdad para estos.
+  const esEventoDeBonoMasivo = (e) => {
+    if(!["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)) return false;
+    if(e.bonoId && bonosPendientes.some(b=>String(b.id)===String(e.bonoId))) return true;
+    if(e.origenBonoId&&bonosPendientes.some(b=>String(b.id)===String(e.origenBonoId))) return true;
+    const descE = (e.descripcion||"").toLowerCase().trim();
+    return bonosPendientes.some(b=>{
+      const descB = (b.descripcion||"").toLowerCase().trim();
+      const palabras = descB.split(" ").filter(p=>p.length>4);
+      return palabras.length>0 && palabras.filter(p=>descE.includes(p)).length >= Math.ceil(palabras.length*0.5);
+    });
+  };
   const trabajadoresCon = personalArr.map(t=>{
     const eventosT = (t.eventos||[]).filter(e=>
       ["bonoConstruccion","bonoPesado","bonoEspecializado","horaExtra","permiso","vacaciones","licencia","otro","amonestacion","capacitacion"].includes(e.tipo) &&
-      e.estado!=="rendido"
+      e.estado!=="rendido" &&
+      !esEventoDeBonoMasivo(e)
     );
     if(!bonosPendientes.some(b=>(b.participantes||[]).some(p=>String(p.trabajadorId)===String(t.id)))&&!eventosT.length) return null;
     return {t, eventosT};
@@ -19095,22 +19113,7 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
     const paginas = personalArr.map(t=>{
       const bonosT = bonosSel.filter(b=>(b.participantes||[]).some(p=>String(p.trabajadorId)===String(t.id)));
       // Eventos "bono" individuales que YA están representados por un bono masivo
-      // pendiente (bonosPendientes) — sea porque están enlazados por bonoId (bonos
-      // nuevos) o porque coinciden por descripción con uno no seleccionado (bonos
-      // antiguos, sin enlace). Estos nunca deben contarse aparte: si el bono masivo
-      // está seleccionado ya se cuenta vía bonosT; si está deseleccionado, se excluye
-      // del informe por completo (no se "cuela" como línea individual).
-      const esEventoDeBonoMasivo = (e) => {
-        if(!["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)) return false;
-        if(e.bonoId && bonosPendientes.some(b=>String(b.id)===String(e.bonoId))) return true;
-        if(e.origenBonoId&&bonosPendientes.some(b=>String(b.id)===String(e.origenBonoId))) return true;
-        const descE = (e.descripcion||"").toLowerCase().trim();
-        return bonosPendientes.some(b=>{
-          const descB = (b.descripcion||"").toLowerCase().trim();
-          const palabras = descB.split(" ").filter(p=>p.length>4);
-          return palabras.length>0 && palabras.filter(p=>descE.includes(p)).length >= Math.ceil(palabras.length*0.5);
-        });
-      };
+      // pendiente — ver esEventoDeBonoMasivo definida arriba, junto a trabajadoresCon.
       const eventosT = (t.eventos||[]).filter(e=>selEventos[`${t.id}_${e.id}`]&&!esEventoDeBonoMasivo(e));
       if(!bonosT.length&&!eventosT.length) return "";
 
@@ -19334,10 +19337,18 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
   // Vista nueva rendición
   return (
     <div className="ein">
-      <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:20,flexWrap:"wrap"}}>
+      <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:12,flexWrap:"wrap"}}>
         <button className="btn-g" style={S.btn} onClick={onVolver}>← Volver</button>
         <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:900,flex:1}}>📄 Informe RRHH — {mesRendicion}</h1>
         <button style={{...S.btn,fontSize:12,background:"rgba(255,255,255,0.06)",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)"}} onClick={()=>setVista("historial")}>📚 Ver historial</button>
+      </div>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:20,flexWrap:"wrap"}}>
+        <label style={{fontSize:11,color:"#7aaa80"}}>Mes de esta rendición:</label>
+        <input value={mesRendicion} onChange={e=>setMesRendicion(e.target.value)}
+          style={{...S.input,fontSize:12,padding:"5px 10px",maxWidth:200}}/>
+        {mesRendicion!==mesActualDefault&&(
+          <span style={{fontSize:11,color:"#fbbf24"}}>⚠️ Distinto al mes actual ({mesActualDefault}) — se guardará con esta etiqueta.</span>
+        )}
       </div>
 
       {confirmado?(
