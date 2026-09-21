@@ -14918,26 +14918,25 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                               <span style={{fontSize:11,color:"#5a9a7a",marginLeft:8}}>{t.tarea?.replace(`· ${nombreG}`,"").replace("⛳ ","")}</span>
                             </div>
                             <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                              {t.alturaCorte?(
-                                <span style={{fontSize:12,fontWeight:700,color:"#34d399"}}>✂️ {t.alturaCorte}mm</span>
-                              ):(
-                                <div style={{display:"flex",gap:4,alignItems:"center"}}>
-                                  <span style={{fontSize:10,color:"#f59e0b"}}>Sin altura</span>
-                                  <input type="number" step="0.1" min="2" max="15"
-                                    style={{...S.input,width:55,fontSize:11,padding:"2px 4px",textAlign:"center",borderColor:"rgba(245,158,11,0.4)"}}
-                                    placeholder="mm"
-                                    onBlur={e=>{
-                                      if(!e.target.value) return;
-                                      setTareasProg(p=>{
-                                        const nuevo={...p};
-                                        if(nuevo[t.fecha]){
-                                          nuevo[t.fecha]=nuevo[t.fecha].map(x=>x.id===t.id?{...x,alturaCorte:e.target.value}:x);
-                                        }
-                                        return nuevo;
-                                      });
-                                    }}/>
-                                </div>
-                              )}
+                              <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                                {!t.alturaCorte&&<span style={{fontSize:10,color:"#f59e0b"}}>Sin altura</span>}
+                                <input type="number" step="0.1" min="2" max="15"
+                                  style={{...S.input,width:55,fontSize:11,padding:"2px 4px",textAlign:"center",fontWeight:700,color:t.alturaCorte?"#34d399":undefined,borderColor:t.alturaCorte?"rgba(52,211,153,0.4)":"rgba(245,158,11,0.4)"}}
+                                  defaultValue={t.alturaCorte||""}
+                                  placeholder="mm"
+                                  onBlur={e=>{
+                                    const val=e.target.value;
+                                    if(!val || Number(val)===Number(t.alturaCorte||NaN)) return;
+                                    setTareasProg(p=>{
+                                      const nuevo={...p};
+                                      if(nuevo[t.fecha]){
+                                        nuevo[t.fecha]=nuevo[t.fecha].map(x=>x.id===t.id?{...x,alturaCorte:val}:x);
+                                      }
+                                      return nuevo;
+                                    });
+                                  }}/>
+                                {t.alturaCorte&&<span style={{fontSize:9,color:"#5a9a7a"}}>mm</span>}
+                              </div>
                               {t.alturaObjetivo&&(
                                 <span style={{fontSize:10,color:"#fbbf24"}}>→ {t.alturaObjetivo}mm</span>
                               )}
@@ -15872,6 +15871,57 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                     </div>
                   ))}
                 </div>
+
+                {/* Ajustar altura de corte de tareas pendientes (hoy) — de a uno o en bloque */}
+                {(()=>{
+                  const cortesPendientesHoy = tareasGolfSem.filter(t=>
+                    t.fechaDia===hoy &&
+                    normalizarEstado(t.estado)!=="hecha" &&
+                    (t.tarea||"").toLowerCase().includes("corte")
+                  ).sort((a,b)=>(a.elemento||"").localeCompare(b.elemento||"","es",{sensitivity:"base"}));
+                  if(cortesPendientesHoy.length===0) return null;
+                  return (
+                    <div style={{...S.card,padding:14,marginBottom:16,borderLeft:"3px solid rgba(52,211,153,0.4)"}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:8}}>
+                        <div style={{fontSize:13,fontWeight:700,color:"#34d399"}}>✂️ Altura de corte pendiente — hoy ({cortesPendientesHoy.length})</div>
+                        <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                          <span style={{fontSize:11,color:"#5a9a7a"}}>Aplicar a todos:</span>
+                          <input type="number" step="0.1" min="2" max="15" placeholder="mm"
+                            style={{...S.input,width:60,fontSize:11,padding:"3px 6px",textAlign:"center"}}
+                            onKeyDown={e=>{
+                              if(e.key!=="Enter") return;
+                              const val=e.target.value; if(!val) return;
+                              const ids=cortesPendientesHoy.map(t=>t.id);
+                              setTareasProg(p=>({...p,[hoy]:(Array.isArray(p[hoy])?p[hoy]:Object.values(p[hoy]||{})).map(x=>ids.includes(x.id)?{...x,alturaCorte:val}:x)}));
+                              e.target.value="";
+                            }}/>
+                          <span style={{fontSize:10,color:"#4a7a5a"}}>(Enter para aplicar)</span>
+                        </div>
+                      </div>
+                      <div style={{fontSize:11,color:"#5a9a7a",marginBottom:8}}>
+                        Corrige la altura antes de que se ejecute la tarea — útil si por frecuencia toca un valor distinto al que corresponde hoy.
+                      </div>
+                      <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                        {cortesPendientesHoy.map(t=>(
+                          <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 8px",background:"rgba(255,255,255,0.03)",borderRadius:6}}>
+                            <span style={{fontSize:12,flex:1}}>{t.elemento}</span>
+                            <span style={{fontSize:10,color:"#5a9a7a"}}>{t.responsable||"Sin asignar"}</span>
+                            <input type="number" step="0.1" min="2" max="15"
+                              style={{...S.input,width:60,fontSize:11,padding:"3px 6px",textAlign:"center",fontWeight:700,color:t.alturaCorte?"#34d399":undefined,borderColor:t.alturaCorte?"rgba(52,211,153,0.4)":"rgba(245,158,11,0.4)"}}
+                              defaultValue={t.alturaCorte||""}
+                              placeholder="mm"
+                              onBlur={e=>{
+                                const val=e.target.value;
+                                if(!val || Number(val)===Number(t.alturaCorte||NaN)) return;
+                                setTareasProg(p=>({...p,[hoy]:(Array.isArray(p[hoy])?p[hoy]:Object.values(p[hoy]||{})).map(x=>x.id===t.id?{...x,alturaCorte:val}:x)}));
+                              }}/>
+                            <span style={{fontSize:9,color:"#5a9a7a"}}>mm</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Tabla semanal por responsable */}
                 <div style={{overflowX:"auto"}}>
