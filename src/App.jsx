@@ -19060,6 +19060,11 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
   const [selBonos, setSelBonos] = React.useState({});
   const [selEventos, setSelEventos] = React.useState({});
   const [confirmado, setConfirmado] = React.useState(false);
+  // Firebase no permite ".", "#", "$", "/", "[" ni "]" en las llaves de un objeto — pero un id de
+  // evento generado con Date.now()+Math.random() puede salir con decimales (ej. "...345722.3342"),
+  // y esa llave se rompe al guardar eventosSeleccionados. Se sanitiza solo al guardar/leer de
+  // Firebase — selEventos en memoria sigue usando la llave normal en el resto de la pantalla.
+  const sanitizeKey = k => String(k).replace(/[.#$/[\]]/g,"_");
 
   const [mostrarRendidos, setMostrarRendidos] = React.useState(false);
   const bonosPendientes = bonosArr.filter(b=>b.estado!=="rendido");
@@ -19245,7 +19250,7 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
       fecha: fechaHoyStr,
       mes: mesRendicion,
       bonos: bonosSel.map(b=>({...b})),
-      eventosSeleccionados: {...selEventos},
+      eventosSeleccionados: Object.fromEntries(Object.entries(selEventos).map(([k,v])=>[sanitizeKey(k),v])),
       paginas: paginas,
       totalBonos: bonosSel.reduce((a,b)=>(b.participantes||[]).reduce((c,p)=>c+Number(p.monto||0),a),0),
     };
@@ -19311,7 +19316,7 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
                         if(Object.keys(evSel).length>0) {
                           setPersonal(p=>(Array.isArray(p)?p:Object.values(p||{})).map(t=>({
                             ...t, eventos:(t.eventos||[]).map(e=>{
-                              const key = `${t.id}_${e.id}`;
+                              const key = sanitizeKey(`${t.id}_${e.id}`);
                               return evSel[key]&&e.estado==="rendido"?{...e,estado:"pendiente"}:e;
                             })
                           })));
