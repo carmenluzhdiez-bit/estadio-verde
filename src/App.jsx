@@ -4777,7 +4777,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           🌿 Programar — todas las macrozonas (excepto Golf)
         </div>
         <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
-          {[["programa","📆 Programar"],["frecuencias","🔄 Frecuencias"],["correccion_gral","🛠️ Corrección Fechas"],["simplificar_gral","🔧 Simplificar Frecuencias"]].map(([t,l])=>(
+          {[["programa","📆 Programar"],["frecuencias","🔄 Frecuencias"],["tipo_elemento","🔎 Ver por tipo"],["correccion_gral","🛠️ Corrección Fechas"],["simplificar_gral","🔧 Simplificar Frecuencias"]].map(([t,l])=>(
             <button key={t} className={`tab${tabProg===t?" on":""}`} onClick={()=>setTabProg(t)}>{l}</button>
           ))}
         </div>
@@ -5130,6 +5130,10 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
       {/* ── FRECUENCIAS POR MACROZONA ── */}
       {tabProg==="frecuencias"&&(
         <PanelFrecuenciasZona S={S} zonas={zonas.filter(z=>String(z.id)!=="31"&&!(z.nombre||"").toLowerCase().includes("golf"))} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} esJefa={esJefa}/>
+      )}
+
+      {tabProg==="tipo_elemento"&&(
+        <VerPorTipoElemento S={S} zonas={zonas.filter(z=>String(z.id)!=="31"&&!(z.nombre||"").toLowerCase().includes("golf"))} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} getElemFrecs={getElemFrecs}/>
       )}
 
       {tabProg==="correccion_gral"&&(
@@ -20261,6 +20265,105 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// Vista cruzada: elige un TIPO de elemento (ej. "césped", "seto") y ve/edita las frecuencias
+// de TODOS los elementos de ese tipo en TODAS las macrozonas de una vez, en vez de tener que
+// entrar zona por zona. Reutiliza el mismo panel de edición (FrecuenciasPanel) que ya existe.
+function VerPorTipoElemento({ S, zonas, getAllElems, getZD, setElemFrecs, getElemFrecs }) {
+  const [tipoSel, setTipoSel] = React.useState("");
+  const [busqueda, setBusqueda] = React.useState("");
+  const [abiertos, setAbiertos] = React.useState({}); // {zonaId_elementoId: bool}
+
+  // Todos los elementos de todas las zonas (excepto Golf, ya filtrado por quien llama), con su zona adjunta.
+  const todosElementos = [];
+  zonas.forEach(z=>{
+    getAllElems(String(z.id)).forEach(e=>{
+      todosElementos.push({...e, zonaId:String(z.id), zonaNombre:z.nombre});
+    });
+  });
+
+  // Tipos únicos presentes, con conteo, ordenados alfabéticamente.
+  const conteoTipos = {};
+  todosElementos.forEach(e=>{ const t=e.tipo||"otro"; conteoTipos[t]=(conteoTipos[t]||0)+1; });
+  const tipos = Object.keys(conteoTipos).sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
+
+  const elementosDelTipo = tipoSel ? todosElementos.filter(e=>(e.tipo||"otro")===tipoSel) : [];
+  const elementosMostrados = busqueda.trim()
+    ? elementosDelTipo.filter(e=>(e.zonaNombre+" "+e.nombre).toLowerCase().includes(busqueda.trim().toLowerCase()))
+    : elementosDelTipo;
+  const elementosOrdenados = [...elementosMostrados].sort((a,b)=>a.zonaNombre.localeCompare(b.zonaNombre,"es",{sensitivity:"base"})||a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+
+  return (
+    <div className="ein">
+      <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,marginBottom:8}}>🔎 Ver por tipo de elemento</div>
+      <div style={{fontSize:12,color:"#5a9a7a",marginBottom:14}}>
+        Elige un tipo (ej. "césped", "seto") para ver y corregir las frecuencias de TODOS los elementos de ese tipo, en todas las macrozonas, sin tener que entrar zona por zona.
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+        <div>
+          <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Tipo de elemento</label>
+          <select style={S.input} value={tipoSel} onChange={e=>{setTipoSel(e.target.value);setBusqueda("");}}>
+            <option value="">— Seleccionar tipo —</option>
+            {tipos.map(t=><option key={t} value={t}>{t} ({conteoTipos[t]})</option>)}
+          </select>
+        </div>
+        {tipoSel&&(
+          <div>
+            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Buscar zona o elemento</label>
+            <input style={S.input} value={busqueda} onChange={e=>setBusqueda(e.target.value)} placeholder="Ej: Alameda, Cancha..."/>
+          </div>
+        )}
+      </div>
+
+      {!tipoSel&&(
+        <div style={{...S.card,padding:24,textAlign:"center",color:"#3a7a5a",fontSize:13}}>
+          Selecciona un tipo de elemento para ver todos los que existen, en todas las zonas, en un solo listado.
+        </div>
+      )}
+
+      {tipoSel&&elementosOrdenados.length===0&&(
+        <div style={{...S.card,padding:24,textAlign:"center",color:"#3a7a5a",fontSize:13}}>
+          {busqueda.trim() ? "Sin resultados para esa búsqueda." : `No hay elementos de tipo "${tipoSel}" en ninguna zona.`}
+        </div>
+      )}
+
+      {tipoSel&&elementosOrdenados.length>0&&(
+        <div style={{fontSize:11,color:"#5a9a7a",marginBottom:10}}>{elementosOrdenados.length} elemento(s) — clic en cada uno para ver/editar sus frecuencias.</div>
+      )}
+
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {elementosOrdenados.map(e=>{
+          const key = e.zonaId+"_"+e.id;
+          const abierta = !!abiertos[key];
+          return (
+            <div key={key} style={{...S.card,padding:0,overflow:"hidden"}}>
+              <button onClick={()=>setAbiertos(p=>({...p,[key]:!p[key]}))}
+                style={{width:"100%",textAlign:"left",padding:"12px 14px",background:abierta?"rgba(255,255,255,0.04)":"transparent",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",color:"#ede9e0"}}>
+                <span style={{fontSize:13}}>
+                  <span style={{color:"#5a9a7a"}}>{e.zonaNombre}</span> — <b>{e.nombre}</b>
+                </span>
+                <span style={{fontSize:11,color:"#5a9a7a"}}>{abierta?"▲ cerrar":"▼ ver frecuencias"}</span>
+              </button>
+              {abierta&&(
+                <div style={{padding:"0 14px 14px 14px",borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+                  <FrecuenciasPanel
+                    S={S}
+                    zid={e.zonaId}
+                    eid={e.id}
+                    tipo={e.tipo||"arboles"}
+                    isCustom={e.isCustom||false}
+                    getFrecs={()=>getElemFrecs(e.zonaId, e.id, e.tipo||"arboles", e.isCustom||false)}
+                    setFrecs={(zidArg, eidArg, isCustomArg, nuevasFrecs)=>setElemFrecs(e.zonaId, e.id, e.isCustom||false, nuevasFrecs)}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
