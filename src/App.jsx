@@ -23961,9 +23961,31 @@ export default function App() {
     else { if(zdat.elementos?.[eid]?.frecuencias) return zdat.elementos[eid].frecuencias; }
     return TAREAS_DEFAULT[tipo] ? TAREAS_DEFAULT[tipo].map(t=>({...t,id:eid+"_"+t.tarea})) : [];
   };
+  // IMPORTANTE: usa escritura DIRIGIDA (fbUpdate a la ruta exacta de este elemento), no un fbSet
+  // del nodo "data" completo. Antes usaba setData (que reescribe TODO "data" con una foto local),
+  // y si se guardaban varios elementos seguidos y rápido (ej. desde "Ver por tipo"), las escrituras
+  // podían llegar desordenadas a Firebase y la última en llegar pisaba a las demás, perdiendo cambios.
+  // Con fbUpdate a la ruta puntual (zid/elementos/eid/frecuencias), cada guardado solo toca SU propio
+  // elemento y no puede pisar el de otro, sin importar el orden de llegada.
   const setElemFrecs = (zid, eid, isCustom, frecuencias) => {
-    if(isCustom){const arr=[...(data[zid]?.elementosCustom||[])];const i=arr.findIndex(e=>e.id===eid);if(i>=0){arr[i]={...arr[i],frecuencias};return setData(p=>({...p,[zid]:{...p[zid],elementosCustom:arr}}));}return Promise.resolve(false);}
-    else{return setData(p=>({...p,[zid]:{...p[zid],elementos:{...p[zid]?.elementos,[eid]:{...(p[zid]?.elementos?.[eid]||{}),frecuencias}}}}));}
+    if(isCustom){
+      let arrFinal = null;
+      setDataLocal(p=>{
+        const arr=[...(p[zid]?.elementosCustom||[])];
+        const i=arr.findIndex(e=>e.id===eid);
+        if(i<0) return p;
+        arr[i]={...arr[i],frecuencias};
+        arrFinal = arr;
+        return {...p,[zid]:{...p[zid],elementosCustom:arr}};
+      });
+      if(!arrFinal) return Promise.resolve(false);
+      return fbUpdate(ref(db,`${ROOT}/data`),{[`${zid}/elementosCustom`]:arrFinal})
+        .then(()=>true).catch(err=>{console.error("Error al guardar frecuencias:",err);return false;});
+    } else {
+      setDataLocal(p=>({...p,[zid]:{...p[zid],elementos:{...p[zid]?.elementos,[eid]:{...(p[zid]?.elementos?.[eid]||{}),frecuencias}}}}));
+      return fbUpdate(ref(db,`${ROOT}/data`),{[`${zid}/elementos/${eid}/frecuencias`]:frecuencias})
+        .then(()=>true).catch(err=>{console.error("Error al guardar frecuencias:",err);return false;});
+    }
   };
   // Versión masiva: aplica frecuencias a VARIOS elementos de una zona en UN SOLO setData/escritura a Firebase.
   // setElemFrecs llamado muchas veces seguidas dispara una escritura independiente por cada llamada — con
