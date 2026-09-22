@@ -1928,7 +1928,7 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
 }
 
 
-function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa=false, puedeCrear=false, cierresTurno={}, onReabrirTurno, getElemFrecs, setElemFrecs }) {
+function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa=false, puedeCrear=false, cierresTurno={}, onReabrirTurno, getElemFrecs, setElemFrecs, tabInicial=null }) {
   const [diasAbiertosHist, setDiasAbiertosHist] = React.useState({});
   const [gruposHistAbiertos, setGruposHistAbiertos] = React.useState({}); // {"dia__nombreTarea": bool}
   const [fechaReprogramarHist, setFechaReprogramarHist] = React.useState({}); // {dia: fechaDestino}
@@ -1939,7 +1939,8 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
   const [filtroZona,   setFiltroZona]   = React.useState("todas");
   const [filtroResponsable, setFiltroResponsable] = React.useState("todos");
   const [diaImpresion, setDiaImpresion] = React.useState("");
-  const [tabHist,      setTabHist]      = React.useState("historial_macro"); // "historial_macro" | "historial_golf" | "buscar" | "turnos" | "renombrar"
+  const [tabHist,      setTabHist]      = React.useState(tabInicial||"historial_macro"); // "historial_macro" | "historial_golf" | "buscar" | "turnos" | "renombrar"
+  const [diaTurnoElegido, setDiaTurnoElegido] = React.useState(tabInicial==="turnos"?new Date().toISOString().slice(0,10):""); // fecha específica elegida para editar en "Ver/editar turnos"
   const esGolfZonaHist = (zona) => zona==="Golf"||(zona||"").includes("Golf");
   const zonaFijaActual = tabHist==="historial_golf" ? "golf" : tabHist==="historial_macro" ? "no-golf" : null;
   const [buscarZona,   setBuscarZona]   = React.useState("");
@@ -2637,16 +2638,30 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
       {tabHist==="turnos"&&esJefa&&(()=>{
         const nA=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
         const hoyT=new Date().toISOString().slice(0,10);
-        const dias=Object.keys(tareas)
-          .filter(diaKey=>nA(tareas[diaKey]).some(tTask=>tTask.responsable))
-          .sort((diaA,diaB)=>diaB.localeCompare(diaA)).slice(0,30);
+        const dias=diaTurnoElegido
+          ? [diaTurnoElegido]
+          : Object.keys(tareas)
+            .filter(diaKey=>nA(tareas[diaKey]).some(tTask=>tTask.responsable))
+            .sort((diaA,diaB)=>diaB.localeCompare(diaA)).slice(0,30);
         return (
           <div>
-            <div style={{marginBottom:12}}>
-              <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#34d399",marginBottom:3}}>✅ Revisión de turnos</div>
-              <div style={{fontSize:11,color:"#5a9a7a"}}>Últimos 30 días · Incluye Golf · Usa el selector de estado para editar directamente</div>
+            <div style={{marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"flex-end",flexWrap:"wrap",gap:10}}>
+              <div>
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#34d399",marginBottom:3}}>✅ Revisión de turnos</div>
+                <div style={{fontSize:11,color:"#5a9a7a"}}>{diaTurnoElegido?"Día elegido":"Últimos 30 días"} · Incluye Golf · Usa el selector de estado para editar directamente</div>
+              </div>
+              <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                <label style={{fontSize:10,color:"#5a9a7a"}}>📅 Elegir día a editar:</label>
+                <input type="date" value={diaTurnoElegido} onChange={e=>setDiaTurnoElegido(e.target.value)}
+                  style={{...S.input,fontSize:12,padding:"5px 8px",width:"auto"}}/>
+                {diaTurnoElegido&&<button onClick={()=>setDiaTurnoElegido("")}
+                  style={{cursor:"pointer",border:"1px solid rgba(255,255,255,0.15)",borderRadius:6,padding:"5px 9px",background:"transparent",color:"#94a3b8",fontSize:11}}>✕ Ver últimos 30 días</button>}
+              </div>
             </div>
             {dias.length===0&&<div style={{...S.card,padding:32,textAlign:"center",color:"#4a8a5a"}}>No hay turnos registrados.</div>}
+            {diaTurnoElegido&&nA(tareas[diaTurnoElegido]).length===0&&(
+              <div style={{...S.card,padding:32,textAlign:"center",color:"#4a8a5a"}}>No hay tareas programadas para el {diaTurnoElegido}.</div>
+            )}
             {dias.map(dia=>{
               const tDia=nA(tareas[dia]);
               const porTrab={};
@@ -4631,6 +4646,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
   const hoy = fechaLocal();
   const [fecha, setFecha] = React.useState(fechaInicial||hoy);
   const [tabProg, setTabProg] = React.useState("programa");
+  const [histTabInicial, setHistTabInicial] = React.useState(null); // sub-tab con la que abre HistorialProg (ej. "turnos")
   const [showAgregar, setShowAgregar] = React.useState(false);
   const EC = {hecha:{color:"#22c55e",icon:"✅",label:"Hecha"},completada:{color:"#22c55e",icon:"✅",label:"Hecha"},no_pudo:{color:"#ef4444",icon:"🔴",label:"No se pudo"},haciendose:{color:"#3b82f6",icon:"🔵",label:"Haciéndose"},en_curso:{color:"#3b82f6",icon:"🔵",label:"En curso"},pendiente:{color:"#f59e0b",icon:"⏳",label:"Pendiente"},por_designar:{color:"#94a3b8",icon:"⬜",label:"Por designar"},cancelada:{color:"#ef4444",icon:"❌",label:"Cancelada"}};
   const [zonasColapsadas, setZonasColapsadas] = React.useState({__init:true}); // {zona: true/false}
@@ -5227,7 +5243,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
       )}
 
       {tabProg==="historial" && (
-        <HistorialProg tareas={tareas} setTareas={setTareas} MACROZONAS_BASE={MACROZONAS_BASE} zonas={zonas} S={S} esJefa={esJefa} puedeCrear={puedeCrear} cierresTurno={cierresTurno} onReabrirTurno={onReabrirTurno} getElemFrecs={getElemFrecs} setElemFrecs={setElemFrecs}/>
+        <HistorialProg tareas={tareas} setTareas={setTareas} MACROZONAS_BASE={MACROZONAS_BASE} zonas={zonas} S={S} esJefa={esJefa} puedeCrear={puedeCrear} cierresTurno={cierresTurno} onReabrirTurno={onReabrirTurno} getElemFrecs={getElemFrecs} setElemFrecs={setElemFrecs} tabInicial={histTabInicial}/>
       )}
 
       {/* ── PROGRAMAR ── */}
@@ -5237,7 +5253,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           {esJefa&&Object.keys(cierresTurno||{}).some(k=>k.startsWith(new Date().toISOString().slice(0,10)))&&(
             <div style={{background:"rgba(34,197,94,0.06)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:10,padding:"10px 14px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap"}}>
               <div style={{fontSize:12,color:"#4ade80"}}>✅ Hay turno(s) cerrado(s) hoy — puedes revisar y editar las tareas</div>
-              <button onClick={()=>setTabProg("turnos")}
+              <button onClick={()=>{setHistTabInicial("turnos");setTabProg("historial");}}
                 style={{cursor:"pointer",border:"1px solid rgba(74,222,128,0.3)",borderRadius:7,padding:"5px 12px",background:"rgba(74,222,128,0.1)",color:"#4ade80",fontSize:11,fontFamily:"'Georgia',serif",flexShrink:0}}>
                 ✏️ Ver/editar turnos →
               </button>
@@ -5542,7 +5558,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
         <div style={{fontSize:11,fontWeight:700,color:"#93c5fd",marginBottom:10,textTransform:"uppercase",letterSpacing:"0.5px"}}>
           📜 Historial — incluye todas las macrozonas, incluido Golf
         </div>
-        <button className={`tab${tabProg==="historial"?" on":""}`} onClick={()=>setTabProg("historial")}>📜 Ver Historial</button>
+        <button className={`tab${tabProg==="historial"?" on":""}`} onClick={()=>{setHistTabInicial(null);setTabProg("historial");}}>📜 Ver Historial</button>
       </div>
     </div>
   );
