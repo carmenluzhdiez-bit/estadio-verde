@@ -16193,7 +16193,12 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             // el texto de la nota para que no quede desincronizado.
             if(t.alturaCorte!==undefined&&t.alturaCorte!==""&&t.tarea.toLowerCase().includes("corte")) {
               const notaAlturaNueva = `Cortar a: ${t.alturaCorte} ${t.unidadAlturaCorte==="cm"?"centímetros":t.unidadAlturaCorte==="pulgadas"?"pulgadas":"milímetros"}.`;
-              const notaSinAltura = (t.notas||"").replace(/Cortar a:[^.]*\./,"").trim();
+              // OJO: el número de altura puede tener decimales (ej. "4.8"), que traen su propio punto.
+              // Antes la expresión se detenía en ESE punto decimal en vez de llegar al punto final de
+              // la oración, dejando colgado un resto como "8 milímetros." sin borrar (se veía dos veces
+              // la altura: "Cortar a: 4.8 milímetros. 8 milímetros. ..."). Ahora exige que el número
+              // (dígitos/punto/coma) vaya seguido de la palabra de unidad antes del punto final.
+              const notaSinAltura = (t.notas||"").replace(/Cortar a:\s*[\d.,]+\s*(?:mil[ií]metros|cent[ií]metros|pulgadas)\.\s*/i,"").trim();
               return {...t, notas:[notaAlturaNueva,notaSinAltura].filter(Boolean).join(" ")};
             }
             return t;
