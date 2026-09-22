@@ -4660,8 +4660,9 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
               const proxEnlazada = frecEnlazada ? calcProximaFrecGlobal(frecEnlazada, fecha) : null;
               let debeAdelantarse = false;
               if(!proxEnlazada){
-                // Sin frecuencia propia configurada (o "según necesidad") — se adelanta igual, junto con la que manda
-                debeAdelantarse = true;
+                // Sin frecuencia propia encontrada (o "según necesidad") — no se fuerza a adelantar sin
+                // saber cuándo le toca de verdad; sigue su propio ciclo normal donde corresponda.
+                debeAdelantarse = false;
               } else if(proxEnlazada.diff <= 0){
                 // Ya le toca o está atrasada por su propia cuenta — se sigue proponiendo sola, normalmente
                 // (el propio bucle de frecs la agregará por su cuenta; no hace falta forzarla aquí)
@@ -4677,7 +4678,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                 debeAdelantarse = fechaPropiaEnlazada>=lunesSemana && fechaPropiaEnlazada<=sabadoSemana;
               }
               if(debeAdelantarse){
-                propuestas.push({ id: Date.now()+Math.random(), fecha, zona:nombreZona, elemento:e.nombre, tarea:nombreEnlazada, responsable:respDefault, estado:respDefault?"pendiente":"por_designar", notas:`Adelantada esta semana — enlazada con "${f.tarea}"`, estacion:estProp, auto:true, incluir:true, abierta:false, diasVencida:0 });
+                propuestas.push({ id: Date.now()+Math.random(), fecha, zona:nombreZona, elemento:e.nombre, tarea:nombreEnlazada, responsable:respDefault, estado:respDefault?"pendiente":"por_designar", notas:`Adelantada esta semana — enlazada con "${f.tarea}"`, estacion:estProp, auto:true, incluir:true, abierta:false, diasVencida:0, origenZid:String(z.id), origenEid:e.id, origenFrecId:frecEnlazada?.id, origenEsCustom:!!e.isCustom });
               }
             }
           }
@@ -16110,7 +16111,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                   const proxEnlazadaGolf = frecEnlazadaGolf ? calcProximaFrecGlobal(frecEnlazadaGolf, fechaProponerGolf) : null;
                   let debeAdelantarseGolf = false;
                   if(!proxEnlazadaGolf){
-                    debeAdelantarseGolf = true; // sin frecuencia propia configurada — se adelanta junto con la que manda
+                    debeAdelantarseGolf = false; // sin frecuencia propia encontrada — no se fuerza, sigue su propio ciclo
                   } else if(proxEnlazadaGolf.diff <= 0){
                     debeAdelantarseGolf = false; // ya le toca o está atrasada por su cuenta — se propone sola
                   } else {
@@ -16124,7 +16125,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                   }
                   if(debeAdelantarseGolf){
                     clavesTareaEnlazadaYaAgregada.add(claveEnlazada);
-                    propuestas.push({id:Date.now()+Math.random(),fecha:fechaProponerGolf,zona:nombreZona,elemento:e.nombre,tarea:nombreEnlazadaGolf,responsable:respDefault,estado:respDefault?"pendiente":"por_designar",notas:`Adelantada esta semana — enlazada con "${f.tarea}"`,estacion:estProp,auto:true,diasVencida:0});
+                    propuestas.push({id:Date.now()+Math.random(),fecha:fechaProponerGolf,zona:nombreZona,elemento:e.nombre,tarea:nombreEnlazadaGolf,responsable:respDefault,estado:respDefault?"pendiente":"por_designar",notas:`Adelantada esta semana — enlazada con "${f.tarea}"`,estacion:estProp,auto:true,diasVencida:0,origenZid:"31",origenEid:e.id,origenFrecId:frecEnlazadaGolf?.id,origenEsCustom:!!e.isCustom});
                   }
                 }
               }
