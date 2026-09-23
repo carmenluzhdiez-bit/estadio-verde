@@ -4718,6 +4718,27 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     const propuestas = [];
     const vencidas = [];
     const existentes = getTareasDelDia(fecha).map(t => t.zona+"_"+t.elemento+"_"+t.tarea);
+    // ── Evitar duplicar tareas que ya existen SIN RESOLVER en un día anterior (turno aún no
+    // cerrado) ── Si una tarea de un día previo todavía no está "hecha"/"no_pudo", no significa
+    // que de verdad haya que hacerla de nuevo hoy: es la MISMA tarea esperando que se cierre ese
+    // turno. Se detecta por origen (zona+elemento+frecuencia) + la misma fecha de vencimiento
+    // calculada (fechaCorrespondiente) — si coincide con una ya pendiente en cualquier día anterior,
+    // no se propone otra vez. Para tareas sin ese origen (ej. adelantadas/enlazadas), se usa el
+    // texto zona+elemento+tarea como respaldo.
+    const finalesProp = ["hecha","completada","no_pudo"];
+    const nAprop = v => Array.isArray(v) ? v : (v && typeof v==="object" ? Object.values(v) : []);
+    const pendSignatures = new Set();
+    const pendTextSet = new Set();
+    Object.keys(tareas).forEach(diaKey => {
+      if(diaKey > fecha) return; // solo días hasta la fecha que se está proponiendo, no futuros
+      nAprop(tareas[diaKey]).forEach(t => {
+        if(finalesProp.includes(t.estado)) return;
+        if(t.origenZid && t.origenEid && t.origenFrecId){
+          pendSignatures.add(`${t.origenZid}_${t.origenEid}_${t.origenFrecId}_${t.fechaCorrespondiente||""}`);
+        }
+        pendTextSet.add(`${t.zona}_${t.elemento}_${t.tarea}`);
+      });
+    });
     zonas.forEach(z => {
       // Golf tiene su propio módulo de programación — excluir aquí
       if(z.id===31||(z.nombre||"").toLowerCase().includes("golf")) return;
@@ -4730,9 +4751,10 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
         if(frecs.length===0) return; // solo proponer si hay frecuencias — incluye Golf
         frecs.forEach(f => {
           const key = nombreZona+"_"+e.nombre+"_"+f.tarea;
-          const yaExisteEsteMismo = existentes.includes(key) || propuestas.some(p=>p.zona===nombreZona&&p.elemento===e.nombre&&p.tarea.trim().toLowerCase()===f.tarea.trim().toLowerCase());
           const prox = calcProximaFrecGlobal(f, fecha);
           if(!prox) return; // sin frecuencia activa, sin última realización registrada, o "según necesidad"/"una vez"
+          const yaPendienteAntes = pendSignatures.has(`${z.id}_${e.id}_${f.id}_${prox.fecha}`) || pendTextSet.has(key);
+          const yaExisteEsteMismo = existentes.includes(key) || propuestas.some(p=>p.zona===nombreZona&&p.elemento===e.nombre&&p.tarea.trim().toLowerCase()===f.tarea.trim().toLowerCase()) || yaPendienteAntes;
           // Solo seguir si la fecha calculada ya llegó (vencida o es hoy) — ni ella ni su enlazada se
           // disparan si todavía falta. Esto se evalúa SIEMPRE, exista ya la tarea o no — para que el
           // enlace (más abajo) funcione también cuando "Corte" ya estaba creada de antes.
@@ -4755,8 +4777,10 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           // se acaba de proponer recién — así funciona también cuando Corte ya estaba creada de antes.
           if(f.tareaEnlazada && f.tareaEnlazada.trim()){
             const nombreEnlazada = f.tareaEnlazada.trim();
-            const yaExisteEnlazada = existentes.includes(nombreZona+"_"+e.nombre+"_"+nombreEnlazada)
-              || propuestas.some(p=>p.zona===nombreZona&&p.elemento===e.nombre&&p.tarea.trim().toLowerCase()===nombreEnlazada.toLowerCase());
+            const keyEnlazada = nombreZona+"_"+e.nombre+"_"+nombreEnlazada;
+            const yaExisteEnlazada = existentes.includes(keyEnlazada)
+              || propuestas.some(p=>p.zona===nombreZona&&p.elemento===e.nombre&&p.tarea.trim().toLowerCase()===nombreEnlazada.toLowerCase())
+              || pendTextSet.has(keyEnlazada);
             if(!yaExisteEnlazada){
               // Buscar la frecuencia propia de la tarea enlazada, para saber cuándo le toca a ELLA
               const frecEnlazada = frecs.find(ff=>(ff.tarea||"").trim().toLowerCase()===nombreEnlazada.toLowerCase());
@@ -16181,6 +16205,26 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           const tareasHoyArr=Array.isArray(tareasProg[fechaProponerGolf])?tareasProg[fechaProponerGolf]:Object.values(tareasProg[fechaProponerGolf]||{});
           const existentes=tareasHoyArr.map(t=>t.zona+"_"+t.elemento+"_"+t.tarea);
           const norm=s=>(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"");
+          // ── Igual que en el módulo general: no duplicar una tarea que ya existe SIN RESOLVER en un
+          // día anterior (turno aún no cerrado) — es la misma tarea esperando que se cierre ese turno,
+          // no una nueva ocurrencia. Se detecta por origen (elemento+frecuencia)+fechaCorrespondiente,
+          // en cualquier fecha anterior a la que se está proponiendo, escaneando todo tareasProg.
+          const finalesGolfProp=["hecha","completada","no_pudo"];
+          const nAGolfProp=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+          const pendSignaturesGolf=new Set();
+          const pendTextSetGolf=new Set();
+          const pendZonaTareaSetGolf=new Set();
+          Object.keys(tareasProg||{}).forEach(diaKeyG=>{
+            if(diaKeyG>fechaProponerGolf) return;
+            nAGolfProp(tareasProg[diaKeyG]).forEach(t=>{
+              if(finalesGolfProp.includes(t.estado)) return;
+              if(t.origenZid==="31" && t.origenEid && t.origenFrecId){
+                pendSignaturesGolf.add(`${t.origenEid}_${t.origenFrecId}_${t.fechaCorrespondiente||""}`);
+              }
+              pendTextSetGolf.add(`${t.zona}_${t.elemento}_${t.tarea}`);
+              pendZonaTareaSetGolf.add(`${t.zona}_${t.tarea}`);
+            });
+          });
           // Ya existe si hay una tarea de la misma zona, cuyo elemento empieza por el nombre del elemento
           // (tolera el sufijo "(Hoyo N)" que agrega el formulario manual de Greens) y cuya tarea CONTIENE
           // el nombre de la tarea de la frecuencia (tolera el texto extra: emoji, HOC, nombre de zona, etc.).
@@ -16203,10 +16247,11 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               const yaExisteEsteMismoGolf = yaExisteTarea(e.nombre,f.tarea);
               const prox=calcProximaFrecGlobal(f,fechaProponerGolf);
               if(!prox||prox.diff>0)return;
+              const yaPendienteAntesGolf = pendSignaturesGolf.has(`${e.id}_${f.id}_${prox.fecha}`) || pendTextSetGolf.has(nombreZona+"_"+e.nombre+"_"+f.tarea);
               const esVencida=prox.diff<0;const diasVencida=Math.abs(prox.diff);
               const respDefault=configSemanal?.corte_golf||"";
               const notaAltura=f.alturaCorte?`Cortar a: ${f.alturaCorte} ${f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="pulgadas"?"pulgadas":"milímetros"}.`:"";
-              if(!yaExisteEsteMismoGolf){
+              if(!yaExisteEsteMismoGolf && !yaPendienteAntesGolf){
                 propuestas.push({id:Date.now()+Math.random(),fecha:fechaProponerGolf,zona:nombreZona,elemento:e.nombre,tarea:f.tarea,responsable:respDefault,estado:respDefault?"pendiente":"por_designar",notas:[notaAltura,f.obs].filter(Boolean).join(" "),alturaCorte:f.alturaCorte||"",unidadAlturaCorte:f.unidadAlturaCorte||"mm",estacion:estProp,auto:true,fechaCorrespondiente:prox.fecha,origenZid:"31",origenEid:e.id,origenFrecId:f.id,origenEsCustom:!!e.isCustom,diasVencida:esVencida?diasVencida:0});
                 if(esVencida)vencidas.push(e.nombre+" — "+f.tarea+" ("+diasVencida+"d vencida)");
               }
@@ -16219,7 +16264,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               if(f.tareaEnlazada&&f.tareaEnlazada.trim()){
                 const nombreEnlazadaGolf=f.tareaEnlazada.trim();
                 const claveEnlazada=nombreZona+"_"+nombreEnlazadaGolf;
-                const yaExisteEnlazada=tareasHoyArr.some(t=>t.zona===nombreZona&&norm(t.tarea).includes(norm(nombreEnlazadaGolf)));
+                const yaExisteEnlazada=tareasHoyArr.some(t=>t.zona===nombreZona&&norm(t.tarea).includes(norm(nombreEnlazadaGolf))) || pendZonaTareaSetGolf.has(claveEnlazada);
                 if(!clavesTareaEnlazadaYaAgregada.has(claveEnlazada)&&!yaExisteEnlazada){
                   const frecEnlazadaGolf = frecs.find(ff=>(ff.tarea||"").trim().toLowerCase()===nombreEnlazadaGolf.toLowerCase());
                   const proxEnlazadaGolf = frecEnlazadaGolf ? calcProximaFrecGlobal(frecEnlazadaGolf, fechaProponerGolf) : null;
