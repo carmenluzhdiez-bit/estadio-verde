@@ -1941,6 +1941,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
   const [diaImpresion, setDiaImpresion] = React.useState("");
   const [tabHist,      setTabHist]      = React.useState(tabInicial||"historial_macro"); // "historial_macro" | "historial_golf" | "buscar" | "turnos" | "renombrar"
   const [diaTurnoElegido, setDiaTurnoElegido] = React.useState(tabInicial==="turnos"?new Date().toISOString().slice(0,10):""); // fecha específica elegida para editar en "Ver/editar turnos"
+  const [turnosTrabAbiertos, setTurnosTrabAbiertos] = React.useState({}); // {"dia_resp": bool} — vista por trabajador colapsada por defecto en "Ver/editar turnos"
   const esGolfZonaHist = (zona) => zona==="Golf"||(zona||"").includes("Golf");
   const zonaFijaActual = tabHist==="historial_golf" ? "golf" : tabHist==="historial_macro" ? "no-golf" : null;
   const [buscarZona,   setBuscarZona]   = React.useState("");
@@ -2687,11 +2688,14 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                     const cerrado=cierresTurno?.[key];
                     const hechas=tds.filter(hpTask=>["hecha","completada"].includes(hpTask.estado)).length;
                     const pct=tds.length?Math.round((hechas/tds.length)*100):0;
+                    const trabKey=`${dia}_${resp}`;
+                    const trabAbierto=!!turnosTrabAbiertos[trabKey];
                     return (
                       <div key={resp} style={{padding:"10px 14px",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
                         {/* Header trabajador */}
-                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,flexWrap:"wrap",gap:6}}>
+                        <div onClick={()=>setTurnosTrabAbiertos(p=>({...p,[trabKey]:!p[trabKey]}))} style={{cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,flexWrap:"wrap",gap:6}}>
                           <div style={{display:"flex",alignItems:"center",gap:7}}>
+                            <span style={{fontSize:11,color:"#6aaa7a",transform:trabAbierto?"rotate(90deg)":"none",transition:"transform .15s",display:"inline-block",flexShrink:0}}>▶</span>
                             <div style={{width:26,height:26,borderRadius:"50%",background:"linear-gradient(135deg,#1a5c35,#2d7a4f)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff"}}>
                               {resp[0]?.toUpperCase()||"?"}
                             </div>
@@ -2700,7 +2704,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                               <div style={{fontSize:10,color:"#5a9a7a"}}>{hechas}/{tds.length} tareas · {pct}%</div>
                             </div>
                           </div>
-                          <div style={{display:"flex",gap:5,alignItems:"center"}}>
+                          <div style={{display:"flex",gap:5,alignItems:"center"}} onClick={e=>e.stopPropagation()}>
                             <button onClick={()=>imprimirDiaPorTrabajador(dia, resp)}
                               style={{cursor:"pointer",border:"1px solid rgba(59,130,246,0.3)",borderRadius:6,padding:"2px 7px",background:"rgba(59,130,246,0.06)",color:"#93c5fd",fontSize:10,fontFamily:"'Georgia',serif"}}>
                               🖨️ Imprimir
@@ -2714,10 +2718,11 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                           </div>
                         </div>
                         {/* Barra progreso */}
-                        <div style={{background:"rgba(255,255,255,0.05)",borderRadius:4,height:4,marginBottom:7,overflow:"hidden"}}>
+                        <div style={{background:"rgba(255,255,255,0.05)",borderRadius:4,height:4,marginBottom:trabAbierto?7:0,overflow:"hidden"}}>
                           <div style={{width:`${pct}%`,height:"100%",background:pct===100?"#22c55e":"linear-gradient(90deg,#3d7a52,#4ade80)",borderRadius:4}}/>
                         </div>
                         {/* Tareas */}
+                        {trabAbierto&&(
                         <div style={{display:"flex",flexDirection:"column",gap:3}}>
                           {tds.map(hpTask=>{
                             const est=EC[hpTask.estado]||EC.pendiente;
@@ -2748,6 +2753,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                             );
                           })}
                         </div>
+                        )}
                       </div>
                     );
                   })}
@@ -4869,6 +4875,24 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
       </div>
       <ConfiguradorSemanal S={S} personal={personal} configSemanal={configSemanal||{}} setConfigSemanal={setConfigSemanal} esJefa={esJefa}/>
 
+      {/* ══════ Historial y Ver/editar turnos — accesos rápidos, uno al lado del otro ══════ */}
+      <div style={{display:"flex",gap:14,marginBottom:14,flexWrap:"wrap"}}>
+        <div style={{flex:"1 1 260px",border:"1px solid rgba(96,165,250,0.25)",borderRadius:12,padding:14,background:"rgba(96,165,250,0.03)"}}>
+          <div style={{fontSize:11,fontWeight:700,color:"#93c5fd",marginBottom:10,textTransform:"uppercase",letterSpacing:"0.5px"}}>
+            📜 Historial — incluye todas las macrozonas, incluido Golf
+          </div>
+          <button className={`tab${tabProg==="historial"&&histTabInicial!=="turnos"?" on":""}`} onClick={()=>{setHistTabInicial(null);setTabProg("historial");}}>📜 Ver Historial</button>
+        </div>
+        {esJefa&&(
+          <div style={{flex:"1 1 260px",border:"1px solid rgba(52,211,153,0.25)",borderRadius:12,padding:14,background:"rgba(52,211,153,0.03)"}}>
+            <div style={{fontSize:11,fontWeight:700,color:"#34d399",marginBottom:10,textTransform:"uppercase",letterSpacing:"0.5px"}}>
+              ✅ Trabajarlos — revisar y editar tareas de turnos
+            </div>
+            <button className={`tab${tabProg==="historial"&&histTabInicial==="turnos"?" on":""}`} onClick={()=>{setHistTabInicial("turnos");setTabProg("historial");}}>✏️ Ver/editar turnos</button>
+          </div>
+        )}
+      </div>
+
       {/* ══════ SECCIÓN: Programar y Frecuencias — todas las macrozonas EXCEPTO GOLF ══════ */}
       <div style={{border:"1px solid rgba(52,211,153,0.25)",borderRadius:12,padding:14,marginBottom:14,background:"rgba(52,211,153,0.03)"}}>
         <div style={{fontSize:11,fontWeight:700,color:"#34d399",marginBottom:10,textTransform:"uppercase",letterSpacing:"0.5px"}}>
@@ -5553,13 +5577,6 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
         </div>
       </div>
 
-      {/* ══════ SECCIÓN: Historial — incluye TODAS las macrozonas (Golf incluido) ══════ */}
-      <div style={{border:"1px solid rgba(96,165,250,0.25)",borderRadius:12,padding:14,marginBottom:14,background:"rgba(96,165,250,0.03)"}}>
-        <div style={{fontSize:11,fontWeight:700,color:"#93c5fd",marginBottom:10,textTransform:"uppercase",letterSpacing:"0.5px"}}>
-          📜 Historial — incluye todas las macrozonas, incluido Golf
-        </div>
-        <button className={`tab${tabProg==="historial"?" on":""}`} onClick={()=>{setHistTabInicial(null);setTabProg("historial");}}>📜 Ver Historial</button>
-      </div>
     </div>
   );
 }
