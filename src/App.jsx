@@ -2032,7 +2032,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
           const estLabel = EC[hpTask.estado]?.label || hpTask.estado;
           const icono = (zonas.find(z=>z.nombre===hpTask.zona)||MACROZONAS_BASE.find(z=>z.nombre===hpTask.zona))?.icono||""
           const obsTxtGen = [hpTask.notas?"📋 "+hpTask.notas:"",hpTask.notaWorker?"⚠️ "+hpTask.notaWorker:""].filter(Boolean).join("<br>")||"-";
-          return '<tr>'+'<td class="'+estCls+'">'+( EC[hpTask.estado]?.icon||"-")+" "+estLabel+"</td>"+'<td><b>'+hpTask.tarea+'</b></td>'+'<td>'+(hpTask.elemento||"-")+"</td>"+'<td>'+icono+" "+(hpTask.zona||"-")+"</td>"+'<td>'+(hpTask.responsable||"<i>Sin asignar</i>")+"</td>"+'<td>'+obsTxtGen+"</td>"+'</tr>';
+          return '<tr>'+'<td class="'+estCls+'">'+( EC[hpTask.estado]?.icon||"-")+" "+estLabel+"</td>"+(hpTask.emergente?'<td><b>'+hpTask.tarea+'</b> <span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;padding:1px 5px;border-radius:6px">⚡ Emergente</span></td>':'<td><b>'+hpTask.tarea+'</b></td>')+'<td>'+(hpTask.elemento||"-")+"</td>"+'<td>'+icono+" "+(hpTask.zona||"-")+"</td>"+'<td>'+(hpTask.responsable||"<i>Sin asignar</i>")+"</td>"+'<td>'+obsTxtGen+"</td>"+'</tr>';
         }).join("")}
       </tbody>
     </table>
@@ -2091,7 +2091,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
           const estLabel = EC[hpTask.estado]?.label || hpTask.estado;
           const icono = (zonas.find(z=>z.nombre===hpTask.zona)||MACROZONAS_BASE.find(z=>z.nombre===hpTask.zona))?.icono||""
           const obsTxt = [hpTask.notas?"📋 "+hpTask.notas:"",hpTask.notaWorker?"⚠️ "+hpTask.notaWorker:""].filter(Boolean).join("<br>")||"-";
-          return '<tr>'+'<td class="'+estCls+'">'+( EC[hpTask.estado]?.icon||"-")+" "+estLabel+"</td>"+'<td><b>'+hpTask.tarea+'</b></td>'+'<td>'+(hpTask.elemento||"-")+"</td>"+'<td>'+icono+" "+(hpTask.zona||"-")+"</td>"+'<td>'+obsTxt+"</td>"+'</tr>';
+          return '<tr>'+'<td class="'+estCls+'">'+( EC[hpTask.estado]?.icon||"-")+" "+estLabel+"</td>"+(hpTask.emergente?'<td><b>'+hpTask.tarea+'</b> <span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;padding:1px 5px;border-radius:6px">⚡ Emergente</span></td>':'<td><b>'+hpTask.tarea+'</b></td>')+'<td>'+(hpTask.elemento||"-")+"</td>"+'<td>'+icono+" "+(hpTask.zona||"-")+"</td>"+'<td>'+obsTxt+"</td>"+'</tr>';
         }).join("")}
       </tbody>
     </table>
@@ -2127,7 +2127,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
         const estLabel = EC[hpTask.estado]?.label || hpTask.estado;
         const icono = (zonas.find(z=>z.nombre===hpTask.zona)||MACROZONAS_BASE.find(z=>z.nombre===hpTask.zona))?.icono||"";
         const obsTxt = [hpTask.notas?"📋 "+hpTask.notas:"",hpTask.notaWorker?"⚠️ "+hpTask.notaWorker:""].filter(Boolean).join("<br>")||"-";
-        return '<tr>'+'<td class="'+estCls+'">'+(EC[hpTask.estado]?.icon||"-")+" "+estLabel+"</td>"+'<td><b>'+hpTask.tarea+'</b></td>'+'<td>'+(hpTask.elemento||"-")+"</td>"+'<td>'+icono+" "+(hpTask.zona||"-")+"</td>"+'<td>'+obsTxt+"</td>"+'</tr>';
+        return '<tr>'+'<td class="'+estCls+'">'+(EC[hpTask.estado]?.icon||"-")+" "+estLabel+"</td>"+(hpTask.emergente?'<td><b>'+hpTask.tarea+'</b> <span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;padding:1px 5px;border-radius:6px">⚡ Emergente</span></td>':'<td><b>'+hpTask.tarea+'</b></td>')+'<td>'+(hpTask.elemento||"-")+"</td>"+'<td>'+icono+" "+(hpTask.zona||"-")+"</td>"+'<td>'+obsTxt+"</td>"+'</tr>';
       }).join("");
       return `<div class="trab-sec">
         <div class="trab-head"><span>🧑‍🌾 ${resp}</span><span class="trab-pct">${hechasR}/${tds.length} · ${pctR}%</span></div>
@@ -2730,7 +2730,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                               <div key={hpTask.id} style={{display:"flex",gap:7,padding:"5px 8px",borderRadius:7,background:`${est.color}07`,border:`1px solid ${est.color}18`,alignItems:"flex-start"}}>
                                 <span style={{fontSize:12,flexShrink:0}}>{est.icon}</span>
                                 <div style={{flex:1,minWidth:0}}>
-                                  <div style={{fontSize:12,fontWeight:600}}>{(hpTask.tarea||"").replace("⛳ ","")}</div>
+                                  <div style={{fontSize:12,fontWeight:600}}>{(hpTask.tarea||"").replace("⛳ ","")}{hpTask.emergente&&<span style={{marginLeft:6,fontSize:9,fontWeight:700,color:"#fbbf24",background:"rgba(251,191,36,0.12)",border:"1px solid rgba(251,191,36,0.3)",padding:"1px 6px",borderRadius:7}}>⚡ Emergente</span>}</div>
                                   {hpTask.zona&&<div style={{fontSize:10,color:"#5a7a7a"}}>📍 {hpTask.zona}{hpTask.elemento?` · ${hpTask.elemento}`:""}</div>}
                                   {hpTask.alturaCorte&&<div style={{fontSize:10,color:"#fbbf24"}}>✂️ HOC indicada: {hpTask.alturaCorte}mm</div>}
                                   {hpTask.alturaCorteReal&&<div style={{fontSize:10,color:"#22c55e",fontWeight:600}}>✂️ HOC real: {hpTask.alturaCorteReal}mm</div>}
@@ -4096,7 +4096,7 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                           return (
                             <div key={t.id} style={{padding:"9px 12px",background:i%2===0?"transparent":"rgba(255,255,255,0.02)",borderTop:"1px solid rgba(255,255,255,0.04)"}}>
                               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:5}}>
-                                <div style={{fontSize:13,fontWeight:600}}>{t.tarea?.replace("⛳ ","")}</div>
+                                <div style={{fontSize:13,fontWeight:600}}>{t.tarea?.replace("⛳ ","")}{t.emergente&&<span style={{marginLeft:6,fontSize:10,fontWeight:700,color:"#fbbf24",background:"rgba(251,191,36,0.12)",border:"1px solid rgba(251,191,36,0.3)",padding:"1px 7px",borderRadius:8,verticalAlign:"middle"}}>⚡ Emergente</span>}</div>
                                 <span style={{fontSize:10,fontWeight:600,color:est.color,background:`${est.color}12`,padding:"2px 7px",borderRadius:8,border:`1px solid ${est.color}25`,whiteSpace:"nowrap",flexShrink:0}}>{est.icon} {est.label}</span>
                               </div>
                               {t.zona&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:1,marginBottom:4}}>📍 {t.zona}{t.elemento?` · ${t.elemento}`:""}</div>}
@@ -4270,7 +4270,7 @@ Una vez cerrado no podrás modificar las tareas. Solo la jefa puede reabrir el t
                   <div style={{display:"flex",gap:8}}>
                     <button onClick={()=>{
                       if(!emergenteForm.tarea.trim()) return;
-                      onAddTarea({id:Date.now(),fecha:fechaVer,tarea:emergenteForm.tarea,responsable:trabajador.nombre,zona:emergenteForm.zona||"Sin zona",estado:"hecha",notas:emergenteForm.obs||"Tarea emergente del turno",auto:false});
+                      onAddTarea({id:Date.now(),fecha:fechaVer,tarea:emergenteForm.tarea,responsable:trabajador.nombre,zona:emergenteForm.zona||"Sin zona",estado:"hecha",notas:emergenteForm.obs||"Tarea emergente del turno",auto:false,emergente:true});
                       setEmergenteForm({zona:"",tarea:"",obs:""});
                       setShowEmergente(false);
                     }} style={{cursor:"pointer",border:"none",borderRadius:10,padding:"8px 18px",background:"#3d7a52",color:"#fff",fontSize:13,fontFamily:"'Georgia',serif",fontWeight:600}}>
