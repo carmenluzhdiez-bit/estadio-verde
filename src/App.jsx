@@ -16882,6 +16882,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
   const [bodegaActiva, setBodegaActiva] = React.useState(bodegaInicial||"b01");
   const [subTab, setSubTab] = React.useState(subTabInicial||"stock");
   const [showItemForm, setShowItemForm] = React.useState(false);
+  const [buscarItemStock, setBuscarItemStock] = React.useState("");
   const [showMovForm, setShowMovForm] = React.useState(false);
   const [editMovId, setEditMovId] = React.useState(null); // id del movimiento en edición (null = registrando uno nuevo)
   const [showTareaForm, setShowTareaForm] = React.useState(false);
@@ -18023,7 +18024,27 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
             <div style={{...S.card,padding:20,marginBottom:14}} className="ein">
               <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,marginBottom:14,color:bodega.color}}>{editItemId?"✏️ Editar":"➕ Nuevo"} {bodegaActiva==="b04"?"equipo":"ítem"}</div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Nombre</label><input style={S.input} value={itemForm.nombre} onChange={e=>setItemForm(p=>({...p,nombre:e.target.value}))} placeholder="Nombre del ítem"/></div>
+                <div style={{gridColumn:"1/-1"}}>
+                  <label style={labelSt}>Nombre</label>
+                  <input style={S.input} value={itemForm.nombre} onChange={e=>setItemForm(p=>({...p,nombre:e.target.value}))} placeholder="Nombre del ítem"/>
+                  {(()=>{
+                    // Aviso de nombres parecidos ya existentes — para no terminar con el mismo ítem
+                    // guardado dos veces con nombres distintos (ej. "Aspersor 15mm" y "aspersor 15 mm").
+                    const normItemName = s => (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/\s+/g," ").trim();
+                    const nombreNormActual = normItemName(itemForm.nombre);
+                    if(nombreNormActual.length<3) return null;
+                    const similares = (bd.items||[]).filter(i=>i.id!==editItemId).filter(i=>{
+                      const n=normItemName(i.nombre);
+                      return n===nombreNormActual || n.includes(nombreNormActual) || nombreNormActual.includes(n);
+                    });
+                    if(similares.length===0) return null;
+                    return (
+                      <div style={{marginTop:6,padding:"6px 10px",background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.25)",borderRadius:6,fontSize:11,color:"#fbbf24"}}>
+                        ⚠️ Ya existe algo parecido: {similares.map(i=>`"${i.nombre}" (stock: ${i.stockActual} ${i.unidad})`).join(", ")}. Si es lo mismo, mejor cancela y usa "± Mov." sobre ese ítem en vez de crear uno nuevo.
+                      </div>
+                    );
+                  })()}
+                </div>
                 <div><label style={labelSt}>Categoría</label>
                   <select style={S.input} value={itemForm.categoria} onChange={e=>setItemForm(p=>({...p,categoria:e.target.value}))}>
                     <option value="">Seleccionar...</option>{bodega.categorias.map(optC=><option key={optC}>{optC}</option>)}
@@ -18275,10 +18296,18 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
               })()}
               {/* Items agrupados por categoría (colapsables, orden alfabético) */}
               {(()=>{
+                const norm=s=>(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
+                const buscando = buscarItemStock.trim().length>0;
+                const itemsBase = buscando ? (bd.items||[]).filter(i=>norm(i.nombre).includes(norm(buscarItemStock))) : (bd.items||[]);
                 const esMaq=bodegaActiva==="b04";
-                const cats=[...new Set((bd.items||[]).map(i=>i.categoria||"Sin categoría"))].sort();
+                const cats=[...new Set(itemsBase.map(i=>i.categoria||"Sin categoría"))].sort();
                 return (<>
-                  {esMaq&&(bd.items||[]).length>0&&(
+                  <div style={{marginBottom:12}}>
+                    <input type="text" placeholder="🔎 Buscar ítem por nombre..." value={buscarItemStock} onChange={e=>setBuscarItemStock(e.target.value)}
+                      style={{...S.input,width:"100%",maxWidth:360}}/>
+                    {buscando&&<div style={{fontSize:11,color:"#7aaa80",marginTop:4}}>{itemsBase.length} resultado{itemsBase.length!==1?"s":""} de {(bd.items||[]).length}</div>}
+                  </div>
+                  {esMaq&&itemsBase.length>0&&(
                     <div style={{fontSize:11,color:"#7aaa80",marginBottom:8,display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
                       <span>Selecciona equipos para el informe (marca cada uno con su casilla, o usa este botón para todos):</span>
                       <button style={{...S.btn,fontSize:10,padding:"2px 8px",background:selMaq.length===(bd.items||[]).length?"rgba(249,115,22,0.15)":"transparent",border:"1px solid rgba(249,115,22,0.3)",color:"#f97316"}}
@@ -18446,8 +18475,8 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                     </div>
                   )}
                   {cats.map(cat=>{
-                    const its=(bd.items||[]).filter(i=>(i.categoria||"Sin categoría")===cat).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
-                    const abierta = esMaq ? (catsAb[cat]!==false) : (catsAb[cat]===true);
+                    const its=itemsBase.filter(i=>(i.categoria||"Sin categoría")===cat).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+                    const abierta = buscando ? true : (esMaq ? (catsAb[cat]!==false) : (catsAb[cat]===true));
                     return (
                       <div key={cat} style={{marginBottom:10}}>
                         <div onClick={()=>setCatsAb(p=>({...p,[cat]:!abierta}))}
