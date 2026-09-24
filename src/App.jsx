@@ -17970,6 +17970,38 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
               setBodegasData(prev=>({...prev,[bodegaActiva]:{...(prev[bodegaActiva]||{}),items:nuevosItems}}));
               alert(`✅ Se recrearon ${reparados.length} ítem(s) que tenían movimiento pero no stock:\n\n${reparados.join("\n")}`);
             }}>🔧 Reparar stock desde movimientos</button>}
+            {esJefa&&<button style={{...S.btn,background:"rgba(167,139,250,0.15)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.3)"}} onClick={()=>{
+              const normFus=s=>(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/\s+/g,"").trim();
+              const items = bd.items||[];
+              const movs = bd.movimientos||[];
+              const grupos = new Map(); // nombreNormalizado -> [items]
+              items.forEach(i=>{
+                const n = normFus(i.nombre);
+                if(!grupos.has(n)) grupos.set(n,[]);
+                grupos.get(n).push(i);
+              });
+              const duplicados = [...grupos.values()].filter(g=>g.length>1);
+              if(duplicados.length===0){ alert("✅ No se encontraron ítems con el mismo nombre — no hay nada que fusionar."); return; }
+              const resumen = duplicados.map(g=>`${g[0].nombre} — ${g.length} copias, stock total: ${g.reduce((s,i)=>s+(Number(i.stockActual)||0),0)} ${g[0].unidad}`).join("\n");
+              if(!window.confirm(`Se encontraron ${duplicados.length} ítem(s) duplicado(s):\n\n${resumen}\n\n¿Fusionar cada grupo en un solo ítem? Se suma el stock y se conserva el historial de movimientos de todos.`)) return;
+              let itemsFinal = [...items];
+              let movsFinal = [...movs];
+              const fusionados = [];
+              duplicados.forEach(g=>{
+                // Se conserva el PRIMER ítem del grupo (el más antiguo, id más chico) como sobreviviente.
+                const ordenado = [...g].sort((a,b)=>Number(a.id)-Number(b.id));
+                const sobreviviente = ordenado[0];
+                const eliminados = ordenado.slice(1);
+                const stockSumado = g.reduce((s,i)=>s+(Number(i.stockActual)||0),0);
+                const idsEliminados = eliminados.map(i=>String(i.id));
+                // Reasignar el historial de movimientos de los eliminados al sobreviviente.
+                movsFinal = movsFinal.map(m=>idsEliminados.includes(String(m.itemId))?{...m,itemId:String(sobreviviente.id)}:m);
+                itemsFinal = itemsFinal.filter(i=>!idsEliminados.includes(String(i.id))).map(i=>i.id===sobreviviente.id?{...i,stockActual:stockSumado}:i);
+                fusionados.push(`${sobreviviente.nombre} (${eliminados.length+1} → 1, stock: ${stockSumado} ${sobreviviente.unidad})`);
+              });
+              setbd({items:itemsFinal, movimientos:movsFinal});
+              alert(`✅ Se fusionaron ${duplicados.length} grupo(s):\n\n${fusionados.join("\n")}`);
+            }}>🔀 Fusionar duplicados</button>}
           </div>
 
           {/* Inventario inicial */}
