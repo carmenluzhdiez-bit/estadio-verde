@@ -2036,7 +2036,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
           const estLabel = EC[hpTask.estado]?.label || hpTask.estado;
           const icono = (zonas.find(z=>z.nombre===hpTask.zona)||MACROZONAS_BASE.find(z=>z.nombre===hpTask.zona))?.icono||""
           const obsTxtGen = [hpTask.notas?"📋 "+hpTask.notas:"",hpTask.notaWorker?"⚠️ "+hpTask.notaWorker:""].filter(Boolean).join("<br>")||"-";
-          return '<tr>'+'<td class="'+estCls+'">'+( EC[hpTask.estado]?.icon||"-")+" "+estLabel+"</td>"+(hpTask.emergente?'<td><b>'+hpTask.tarea+'</b> <span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;padding:1px 5px;border-radius:6px">⚡ Emergente</span></td>':'<td><b>'+hpTask.tarea+'</b></td>')+'<td>'+(hpTask.elemento||"-")+"</td>"+'<td>'+icono+" "+(hpTask.zona||"-")+"</td>"+'<td>'+(hpTask.responsable||"<i>Sin asignar</i>")+"</td>"+'<td>'+obsTxtGen+"</td>"+'</tr>';
+          return '<tr>'+'<td class="'+estCls+'">'+( EC[hpTask.estado]?.icon||"-")+" "+estLabel+"</td>"+(hpTask.emergente?'<td><b>'+hpTask.tarea+'</b> <span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;padding:1px 5px;border-radius:6px">⚡ Emergente</span></td>':hpTask.movidoDesde?'<td><b>'+hpTask.tarea+'</b> <span style="font-size:9px;font-weight:700;color:#1e40af;background:#dbeafe;border:1px solid #93c5fd;padding:1px 5px;border-radius:6px">🔁 Movida desde '+hpTask.movidoDesde+'</span></td>':'<td><b>'+hpTask.tarea+'</b></td>')+'<td>'+(hpTask.elemento||"-")+"</td>"+'<td>'+icono+" "+(hpTask.zona||"-")+"</td>"+'<td>'+(hpTask.responsable||"<i>Sin asignar</i>")+"</td>"+'<td>'+obsTxtGen+"</td>"+'</tr>';
         }).join("")}
       </tbody>
     </table>
@@ -2095,7 +2095,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
           const estLabel = EC[hpTask.estado]?.label || hpTask.estado;
           const icono = (zonas.find(z=>z.nombre===hpTask.zona)||MACROZONAS_BASE.find(z=>z.nombre===hpTask.zona))?.icono||""
           const obsTxt = [hpTask.notas?"📋 "+hpTask.notas:"",hpTask.notaWorker?"⚠️ "+hpTask.notaWorker:""].filter(Boolean).join("<br>")||"-";
-          return '<tr>'+'<td class="'+estCls+'">'+( EC[hpTask.estado]?.icon||"-")+" "+estLabel+"</td>"+(hpTask.emergente?'<td><b>'+hpTask.tarea+'</b> <span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;padding:1px 5px;border-radius:6px">⚡ Emergente</span></td>':'<td><b>'+hpTask.tarea+'</b></td>')+'<td>'+(hpTask.elemento||"-")+"</td>"+'<td>'+icono+" "+(hpTask.zona||"-")+"</td>"+'<td>'+obsTxt+"</td>"+'</tr>';
+          return '<tr>'+'<td class="'+estCls+'">'+( EC[hpTask.estado]?.icon||"-")+" "+estLabel+"</td>"+(hpTask.emergente?'<td><b>'+hpTask.tarea+'</b> <span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;padding:1px 5px;border-radius:6px">⚡ Emergente</span></td>':hpTask.movidoDesde?'<td><b>'+hpTask.tarea+'</b> <span style="font-size:9px;font-weight:700;color:#1e40af;background:#dbeafe;border:1px solid #93c5fd;padding:1px 5px;border-radius:6px">🔁 Movida desde '+hpTask.movidoDesde+'</span></td>':'<td><b>'+hpTask.tarea+'</b></td>')+'<td>'+(hpTask.elemento||"-")+"</td>"+'<td>'+icono+" "+(hpTask.zona||"-")+"</td>"+'<td>'+obsTxt+"</td>"+'</tr>';
         }).join("")}
       </tbody>
     </table>
@@ -2131,7 +2131,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
         const estLabel = EC[hpTask.estado]?.label || hpTask.estado;
         const icono = (zonas.find(z=>z.nombre===hpTask.zona)||MACROZONAS_BASE.find(z=>z.nombre===hpTask.zona))?.icono||"";
         const obsTxt = [hpTask.notas?"📋 "+hpTask.notas:"",hpTask.notaWorker?"⚠️ "+hpTask.notaWorker:""].filter(Boolean).join("<br>")||"-";
-        return '<tr>'+'<td class="'+estCls+'">'+(EC[hpTask.estado]?.icon||"-")+" "+estLabel+"</td>"+(hpTask.emergente?'<td><b>'+hpTask.tarea+'</b> <span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;padding:1px 5px;border-radius:6px">⚡ Emergente</span></td>':'<td><b>'+hpTask.tarea+'</b></td>')+'<td>'+(hpTask.elemento||"-")+"</td>"+'<td>'+icono+" "+(hpTask.zona||"-")+"</td>"+'<td>'+obsTxt+"</td>"+'</tr>';
+        return '<tr>'+'<td class="'+estCls+'">'+(EC[hpTask.estado]?.icon||"-")+" "+estLabel+"</td>"+(hpTask.emergente?'<td><b>'+hpTask.tarea+'</b> <span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;padding:1px 5px;border-radius:6px">⚡ Emergente</span></td>':hpTask.movidoDesde?'<td><b>'+hpTask.tarea+'</b> <span style="font-size:9px;font-weight:700;color:#1e40af;background:#dbeafe;border:1px solid #93c5fd;padding:1px 5px;border-radius:6px">🔁 Movida desde '+hpTask.movidoDesde+'</span></td>':'<td><b>'+hpTask.tarea+'</b></td>')+'<td>'+(hpTask.elemento||"-")+"</td>"+'<td>'+icono+" "+(hpTask.zona||"-")+"</td>"+'<td>'+obsTxt+"</td>"+'</tr>';
       }).join("");
       return `<div class="trab-sec">
         <div class="trab-head"><span>🧑‍🌾 ${resp}</span><span class="trab-pct">${hechasR}/${tds.length} · ${pctR}%</span></div>
@@ -2740,6 +2740,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                                   {hpTask.alturaCorteReal&&<div style={{fontSize:10,color:"#22c55e",fontWeight:600}}>✂️ HOC real: {hpTask.alturaCorteReal}mm</div>}
                                   {hpTask.notaWorker&&<div style={{fontSize:10,color:hpTask.estado==="no_pudo"?"#f87171":"#a0c8a0",fontStyle:"italic"}}>💬 {hpTask.notaWorker}</div>}
                                   {hpTask.notaJefa&&<div style={{fontSize:10,color:"#fbbf24",fontStyle:"italic"}}>📋 {hpTask.notaJefa}</div>}
+                                  {hpTask.movidoDesde&&<div style={{fontSize:10,color:"#93c5fd"}}>🔁 Movida desde {hpTask.movidoDesde} (seguía sin resolver)</div>}
                                 </div>
                                 <div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
                                   <select value={hpTask.estado}
@@ -4107,6 +4108,7 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                               {t.alturaCorte&&<div style={{fontSize:12,color:"#fbbf24",fontWeight:600,marginBottom:4,background:"rgba(251,191,36,0.08)",border:"1px solid rgba(251,191,36,0.2)",borderRadius:6,padding:"3px 8px",display:"inline-block"}}>✂️ Cortar a: {t.alturaCorte} {t.unidadAlturaCorte==="cm"?"cm":t.unidadAlturaCorte==="pulgadas"?"pulgadas":"mm"}</div>}
                               {t.metodoLimpieza&&<span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.08)",padding:"1px 8px",borderRadius:8,border:"1px solid rgba(251,191,36,0.2)",display:"inline-block",marginBottom:4}}>{t.metodoLimpieza==="sopladora"?"🌬️ Sopladora":t.metodoLimpieza==="barrido"?"🧹 Barrido":"🌬️+🧹 Sopladora + Barrido"}</span>}
                               {t.notas&&<div style={{fontSize:11,color:"#5a8a6a",marginTop:2,marginBottom:4,fontStyle:"italic"}}>💡 {t.notas}</div>}
+                              {t.movidoDesde&&<div style={{fontSize:10,color:"#93c5fd",marginBottom:4}}>🔁 Movida desde {t.movidoDesde} (seguía sin resolver)</div>}
                               {puedeEditar ? (
                                 <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                                   {Object.entries(ESTADOS_TAREA).map(([k,v])=>(
@@ -4873,7 +4875,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
 
   const confirmarPreviewProp = () => {
     const yaExistenConfirm = getTareasDelDia(fecha).map(t=>t.zona+"_"+t.elemento+"_"+t.tarea);
-    const aEnviar = (previewProp||[]).filter(p=>p.incluir && !yaExistenConfirm.includes(p.zona+"_"+p.elemento+"_"+p.tarea)).map(({incluir,abierta,_movidoDesde,...t})=>t);
+    const aEnviar = (previewProp||[]).filter(p=>p.incluir && !yaExistenConfirm.includes(p.zona+"_"+p.elemento+"_"+p.tarea)).map(({incluir,abierta,_movidoDesde,...t})=>_movidoDesde?{...t,movidoDesde:_movidoDesde}:t);
     const yaEstabanConfirm = (previewProp||[]).filter(p=>p.incluir).length - aEnviar.length;
     if(aEnviar.length===0 && yaEstabanConfirm===0){ alert("No hay tareas seleccionadas."); return; }
     // Tareas movidas desde un día anterior (misma id): hay que quitarlas de su día original para
@@ -16523,7 +16525,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               return nuevo;
             });
           }
-          const aEnviarLimpio = aEnviar.map(({_movidoDesde,...t})=>t);
+          const aEnviarLimpio = aEnviar.map(({_movidoDesde,...t})=>_movidoDesde?{...t,movidoDesde:_movidoDesde}:t);
           const tareasHoyArr=Array.isArray(tareasProg[fechaDestinoGolf])?tareasProg[fechaDestinoGolf]:Object.values(tareasProg[fechaDestinoGolf]||{});
           setTareasProg(prev=>({...prev,[fechaDestinoGolf]:[...tareasHoyArr,...aEnviarLimpio]}));
           setPreviewGolfProp(null);
