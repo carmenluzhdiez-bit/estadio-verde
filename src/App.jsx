@@ -4752,13 +4752,20 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     // para tareas sin ese origen (ej. adelantadas/enlazadas) se usa el texto zona+elemento+tarea.
     const finalesProp = ["hecha","completada","no_pudo"];
     const nAprop = v => Array.isArray(v) ? v : (v && typeof v==="object" ? Object.values(v) : []);
+    // Blindaje: si un id de tarea ya quedó resuelto (hecha/completada/no_pudo) en CUALQUIER día,
+    // nunca lo volvemos a tratar como pendiente aunque quede una copia vieja sin borrar dando vueltas
+    // (ej. un resabio de una "movida" cuyo borrado del día original no se guardó a tiempo).
+    const idsResueltos = new Set();
+    Object.keys(tareas).forEach(diaKey => {
+      nAprop(tareas[diaKey]).forEach(t => { if(finalesProp.includes(t.estado)) idsResueltos.add(t.id); });
+    });
     const pendItemsMap = new Map(); // signature -> {dia, item}
     const pendItemsMapText = new Map(); // "zona_elemento_tarea" -> {dia, item}
     const pendItemsAll = []; // TODOS los pendientes de días anteriores, con o sin frecuencia (incluye manuales)
     Object.keys(tareas).sort().forEach(diaKey => {
       if(diaKey >= fecha) return; // solo días ANTERIORES al que se está proponiendo
       nAprop(tareas[diaKey]).forEach(t => {
-        if(finalesProp.includes(t.estado)) return;
+        if(finalesProp.includes(t.estado) || idsResueltos.has(t.id)) return;
         if(t.origenZid && t.origenEid && t.origenFrecId){
           pendItemsMap.set(`${t.origenZid}_${t.origenEid}_${t.origenFrecId}_${t.fechaCorrespondiente||""}`, {dia:diaKey, item:t});
         }
@@ -16323,6 +16330,12 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           // se está proponiendo, escaneando todo tareasProg.
           const finalesGolfProp=["hecha","completada","no_pudo"];
           const nAGolfProp=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+          // Blindaje: si un id ya quedó resuelto en cualquier fecha, nunca se vuelve a tratar como
+          // pendiente aunque quede una copia vieja sin borrar (ver mismo blindaje en el módulo general).
+          const idsResueltosGolf = new Set();
+          Object.keys(tareasProg||{}).forEach(diaKeyG=>{
+            nAGolfProp(tareasProg[diaKeyG]).forEach(t=>{ if(finalesGolfProp.includes(t.estado)) idsResueltosGolf.add(t.id); });
+          });
           const pendSignaturesGolf=new Map();
           const pendTextSetGolf=new Map();
           const pendZonaTareaSetGolf=new Map();
@@ -16330,7 +16343,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           Object.keys(tareasProg||{}).sort().forEach(diaKeyG=>{
             if(diaKeyG>=fechaProponerGolf) return;
             nAGolfProp(tareasProg[diaKeyG]).forEach(t=>{
-              if(finalesGolfProp.includes(t.estado)) return;
+              if(finalesGolfProp.includes(t.estado) || idsResueltosGolf.has(t.id)) return;
               if(t.origenZid==="31" && t.origenEid && t.origenFrecId){
                 pendSignaturesGolf.set(`${t.origenEid}_${t.origenFrecId}_${t.fechaCorrespondiente||""}`, {dia:diaKeyG, item:t});
               }
