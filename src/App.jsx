@@ -4728,6 +4728,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     const nAprop = v => Array.isArray(v) ? v : (v && typeof v==="object" ? Object.values(v) : []);
     const pendItemsMap = new Map(); // signature -> {dia, item}
     const pendItemsMapText = new Map(); // "zona_elemento_tarea" -> {dia, item}
+    const pendItemsAll = []; // TODOS los pendientes de días anteriores, con o sin frecuencia (incluye manuales)
     Object.keys(tareas).sort().forEach(diaKey => {
       if(diaKey >= fecha) return; // solo días ANTERIORES al que se está proponiendo
       nAprop(tareas[diaKey]).forEach(t => {
@@ -4736,6 +4737,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           pendItemsMap.set(`${t.origenZid}_${t.origenEid}_${t.origenFrecId}_${t.fechaCorrespondiente||""}`, {dia:diaKey, item:t});
         }
         pendItemsMapText.set(`${t.zona}_${t.elemento}_${t.tarea}`, {dia:diaKey, item:t});
+        pendItemsAll.push({dia:diaKey, item:t});
       });
     });
     zonas.forEach(z => {
@@ -4817,6 +4819,16 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           }
         });
       });
+    });
+    // ── Tareas MANUALES pendientes de días anteriores (sin frecuencia configurada) ── El barrido
+    // de arriba solo mueve tareas ligadas a una frecuencia; una tarea puntual (ej. un encargo del
+    // supervisor) no corresponde a ninguna, así que nunca entra en ese barrido. Aquí se arrastran
+    // las que quedaron: cualquier pendiente/en_curso de un día anterior cuyo id no se haya movido ya.
+    const idsYaMovidos = new Set(propuestas.filter(p=>p._movidoDesde).map(p=>p.id));
+    pendItemsAll.forEach(({dia,item})=>{
+      if(idsYaMovidos.has(item.id)) return;
+      idsYaMovidos.add(item.id);
+      propuestas.push({...item, fecha, incluir:true, abierta:false, _movidoDesde:dia});
     });
     // No proponer tareas en domingo
     const diaSemana = new Date(fecha+"T12:00:00").getDay();
@@ -16247,6 +16259,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           const pendSignaturesGolf=new Map();
           const pendTextSetGolf=new Map();
           const pendZonaTareaSetGolf=new Map();
+          const pendItemsAllGolf=[]; // TODOS los pendientes de Golf de días anteriores, con o sin frecuencia (incluye manuales)
           Object.keys(tareasProg||{}).sort().forEach(diaKeyG=>{
             if(diaKeyG>=fechaProponerGolf) return;
             nAGolfProp(tareasProg[diaKeyG]).forEach(t=>{
@@ -16256,6 +16269,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               }
               pendTextSetGolf.set(`${t.zona}_${t.elemento}_${t.tarea}`, {dia:diaKeyG, item:t});
               pendZonaTareaSetGolf.set(`${t.zona}_${t.tarea}`, {dia:diaKeyG, item:t});
+              if(t.zona===nombreZona) pendItemsAllGolf.push({dia:diaKeyG, item:t});
             });
           });
           // Ya existe si hay una tarea de la misma zona, cuyo elemento empieza por el nombre del elemento
@@ -16380,6 +16394,15 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             propuestas.push({id:Date.now()+Math.random(),fecha:fechaProponerGolf,zona:nombreZona,elemento:t.elemento,tarea:t.tarea,responsable:t.responsable||(configSemanal?.corte_golf||""),estado:(t.responsable||configSemanal?.corte_golf)?"pendiente":"por_designar",notas:(t.notas?t.notas+" | ":"")+"Reprogramada (no se pudo) desde "+fOrig+(t.notaWorker?" — Obs. anterior: "+t.notaWorker:""),alturaCorte:t.alturaCorte||"",unidadAlturaCorte:t.unidadAlturaCorte||"mm",estacion:estProp,auto:true,origenNoPudo:true,fechaOrigenNoPudo:fOrig,diasVencida:0,origenZid:t.origenZid,origenEid:t.origenEid,origenFrecId:t.origenFrecId,origenEsCustom:t.origenEsCustom});
             clavesYaPropuestas.add(clave);
             vencidas.push(t.elemento+" — "+t.tarea+" (no se pudo el "+fOrig+")");
+          });
+          // ── Tareas MANUALES de Golf pendientes de días anteriores (sin frecuencia configurada) ──
+          // Igual que en el módulo general: una tarea puntual no corresponde a ninguna frecuencia,
+          // así que nunca entra en el barrido de arriba. Aquí se arrastran las que falten.
+          const idsYaMovidosGolf = new Set(propuestas.filter(p=>p._movidoDesde).map(p=>p.id));
+          pendItemsAllGolf.forEach(({dia,item})=>{
+            if(idsYaMovidosGolf.has(item.id)) return;
+            idsYaMovidosGolf.add(item.id);
+            propuestas.push({...item, fecha:fechaProponerGolf, _movidoDesde:dia});
           });
           if(propuestas.length===0){alert("No hay tareas de Golf pendientes según las frecuencias definidas para "+fechaProponerGolf+".");return;}
           const propOrdenadas=[...propuestas].sort((a,b)=>a.tarea.localeCompare(b.tarea,"es",{sensitivity:"base"}));
