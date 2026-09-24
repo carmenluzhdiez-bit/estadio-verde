@@ -4718,25 +4718,24 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     const propuestas = [];
     const vencidas = [];
     const existentes = getTareasDelDia(fecha).map(t => t.zona+"_"+t.elemento+"_"+t.tarea);
-    // ── Evitar duplicar tareas que ya existen SIN RESOLVER en un día anterior (turno aún no
-    // cerrado) ── Si una tarea de un día previo todavía no está "hecha"/"no_pudo", no significa
-    // que de verdad haya que hacerla de nuevo hoy: es la MISMA tarea esperando que se cierre ese
-    // turno. Se detecta por origen (zona+elemento+frecuencia) + la misma fecha de vencimiento
-    // calculada (fechaCorrespondiente) — si coincide con una ya pendiente en cualquier día anterior,
-    // no se propone otra vez. Para tareas sin ese origen (ej. adelantadas/enlazadas), se usa el
-    // texto zona+elemento+tarea como respaldo.
+    // ── Tareas SIN RESOLVER de un día anterior (turno aún no cerrado) ── No se duplican: se
+    // MUEVEN al día que se está programando (mismo registro, misma id, mismo estado — solo cambia
+    // su fecha). Así nunca desaparecen de la vista ni quedan "atrapadas" en un día viejo que ya
+    // nadie revisa, pero tampoco se crea una tarea nueva de la nada. Se detecta por origen
+    // (zona+elemento+frecuencia) + la misma fecha de vencimiento calculada (fechaCorrespondiente);
+    // para tareas sin ese origen (ej. adelantadas/enlazadas) se usa el texto zona+elemento+tarea.
     const finalesProp = ["hecha","completada","no_pudo"];
     const nAprop = v => Array.isArray(v) ? v : (v && typeof v==="object" ? Object.values(v) : []);
-    const pendSignatures = new Set();
-    const pendTextSet = new Set();
-    Object.keys(tareas).forEach(diaKey => {
-      if(diaKey > fecha) return; // solo días hasta la fecha que se está proponiendo, no futuros
+    const pendItemsMap = new Map(); // signature -> {dia, item}
+    const pendItemsMapText = new Map(); // "zona_elemento_tarea" -> {dia, item}
+    Object.keys(tareas).sort().forEach(diaKey => {
+      if(diaKey >= fecha) return; // solo días ANTERIORES al que se está proponiendo
       nAprop(tareas[diaKey]).forEach(t => {
         if(finalesProp.includes(t.estado)) return;
         if(t.origenZid && t.origenEid && t.origenFrecId){
-          pendSignatures.add(`${t.origenZid}_${t.origenEid}_${t.origenFrecId}_${t.fechaCorrespondiente||""}`);
+          pendItemsMap.set(`${t.origenZid}_${t.origenEid}_${t.origenFrecId}_${t.fechaCorrespondiente||""}`, {dia:diaKey, item:t});
         }
-        pendTextSet.add(`${t.zona}_${t.elemento}_${t.tarea}`);
+        pendItemsMapText.set(`${t.zona}_${t.elemento}_${t.tarea}`, {dia:diaKey, item:t});
       });
     });
     zonas.forEach(z => {
@@ -4753,8 +4752,8 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           const key = nombreZona+"_"+e.nombre+"_"+f.tarea;
           const prox = calcProximaFrecGlobal(f, fecha);
           if(!prox) return; // sin frecuencia activa, sin última realización registrada, o "según necesidad"/"una vez"
-          const yaPendienteAntes = pendSignatures.has(`${z.id}_${e.id}_${f.id}_${prox.fecha}`) || pendTextSet.has(key);
-          const yaExisteEsteMismo = existentes.includes(key) || propuestas.some(p=>p.zona===nombreZona&&p.elemento===e.nombre&&p.tarea.trim().toLowerCase()===f.tarea.trim().toLowerCase()) || yaPendienteAntes;
+          const pendienteAntes = pendItemsMap.get(`${z.id}_${e.id}_${f.id}_${prox.fecha}`) || pendItemsMapText.get(key);
+          const yaExisteEsteMismo = existentes.includes(key) || propuestas.some(p=>p.zona===nombreZona&&p.elemento===e.nombre&&p.tarea.trim().toLowerCase()===f.tarea.trim().toLowerCase()) || !!pendienteAntes;
           // Solo seguir si la fecha calculada ya llegó (vencida o es hoy) — ni ella ni su enlazada se
           // disparan si todavía falta. Esto se evalúa SIEMPRE, exista ya la tarea o no — para que el
           // enlace (más abajo) funcione también cuando "Corte" ya estaba creada de antes.
@@ -4767,7 +4766,11 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
             : getResponsablePorTipo(f.tarea, configSemanal, nombreZona)||"";
           const notaAltura = f.alturaCorte ? `Cortar a: ${f.alturaCorte} ${f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="pulgadas"?"pulgadas":"milímetros"}.` : "";
           const etiquetaFrec = f.modo==="diasSemana" ? `cada ${f.diasMinimos||"?"} días` : f.intervaloDias ? `cada ${f.intervaloDias} días` : (f[estProp]||"");
-          if(!yaExisteEsteMismo){
+          if(pendienteAntes){
+            // Mover la tarea sin resolver: mismo id/estado/notaWorker, solo cambia la fecha.
+            const it = pendienteAntes.item;
+            propuestas.push({...it, fecha, diasVencida:esVencida?Math.abs(prox.diff):(it.diasVencida||0), incluir:true, abierta:false, _movidoDesde:pendienteAntes.dia});
+          } else if(!yaExisteEsteMismo){
             const item = { id: Date.now()+Math.random(), fecha, zona:nombreZona, elemento:e.nombre, tarea:f.tarea, responsable:respDefault, estado:respDefault?"pendiente":"por_designar", notas:[notaAltura,f.obs].filter(Boolean).join(" "), alturaCorte:f.alturaCorte||"", unidadAlturaCorte:f.unidadAlturaCorte||"mm", frecuencia:etiquetaFrec, estacion:estProp, auto:true, fechaCorrespondiente:prox.fecha, origenZid:String(z.id), origenEid:e.id, origenFrecId:f.id, origenEsCustom:!!e.isCustom, diasVencida:esVencida?Math.abs(prox.diff):0, incluir:true, abierta:false };
             propuestas.push(item);
             if(esVencida) { const vKey=`${nombreZona} — ${f.tarea}`; if(!vencidas.includes(vKey)) vencidas.push(vKey); }
@@ -4778,10 +4781,13 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           if(f.tareaEnlazada && f.tareaEnlazada.trim()){
             const nombreEnlazada = f.tareaEnlazada.trim();
             const keyEnlazada = nombreZona+"_"+e.nombre+"_"+nombreEnlazada;
+            const pendienteEnlazadaAntes = pendItemsMapText.get(keyEnlazada);
             const yaExisteEnlazada = existentes.includes(keyEnlazada)
               || propuestas.some(p=>p.zona===nombreZona&&p.elemento===e.nombre&&p.tarea.trim().toLowerCase()===nombreEnlazada.toLowerCase())
-              || pendTextSet.has(keyEnlazada);
-            if(!yaExisteEnlazada){
+              || !!pendienteEnlazadaAntes;
+            if(pendienteEnlazadaAntes){
+              propuestas.push({...pendienteEnlazadaAntes.item, fecha, incluir:true, abierta:false, _movidoDesde:pendienteEnlazadaAntes.dia});
+            } else if(!yaExisteEnlazada){
               // Buscar la frecuencia propia de la tarea enlazada, para saber cuándo le toca a ELLA
               const frecEnlazada = frecs.find(ff=>(ff.tarea||"").trim().toLowerCase()===nombreEnlazada.toLowerCase());
               const proxEnlazada = frecEnlazada ? calcProximaFrecGlobal(frecEnlazada, fecha) : null;
@@ -4821,13 +4827,29 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
 
   const confirmarPreviewProp = () => {
     const yaExistenConfirm = getTareasDelDia(fecha).map(t=>t.zona+"_"+t.elemento+"_"+t.tarea);
-    const aEnviar = (previewProp||[]).filter(p=>p.incluir && !yaExistenConfirm.includes(p.zona+"_"+p.elemento+"_"+p.tarea)).map(({incluir,abierta,...t})=>t);
+    const aEnviar = (previewProp||[]).filter(p=>p.incluir && !yaExistenConfirm.includes(p.zona+"_"+p.elemento+"_"+p.tarea)).map(({incluir,abierta,_movidoDesde,...t})=>t);
     const yaEstabanConfirm = (previewProp||[]).filter(p=>p.incluir).length - aEnviar.length;
     if(aEnviar.length===0 && yaEstabanConfirm===0){ alert("No hay tareas seleccionadas."); return; }
+    // Tareas movidas desde un día anterior (misma id): hay que quitarlas de su día original para
+    // que no queden duplicadas ahí y aquí.
+    const movidas = (previewProp||[]).filter(p=>p.incluir && p._movidoDesde);
+    if(movidas.length>0){
+      const porDiaOrigen = {};
+      movidas.forEach(p=>{ (porDiaOrigen[p._movidoDesde] ||= []).push(p.id); });
+      setTareas(prevT=>{
+        const nuevo = {...prevT};
+        Object.entries(porDiaOrigen).forEach(([diaOrig,ids])=>{
+          const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+          nuevo[diaOrig] = normArr(nuevo[diaOrig]).filter(t=>!ids.includes(t.id));
+        });
+        return nuevo;
+      });
+    }
     if(aEnviar.length>0) setTareasDelDia(fecha, [...getTareasDelDia(fecha), ...aEnviar]);
     const vencidasCount = aEnviar.filter(t=>t.diasVencida>0).length;
+    const movidasCount = aEnviar.filter(t=>previewProp.find(p=>p.id===t.id)?._movidoDesde).length;
     if(esDomingo(fecha)) setAviso("⚠️ El día seleccionado es domingo. Las tareas fueron cargadas igual, pero considera mover la programación a otro día.");
-    else setAviso(`✅ ${aEnviar.length} tarea(s) confirmadas y asignadas para ${fecha}.${vencidasCount>0?` ${vencidasCount} estaban vencidas.`:""}${yaEstabanConfirm>0?` (${yaEstabanConfirm} ya estaban agregadas — no se duplicaron.)`:""}`);
+    else setAviso(`✅ ${aEnviar.length} tarea(s) confirmadas y asignadas para ${fecha}.${vencidasCount>0?` ${vencidasCount} estaban vencidas.`:""}${movidasCount>0?` ${movidasCount} se movieron desde un día anterior (seguían sin resolver).`:""}${yaEstabanConfirm>0?` (${yaEstabanConfirm} ya estaban agregadas — no se duplicaron.)`:""}`);
     // Se quitan de la vista previa TODAS las marcadas (enviadas ahora o que ya estaban) — las desmarcadas siguen ahí, esperando.
     setPreviewProp(prev=>{
       const restantes = prev.filter(p=>!p.incluir);
@@ -5173,6 +5195,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                                     <span style={{fontSize:12,fontWeight:600}}>{p.zona}</span>
                                     <span style={{fontSize:11,color:"#5a9a7a",marginLeft:6}}>· {p.elemento}</span>
                                     {p.diasVencida>0&&<span style={{fontSize:10,color:"#f87171",marginLeft:6,background:"rgba(248,113,113,0.1)",padding:"1px 6px",borderRadius:8}}>⚠️ {p.diasVencida}d vencida</span>}
+                                    {p._movidoDesde&&<span style={{fontSize:10,color:"#93c5fd",marginLeft:6,background:"rgba(59,130,246,0.1)",padding:"1px 6px",borderRadius:8}}>🔁 Movida desde {p._movidoDesde}{p.estado==="en_curso"?" (en curso)":""}</span>}
                                   </div>
                                   <select value={p.responsable||""} onChange={e=>{
                                       if(e.target.value==="__todos__"){
@@ -16214,24 +16237,25 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           const tareasHoyArr=Array.isArray(tareasProg[fechaProponerGolf])?tareasProg[fechaProponerGolf]:Object.values(tareasProg[fechaProponerGolf]||{});
           const existentes=tareasHoyArr.map(t=>t.zona+"_"+t.elemento+"_"+t.tarea);
           const norm=s=>(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"");
-          // ── Igual que en el módulo general: no duplicar una tarea que ya existe SIN RESOLVER en un
-          // día anterior (turno aún no cerrado) — es la misma tarea esperando que se cierre ese turno,
-          // no una nueva ocurrencia. Se detecta por origen (elemento+frecuencia)+fechaCorrespondiente,
-          // en cualquier fecha anterior a la que se está proponiendo, escaneando todo tareasProg.
+          // ── Igual que en el módulo general: las tareas SIN RESOLVER de un día anterior no se
+          // duplican — se MUEVEN al día que se está proponiendo (misma id/estado, solo cambia la
+          // fecha), así nunca quedan "atrapadas" en un día viejo que ya nadie revisa. Se detecta por
+          // origen (elemento+frecuencia)+fechaCorrespondiente, en cualquier fecha anterior a la que
+          // se está proponiendo, escaneando todo tareasProg.
           const finalesGolfProp=["hecha","completada","no_pudo"];
           const nAGolfProp=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-          const pendSignaturesGolf=new Set();
-          const pendTextSetGolf=new Set();
-          const pendZonaTareaSetGolf=new Set();
-          Object.keys(tareasProg||{}).forEach(diaKeyG=>{
-            if(diaKeyG>fechaProponerGolf) return;
+          const pendSignaturesGolf=new Map();
+          const pendTextSetGolf=new Map();
+          const pendZonaTareaSetGolf=new Map();
+          Object.keys(tareasProg||{}).sort().forEach(diaKeyG=>{
+            if(diaKeyG>=fechaProponerGolf) return;
             nAGolfProp(tareasProg[diaKeyG]).forEach(t=>{
               if(finalesGolfProp.includes(t.estado)) return;
               if(t.origenZid==="31" && t.origenEid && t.origenFrecId){
-                pendSignaturesGolf.add(`${t.origenEid}_${t.origenFrecId}_${t.fechaCorrespondiente||""}`);
+                pendSignaturesGolf.set(`${t.origenEid}_${t.origenFrecId}_${t.fechaCorrespondiente||""}`, {dia:diaKeyG, item:t});
               }
-              pendTextSetGolf.add(`${t.zona}_${t.elemento}_${t.tarea}`);
-              pendZonaTareaSetGolf.add(`${t.zona}_${t.tarea}`);
+              pendTextSetGolf.set(`${t.zona}_${t.elemento}_${t.tarea}`, {dia:diaKeyG, item:t});
+              pendZonaTareaSetGolf.set(`${t.zona}_${t.tarea}`, {dia:diaKeyG, item:t});
             });
           });
           // Ya existe si hay una tarea de la misma zona, cuyo elemento empieza por el nombre del elemento
@@ -16256,11 +16280,13 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               const yaExisteEsteMismoGolf = yaExisteTarea(e.nombre,f.tarea);
               const prox=calcProximaFrecGlobal(f,fechaProponerGolf);
               if(!prox||prox.diff>0)return;
-              const yaPendienteAntesGolf = pendSignaturesGolf.has(`${e.id}_${f.id}_${prox.fecha}`) || pendTextSetGolf.has(nombreZona+"_"+e.nombre+"_"+f.tarea);
+              const pendienteAntesGolf = pendSignaturesGolf.get(`${e.id}_${f.id}_${prox.fecha}`) || pendTextSetGolf.get(nombreZona+"_"+e.nombre+"_"+f.tarea);
               const esVencida=prox.diff<0;const diasVencida=Math.abs(prox.diff);
               const respDefault=configSemanal?.corte_golf||"";
               const notaAltura=f.alturaCorte?`Cortar a: ${f.alturaCorte} ${f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="pulgadas"?"pulgadas":"milímetros"}.`:"";
-              if(!yaExisteEsteMismoGolf && !yaPendienteAntesGolf){
+              if(pendienteAntesGolf){
+                propuestas.push({...pendienteAntesGolf.item, fecha:fechaProponerGolf, diasVencida:esVencida?diasVencida:(pendienteAntesGolf.item.diasVencida||0), _movidoDesde:pendienteAntesGolf.dia});
+              } else if(!yaExisteEsteMismoGolf){
                 propuestas.push({id:Date.now()+Math.random(),fecha:fechaProponerGolf,zona:nombreZona,elemento:e.nombre,tarea:f.tarea,responsable:respDefault,estado:respDefault?"pendiente":"por_designar",notas:[notaAltura,f.obs].filter(Boolean).join(" "),alturaCorte:f.alturaCorte||"",unidadAlturaCorte:f.unidadAlturaCorte||"mm",estacion:estProp,auto:true,fechaCorrespondiente:prox.fecha,origenZid:"31",origenEid:e.id,origenFrecId:f.id,origenEsCustom:!!e.isCustom,diasVencida:esVencida?diasVencida:0});
                 if(esVencida)vencidas.push(e.nombre+" — "+f.tarea+" ("+diasVencida+"d vencida)");
               }
@@ -16273,8 +16299,12 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               if(f.tareaEnlazada&&f.tareaEnlazada.trim()){
                 const nombreEnlazadaGolf=f.tareaEnlazada.trim();
                 const claveEnlazada=nombreZona+"_"+nombreEnlazadaGolf;
-                const yaExisteEnlazada=tareasHoyArr.some(t=>t.zona===nombreZona&&norm(t.tarea).includes(norm(nombreEnlazadaGolf))) || pendZonaTareaSetGolf.has(claveEnlazada);
-                if(!clavesTareaEnlazadaYaAgregada.has(claveEnlazada)&&!yaExisteEnlazada){
+                const pendienteEnlazadaAntesGolf = pendZonaTareaSetGolf.get(claveEnlazada);
+                const yaExisteEnlazada=tareasHoyArr.some(t=>t.zona===nombreZona&&norm(t.tarea).includes(norm(nombreEnlazadaGolf))) || !!pendienteEnlazadaAntesGolf;
+                if(pendienteEnlazadaAntesGolf && !clavesTareaEnlazadaYaAgregada.has(claveEnlazada)){
+                  clavesTareaEnlazadaYaAgregada.add(claveEnlazada);
+                  propuestas.push({...pendienteEnlazadaAntesGolf.item, fecha:fechaProponerGolf, _movidoDesde:pendienteEnlazadaAntesGolf.dia});
+                } else if(!clavesTareaEnlazadaYaAgregada.has(claveEnlazada)&&!yaExisteEnlazada){
                   const frecEnlazadaGolf = frecs.find(ff=>(ff.tarea||"").trim().toLowerCase()===nombreEnlazadaGolf.toLowerCase());
                   const proxEnlazadaGolf = frecEnlazadaGolf ? calcProximaFrecGlobal(frecEnlazadaGolf, fechaProponerGolf) : null;
                   let debeAdelantarseGolf = false;
@@ -16373,10 +16403,26 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           });
           if(aEnviar.length===0){setPreviewGolfProp(null);return;}
           const fechaDestinoGolf=aEnviar[0]?.fecha||fechaProponerGolf;
+          // Tareas movidas desde un día anterior sin resolver: hay que quitarlas de su día original
+          // para que no queden duplicadas ahí y aquí.
+          const movidasGolf = aEnviar.filter(t=>t._movidoDesde);
+          if(movidasGolf.length>0){
+            const porDiaOrigenGolf = {};
+            movidasGolf.forEach(t=>{ (porDiaOrigenGolf[t._movidoDesde] ||= []).push(t.id); });
+            setTareasProg(prev=>{
+              const nuevo = {...prev};
+              const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+              Object.entries(porDiaOrigenGolf).forEach(([diaOrig,ids])=>{
+                nuevo[diaOrig] = normArr(nuevo[diaOrig]).filter(t=>!ids.includes(t.id));
+              });
+              return nuevo;
+            });
+          }
+          const aEnviarLimpio = aEnviar.map(({_movidoDesde,...t})=>t);
           const tareasHoyArr=Array.isArray(tareasProg[fechaDestinoGolf])?tareasProg[fechaDestinoGolf]:Object.values(tareasProg[fechaDestinoGolf]||{});
-          setTareasProg(prev=>({...prev,[fechaDestinoGolf]:[...tareasHoyArr,...aEnviar]}));
+          setTareasProg(prev=>({...prev,[fechaDestinoGolf]:[...tareasHoyArr,...aEnviarLimpio]}));
           setPreviewGolfProp(null);
-          alert(`✅ ${aEnviar.length} tarea(s) de Golf enviadas al jardinero para el ${fechaDestinoGolf}.`);
+          alert(`✅ ${aEnviarLimpio.length} tarea(s) de Golf enviadas al jardinero para el ${fechaDestinoGolf}.${movidasGolf.length>0?` ${movidasGolf.length} se movieron desde un día anterior (seguían sin resolver).`:""}`);
         };
         return (
         <div className="ein">
@@ -16460,6 +16506,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                                     <span style={{fontSize:12,fontWeight:600}}>{p.tarea}</span>
                                     <span style={{fontSize:11,color:"#5a9a7a",marginLeft:6}}>· {p.elemento}</span>
                                     {p.diasVencida>0&&<span style={{fontSize:10,color:"#f87171",marginLeft:6,background:"rgba(248,113,113,0.1)",padding:"1px 6px",borderRadius:8}}>⚠️ {p.diasVencida}d vencida</span>}
+                                    {p._movidoDesde&&<span style={{fontSize:10,color:"#93c5fd",marginLeft:6,background:"rgba(59,130,246,0.1)",padding:"1px 6px",borderRadius:8}}>🔁 Movida desde {p._movidoDesde}{p.estado==="en_curso"?" (en curso)":""}</span>}
                                   </div>
                                   <select value={p.responsable||""} onClick={e=>e.stopPropagation()} onChange={e=>{
                                       if(e.target.value==="__todos__"){
@@ -16788,6 +16835,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
   const [subTab, setSubTab] = React.useState(subTabInicial||"stock");
   const [showItemForm, setShowItemForm] = React.useState(false);
   const [showMovForm, setShowMovForm] = React.useState(false);
+  const [editMovId, setEditMovId] = React.useState(null); // id del movimiento en edición (null = registrando uno nuevo)
   const [showTareaForm, setShowTareaForm] = React.useState(false);
   const [showTraslForm, setShowTraslForm] = React.useState(false);
   const [showInventForm, setShowInventForm] = React.useState(false);
@@ -17133,17 +17181,40 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
 
   const eliminarItem = (id) => setbd({items:(bd.items||[]).filter(i=>i.id!==id)});
 
+  const deltaMov = mov => (mov.tipo==="entrada"||mov.tipo==="ajuste" ? Number(mov.cantidad)||0 : -(Number(mov.cantidad)||0));
   const guardarMov = () => {
     if(!movForm.itemId||!movForm.cantidad) return;
     const cant = Number(movForm.cantidad);
-    const mov = {...movForm,id:Date.now(),cantidad:cant};
-    const items = (bd.items||[]).map(i=>{
-      if(i.id!==movForm.itemId&&String(i.id)!==String(movForm.itemId)) return i;
-      const delta = movForm.tipo==="entrada"||movForm.tipo==="ajuste"?cant:-cant;
-      return {...i,stockActual:Math.max(0,(Number(i.stockActual)||0)+delta)};
-    });
-    setbd({items,movimientos:[mov,...(bd.movimientos||[])].slice(0,200)});
+    if(editMovId){
+      // Editar: revertir el efecto en stock del movimiento ORIGINAL, luego aplicar el nuevo.
+      const movOriginal = (bd.movimientos||[]).find(m=>m.id===editMovId);
+      const movNuevo = {...movForm,id:editMovId,cantidad:cant};
+      let items = bd.items||[];
+      if(movOriginal){
+        items = items.map(i=>String(i.id)===String(movOriginal.itemId)?{...i,stockActual:Math.max(0,(Number(i.stockActual)||0)-deltaMov(movOriginal))}:i);
+      }
+      items = items.map(i=>String(i.id)===String(movNuevo.itemId)?{...i,stockActual:Math.max(0,(Number(i.stockActual)||0)+deltaMov(movNuevo))}:i);
+      const movimientos = (bd.movimientos||[]).map(m=>m.id===editMovId?movNuevo:m);
+      setbd({items,movimientos});
+      setEditMovId(null);
+    } else {
+      const mov = {...movForm,id:Date.now(),cantidad:cant};
+      const items = (bd.items||[]).map(i=>{
+        if(i.id!==movForm.itemId&&String(i.id)!==String(movForm.itemId)) return i;
+        const delta = movForm.tipo==="entrada"||movForm.tipo==="ajuste"?cant:-cant;
+        return {...i,stockActual:Math.max(0,(Number(i.stockActual)||0)+delta)};
+      });
+      setbd({items,movimientos:[mov,...(bd.movimientos||[])].slice(0,200)});
+    }
     setMovForm(emptyMov); setShowMovForm(false);
+  };
+  const editarMov = (mov) => { setMovForm({...emptyMov,...mov,cantidad:String(mov.cantidad)}); setEditMovId(mov.id); setShowMovForm(true); };
+  const eliminarMov = (mov) => {
+    if(!window.confirm("¿Eliminar este movimiento? Se revertirá su efecto en el stock del ítem."))return;
+    const items = (bd.items||[]).map(i=>String(i.id)===String(mov.itemId)?{...i,stockActual:Math.max(0,(Number(i.stockActual)||0)-deltaMov(mov))}:i);
+    const movimientos = (bd.movimientos||[]).filter(m=>m.id!==mov.id);
+    setbd({items,movimientos});
+    if(editMovId===mov.id){ setEditMovId(null); setMovForm(emptyMov); setShowMovForm(false); }
   };
 
   const guardarTarea = () => {
@@ -18407,10 +18478,10 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
       {/* ── MOVIMIENTOS ── */}
       {subTab==="movimientos"&&(
         <div className="ein">
-          {esJefa&&<button style={{...S.btn,background:"rgba(34,197,94,0.12)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)",marginBottom:14}} onClick={()=>setShowMovForm(true)}>📥 Registrar movimiento</button>}
+          {esJefa&&<button style={{...S.btn,background:"rgba(34,197,94,0.12)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)",marginBottom:14}} onClick={()=>{setEditMovId(null);setMovForm(emptyMov);setShowMovForm(true);}}>📥 Registrar movimiento</button>}
           {showMovForm&&(
             <div style={{...S.card,padding:16,marginBottom:14,background:"rgba(34,197,94,0.05)",borderColor:"rgba(34,197,94,0.2)"}} className="ein">
-              <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#86efac",marginBottom:12}}>📥 Registrar movimiento</div>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#86efac",marginBottom:12}}>{editMovId?"✏️ Editar movimiento":"📥 Registrar movimiento"}</div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
                 <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={movForm.fecha} onChange={e=>setMovForm(p=>({...p,fecha:e.target.value}))}/></div>
                 <div><label style={labelSt}>Tipo</label>
@@ -18435,8 +18506,8 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                 <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observaciones</label><input style={S.input} value={movForm.obs} onChange={e=>setMovForm(p=>({...p,obs:e.target.value}))}/></div>
               </div>
               <div style={{display:"flex",gap:8}}>
-                <button className="btn-p" style={S.btn} onClick={guardarMov}>✓ Registrar</button>
-                <button className="btn-g" style={S.btn} onClick={()=>setShowMovForm(false)}>Cancelar</button>
+                <button className="btn-p" style={S.btn} onClick={guardarMov}>{editMovId?"✓ Guardar cambios":"✓ Registrar"}</button>
+                <button className="btn-g" style={S.btn} onClick={()=>{setShowMovForm(false);setEditMovId(null);setMovForm(emptyMov);}}>Cancelar</button>
               </div>
             </div>
           )}
@@ -18448,7 +18519,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                 const est=ESTADOS_MOV[mov.tipo]||ESTADOS_MOV.entrada;
                 const item=(bd.items||[]).find(i=>String(i.id)===String(mov.itemId));
                 return (
-                  <div key={mov.id} style={{...S.card,padding:"12px 14px",borderLeft:`3px solid ${est.color}40`}}>
+                  <div key={mov.id} style={{...S.card,padding:"12px 14px",borderLeft:`3px solid ${est.color}40`,display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                     <div style={{display:"flex",gap:8,alignItems:"center",fontSize:12,flexWrap:"wrap"}}>
                       <span style={{color:"#5a8a6a"}}>{mov.fecha}</span>
                       <span style={{fontWeight:600,color:est.color}}>{est.label}</span>
@@ -18457,6 +18528,12 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                       {mov.responsable&&<span style={{color:"#5a8a6a"}}>· 👤 {mov.responsable}</span>}
                       {mov.motivo&&<span style={{color:"#5a8a6a"}}>· {mov.motivo}</span>}
                     </div>
+                    {esJefa&&(
+                      <div style={{display:"flex",gap:5,flexShrink:0}}>
+                        <button style={{...S.btn,fontSize:11,padding:"3px 9px",background:"rgba(59,130,246,0.1)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.25)"}} onClick={()=>editarMov(mov)}>✏️</button>
+                        <button style={{...S.btn,fontSize:11,padding:"3px 9px",background:"rgba(239,68,68,0.1)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.25)"}} onClick={()=>eliminarMov(mov)}>🗑</button>
+                      </div>
+                    )}
                   </div>
                 );
               })}
