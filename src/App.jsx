@@ -179,18 +179,22 @@ const calcProximaFrecGlobal = (f, refFecha) => {
   // ── Modelo simple (nuevo): "cada X días" + fecha próxima editable a mano ──
   if(f.intervaloDias){
     if(!f.ultimaVez && !f.proximaFechaManual) return null;
+    // Antes: si la fecha "natural" (última vez + intervalo) caía en un día prohibido, se retrocedía
+    // de a un día hasta encontrar uno válido — con muchos días prohibidos seguidos, eso podía
+    // retroceder hasta HOY MISMO (o antes), dejando la tarea eternamente "vencida para hoy" sin
+    // avanzar nunca, aunque se marcara hecha. Ahora se consulta directamente la fecha que se está
+    // programando (refFecha): si ese día no es válido para esta tarea, simplemente no se propone
+    // ahí (se espera al próximo día válido que efectivamente se programe).
+    const refDow = ref.getDay();
+    if(refDow===0 || prohibidosGlobal.includes(refDow)) return null;
     let proxima = f.proximaFechaManual
       ? new Date(f.proximaFechaManual+"T12:00:00")
       : new Date(new Date(f.ultimaVez+"T12:00:00").getTime() + Number(f.intervaloDias)*24*60*60*1000);
-    // Si cae domingo (o un día prohibido), correr al día anterior válido — nunca posponer
-    for(let salvavidas=0;salvavidas<8;salvavidas++){
-      const dow=proxima.getDay();
-      if(dow===0 || prohibidosGlobal.includes(dow)){
-        proxima = new Date(proxima.getTime() - 24*60*60*1000);
-      } else break;
-    }
     const diff = Math.round((proxima-ref)/(24*60*60*1000));
-    return { fecha: proxima.toISOString().slice(0,10), diff };
+    // La fecha "correspondiente" pasa a ser la del día que se está programando (que ya sabemos es
+    // válido), no la fecha natural sin ajustar — así el resto del sistema (duplicados, movidas) la
+    // referencia correctamente.
+    return { fecha: ref.toISOString().slice(0,10), diff };
   }
   if(f.modo==="diasSemana"){
     if(!f.ultimaVez) return null;
@@ -6873,10 +6877,14 @@ function FrecuenciasPanel({ zid, eid, tipo, isCustom, S, getFrecs, setFrecs }) {
       ? new Date(f.proximaFechaManual+"T12:00:00")
       : new Date(new Date(f.ultimaVez+"T12:00:00").getTime() + Number(f.intervaloDias)*24*60*60*1000);
     const prohibidosGlobal = (f.diasProhibidosGlobal||[]).map(Number);
+    // Solo para MOSTRAR una fecha de referencia en el formulario — avanza al próximo día válido
+    // (nunca retrocede) para no mostrar una fecha pasada. La tarea en sí no se propone según esta
+    // fecha exacta: se propone en el próximo día válido que efectivamente se programe (ver
+    // calcProximaFrecGlobal), así que este ajuste es solo informativo.
     for(let salvavidas=0;salvavidas<8;salvavidas++){
       const dow=proxima.getDay();
       if(dow===0 || prohibidosGlobal.includes(dow)){
-        proxima = new Date(proxima.getTime() - 24*60*60*1000);
+        proxima = new Date(proxima.getTime() + 24*60*60*1000);
       } else break;
     }
     return proxima;
