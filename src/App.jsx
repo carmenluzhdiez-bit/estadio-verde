@@ -4768,11 +4768,11 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
             : getResponsablePorTipo(f.tarea, configSemanal, nombreZona)||"";
           const notaAltura = f.alturaCorte ? `Cortar a: ${f.alturaCorte} ${f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="pulgadas"?"pulgadas":"milímetros"}.` : "";
           const etiquetaFrec = f.modo==="diasSemana" ? `cada ${f.diasMinimos||"?"} días` : f.intervaloDias ? `cada ${f.intervaloDias} días` : (f[estProp]||"");
-          if(pendienteAntes){
+          if(pendienteAntes && !existentes.includes(key)){
             // Mover la tarea sin resolver: mismo id/estado/notaWorker, solo cambia la fecha.
             const it = pendienteAntes.item;
             propuestas.push({...it, fecha, diasVencida:esVencida?Math.abs(prox.diff):(it.diasVencida||0), incluir:true, abierta:false, _movidoDesde:pendienteAntes.dia});
-          } else if(!yaExisteEsteMismo){
+          } else if(!pendienteAntes && !yaExisteEsteMismo){
             const item = { id: Date.now()+Math.random(), fecha, zona:nombreZona, elemento:e.nombre, tarea:f.tarea, responsable:respDefault, estado:respDefault?"pendiente":"por_designar", notas:[notaAltura,f.obs].filter(Boolean).join(" "), alturaCorte:f.alturaCorte||"", unidadAlturaCorte:f.unidadAlturaCorte||"mm", frecuencia:etiquetaFrec, estacion:estProp, auto:true, fechaCorrespondiente:prox.fecha, origenZid:String(z.id), origenEid:e.id, origenFrecId:f.id, origenEsCustom:!!e.isCustom, diasVencida:esVencida?Math.abs(prox.diff):0, incluir:true, abierta:false };
             propuestas.push(item);
             if(esVencida) { const vKey=`${nombreZona} — ${f.tarea}`; if(!vencidas.includes(vKey)) vencidas.push(vKey); }
@@ -4787,9 +4787,9 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
             const yaExisteEnlazada = existentes.includes(keyEnlazada)
               || propuestas.some(p=>p.zona===nombreZona&&p.elemento===e.nombre&&p.tarea.trim().toLowerCase()===nombreEnlazada.toLowerCase())
               || !!pendienteEnlazadaAntes;
-            if(pendienteEnlazadaAntes){
+            if(pendienteEnlazadaAntes && !existentes.includes(keyEnlazada)){
               propuestas.push({...pendienteEnlazadaAntes.item, fecha, incluir:true, abierta:false, _movidoDesde:pendienteEnlazadaAntes.dia});
-            } else if(!yaExisteEnlazada){
+            } else if(!pendienteEnlazadaAntes && !yaExisteEnlazada){
               // Buscar la frecuencia propia de la tarea enlazada, para saber cuándo le toca a ELLA
               const frecEnlazada = frecs.find(ff=>(ff.tarea||"").trim().toLowerCase()===nombreEnlazada.toLowerCase());
               const proxEnlazada = frecEnlazada ? calcProximaFrecGlobal(frecEnlazada, fecha) : null;
@@ -4827,6 +4827,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     const idsYaMovidos = new Set(propuestas.filter(p=>p._movidoDesde).map(p=>p.id));
     pendItemsAll.forEach(({dia,item})=>{
       if(idsYaMovidos.has(item.id)) return;
+      if(existentes.includes(`${item.zona}_${item.elemento}_${item.tarea}`)) return;
       idsYaMovidos.add(item.id);
       propuestas.push({...item, fecha, incluir:true, abierta:false, _movidoDesde:dia});
     });
@@ -16298,9 +16299,9 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               const esVencida=prox.diff<0;const diasVencida=Math.abs(prox.diff);
               const respDefault=configSemanal?.corte_golf||"";
               const notaAltura=f.alturaCorte?`Cortar a: ${f.alturaCorte} ${f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="pulgadas"?"pulgadas":"milímetros"}.`:"";
-              if(pendienteAntesGolf){
+              if(pendienteAntesGolf && !yaExisteEsteMismoGolf){
                 propuestas.push({...pendienteAntesGolf.item, fecha:fechaProponerGolf, diasVencida:esVencida?diasVencida:(pendienteAntesGolf.item.diasVencida||0), _movidoDesde:pendienteAntesGolf.dia});
-              } else if(!yaExisteEsteMismoGolf){
+              } else if(!pendienteAntesGolf && !yaExisteEsteMismoGolf){
                 propuestas.push({id:Date.now()+Math.random(),fecha:fechaProponerGolf,zona:nombreZona,elemento:e.nombre,tarea:f.tarea,responsable:respDefault,estado:respDefault?"pendiente":"por_designar",notas:[notaAltura,f.obs].filter(Boolean).join(" "),alturaCorte:f.alturaCorte||"",unidadAlturaCorte:f.unidadAlturaCorte||"mm",estacion:estProp,auto:true,fechaCorrespondiente:prox.fecha,origenZid:"31",origenEid:e.id,origenFrecId:f.id,origenEsCustom:!!e.isCustom,diasVencida:esVencida?diasVencida:0});
                 if(esVencida)vencidas.push(e.nombre+" — "+f.tarea+" ("+diasVencida+"d vencida)");
               }
@@ -16314,8 +16315,9 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                 const nombreEnlazadaGolf=f.tareaEnlazada.trim();
                 const claveEnlazada=nombreZona+"_"+nombreEnlazadaGolf;
                 const pendienteEnlazadaAntesGolf = pendZonaTareaSetGolf.get(claveEnlazada);
-                const yaExisteEnlazada=tareasHoyArr.some(t=>t.zona===nombreZona&&norm(t.tarea).includes(norm(nombreEnlazadaGolf))) || !!pendienteEnlazadaAntesGolf;
-                if(pendienteEnlazadaAntesGolf && !clavesTareaEnlazadaYaAgregada.has(claveEnlazada)){
+                const yaExisteEnlazadaHoy = tareasHoyArr.some(t=>t.zona===nombreZona&&norm(t.tarea).includes(norm(nombreEnlazadaGolf)));
+                const yaExisteEnlazada = yaExisteEnlazadaHoy || !!pendienteEnlazadaAntesGolf;
+                if(pendienteEnlazadaAntesGolf && !yaExisteEnlazadaHoy && !clavesTareaEnlazadaYaAgregada.has(claveEnlazada)){
                   clavesTareaEnlazadaYaAgregada.add(claveEnlazada);
                   propuestas.push({...pendienteEnlazadaAntesGolf.item, fecha:fechaProponerGolf, _movidoDesde:pendienteEnlazadaAntesGolf.dia});
                 } else if(!clavesTareaEnlazadaYaAgregada.has(claveEnlazada)&&!yaExisteEnlazada){
@@ -16401,6 +16403,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           const idsYaMovidosGolf = new Set(propuestas.filter(p=>p._movidoDesde).map(p=>p.id));
           pendItemsAllGolf.forEach(({dia,item})=>{
             if(idsYaMovidosGolf.has(item.id)) return;
+            if(yaExisteTarea(item.elemento,item.tarea)) return;
             idsYaMovidosGolf.add(item.id);
             propuestas.push({...item, fecha:fechaProponerGolf, _movidoDesde:dia});
           });
