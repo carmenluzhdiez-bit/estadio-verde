@@ -7161,10 +7161,19 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
             </div>
           </div>
           <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+            {t.estado==="retirado"&&<span style={chip("rgba(239,68,68,0.12)","#f87171","1px solid rgba(239,68,68,0.25)")}>🚫 Acceso bloqueado (retirado)</span>}
             <span style={chip("rgba(59,130,246,0.12)","#93c5fd","1px solid rgba(59,130,246,0.25)")}>🏖️ {vacAprobadas}d vac.</span>
             <span style={chip("rgba(34,197,94,0.12)","#86efac","1px solid rgba(34,197,94,0.25)")}>⏰ {heTotal}h ext.</span>
             {bonosMonto>0&&<span style={chip("rgba(124,58,237,0.12)","#c4b5fd","1px solid rgba(124,58,237,0.25)")}>💰 ${bonosMonto.toLocaleString("es-CL")}</span>}
             {pendientes>0&&<span style={chip("rgba(245,158,11,0.12)","#fcd34d","1px solid rgba(245,158,11,0.25)")}>⏳ {pendientes} pend.</span>}
+            {t.estado==="retirado"?(
+              <button className="btn-g" style={{...S.btn,fontSize:12,padding:"5px 12px",color:"#34d399"}} onClick={()=>onUpdate({estado:""})}>✅ Reactivar acceso</button>
+            ):(
+              <button style={{...S.btn,fontSize:12,padding:"5px 12px",background:"rgba(245,158,11,0.1)",color:"#fbbf24",border:"1px solid rgba(245,158,11,0.25)"}}
+                onClick={()=>{if(window.confirm(`¿Bloquear el acceso de ${t.nombre}? Ya no podrá elegir su nombre para entrar a la app, pero su historial de tareas se mantiene intacto.`)) onUpdate({estado:"retirado"});}}>
+                🚫 Marcar como retirado
+              </button>
+            )}
             <button className="btn-d" style={{...S.btn,fontSize:12,padding:"5px 12px"}} onClick={()=>{if(window.confirm("¿Eliminar trabajador?")) onDelete();}}>🗑 Eliminar</button>
           </div>
         </div>
