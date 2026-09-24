@@ -2746,10 +2746,26 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                                   <input placeholder="nota..." defaultValue={hpTask.notaJefa||""}
                                     onBlur={e=>{if(e.target.value!==hpTask.notaJefa){const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);setTareas(prev=>({...prev,[dia]:nA2(prev[dia]).map(x=>x.id===hpTask.id?{...x,notaJefa:e.target.value}:x)}));}}}
                                     style={{fontSize:10,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:5,color:"#ede9e0",padding:"2px 4px",width:90}}/>
+                                  {!hpTask.origenFrecId&&!["hecha","completada","no_pudo"].includes(hpTask.estado)&&(
+                                    <button onClick={()=>{
+                                        const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+                                        const mananaDef=new Date(dia+"T12:00:00");mananaDef.setDate(mananaDef.getDate()+1);
+                                        const destinoStr=window.prompt(`¿Para qué fecha reprogramar "${(hpTask.tarea||"").replace("⛳ ","")}"? (AAAA-MM-DD)`, mananaDef.toISOString().slice(0,10));
+                                        if(!destinoStr) return;
+                                        if(!/^\d{4}-\d{2}-\d{2}$/.test(destinoStr)){ alert("Fecha inválida — usa el formato AAAA-MM-DD."); return; }
+                                        setTareas(prev=>{
+                                          const nuevo={...prev};
+                                          nuevo[dia]=nA2(nuevo[dia]).filter(x=>x.id!==hpTask.id);
+                                          nuevo[destinoStr]=[...nA2(nuevo[destinoStr]),{...hpTask,fecha:destinoStr,notas:(hpTask.notas?hpTask.notas+" | ":"")+"Reprogramada desde "+dia}];
+                                          return nuevo;
+                                        });
+                                      }}
+                                      style={{cursor:"pointer",border:"1px solid rgba(59,130,246,0.25)",borderRadius:5,padding:"1px 5px",background:"rgba(59,130,246,0.06)",color:"#93c5fd",fontSize:10}}>📅 Reprogramar</button>
+                                  )}
                                   <button onClick={()=>{
                                       const esManual = !hpTask.origenFrecId;
                                       const msg = esManual
-                                        ? `¿Eliminar "${(hpTask.tarea||"").replace("⛳ ","")}"?\n\n⚠️ Esta tarea NO tiene frecuencia asociada — al eliminarla se pierde para siempre, no se va a volver a proponer sola ningún otro día.`
+                                        ? `¿Eliminar "${(hpTask.tarea||"").replace("⛳ ","")}"?\n\n⚠️ Esta tarea NO tiene frecuencia asociada — al eliminarla se pierde para siempre, no se va a volver a proponer sola ningún otro día. Si quieres conservarla, usa "📅 Reprogramar" en vez de eliminar.`
                                         : `¿Eliminar "${(hpTask.tarea||"").replace("⛳ ","")}"?\n\nEsta tarea tiene una frecuencia asociada — si sigue vencida, "Proponer del día" la va a volver a proponer más adelante.`;
                                       if(window.confirm(msg)){const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);setTareas(prev=>({...prev,[dia]:nA2(prev[dia]).filter(x=>x.id!==hpTask.id)}));}
                                     }}
