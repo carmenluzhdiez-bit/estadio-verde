@@ -2746,7 +2746,13 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                                   <input placeholder="nota..." defaultValue={hpTask.notaJefa||""}
                                     onBlur={e=>{if(e.target.value!==hpTask.notaJefa){const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);setTareas(prev=>({...prev,[dia]:nA2(prev[dia]).map(x=>x.id===hpTask.id?{...x,notaJefa:e.target.value}:x)}));}}}
                                     style={{fontSize:10,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:5,color:"#ede9e0",padding:"2px 4px",width:90}}/>
-                                  <button onClick={()=>{if(window.confirm(`¿Eliminar "${(hpTask.tarea||"").replace("⛳ ","")}"?`)){const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);setTareas(prev=>({...prev,[dia]:nA2(prev[dia]).filter(x=>x.id!==hpTask.id)}));}}}
+                                  <button onClick={()=>{
+                                      const esManual = !hpTask.origenFrecId;
+                                      const msg = esManual
+                                        ? `¿Eliminar "${(hpTask.tarea||"").replace("⛳ ","")}"?\n\n⚠️ Esta tarea NO tiene frecuencia asociada — al eliminarla se pierde para siempre, no se va a volver a proponer sola ningún otro día.`
+                                        : `¿Eliminar "${(hpTask.tarea||"").replace("⛳ ","")}"?\n\nEsta tarea tiene una frecuencia asociada — si sigue vencida, "Proponer del día" la va a volver a proponer más adelante.`;
+                                      if(window.confirm(msg)){const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);setTareas(prev=>({...prev,[dia]:nA2(prev[dia]).filter(x=>x.id!==hpTask.id)}));}
+                                    }}
                                     style={{cursor:"pointer",border:"1px solid rgba(239,68,68,0.2)",borderRadius:5,padding:"1px 5px",background:"rgba(239,68,68,0.06)",color:"#f87171",fontSize:10}}>🗑</button>
                                 </div>
                               </div>
