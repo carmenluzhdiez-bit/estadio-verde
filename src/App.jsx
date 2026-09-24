@@ -11587,6 +11587,17 @@ const EDIFICIO_GOLF = [
   {id:"edif_2p_jardinera", nombre:"Jardinera 2do Piso",    piso:"2do piso"},
   {id:"edif_2p_liquidambar",nombre:"Macetas Liquidámbar 2do Piso", piso:"2do piso"},
 ];
+// Infraestructura y sistemas de Golf — ya existían como elementos en Macrozonas (zona 31) pero no
+// tenían su propia sección visible dentro del Módulo Golf; antes solo aparecían (si acaso) enterrados
+// en el catch-all genérico "Otros elementos desde Macrozonas".
+const INFRAESTRUCTURA_GOLF = [
+  {id:"estanque_golf",       nombre:"Estanque de agua"},
+  {id:"e8",                  nombre:"Sistema de riego"},
+  {id:"caseta_bomba",        nombre:"Caseta de bombas"},
+  {id:"sala_maquinas",       nombre:"Sala de máquinas Golf"},
+  {id:"bodega_insumos_golf", nombre:"Bodega de insumos Golf"},
+];
+const TAREAS_INFRAESTRUCTURA_GOLF = ["Revisión sistema de riego","Reparar sistema de riego","Revisión y limpieza de filtros","Purga de aire en la red","Revisión de bombas","Mantención de bombas","Revisión de nivel de estanque","Limpieza de estanque","Revisión luminarias","Cambio de ampolletas / focos"];
 const TAREAS_BUNKERS    = ["Recortar bordes","Rastrillar y labrar arena","Rellenar con arena","Rastrillado superficial","Recoger piedras/escombros","Revisión estado"];
 const TAREAS_FAIRWAYS   = ["Corte","Riego","Reparar sistema de riego","Fertilización","Control malezas","Aireación con sacabocados fino","Aireación con sacabocados grueso","Aireación con púas finas","Aireación con púas gruesas","Resiembra","Soplado"];
 const TAREAS_LOMAS      = ["Corte","Desbrozado","Riego","Reparar sistema de riego","Control malezas"];
@@ -14118,7 +14129,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           <div><label style={labelSt}>Tarea</label>
             <select style={S.input} value={tareaForm.tipo} onChange={e=>setTareaForm(p=>({...p,tipo:e.target.value}))}>
               <option value="">Seleccionar...</option>
-              {TAREAS_LOMAS.concat(TAREAS_MACIZOS).concat(TAREAS_EDIFICIO).filter((v,i,a)=>a.indexOf(v)===i).map(t=><option key={t}>{t}</option>)}
+              {TAREAS_LOMAS.concat(TAREAS_MACIZOS).concat(TAREAS_EDIFICIO).concat(TAREAS_INFRAESTRUCTURA_GOLF).filter((v,i,a)=>a.indexOf(v)===i).map(t=><option key={t}>{t}</option>)}
               <option value="Otra">Otra...</option>
             </select>
             {tareaForm.tipo==="Otra"&&(
@@ -15700,9 +15711,34 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             );
           })}
 
+          {/* Infraestructura y sistemas (Estanque, Sistema de riego, Bombas, Sala de máquinas, Bodega) */}
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:"#38bdf8",margin:"16px 0 8px"}}>🚰 Infraestructura y Sistemas</div>
+          {INFRAESTRUCTURA_GOLF.map(inf=>{
+            const abierta=historialZonaAbierta===("inf_"+inf.id);
+            return (
+            <div key={inf.id} style={{...S.card,padding:"10px 14px",marginBottom:6,borderLeft:"3px solid rgba(56,189,248,0.4)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+                <div style={{fontSize:13,fontWeight:600}}>{inf.nombre}</div>
+                <div style={{display:"flex",gap:6}}>
+                  <button onClick={()=>setHistorialZonaAbierta(abierta?null:"inf_"+inf.id)}
+                    style={{...S.btn,fontSize:11,padding:"4px 10px",background:abierta?"rgba(167,139,250,0.2)":"rgba(167,139,250,0.1)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.35)"}}>
+                    📜 Historial
+                  </button>
+                  <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(56,189,248,0.12)",color:"#38bdf8",border:"1px solid rgba(56,189,248,0.3)"}}
+                    onClick={()=>{setTareaForm({...emptyTarea,descripcion:inf.nombre,responsable:configSemanal?.corte_golf||"Osmar Bhalú Armijo Zúñiga",target:"zona",targetId:inf.id});setShowTareaForm("zona");}}>
+                    📋 Nueva tarea
+                  </button>
+                </div>
+              </div>
+              {abierta&&<div style={{marginTop:10}}><HistorialElementoGolf S={S} nombreElemento={inf.nombre} tareasProg={tareasProg} aplicaciones={aplicaciones}/></div>}
+              {renderFormZonaInline(inf.id)}
+            </div>
+            );
+          })}
+
           {/* Otros elementos configurados en Macrozonas (zona Golf) que no están en las listas fijas de arriba
               — ej. si en Macrozonas hay 10 "Ante-green" individuales pero aquí solo existía uno genérico. */}
-          {renderSeccionElementosExtra("otro", [...ZONAS_GOLF_EXTRA,...PLANTAS_GOLF,...EDIFICIO_GOLF].map(x=>x.nombre))}
+          {renderSeccionElementosExtra("otro", [...ZONAS_GOLF_EXTRA,...PLANTAS_GOLF,...EDIFICIO_GOLF,...INFRAESTRUCTURA_GOLF].map(x=>x.nombre))}
 
           {/* El formulario "Nueva tarea" ahora aparece inline, justo debajo de la fila que se tocó — ver renderFormZonaInline */}
         </div>
@@ -16662,7 +16698,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
         const oficiales = [
           ...GREENS_DEF.map(g=>g.nombre), ...TEES_DEF.map(t=>t.nombre), ...BUNKERS_DEF.map(b=>b.nombre),
           ...FAIRWAYS_DEF.map(f=>f.nombre), ...ZONAS_GOLF_EXTRA.map(z=>z.nombre),
-          ...PLANTAS_GOLF.map(p=>p.nombre), ...EDIFICIO_GOLF.map(e=>e.nombre), "Vivero Golf",
+          ...PLANTAS_GOLF.map(p=>p.nombre), ...EDIFICIO_GOLF.map(e=>e.nombre), ...INFRAESTRUCTURA_GOLF.map(i=>i.nombre), "Vivero Golf",
         ];
         const oficialesNorm = oficiales.map(o=>({original:o, norm:normCN(o)}));
         const extraerHoyoCN = s => { const m=(s||"").match(/hoyo\s*0*(\d+)/i); return m?m[1].padStart(2,"0"):null; };
@@ -16691,7 +16727,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           <div className="ein">
             <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,marginBottom:6}}>🔀 Comparación de nombres — Macrozonas vs Módulo Golf</div>
             <div style={{fontSize:12,color:"#5a9a7a",marginBottom:16}}>
-              Compara cada elemento de la zona "Golf" en Macrozonas contra el catálogo oficial del Módulo Golf (Greens, Tees, Búnkers, Fairways, Zonas, Plantas, Edificio).
+              Compara cada elemento de la zona "Golf" en Macrozonas contra el catálogo oficial del Módulo Golf (Greens, Tees, Búnkers, Fairways, Zonas, Plantas, Edificio, Infraestructura).
             </div>
             <div style={{display:"flex",gap:16,marginBottom:16}}>
               <div style={{fontSize:13,color:"#4ade80"}}>✅ {comparacion.length-conProblema.length} coinciden exacto</div>
