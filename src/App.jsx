@@ -1947,6 +1947,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
   const [diaTurnoElegido, setDiaTurnoElegido] = React.useState(tabInicial==="turnos"?new Date().toISOString().slice(0,10):""); // fecha específica elegida para editar en "Ver/editar turnos"
   const [turnosTrabAbiertos, setTurnosTrabAbiertos] = React.useState({}); // {"dia_resp": bool} — vista por trabajador colapsada por defecto en "Ver/editar turnos"
   const [gruposTareaAbiertosTurnos, setGruposTareaAbiertosTurnos] = React.useState({}); // {"dia_resp_tarea": bool} — grupos por tipo de tarea colapsados por defecto
+  const [filtroEstadoTurnos, setFiltroEstadoTurnos] = React.useState("todos"); // filtro de estado dentro de "Ver/editar turnos"
   const esGolfZonaHist = (zona) => zona==="Golf"||(zona||"").includes("Golf");
   const zonaFijaActual = tabHist==="historial_golf" ? "golf" : tabHist==="historial_macro" ? "no-golf" : null;
   const [buscarZona,   setBuscarZona]   = React.useState("");
@@ -2656,7 +2657,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                 <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#34d399",marginBottom:3}}>✅ Revisión de turnos</div>
                 <div style={{fontSize:11,color:"#5a9a7a"}}>{diaTurnoElegido?"Día elegido":"Últimos 30 días"} · Incluye Golf · Usa el selector de estado para editar directamente</div>
               </div>
-              <div style={{display:"flex",gap:6,alignItems:"center"}}>
+              <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
                 <label style={{fontSize:10,color:"#5a9a7a"}}>📅 Elegir día a editar:</label>
                 <input type="date" value={diaTurnoElegido} onChange={e=>setDiaTurnoElegido(e.target.value)}
                   style={{...S.input,fontSize:12,padding:"5px 8px",width:"auto"}}/>
@@ -2664,12 +2665,26 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                   style={{cursor:"pointer",border:"1px solid rgba(255,255,255,0.15)",borderRadius:6,padding:"5px 9px",background:"transparent",color:"#94a3b8",fontSize:11}}>✕ Ver últimos 30 días</button>}
               </div>
             </div>
+            <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginBottom:14}}>
+              <label style={{fontSize:10,color:"#5a9a7a"}}>Filtrar por estado:</label>
+              <button onClick={()=>setFiltroEstadoTurnos("todos")}
+                style={{cursor:"pointer",border:`1px solid ${filtroEstadoTurnos==="todos"?"rgba(52,211,153,0.4)":"rgba(255,255,255,0.12)"}`,borderRadius:7,padding:"3px 10px",background:filtroEstadoTurnos==="todos"?"rgba(52,211,153,0.12)":"transparent",color:filtroEstadoTurnos==="todos"?"#34d399":"#94a3b8",fontSize:11}}>
+                Todos
+              </button>
+              {Object.entries(EC).map(([k,v])=>(
+                <button key={k} onClick={()=>setFiltroEstadoTurnos(k)}
+                  style={{cursor:"pointer",border:`1px solid ${filtroEstadoTurnos===k?v.color+"66":"rgba(255,255,255,0.12)"}`,borderRadius:7,padding:"3px 10px",background:filtroEstadoTurnos===k?v.color+"1f":"transparent",color:filtroEstadoTurnos===k?v.color:"#94a3b8",fontSize:11}}>
+                  {v.icon} {v.label}
+                </button>
+              ))}
+            </div>
             {dias.length===0&&<div style={{...S.card,padding:32,textAlign:"center",color:"#4a8a5a"}}>No hay turnos registrados.</div>}
             {diaTurnoElegido&&nA(tareas[diaTurnoElegido]).length===0&&(
               <div style={{...S.card,padding:32,textAlign:"center",color:"#4a8a5a"}}>No hay tareas programadas para el {diaTurnoElegido}.</div>
             )}
             {dias.map(dia=>{
-              const tDia=nA(tareas[dia]);
+              const tDiaCompleto=nA(tareas[dia]);
+              const tDia=filtroEstadoTurnos==="todos"?tDiaCompleto:tDiaCompleto.filter(hpTask=>hpTask.estado===filtroEstadoTurnos);
               const porTrab={};
               tDia.forEach(hpTask=>{const r=hpTask.responsable||"Sin asignar";if(!porTrab[r])porTrab[r]=[];porTrab[r].push(hpTask);});
               if(Object.keys(porTrab).length===0) return null;
@@ -2681,7 +2696,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                       {dia===hoyT&&<span style={{fontSize:10,color:"#fbbf24",marginLeft:8,background:"rgba(251,191,36,0.1)",padding:"1px 7px",borderRadius:8}}>Hoy</span>}
                     </span>
                     <div style={{display:"flex",alignItems:"center",gap:8}}>
-                      <span style={{fontSize:11,color:"#5a9a7a"}}>{tDia.length} tareas · {Object.keys(porTrab).length} trabajadores</span>
+                      <span style={{fontSize:11,color:"#5a9a7a"}}>{filtroEstadoTurnos!=="todos"?`${tDia.length} de ${tDiaCompleto.length} tareas`:`${tDia.length} tareas`} · {Object.keys(porTrab).length} trabajadores</span>
                       <button onClick={()=>imprimirTurnoGeneral(dia)}
                         style={{cursor:"pointer",border:"1px solid rgba(59,130,246,0.3)",borderRadius:6,padding:"3px 9px",background:"rgba(59,130,246,0.1)",color:"#93c5fd",fontSize:11,fontFamily:"'Georgia',serif"}}>
                         🖨️ Imprimir todo el día
