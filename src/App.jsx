@@ -4768,6 +4768,13 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
       if(diaKey >= fecha) return; // solo días ANTERIORES al que se está proponiendo
       nAprop(tareas[diaKey]).forEach(t => {
         if(finalesProp.includes(t.estado) || idsResueltos.has(t.id)) return;
+        // El día de HOY es especial: si el turno de ESTE trabajador todavía está abierto, lo
+        // pendiente es normal a media jornada (no "atrasado") — no se arrastra todavía. En cuanto
+        // cierre su turno (aunque sea hoy mismo), sí se arrastra con normalidad.
+        if(diaKey===hoy){
+          const keyCierreProp = `${hoy}_${(t.responsable||"").split(" ")[0]?.toLowerCase()||""}`;
+          if(!cierresTurno?.[keyCierreProp]) return;
+        }
         if(t.origenZid && t.origenEid && t.origenFrecId){
           pendItemsMap.set(`${t.origenZid}_${t.origenEid}_${t.origenFrecId}_${t.fechaCorrespondiente||""}`, {dia:diaKey, item:t});
         }
@@ -14100,7 +14107,7 @@ function HistorialElementoGolf({ S, nombreElemento, hoyoElemento="", tareasProg,
   );
 }
 
-function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito, onCierreSectorial, onNuevaAlerta, configSemanal={}, setConfigSemanal, getAllElems, getZD, setElemFrecs, setElemFrecsBulk, bodegasData, setBodegasData }) {
+function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito, onCierreSectorial, onNuevaAlerta, configSemanal={}, setConfigSemanal, getAllElems, getZD, setElemFrecs, setElemFrecsBulk, bodegasData, setBodegasData, cierresTurno={} }) {
   const GOLF_ZONA_ID = 31; // ID macrozona Golf
   // Alinea el nombre de un elemento con el catálogo configurado en Macrozonas → zona Golf → Frecuencias,
   // para que las tareas creadas desde el Módulo Golf usen exactamente el mismo nombre que ahí (evita
@@ -16349,6 +16356,12 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             if(diaKeyG>=fechaProponerGolf) return;
             nAGolfProp(tareasProg[diaKeyG]).forEach(t=>{
               if(finalesGolfProp.includes(t.estado) || idsResueltosGolf.has(t.id)) return;
+              // Mismo criterio que el módulo general: el día de hoy no se arrastra mientras el
+              // turno de este trabajador siga abierto — solo en cuanto cierre (aunque sea hoy mismo).
+              if(diaKeyG===hoy){
+                const keyCierreGolf = `${hoy}_${(t.responsable||"").split(" ")[0]?.toLowerCase()||""}`;
+                if(!cierresTurno?.[keyCierreGolf]) return;
+              }
               if(t.origenZid==="31" && t.origenEid && t.origenFrecId){
                 pendSignaturesGolf.set(`${t.origenEid}_${t.origenFrecId}_${t.fechaCorrespondiente||""}`, {dia:diaKeyG, item:t});
               }
@@ -26759,7 +26772,7 @@ export default function App() {
 
         {/* GOLF */}
         {vista==="golf"&&(
-          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={esJefa&&!soloLectura} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial} setVista={setVista} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} onCierreSectorial={()=>setShowCierreSectorial(true)} onNuevaAlerta={()=>{setAutoOpenAlerta(true);setVista("notificaciones");}} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} setElemFrecsBulk={setElemFrecsBulk} bodegasData={bodegasData} setBodegasData={setBodegasData}
+          <PanelGolf S={S} golfData={golfData} setGolfData={setGolfData} personal={personal} esJefa={esJefa&&!soloLectura} tareasProg={tareasProg} setTareasProg={setTareasProg} rolLogueado={rolLogueado} updateZona={updateZona} addHistorial={addHistorial} setVista={setVista} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} incidenciasFito={incidenciasFito} setIncidenciasFito={setIncidenciasFito} onCierreSectorial={()=>setShowCierreSectorial(true)} onNuevaAlerta={()=>{setAutoOpenAlerta(true);setVista("notificaciones");}} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} setElemFrecsBulk={setElemFrecsBulk} bodegasData={bodegasData} setBodegasData={setBodegasData} cierresTurno={cierresTurno}
             crearNotificacion={crearNotificacion}
             initialSubTab={golfInitTab}
             onRegistroGuardado={(tipo)=>{
