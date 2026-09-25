@@ -1946,6 +1946,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
   const [tabHist,      setTabHist]      = React.useState(tabInicial||"historial_macro"); // "historial_macro" | "historial_golf" | "buscar" | "turnos" | "renombrar"
   const [diaTurnoElegido, setDiaTurnoElegido] = React.useState(tabInicial==="turnos"?new Date().toISOString().slice(0,10):""); // fecha específica elegida para editar en "Ver/editar turnos"
   const [turnosTrabAbiertos, setTurnosTrabAbiertos] = React.useState({}); // {"dia_resp": bool} — vista por trabajador colapsada por defecto en "Ver/editar turnos"
+  const [gruposTareaAbiertosTurnos, setGruposTareaAbiertosTurnos] = React.useState({}); // {"dia_resp_tarea": bool} — grupos por tipo de tarea colapsados por defecto
   const esGolfZonaHist = (zona) => zona==="Golf"||(zona||"").includes("Golf");
   const zonaFijaActual = tabHist==="historial_golf" ? "golf" : tabHist==="historial_macro" ? "no-golf" : null;
   const [buscarZona,   setBuscarZona]   = React.useState("");
@@ -2726,61 +2727,85 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                           <div style={{width:`${pct}%`,height:"100%",background:pct===100?"#22c55e":"linear-gradient(90deg,#3d7a52,#4ade80)",borderRadius:4}}/>
                         </div>
                         {/* Tareas */}
-                        {trabAbierto&&(
-                        <div style={{display:"flex",flexDirection:"column",gap:3}}>
-                          {tds.map(hpTask=>{
-                            const est=EC[hpTask.estado]||EC.pendiente;
+                        {trabAbierto&&(()=>{
+                          const grupos={};
+                          tds.forEach(hpTask=>{ const g=(hpTask.tarea||"Sin tarea").replace("⛳ ",""); (grupos[g] ||= []).push(hpTask); });
+                          const nombresGrupos=Object.keys(grupos).sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
+                          return (
+                        <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                          {nombresGrupos.map(nombreGrupo=>{
+                            const items=grupos[nombreGrupo];
+                            const grupoKey=`${dia}_${resp}_${nombreGrupo}`;
+                            const grupoAbierto=!!gruposTareaAbiertosTurnos[grupoKey];
+                            const hechasGrupo=items.filter(x=>["hecha","completada"].includes(x.estado)).length;
                             return (
-                              <div key={hpTask.id} style={{display:"flex",gap:7,padding:"5px 8px",borderRadius:7,background:`${est.color}07`,border:`1px solid ${est.color}18`,alignItems:"flex-start"}}>
+                            <div key={nombreGrupo}>
+                              <div onClick={()=>setGruposTareaAbiertosTurnos(p=>({...p,[grupoKey]:!p[grupoKey]}))}
+                                style={{cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 9px",background:"rgba(255,255,255,0.03)",borderRadius:6}}>
+                                <span style={{fontSize:12,fontWeight:600}}>
+                                  <span style={{display:"inline-block",transform:grupoAbierto?"rotate(90deg)":"none",transition:"transform .15s",marginRight:5}}>▶</span>
+                                  {nombreGrupo}
+                                </span>
+                                <span style={{fontSize:10,color:"#6aaa7a"}}>{hechasGrupo}/{items.length}</span>
+                              </div>
+                              {grupoAbierto&&(
+                              <div style={{display:"flex",flexDirection:"column",gap:2,marginTop:2}}>
+                          {items.map(hpTask=>{
+                            const est=EC[hpTask.estado]||EC.pendiente;
+                            const notaExtra=[hpTask.notaWorker&&("💬 "+hpTask.notaWorker),hpTask.notaJefa&&("📋 "+hpTask.notaJefa),hpTask.movidoDesde&&("🔁 Movida desde "+hpTask.movidoDesde),hpTask.alturaCorte&&("✂️ HOC: "+hpTask.alturaCorte+"mm")].filter(Boolean).join(" · ");
+                            return (
+                              <div key={hpTask.id} style={{display:"flex",gap:7,padding:"4px 8px",borderRadius:6,background:`${est.color}07`,border:`1px solid ${est.color}18`,alignItems:"center",flexWrap:"wrap"}}>
                                 <span style={{fontSize:12,flexShrink:0}}>{est.icon}</span>
-                                <div style={{flex:1,minWidth:0}}>
-                                  <div style={{fontSize:12,fontWeight:600}}>{(hpTask.tarea||"").replace("⛳ ","")}{hpTask.emergente&&<span style={{marginLeft:6,fontSize:9,fontWeight:700,color:"#fbbf24",background:"rgba(251,191,36,0.12)",border:"1px solid rgba(251,191,36,0.3)",padding:"1px 6px",borderRadius:7}}>⚡ Emergente</span>}</div>
-                                  {hpTask.zona&&<div style={{fontSize:10,color:"#5a7a7a"}}>📍 {hpTask.zona}{hpTask.elemento?` · ${hpTask.elemento}`:""}</div>}
-                                  {hpTask.alturaCorte&&<div style={{fontSize:10,color:"#fbbf24"}}>✂️ HOC indicada: {hpTask.alturaCorte}mm</div>}
-                                  {hpTask.alturaCorteReal&&<div style={{fontSize:10,color:"#22c55e",fontWeight:600}}>✂️ HOC real: {hpTask.alturaCorteReal}mm</div>}
-                                  {hpTask.notaWorker&&<div style={{fontSize:10,color:hpTask.estado==="no_pudo"?"#f87171":"#a0c8a0",fontStyle:"italic"}}>💬 {hpTask.notaWorker}</div>}
-                                  {hpTask.notaJefa&&<div style={{fontSize:10,color:"#fbbf24",fontStyle:"italic"}}>📋 {hpTask.notaJefa}</div>}
-                                  {hpTask.movidoDesde&&<div style={{fontSize:10,color:"#93c5fd"}}>🔁 Movida desde {hpTask.movidoDesde} (seguía sin resolver)</div>}
+                                <div style={{flex:1,minWidth:120}}>
+                                  <div style={{fontSize:11,color:"#8aa89a"}}>
+                                    {hpTask.zona&&<>📍 {hpTask.zona}{hpTask.elemento?` · ${hpTask.elemento}`:""}</>}
+                                    {hpTask.emergente&&<span style={{marginLeft:6,fontSize:9,fontWeight:700,color:"#fbbf24",background:"rgba(251,191,36,0.12)",border:"1px solid rgba(251,191,36,0.3)",padding:"1px 6px",borderRadius:7}}>⚡ Emergente</span>}
+                                  </div>
+                                  {notaExtra&&<div style={{fontSize:10,color:"#a0c8a0",fontStyle:"italic"}}>{notaExtra}</div>}
                                 </div>
-                                <div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
-                                  <select value={hpTask.estado}
-                                    onChange={e=>{const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);const patch=aplicarCambioFrecuencia(hpTask,{estado:e.target.value},getElemFrecs,setElemFrecs);setTareas(prev=>{const updated=cerrarLoteSiCorresponde(nA2(prev[dia]), hpTask.id, patch);return {...prev,[dia]:updated.map(limpiarUndef)};});}}
-                                    style={{fontSize:10,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:5,color:"#ede9e0",padding:"2px 3px",cursor:"pointer"}}>
-                                    {Object.entries(EC).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
-                                  </select>
-                                  <input placeholder="nota..." defaultValue={hpTask.notaJefa||""}
-                                    onBlur={e=>{if(e.target.value!==hpTask.notaJefa){const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);setTareas(prev=>({...prev,[dia]:nA2(prev[dia]).map(x=>x.id===hpTask.id?{...x,notaJefa:e.target.value}:x)}));}}}
-                                    style={{fontSize:10,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:5,color:"#ede9e0",padding:"2px 4px",width:90}}/>
-                                  {!hpTask.origenFrecId&&!["hecha","completada","no_pudo"].includes(hpTask.estado)&&(
-                                    <button onClick={()=>{
-                                        const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-                                        const mananaDef=new Date(dia+"T12:00:00");mananaDef.setDate(mananaDef.getDate()+1);
-                                        const destinoStr=window.prompt(`¿Para qué fecha reprogramar "${(hpTask.tarea||"").replace("⛳ ","")}"? (AAAA-MM-DD)`, mananaDef.toISOString().slice(0,10));
-                                        if(!destinoStr) return;
-                                        if(!/^\d{4}-\d{2}-\d{2}$/.test(destinoStr)){ alert("Fecha inválida — usa el formato AAAA-MM-DD."); return; }
-                                        setTareas(prev=>{
-                                          const nuevo={...prev};
-                                          nuevo[dia]=nA2(nuevo[dia]).filter(x=>x.id!==hpTask.id);
-                                          nuevo[destinoStr]=[...nA2(nuevo[destinoStr]),{...hpTask,fecha:destinoStr,notas:(hpTask.notas?hpTask.notas+" | ":"")+"Reprogramada desde "+dia}];
-                                          return nuevo;
-                                        });
-                                      }}
-                                      style={{cursor:"pointer",border:"1px solid rgba(59,130,246,0.25)",borderRadius:5,padding:"1px 5px",background:"rgba(59,130,246,0.06)",color:"#93c5fd",fontSize:10}}>📅 Reprogramar</button>
-                                  )}
-                                  <button onClick={()=>{
-                                      const esManual = !hpTask.origenFrecId;
-                                      const msg = esManual
-                                        ? `¿Eliminar "${(hpTask.tarea||"").replace("⛳ ","")}"?\n\n⚠️ Esta tarea NO tiene frecuencia asociada — al eliminarla se pierde para siempre, no se va a volver a proponer sola ningún otro día. Si quieres conservarla, usa "📅 Reprogramar" en vez de eliminar.`
-                                        : `¿Eliminar "${(hpTask.tarea||"").replace("⛳ ","")}"?\n\nEsta tarea tiene una frecuencia asociada — si sigue vencida, "Proponer del día" la va a volver a proponer más adelante.`;
-                                      if(window.confirm(msg)){const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);setTareas(prev=>({...prev,[dia]:nA2(prev[dia]).filter(x=>x.id!==hpTask.id)}));}
+                                <select value={hpTask.estado}
+                                  onChange={e=>{const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);const patch=aplicarCambioFrecuencia(hpTask,{estado:e.target.value},getElemFrecs,setElemFrecs);setTareas(prev=>{const updated=cerrarLoteSiCorresponde(nA2(prev[dia]), hpTask.id, patch);return {...prev,[dia]:updated.map(limpiarUndef)};});}}
+                                  style={{fontSize:10,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:5,color:"#ede9e0",padding:"2px 3px",cursor:"pointer",flexShrink:0}}>
+                                  {Object.entries(EC).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
+                                </select>
+                                <input placeholder="nota..." defaultValue={hpTask.notaJefa||""}
+                                  onBlur={e=>{if(e.target.value!==hpTask.notaJefa){const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);setTareas(prev=>({...prev,[dia]:nA2(prev[dia]).map(x=>x.id===hpTask.id?{...x,notaJefa:e.target.value}:x)}));}}}
+                                  style={{fontSize:10,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:5,color:"#ede9e0",padding:"2px 4px",width:70,flexShrink:0}}/>
+                                {!hpTask.origenFrecId&&!["hecha","completada","no_pudo"].includes(hpTask.estado)&&(
+                                  <button title="Reprogramar" onClick={()=>{
+                                      const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+                                      const mananaDef=new Date(dia+"T12:00:00");mananaDef.setDate(mananaDef.getDate()+1);
+                                      const destinoStr=window.prompt(`¿Para qué fecha reprogramar "${(hpTask.tarea||"").replace("⛳ ","")}"? (AAAA-MM-DD)`, mananaDef.toISOString().slice(0,10));
+                                      if(!destinoStr) return;
+                                      if(!/^\d{4}-\d{2}-\d{2}$/.test(destinoStr)){ alert("Fecha inválida — usa el formato AAAA-MM-DD."); return; }
+                                      setTareas(prev=>{
+                                        const nuevo={...prev};
+                                        nuevo[dia]=nA2(nuevo[dia]).filter(x=>x.id!==hpTask.id);
+                                        nuevo[destinoStr]=[...nA2(nuevo[destinoStr]),{...hpTask,fecha:destinoStr,notas:(hpTask.notas?hpTask.notas+" | ":"")+"Reprogramada desde "+dia}];
+                                        return nuevo;
+                                      });
                                     }}
-                                    style={{cursor:"pointer",border:"1px solid rgba(239,68,68,0.2)",borderRadius:5,padding:"1px 5px",background:"rgba(239,68,68,0.06)",color:"#f87171",fontSize:10}}>🗑</button>
-                                </div>
+                                    style={{cursor:"pointer",border:"1px solid rgba(59,130,246,0.25)",borderRadius:5,padding:"2px 6px",background:"rgba(59,130,246,0.06)",color:"#93c5fd",fontSize:11,flexShrink:0}}>📅</button>
+                                )}
+                                <button title="Eliminar" onClick={()=>{
+                                    const esManual = !hpTask.origenFrecId;
+                                    const msg = esManual
+                                      ? `¿Eliminar "${(hpTask.tarea||"").replace("⛳ ","")}"?\n\n⚠️ Esta tarea NO tiene frecuencia asociada — al eliminarla se pierde para siempre, no se va a volver a proponer sola ningún otro día. Si quieres conservarla, usa "📅 Reprogramar" en vez de eliminar.`
+                                      : `¿Eliminar "${(hpTask.tarea||"").replace("⛳ ","")}"?\n\nEsta tarea tiene una frecuencia asociada — si sigue vencida, "Proponer del día" la va a volver a proponer más adelante.`;
+                                    if(window.confirm(msg)){const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);setTareas(prev=>({...prev,[dia]:nA2(prev[dia]).filter(x=>x.id!==hpTask.id)}));}
+                                  }}
+                                  style={{cursor:"pointer",border:"1px solid rgba(239,68,68,0.2)",borderRadius:5,padding:"2px 6px",background:"rgba(239,68,68,0.06)",color:"#f87171",fontSize:11,flexShrink:0}}>🗑</button>
                               </div>
                             );
                           })}
+                              </div>
+                              )}
+                            </div>
+                            );
+                          })}
                         </div>
-                        )}
+                          );
+                        })()}
                       </div>
                     );
                   })}
