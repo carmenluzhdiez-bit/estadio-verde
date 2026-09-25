@@ -1932,7 +1932,7 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
 }
 
 
-function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa=false, puedeCrear=false, cierresTurno={}, onReabrirTurno, getElemFrecs, setElemFrecs, tabInicial=null }) {
+function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa=false, esSupervisor=false, puedeCrear=false, cierresTurno={}, onReabrirTurno, onCerrarTurno, getElemFrecs, setElemFrecs, tabInicial=null }) {
   const [diasAbiertosHist, setDiasAbiertosHist] = React.useState({});
   const [gruposHistAbiertos, setGruposHistAbiertos] = React.useState({}); // {"dia__nombreTarea": bool}
   const [fechaReprogramarHist, setFechaReprogramarHist] = React.useState({}); // {dia: fechaDestino}
@@ -2237,7 +2237,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
       {/* Tabs */}
       <div style={{display:"flex",gap:6,marginBottom:14}}>
         {([["historial_macro","📜 Historial Macrozonas"],["historial_golf","⛳ Historial Golf"],["buscar","🔍 Consulta histórica"]]
-          .concat(esJefa?[["turnos","✏️ Ver/editar turnos"]]:[])
+          .concat((esJefa||esSupervisor)?[["turnos","✏️ Ver/editar turnos"]]:[])
           .concat(esJefa?[["renombrar","🏷️ Renombrar tareas"]]:[])).map(([t,l])=>(
           <button key={t} onClick={()=>setTabHist(t)}
             style={{cursor:"pointer",border:`1px solid ${tabHist===t?"#34d399":"rgba(255,255,255,0.12)"}`,
@@ -2642,7 +2642,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
       </>)}
 
       {/* ══ PANEL TURNOS TRABAJADORES ══ */}
-      {tabHist==="turnos"&&esJefa&&(()=>{
+      {tabHist==="turnos"&&(esJefa||esSupervisor)&&(()=>{
         const nA=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
         const hoyT=new Date().toISOString().slice(0,10);
         const dias=diaTurnoElegido
@@ -2734,7 +2734,11 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                             ):(
                               <span style={{fontSize:10,color:"#f59e0b",background:"rgba(245,158,11,0.06)",border:"1px solid rgba(245,158,11,0.2)",borderRadius:7,padding:"2px 9px"}}>⏳ Abierto</span>
                             )}
-                            {cerrado&&<button onClick={()=>onReabrirTurno?.(dia,resp)} style={{cursor:"pointer",border:"1px solid rgba(245,158,11,0.3)",borderRadius:6,padding:"2px 7px",background:"rgba(245,158,11,0.06)",color:"#fbbf24",fontSize:10,fontFamily:"'Georgia',serif"}}>🔓 Reabrir</button>}
+                            {cerrado?(
+                              <button onClick={()=>onReabrirTurno?.(dia,resp)} style={{cursor:"pointer",border:"1px solid rgba(245,158,11,0.3)",borderRadius:6,padding:"2px 7px",background:"rgba(245,158,11,0.06)",color:"#fbbf24",fontSize:10,fontFamily:"'Georgia',serif"}}>🔓 Reabrir</button>
+                            ):(
+                              <button onClick={()=>{if(window.confirm(`¿Cerrar el turno de ${resp} del ${dia}?`)) onCerrarTurno?.(dia,resp);}} style={{cursor:"pointer",border:"1px solid rgba(34,197,94,0.3)",borderRadius:6,padding:"2px 7px",background:"rgba(34,197,94,0.06)",color:"#4ade80",fontSize:10,fontFamily:"'Georgia',serif"}}>🔒 Cerrar turno</button>
+                            )}
                           </div>
                         </div>
                         {/* Barra progreso */}
@@ -2778,15 +2782,19 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                                   </div>
                                   {notaExtra&&<div style={{fontSize:10,color:"#a0c8a0",fontStyle:"italic"}}>{notaExtra}</div>}
                                 </div>
+                                {esJefa?(
                                 <select value={hpTask.estado}
                                   onChange={e=>{const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);const patch=aplicarCambioFrecuencia(hpTask,{estado:e.target.value},getElemFrecs,setElemFrecs);setTareas(prev=>{const updated=cerrarLoteSiCorresponde(nA2(prev[dia]), hpTask.id, patch);return {...prev,[dia]:updated.map(limpiarUndef)};});}}
                                   style={{fontSize:10,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:5,color:"#ede9e0",padding:"2px 3px",cursor:"pointer",flexShrink:0}}>
                                   {Object.entries(EC).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
                                 </select>
-                                <input placeholder="nota..." defaultValue={hpTask.notaJefa||""}
+                                ):(
+                                <span style={{fontSize:10,color:est.color,flexShrink:0}}>{est.icon} {est.label}</span>
+                                )}
+                                {esJefa&&<input placeholder="nota..." defaultValue={hpTask.notaJefa||""}
                                   onBlur={e=>{if(e.target.value!==hpTask.notaJefa){const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);setTareas(prev=>({...prev,[dia]:nA2(prev[dia]).map(x=>x.id===hpTask.id?{...x,notaJefa:e.target.value}:x)}));}}}
-                                  style={{fontSize:10,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:5,color:"#ede9e0",padding:"2px 4px",width:70,flexShrink:0}}/>
-                                {!hpTask.origenFrecId&&!["hecha","completada","no_pudo"].includes(hpTask.estado)&&(
+                                  style={{fontSize:10,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:5,color:"#ede9e0",padding:"2px 4px",width:70,flexShrink:0}}/>}
+                                {esJefa&&!hpTask.origenFrecId&&!["hecha","completada","no_pudo"].includes(hpTask.estado)&&(
                                   <button title="Reprogramar" onClick={()=>{
                                       const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
                                       const mananaDef=new Date(dia+"T12:00:00");mananaDef.setDate(mananaDef.getDate()+1);
@@ -2802,14 +2810,14 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                                     }}
                                     style={{cursor:"pointer",border:"1px solid rgba(59,130,246,0.25)",borderRadius:5,padding:"2px 6px",background:"rgba(59,130,246,0.06)",color:"#93c5fd",fontSize:11,flexShrink:0}}>📅</button>
                                 )}
-                                <button title="Eliminar" onClick={()=>{
+                                {esJefa&&<button title="Eliminar" onClick={()=>{
                                     const esManual = !hpTask.origenFrecId;
                                     const msg = esManual
                                       ? `¿Eliminar "${(hpTask.tarea||"").replace("⛳ ","")}"?\n\n⚠️ Esta tarea NO tiene frecuencia asociada — al eliminarla se pierde para siempre, no se va a volver a proponer sola ningún otro día. Si quieres conservarla, usa "📅 Reprogramar" en vez de eliminar.`
                                       : `¿Eliminar "${(hpTask.tarea||"").replace("⛳ ","")}"?\n\nEsta tarea tiene una frecuencia asociada — si sigue vencida, "Proponer del día" la va a volver a proponer más adelante.`;
                                     if(window.confirm(msg)){const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);setTareas(prev=>({...prev,[dia]:nA2(prev[dia]).filter(x=>x.id!==hpTask.id)}));}
                                   }}
-                                  style={{cursor:"pointer",border:"1px solid rgba(239,68,68,0.2)",borderRadius:5,padding:"2px 6px",background:"rgba(239,68,68,0.06)",color:"#f87171",fontSize:11,flexShrink:0}}>🗑</button>
+                                  style={{cursor:"pointer",border:"1px solid rgba(239,68,68,0.2)",borderRadius:5,padding:"2px 6px",background:"rgba(239,68,68,0.06)",color:"#f87171",fontSize:11,flexShrink:0}}>🗑</button>}
                               </div>
                             );
                           })}
@@ -4716,7 +4724,7 @@ function SimplificarFrecuenciasGeneral({ S, zonas, getAllElems, getZD, setElemFr
   );
 }
 
-function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACROZONAS_BASE, tareas, setTareas, tareasZonaHoy=0, esJefa=false, configSemanal={}, setConfigSemanal, puedeCrear=false, cierresTurno={}, onReabrirTurno, getElemFrecs, setElemFrecs, setElemFrecsBulk, aplicaciones=[], setAplicaciones, stockFito, setStockFito, crearNotificacion, fechaInicial=null, onIrARegistrarAplicacion=()=>{}, setVista=()=>{} }) {
+function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACROZONAS_BASE, tareas, setTareas, tareasZonaHoy=0, esJefa=false, esSupervisor=false, configSemanal={}, setConfigSemanal, puedeCrear=false, cierresTurno={}, onReabrirTurno, onCerrarTurno, getElemFrecs, setElemFrecs, setElemFrecsBulk, aplicaciones=[], setAplicaciones, stockFito, setStockFito, crearNotificacion, fechaInicial=null, onIrARegistrarAplicacion=()=>{}, setVista=()=>{} }) {
   const hoy = fechaLocal();
   const [fecha, setFecha] = React.useState(fechaInicial||hoy);
   const [tabProg, setTabProg] = React.useState("programa");
@@ -5024,10 +5032,10 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           </div>
           <button className={`tab${tabProg==="historial"&&histTabInicial!=="turnos"?" on":""}`} onClick={()=>{setHistTabInicial(null);setTabProg("historial");}}>📜 Ver Historial</button>
         </div>
-        {esJefa&&(
+        {(esJefa||esSupervisor)&&(
           <div style={{flex:"1 1 260px",border:"1px solid rgba(52,211,153,0.25)",borderRadius:12,padding:14,background:"rgba(52,211,153,0.03)"}}>
             <div style={{fontSize:11,fontWeight:700,color:"#34d399",marginBottom:10,textTransform:"uppercase",letterSpacing:"0.5px"}}>
-              ✅ Trabajarlos — revisar y editar tareas de turnos
+              ✅ Trabajarlos — revisar y {esJefa?"editar":"cerrar/reabrir"} turnos
             </div>
             <button className={`tab${tabProg==="historial"&&histTabInicial==="turnos"?" on":""}`} onClick={()=>{setHistTabInicial("turnos");setTabProg("historial");}}>✏️ Ver/editar turnos</button>
           </div>
@@ -5412,7 +5420,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
       )}
 
       {tabProg==="historial" && (
-        <HistorialProg tareas={tareas} setTareas={setTareas} MACROZONAS_BASE={MACROZONAS_BASE} zonas={zonas} S={S} esJefa={esJefa} puedeCrear={puedeCrear} cierresTurno={cierresTurno} onReabrirTurno={onReabrirTurno} getElemFrecs={getElemFrecs} setElemFrecs={setElemFrecs} tabInicial={histTabInicial}/>
+        <HistorialProg tareas={tareas} setTareas={setTareas} MACROZONAS_BASE={MACROZONAS_BASE} zonas={zonas} S={S} esJefa={esJefa} esSupervisor={esSupervisor} puedeCrear={puedeCrear} cierresTurno={cierresTurno} onReabrirTurno={onReabrirTurno} onCerrarTurno={onCerrarTurno} getElemFrecs={getElemFrecs} setElemFrecs={setElemFrecs} tabInicial={histTabInicial}/>
       )}
 
       {/* ── PROGRAMAR ── */}
@@ -25540,7 +25548,16 @@ export default function App() {
                 MACROZONAS_BASE={MACROZONAS_BASE}
                 onAccesoRapido={(vista,subTab)=>{setVista(vista);if(subTab)setGolfInitTab(subTab);setWorkerARevisar(null);}}
                 onCambiarMetodo={()=>{}}
-                onCerrarTurno={()=>{}}
+                onCerrarTurno={(fecha,nombre)=>{
+                  const key=`${fecha}_${nombre.split(" ")[0].toLowerCase()}`;
+                  setCierresTurno(prev=>({...prev,[key]:{
+                    fecha,nombre,
+                    hora:new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"}),
+                    cerradoEn:new Date().toISOString(),
+                    cerradoPor:"jefa",
+                  }}));
+                  alert(`✅ Turno de ${nombre} del ${fecha} cerrado.`);
+                }}
                 onReabrirTurno={(fecha,nombre)=>{
                   const key=`${fecha}_${nombre.split(" ")[0].toLowerCase()}`;
                   setCierresTurno(prev=>{const n={...prev};delete n[key];return n;});
@@ -26656,6 +26673,7 @@ export default function App() {
             getElemFrecs={getElemFrecs} setElemFrecs={setElemFrecs} setElemFrecsBulk={setElemFrecsBulk} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} stockFito={stockFito} setStockFito={setStockFito} crearNotificacion={crearNotificacion}
             tareasZonaHoy={(tareasProg[new Date().toISOString().slice(0,10)]||[]).filter(t=>t.origenZona&&t.estado==="por_designar").length}
             esJefa={esJefa}
+            esSupervisor={esSupervisor||rolLogueado==="supervisor"}
             puedeCrear={rolLogueado==="jefa"||rolLogueado==="supervisor"||esJefa}
             cierresTurno={cierresTurno}
             fechaInicial={fechaProgramaObjetivo}
@@ -26664,6 +26682,16 @@ export default function App() {
             onReabrirTurno={(fecha,nombre)=>{
               const key=`${fecha}_${nombre.split(" ")[0].toLowerCase()}`;
               setCierresTurno(prev=>{ const n={...prev}; delete n[key]; return n; });
+            }}
+            onCerrarTurno={(fecha,nombre)=>{
+              const key=`${fecha}_${nombre.split(" ")[0].toLowerCase()}`;
+              setCierresTurno(prev=>({...prev,[key]:{
+                fecha,nombre,
+                hora:new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"}),
+                cerradoEn:new Date().toISOString(),
+                cerradoPor:rolLogueado==="jefa"?"jefa":rolLogueado==="supervisor"?"supervisor":"programador",
+              }}));
+              alert(`✅ Turno de ${nombre} del ${fecha} cerrado.`);
             }}
           />
         )}
@@ -26780,13 +26808,13 @@ export default function App() {
                   esJefaApp={rolLogueado==="jefa"}
                   cierresTurno={cierresTurno}
                   onCerrarTurno={(fecha,nombre)=>{
-                    const fechaCierre=fechaLocal(); // siempre usar hora local Chile
-                    const key=`${fechaCierre}_${nombre.split(" ")[0].toLowerCase()}`;
+                    const key=`${fecha}_${nombre.split(" ")[0].toLowerCase()}`;
                     setCierresTurno(prev=>({...prev,[key]:{
-                      fecha:fechaCierre,nombre,
+                      fecha,nombre,
                       hora:new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"}),
                       cerradoEn:new Date().toISOString(),
                     }}));
+                    alert(`✅ Turno del ${fecha} cerrado correctamente.`);
                   }}
                   onReabrirTurno={(fecha,nombre)=>{
                     const key=`${fecha}_${nombre.split(" ")[0].toLowerCase()}`;
