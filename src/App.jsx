@@ -5134,7 +5134,9 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
             })()}
           </div>
 
-          {previewReprogramar&&(
+          {previewReprogramar&&(()=>{
+            const destinoElegido = fechaReprogramar || diasHabiles(fecha,1);
+            return (
             <div style={{...S.card,padding:16,marginBottom:16,border:"1px solid rgba(251,191,36,0.35)"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:8}}>
                 <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,color:"#fbbf24"}}>
@@ -5179,7 +5181,8 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                 <button className="btn-g" style={S.btn} onClick={()=>setPreviewReprogramar(null)}>Cancelar</button>
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {previewProp&&(()=>{
             const previewFiltradoProp = previewProp.filter(p=>
