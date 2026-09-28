@@ -2319,6 +2319,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
   const [filtroTarea,  setFiltroTarea]  = React.useState("");
   const [filtroZona,   setFiltroZona]   = React.useState("todas");
   const [filtroResponsable, setFiltroResponsable] = React.useState("todos");
+  const [filtroElemento, setFiltroElemento] = React.useState(""); // texto libre: coincide con cualquier parte del nombre del elemento
   const [diaImpresion, setDiaImpresion] = React.useState("");
   const [tabHist,      setTabHist]      = React.useState(tabInicial||"historial_macro"); // "historial_macro" | "historial_golf" | "buscar" | "turnos" | "renombrar"
   const [diaTurnoElegido, setDiaTurnoElegido] = React.useState(tabInicial==="turnos"?new Date().toISOString().slice(0,10):""); // fecha específica elegida para editar en "Ver/editar turnos"
@@ -2347,6 +2348,12 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
   const allTareasSinGolf = allTareas;
   const todasZonas  = [...new Set(allTareasSinGolf.map(t=>t.zona).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
   const todosResponsables = [...new Set(allTareas.map(t=>t.responsable).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
+  // Elementos sugeridos: solo los del módulo que se está viendo (Golf / resto) y, si hay una zona elegida, solo los de esa zona.
+  const todosElementos = [...new Set(allTareas
+    .filter(t=>!zonaFijaActual || (zonaFijaActual==="golf"?esGolfZonaHist(t.zona):!esGolfZonaHist(t.zona)))
+    .filter(t=>filtroZona==="todas" || t.zona===filtroZona)
+    .map(t=>(t.elemento||"").trim()).filter(Boolean))]
+    .sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base",numeric:true}));
 
   const diasOrdenados = Object.keys(tareas)
     .filter(dKey => (tareas[dKey]||[]).length > 0)
@@ -2362,8 +2369,9 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
       const okTar = !filtroTarea || histItem.tarea===filtroTarea;
       const okZon = filtroZona==="todas" || histItem.zona===filtroZona;
       const okResp = filtroResponsable==="todos" || histItem.responsable===filtroResponsable;
+      const okElem = !filtroElemento.trim() || (histItem.elemento||"").toLowerCase().includes(filtroElemento.trim().toLowerCase());
       const okZonaFija = !zonaFijaActual || (zonaFijaActual==="golf" ? esGolfZonaHist(histItem.zona) : !esGolfZonaHist(histItem.zona));
-      if(okEst && okTar && okZon && okResp && okZonaFija) resultado.push(histItem);
+      if(okEst && okTar && okZon && okResp && okElem && okZonaFija) resultado.push(histItem);
     }
     return resultado;
   }
@@ -2556,7 +2564,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
     win.document.close();
   };
 
-  const hayFiltros = filtroEstado!=="todos"||filtroTarea||filtroZona!=="todas"||filtroDia||filtroResponsable!=="todos";
+  const hayFiltros = filtroEstado!=="todos"||filtroTarea||filtroZona!=="todas"||filtroDia||filtroResponsable!=="todos"||filtroElemento.trim()!=="";
 
   // ── Calcular historial de zona+tipo para el buscador ──────────────
   const calcHistorialZona = () => {
@@ -2779,6 +2787,13 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
             </select>
           </div>
           <div>
+            <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>ELEMENTO</label>
+            <input list="hist-elementos-lista" style={{...S.input,fontSize:13}} value={filtroElemento} onChange={e=>setFiltroElemento(e.target.value)} placeholder="Escribe o elige un elemento…"/>
+            <datalist id="hist-elementos-lista">
+              {todosElementos.map(el=><option key={el} value={el}/>)}
+            </datalist>
+          </div>
+          <div>
             <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>RESPONSABLE</label>
             <select style={{...S.input,fontSize:13}} value={filtroResponsable} onChange={e=>setFiltroResponsable(e.target.value)}>
               <option value="todos">Todos</option>
@@ -2787,7 +2802,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
           </div>
         </div>
         {hayFiltros && (
-          <button onClick={()=>{setFiltroDia("");setFiltroEstado("todos");setFiltroTarea("");setFiltroZona("todas");setFiltroResponsable("todos");}}
+          <button onClick={()=>{setFiltroDia("");setFiltroEstado("todos");setFiltroTarea("");setFiltroZona("todas");setFiltroResponsable("todos");setFiltroElemento("");}}
             style={{...S.btn,background:"transparent",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)",fontSize:12}}>
             ✕ Limpiar filtros
           </button>
