@@ -444,6 +444,76 @@ const calcularAlertasDatos = (f) => {
   return al.sort((a,b)=>(a.nivel==="critico"?0:1)-(b.nivel==="critico"?0:1));
 };
 
+// ── "No se pudo": tareas que quedan sin decisión ──
+// Antes, marcar una tarea "no_pudo" la dejaba resuelta para siempre — nadie volvía a verla ni a
+// decidir qué hacer con ella. Ahora, al programar, se avisa de las que siguen sin una decisión
+// (reprogramarlas o anularlas) y se pueden resolver ahí mismo, con el motivo que dejó el jardinero.
+const normArrNP = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v).filter(Boolean):[]);
+const noPudoSinResolver = (tareas, hoy, filtroTarea=()=>true) => {
+  const res = [];
+  Object.keys(tareas||{}).sort().forEach(dia=>{
+    if(dia>=hoy) return;
+    normArrNP(tareas[dia]).forEach(t=>{
+      if(t.estado!=="no_pudo" || t.trasladadaA || t.anuladaNoPudo || !filtroTarea(t)) return;
+      res.push({dia, item:t});
+    });
+  });
+  return res;
+};
+// Modal de decisión: para cada tarea, "📅 Reprogramar" (elige fecha) o "🚫 Anular" (queda archivada,
+// no se vuelve a avisar). "Revisar después" cierra sin decidir nada — se vuelve a preguntar la próxima vez.
+// setter = setTareas/setTareasProg del módulo correspondiente.
+const resolverNoPudoModal = (lista, setter) => new Promise(resolveAll=>{
+  if(lista.length===0){ resolveAll(); return; }
+  const el = (tag, css, txt) => { const e=document.createElement(tag); if(css) e.style.cssText=css; if(txt!==undefined) e.textContent=txt; return e; };
+  const overlay = el("div","position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;font-family:Georgia,serif");
+  const box = el("div","background:#10281a;border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:20px;max-width:560px;width:100%;max-height:82vh;overflow:auto;color:#ede9e0;box-shadow:0 10px 40px rgba(0,0,0,.6)");
+  let pendientesLocal = [...lista];
+  const cerrar = () => { document.removeEventListener("keydown",onKey); overlay.remove(); resolveAll(); };
+  const onKey = (e) => { if(e.key==="Escape") cerrar(); };
+  document.addEventListener("keydown",onKey);
+  overlay.addEventListener("mousedown",(e)=>{ if(e.target===overlay) cerrar(); });
+  const render = () => {
+    box.innerHTML = "";
+    box.appendChild(el("div","font-size:16px;font-weight:700;margin-bottom:4px",`⚠️ ${pendientesLocal.length} tarea${pendientesLocal.length!==1?"s":""} marcada${pendientesLocal.length!==1?"s":""} "No se pudo" sin decidir`));
+    box.appendChild(el("div","font-size:12px;color:#c9d6cf;margin-bottom:14px;line-height:1.4","Quedaron así porque el jardinero no pudo hacerlas. Decide para cada una si se reprograma o se anula — si no decides, se vuelve a preguntar la próxima vez que programes."));
+    const btnCss = (bg,col,brd) => `cursor:pointer;border:1px solid ${brd};border-radius:8px;padding:6px 11px;font-size:12px;background:${bg};color:${col};font-family:Georgia,serif`;
+    pendientesLocal.forEach(({dia,item:t})=>{
+      const fila = el("div","border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 12px;margin-bottom:9px");
+      fila.appendChild(el("div","font-size:13px;font-weight:600",(t.tarea||"Tarea").replace("⛳ ","")));
+      fila.appendChild(el("div","font-size:11px;color:#8aa89a;margin-bottom:4px",[t.zona,t.elemento,t.responsable].filter(Boolean).join(" · ")+" — "+dia));
+      fila.appendChild(el("div","font-size:12px;color:#fca5a5;margin-bottom:8px",t.notaWorker?`💬 Motivo: ${t.notaWorker}`:"Sin motivo registrado por el jardinero."));
+      const inp = el("input","background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.2);border-radius:7px;color:#ede9e0;padding:5px 8px;font-size:12px;margin-right:8px");
+      inp.type = "date"; const base = new Date(fechaLocal()+"T12:00:00"); base.setDate(base.getDate()+1); inp.value = base.toISOString().slice(0,10);
+      const btnRep = el("button",btnCss("rgba(59,130,246,.18)","#93c5fd","rgba(59,130,246,.45)"),"📅 Reprogramar");
+      const btnAnular = el("button",btnCss("rgba(239,68,68,.14)","#fca5a5","rgba(239,68,68,.4)"),"🚫 Anular");
+      const err = el("span","font-size:11px;color:#f87171;margin-left:8px");
+      const quitarDeLista = () => { pendientesLocal = pendientesLocal.filter(x=>x.item.id!==t.id); render(); };
+      btnRep.onclick = () => {
+        if(!/^\d{4}-\d{2}-\d{2}$/.test(inp.value) || inp.value===dia){ err.textContent = "Elige una fecha válida."; return; }
+        setter(prev=>trasladarEnEstado(prev,dia,t,inp.value));
+        quitarDeLista();
+      };
+      btnAnular.onclick = () => {
+        setter(prev=>({...prev,[dia]:normArrNP(prev[dia]).map(x=>String(x.id)===String(t.id)?{...x,anuladaNoPudo:true}:x)}));
+        quitarDeLista();
+      };
+      const filaBtns = el("div","display:flex;align-items:center;flex-wrap:wrap;gap:0");
+      filaBtns.appendChild(inp); filaBtns.appendChild(btnRep); filaBtns.appendChild(btnAnular); filaBtns.appendChild(err);
+      fila.appendChild(filaBtns);
+      box.appendChild(fila);
+    });
+    const pie = el("div","display:flex;justify-content:flex-end;margin-top:6px");
+    const btnCerrar = el("button",btnCss("transparent","#94a3b8","rgba(255,255,255,.2)"),pendientesLocal.length>0?"Revisar después":"Cerrar");
+    btnCerrar.onclick = cerrar;
+    pie.appendChild(btnCerrar);
+    box.appendChild(pie);
+  };
+  render();
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+});
+
 // ── Recordatorio: turnos de días anteriores sin cerrar y con tareas pendientes ──
 // Devuelve [{dia, nombre, pendientes}] para los últimos `diasAtras` días ANTERIORES a hoy (el día de hoy
 // no cuenta: a media jornada es normal que el turno siga abierto). Solo considera trabajadores que
@@ -2381,10 +2451,14 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
   const imprimirDia = (dia) => {
     const hpTdArr = filtrarTareas(tareas[dia]||[]);
     const hpTdLen = hpTdArr.length;
-    let hechas = 0; let noPudo = 0;
+    let hechas = 0; let noPudo = 0; let pendiente = 0; let enCurso = 0; let porDesignar = 0;
     for(let hpII=0;hpII<hpTdLen;hpII++){
-      if(["hecha","completada"].includes(hpTdArr[hpII].estado)) hechas++;
-      if(hpTdArr[hpII].estado==="no_pudo") noPudo++;
+      const estHp = normalizarEstado(hpTdArr[hpII].estado);
+      if(estHp==="hecha") hechas++;
+      else if(estHp==="no_pudo") noPudo++;
+      else if(estHp==="en_curso") enCurso++;
+      else if(estHp==="por_designar") porDesignar++;
+      else pendiente++;
     }
     const pct = hpTdLen ? Math.round((hechas/hpTdLen)*100) : 0;
     const win = window.open("","_blank","width=800,height=600");
@@ -2413,6 +2487,9 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
     <div class="stats">
       <span>Total: <b>${hpTdArr.length}</b></span>
       <span class="stat-ok">✅ Hechas: ${hechas}</span>
+      ${pendiente>0?"<span class=\"stat-pend\">⏳ Pendientes: "+pendiente+"</span>":""}
+      ${enCurso>0?"<span class=\"stat-blue\">🔵 En curso: "+enCurso+"</span>":""}
+      ${porDesignar>0?"<span>⬜ Por designar: "+porDesignar+"</span>":""}
       ${noPudo>0?"<span class=\"stat-bad\">🔴 No pudieron: "+noPudo+"</span>":""}
       <span class="stat-pct">${pct}% completado</span>
     </div>
@@ -2439,10 +2516,14 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
     const normArrImp = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
     const hpTdArr = filtrarTareas(normArrImp(tareas[dia]||[])).filter(t=>(t.responsable||"")===responsable);
     const hpTdLen = hpTdArr.length;
-    let hechas = 0; let noPudo = 0;
+    let hechas = 0; let noPudo = 0; let pendiente = 0; let enCurso = 0; let porDesignar = 0;
     for(let hpII=0;hpII<hpTdLen;hpII++){
-      if(["hecha","completada"].includes(hpTdArr[hpII].estado)) hechas++;
-      if(hpTdArr[hpII].estado==="no_pudo") noPudo++;
+      const estHp = normalizarEstado(hpTdArr[hpII].estado);
+      if(estHp==="hecha") hechas++;
+      else if(estHp==="no_pudo") noPudo++;
+      else if(estHp==="en_curso") enCurso++;
+      else if(estHp==="por_designar") porDesignar++;
+      else pendiente++;
     }
     const pct = hpTdLen ? Math.round((hechas/hpTdLen)*100) : 0;
     const win = window.open("","_blank","width=800,height=600");
@@ -2472,6 +2553,9 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
     <div class="stats">
       <span>Total: <b>${hpTdArr.length}</b></span>
       <span class="stat-ok">✅ Hechas: ${hechas}</span>
+      ${pendiente>0?"<span class=\"stat-pend\">⏳ Pendientes: "+pendiente+"</span>":""}
+      ${enCurso>0?"<span class=\"stat-blue\">🔵 En curso: "+enCurso+"</span>":""}
+      ${porDesignar>0?"<span>⬜ Por designar: "+porDesignar+"</span>":""}
       ${noPudo>0?"<span class=\"stat-bad\">🔴 No pudieron: "+noPudo+"</span>":""}
       <span class="stat-pct">${pct}% completado</span>
     </div>
@@ -2500,10 +2584,14 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
     const normArrImp = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
     const hpTdArr = filtrarTareas(normArrImp(tareas[dia]||[]));
     const hpTdLen = hpTdArr.length;
-    let hechasTotal = 0; let noPudoTotal = 0;
+    let hechasTotal = 0; let noPudoTotal = 0; let pendienteTotal = 0; let enCursoTotal = 0; let porDesignarTotal = 0;
     for(let i=0;i<hpTdLen;i++){
-      if(["hecha","completada"].includes(hpTdArr[i].estado)) hechasTotal++;
-      if(hpTdArr[i].estado==="no_pudo") noPudoTotal++;
+      const estGen = normalizarEstado(hpTdArr[i].estado);
+      if(estGen==="hecha") hechasTotal++;
+      else if(estGen==="no_pudo") noPudoTotal++;
+      else if(estGen==="en_curso") enCursoTotal++;
+      else if(estGen==="por_designar") porDesignarTotal++;
+      else pendienteTotal++;
     }
     const pctTotal = hpTdLen ? Math.round((hechasTotal/hpTdLen)*100) : 0;
     const porTrabImp = {};
@@ -2554,6 +2642,9 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
     <div class="stats">
       <span>Total: <b>${hpTdArr.length}</b></span>
       <span class="stat-ok">✅ Hechas: ${hechasTotal}</span>
+      ${pendienteTotal>0?"<span class=\"stat-pend\">⏳ Pendientes: "+pendienteTotal+"</span>":""}
+      ${enCursoTotal>0?"<span class=\"stat-blue\">🔵 En curso: "+enCursoTotal+"</span>":""}
+      ${porDesignarTotal>0?"<span>⬜ Por designar: "+porDesignarTotal+"</span>":""}
       ${noPudoTotal>0?"<span class=\"stat-bad\">🔴 No pudieron: "+noPudoTotal+"</span>":""}
       <span class="stat-pct">${pctTotal}% completado</span>
       <span>${responsablesOrdenados.length} trabajador${responsablesOrdenados.length!==1?"es":""}</span>
@@ -3175,7 +3266,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                           {items.map(hpTask=>{
                             const est=EC[hpTask.estado]||EC.pendiente;
                             const esTrasl=!!hpTask.trasladadaA;
-                            const notaExtra=[hpTask.notaWorker&&("💬 "+hpTask.notaWorker),hpTask.notaJefa&&("📋 "+hpTask.notaJefa),hpTask.movidoDesde&&("🔁 Movida desde "+hpTask.movidoDesde),hpTask.alturaCorte&&("✂️ HOC: "+hpTask.alturaCorte+"mm")].filter(Boolean).join(" · ");
+                            const notaExtra=[hpTask.notaWorker&&("💬 "+hpTask.notaWorker),hpTask.notaJefa&&("📋 "+hpTask.notaJefa),hpTask.movidoDesde&&("🔁 Movida desde "+hpTask.movidoDesde),hpTask.anuladaNoPudo&&("🚫 Anulada — no se va a hacer"),hpTask.alturaCorte&&("✂️ HOC: "+hpTask.alturaCorte+"mm")].filter(Boolean).join(" · ");
                             return (
                               <div key={hpTask.id} style={{display:"flex",gap:7,padding:"4px 8px",borderRadius:6,background:`${est.color}07`,border:`1px solid ${est.color}18`,alignItems:"center",flexWrap:"wrap",opacity:esTrasl?0.6:1}}>
                                 <span style={{fontSize:12,flexShrink:0}}>{est.icon}</span>
@@ -3199,7 +3290,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                                 {esJefa&&<input placeholder="nota..." defaultValue={hpTask.notaJefa||""}
                                   onBlur={e=>{if(e.target.value!==hpTask.notaJefa){const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);setTareas(prev=>({...prev,[dia]:nA2(prev[dia]).map(x=>x.id===hpTask.id?{...x,notaJefa:e.target.value}:x)}));}}}
                                   style={{fontSize:10,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:5,color:"#ede9e0",padding:"2px 4px",width:70,flexShrink:0}}/>}
-                                {esJefa&&!esTrasl&&!hpTask.origenFrecId&&!["hecha","completada","no_pudo"].includes(hpTask.estado)&&(
+                                {esJefa&&!esTrasl&&!hpTask.origenFrecId&&!["hecha","completada"].includes(hpTask.estado)&&(
                                   <button title="Reprogramar" onClick={()=>{
                                       const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
                                       const mananaDef=new Date(dia+"T12:00:00");mananaDef.setDate(mananaDef.getDate()+1);
@@ -3215,6 +3306,14 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                                       });
                                     }}
                                     style={{cursor:"pointer",border:"1px solid rgba(59,130,246,0.25)",borderRadius:5,padding:"2px 6px",background:"rgba(59,130,246,0.06)",color:"#93c5fd",fontSize:11,flexShrink:0}}>📅</button>
+                                )}
+                                {esJefa&&!esTrasl&&hpTask.estado==="no_pudo"&&!hpTask.anuladaNoPudo&&(
+                                  <button title="Anular — no se va a hacer, deja de avisar" onClick={()=>{
+                                      if(!window.confirm(`¿Anular "${(hpTask.tarea||"").replace("⛳ ","")}"? Queda archivada como no realizada y no se vuelve a avisar.`)) return;
+                                      const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+                                      setTareas(prev=>({...prev,[dia]:nA2(prev[dia]).map(x=>x.id===hpTask.id?{...x,anuladaNoPudo:true}:x)}));
+                                    }}
+                                    style={{cursor:"pointer",border:"1px solid rgba(239,68,68,0.2)",borderRadius:5,padding:"2px 6px",background:"rgba(239,68,68,0.06)",color:"#fca5a5",fontSize:11,flexShrink:0}}>🚫</button>
                                 )}
                                 {esJefa&&<button title="Eliminar" onClick={()=>eliminarTareaConDecision(hpTask,dia,setTareas,"Ver/editar turnos")}
                                   style={{cursor:"pointer",border:"1px solid rgba(239,68,68,0.2)",borderRadius:5,padding:"2px 6px",background:"rgba(239,68,68,0.06)",color:"#f87171",fontSize:11,flexShrink:0}}>🗑</button>}
@@ -5190,9 +5289,13 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
   const [previewReprogramar, setPreviewReprogramar] = React.useState(null); // [{...tarea, seleccionada:true}]
   const [buscarPreviewProp, setBuscarPreviewProp] = React.useState("");
   const [gruposPreviewPropAbiertos, setGruposPreviewPropAbiertos] = React.useState({});
-  const proponerTareas = () => {
+  const proponerTareas = async () => {
+    const noGolfProp = t=>!((t.zona||"")==="Golf"||(t.zona||"").toLowerCase().includes("golf"));
+    // "No se pudo" sin decisión: se resuelve primero (reprogramar/anular), antes de seguir programando.
+    const noPudoProp = noPudoSinResolver(tareas, hoy, noGolfProp);
+    if(noPudoProp.length>0) await resolverNoPudoModal(noPudoProp, setTareas);
     // Recordatorio (no bloquea): turnos anteriores sin cerrar con tareas pendientes.
-    const sinCerrarProp = turnosSinCerrarPrevios(tareas, cierresTurno, hoy, t=>!((t.zona||"")==="Golf"||(t.zona||"").toLowerCase().includes("golf")));
+    const sinCerrarProp = turnosSinCerrarPrevios(tareas, cierresTurno, hoy, noGolfProp);
     if(sinCerrarProp.length>0 && !window.confirm(avisoTurnosSinCerrar(sinCerrarProp))) return;
     const estProp = estacionDeFecha(fecha);
     const propuestas = [];
@@ -16960,10 +17063,14 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       {subTab==="config_golf"&&rolLogueado!=="trabajador"&&(()=>{
         const setHoc=(superficie,est,valor)=>{const actual=golfData.hocConfig||{};setG({hocConfig:{...actual,[superficie]:{...(actual[superficie]||{}),[est]:valor}}});};
         const setRespSemanal=(tipoId,nombre)=>{if(!setConfigSemanal)return;setConfigSemanal(prev=>({...(prev||{}),[tipoId]:nombre}));};
-        const proponerTareasGolf=()=>{
+        const proponerTareasGolf=async ()=>{
           if(!getAllElems||!getZD||!setTareasProg)return;
+          const esGolfProp = t=>(t.zona||"")==="Golf"||(t.zona||"").includes("Golf");
+          // "No se pudo" sin decisión: se resuelve primero (reprogramar/anular), antes de seguir programando.
+          const noPudoGolf = noPudoSinResolver(tareasProg, hoy, esGolfProp);
+          if(noPudoGolf.length>0) await resolverNoPudoModal(noPudoGolf, setTareasProg);
           // Recordatorio (no bloquea): turnos anteriores sin cerrar con tareas de Golf pendientes.
-          const sinCerrarGolf = turnosSinCerrarPrevios(tareasProg, cierresTurno, hoy, t=>(t.zona||"")==="Golf"||(t.zona||"").includes("Golf"));
+          const sinCerrarGolf = turnosSinCerrarPrevios(tareasProg, cierresTurno, hoy, esGolfProp);
           if(sinCerrarGolf.length>0 && !window.confirm(avisoTurnosSinCerrar(sinCerrarGolf))) return;
           const golfZonaObj=MACROZONAS_BASE.find(z=>z.id===31);if(!golfZonaObj)return;
           const zdatG=getZD(31);const nombreZona="Golf"; // siempre "Golf" — no usar nombreCustom, para no generar un segundo nombre de zona distinto al resto de las tareas de Golf
