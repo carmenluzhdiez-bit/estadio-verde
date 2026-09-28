@@ -5308,7 +5308,10 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                 debeAdelantarse = fechaPropiaEnlazada>=lunesSemana && fechaPropiaEnlazada<=sabadoSemana;
               }
               if(debeAdelantarse){
-                propuestas.push({ id: Date.now()+Math.random(), fecha, zona:nombreZona, elemento:e.nombre, tarea:nombreEnlazada, responsable:respDefault, estado:respDefault?"pendiente":"por_designar", notas:`Adelantada esta semana — enlazada con "${f.tarea}"`, estacion:estProp, auto:true, incluir:true, abierta:false, diasVencida:0, origenZid:String(z.id), origenEid:e.id, origenFrecId:frecEnlazada?.id, origenEsCustom:!!e.isCustom });
+                // El responsable de la tarea enlazada es el suyo propio (ej. quien hace Orillado), no el
+                // de la que manda (ej. Corte) — antes se copiaba el de la que manda por error.
+                const respEnlazada = getResponsablePorTipo(nombreEnlazada, configSemanal, nombreZona)||"";
+                propuestas.push({ id: Date.now()+Math.random(), fecha, zona:nombreZona, elemento:e.nombre, tarea:nombreEnlazada, responsable:respEnlazada, estado:respEnlazada?"pendiente":"por_designar", notas:`Adelantada esta semana — enlazada con "${f.tarea}"`, estacion:estProp, auto:true, incluir:true, abierta:false, diasVencida:0, origenZid:String(z.id), origenEid:e.id, origenFrecId:frecEnlazada?.id, origenEsCustom:!!e.isCustom });
               }
             }
           }
@@ -17067,7 +17070,9 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                   }
                   if(debeAdelantarseGolf){
                     clavesTareaEnlazadaYaAgregada.add(claveEnlazada);
-                    propuestas.push({id:Date.now()+Math.random(),fecha:fechaProponerGolf,zona:nombreZona,elemento:e.nombre,tarea:nombreEnlazadaGolf,responsable:respDefault,estado:respDefault?"pendiente":"por_designar",notas:`Adelantada esta semana — enlazada con "${f.tarea}"`,estacion:estProp,auto:true,diasVencida:0,origenZid:"31",origenEid:e.id,origenFrecId:frecEnlazadaGolf?.id,origenEsCustom:!!e.isCustom});
+                    // Responsable propio de la tarea enlazada, no el de la que manda (mismo fix que el módulo general).
+                    const respEnlazadaGolf = configSemanal?.corte_golf||"";
+                    propuestas.push({id:Date.now()+Math.random(),fecha:fechaProponerGolf,zona:nombreZona,elemento:e.nombre,tarea:nombreEnlazadaGolf,responsable:respEnlazadaGolf,estado:respEnlazadaGolf?"pendiente":"por_designar",notas:`Adelantada esta semana — enlazada con "${f.tarea}"`,estacion:estProp,auto:true,diasVencida:0,origenZid:"31",origenEid:e.id,origenFrecId:frecEnlazadaGolf?.id,origenEsCustom:!!e.isCustom});
                   }
                 }
               }
