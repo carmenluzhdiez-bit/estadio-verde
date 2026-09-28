@@ -7,7 +7,7 @@ import * as React from "react";
 // ─── FIREBASE ────────────────────────────────────────────────────────────────
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, onValue, set as fbSet, update as fbUpdate, get } from "firebase/database";
-import { getAuth, signInWithEmailAndPassword, signInAnonymously, signOut, onAuthStateChanged } from "firebase/auth";
+import { getAuth, signInWithEmailAndPassword, sendPasswordResetEmail, signInAnonymously, signOut, onAuthStateChanged } from "firebase/auth";
 import { getFunctions, httpsCallable } from "firebase/functions";
 
 const firebaseConfig = {
@@ -23911,6 +23911,7 @@ export default function App() {
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPass,  setLoginPass]  = useState("");
   const [loginError, setLoginError] = useState("");
+  const [loginInfo,  setLoginInfo]  = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
   const [modoLogin, setModoLogin] = useState("trabajador");
   const [workerSel, setWorkerSel] = useState("");
@@ -23983,6 +23984,20 @@ export default function App() {
     } catch(err) {
       setLoginError("Email o contraseña incorrectos.");
     } finally { setLoginLoading(false); }
+  };
+
+  // Envía el correo de restablecimiento de contraseña (Firebase Authentication).
+  // Por seguridad Firebase no revela si el correo existe, así que el aviso es genérico.
+  const handleResetPassword = async () => {
+    setLoginError(""); setLoginInfo("");
+    const email = loginEmail.trim();
+    if(!email){ setLoginError("Escribe primero tu correo electrónico arriba y vuelve a presionar \"¿Olvidaste tu clave?\"."); return; }
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setLoginInfo("Si ese correo está registrado, te enviamos un enlace para crear una clave nueva. Revisa también la carpeta de spam.");
+    } catch(err) {
+      setLoginError("No se pudo enviar el correo. Revisa que la dirección esté bien escrita e intenta de nuevo.");
+    }
   };
 
   const handleLogout = () => {
@@ -25164,6 +25179,11 @@ export default function App() {
                   <button onClick={handleLogin} disabled={loginLoading}
                     style={{background:"#2d6a3f",color:"#fff",border:"none",borderRadius:10,padding:"14px",fontSize:15,fontWeight:700,cursor:"pointer",marginTop:6,opacity:loginLoading?0.7:1}}>
                     {loginLoading?"Ingresando...":"Ingresar →"}
+                  </button>
+                  {loginInfo&&<div style={{fontSize:12,color:"#86efac",background:"rgba(34,197,94,0.1)",border:"1px solid rgba(34,197,94,0.25)",borderRadius:8,padding:"8px 12px",textAlign:"center"}}>{loginInfo}</div>}
+                  <button type="button" onClick={handleResetPassword}
+                    style={{background:"transparent",border:"none",color:"#93c5fd",fontSize:12,cursor:"pointer",textDecoration:"underline",padding:0}}>
+                    ¿Olvidaste tu clave?
                   </button>
                 </div>
               )}
