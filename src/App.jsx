@@ -2326,6 +2326,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
   const [turnosTrabAbiertos, setTurnosTrabAbiertos] = React.useState({}); // {"dia_resp": bool} — vista por trabajador colapsada por defecto en "Ver/editar turnos"
   const [gruposTareaAbiertosTurnos, setGruposTareaAbiertosTurnos] = React.useState({}); // {"dia_resp_tarea": bool} — grupos por tipo de tarea colapsados por defecto
   const [filtroEstadoTurnos, setFiltroEstadoTurnos] = React.useState("todos"); // filtro de estado dentro de "Ver/editar turnos"
+  const [filtroTareaTurnos, setFiltroTareaTurnos] = React.useState(""); // filtro de tarea dentro de "Ver/editar turnos"
   const esGolfZonaHist = (zona) => zona==="Golf"||(zona||"").includes("Golf");
   const zonaFijaActual = tabHist==="historial_golf" ? "golf" : tabHist==="historial_macro" ? "no-golf" : null;
   const [buscarZona,   setBuscarZona]   = React.useState("");
@@ -3063,12 +3064,20 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                 style={{cursor:"pointer",border:`1px solid ${filtroEstadoTurnos==="todos"?"rgba(52,211,153,0.4)":"rgba(255,255,255,0.12)"}`,borderRadius:7,padding:"3px 10px",background:filtroEstadoTurnos==="todos"?"rgba(52,211,153,0.12)":"transparent",color:filtroEstadoTurnos==="todos"?"#34d399":"#94a3b8",fontSize:11}}>
                 Todos
               </button>
-              {Object.entries(EC).map(([k,v])=>(
+              {Object.entries(EC).filter(([k])=>!["completada","haciendose","cancelada"].includes(k)).map(([k,v])=>(
                 <button key={k} onClick={()=>setFiltroEstadoTurnos(k)}
                   style={{cursor:"pointer",border:`1px solid ${filtroEstadoTurnos===k?v.color+"66":"rgba(255,255,255,0.12)"}`,borderRadius:7,padding:"3px 10px",background:filtroEstadoTurnos===k?v.color+"1f":"transparent",color:filtroEstadoTurnos===k?v.color:"#94a3b8",fontSize:11}}>
                   {v.icon} {v.label}
                 </button>
               ))}
+              <label style={{fontSize:10,color:"#5a9a7a",marginLeft:10}}>Filtrar por tarea:</label>
+              <input list="turnos-tareas-lista" value={filtroTareaTurnos} onChange={e=>setFiltroTareaTurnos(e.target.value)}
+                placeholder="Escribe o elige una tarea…" style={{...S.input,fontSize:12,padding:"4px 9px",width:200}}/>
+              <datalist id="turnos-tareas-lista">
+                {[...new Set(dias.flatMap(dSug=>nA(tareas[dSug]).map(t=>t.tarea)).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"})).map(t=><option key={t} value={t}/>)}
+              </datalist>
+              {filtroTareaTurnos&&<button onClick={()=>setFiltroTareaTurnos("")}
+                style={{cursor:"pointer",border:"1px solid rgba(255,255,255,0.15)",borderRadius:6,padding:"4px 9px",background:"transparent",color:"#94a3b8",fontSize:11}}>✕</button>}
             </div>
             {dias.length===0&&<div style={{...S.card,padding:32,textAlign:"center",color:"#4a8a5a"}}>No hay turnos registrados.</div>}
             {diaTurnoElegido&&nA(tareas[diaTurnoElegido]).length===0&&(
@@ -3076,7 +3085,9 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
             )}
             {dias.map(dia=>{
               const tDiaCompleto=nA(tareas[dia]);
-              const tDia=filtroEstadoTurnos==="todos"?tDiaCompleto:tDiaCompleto.filter(hpTask=>hpTask.estado===filtroEstadoTurnos&&!hpTask.trasladadaA);
+              const okFiltroTareaTurno = hpTask => !filtroTareaTurnos || (hpTask.tarea||"").toLowerCase().includes(filtroTareaTurnos.toLowerCase());
+              const tDiaTarea = filtroTareaTurnos ? tDiaCompleto.filter(okFiltroTareaTurno) : tDiaCompleto;
+              const tDia=filtroEstadoTurnos==="todos"?tDiaTarea:tDiaTarea.filter(hpTask=>normalizarEstado(hpTask.estado)===filtroEstadoTurnos&&!hpTask.trasladadaA);
               const porTrab={};
               tDia.forEach(hpTask=>{const r=hpTask.responsable||"Sin asignar";if(!porTrab[r])porTrab[r]=[];porTrab[r].push(hpTask);});
               if(Object.keys(porTrab).length===0) return null;
@@ -3180,7 +3191,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                                 <select value={hpTask.estado}
                                   onChange={e=>{const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);const patch=aplicarCambioFrecuencia(hpTask,{estado:e.target.value},getElemFrecs,setElemFrecs);setTareas(prev=>{const updated=cerrarLoteSiCorresponde(nA2(prev[dia]), hpTask.id, patch);return {...prev,[dia]:updated.map(limpiarUndef)};});}}
                                   style={{fontSize:10,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:5,color:"#ede9e0",padding:"2px 3px",cursor:"pointer",flexShrink:0}}>
-                                  {Object.entries(EC).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
+                                  {Object.entries(EC).filter(([k])=>!["completada","haciendose","cancelada"].includes(k)).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
                                 </select>
                                 ):(
                                 <span style={{fontSize:10,color:est.color,flexShrink:0}}>{est.icon} {est.label}</span>
