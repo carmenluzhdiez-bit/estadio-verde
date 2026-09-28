@@ -6,7 +6,7 @@ import * as React from "react";
 
 // ─── FIREBASE ────────────────────────────────────────────────────────────────
 import { initializeApp } from "firebase/app";
-import { getDatabase, ref, onValue, set as fbSet, update as fbUpdate, get } from "firebase/database";
+import { getDatabase, ref, onValue, set as fbSet, update as fbUpdate, push as fbPush, get } from "firebase/database";
 import { getAuth, signInWithEmailAndPassword, sendPasswordResetEmail, signInAnonymously, signOut, onAuthStateChanged } from "firebase/auth";
 import { getFunctions, httpsCallable } from "firebase/functions";
 
@@ -253,6 +253,197 @@ const calcProximaFrecGlobal = (f, refFecha) => {
 // - Vuelta (hecha/completada -> algo): si la frecuencia sigue apuntando a esta tarea, la revierte
 //   al valor previo (evita que quede "al día" una tarea que resultó incompleta).
 // Devuelve el patch (posiblemente con ultimaVezPrevia agregado) para que el llamador lo aplique a la tarea.
+// ── Papelera de tareas eliminadas ──
+// Nada se borra de forma definitiva al instante: las tareas eliminadas van a un nodo aparte de Firebase
+// ("papelera_tareas") y se pueden restaurar durante PAPELERA_DIAS días desde Historial → 🗑 Papelera.
+const PAPELERA_DIAS = 30;
+const normArrTP = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+const claveFbPapelera = (id) => String(id).replace(/[.#$\/\[\]]/g,"_");
+const enviarAPapelera = (dia, tareasArr, motivo="") => {
+  const ahora = new Date().toISOString();
+  const upd = {};
+  let n = 0;
+  normArrTP(tareasArr).forEach(t=>{
+    if(!t) return;
+    upd[`${claveFbPapelera(t.id)}_${Date.now()}_${n++}`] = {dia, eliminadoEn:ahora, motivo, tarea:limpiarUndef(t)};
+  });
+  if(n>0) fbUpdate(ref(db,`${ROOT}/papelera_tareas`), upd).catch(e=>console.error("papelera:",e));
+};
+// Traslado sin borrar: el original queda en su día marcado como trasladado y se crea una copia en el destino.
+const trasladarEnEstado = (prev, dia, t, destino) => {
+  const nuevo = {...prev};
+  nuevo[dia] = normArrTP(nuevo[dia]).map(x=>String(x.id)===String(t.id)?{...x,trasladadaA:destino}:x);
+  nuevo[destino] = [...normArrTP(nuevo[destino]), {...t, id:Date.now()+Math.random(), fecha:destino, origenTareaId:t.id, notas:(t.notas?t.notas+" | ":"")+"Reprogramada desde "+dia}];
+  return nuevo;
+};
+// Diálogo: si la tarea sigue sin resolver ofrece REPROGRAMAR o enviar a la papelera; si ya está resuelta,
+// solo confirma el envío a la papelera. Devuelve null | {accion:"eliminar"} | {accion:"reprogramar",fecha}.
+const decidirEliminarTarea = (t, dia) => new Promise(resolve=>{
+  const finales = ["hecha","completada","no_pudo"];
+  const sinResolver = !finales.includes(t.estado) && !t.trasladadaA;
+  const nombre = (t.tarea||"Tarea").replace("⛳ ","");
+  const el = (tag, css, txt) => { const e=document.createElement(tag); if(css) e.style.cssText=css; if(txt!==undefined) e.textContent=txt; return e; };
+  const overlay = el("div","position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;font-family:Georgia,serif");
+  const box = el("div","background:#10281a;border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:20px;max-width:460px;width:100%;color:#ede9e0;box-shadow:0 10px 40px rgba(0,0,0,.6)");
+  const cerrar = (val) => { document.removeEventListener("keydown",onKey); overlay.remove(); resolve(val); };
+  const onKey = (e) => { if(e.key==="Escape") cerrar(null); };
+  document.addEventListener("keydown",onKey);
+  overlay.addEventListener("mousedown",(e)=>{ if(e.target===overlay) cerrar(null); });
+  box.appendChild(el("div","font-size:16px;font-weight:700;margin-bottom:6px",sinResolver?"¿Qué hacer con esta tarea?":"Eliminar tarea"));
+  box.appendChild(el("div","font-size:13px;font-weight:600",nombre));
+  box.appendChild(el("div","font-size:11px;color:#8aa89a;margin-bottom:12px",[t.zona,t.elemento,t.responsable].filter(Boolean).join(" · ")+" — "+dia));
+  const btnCss = (bg,col,brd) => `cursor:pointer;border:1px solid ${brd};border-radius:9px;padding:9px 14px;font-size:13px;background:${bg};color:${col};font-family:Georgia,serif`;
+  const fila = el("div","display:flex;gap:8px;flex-wrap:wrap;margin-top:14px");
+  const btnPapelera = el("button",btnCss("rgba(239,68,68,.12)","#fca5a5","rgba(239,68,68,.35)"),"🗑 Enviar a la papelera");
+  btnPapelera.onclick = () => cerrar({accion:"eliminar"});
+  const btnCancelar = el("button",btnCss("transparent","#94a3b8","rgba(255,255,255,.2)"),"Cancelar");
+  btnCancelar.onclick = () => cerrar(null);
+  if(sinResolver){
+    box.appendChild(el("div","font-size:12px;color:#c9d6cf;line-height:1.4","Esta tarea sigue sin resolver. Si solo necesitas pasarla a otro día, reprográmala: el original queda registrado en su fecha y no se pierde nada."));
+    const base = new Date(fechaLocal()+"T12:00:00"); base.setDate(base.getDate()+1);
+    const inp = el("input","margin-top:10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.2);border-radius:8px;color:#ede9e0;padding:7px 10px;font-size:13px");
+    inp.type = "date"; inp.value = base.toISOString().slice(0,10);
+    box.appendChild(inp);
+    const err = el("div","font-size:11px;color:#f87171;margin-top:6px;min-height:14px");
+    box.appendChild(err);
+    const btnRep = el("button",btnCss("rgba(59,130,246,.18)","#93c5fd","rgba(59,130,246,.45)"),"📅 Reprogramar");
+    btnRep.onclick = () => {
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(inp.value)){ err.textContent="Elige una fecha válida."; return; }
+      if(inp.value===dia){ err.textContent="Elige una fecha distinta a la actual de la tarea."; return; }
+      cerrar({accion:"reprogramar",fecha:inp.value});
+    };
+    fila.appendChild(btnRep);
+  } else {
+    box.appendChild(el("div","font-size:12px;color:#c9d6cf;line-height:1.4","La tarea ya está resuelta o trasladada."));
+  }
+  box.appendChild(el("div","font-size:11px;color:#8aa89a;margin-top:8px","Si la envías a la papelera podrás restaurarla desde Historial → 🗑 Papelera durante "+PAPELERA_DIAS+" días."));
+  fila.appendChild(btnPapelera); fila.appendChild(btnCancelar);
+  box.appendChild(fila);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+});
+const eliminarTareaConDecision = async (t, dia, setter, origen="") => {
+  const dec = await decidirEliminarTarea(t, dia);
+  if(!dec) return false;
+  if(dec.accion==="reprogramar"){ setter(prev=>trasladarEnEstado(prev,dia,t,dec.fecha)); return true; }
+  enviarAPapelera(dia,[t],origen?("eliminada desde "+origen):"eliminada manualmente");
+  setter(prev=>({...prev,[dia]:normArrTP(prev[dia]).filter(x=>String(x.id)!==String(t.id))}));
+  return true;
+};
+
+// ── Centro de respaldos: alertas ANTES de que se pierdan datos ──
+// La app descarta sola los registros más antiguos de varias listas al llegar a su tope (ver listasConTope),
+// la papelera vacía lo que lleva más de PAPELERA_DIAS días, y el plan gratuito de Firebase tiene límites de
+// espacio y descarga. Aquí se calculan las alertas y se generan los archivos de respaldo.
+const UMBRAL_AVISO_TOPE = 0.8;          // avisar desde el 80% del tope de cada lista
+const DIAS_RESPALDO_PERIODICO = 30;     // recordar un respaldo completo cada 30 días
+const MB_AVISO_ESPACIO = 20, MB_CRITICO_ESPACIO = 50; // tamaño estimado que la app descarga al abrirse
+const arrDeCR = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v).filter(Boolean):[]);
+const fmtBytesCR = (b) => b>=1048576 ? (b/1048576).toFixed(1)+" MB" : Math.max(1,Math.round(b/1024))+" KB";
+
+// Listas que descartan solas lo más antiguo al llegar al tope (los topes son los del código de cada módulo).
+const listasConTope = (f) => {
+  const out = [];
+  const add = (id,nombre,tope,items) => out.push({id,nombre,tope,items:arrDeCR(items)});
+  const g = f.golfData || {};
+  add("golf_mediciones","Golf — mediciones de altura de greens",100,g.mediciones);
+  add("golf_registros_diarios","Golf — registros diarios",200,g.registrosDiarios);
+  add("golf_humedad","Golf — humedad de greens",200,g.humedades);
+  Object.keys(g).filter(k=>k.startsWith("registros_")).forEach(k=>add("golf_"+k,`Golf — registros de zona especial (${k.replace("registros_","")})`,100,g[k]));
+  add("fito_aplicaciones","Fitosanitarios — aplicaciones",200,f.aplicaciones);
+  add("fito_incidencias","Fitosanitarios — incidencias",100,f.incidenciasFito);
+  add("notificaciones","Notificaciones de la app",100,f.notificaciones);
+  const b = f.bodegasData || {};
+  Object.keys(b).forEach(id=>{
+    const nom = (BODEGAS_DEF.find(x=>x.id===id)||{}).nombre || id;
+    add(`bodega_${id}_movimientos`,`Bodega ${nom} — movimientos`,200,b[id]?.movimientos);
+    add(`bodega_${id}_tareas`,`Bodega ${nom} — tareas`,100,b[id]?.tareas);
+    add(`bodega_${id}_traslados`,`Bodega ${nom} — traslados`,100,b[id]?.traslados);
+  });
+  return out;
+};
+
+// CSV compatible con Excel en español (separador ";" y BOM UTF-8).
+const csvDeItems = (items) => {
+  const cols = [];
+  items.forEach(it=>Object.keys(it||{}).forEach(k=>{ if(!cols.includes(k)) cols.push(k); }));
+  const esc = (v) => {
+    if(v===undefined || v===null) return "";
+    let t = typeof v==="object" ? JSON.stringify(v) : String(v);
+    if(typeof v==="string" && /^[=+@]|^-[^0-9.\s]/.test(t)) t = "'"+t; // evita fórmulas al abrir en Excel
+    return /[";\r\n]/.test(t) ? '"'+t.replace(/"/g,'""')+'"' : t;
+  };
+  return [cols.join(";"), ...items.map(it=>cols.map(c=>esc(it?.[c])).join(";"))].join("\r\n");
+};
+const descargarArchivoCR = (nombre, contenido, mime) => {
+  const blob = new Blob([contenido],{type:mime});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+};
+const descargarListaCSV = (archivo, items) => descargarArchivoCR(archivo, "\uFEFF"+csvDeItems(items), "text/csv;charset=utf-8");
+// Respaldo completo en JSON. No incluye PINs ni la lista de correos/roles.
+const descargarRespaldoCompleto = (fuentes) => {
+  const limpio = JSON.parse(JSON.stringify(fuentes,(k,v)=>(k==="pinSupervisor"||k==="pin")?undefined:v));
+  const payload = {app:"Estadio Verde",generado:new Date().toISOString(),version:1,
+    nota:"Respaldo de los datos de la app. No incluye PINs de supervisores ni correos/roles de acceso.",datos:limpio};
+  descargarArchivoCR(`respaldo_estadio_verde_${fechaLocal()}.json`, JSON.stringify(payload), "application/json");
+};
+
+const calcularAlertasDatos = (f) => {
+  const al = [];
+  const hoyMs = Date.now();
+  listasConTope(f).forEach(l=>{
+    const n = l.items.length;
+    if(n===0 || n < l.tope*UMBRAL_AVISO_TOPE) return;
+    const lleno = n >= l.tope;
+    const faltan = l.tope-n;
+    al.push({key:"tope_"+l.id, tipo:"tope", nivel:lleno?"critico":"aviso",
+      titulo:`${l.nombre}: ${n} de ${l.tope}`,
+      detalle: lleno
+        ? "La lista ya está llena: cada registro nuevo borra el más antiguo. Descárgala antes de seguir."
+        : `Faltan ${faltan} registro${faltan!==1?"s":""} para el tope; al llegar, cada registro nuevo borrará el más antiguo.`,
+      archivo:`${l.id}_${fechaLocal()}.csv`, items:l.items});
+  });
+  // Papelera: tareas que se borran definitivamente en ≤7 días
+  const porVencer = Object.values(f.papelera||{}).filter(e=>e&&e.tarea).map(e=>{
+    const rest = Date.parse(e.eliminadoEn) + PAPELERA_DIAS*86400000 - hoyMs;
+    return {e, dias:Math.ceil(rest/86400000), rest};
+  }).filter(x=>!isNaN(x.rest) && x.rest>0 && x.rest<=7*86400000);
+  if(porVencer.length>0){
+    const minDias = Math.min(...porVencer.map(x=>x.dias));
+    al.push({key:"papelera", tipo:"papelera", nivel: minDias<=2?"critico":"aviso",
+      titulo:`Papelera: ${porVencer.length} tarea${porVencer.length!==1?"s":""} se borrará${porVencer.length!==1?"n":""} en ${minDias} día${minDias!==1?"s":""} o menos`,
+      detalle:"Restáuralas desde Historial → 🗑 Papelera si las necesitas, o descarga la lista antes de que se eliminen para siempre.",
+      archivo:`papelera_por_vencer_${fechaLocal()}.csv`,
+      items:porVencer.map(x=>({dia_original:x.e.dia, eliminada_el:x.e.eliminadoEn, motivo:x.e.motivo||"", ...x.e.tarea}))});
+  }
+  // Espacio estimado
+  if(f.tamanos){
+    const total = Object.values(f.tamanos).reduce((a,b)=>a+b,0);
+    const mb = total/1048576;
+    if(mb>=MB_AVISO_ESPACIO){
+      const top = Object.entries(f.tamanos).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,v])=>`${k} ${fmtBytesCR(v)}`).join(", ");
+      al.push({key:"espacio", tipo:"espacio", nivel: mb>=MB_CRITICO_ESPACIO?"critico":"aviso",
+        titulo:`Datos de la app: ~${mb.toFixed(1)} MB estimados`,
+        detalle:`Lo más pesado: ${top}. Cada vez que alguien abre la app descarga todo esto; el plan gratuito de Firebase permite 1 GB de almacenamiento y 10 GB de descarga al mes. Conviene respaldar y archivar los datos antiguos.`});
+    }
+  }
+  // Respaldo completo periódico
+  if(f.respaldoListo){
+    const dias = f.ultimoRespaldo ? Math.floor((hoyMs-Date.parse(f.ultimoRespaldo))/86400000) : null;
+    if(dias===null || isNaN(dias)){
+      al.push({key:"respaldo_periodico", tipo:"respaldo", nivel:"aviso", titulo:"Aún no hay un respaldo completo descargado",
+        detalle:"El plan gratuito de Firebase no hace copias automáticas. Descarga un respaldo completo y repite cada "+DIAS_RESPALDO_PERIODICO+" días."});
+    } else if(dias>=DIAS_RESPALDO_PERIODICO){
+      al.push({key:"respaldo_periodico", tipo:"respaldo", nivel:"aviso", titulo:`Hace ${dias} días que no descargas un respaldo completo`,
+        detalle:"Descarga uno nuevo para tener una copia reciente de todo el sistema."});
+    }
+  }
+  return al.sort((a,b)=>(a.nivel==="critico"?0:1)-(b.nivel==="critico"?0:1));
+};
+
 // ── Recordatorio: turnos de días anteriores sin cerrar y con tareas pendientes ──
 // Devuelve [{dia, nombre, pendientes}] para los últimos `diasAtras` días ANTERIORES a hoy (el día de hoy
 // no cuenta: a media jornada es normal que el turno siga abierto). Solo considera trabajadores que
@@ -1380,7 +1571,7 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
   const getDiasRango = (desde,hasta) => {
     if(!desde||!hasta||desde>hasta) return [];
     const dias=[]; const rsDD=new Date(desde+"T12:00:00"); const fin=new Date(hasta+"T12:00:00");
-    while(d<=fin&&dias.length<366){ dias.push(rsDD.toISOString().slice(0,10)); rsDD.setDate(rsDD.getDate()+1); }
+    while(rsDD<=fin&&dias.length<366){ dias.push(rsDD.toISOString().slice(0,10)); rsDD.setDate(rsDD.getDate()+1); }
     return dias;
   };
   const semanaAnterior  = ()=>{ const rsDateA=new Date(semanaBase+"T12:00:00"); rsDateA.setDate(rsDateA.getDate()-7); setSemanaBase(rsDateA.toISOString().slice(0,10)); };
@@ -1964,6 +2155,160 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
 }
 
 
+function CentroRespaldos({ S, fuentes, crearNotificacion }) {
+  const [ultimoRespaldo, setUltimoRespaldo, respaldoListo] = useFirebaseState("config/ultimo_respaldo", null);
+  const [papelera] = useFirebaseState("papelera_tareas", {});
+  const [avisadas, setAvisadas, avisadasListo] = useFirebaseState("config/alertas_respaldo_avisadas", {});
+  const [abiertoUsuario, setAbiertoUsuario] = React.useState(null);
+  const [tamanos, setTamanos] = React.useState(null);
+  const fuentesRef = React.useRef(fuentes); fuentesRef.current = fuentes;
+  const medir = React.useCallback(()=>{
+    const t = {};
+    Object.entries(fuentesRef.current||{}).forEach(([k,v])=>{ try{ t[k]=JSON.stringify(v??null).length; }catch(e){ t[k]=0; } });
+    setTamanos(t);
+  },[]);
+  React.useEffect(()=>{ const id=setTimeout(medir,3000); return ()=>clearTimeout(id); },[medir]);
+
+  const alertas = calcularAlertasDatos({...fuentes, papelera, tamanos, ultimoRespaldo, respaldoListo});
+  const hayCritica = alertas.some(a=>a.nivel==="critico");
+  const abierto = abiertoUsuario===null ? hayCritica : abiertoUsuario;
+
+  // Aviso dentro de la app (un solo mensaje resumen, como máximo una vez por semana por alerta)
+  const clavesAlertas = alertas.map(a=>a.key+"|"+a.nivel).join(",");
+  React.useEffect(()=>{
+    if(!avisadasListo || !crearNotificacion || alertas.length===0) return;
+    const hoyStr = fechaLocal();
+    const nuevas = {};
+    const pendientesAviso = alertas.filter(a=>{
+      const ult = avisadas?.[a.key];
+      const dias = ult ? Math.floor((Date.parse(hoyStr)-Date.parse(ult))/86400000) : 999;
+      return dias>=7;
+    });
+    if(pendientesAviso.length===0) return;
+    pendientesAviso.forEach(a=>{ nuevas[a.key]=hoyStr; });
+    const criticas = pendientesAviso.filter(a=>a.nivel==="critico").length;
+    crearNotificacion("respaldo",{
+      titulo:`${criticas>0?"🛑":"⚠️"} Respaldo de datos: ${pendientesAviso.length} alerta${pendientesAviso.length!==1?"s":""}`,
+      mensaje:pendientesAviso.slice(0,3).map(a=>a.titulo).join(" · ")+(pendientesAviso.length>3?` · y ${pendientesAviso.length-3} más`:"")+" — entra al Panel → Centro de respaldos.",
+    });
+    setAvisadas(prev=>({...(prev||{}),...nuevas}));
+  },[clavesAlertas,avisadasListo]);
+
+  const bajarCompleto = () => {
+    descargarRespaldoCompleto({...fuentes, papelera_tareas:papelera});
+    setUltimoRespaldo(new Date().toISOString());
+  };
+  const colorNivel = (n) => n==="critico" ? "#ef4444" : "#f59e0b";
+  const borde = hayCritica ? "#ef4444" : alertas.length>0 ? "#f59e0b" : "#22c55e";
+  const ultimaTxt = ultimoRespaldo ? new Date(ultimoRespaldo).toLocaleDateString("es-CL") : "nunca";
+  const filasTam = tamanos ? Object.entries(tamanos).sort((a,b)=>b[1]-a[1]).slice(0,8) : [];
+  const btn = (bg,col,brd) => ({cursor:"pointer",border:`1px solid ${brd}`,borderRadius:7,padding:"5px 12px",background:bg,color:col,fontSize:11,fontFamily:"'Georgia',serif"});
+  return (
+    <div style={{...S.card,padding:14,marginBottom:16,borderLeft:`3px solid ${borde}`}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+        <div>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700}}>
+            🛟 Centro de respaldos {alertas.length===0?<span style={{fontSize:11,color:"#22c55e",fontWeight:400}}>· sin riesgo de pérdida detectado</span>:<span style={{fontSize:11,color:colorNivel(hayCritica?"critico":"aviso"),fontWeight:400}}>· {alertas.length} alerta{alertas.length!==1?"s":""}: hay datos que se pueden perder</span>}
+          </div>
+          <div style={{fontSize:10,color:"#6aaa7a"}}>Último respaldo completo: {ultimaTxt}</div>
+        </div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          <button onClick={bajarCompleto} style={btn("rgba(34,197,94,0.12)","#86efac","rgba(34,197,94,0.3)")}>⬇ Respaldo completo</button>
+          <button onClick={()=>setAbiertoUsuario(!abierto)} style={btn("transparent","#94a3b8","rgba(255,255,255,0.15)")}>{abierto?"Ocultar detalle":"Ver detalle"}</button>
+        </div>
+      </div>
+      {abierto&&(
+        <div style={{marginTop:12,display:"flex",flexDirection:"column",gap:8}}>
+          {alertas.length===0&&<div style={{fontSize:12,color:"#8aa89a"}}>Ninguna lista está cerca de su tope, la papelera no tiene tareas por vencer y el respaldo completo está al día.</div>}
+          {alertas.map(a=>(
+            <div key={a.key} style={{padding:"8px 10px",borderRadius:8,background:`${colorNivel(a.nivel)}10`,border:`1px solid ${colorNivel(a.nivel)}40`}}>
+              <div style={{fontSize:12,fontWeight:700,color:colorNivel(a.nivel)}}>{a.nivel==="critico"?"🛑":"⚠️"} {a.titulo}</div>
+              <div style={{fontSize:11,color:"#c9d6cf",margin:"3px 0 6px"}}>{a.detalle}</div>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                {a.items&&<button onClick={()=>descargarListaCSV(a.archivo,a.items)} style={btn("rgba(59,130,246,0.12)","#93c5fd","rgba(59,130,246,0.3)")}>⬇ Descargar esta lista (Excel/CSV)</button>}
+                {!a.items&&<button onClick={bajarCompleto} style={btn("rgba(34,197,94,0.12)","#86efac","rgba(34,197,94,0.3)")}>⬇ Respaldo completo</button>}
+              </div>
+            </div>
+          ))}
+          <div style={{fontSize:10,color:"#6aaa7a",marginTop:4}}>
+            Espacio estimado que descarga la app al abrirse: {tamanos?fmtBytesCR(Object.values(tamanos).reduce((x,y)=>x+y,0)):"calculando…"}
+            {" "}<button onClick={medir} style={{...btn("transparent","#93c5fd","transparent"),padding:0,textDecoration:"underline"}}>recalcular</button>
+            {filasTam.length>0&&<div style={{marginTop:3}}>{filasTam.map(([k,v])=>`${k}: ${fmtBytesCR(v)}`).join(" · ")}</div>}
+          </div>
+          <div style={{fontSize:10,color:"#8a9a90",borderTop:"1px solid rgba(255,255,255,0.06)",paddingTop:6}}>
+            <b>Riesgos que la app no puede medir:</b> (1) si tu Realtime Database quedó en "modo de prueba", sus reglas pueden vencer y bloquear el acceso a los datos — revisa en Firebase → Realtime Database → Reglas que no tengan una fecha de expiración. (2) El plan gratuito normalmente no incluye copias automáticas, por eso conviene el respaldo completo periódico. El respaldo no incluye PINs ni correos/roles de acceso.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PanelPapeleraTareas({ S, setTareas }) {
+  const [papelera] = useFirebaseState("papelera_tareas", {});
+  const ahoraMs = Date.now();
+  const limiteMs = PAPELERA_DIAS*24*60*60*1000;
+  const todas = Object.entries(papelera||{}).filter(([k,v])=>v&&v.tarea).map(([k,v])=>({key:k,...v}));
+  const esVigente = (e) => { const edad = ahoraMs - Date.parse(e.eliminadoEn); return isNaN(edad) || edad<=limiteMs; };
+  const vigentes = todas.filter(esVigente).sort((a,b)=>String(b.eliminadoEn).localeCompare(String(a.eliminadoEn)));
+  const vencidas = todas.filter(e=>!esVigente(e));
+  React.useEffect(()=>{
+    if(vencidas.length===0) return;
+    const upd = {}; vencidas.forEach(e=>{ upd[e.key]=null; });
+    fbUpdate(ref(db,`${ROOT}/papelera_tareas`), upd).catch(()=>{});
+  },[vencidas.length]);
+  const restaurar = (e) => {
+    const t = e.tarea; const dia = e.dia;
+    setTareas(prev=>{
+      const lista = normArrTP(prev[dia]);
+      if(lista.some(x=>String(x.id)===String(t.id))) return prev;
+      return {...prev,[dia]:[...lista,t]};
+    });
+    fbUpdate(ref(db,`${ROOT}/papelera_tareas`),{[e.key]:null}).catch(er=>console.error(er));
+  };
+  const borrarDefinitivo = (e) => {
+    if(!window.confirm("¿Eliminar definitivamente esta tarea? Ya no se podrá restaurar.")) return;
+    fbUpdate(ref(db,`${ROOT}/papelera_tareas`),{[e.key]:null}).catch(er=>console.error(er));
+  };
+  const vaciar = () => {
+    if(vigentes.length===0) return;
+    if(!window.confirm(`¿Vaciar la papelera (${vigentes.length} tarea${vigentes.length!==1?"s":""})? Ya no se podrán restaurar.`)) return;
+    const upd = {}; vigentes.forEach(e=>{ upd[e.key]=null; });
+    fbUpdate(ref(db,`${ROOT}/papelera_tareas`),upd).catch(er=>console.error(er));
+  };
+  const porDia = {};
+  vigentes.forEach(e=>{ (porDia[e.dia] ||= []).push(e); });
+  const dias = Object.keys(porDia).sort((a,b)=>b.localeCompare(a));
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10,marginBottom:12}}>
+        <div>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#f87171",marginBottom:3}}>🗑 Papelera de tareas</div>
+          <div style={{fontSize:11,color:"#5a9a7a"}}>Las tareas eliminadas se guardan aquí {PAPELERA_DIAS} días. "Restaurar" la devuelve a su día original.</div>
+        </div>
+        {vigentes.length>0&&<button onClick={vaciar} style={{cursor:"pointer",border:"1px solid rgba(239,68,68,0.3)",borderRadius:7,padding:"5px 12px",background:"rgba(239,68,68,0.08)",color:"#fca5a5",fontSize:11}}>Vaciar papelera</button>}
+      </div>
+      {vigentes.length===0&&<div style={{...S.card,padding:32,textAlign:"center",color:"#4a8a5a"}}>La papelera está vacía.</div>}
+      {dias.map(dia=>(
+        <div key={dia} style={{marginBottom:12,border:"1px solid rgba(255,255,255,0.08)",borderRadius:10,overflow:"hidden"}}>
+          <div style={{padding:"7px 12px",background:"rgba(255,255,255,0.04)",fontSize:12,fontWeight:700}}>📅 {dia} <span style={{fontWeight:400,color:"#6aaa7a"}}>· {porDia[dia].length} eliminada{porDia[dia].length!==1?"s":""}</span></div>
+          {porDia[dia].map(e=>(
+            <div key={e.key} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 12px",borderTop:"1px solid rgba(255,255,255,0.05)",flexWrap:"wrap"}}>
+              <div style={{flex:1,minWidth:160}}>
+                <div style={{fontSize:12,fontWeight:600}}>{(e.tarea.tarea||"").replace("⛳ ","")}</div>
+                <div style={{fontSize:10,color:"#8aa89a"}}>{[e.tarea.zona,e.tarea.elemento,e.tarea.responsable].filter(Boolean).join(" · ")}</div>
+                <div style={{fontSize:10,color:"#5a7a7a"}}>Eliminada {new Date(e.eliminadoEn).toLocaleString("es-CL")}{e.motivo?` · ${e.motivo}`:""}</div>
+              </div>
+              <button onClick={()=>restaurar(e)} style={{cursor:"pointer",border:"1px solid rgba(34,197,94,0.3)",borderRadius:6,padding:"4px 10px",background:"rgba(34,197,94,0.1)",color:"#86efac",fontSize:11}}>↩ Restaurar</button>
+              <button title="Eliminar definitivamente" onClick={()=>borrarDefinitivo(e)} style={{cursor:"pointer",border:"1px solid rgba(239,68,68,0.25)",borderRadius:6,padding:"4px 8px",background:"rgba(239,68,68,0.06)",color:"#f87171",fontSize:11}}>✕</button>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa=false, esSupervisor=false, puedeCrear=false, cierresTurno={}, onReabrirTurno, onCerrarTurno, getElemFrecs, setElemFrecs, tabInicial=null }) {
   const [diasAbiertosHist, setDiasAbiertosHist] = React.useState({});
   const [gruposHistAbiertos, setGruposHistAbiertos] = React.useState({}); // {"dia__nombreTarea": bool}
@@ -2270,7 +2615,8 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
       <div style={{display:"flex",gap:6,marginBottom:14}}>
         {([["historial_macro","📜 Historial Macrozonas"],["historial_golf","⛳ Historial Golf"],["buscar","🔍 Consulta histórica"]]
           .concat((esJefa||esSupervisor)?[["turnos","✏️ Ver/editar turnos"]]:[])
-          .concat(esJefa?[["renombrar","🏷️ Renombrar tareas"]]:[])).map(([t,l])=>(
+          .concat(esJefa?[["renombrar","🏷️ Renombrar tareas"]]:[])
+          .concat(esJefa?[["papelera","🗑 Papelera"]]:[])).map(([t,l])=>(
           <button key={t} onClick={()=>setTabHist(t)}
             style={{cursor:"pointer",border:`1px solid ${tabHist===t?"#34d399":"rgba(255,255,255,0.12)"}`,
               borderRadius:8,padding:"5px 14px",fontSize:12,
@@ -2282,6 +2628,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
       </div>
 
       {/* ── Panel de consulta histórica ── */}
+      {tabHist==="papelera"&&esJefa&&<PanelPapeleraTareas S={S} setTareas={setTareas}/>}
       {tabHist==="renombrar"&&(
         <RenombradorMasivoTareas S={S} tareasProg={tareas} setTareasProg={setTareas}/>
       )}
@@ -2565,7 +2912,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                 })()}
                 {(esJefa||puedeCrear)&&(
                   <button
-                    onClick={()=>{if(window.confirm("¿Eliminar todas las tareas del día "+dia+"?"))setTareas(prev=>{const n={...prev};delete n[dia];return n;});}}
+                    onClick={()=>{if(window.confirm("¿Eliminar todas las tareas del día "+dia+"?\n\nIrán a la papelera (Historial → 🗑 Papelera) y podrás restaurarlas durante "+PAPELERA_DIAS+" días.")){enviarAPapelera(dia,tareas[dia],"día completo borrado desde Historial");setTareas(prev=>{const n={...prev};delete n[dia];return n;});}}}
                     style={{cursor:"pointer",border:"1px solid rgba(239,68,68,0.3)",borderRadius:8,padding:"5px 12px",fontSize:12,background:"rgba(239,68,68,0.12)",color:"#fca5a5",fontFamily:"'Georgia',serif"}}>
                     🗑 Borrar día
                   </button>
@@ -2643,12 +2990,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                               setTareas(prev=>({...prev,[dia]:nA(prev[dia]).map(x=>x.id===hpTask.id?{...x,notaJefa:e.target.value}:x)}));
                             }}
                             style={{fontSize:11,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:6,color:"#ede9e0",padding:"3px 8px",flex:1,minWidth:100,fontFamily:"'Georgia',serif"}}/>
-                          <button onClick={()=>{
-                            if(window.confirm(`¿Eliminar la tarea "${hpTask.tarea}" de ${hpTask.responsable||"sin asignar"}?`)){
-                              const nA=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-                              setTareas(prev=>({...prev,[dia]:nA(prev[dia]).filter(x=>x.id!==hpTask.id)}));
-                            }
-                          }} style={{cursor:"pointer",border:"1px solid rgba(239,68,68,0.3)",borderRadius:6,padding:"3px 8px",background:"rgba(239,68,68,0.07)",color:"#f87171",fontSize:11,fontFamily:"'Georgia',serif"}}>
+                          <button onClick={()=>eliminarTareaConDecision(hpTask,dia,setTareas,"Historial")} style={{cursor:"pointer",border:"1px solid rgba(239,68,68,0.3)",borderRadius:6,padding:"3px 8px",background:"rgba(239,68,68,0.07)",color:"#f87171",fontSize:11,fontFamily:"'Georgia',serif"}}>
                             🗑
                           </button>
                         </div>
@@ -2848,13 +3190,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                                     }}
                                     style={{cursor:"pointer",border:"1px solid rgba(59,130,246,0.25)",borderRadius:5,padding:"2px 6px",background:"rgba(59,130,246,0.06)",color:"#93c5fd",fontSize:11,flexShrink:0}}>📅</button>
                                 )}
-                                {esJefa&&<button title="Eliminar" onClick={()=>{
-                                    const esManual = !hpTask.origenFrecId;
-                                    const msg = esManual
-                                      ? `¿Eliminar "${(hpTask.tarea||"").replace("⛳ ","")}"?\n\n⚠️ Esta tarea NO tiene frecuencia asociada — al eliminarla se pierde para siempre, no se va a volver a proponer sola ningún otro día. Si quieres conservarla, usa "📅 Reprogramar" en vez de eliminar.`
-                                      : `¿Eliminar "${(hpTask.tarea||"").replace("⛳ ","")}"?\n\nEsta tarea tiene una frecuencia asociada — si sigue vencida, "Proponer del día" la va a volver a proponer más adelante.`;
-                                    if(window.confirm(msg)){const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);setTareas(prev=>({...prev,[dia]:nA2(prev[dia]).filter(x=>x.id!==hpTask.id)}));}
-                                  }}
+                                {esJefa&&<button title="Eliminar" onClick={()=>eliminarTareaConDecision(hpTask,dia,setTareas,"Ver/editar turnos")}
                                   style={{cursor:"pointer",border:"1px solid rgba(239,68,68,0.2)",borderRadius:5,padding:"2px 6px",background:"rgba(239,68,68,0.06)",color:"#f87171",fontSize:11,flexShrink:0}}>🗑</button>}
                               </div>
                             );
@@ -3930,7 +4266,7 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                               </button>
                             ))}
                             {esJefaApp&&(
-                              <button onClick={()=>{if(window.confirm("¿Eliminar esta tarea? No se puede deshacer."))onUpdateTarea(fechaVer,t.id,{_eliminar:true});}}
+                              <button onClick={async()=>{const dec=await decidirEliminarTarea(t,fechaVer);if(!dec)return;if(dec.accion==="reprogramar")onUpdateTarea(fechaVer,t.id,{_trasladarA:dec.fecha});else onUpdateTarea(fechaVer,t.id,{_eliminar:true});}}
                                 style={{cursor:"pointer",border:"1px solid rgba(239,68,68,0.25)",borderRadius:8,padding:"4px 8px",fontSize:11,background:"rgba(239,68,68,0.06)",color:"#f87171",marginLeft:4}}>
                                 🗑
                               </button>
@@ -4822,7 +5158,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     const copias = listaTodos.map(p=>({...tarea, id:Date.now()+Math.random(), responsable:p.nombre, estado:"pendiente", loteTodosId:loteId}));
     setTareasDelDia(fecha, [...tareasDia.filter(t=>t.id!==id), ...copias]);
   };
-  const deleteTarea = (id) => setTareasDelDia(fecha, getTareasDelDia(fecha).filter(t => t.id!==id));
+  const deleteTarea = (id) => { const tDel = getTareasDelDia(fecha).find(t=>t.id===id); if(tDel) eliminarTareaConDecision(tDel, fecha, setTareas, "Programación"); };
 
   const [previewProp, setPreviewProp] = React.useState(null);
   const [previewReprogramar, setPreviewReprogramar] = React.useState(null); // [{...tarea, seleccionada:true}]
@@ -4854,6 +5190,11 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     const pendItemsMap = new Map(); // signature -> {dia, item}
     const pendItemsMapText = new Map(); // "zona_elemento_tarea" -> {dia, item}
     const pendItemsAll = []; // TODOS los pendientes de días anteriores, con o sin frecuencia (incluye manuales)
+    // Tareas de HOY que siguen en curso con el turno abierto (a media jornada es lo normal). No se
+    // arrastran, pero tampoco se vuelven a proponer como si estuvieran "atrasadas": para saber si
+    // toca otra vez mañana se asume que quedarán hechas hoy (ver más abajo).
+    const abiertoHoySig = new Set();
+    const abiertoHoyText = new Set();
     Object.keys(tareas).sort().forEach(diaKey => {
       if(diaKey >= fecha) return; // solo días ANTERIORES al que se está proponiendo
       nAprop(tareas[diaKey]).forEach(t => {
@@ -4863,7 +5204,11 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
         // cierre su turno (aunque sea hoy mismo), sí se arrastra con normalidad.
         if(diaKey===hoy){
           const keyCierreProp = `${hoy}_${(t.responsable||"").split(" ")[0]?.toLowerCase()||""}`;
-          if(!cierresTurno?.[keyCierreProp]) return;
+          if(!cierresTurno?.[keyCierreProp]){
+            if(t.origenZid && t.origenEid && t.origenFrecId) abiertoHoySig.add(`${t.origenZid}_${t.origenEid}_${t.origenFrecId}`);
+            abiertoHoyText.add(`${t.zona}_${t.elemento}_${t.tarea}`);
+            return;
+          }
         }
         if(t.origenZid && t.origenEid && t.origenFrecId){
           pendItemsMap.set(`${t.origenZid}_${t.origenEid}_${t.origenFrecId}_${t.fechaCorrespondiente||""}`, {dia:diaKey, item:t});
@@ -4884,7 +5229,10 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
         if(frecs.length===0) return; // solo proponer si hay frecuencias — incluye Golf
         frecs.forEach(f => {
           const key = nombreZona+"_"+e.nombre+"_"+f.tarea;
-          const prox = calcProximaFrecGlobal(f, fecha);
+          // Si la de hoy sigue en curso (turno abierto), se proyecta como si se terminara hoy: solo se
+          // propone para el día pedido si, contando desde hoy, su frecuencia realmente le toca ese día.
+          const enCursoHoy = abiertoHoySig.has(`${z.id}_${e.id}_${f.id}`) || abiertoHoyText.has(key);
+          const prox = enCursoHoy ? calcProximaFrecGlobal({...f, ultimaVez:hoy, proximaFechaManual:""}, fecha) : calcProximaFrecGlobal(f, fecha);
           if(!prox) return; // sin frecuencia activa, sin última realización registrada, o "según necesidad"/"una vez"
           const pendienteAntes = pendItemsMap.get(`${z.id}_${e.id}_${f.id}_${prox.fecha}`) || pendItemsMapText.get(key);
           const yaExisteEsteMismo = existentes.includes(key) || propuestas.some(p=>p.zona===nombreZona&&p.elemento===e.nombre&&p.tarea.trim().toLowerCase()===f.tarea.trim().toLowerCase()) || !!pendienteAntes;
@@ -4924,7 +5272,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
             } else if(!pendienteEnlazadaAntes && !yaExisteEnlazada){
               // Buscar la frecuencia propia de la tarea enlazada, para saber cuándo le toca a ELLA
               const frecEnlazada = frecs.find(ff=>(ff.tarea||"").trim().toLowerCase()===nombreEnlazada.toLowerCase());
-              const proxEnlazada = frecEnlazada ? calcProximaFrecGlobal(frecEnlazada, fecha) : null;
+              const proxEnlazada = frecEnlazada ? (abiertoHoyText.has(keyEnlazada) ? calcProximaFrecGlobal({...frecEnlazada, ultimaVez:hoy, proximaFechaManual:""}, fecha) : calcProximaFrecGlobal(frecEnlazada, fecha)) : null;
               let debeAdelantarse = false;
               if(!proxEnlazada){
                 // Sin frecuencia propia encontrada (o "según necesidad") — no se fuerza a adelantar sin
@@ -9041,7 +9389,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                         onKeyDown={e=>{
                           if(e.key==="Enter"&&e.target.value.trim()){
                             const prodS=e.target.value.trim();
-                            setIncidForm(p=>({...p,sectoresCerrados:[...p.sectoresCerrados,s]}));
+                            setIncidForm(p=>({...p,sectoresCerrados:[...p.sectoresCerrados,prodS]}));
                             e.target.value="";
                           }
                         }}/>
@@ -16344,14 +16692,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                                   return (
                                     <td key={d} style={{padding:"4px 5px",textAlign:"center",background:d===hoy?"rgba(251,191,36,0.04)":"transparent"}}>
                                       {tDia?(
-                                        <span title={`${est.label} — clic para eliminar`} onClick={()=>{
-                                          if(!window.confirm(`¿Eliminar la tarea "${tDia.tarea}" del ${d}?`)) return;
-                                          setTareasProg(prev=>{
-                                            const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-                                            const nuevaLista = normArr(prev[d]).filter(x=>x.id!==tDia.id);
-                                            return {...prev,[d]:nuevaLista};
-                                          });
-                                        }} style={{display:"inline-block",padding:"2px 7px",borderRadius:8,fontSize:10,fontWeight:600,background:est.bg,color:est.color,border:`1px solid ${est.color}30`,cursor:"pointer"}}>
+                                        <span title={`${est.label} — clic para eliminar`} onClick={()=>eliminarTareaConDecision(tDia,d,setTareasProg,"Golf")} style={{display:"inline-block",padding:"2px 7px",borderRadius:8,fontSize:10,fontWeight:600,background:est.bg,color:est.color,border:`1px solid ${est.color}30`,cursor:"pointer"}}>
                                           {est.icon}
                                         </span>
                                       ):(
@@ -16401,15 +16742,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                                     return (
                                       <td key={d} style={{padding:"3px 5px",textAlign:"center",background:d===hoy?"rgba(251,191,36,0.04)":"transparent"}}>
                                         {tDia?(
-                                          <span title={`${est.label} — clic para eliminar`} onClick={(e)=>{
-                                            e.stopPropagation();
-                                            if(!window.confirm(`¿Eliminar la tarea "${tDia.tarea}" del ${d}?`)) return;
-                                            setTareasProg(prev=>{
-                                              const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-                                              const nuevaLista = normArr(prev[d]).filter(x=>x.id!==tDia.id);
-                                              return {...prev,[d]:nuevaLista};
-                                            });
-                                          }} style={{display:"inline-block",padding:"1px 6px",borderRadius:7,fontSize:9,fontWeight:600,background:est.bg,color:est.color,border:`1px solid ${est.color}30`,cursor:"pointer"}}>
+                                          <span title={`${est.label} — clic para eliminar`} onClick={(e)=>{e.stopPropagation();eliminarTareaConDecision(tDia,d,setTareasProg,"Golf");}} style={{display:"inline-block",padding:"1px 6px",borderRadius:7,fontSize:9,fontWeight:600,background:est.bg,color:est.color,border:`1px solid ${est.color}30`,cursor:"pointer"}}>
                                             {est.icon}
                                           </span>
                                         ):(
@@ -16466,6 +16799,9 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           const pendTextSetGolf=new Map();
           const pendZonaTareaSetGolf=new Map();
           const pendItemsAllGolf=[]; // TODOS los pendientes de Golf de días anteriores, con o sin frecuencia (incluye manuales)
+          // Tareas de HOY en curso con el turno abierto: no se arrastran ni se re-proponen como atrasadas.
+          const abiertoHoySigGolf = new Set();
+          const abiertoHoyTextGolf = new Set();
           Object.keys(tareasProg||{}).sort().forEach(diaKeyG=>{
             if(diaKeyG>=fechaProponerGolf) return;
             nAGolfProp(tareasProg[diaKeyG]).forEach(t=>{
@@ -16474,7 +16810,11 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               // turno de este trabajador siga abierto — solo en cuanto cierre (aunque sea hoy mismo).
               if(diaKeyG===hoy){
                 const keyCierreGolf = `${hoy}_${(t.responsable||"").split(" ")[0]?.toLowerCase()||""}`;
-                if(!cierresTurno?.[keyCierreGolf]) return;
+                if(!cierresTurno?.[keyCierreGolf]){
+                  if(t.origenZid==="31" && t.origenEid && t.origenFrecId) abiertoHoySigGolf.add(`${t.origenEid}_${t.origenFrecId}`);
+                  abiertoHoyTextGolf.add(`${t.zona}_${t.elemento}_${t.tarea}`);
+                  return;
+                }
               }
               if(t.origenZid==="31" && t.origenEid && t.origenFrecId){
                 pendSignaturesGolf.set(`${t.origenEid}_${t.origenFrecId}_${t.fechaCorrespondiente||""}`, {dia:diaKeyG, item:t});
@@ -16504,7 +16844,9 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               const esFertilizAdaptada=(f.tarea||"").toLowerCase().includes("fertiliz")&&f.tareaEnlazada&&f.tareaEnlazada.trim();
               if(esFertilizAdaptada)return;
               const yaExisteEsteMismoGolf = yaExisteTarea(e.nombre,f.tarea);
-              const prox=calcProximaFrecGlobal(f,fechaProponerGolf);
+              // Si la de hoy sigue en curso (turno abierto), se proyecta como si se terminara hoy.
+              const enCursoHoyGolf = abiertoHoySigGolf.has(`${e.id}_${f.id}`) || abiertoHoyTextGolf.has(nombreZona+"_"+e.nombre+"_"+f.tarea);
+              const prox=enCursoHoyGolf ? calcProximaFrecGlobal({...f,ultimaVez:hoy,proximaFechaManual:""},fechaProponerGolf) : calcProximaFrecGlobal(f,fechaProponerGolf);
               if(!prox||prox.diff>0)return;
               const pendienteAntesGolf = pendSignaturesGolf.get(`${e.id}_${f.id}_${prox.fecha}`) || pendTextSetGolf.get(nombreZona+"_"+e.nombre+"_"+f.tarea);
               const esVencida=prox.diff<0;const diasVencida=Math.abs(prox.diff);
@@ -16533,7 +16875,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                   propuestas.push({...pendienteEnlazadaAntesGolf.item, fecha:fechaProponerGolf, _movidoDesde:pendienteEnlazadaAntesGolf.dia});
                 } else if(!clavesTareaEnlazadaYaAgregada.has(claveEnlazada)&&!yaExisteEnlazada){
                   const frecEnlazadaGolf = frecs.find(ff=>(ff.tarea||"").trim().toLowerCase()===nombreEnlazadaGolf.toLowerCase());
-                  const proxEnlazadaGolf = frecEnlazadaGolf ? calcProximaFrecGlobal(frecEnlazadaGolf, fechaProponerGolf) : null;
+                  const proxEnlazadaGolf = frecEnlazadaGolf ? (abiertoHoyTextGolf.has(nombreZona+"_"+e.nombre+"_"+nombreEnlazadaGolf) ? calcProximaFrecGlobal({...frecEnlazadaGolf,ultimaVez:hoy,proximaFechaManual:""}, fechaProponerGolf) : calcProximaFrecGlobal(frecEnlazadaGolf, fechaProponerGolf)) : null;
                   let debeAdelantarseGolf = false;
                   if(!proxEnlazadaGolf){
                     debeAdelantarseGolf = false; // sin frecuencia propia encontrada — no se fuerza, sigue su propio ciclo
@@ -21586,7 +21928,7 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
     const tipoObj = TIPOS_ALERTA.find(t=>t.id===af.tipo)||TIPOS_ALERTA[0];
     const esGestion = !!gestionandoAlertaId;
     const nuevaId = esGestion ? gestionandoAlertaId : Date.now()+Math.random();
-    const nuevaAlerta = limpiarUndef({id:nuevaId,estado:"activa",tipo:af.tipo,tipoLabel:af.tipoLabel||tipoObj.label,tipoIcon:af.tipoIcon||tipoObj.icon,zonas:af.zonas,origen:af.origen,urgencia:af.urgencia,descripcion:af.descripcion||"(sin descripción)",responsable:af.responsable,fecha:af.fecha,hora:af.hora,fechaAplicacion:af.fechaAplicacion||fitoForm.fechaAplicacion||af.fecha,elementoAfectado:af.elementoAfectado||"",agenteCausal:af.agenteCausal||"",fechaCreacion:new Date().toISOString(),tareas:tareasEditables.filter(t=>t.incluir).map(t=>({texto:t.texto,responsable:t.responsable,estado:"pendiente",esAplicacion:t.esAplicacion||false})),historial:[{accion:esGestion?"Tareas formalizadas por la jefa":"Alerta creada",fecha:af.fecha,hora:af.hora,responsable:af.responsable}]});
+    const nuevaAlerta = limpiarUndef({id:nuevaId,estado:"activa",tipo:af.tipo,tipoLabel:af.tipoLabel||tipoObj.label,tipoIcon:af.tipoIcon||tipoObj.icon,zonas:af.zonas,origen:af.origen,urgencia:af.urgencia,descripcion:af.descripcion||"(sin descripción)",responsable:af.responsable,fecha:af.fecha,hora:af.hora,fechaAplicacion:af.fechaAplicacion||af.fecha,elementoAfectado:af.elementoAfectado||"",agenteCausal:af.agenteCausal||"",fechaCreacion:new Date().toISOString(),tareas:tareasEditables.filter(t=>t.incluir).map(t=>({texto:t.texto,responsable:t.responsable,estado:"pendiente",esAplicacion:t.esAplicacion||false})),historial:[{accion:esGestion?"Tareas formalizadas por la jefa":"Alerta creada",fecha:af.fecha,hora:af.hora,responsable:af.responsable}]});
     setIncidencias(prev=>{
       const arr = Array.isArray(prev)?prev:Object.values(prev||{});
       return esGestion ? arr.map(x=>String(x.id)===String(nuevaId)?nuevaAlerta:x) : [nuevaAlerta, ...arr];
@@ -21609,7 +21951,7 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
                    af.tipo==="golf_incid";
     const zonaLabel = af.zonas.join(", ");
 
-    const fechaTareas = af.fechaAplicacion || fitoForm.fechaAplicacion || af.fecha;
+    const fechaTareas = af.fechaAplicacion || af.fecha;
     const tareaCierre = limpiarUndef({
       id:Date.now()+Math.random(), fecha:fechaTareas,
       zona: esGolf ? "Golf" : zonaLabel, elemento:"",
@@ -25538,10 +25880,17 @@ export default function App() {
                 onUpdateTarea={(fecha,tid,patch)=>{
                   const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
                   if(patch._eliminar){
+                    const tElim = normArr(tareasProg[fecha]).find(t=>String(t.id)===String(tid));
+                    if(tElim) enviarAPapelera(fecha,[tElim],"eliminada en modo supervisión");
                     setTareasProg(prev=>{
                       const lista=normArr(prev[fecha]);
                       return {...prev,[fecha]:lista.filter(t=>String(t.id)!==String(tid))};
                     });
+                    return;
+                  }
+                  if(patch._trasladarA){
+                    const tTras = normArr(tareasProg[fecha]).find(t=>String(t.id)===String(tid));
+                    if(tTras) setTareasProg(prev=>trasladarEnEstado(prev,fecha,tTras,patch._trasladarA));
                     return;
                   }
                   setTareasProg(prev=>{
@@ -25660,6 +26009,8 @@ export default function App() {
               <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:26,fontWeight:900,marginBottom:3}}>Panel General</h1>
               <p style={{color:"#6aaa7a",fontSize:15}}>Estado global de las {stats.total} macrozonas</p>
             </div>
+            {esJefa&&<CentroRespaldos S={S} crearNotificacion={crearNotificacion}
+              fuentes={{data,personal,macrozonasCust,tareasProg,cierresTurno,configSemanal,aplicaciones,incidenciasFito,stockFito,comprasData,bodegasData,memosData,herramientasCustodia,golfData,bonosConfig,bonosMasivos,rendicionesRRHH,notificaciones,incidencias,hojasSeguridad,eppEntregas,eppFiltros,eppVidaUtil,eppInspecciones,eppFitTests,eppDisposiciones}}/>}
             {(fbRol==="jefa"||fbRol==="supervisor"||fbRol==="programador")&&(()=>{
               const hoyPG = fechaLocal();
               const normArrPG = v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
@@ -25702,7 +26053,12 @@ export default function App() {
                         if(!fechaCorte) return;
                         const aEliminar = pendientesAnteriores.filter(t=>t.fecha<fechaCorte);
                         if(aEliminar.length===0){ alert("No hay tareas pendientes antes de esa fecha."); return; }
-                        if(!window.confirm(`¿Eliminar ${aEliminar.length} tarea(s) pendiente(s) de días anteriores al ${fechaCorte}?\n\nEsta acción no se puede deshacer.`)) return;
+                        if(!window.confirm(`¿Eliminar ${aEliminar.length} tarea(s) pendiente(s) de días anteriores al ${fechaCorte}?\n\nIrán a la papelera (Historial → 🗑 Papelera) y podrás restaurarlas durante ${PAPELERA_DIAS} días.`)) return;
+                        Object.keys(tareasProg||{}).forEach(fk=>{
+                          if(fk>=fechaCorte) return;
+                          const rem = normArrPG(tareasProg[fk]).filter(t=>!["hecha","completada","cancelada"].includes(t.estado));
+                          if(rem.length) enviarAPapelera(fk,rem,"limpieza masiva de pendientes antiguos");
+                        });
                         setTareasProg(prev=>{
                           const nuevo={...prev};
                           Object.keys(nuevo).forEach(fk=>{
