@@ -253,6 +253,38 @@ const calcProximaFrecGlobal = (f, refFecha) => {
 // - Vuelta (hecha/completada -> algo): si la frecuencia sigue apuntando a esta tarea, la revierte
 //   al valor previo (evita que quede "al día" una tarea que resultó incompleta).
 // Devuelve el patch (posiblemente con ultimaVezPrevia agregado) para que el llamador lo aplique a la tarea.
+// ── Recordatorio: turnos de días anteriores sin cerrar y con tareas pendientes ──
+// Devuelve [{dia, nombre, pendientes}] para los últimos `diasAtras` días ANTERIORES a hoy (el día de hoy
+// no cuenta: a media jornada es normal que el turno siga abierto). Solo considera trabajadores que
+// tengan tareas sin resolver ese día y cuyo turno no esté cerrado. `filtroTarea` permite acotar por módulo
+// (Golf / no Golf).
+const turnosSinCerrarPrevios = (tareas, cierresTurno, hoy, filtroTarea=()=>true, diasAtras=7) => {
+  const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+  const limite = new Date(hoy+"T12:00:00"); limite.setDate(limite.getDate()-diasAtras);
+  const limiteStr = limite.toISOString().slice(0,10);
+  const finales = ["hecha","completada","no_pudo"];
+  const res = [];
+  Object.keys(tareas||{}).sort().forEach(dia=>{
+    if(dia>=hoy || dia<limiteStr) return;
+    const porTrab = {};
+    normArr(tareas[dia]).forEach(t=>{
+      if(!t.responsable || t.trasladadaA || finales.includes(t.estado) || !filtroTarea(t)) return;
+      porTrab[t.responsable] = (porTrab[t.responsable]||0)+1;
+    });
+    Object.entries(porTrab).forEach(([nombre,n])=>{
+      const key = `${dia}_${nombre.split(" ")[0].toLowerCase()}`;
+      if(!cierresTurno?.[key]) res.push({dia, nombre, pendientes:n});
+    });
+  });
+  return res;
+};
+const avisoTurnosSinCerrar = (lista) => {
+  const maxLineas = 12;
+  const lineas = lista.slice(0,maxLineas).map(x=>`• ${x.dia} — ${x.nombre} (${x.pendientes} pendiente${x.pendientes!==1?"s":""})`);
+  if(lista.length>maxLineas) lineas.push(`… y ${lista.length-maxLineas} más`);
+  return `⚠️ Hay turnos de días anteriores sin cerrar y con tareas pendientes:\n\n${lineas.join("\n")}\n\nSi programas ahora, esas pendientes se trasladarán al nuevo día (el original queda intacto en su fecha).\n\n¿Continuar de todos modos?\n\nAceptar = continuar  ·  Cancelar = volver para cerrar esos turnos primero`;
+};
+
 const aplicarCambioFrecuencia = (tareaVieja, patch, getElemFrecs, setElemFrecs) => {
   if(!tareaVieja || !patch || patch.estado===undefined) return patch;
   if(!tareaVieja.origenZid || !tareaVieja.origenFrecId || !getElemFrecs || !setElemFrecs) return patch;
@@ -2038,7 +2070,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
           const estLabel = EC[hpTask.estado]?.label || hpTask.estado;
           const icono = (zonas.find(z=>z.nombre===hpTask.zona)||MACROZONAS_BASE.find(z=>z.nombre===hpTask.zona))?.icono||""
           const obsTxtGen = [hpTask.notas?"📋 "+hpTask.notas:"",hpTask.notaWorker?"⚠️ "+hpTask.notaWorker:""].filter(Boolean).join("<br>")||"-";
-          return '<tr>'+'<td class="'+estCls+'">'+( EC[hpTask.estado]?.icon||"-")+" "+estLabel+"</td>"+(hpTask.emergente?'<td><b>'+hpTask.tarea+'</b> <span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;padding:1px 5px;border-radius:6px">⚡ Emergente</span></td>':hpTask.movidoDesde?'<td><b>'+hpTask.tarea+'</b> <span style="font-size:9px;font-weight:700;color:#1e40af;background:#dbeafe;border:1px solid #93c5fd;padding:1px 5px;border-radius:6px">🔁 Movida desde '+hpTask.movidoDesde+'</span></td>':'<td><b>'+hpTask.tarea+'</b></td>')+'<td>'+(hpTask.elemento||"-")+"</td>"+'<td>'+icono+" "+(hpTask.zona||"-")+"</td>"+'<td>'+(hpTask.responsable||"<i>Sin asignar</i>")+"</td>"+'<td>'+obsTxtGen+"</td>"+'</tr>';
+          return '<tr>'+'<td class="'+estCls+'">'+( EC[hpTask.estado]?.icon||"-")+" "+estLabel+"</td>"+(hpTask.trasladadaA?'<td><b>'+hpTask.tarea+'</b> <span style="font-size:9px;font-weight:700;color:#1e40af;background:#dbeafe;border:1px solid #93c5fd;padding:1px 5px;border-radius:6px">➡️ Trasladada al '+hpTask.trasladadaA+'</span></td>':hpTask.emergente?'<td><b>'+hpTask.tarea+'</b> <span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;padding:1px 5px;border-radius:6px">⚡ Emergente</span></td>':hpTask.movidoDesde?'<td><b>'+hpTask.tarea+'</b> <span style="font-size:9px;font-weight:700;color:#1e40af;background:#dbeafe;border:1px solid #93c5fd;padding:1px 5px;border-radius:6px">🔁 Movida desde '+hpTask.movidoDesde+'</span></td>':'<td><b>'+hpTask.tarea+'</b></td>')+'<td>'+(hpTask.elemento||"-")+"</td>"+'<td>'+icono+" "+(hpTask.zona||"-")+"</td>"+'<td>'+(hpTask.responsable||"<i>Sin asignar</i>")+"</td>"+'<td>'+obsTxtGen+"</td>"+'</tr>';
         }).join("")}
       </tbody>
     </table>
@@ -2097,7 +2129,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
           const estLabel = EC[hpTask.estado]?.label || hpTask.estado;
           const icono = (zonas.find(z=>z.nombre===hpTask.zona)||MACROZONAS_BASE.find(z=>z.nombre===hpTask.zona))?.icono||""
           const obsTxt = [hpTask.notas?"📋 "+hpTask.notas:"",hpTask.notaWorker?"⚠️ "+hpTask.notaWorker:""].filter(Boolean).join("<br>")||"-";
-          return '<tr>'+'<td class="'+estCls+'">'+( EC[hpTask.estado]?.icon||"-")+" "+estLabel+"</td>"+(hpTask.emergente?'<td><b>'+hpTask.tarea+'</b> <span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;padding:1px 5px;border-radius:6px">⚡ Emergente</span></td>':hpTask.movidoDesde?'<td><b>'+hpTask.tarea+'</b> <span style="font-size:9px;font-weight:700;color:#1e40af;background:#dbeafe;border:1px solid #93c5fd;padding:1px 5px;border-radius:6px">🔁 Movida desde '+hpTask.movidoDesde+'</span></td>':'<td><b>'+hpTask.tarea+'</b></td>')+'<td>'+(hpTask.elemento||"-")+"</td>"+'<td>'+icono+" "+(hpTask.zona||"-")+"</td>"+'<td>'+obsTxt+"</td>"+'</tr>';
+          return '<tr>'+'<td class="'+estCls+'">'+( EC[hpTask.estado]?.icon||"-")+" "+estLabel+"</td>"+(hpTask.trasladadaA?'<td><b>'+hpTask.tarea+'</b> <span style="font-size:9px;font-weight:700;color:#1e40af;background:#dbeafe;border:1px solid #93c5fd;padding:1px 5px;border-radius:6px">➡️ Trasladada al '+hpTask.trasladadaA+'</span></td>':hpTask.emergente?'<td><b>'+hpTask.tarea+'</b> <span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;padding:1px 5px;border-radius:6px">⚡ Emergente</span></td>':hpTask.movidoDesde?'<td><b>'+hpTask.tarea+'</b> <span style="font-size:9px;font-weight:700;color:#1e40af;background:#dbeafe;border:1px solid #93c5fd;padding:1px 5px;border-radius:6px">🔁 Movida desde '+hpTask.movidoDesde+'</span></td>':'<td><b>'+hpTask.tarea+'</b></td>')+'<td>'+(hpTask.elemento||"-")+"</td>"+'<td>'+icono+" "+(hpTask.zona||"-")+"</td>"+'<td>'+obsTxt+"</td>"+'</tr>';
         }).join("")}
       </tbody>
     </table>
@@ -2133,7 +2165,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
         const estLabel = EC[hpTask.estado]?.label || hpTask.estado;
         const icono = (zonas.find(z=>z.nombre===hpTask.zona)||MACROZONAS_BASE.find(z=>z.nombre===hpTask.zona))?.icono||"";
         const obsTxt = [hpTask.notas?"📋 "+hpTask.notas:"",hpTask.notaWorker?"⚠️ "+hpTask.notaWorker:""].filter(Boolean).join("<br>")||"-";
-        return '<tr>'+'<td class="'+estCls+'">'+(EC[hpTask.estado]?.icon||"-")+" "+estLabel+"</td>"+(hpTask.emergente?'<td><b>'+hpTask.tarea+'</b> <span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;padding:1px 5px;border-radius:6px">⚡ Emergente</span></td>':hpTask.movidoDesde?'<td><b>'+hpTask.tarea+'</b> <span style="font-size:9px;font-weight:700;color:#1e40af;background:#dbeafe;border:1px solid #93c5fd;padding:1px 5px;border-radius:6px">🔁 Movida desde '+hpTask.movidoDesde+'</span></td>':'<td><b>'+hpTask.tarea+'</b></td>')+'<td>'+(hpTask.elemento||"-")+"</td>"+'<td>'+icono+" "+(hpTask.zona||"-")+"</td>"+'<td>'+obsTxt+"</td>"+'</tr>';
+        return '<tr>'+'<td class="'+estCls+'">'+(EC[hpTask.estado]?.icon||"-")+" "+estLabel+"</td>"+(hpTask.trasladadaA?'<td><b>'+hpTask.tarea+'</b> <span style="font-size:9px;font-weight:700;color:#1e40af;background:#dbeafe;border:1px solid #93c5fd;padding:1px 5px;border-radius:6px">➡️ Trasladada al '+hpTask.trasladadaA+'</span></td>':hpTask.emergente?'<td><b>'+hpTask.tarea+'</b> <span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;padding:1px 5px;border-radius:6px">⚡ Emergente</span></td>':hpTask.movidoDesde?'<td><b>'+hpTask.tarea+'</b> <span style="font-size:9px;font-weight:700;color:#1e40af;background:#dbeafe;border:1px solid #93c5fd;padding:1px 5px;border-radius:6px">🔁 Movida desde '+hpTask.movidoDesde+'</span></td>':'<td><b>'+hpTask.tarea+'</b></td>')+'<td>'+(hpTask.elemento||"-")+"</td>"+'<td>'+icono+" "+(hpTask.zona||"-")+"</td>"+'<td>'+obsTxt+"</td>"+'</tr>';
       }).join("");
       return `<div class="trab-sec">
         <div class="trab-head"><span>🧑‍🌾 ${resp}</span><span class="trab-pct">${hechasR}/${tds.length} · ${pctR}%</span></div>
@@ -2475,7 +2507,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                       <button onClick={()=>{
                         const normArrRp = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
                         const todasDia = normArrRp(tareas[dia]||[]);
-                        const pendientesRp = todasDia.filter(t=>normalizarEstado(t.estado)!=="hecha"&&(zonaFijaActual==="golf"?esGolfZonaHist(t.zona):!esGolfZonaHist(t.zona)));
+                        const pendientesRp = todasDia.filter(t=>!t.trasladadaA&&normalizarEstado(t.estado)!=="hecha"&&(zonaFijaActual==="golf"?esGolfZonaHist(t.zona):!esGolfZonaHist(t.zona)));
                         if(pendientesRp.length===0) return alert(`No hay tareas pendientes para reprogramar en ${dia}${zonaFijaActual==="golf"?"":" (Golf no se incluye acá — usa \"Historial Golf\")"}.`);
                         if(destinoElegido===dia) return alert("Elige una fecha destino distinta a la fecha de origen.");
                         const tareasDestinoRp = normArrRp(tareas[destinoElegido]||[]);
@@ -2514,10 +2546,13 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                                 const estOriginalRp = normalizarEstado(t.estado);
                                 const estNuevoRp = estOriginalRp==="en_curso" ? "en_curso" : "pendiente";
                                 const {seleccionada, ...tSinFlag} = t;
-                                return {...tSinFlag, id:Date.now()+Math.random(), fecha:previewReprogramarHist.destino, estado:estNuevoRp,
+                                return {...tSinFlag, id:Date.now()+Math.random(), origenTareaId:t.id, fecha:previewReprogramarHist.destino, estado:estNuevoRp,
                                   notas:(t.notas?t.notas+" | ":"")+(estOriginalRp==="no_pudo"?"Reprogramada (no se pudo) desde ":estOriginalRp==="en_curso"?"Continúa (estaba en curso) desde ":"Reprogramada desde ")+dia+(t.notaWorker?" — Obs. anterior: "+t.notaWorker:"")};
                               });
-                              setTareas(prev=>({...prev,[previewReprogramarHist.destino]:[...normArrRp2(prev[previewReprogramarHist.destino]||[]), ...nuevasRp]}));
+                              const idsOrigRp = seleccionadasRp.map(t=>String(t.id));
+                              setTareas(prev=>({...prev,
+                                [previewReprogramarHist.destino]:[...normArrRp2(prev[previewReprogramarHist.destino]||[]), ...nuevasRp],
+                                [dia]:normArrRp2(prev[dia]||[]).map(x=>idsOrigRp.includes(String(x.id))?{...x,trasladadaA:previewReprogramarHist.destino}:x)}));
                               setPreviewReprogramarHist(null);
                               alert(`✅ ${nuevasRp.length} tarea(s) reprogramadas para ${previewReprogramarHist.destino}`);
                             }}>✓ Confirmar ({previewReprogramarHist.tareas.filter(t=>t.seleccionada).length})</button>
@@ -2684,7 +2719,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
             )}
             {dias.map(dia=>{
               const tDiaCompleto=nA(tareas[dia]);
-              const tDia=filtroEstadoTurnos==="todos"?tDiaCompleto:tDiaCompleto.filter(hpTask=>hpTask.estado===filtroEstadoTurnos);
+              const tDia=filtroEstadoTurnos==="todos"?tDiaCompleto:tDiaCompleto.filter(hpTask=>hpTask.estado===filtroEstadoTurnos&&!hpTask.trasladadaA);
               const porTrab={};
               tDia.forEach(hpTask=>{const r=hpTask.responsable||"Sin asignar";if(!porTrab[r])porTrab[r]=[];porTrab[r].push(hpTask);});
               if(Object.keys(porTrab).length===0) return null;
@@ -2771,18 +2806,20 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                               <div style={{display:"flex",flexDirection:"column",gap:2,marginTop:2}}>
                           {items.map(hpTask=>{
                             const est=EC[hpTask.estado]||EC.pendiente;
+                            const esTrasl=!!hpTask.trasladadaA;
                             const notaExtra=[hpTask.notaWorker&&("💬 "+hpTask.notaWorker),hpTask.notaJefa&&("📋 "+hpTask.notaJefa),hpTask.movidoDesde&&("🔁 Movida desde "+hpTask.movidoDesde),hpTask.alturaCorte&&("✂️ HOC: "+hpTask.alturaCorte+"mm")].filter(Boolean).join(" · ");
                             return (
-                              <div key={hpTask.id} style={{display:"flex",gap:7,padding:"4px 8px",borderRadius:6,background:`${est.color}07`,border:`1px solid ${est.color}18`,alignItems:"center",flexWrap:"wrap"}}>
+                              <div key={hpTask.id} style={{display:"flex",gap:7,padding:"4px 8px",borderRadius:6,background:`${est.color}07`,border:`1px solid ${est.color}18`,alignItems:"center",flexWrap:"wrap",opacity:esTrasl?0.6:1}}>
                                 <span style={{fontSize:12,flexShrink:0}}>{est.icon}</span>
                                 <div style={{flex:1,minWidth:120}}>
                                   <div style={{fontSize:11,color:"#8aa89a"}}>
                                     {hpTask.zona&&<>📍 {hpTask.zona}{hpTask.elemento?` · ${hpTask.elemento}`:""}</>}
                                     {hpTask.emergente&&<span style={{marginLeft:6,fontSize:9,fontWeight:700,color:"#fbbf24",background:"rgba(251,191,36,0.12)",border:"1px solid rgba(251,191,36,0.3)",padding:"1px 6px",borderRadius:7}}>⚡ Emergente</span>}
+                                    {esTrasl&&<span style={{marginLeft:6,fontSize:9,fontWeight:700,color:"#93c5fd",background:"rgba(59,130,246,0.12)",border:"1px solid rgba(59,130,246,0.3)",padding:"1px 6px",borderRadius:7}}>➡️ Trasladada al {hpTask.trasladadaA}</span>}
                                   </div>
                                   {notaExtra&&<div style={{fontSize:10,color:"#a0c8a0",fontStyle:"italic"}}>{notaExtra}</div>}
                                 </div>
-                                {esJefa?(
+                                {esJefa&&!esTrasl?(
                                 <select value={hpTask.estado}
                                   onChange={e=>{const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);const patch=aplicarCambioFrecuencia(hpTask,{estado:e.target.value},getElemFrecs,setElemFrecs);setTareas(prev=>{const updated=cerrarLoteSiCorresponde(nA2(prev[dia]), hpTask.id, patch);return {...prev,[dia]:updated.map(limpiarUndef)};});}}
                                   style={{fontSize:10,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:5,color:"#ede9e0",padding:"2px 3px",cursor:"pointer",flexShrink:0}}>
@@ -2794,7 +2831,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                                 {esJefa&&<input placeholder="nota..." defaultValue={hpTask.notaJefa||""}
                                   onBlur={e=>{if(e.target.value!==hpTask.notaJefa){const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);setTareas(prev=>({...prev,[dia]:nA2(prev[dia]).map(x=>x.id===hpTask.id?{...x,notaJefa:e.target.value}:x)}));}}}
                                   style={{fontSize:10,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:5,color:"#ede9e0",padding:"2px 4px",width:70,flexShrink:0}}/>}
-                                {esJefa&&!hpTask.origenFrecId&&!["hecha","completada","no_pudo"].includes(hpTask.estado)&&(
+                                {esJefa&&!esTrasl&&!hpTask.origenFrecId&&!["hecha","completada","no_pudo"].includes(hpTask.estado)&&(
                                   <button title="Reprogramar" onClick={()=>{
                                       const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
                                       const mananaDef=new Date(dia+"T12:00:00");mananaDef.setDate(mananaDef.getDate()+1);
@@ -2803,8 +2840,9 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                                       if(!/^\d{4}-\d{2}-\d{2}$/.test(destinoStr)){ alert("Fecha inválida — usa el formato AAAA-MM-DD."); return; }
                                       setTareas(prev=>{
                                         const nuevo={...prev};
-                                        nuevo[dia]=nA2(nuevo[dia]).filter(x=>x.id!==hpTask.id);
-                                        nuevo[destinoStr]=[...nA2(nuevo[destinoStr]),{...hpTask,fecha:destinoStr,notas:(hpTask.notas?hpTask.notas+" | ":"")+"Reprogramada desde "+dia}];
+                                        // El original NO se borra: queda en su día marcado como trasladado (historial intacto).
+                                        nuevo[dia]=nA2(nuevo[dia]).map(x=>x.id===hpTask.id?{...x,trasladadaA:destinoStr}:x);
+                                        nuevo[destinoStr]=[...nA2(nuevo[destinoStr]),{...hpTask,id:Date.now()+Math.random(),fecha:destinoStr,origenTareaId:hpTask.id,notas:(hpTask.notas?hpTask.notas+" | ":"")+"Reprogramada desde "+dia}];
                                         return nuevo;
                                       });
                                     }}
@@ -3645,6 +3683,7 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
     const nombreTrab = normalizar(trabajador?.nombre||"");
     const resultado = combinadas.filter(t => {
       if(!t.responsable) return false;
+      if(t.trasladadaA) return false; // ya se trasladó a otro día: el trabajador ve solo la copia vigente
       const normResp = normalizar(t.responsable);
       if(normResp===nombreTrab) return true;
       // Compatibilidad: Bhalu puede estar guardado con acento o sin él
@@ -4790,6 +4829,9 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
   const [buscarPreviewProp, setBuscarPreviewProp] = React.useState("");
   const [gruposPreviewPropAbiertos, setGruposPreviewPropAbiertos] = React.useState({});
   const proponerTareas = () => {
+    // Recordatorio (no bloquea): turnos anteriores sin cerrar con tareas pendientes.
+    const sinCerrarProp = turnosSinCerrarPrevios(tareas, cierresTurno, hoy, t=>!((t.zona||"")==="Golf"||(t.zona||"").toLowerCase().includes("golf")));
+    if(sinCerrarProp.length>0 && !window.confirm(avisoTurnosSinCerrar(sinCerrarProp))) return;
     const estProp = estacionDeFecha(fecha);
     const propuestas = [];
     const vencidas = [];
@@ -4815,7 +4857,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     Object.keys(tareas).sort().forEach(diaKey => {
       if(diaKey >= fecha) return; // solo días ANTERIORES al que se está proponiendo
       nAprop(tareas[diaKey]).forEach(t => {
-        if(finalesProp.includes(t.estado) || idsResueltos.has(t.id)) return;
+        if(finalesProp.includes(t.estado) || idsResueltos.has(t.id) || t.trasladadaA) return;
         // El día de HOY es especial: si el turno de ESTE trabajador todavía está abierto, lo
         // pendiente es normal a media jornada (no "atrasado") — no se arrastra todavía. En cuanto
         // cierre su turno (aunque sea hoy mismo), sí se arrastra con normalidad.
@@ -4928,31 +4970,51 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     setPreviewProp(propuestas);
   };
 
-  const confirmarPreviewProp = () => {
-    const yaExistenConfirm = getTareasDelDia(fecha).map(t=>t.zona+"_"+t.elemento+"_"+t.tarea);
-    const aEnviar = (previewProp||[]).filter(p=>p.incluir && !yaExistenConfirm.includes(p.zona+"_"+p.elemento+"_"+p.tarea)).map(({incluir,abierta,_movidoDesde,...t})=>_movidoDesde?{...t,movidoDesde:_movidoDesde}:t);
-    const yaEstabanConfirm = (previewProp||[]).filter(p=>p.incluir).length - aEnviar.length;
-    if(aEnviar.length===0 && yaEstabanConfirm===0){ alert("No hay tareas seleccionadas."); return; }
-    // Tareas movidas desde un día anterior (misma id): hay que quitarlas de su día original para
-    // que no queden duplicadas ahí y aquí.
-    const movidas = (previewProp||[]).filter(p=>p.incluir && p._movidoDesde);
-    if(movidas.length>0){
-      const porDiaOrigen = {};
-      movidas.forEach(p=>{ (porDiaOrigen[p._movidoDesde] ||= []).push(p.id); });
+  // ── Envío desde la vista previa ──
+  // Las tareas "movidas" (seguían sin resolver en un día anterior) NO se quitan del día original:
+  // allí queda el registro tal como estaba, marcado como "trasladada" al día nuevo, y en el día
+  // nuevo se crea una COPIA con id nuevo. Así, aunque el turno anterior no se haya cerrado, su
+  // historial (informes, % de avance, cierre) no se altera.
+  const prepararEnvioProp = (items) => {
+    const yaExisten = getTareasDelDia(fecha).map(t=>t.zona+"_"+t.elemento+"_"+t.tarea);
+    const nuevos = [];
+    const traslados = {}; // díaOrigen -> [ids originales]
+    items.forEach(({incluir,abierta,_movidoDesde,...t})=>{
+      if(yaExisten.includes(t.zona+"_"+t.elemento+"_"+t.tarea)) return;
+      if(_movidoDesde){
+        (traslados[_movidoDesde] ||= []).push(String(t.id));
+        nuevos.push({...t, id:Date.now()+Math.random(), movidoDesde:_movidoDesde, origenTareaId:t.id});
+      } else {
+        nuevos.push(t);
+      }
+    });
+    return {nuevos, traslados};
+  };
+  const aplicarEnvioProp = ({nuevos, traslados}) => {
+    if(Object.keys(traslados).length>0){
       setTareas(prevT=>{
+        const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
         const nuevo = {...prevT};
-        Object.entries(porDiaOrigen).forEach(([diaOrig,ids])=>{
-          const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-          nuevo[diaOrig] = normArr(nuevo[diaOrig]).filter(t=>!ids.includes(t.id));
+        Object.entries(traslados).forEach(([diaOrig,ids])=>{
+          nuevo[diaOrig] = normArr(nuevo[diaOrig]).map(t=>ids.includes(String(t.id))?{...t,trasladadaA:fecha}:t);
         });
         return nuevo;
       });
     }
-    if(aEnviar.length>0) setTareasDelDia(fecha, [...getTareasDelDia(fecha), ...aEnviar]);
+    if(nuevos.length>0) setTareasDelDia(fecha, [...getTareasDelDia(fecha), ...nuevos]);
+  };
+
+  const confirmarPreviewProp = () => {
+    const seleccion = (previewProp||[]).filter(p=>p.incluir);
+    const envio = prepararEnvioProp(seleccion);
+    const aEnviar = envio.nuevos;
+    const yaEstabanConfirm = seleccion.length - aEnviar.length;
+    if(aEnviar.length===0 && yaEstabanConfirm===0){ alert("No hay tareas seleccionadas."); return; }
+    aplicarEnvioProp(envio);
     const vencidasCount = aEnviar.filter(t=>t.diasVencida>0).length;
-    const movidasCount = aEnviar.filter(t=>previewProp.find(p=>p.id===t.id)?._movidoDesde).length;
+    const movidasCount = aEnviar.filter(t=>t.origenTareaId).length;
     if(esDomingo(fecha)) setAviso("⚠️ El día seleccionado es domingo. Las tareas fueron cargadas igual, pero considera mover la programación a otro día.");
-    else setAviso(`✅ ${aEnviar.length} tarea(s) confirmadas y asignadas para ${fecha}.${vencidasCount>0?` ${vencidasCount} estaban vencidas.`:""}${movidasCount>0?` ${movidasCount} se movieron desde un día anterior (seguían sin resolver).`:""}${yaEstabanConfirm>0?` (${yaEstabanConfirm} ya estaban agregadas — no se duplicaron.)`:""}`);
+    else setAviso(`✅ ${aEnviar.length} tarea(s) confirmadas y asignadas para ${fecha}.${vencidasCount>0?` ${vencidasCount} estaban vencidas.`:""}${movidasCount>0?` ${movidasCount} se trasladaron desde un día anterior (el original queda intacto, marcado como trasladado).`:""}${yaEstabanConfirm>0?` (${yaEstabanConfirm} ya estaban agregadas — no se duplicaron.)`:""}`);
     // Se quitan de la vista previa TODAS las marcadas (enviadas ahora o que ya estaban) — las desmarcadas siguen ahí, esperando.
     setPreviewProp(prev=>{
       const restantes = prev.filter(p=>!p.incluir);
@@ -4963,13 +5025,12 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
   const enviarUnaPreviewProp = (id) => {
     const item = (previewProp||[]).find(p=>p.id===id);
     if(!item) return;
-    const { incluir, abierta, ...tarea } = item;
-    const yaExisteUna = getTareasDelDia(fecha).some(t=>t.zona===tarea.zona&&t.elemento===tarea.elemento&&t.tarea===tarea.tarea);
-    if(!yaExisteUna){
-      setTareasDelDia(fecha, [...getTareasDelDia(fecha), tarea]);
-      setAviso(`✅ "${tarea.tarea}" (${tarea.elemento}) confirmada y asignada a ${tarea.responsable||"sin asignar"}.`);
+    const envio = prepararEnvioProp([item]);
+    if(envio.nuevos.length>0){
+      aplicarEnvioProp(envio);
+      setAviso(`✅ "${item.tarea}" (${item.elemento}) confirmada y asignada a ${item.responsable||"sin asignar"}.`);
     } else {
-      setAviso(`ℹ️ "${tarea.tarea}" (${tarea.elemento}) ya estaba agregada — no se duplicó.`);
+      setAviso(`ℹ️ "${item.tarea}" (${item.elemento}) ya estaba agregada — no se duplicó.`);
     }
     setPreviewProp(prev=>{
       const restantes = prev.filter(p=>p.id!==id);
@@ -4981,11 +5042,10 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     if(idsGrupo.length===0) return;
     const items = (previewProp||[]).filter(p=>idsGrupo.includes(p.id));
     if(items.length===0) return;
-    const yaExistenGrupo = getTareasDelDia(fecha).map(t=>t.zona+"_"+t.elemento+"_"+t.tarea);
-    const aEnviar = items.filter(p=>!yaExistenGrupo.includes(p.zona+"_"+p.elemento+"_"+p.tarea)).map(({incluir,abierta,...t})=>t);
-    if(aEnviar.length>0) setTareasDelDia(fecha, [...getTareasDelDia(fecha), ...aEnviar]);
-    const yaEstabanGrupo = items.length - aEnviar.length;
-    setAviso(`✅ ${aEnviar.length} tarea(s) de "${items[0].tarea}" confirmadas y enviadas.${yaEstabanGrupo>0?` (${yaEstabanGrupo} ya estaban agregadas.)`:""}`);
+    const envio = prepararEnvioProp(items);
+    aplicarEnvioProp(envio);
+    const yaEstabanGrupo = items.length - envio.nuevos.length;
+    setAviso(`✅ ${envio.nuevos.length} tarea(s) de "${items[0].tarea}" confirmadas y enviadas.${yaEstabanGrupo>0?` (${yaEstabanGrupo} ya estaban agregadas.)`:""}`);
     setPreviewProp(prev=>{
       const restantes = prev.filter(p=>!idsGrupo.includes(p.id));
       return restantes.length>0 ? restantes : null;
@@ -4996,7 +5056,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
 
   // Golf se gestiona íntegramente en su propio módulo (Golf → ⚙️ Programación Golf / 📅 Semana Golf),
   // así que sus tareas no se muestran en la vista general de Programación Diaria.
-  const tareasHoy = getTareasDelDia(fecha).filter(t=>(t.zona||"")!=="Golf"&&!(t.zona||"").toLowerCase().includes("golf"));
+  const tareasHoy = getTareasDelDia(fecha).filter(t=>!t.trasladadaA&&(t.zona||"")!=="Golf"&&!(t.zona||"").toLowerCase().includes("golf"));
   const filtradas = tareasHoy.filter(pdTask => {
     const mE = filtroEstado==="todos" || pdTask.estado===filtroEstado;
     const mZ = filtroZona==="todas" || pdTask.zona===filtroZona;
@@ -5172,7 +5232,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                   const pendientes = todasHoy.filter(t=>{
                     const est = normalizarEstado(t.estado);
                     const esGolfRp = t.zona==="Golf"||(t.zona||"").includes("Golf");
-                    return est!=="hecha" && !esGolfRp;
+                    return est!=="hecha" && !esGolfRp && !t.trasladadaA;
                   });
                   if(pendientes.length===0) return alert("No hay tareas pendientes para reprogramar (Golf no se incluye — usa \"Proponer para esta fecha\" en Golf).");
                   if(destinoElegido===fecha) return alert("Elige una fecha destino distinta a la fecha de origen.");
@@ -5226,10 +5286,13 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                     const estOriginal = normalizarEstado(t.estado);
                     const estNuevo = estOriginal==="en_curso" ? "en_curso" : "pendiente";
                     const {seleccionada, ...tSinFlag} = t;
-                    return {...tSinFlag, id:Date.now()+Math.random(), fecha:destinoElegido, estado:estNuevo,
+                    return {...tSinFlag, id:Date.now()+Math.random(), origenTareaId:t.id, fecha:destinoElegido, estado:estNuevo,
                       notas:(t.notas?t.notas+" | ":"")+(estOriginal==="no_pudo"?"Reprogramada (no se pudo) desde ":estOriginal==="en_curso"?"Continúa (estaba en curso) desde ":"Reprogramada desde ")+fecha+(t.notaWorker?" — Obs. anterior: "+t.notaWorker:"")};
                   });
                   setTareasDelDia(destinoElegido, [...normArr(tareas[destinoElegido]||[]), ...nuevas]);
+                  // El original queda en su día (historial intacto), marcado como trasladado.
+                  const idsOrig = seleccionadas.map(t=>String(t.id));
+                  setTareasDelDia(fecha, normArr(tareas[fecha]||[]).map(x=>idsOrig.includes(String(x.id))?{...x,trasladadaA:destinoElegido}:x));
                   setPreviewReprogramar(null);
                   alert(`✅ ${nuevas.length} tarea(s) reprogramadas para ${destinoElegido}`);
                 }}>✓ Confirmar reprogramación ({previewReprogramar.filter(t=>t.seleccionada).length})</button>
@@ -16377,6 +16440,9 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
         const setRespSemanal=(tipoId,nombre)=>{if(!setConfigSemanal)return;setConfigSemanal(prev=>({...(prev||{}),[tipoId]:nombre}));};
         const proponerTareasGolf=()=>{
           if(!getAllElems||!getZD||!setTareasProg)return;
+          // Recordatorio (no bloquea): turnos anteriores sin cerrar con tareas de Golf pendientes.
+          const sinCerrarGolf = turnosSinCerrarPrevios(tareasProg, cierresTurno, hoy, t=>(t.zona||"")==="Golf"||(t.zona||"").includes("Golf"));
+          if(sinCerrarGolf.length>0 && !window.confirm(avisoTurnosSinCerrar(sinCerrarGolf))) return;
           const golfZonaObj=MACROZONAS_BASE.find(z=>z.id===31);if(!golfZonaObj)return;
           const zdatG=getZD(31);const nombreZona="Golf"; // siempre "Golf" — no usar nombreCustom, para no generar un segundo nombre de zona distinto al resto de las tareas de Golf
           const elems=getAllElems(31);
@@ -16403,7 +16469,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           Object.keys(tareasProg||{}).sort().forEach(diaKeyG=>{
             if(diaKeyG>=fechaProponerGolf) return;
             nAGolfProp(tareasProg[diaKeyG]).forEach(t=>{
-              if(finalesGolfProp.includes(t.estado) || idsResueltosGolf.has(t.id)) return;
+              if(finalesGolfProp.includes(t.estado) || idsResueltosGolf.has(t.id) || t.trasladadaA) return;
               // Mismo criterio que el módulo general: el día de hoy no se arrastra mientras el
               // turno de este trabajador siga abierto — solo en cuanto cierre (aunque sea hoy mismo).
               if(diaKeyG===hoy){
@@ -16574,26 +16640,27 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           });
           if(aEnviar.length===0){setPreviewGolfProp(null);return;}
           const fechaDestinoGolf=aEnviar[0]?.fecha||fechaProponerGolf;
-          // Tareas movidas desde un día anterior sin resolver: hay que quitarlas de su día original
-          // para que no queden duplicadas ahí y aquí.
+          // Tareas movidas desde un día anterior sin resolver: el original NO se borra — queda en su
+          // día marcado como "trasladada" (el historial de ese día no se altera) y aquí se crea una
+          // copia con id nuevo.
           const movidasGolf = aEnviar.filter(t=>t._movidoDesde);
-          if(movidasGolf.length>0){
-            const porDiaOrigenGolf = {};
-            movidasGolf.forEach(t=>{ (porDiaOrigenGolf[t._movidoDesde] ||= []).push(t.id); });
+          const trasladosGolf = {};
+          movidasGolf.forEach(t=>{ (trasladosGolf[t._movidoDesde] ||= []).push(String(t.id)); });
+          if(Object.keys(trasladosGolf).length>0){
             setTareasProg(prev=>{
               const nuevo = {...prev};
               const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
-              Object.entries(porDiaOrigenGolf).forEach(([diaOrig,ids])=>{
-                nuevo[diaOrig] = normArr(nuevo[diaOrig]).filter(t=>!ids.includes(t.id));
+              Object.entries(trasladosGolf).forEach(([diaOrig,ids])=>{
+                nuevo[diaOrig] = normArr(nuevo[diaOrig]).map(t=>ids.includes(String(t.id))?{...t,trasladadaA:fechaDestinoGolf}:t);
               });
               return nuevo;
             });
           }
-          const aEnviarLimpio = aEnviar.map(({_movidoDesde,...t})=>_movidoDesde?{...t,movidoDesde:_movidoDesde}:t);
+          const aEnviarLimpio = aEnviar.map(({_movidoDesde,...t})=>_movidoDesde?{...t,id:Date.now()+Math.random(),movidoDesde:_movidoDesde,origenTareaId:t.id}:t);
           const tareasHoyArr=Array.isArray(tareasProg[fechaDestinoGolf])?tareasProg[fechaDestinoGolf]:Object.values(tareasProg[fechaDestinoGolf]||{});
           setTareasProg(prev=>({...prev,[fechaDestinoGolf]:[...tareasHoyArr,...aEnviarLimpio]}));
           setPreviewGolfProp(null);
-          alert(`✅ ${aEnviarLimpio.length} tarea(s) de Golf enviadas al jardinero para el ${fechaDestinoGolf}.${movidasGolf.length>0?` ${movidasGolf.length} se movieron desde un día anterior (seguían sin resolver).`:""}`);
+          alert(`✅ ${aEnviarLimpio.length} tarea(s) de Golf enviadas al jardinero para el ${fechaDestinoGolf}.${movidasGolf.length>0?` ${movidasGolf.length} se trasladaron desde un día anterior (el original queda intacto, marcado como trasladado).`:""}`);
         };
         return (
         <div className="ein">
