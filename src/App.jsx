@@ -12421,6 +12421,133 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
   );
 }
 
+// ── Gráfico de crecimiento (eje de tiempo real, escala ajustada, detalle al pasar el mouse) ──
+// series: [{id,nombre,color,pts:[{t,v,f,tipo}]}]   siembras: [{id,nombre,color,t,v,f}]
+// cortes: [{f,t,zonas:[nombres],todas}]   leyenda: [{id,nombre,color,extra,extraColor}]
+function GraficoCrecimiento({ series, siembras, cortes, rango, inicioT, finT, leyenda }) {
+  const [hover, setHover] = React.useState(null);      // {serie,i} | {corte:i} | {siembra:i}
+  const [serieRes, setSerieRes] = React.useState(null); // serie resaltada desde la leyenda
+  const W=900, H=340, PAD={top:20,right:22,bottom:36,left:46};
+  const DIA=86400000;
+  const fmtCorta = t => { const d=new Date(t); return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`; };
+  const fmtLarga = f => { const [y,m,d]=String(f).split("-"); return `${d}/${m}/${y}`; };
+  const todos = series.flatMap(s=>s.pts.map(p=>p.v));
+  if(todos.length<2) return <div style={{fontSize:12,color:"#5a9a7a",padding:24,textAlign:"center"}}>Sin mediciones suficientes en este período — prueba con un rango más amplio.</div>;
+  const minV = Math.floor((Math.min(...todos,rango.min)-0.3)*2)/2;
+  const maxV = Math.ceil((Math.max(...todos,rango.max)+0.3)*2)/2;
+  const span = Math.max(finT-inicioT, DIA);
+  const xScale = t => PAD.left+((t-inicioT)/span)*(W-PAD.left-PAD.right);
+  const yScale = v => H-PAD.bottom-((v-minV)/(maxV-minV))*(H-PAD.top-PAD.bottom);
+  const stepY = (maxV-minV)>6 ? 1 : 0.5;
+  const ticksY = []; for(let v=minV; v<=maxV+1e-9; v+=stepY) ticksY.push(Math.round(v*10)/10);
+  const dias = span/DIA;
+  const stepDias = dias<=14?2 : dias<=45?7 : dias<=100?14 : dias<=200?30 : 60;
+  const ticksX = []; for(let t=inicioT; t<=finT+1; t+=stepDias*DIA) ticksX.push(t);
+  const activa = hover?.serie ?? serieRes;
+  const tip = (() => {
+    if(!hover) return null;
+    if(hover.serie!==undefined){
+      const s = series.find(x=>x.id===hover.serie); const p = s?.pts[hover.i]; if(!p) return null;
+      const prev = s.pts[hover.i-1];
+      const lines = [`${s.nombre} · ${fmtLarga(p.f)}`, `${p.v.toFixed(1)} mm${p.tipo==="corte"?" (altura tras el corte)":""}`];
+      if(prev && p.tipo!=="corte"){
+        const d = Math.round((p.t-prev.t)/DIA); const dv = p.v-prev.v;
+        if(d>0) lines.push(`${dv>=0?"+":""}${dv.toFixed(1)} mm en ${d} día${d!==1?"s":""} ${prev.tipo==="corte"?"desde el corte":"vs. medición anterior"}`);
+      }
+      return {x:xScale(p.t), y:yScale(p.v), lines, color:s.color};
+    }
+    if(hover.corte!==undefined){
+      const c = cortes[hover.corte]; if(!c) return null;
+      return {x:xScale(c.t), y:PAD.top+16, lines:[`✂ Corte · ${fmtLarga(c.f)}`, c.todas?"Todos los mostrados":c.zonas.join(", ")], color:"#fbbf24"};
+    }
+    if(hover.siembra!==undefined){
+      const m = siembras[hover.siembra]; if(!m) return null;
+      return {x:xScale(m.t), y:PAD.top+16, lines:[`◇ Siembra ${m.nombre} · ${fmtLarga(m.f)}`, `${m.v.toFixed(1)} mm (no incluida en la línea)`], color:m.color};
+    }
+    return null;
+  })();
+  const tipW = tip ? Math.max(...tip.lines.map(l=>l.length))*6.4+18 : 0;
+  const tipH = tip ? tip.lines.length*15+10 : 0;
+  const tipX = tip ? (tip.x+tipW+14>W ? tip.x-tipW-10 : tip.x+10) : 0;
+  const tipY = tip ? Math.min(Math.max(tip.y-tipH/2,4),H-PAD.bottom-tipH-2) : 0;
+  return (
+    <div>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",height:"auto",borderRadius:8,display:"block"}} onMouseLeave={()=>setHover(null)}>
+        {ticksY.map(v=>(
+          <g key={v}>
+            <line x1={PAD.left} y1={yScale(v)} x2={W-PAD.right} y2={yScale(v)} stroke="rgba(255,255,255,0.06)" strokeWidth="1"/>
+            <text x={PAD.left-6} y={yScale(v)+4} textAnchor="end" fill="#5a9a7a" fontSize="11">{v.toFixed(v%1===0?0:1)}</text>
+          </g>
+        ))}
+        <rect x={PAD.left} y={yScale(rango.max)} width={W-PAD.left-PAD.right} height={Math.max(yScale(rango.min)-yScale(rango.max),1)} fill="rgba(52,211,153,0.10)"/>
+        <line x1={PAD.left} y1={yScale(rango.min)} x2={W-PAD.right} y2={yScale(rango.min)} stroke="#34d39970" strokeWidth="1" strokeDasharray="5,4"/>
+        <line x1={PAD.left} y1={yScale(rango.max)} x2={W-PAD.right} y2={yScale(rango.max)} stroke="#34d39970" strokeWidth="1" strokeDasharray="5,4"/>
+        <text x={W-PAD.right-4} y={yScale(rango.max)-4} textAnchor="end" fill="#34d399" fontSize="10">rango óptimo {rango.min}–{rango.max} mm</text>
+        {ticksX.map(t=>(
+          <g key={t}>
+            <line x1={xScale(t)} y1={H-PAD.bottom} x2={xScale(t)} y2={H-PAD.bottom+4} stroke="#5a9a7a" strokeWidth="1"/>
+            <text x={xScale(t)} y={H-PAD.bottom+17} textAnchor="middle" fill="#5a9a7a" fontSize="11">{fmtCorta(t)}</text>
+          </g>
+        ))}
+        {cortes.map((c,i)=>(
+          <g key={c.f} onMouseEnter={()=>setHover({corte:i})}>
+            <line x1={xScale(c.t)} y1={PAD.top} x2={xScale(c.t)} y2={H-PAD.bottom} stroke="#fbbf24" strokeOpacity="0.30" strokeWidth="1.2" strokeDasharray="3,3"/>
+            <text x={xScale(c.t)} y={H-PAD.bottom-5} textAnchor="middle" fill="#fbbf24" fillOpacity="0.85" fontSize="12">✂</text>
+            <rect x={xScale(c.t)-6} y={PAD.top} width="12" height={H-PAD.top-PAD.bottom} fill="transparent"/>
+          </g>
+        ))}
+        {series.map(s=>{
+          const dim = activa!==null && activa!==undefined && activa!==s.id;
+          const resalt = activa===s.id;
+          const path = s.pts.map((p,i)=>`${i?"L":"M"}${xScale(p.t).toFixed(1)},${yScale(p.v).toFixed(1)}`).join(" ");
+          const ultimo = s.pts[s.pts.length-1];
+          return (
+            <g key={s.id} opacity={dim?0.14:1}>
+              <path d={path} stroke={s.color} strokeWidth={resalt?2.6:1.5} fill="none" strokeLinejoin="round" strokeLinecap="round"/>
+              {s.pts.map((p,i)=>(
+                <circle key={i} cx={xScale(p.t)} cy={yScale(p.v)} r={p.tipo==="corte"?2.4:2.6} fill={p.tipo==="corte"?"#0f2517":s.color} stroke={s.color} strokeWidth="1.2"/>
+              ))}
+              {series.length<=4&&<text x={Math.min(xScale(ultimo.t)+6,W-PAD.right-2)} y={yScale(ultimo.v)-6} fill={s.color} fontSize="11" fontWeight="700" textAnchor={xScale(ultimo.t)+40>W?"end":"start"}>{ultimo.v.toFixed(1)}</text>}
+              {s.pts.map((p,i)=>(
+                <circle key={"h"+i} cx={xScale(p.t)} cy={yScale(p.v)} r="8" fill="transparent" style={{cursor:"pointer"}} onMouseEnter={()=>setHover({serie:s.id,i})} onClick={()=>setHover({serie:s.id,i})}/>
+              ))}
+            </g>
+          );
+        })}
+        {siembras.map((m,i)=>{
+          const fuera = m.v>maxV; const y = fuera ? PAD.top+9 : yScale(m.v); const x = xScale(m.t);
+          return (
+            <g key={"s"+i} onMouseEnter={()=>setHover({siembra:i})} style={{cursor:"pointer"}}>
+              <polygon points={`${x},${y-5.5} ${x+5.5},${y} ${x},${y+5.5} ${x-5.5},${y}`} fill="#0f2517" stroke={m.color} strokeWidth="1.5"/>
+              <text x={x+8} y={y+3.5} fill={m.color} fontSize="10">{fuera?"↑":""}{m.v.toFixed(1)}</text>
+              <circle cx={x} cy={y} r="9" fill="transparent"/>
+            </g>
+          );
+        })}
+        {tip&&(
+          <g pointerEvents="none">
+            <rect x={tipX} y={tipY} width={tipW} height={tipH} rx="6" fill="#0b1c11" stroke={tip.color} strokeWidth="1" opacity="0.97"/>
+            {tip.lines.map((l,i)=>(<text key={i} x={tipX+9} y={tipY+17+i*15} fill={i===0?tip.color:"#dbe7de"} fontSize="11" fontWeight={i===0?700:400}>{l}</text>))}
+          </g>
+        )}
+      </svg>
+      {leyenda&&leyenda.length>0&&(
+        <div style={{display:"flex",gap:"6px 12px",flexWrap:"wrap",marginTop:8}}>
+          {leyenda.map(it=>(
+            <div key={it.id} onMouseEnter={()=>setSerieRes(it.id)} onMouseLeave={()=>setSerieRes(null)}
+              style={{display:"flex",alignItems:"center",gap:5,fontSize:11,cursor:"default",padding:"2px 6px",borderRadius:6,background:serieRes===it.id?"rgba(255,255,255,0.07)":"transparent"}}>
+              <div style={{width:12,height:3,background:it.color,borderRadius:2}}/>
+              <span style={{color:"#7aaa80"}}>{it.nombre}</span>
+              {it.extra&&<span style={{color:it.extraColor||"#7aaa80",fontWeight:600}}>{it.extra}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+      <div style={{fontSize:10,color:"#5a7a6a",marginTop:6}}>● medición · ○ altura tras el corte · ✂ día de corte · ◇ siembra del Vivero (fuera de la línea) · Pasa el mouse por un punto para ver el detalle.</div>
+    </div>
+  );
+}
+
 function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJefa, onBorrar, onBorrarTodo, tareasProg }) {
   const [showRegIndividuales, setShowRegIndividuales] = React.useState(false);
   const ZONAS = [...GREENS_DEF,{id:"vivero",nombre:"Vivero",hoyos:"Vivero"}].map((g,gi)=>({id:g.id,nombre:g.nombre,hoyos:g.hoyos,color:["#34d399","#60a5fa","#f59e0b","#a78bfa","#f472b6","#22d3ee","#fb923c","#86efac","#fcd34d","#4ade80"][gi]||"#34d399"}));
@@ -12439,6 +12566,7 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
   const [vistaGrafico, setVistaGrafico] = React.useState("tasas");
   const [zonaSelGrafico, setZonaSelGrafico] = React.useState("g1");
   const [zonasComparativas, setZonasComparativas] = React.useState(["g1","g3","vivero"]);
+  const [ventanaGrafico, setVentanaGrafico] = React.useState("60"); // días hacia atrás desde la última medición | "todo"
   const [confirmarBorrarTodo, setConfirmarBorrarTodo] = React.useState(false);
   const [verInforme, setVerInforme] = React.useState(false);
   const [unidadTasa, setUnidadTasa] = React.useState("dia");
@@ -12600,54 +12728,81 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
   };
 
   // ── SVG gráfico de línea ──────────────────────────────────────────────
-  const graficoLinea = (zonas) => {
-    const W=520, H=160, PAD={top:20,right:20,bottom:30,left:45};
-    const todasFechas = [...new Set(medOrdenadas.map(m=>m.fecha))];
-    if(todasFechas.length<2) return <div style={{fontSize:12,color:"#5a9a7a",padding:20,textAlign:"center"}}>Se necesitan al menos 2 mediciones para graficar</div>;
-    const puntosPorZona = zonas.map(z=>({
-      id:z, color:COLORES_ZONA[z]||"#34d399",
-      pts:todasFechas.map(f=>{const m=medOrdenadas.find(x=>x.fecha===f);return m?.alturas?.[z]?{f,v:Number(m.alturas[z])}:null;}).filter(Boolean)
-    })).filter(p=>p.pts.length>0);
-    if(!puntosPorZona.some(p=>p.pts.length>1)) return <div style={{fontSize:12,color:"#5a9a7a",padding:20,textAlign:"center"}}>Insuficientes datos para graficar</div>;
-    const allVals = puntosPorZona.flatMap(p=>p.pts.map(x=>x.v));
-    const minV = Math.min(...allVals, rango.min)-0.5;
-    const maxV = Math.max(...allVals, rango.max)+0.5;
-    const xScale = i=>(PAD.left+(i/(todasFechas.length-1))*(W-PAD.left-PAD.right));
-    const yScale = v=>(H-PAD.bottom-(v-minV)/(maxV-minV)*(H-PAD.top-PAD.bottom));
-    // Líneas de rango
-    const yMin = yScale(rango.min), yMax = yScale(rango.max);
-    return (
-      <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",height:"auto",borderRadius:8}}>
-        {/* Zona rango óptimo */}
-        <rect x={PAD.left} y={yMax} width={W-PAD.left-PAD.right} height={yMin-yMax} fill="rgba(52,211,153,0.08)" stroke="none"/>
-        <line x1={PAD.left} y1={yMin} x2={W-PAD.right} y2={yMin} stroke="#34d39960" strokeWidth="1" strokeDasharray="4,3"/>
-        <line x1={PAD.left} y1={yMax} x2={W-PAD.right} y2={yMax} stroke="#34d39960" strokeWidth="1" strokeDasharray="4,3"/>
-        <text x={PAD.left-3} y={yMin+3} textAnchor="end" fill="#34d399" fontSize="9">{rango.min}</text>
-        <text x={PAD.left-3} y={yMax+3} textAnchor="end" fill="#34d399" fontSize="9">{rango.max}</text>
-        {/* Eje Y labels */}
-        {[minV, (minV+maxV)/2, maxV].map((v,i)=>(
-          <text key={i} x={PAD.left-4} y={yScale(v)+3} textAnchor="end" fill="#5a9a7a" fontSize="8">{v.toFixed(1)}</text>
-        ))}
-        {/* Líneas por zona */}
-        {puntosPorZona.map(z=>{
-          if(z.pts.length<2) return null;
-          const idxOf = f=>todasFechas.indexOf(f);
-          const path = z.pts.map((p,i)=>`${i===0?"M":"L"}${xScale(idxOf(p.f))},${yScale(p.v)}`).join(" ");
-          return (
-            <g key={z.id}>
-              <path d={path} stroke={z.color} strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-              {z.pts.map((p,i)=>(
-                <circle key={i} cx={xScale(idxOf(p.f))} cy={yScale(p.v)} r="3" fill={z.color} stroke="#0f2517" strokeWidth="1"/>
-              ))}
-            </g>
-          );
-        })}
-        {/* Eje X fechas */}
-        {todasFechas.filter((_,i)=>i===0||i===todasFechas.length-1||todasFechas.length<=6||(i%Math.ceil(todasFechas.length/5)===0)).map((f,i)=>(
-          <text key={f} x={xScale(todasFechas.indexOf(f))} y={H-5} textAnchor="middle" fill="#5a9a7a" fontSize="8">{f.slice(5)}</text>
-        ))}
-      </svg>
+  // ── Datos y ayudas para el gráfico ──
+  const tOfF = f => new Date(f+"T12:00:00").getTime();
+  const nombreDeZona = id => ZONAS.find(z=>z.id===id)?.nombre || id;
+  // Una medición de "siembra" (altura al sembrar el Vivero) no es crecimiento normal: se dibuja aparte.
+  const esSiembraMed = (m,z) => {
+    if(m.tipo==="corte") return false;
+    const claves = Object.keys(m.alturas||{}).filter(k=>Number(m.alturas[k]));
+    // Solo cuenta como siembra un registro que mide ÚNICAMENTE esta zona. Si en la misma medición
+    // se midieron también greens, el valor del Vivero es una medición normal (la nota solo comenta la siembra).
+    if(!(claves.length===1 && claves[0]===z)) return false;
+    if(/siembra/i.test(m.obsGreen?.[z]||"") || (z==="vivero" && /siembra/i.test(m.obs||""))) return true;
+    if(z==="vivero") return medOrdenadas.some(x=>x!==m && x.fecha===m.fecha && x.tipo!=="corte" && Number(x.alturas?.vivero));
+    return false;
+  };
+  // Fechas de corte hechas para una zona (misma regla que el cálculo de tasas).
+  const cortesDeZonaChart = (zona) => {
+    const zonaNum = zona.replace(/\D/g,"");
+    const esVivero = zona.includes("vivero");
+    return Object.entries(tareasProg||{}).flatMap(([fecha, ts])=>
+      arrDeCR(ts).filter(t=>{
+        if(t.estado!=="hecha" && t.estado!=="completada") return false;
+        if(!(t.tarea||"").toLowerCase().includes("corte")) return false;
+        if(!(t.zona==="Golf" || (t.zona||"").includes("Golf"))) return false;
+        const elem=(t.elemento||"").toLowerCase(), tar=(t.tarea||"").toLowerCase();
+        if(esVivero) return elem.includes("vivero") || tar.includes("vivero") || elem.includes("green 10") || tar.includes("todos");
+        return !!zonaNum && (elem.includes(`green ${zonaNum.padStart(2,"0")}`) || elem.includes(`green ${Number(zonaNum)}`) || elem.includes(`green0${zonaNum}`) || tar.includes(`green ${zonaNum.padStart(2,"0")}`) || tar.includes("todos") || elem.includes("todos"));
+      }).map(()=>({fecha}))
     );
+  };
+  // Grupos según la frecuencia con que se mide cada zona (últimos 30 días desde la última medición).
+  const DIA_MS = 86400000;
+  const ultimaMedT = medOrdenadas.length ? tOfF(medOrdenadas[medOrdenadas.length-1].fecha) : Date.now();
+  const zonasDiarias = ZONAS.filter(z=>{
+    const fechas = new Set(medOrdenadas.filter(m=>m.tipo!=="corte" && Number(m.alturas?.[z.id]) && !esSiembraMed(m,z.id) && tOfF(m.fecha)>=ultimaMedT-30*DIA_MS).map(m=>m.fecha));
+    return fechas.size>=10;
+  }).map(z=>z.id);
+  const zonasSemanales = ZONAS.map(z=>z.id).filter(id=>!zonasDiarias.includes(id));
+  const barraVentana = (
+    <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginBottom:10}}>
+      <span style={{fontSize:11,color:"#5a9a7a"}}>Período:</span>
+      {[["30","30 días"],["60","60 días"],["90","90 días"],["todo","Todo"]].map(([v,l])=>(
+        <button key={v} onClick={()=>setVentanaGrafico(v)}
+          style={{cursor:"pointer",fontSize:11,padding:"3px 10px",borderRadius:7,border:`1px solid ${ventanaGrafico===v?"rgba(52,211,153,0.5)":"rgba(255,255,255,0.12)"}`,background:ventanaGrafico===v?"rgba(52,211,153,0.15)":"transparent",color:ventanaGrafico===v?"#34d399":"#7aaa80"}}>
+          {l}
+        </button>
+      ))}
+    </div>
+  );
+
+  const graficoLinea = (zonasIds, leyenda=[]) => {
+    if(medOrdenadas.length<2) return <div style={{fontSize:12,color:"#5a9a7a",padding:20,textAlign:"center"}}>Se necesitan al menos 2 mediciones para graficar</div>;
+    const primeraT = tOfF(medOrdenadas[0].fecha);
+    const finT = tOfF(medOrdenadas[medOrdenadas.length-1].fecha);
+    const inicioT = ventanaGrafico==="todo" ? primeraT : Math.max(primeraT, finT-Number(ventanaGrafico)*DIA_MS);
+    // Todas las mediciones del día cuentan (antes solo se tomaba la primera). En un mismo día la
+    // medición va antes que el registro de corte, para que se vea la caída.
+    const ordenadas = [...medOrdenadas].sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||"") || ((a.tipo==="corte"?1:0)-(b.tipo==="corte"?1:0)));
+    const series=[], siembras=[];
+    zonasIds.forEach(z=>{
+      const color = COLORES_ZONA[z]||"#34d399";
+      const pts=[];
+      ordenadas.forEach(m=>{
+        const v = Number(m.alturas?.[z]); if(!v) return;
+        const t = tOfF(m.fecha); if(t<inicioT||t>finT) return;
+        if(esSiembraMed(m,z)) siembras.push({id:z,nombre:nombreDeZona(z),color,t,v,f:m.fecha});
+        else pts.push({t,v,f:m.fecha,tipo:m.tipo==="corte"?"corte":"med"});
+      });
+      if(pts.length>0) series.push({id:z,nombre:nombreDeZona(z),color,pts});
+    });
+    const cortesMap={};
+    const addCorte=(f,nombre)=>{ const t=tOfF(f); if(t<inicioT||t>finT) return; (cortesMap[f] ||= new Set()).add(nombre); };
+    zonasIds.forEach(z=>cortesDeZonaChart(z).forEach(c=>addCorte(c.fecha,nombreDeZona(z))));
+    ordenadas.filter(m=>m.tipo==="corte").forEach(m=>zonasIds.forEach(z=>{ if(m.alturas?.[z]) addCorte(m.fecha,nombreDeZona(z)); }));
+    const cortes = Object.keys(cortesMap).sort().map(f=>({f,t:tOfF(f),zonas:[...cortesMap[f]],todas:zonasIds.length>1&&cortesMap[f].size>=zonasIds.length}));
+    return <GraficoCrecimiento series={series} siembras={siembras} cortes={cortes} rango={rango} inicioT={inicioT} finT={finT} leyenda={leyenda}/>;
   };
 
   const colorCategoria = (cat) => cat?.includes("Rápido")?"#22c55e":cat?.includes("Medio")?"#f59e0b":"#ef4444";
@@ -12835,6 +12990,7 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
                 );
               })}
             </div>
+            {barraVentana}
             {graficoLinea([zonaSelGrafico])}
             {(()=>{
               const medA = analisisTasas(zonaSelGrafico);
@@ -12889,6 +13045,20 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
         {/* Vista Comparativa */}
         {vistaGrafico==="comparativo"&&(
           <div style={{...S.card,padding:16,marginBottom:14}}>
+            {barraVentana}
+            <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginBottom:8}}>
+              <span style={{fontSize:11,color:"#5a9a7a"}}>Grupos:</span>
+              {[["Todos",ZONAS.map(z=>z.id)],
+                ["Medición diaria",zonasDiarias],
+                ["Medición semanal",zonasSemanales],
+                ["Ninguno",[]]].map(([l,ids])=>(
+                <button key={l} disabled={l!=="Ninguno"&&ids.length===0} title={ids.map(nombreDeZona).join(", ")||"—"}
+                  onClick={()=>setZonasComparativas(ids)}
+                  style={{cursor:"pointer",fontSize:11,padding:"3px 10px",borderRadius:7,border:"1px solid rgba(255,255,255,0.12)",background:"transparent",color:"#7aaa80",opacity:(l!=="Ninguno"&&ids.length===0)?0.4:1}}>
+                  {l}{l==="Medición diaria"||l==="Medición semanal"?` (${ids.length})`:""}
+                </button>
+              ))}
+            </div>
             <div style={{fontSize:11,color:"#5a9a7a",marginBottom:8}}>Selecciona zonas a comparar:</div>
             <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:12}}>
               {ZONAS.map(z=>{
@@ -12902,21 +13072,11 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
                 );
               })}
             </div>
-            {graficoLinea(zonasComparativas)}
-            {/* Leyenda */}
-            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>
-              {zonasComparativas.map(id=>{
-                const medZ2=ZONAS.find(x=>x.id===id);
-                const medA2=analisisTasas(id);
-                return medZ2?(
-                  <div key={id} style={{display:"flex",alignItems:"center",gap:5,fontSize:11}}>
-                    <div style={{width:12,height:3,background:COLORES_ZONA[id],borderRadius:2}}/>
-                    <span style={{color:"#7aaa80"}}>{medZ2.nombre}</span>
-                    {medA2&&<span style={{color:colorCategoria(medA2.categoria),fontWeight:600}}>{medA2.tasaGlobal>0?"+":""}{medA2.tasaGlobal}mm/d {medA2.categoria.split(" ")[0]}</span>}
-                  </div>
-                ):null;
-              })}
-            </div>
+            {graficoLinea(zonasComparativas, zonasComparativas.map(id=>{
+              const z=ZONAS.find(x=>x.id===id); if(!z) return null;
+              const a=analisisTasas(id);
+              return {id,nombre:z.nombre,color:COLORES_ZONA[id],extra:a?`${a.tasaGlobal>0?"+":""}${a.tasaGlobal}mm/d ${a.categoria.split(" ")[0]}`:"",extraColor:a?colorCategoria(a.categoria):"#7aaa80"};
+            }).filter(Boolean))}
           </div>
         )}
 
