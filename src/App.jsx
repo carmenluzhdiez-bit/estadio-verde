@@ -799,7 +799,7 @@ const MACROZONAS_BASE = [
     ]
   },
   {
-    id: 8, nombre: "Palitroque", categoria: "Patios y Jardines", icono: "🎯",
+    id: 8, nombre: "Palitroque", categoria: "Patios y Jardines", icono: "🎳",
     elementos: [
       { id: "e1", nombre: "Césped perimetral", tipo: "cesped" },
       { id: "e2", nombre: "Arbustos borde", tipo: "arbustos" },
@@ -1046,7 +1046,7 @@ const MACROZONAS_BASE = [
     ]
   },
   {
-    id: 27, nombre: "Patinaje", categoria: "Deportivo", icono: "⛸️",
+    id: 27, nombre: "Patinaje", categoria: "Deportivo", icono: "🛼",
     elementos: [
       { id: "e1", nombre: "Superficie pista patinaje", tipo: "pavimentos" },
       { id: "e2", nombre: "Jardines perimetrales", tipo: "arbustos" },
