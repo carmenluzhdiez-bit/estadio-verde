@@ -24447,6 +24447,10 @@ export default function App() {
   const [aiText, setAiText] = useState("");
   const [editElem, setEditElem] = useState(null);
   const [editZonaForm, setEditZonaForm] = useState(null);
+  // El formulario de edición es UNO solo para toda la app: si se cambiaba de macrozona sin guardar ni
+  // cancelar, quedaba abierto con los datos de la zona anterior y al guardar los escribía en la nueva
+  // (ej. renombraba "Refugio Farellones" como "Patinaje"). Ahora se cierra al cambiar de zona.
+  useEffect(()=>{ setEditZonaForm(null); },[zonaId]);
   const [condicionesLocales, setCondicionesLocales] = useState({}); // condicion UI inmediata por elemento
   const [showPlantacionForm, setShowPlantacionForm] = useState(null);
 
@@ -26439,13 +26443,24 @@ export default function App() {
                     <div style={{display:"flex",flexDirection:"column",gap:6}}>
                       {zonasDuplicadasExcluidas.map(z=>(
                         <div key={z.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"rgba(0,0,0,0.15)",borderRadius:6,padding:"5px 10px"}}>
-                          <span><b>{z.nombre}</b> <span style={{color:"#a08050"}}>({z.categoria})</span></span>
+                          <span><span style={{marginRight:4}}>{z.icono}</span><b>{z.nombre}</b> <span style={{color:"#a08050"}}>({z.categoria})</span></span>
+                          <div style={{display:"flex",gap:6}}>
+                          <button onClick={()=>{
+                            const nuevo = (window.prompt(`La macrozona personalizada "${z.nombre}" está oculta porque su nombre se repite.\n\nEscribe el nombre correcto para rescatarla (conserva sus elementos y tareas):`,"")||"").trim();
+                            if(!nuevo) return;
+                            if(normNombreZona(nuevo)===normNombreZona(z.nombre) || todasLasZonas.some(x=>normNombreZona(x.nombre)===normNombreZona(nuevo))){ alert(`Ya existe una macrozona llamada "${nuevo}". Elige otro nombre.`); return; }
+                            const ico = (window.prompt("Ícono (opcional — déjalo vacío para conservar el actual):",z.icono||"")||"").trim();
+                            setMacrozonasCust(prev=>prev.map(x=>x.id===z.id?{...x,nombre:nuevo,icono:ico||x.icono}:x));
+                          }} style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(59,130,246,0.12)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}}>
+                            ✏️ Renombrar y rescatar
+                          </button>
                           <button onClick={()=>{
                             if(!window.confirm(`¿Eliminar definitivamente la macrozona personalizada "${z.nombre}" duplicada? Esta acción no se puede deshacer.`)) return;
                             setMacrozonasCust(prev=>prev.filter(x=>x.id!==z.id));
                           }} style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(239,68,68,0.12)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}}>
                             🗑️ Eliminar
                           </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -26627,8 +26642,8 @@ export default function App() {
                         <span style={{fontSize:44,lineHeight:1}}>{zd.iconoCustom||zona.icono}</span>
                         <div>
                           <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:21,fontWeight:900,marginBottom:6,lineHeight:1.2}}>{zd.nombreCustom||zona.nombre}</h2>
-                          {esJefa&&!editZonaForm&&(
-                            <button onClick={()=>setEditZonaForm({nombre:zd.nombreCustom||zona.nombre,icono:zd.iconoCustom||zona.icono,descripcion:zd.descripcion||zona.descripcion||"",categoria:zd.categoriaCustom||zona.categoria||"",elementoCritico:zd.elementoCriticoCustom??getElementoCriticoZona(zona)})}
+                          {esJefa&&!(editZonaForm&&String(editZonaForm.zonaId)===String(zona.id))&&(
+                            <button onClick={()=>setEditZonaForm({zonaId:String(zona.id),nombre:zd.nombreCustom||zona.nombre,icono:zd.iconoCustom||zona.icono,descripcion:zd.descripcion||zona.descripcion||"",categoria:zd.categoriaCustom||zona.categoria||"",elementoCritico:zd.elementoCriticoCustom??getElementoCriticoZona(zona)})}
                               style={{fontSize:11,padding:"2px 8px",borderRadius:5,cursor:"pointer",border:"1px solid rgba(96,165,250,0.3)",background:"rgba(96,165,250,0.08)",color:"#60a5fa"}}>
                               ✏️ Editar
                             </button>
@@ -26687,7 +26702,7 @@ export default function App() {
               );
             })()}
             {/* Formulario edición nombre/ícono/categoría/descripción */}
-            {editZonaForm&&esJefa&&(
+            {editZonaForm&&esJefa&&String(editZonaForm.zonaId)===String(zona.id)&&(
               <div style={{...S.card,padding:14,marginBottom:14,border:"1px solid rgba(96,165,250,0.25)"}}>
                 <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:"#60a5fa",marginBottom:12}}>✏️ Editar macrozona</div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 80px",gap:8,marginBottom:8}}>
