@@ -3278,6 +3278,23 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                                   </div>
                                   {notaExtra&&<div style={{fontSize:10,color:"#a0c8a0",fontStyle:"italic"}}>{notaExtra}</div>}
                                 </div>
+                                {esJefa&&!esTrasl&&hpTask.alturaCorte!==undefined&&hpTask.alturaCorte!==""&&!["hecha","completada"].includes(hpTask.estado)&&(
+                                  <div style={{display:"flex",alignItems:"center",gap:3,flexShrink:0}} title="Altura de corte objetivo — ajústala aquí según lo medido antes de que el jardinero corte">
+                                    <input type="number" step="0.1" min="0" defaultValue={hpTask.alturaCorte}
+                                      onBlur={e=>{
+                                        const val=e.target.value; if(!val || Number(val)===Number(hpTask.alturaCorte)) return;
+                                        const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+                                        const unidadTxt=hpTask.unidadAlturaCorte==="cm"?"centímetros":hpTask.unidadAlturaCorte==="pulgadas"?"pulgadas":"milímetros";
+                                        const notaAlturaNueva=`Cortar a: ${val} ${unidadTxt}.`;
+                                        // Mismo cuidado que en Golf: el número puede tener decimales (su propio punto), así que la
+                                        // búsqueda del texto viejo exige que termine en la palabra de unidad antes del punto final.
+                                        const notaSinAltura=(hpTask.notas||"").replace(/Cortar a:\s*[\d.,]+\s*(?:mil[ií]metros|cent[ií]metros|pulgadas)\.\s*/i,"").trim();
+                                        setTareas(prev=>({...prev,[dia]:nA2(prev[dia]).map(x=>x.id===hpTask.id?{...x,alturaCorte:val,notas:[notaAlturaNueva,notaSinAltura].filter(Boolean).join(" ")}:x)}));
+                                      }}
+                                      style={{width:44,fontSize:10,background:"rgba(251,191,36,0.08)",border:"1px solid rgba(251,191,36,0.3)",borderRadius:5,color:"#fbbf24",padding:"2px 3px",textAlign:"center"}}/>
+                                    <span style={{fontSize:9,color:"#fbbf24"}}>mm ✂️</span>
+                                  </div>
+                                )}
                                 {esJefa&&!esTrasl?(
                                 <select value={hpTask.estado}
                                   onChange={e=>{const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);const patch=aplicarCambioFrecuencia(hpTask,{estado:e.target.value},getElemFrecs,setElemFrecs);setTareas(prev=>{const updated=cerrarLoteSiCorresponde(nA2(prev[dia]), hpTask.id, patch);return {...prev,[dia]:updated.map(limpiarUndef)};});}}
