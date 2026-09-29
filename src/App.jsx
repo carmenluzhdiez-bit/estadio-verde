@@ -6212,10 +6212,14 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                   if(!nuevaTarea.zona||!nuevaTarea.tarea||nuevaTarea.tarea==="__otro__") return;
                   if(modoVariosJardineros){
                     if(responsablesMultiple.length===0) return;
+                    // OJO: antes esto llamaba a addTarea() una vez por jardinero, en un ciclo — cada
+                    // llamada partía de la misma lista "vieja" (la del render) y la reemplazaba entera,
+                    // así que cada guardado pisaba al anterior y solo quedaba el último jardinero.
+                    // Ahora se arman TODAS las copias primero y se guardan de una sola vez.
                     const loteId = "lote_"+Date.now()+"_"+Math.random().toString(36).slice(2);
-                    responsablesMultiple.forEach(nombre=>{
-                      addTarea({...nuevaTarea, responsable:nombre, estado:"pendiente", loteTodosId:loteId});
-                    });
+                    const copias = responsablesMultiple.map((nombre,iVJ)=>({...nuevaTarea, id:Date.now()+iVJ+Math.random(), fecha, responsable:nombre, estado:"pendiente", loteTodosId:loteId}));
+                    setTareasDelDia(fecha, [...getTareasDelDia(fecha), ...copias]);
+                    if(esDomingo(fecha)) setAviso("⚠️ El día seleccionado es domingo. Considera mover esta tarea a otro día.");
                   } else {
                     addTarea(nuevaTarea);
                   }
