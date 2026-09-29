@@ -25882,9 +25882,6 @@ export default function App() {
               {/* Modo admin: email + contraseña */}
               {modoLogin==="admin"&&(
                 <div style={{display:"flex",flexDirection:"column",gap:14}}>
-                  <div style={{fontSize:11,color:"#93c5fd",background:"rgba(147,197,253,0.08)",border:"1px solid rgba(147,197,253,0.25)",borderRadius:8,padding:"8px 12px"}}>
-                    👷 ¿Eres Supervisor? Entra por la pestaña "👤 Jardinero / Supervisor" con tu nombre y PIN — no por aquí.
-                  </div>
                   <div>
                     <label style={{fontSize:11,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:6,textTransform:"uppercase"}}>Correo electrónico</label>
                     <input type="email" autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck="false" inputMode="email"
