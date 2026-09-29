@@ -3304,7 +3304,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                                 ):(
                                 <span style={{fontSize:10,color:est.color,flexShrink:0}}>{est.icon} {est.label}</span>
                                 )}
-                                {esJefa&&<input placeholder="nota..." defaultValue={hpTask.notaJefa||""}
+                                {esJefa&&!esTrasl&&<input placeholder="nota..." defaultValue={hpTask.notaJefa||""}
                                   onBlur={e=>{if(e.target.value!==hpTask.notaJefa){const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);setTareas(prev=>({...prev,[dia]:nA2(prev[dia]).map(x=>x.id===hpTask.id?{...x,notaJefa:e.target.value}:x)}));}}}
                                   style={{fontSize:10,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:5,color:"#ede9e0",padding:"2px 4px",width:70,flexShrink:0}}/>}
                                 {esJefa&&!esTrasl&&!hpTask.origenFrecId&&!["hecha","completada"].includes(hpTask.estado)&&(
@@ -3332,7 +3332,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                                     }}
                                     style={{cursor:"pointer",border:"1px solid rgba(239,68,68,0.2)",borderRadius:5,padding:"2px 6px",background:"rgba(239,68,68,0.06)",color:"#fca5a5",fontSize:11,flexShrink:0}}>🚫</button>
                                 )}
-                                {esJefa&&<button title="Eliminar" onClick={()=>eliminarTareaConDecision(hpTask,dia,setTareas,"Ver/editar turnos")}
+                                {esJefa&&!esTrasl&&<button title="Eliminar" onClick={()=>eliminarTareaConDecision(hpTask,dia,setTareas,"Ver/editar turnos")}
                                   style={{cursor:"pointer",border:"1px solid rgba(239,68,68,0.2)",borderRadius:5,padding:"2px 6px",background:"rgba(239,68,68,0.06)",color:"#f87171",fontSize:11,flexShrink:0}}>🗑</button>}
                               </div>
                             );
