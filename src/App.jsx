@@ -24623,6 +24623,7 @@ export default function App() {
   const [loginPass,  setLoginPass]  = useState("");
   const [loginError, setLoginError] = useState("");
   const [loginInfo,  setLoginInfo]  = useState("");
+  const [verClave,   setVerClave]   = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
   const [modoLogin, setModoLogin] = useState("trabajador");
   const [workerSel, setWorkerSel] = useState("");
@@ -25892,11 +25893,17 @@ export default function App() {
                   </div>
                   <div>
                     <label style={{fontSize:11,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:6,textTransform:"uppercase"}}>Contraseña</label>
-                    <input type="password" autoComplete="current-password" autoCapitalize="none" autoCorrect="off" spellCheck="false"
-                      style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"12px 14px",color:"#ede9e0",fontSize:14,outline:"none"}}
-                      value={loginPass} onChange={e=>setLoginPass(e.target.value)}
-                      onKeyDown={e=>e.key==="Enter"&&handleLogin()}
-                      placeholder="••••••••"/>
+                    <div style={{position:"relative"}}>
+                      <input type={verClave?"text":"password"} autoComplete="current-password" autoCapitalize="none" autoCorrect="off" spellCheck="false"
+                        style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"12px 44px 12px 14px",color:"#ede9e0",fontSize:14,outline:"none"}}
+                        value={loginPass} onChange={e=>setLoginPass(e.target.value)}
+                        onKeyDown={e=>e.key==="Enter"&&handleLogin()}
+                        placeholder="••••••••"/>
+                      <button type="button" onClick={()=>setVerClave(v=>!v)} title={verClave?"Ocultar clave":"Mostrar clave"}
+                        style={{position:"absolute",right:6,top:"50%",transform:"translateY(-50%)",background:"transparent",border:"none",color:"#93c5fd",cursor:"pointer",fontSize:16,padding:8}}>
+                        {verClave?"🙈":"👁️"}
+                      </button>
+                    </div>
                   </div>
                   {loginError&&<div style={{fontSize:13,color:"#fca5a5",background:"rgba(239,68,68,0.1)",borderRadius:8,padding:"8px 12px",textAlign:"center"}}>{loginError}</div>}
                   <button onClick={handleLogin} disabled={loginLoading}
