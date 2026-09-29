@@ -24693,7 +24693,20 @@ export default function App() {
     try {
       await signInWithEmailAndPassword(auth, loginEmail.trim().toLowerCase(), loginPass.trim());
     } catch(err) {
-      setLoginError("Email o contraseña incorrectos.");
+      // Se muestra el código real de Firebase (ej. auth/network-request-failed, auth/unauthorized-domain,
+      // auth/too-many-requests) para poder distinguir "clave incorrecta" de un problema de conexión o de
+      // dominio no autorizado — el mensaje genérico no permitía saber cuál de los tres era.
+      const codigo = err?.code || "desconocido";
+      const amigable = {
+        "auth/invalid-credential":"Correo o clave incorrectos.",
+        "auth/wrong-password":"Clave incorrecta.",
+        "auth/user-not-found":"No existe una cuenta con ese correo.",
+        "auth/invalid-email":"El correo no tiene un formato válido.",
+        "auth/too-many-requests":"Demasiados intentos seguidos — espera unos minutos y vuelve a probar.",
+        "auth/network-request-failed":"Sin conexión a internet, o la red del celular está bloqueando la app.",
+        "auth/unauthorized-domain":"Este sitio no está autorizado para iniciar sesión (revisar configuración de Firebase).",
+      }[codigo] || "No se pudo iniciar sesión.";
+      setLoginError(`${amigable} (${codigo})`);
     } finally { setLoginLoading(false); }
   };
 
