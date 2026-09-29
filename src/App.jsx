@@ -24691,7 +24691,7 @@ export default function App() {
     e && e.preventDefault();
     setLoginError(""); setLoginLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, loginEmail.trim(), loginPass);
+      await signInWithEmailAndPassword(auth, loginEmail.trim().toLowerCase(), loginPass.trim());
     } catch(err) {
       setLoginError("Email o contraseña incorrectos.");
     } finally { setLoginLoading(false); }
@@ -24701,7 +24701,7 @@ export default function App() {
   // Por seguridad Firebase no revela si el correo existe, así que el aviso es genérico.
   const handleResetPassword = async () => {
     setLoginError(""); setLoginInfo("");
-    const email = loginEmail.trim();
+    const email = loginEmail.trim().toLowerCase();
     if(!email){ setLoginError("Escribe primero tu correo electrónico arriba y vuelve a presionar \"¿Olvidaste tu clave?\"."); return; }
     try {
       await sendPasswordResetEmail(auth, email);
@@ -25874,14 +25874,16 @@ export default function App() {
                   </div>
                   <div>
                     <label style={{fontSize:11,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:6,textTransform:"uppercase"}}>Correo electrónico</label>
-                    <input type="email" autoComplete="email" style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"12px 14px",color:"#ede9e0",fontSize:14,outline:"none"}}
+                    <input type="email" autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck="false" inputMode="email"
+                      style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"12px 14px",color:"#ede9e0",fontSize:14,outline:"none"}}
                       value={loginEmail} onChange={e=>setLoginEmail(e.target.value)}
                       onKeyDown={e=>e.key==="Enter"&&handleLogin()}
                       placeholder="tu@email.com"/>
                   </div>
                   <div>
                     <label style={{fontSize:11,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:6,textTransform:"uppercase"}}>Contraseña</label>
-                    <input type="password" autoComplete="current-password" style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"12px 14px",color:"#ede9e0",fontSize:14,outline:"none"}}
+                    <input type="password" autoComplete="current-password" autoCapitalize="none" autoCorrect="off" spellCheck="false"
+                      style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"12px 14px",color:"#ede9e0",fontSize:14,outline:"none"}}
                       value={loginPass} onChange={e=>setLoginPass(e.target.value)}
                       onKeyDown={e=>e.key==="Enter"&&handleLogin()}
                       placeholder="••••••••"/>
