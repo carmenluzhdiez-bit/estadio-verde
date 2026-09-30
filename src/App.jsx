@@ -11454,20 +11454,20 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
               {/* Panel notas de pedido / guías de despacho AL INICIO — seleccionar primero si es Factura */}
               {form.tipoDoc==="Factura"&&!editId&&(()=>{
                 const notasDisp = compras.filter(c=>
-                  ["Nota de Pedido","Guía de Despacho"].includes(c.tipoDoc) &&
+                  ["Nota de Pedido","Guía de Despacho","Cotización","Orden de Compra"].includes(c.tipoDoc) &&
                   !["facturada","cancelada"].includes(c.estado)
                 );
                 if(!notasDisp.length) return null;
                 return (
                   <div style={{background:"rgba(251,191,36,0.06)",border:"1px solid rgba(251,191,36,0.25)",borderRadius:10,padding:"12px 14px",marginBottom:16}}>
                     <div style={{fontSize:11,color:"#fcd34d",letterSpacing:"0.6px",marginBottom:8,textTransform:"uppercase"}}>
-                      📋 ¿Esta factura corresponde a Notas de Pedido o Guías de Despacho? — Selecciona las que incluye
+                      📋 ¿Esta factura corresponde a Notas de Pedido, Guías de Despacho, Cotizaciones u Órdenes de Compra? — Selecciona las que incluye
                     </div>
                     <div style={{fontSize:11,color:"#a08050",marginBottom:10}}>Al seleccionar, se copian automáticamente proveedor, RUT e ítems</div>
                     <div style={{display:"flex",flexDirection:"column",gap:6}}>
                       {notasDisp.map(np=>{
                         const vinculada=(form.notasVinculadas||[]).includes(np.id);
-                        const prefijo = np.tipoDoc==="Guía de Despacho"?"GD":"NP";
+                        const prefijo = {"Guía de Despacho":"GD","Nota de Pedido":"NP","Cotización":"COT","Orden de Compra":"OC"}[np.tipoDoc]||"DOC";
                         return (
                           <div key={np.id} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 10px",borderRadius:7,background:vinculada?"rgba(251,191,36,0.1)":"rgba(255,255,255,0.03)",border:`1px solid ${vinculada?"rgba(251,191,36,0.35)":"rgba(255,255,255,0.07)"}`,cursor:"pointer"}}
                             onClick={()=>{
@@ -11728,7 +11728,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                             const guiasVinc = compras.filter(np=>np.facturaId===c.id);
                             return guiasVinc.length>0&&(
                               <div style={{fontSize:11,color:"#fbbf24",marginBottom:4}}>
-                                🔗 {guiasVinc.length} documento{guiasVinc.length!==1?"s":""} vinculado{guiasVinc.length!==1?"s":""}: {guiasVinc.map(np=>`${np.tipoDoc==="Guía de Despacho"?"GD":"NP"} ${np.nDocumento}`).join(", ")}
+                                🔗 {guiasVinc.length} documento{guiasVinc.length!==1?"s":""} vinculado{guiasVinc.length!==1?"s":""}: {guiasVinc.map(np=>`${({"Guía de Despacho":"GD","Nota de Pedido":"NP","Cotización":"COT","Orden de Compra":"OC"}[np.tipoDoc]||"DOC")} ${np.nDocumento}`).join(", ")}
                               </div>
                             );
                           })()}
