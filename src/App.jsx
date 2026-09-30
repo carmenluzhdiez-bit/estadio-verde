@@ -5280,7 +5280,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
   const getTareasDelDia = (f) => tareas[f] || [];
   const setTareasDelDia = (f, arr) => setTareas(p => ({ ...p, [f]: arr.map(limpiarUndef) }));
   const addTarea = (t) => {
-    setTareasDelDia(fecha, [...getTareasDelDia(fecha), { ...t, id: Date.now(), fecha }]);
+    setTareasDelDia(fecha, [...getTareasDelDia(fecha), { ...t, id: Date.now()+Math.random(), fecha }]);
     if (esDomingo(fecha)) setAviso("⚠️ El día seleccionado es domingo. Considera mover esta tarea a otro día.");
   };
   const updateTarea = (id, patch) => {
@@ -10381,7 +10381,7 @@ const BODEGAS_DEF = [
   },
   { id:"b06", nombre:"Golf", icono:"⛳", color:"#34d399",
     descripcion:"Maquinaria, herramientas, materiales y fertilizantes específicos de Golf",
-    categorias:["Maquinaria golf","Herramienta golf","Fertilizante golf","Arena golf","Semilla golf","Material cancha","Accesorio golf","Otro"],
+    categorias:["Maquinaria golf","Repuesto","Herramienta golf","Fertilizante golf","Arena golf","Semilla golf","Material cancha","Accesorio golf","Otro"],
     tareasTipo:["Inventario","Orden y limpieza","Revisión maquinaria","Mantención","Recepción","Registro uso combustible"],
   },
   { id:"b07", nombre:"Oficina Áreas Verdes", icono:"🏢", color:"#6aaa7a",
@@ -10479,6 +10479,15 @@ function CuentaSelector({ value, onChange, S, CUENTAS_INTERNAS, CUENTAS_EXTERNAS
 }
 
 // ─── SELECTOR DE BODEGA POR ÍTEM ─────────────────────────────────────────────
+// Equipos ya registrados en una bodega (excluye repuestos/combustible) — para elegir a qué máquina
+// asociar un repuesto o servicio comprado, y para sugerir nombres reales al escribir la descripción.
+// A nivel de módulo para que TODAS las pantallas de Compras usen siempre la misma lista real.
+const equiposDeBodega = (bodegasData, bodId) => ((bodegasData?.[bodId]?.items)||[]).filter(i=>{
+  const cat=(i.categoria||"").toLowerCase();
+  return cat!=="combustible" && !cat.includes("repuesto");
+});
+const nombresDeBodega = (bodegasData, bodId) => [...new Set(((bodegasData?.[bodId]?.items)||[]).map(i=>i.nombre).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
+
 function BodegaSelector({ items, compra, onConfirm, onCancel, S, bodegasData={} }) {
   const [asignaciones, setAsignaciones] = React.useState(
     items.map(it=>it.bodegaDestino||"")
@@ -10491,11 +10500,7 @@ function BodegaSelector({ items, compra, onConfirm, onCancel, S, bodegasData={} 
   );
   const [modelosEpp, setModelosEpp] = React.useState(items.map(it=>it.modelo||""));
   const [registrosISP, setRegistrosISP] = React.useState(items.map(it=>it.registroISP||""));
-  // Equipos disponibles en Maquinaria (excluye combustible y repuestos)
-  const equiposMaq = ((bodegasData["b04"]?.items)||[]).filter(i=>{
-    const cat=(i.categoria||"").toLowerCase();
-    return cat!=="combustible"&&cat!=="repuesto";
-  });
+
   return (
     <div style={{marginTop:8,background:"rgba(61,122,82,0.08)",borderRadius:10,padding:"12px 14px",border:"1px solid rgba(61,122,82,0.25)"}}>
       <div style={{fontSize:12,color:"#86efac",fontWeight:600,marginBottom:10}}>
@@ -10537,14 +10542,14 @@ function BodegaSelector({ items, compra, onConfirm, onCancel, S, bodegasData={} 
                   value={registrosISP[i]} onChange={e=>{const v=e.target.value;setRegistrosISP(p=>{const n=[...p];n[i]=v;return n;});}}/>
               </div>
             )}
-            {/* Si va a Maquinaria, pedir máquina asociada */}
-            {asignaciones[i]==="b04"&&(
+            {/* Si va a Maquinaria o Golf, pedir máquina/equipo asociado — misma lista real que en el formulario de compra */}
+            {(asignaciones[i]==="b04"||asignaciones[i]==="b06")&&(
               <div style={{display:"flex",gap:8,alignItems:"center",marginTop:4}}>
                 <span style={{fontSize:10,color:"#f97316",whiteSpace:"nowrap"}}>🔩 Máquina:</span>
                 <select style={{...S.input,fontSize:11,padding:"4px 8px",flex:1}}
                   value={maquinas[i]} onChange={e=>setMaquinas(p=>{const n=[...p];n[i]=e.target.value;return n;})}>
                   <option value="">— Sin asignar (equipo nuevo) —</option>
-                  {equiposMaq.map(eq=><option key={eq.id} value={eq.nombre}>{eq.nombre}</option>)}
+                  {equiposDeBodega(bodegasData,asignaciones[i]).map(eq=><option key={eq.id} value={eq.nombre}>{eq.nombre}</option>)}
                   <option value="General">General (sirve para varios)</option>
                 </select>
               </div>
@@ -10613,7 +10618,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
           nuevosItems.push({id:Date.now()+Math.random(), nombre:it.descripcion, categoria:it.categoriaBodega||it.categoria||"", unidad:it.unidad||"unidad", stockActual:cant, stockMinimo:0, ubicacion:"", obs:`Ingresado desde ${docRef}`, maquinaAsociada:it.maquinaAsociada||""});
         }
         const itemId = idx>=0?nuevosItems[idx].id:nuevosItems[nuevosItems.length-1].id;
-        nuevosMovs.unshift({id:Date.now()+Math.random(), fecha:docFecha, tipo:"entrada", cantidad:cant, unidad:it.unidad||"unidad", motivo:`Compra — ${docRef}`, responsable:"", itemId:String(itemId), docRef, itemNombre:it.descripcion.trim()});
+        nuevosMovs.unshift({id:Date.now()+Math.random(), fecha:docFecha, tipo:"entrada", cantidad:cant, unidad:it.unidad||"unidad", motivo:`Compra — ${docRef}`, responsable:"", itemId:String(itemId), docRef, itemNombre:it.descripcion.trim(), maquinaAsociada:it.maquinaAsociada||""});
       });
       nuevoBodegasData[bodId] = {...bd, items:nuevosItems, movimientos:nuevosMovs.slice(0,200)};
     });
@@ -10684,7 +10689,8 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   const labelSt = {fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
 
   // ── Formulario cabecera + ítems ───────────────────────────────────────────
-  const emptyItem = {id:Date.now(), descripcion:"", categoria:"", cantidad:1, unidad:"unidad", precioUnitario:"", totalNeto:"", iva:"", totalBruto:"", bodegaDestino:"", categoriaBodega:"", modelo:"", registroISP:""};
+  const emptyItem = {id:Date.now(), descripcion:"", categoria:"", cantidad:1, unidad:"unidad", precioUnitario:"", totalNeto:"", iva:"", totalBruto:"", bodegaDestino:"", categoriaBodega:"", modelo:"", registroISP:"", maquinaAsociada:""};
+
   const emptyForm = {
     fecha:hoy.toISOString().slice(0,10),
     proveedor:"", rut:"", nDocumento:"", tipoDoc:"Factura",
@@ -11546,7 +11552,17 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                       {form.items.length>1&&<button className="btn-d" style={{...S.btn,fontSize:10,padding:"2px 8px"}} onClick={()=>removeItem(idx)}>✕</button>}
                     </div>
                     <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:8,marginBottom:8}}>
-                      <div><label style={labelSt}>Descripción</label><input style={S.input} placeholder="Nombre del producto" value={item.descripcion} onChange={e=>updateItem(idx,{descripcion:e.target.value})}/></div>
+                      <div><label style={labelSt}>Descripción</label>
+                        <input style={S.input} list={item.bodegaDestino?`compra-items-${item.bodegaDestino}-${idx}`:undefined} placeholder="Nombre del producto" value={item.descripcion} onChange={e=>updateItem(idx,{descripcion:e.target.value})}/>
+                        {item.bodegaDestino&&(
+                          <datalist id={`compra-items-${item.bodegaDestino}-${idx}`}>
+                            {nombresDeBodega(bodegasData,item.bodegaDestino).map(n=><option key={n} value={n}/>)}
+                          </datalist>
+                        )}
+                        {item.bodegaDestino&&item.descripcion.trim()&&nombresDeBodega(bodegasData,item.bodegaDestino).some(n=>n.toLowerCase()===item.descripcion.trim().toLowerCase())&&(
+                          <div style={{fontSize:10,color:"#86efac",marginTop:3}}>✓ Ya existe en {BODEGAS_DEF.find(b=>b.id===item.bodegaDestino)?.nombre} — esta compra suma stock a ese ítem, no crea uno nuevo.</div>
+                        )}
+                      </div>
                       <div><label style={labelSt}>Categoría</label>
                         <select style={S.input} value={item.categoria||""} onChange={e=>updateItem(idx,{categoria:e.target.value})}>
                           <option value="">Seleccionar...</option>
@@ -11590,6 +11606,17 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                         </div>
                       );
                     })()}
+                    {(item.bodegaDestino==="b04"||item.bodegaDestino==="b06")&&(
+                      <div style={{marginTop:8}}>
+                        <label style={{...labelSt,color:"#f97316"}}>🔩 Máquina / Equipo asociado</label>
+                        <select style={{...S.input,fontSize:12}} value={item.maquinaAsociada||""} onChange={e=>updateItem(idx,{maquinaAsociada:e.target.value})}>
+                          <option value="">— Sin asignar (repuesto general o equipo nuevo) —</option>
+                          {equiposDeBodega(bodegasData,item.bodegaDestino).map(eq=><option key={eq.id} value={eq.nombre}>{eq.nombre}</option>)}
+                          <option value="General">General (sirve para varios equipos)</option>
+                        </select>
+                        <div style={{fontSize:10,color:"#8aa89a",marginTop:3}}>Si es un repuesto o un servicio para un equipo ya registrado, elígelo aquí para que quede en su historial.</div>
+                      </div>
+                    )}
                     {item.bodegaDestino==="b08"&&(
                       <div style={{marginTop:8,display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                         <div><label style={{...labelSt,color:"#86efac"}}>Modelo (opcional)</label>
@@ -18200,6 +18227,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
         ] : [["stock","📦 Stock"],["movimientos","🔄 Movimientos"],["traslados","🚛 Traslados"],["tareas","✅ Tareas"],["historial","📜 Historial"],
           ...(bodegaActiva==="b05"?[["hojas_seguridad","🛡️ Hojas de Seguridad"]]:[]),
           ...(bodegaActiva==="b04"?[["horometro","⏱️ Horómetro"],["repuestos","🔩 Repuestos"]]:[]),
+          ...(bodegaActiva==="b06"?[["repuestos","🔩 Repuestos"]]:[]),
         ]).map(([t,l])=>(
           <button key={t} className={`tab${subTab===t?" on":""}`} onClick={()=>setSubTab(t)}>{l}</button>
         ))}
@@ -19932,7 +19960,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
       })()}
 
       {/* ── REPUESTOS (Maquinaria) ── */}
-      {subTab==="repuestos"&&bodegaActiva==="b04"&&(()=>{
+      {subTab==="repuestos"&&(bodegaActiva==="b04"||bodegaActiva==="b06")&&(()=>{
         const equipos = (bd.items||[]).filter(i=>(i.categoria||"").toLowerCase()!=="combustible"&&(i.categoria||"").toLowerCase()!=="repuesto");
         const repuestos = (bd.items||[]).filter(i=>(i.categoria||"").toLowerCase()==="repuesto")
           .sort((a,b)=>(a.maquinaAsociada||"").localeCompare(b.maquinaAsociada||"","es",{sensitivity:"base"})||a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
@@ -19943,7 +19971,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
 
         return (
           <div className="ein">
-            <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,color:"#f97316",marginBottom:4}}>🔩 Repuestos — Maquinaria</div>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,color:"#f97316",marginBottom:4}}>🔩 Repuestos — {bodegaActiva==="b06"?"Golf":"Maquinaria"}</div>
             <div style={{fontSize:12,color:"#5a9a7a",marginBottom:14}}>Stock de repuestos organizados por equipo. Para agregar un repuesto, usa <strong>➕ Nuevo ítem</strong> en Stock y elige categoría "Repuesto".</div>
 
             {esJefa&&(
