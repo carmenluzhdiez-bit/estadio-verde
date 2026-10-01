@@ -12437,10 +12437,15 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
 
     // Línea de tiempo combinada: cada evento real conocido (corte o medición),
     // en orden. Si coinciden el mismo día, el corte manda (se mide, luego se corta).
+    // Si la medición y el corte quedan registrados el MISMO día (se mide antes de cortar), el corte
+    // debe quedar como el evento "último" de ese día — es lo que pasó al final, y es la altura real
+    // desde la que hay que proyectar el rebrote. Antes el corte se ordenaba PRIMERO en caso de empate,
+    // así que la medición (anterior al corte) terminaba siendo la "última" del arreglo — el sistema
+    // seguía proyectando desde la altura de ANTES de cortar, como si el corte nunca hubiera pasado.
     const eventos = [
       ...cortesZona.map(c=>({fecha:c.fecha, alt:c.alturaCorte, tipo:"corte"})),
       ...medicionesZona.map(m=>({fecha:m.fecha, alt:m.alt, tipo:"medicion"})),
-    ].sort((a,b)=>a.fecha.localeCompare(b.fecha)||(a.tipo==="corte"?-1:1));
+    ].sort((a,b)=>a.fecha.localeCompare(b.fecha)||(a.tipo==="corte"?1:-1));
 
     if(!eventos.length) return null;
 
