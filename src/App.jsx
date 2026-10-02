@@ -20413,6 +20413,7 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
     const bonosSel = bonosPendientes.filter(b=>selBonos[b.id]);
     const fechaHoy2 = new Date().toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"});
 
+    const resumenPorTrabajador = [];
     const paginas = personalArr.map(t=>{
       const bonosT = bonosSel.filter(b=>(b.participantes||[]).some(p=>String(p.trabajadorId)===String(t.id)));
       // Eventos "bono" individuales que YA están representados por un bono masivo
@@ -20426,6 +20427,8 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
       },0) + eventosT.filter(e=>["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)).reduce((a,e)=>a+Number(e.valor||0),0);
       const totalHE = eventosT.filter(e=>e.tipo==="horaExtra"&&e.estado==="aprobado").reduce((a,e)=>a+Number(e.horas||0),0);
       const hePendientes = eventosT.filter(e=>e.tipo==="horaExtra"&&e.estado!=="aprobado");
+      const permisosCount = eventosT.filter(e=>["permiso","vacaciones","licencia"].includes(e.tipo)).length;
+      resumenPorTrabajador.push({nombre:t.nombre, cargo:t.cargo||"—", totalBonos, totalHE, horasPend:hePendientes.reduce((a,e)=>a+Number(e.horas||0),0), permisosCount});
 
       const filasBonosMasivos = bonosT.map(b=>{
         const bonoP3=b.participantes?.find(bp3=>String(bp3.trabajadorId)===String(t.id));
@@ -20508,6 +20511,45 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
         <div class="footer">Estadio Español de Las Condes · Departamento de Áreas Verdes · Jefe de Departamento de Áreas Verdes · Carmen Luz Hermosilla Diez · ${fechaHoy2}</div>
       </div>`;
     }).filter(Boolean);
+
+    // Página de resumen general — antes de las páginas individuales, para que quede primero al imprimir.
+    if(resumenPorTrabajador.length>0){
+      const totBonosGral = resumenPorTrabajador.reduce((a,r)=>a+r.totalBonos,0);
+      const totHEGral = resumenPorTrabajador.reduce((a,r)=>a+r.totalHE,0);
+      const totPendGral = resumenPorTrabajador.reduce((a,r)=>a+r.horasPend,0);
+      const filasResumen = resumenPorTrabajador.map(r=>`
+        <tr>
+          <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px">${r.nombre}<br><span style="color:#888;font-size:10px">${r.cargo}</span></td>
+          <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px;text-align:right">${r.totalBonos>0?`$${r.totalBonos.toLocaleString("es-CL")}`:"—"}</td>
+          <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px;text-align:right">${r.totalHE>0?`${r.totalHE} hrs`:"—"}</td>
+          <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px;text-align:right;color:${r.horasPend>0?"#e65100":"#888"}">${r.horasPend>0?`⚠️ ${r.horasPend} hrs`:"—"}</td>
+          <td style="padding:6px 10px;border:1px solid #e0e0e0;font-size:12px;text-align:center">${r.permisosCount>0?r.permisosCount:"—"}</td>
+        </tr>`).join("");
+      const resumenHTML = `<div class="pagina">
+        <div class="hdr">
+          <div style="display:flex;align-items:center;gap:12px">
+            <img src="${LOGO_AREAS_VERDES_B64}" style="height:44px;flex-shrink:0"/>
+            <div><h1>Resumen General — ${mesRendicion}</h1>
+            <h2>Departamento de Áreas Verdes · Estadio Español de Las Condes</h2>
+            <h2>Para: Recursos Humanos / Remuneraciones</h2></div>
+          </div>
+          <div style="text-align:right;font-size:12px;color:#555">Emisión: <strong>${fechaHoy2}</strong></div>
+        </div>
+        <div class="sec">📋 Resumen por trabajador (${resumenPorTrabajador.length})</div>
+        <table><thead><tr><th>Trabajador</th><th style="text-align:right">Bonos</th><th style="text-align:right">Horas extra aprobadas</th><th style="text-align:right">Horas extra pendientes</th><th style="text-align:center">Permisos/Lic./Vac.</th></tr></thead>
+        <tbody>${filasResumen}</tbody>
+        <tfoot><tr style="background:#f3e5ff;font-weight:bold">
+          <td style="padding:6px 10px;border:1px solid #e0e0e0;text-align:right">TOTAL</td>
+          <td style="padding:6px 10px;border:1px solid #e0e0e0;text-align:right;color:#7b1fa2">${totBonosGral>0?`$${totBonosGral.toLocaleString("es-CL")}`:"—"}</td>
+          <td style="padding:6px 10px;border:1px solid #e0e0e0;text-align:right;color:#1565c0">${totHEGral>0?`${totHEGral} hrs`:"—"}</td>
+          <td style="padding:6px 10px;border:1px solid #e0e0e0;text-align:right;color:#e65100">${totPendGral>0?`${totPendGral} hrs`:"—"}</td>
+          <td style="padding:6px 10px;border:1px solid #e0e0e0"></td>
+        </tr></tfoot></table>
+        ${totPendGral>0?`<div style="background:#fff8e1;border:1px solid #ffc107;border-radius:6px;padding:8px 12px;font-size:11px">⚠️ Hay ${totPendGral} hora${totPendGral!==1?"s":""} extra pendiente${totPendGral!==1?"s":""} de aprobación en total — no están incluidas en los montos de esta rendición.</div>`:""}
+      </div>`;
+      paginas.unshift(resumenHTML);
+    }
+
     return paginas;
   };
 
