@@ -20490,7 +20490,7 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
         <tfoot><tr style="background:#e3f2fd;font-weight:bold"><td colspan="2" style="padding:6px 10px;border:1px solid #e0e0e0;text-align:right">TOTAL APROBADAS</td>
         <td style="padding:6px 10px;border:1px solid #e0e0e0;text-align:right;color:#1565c0">${totalHE} hrs</td></tr></tfoot></table>
         ${hePendientes.length>0?`<div style="background:#fff8e1;border:1px solid #ffc107;border-radius:6px;padding:8px 12px;font-size:11px;margin-bottom:8px">
-          ⚠️ <strong>${hePendientes.reduce((a,e)=>a+Number(e.horas||0),0)} hora${hePendientes.reduce((a,e)=>a+Number(e.horas||0),0)!==1?"s":""} extra${hePendientes.reduce((a,e)=>a+Number(e.horas||0),0)!==1?"s":""} pendiente${hePendientes.reduce((a,e)=>a+Number(e.horas||0),0)!==1?"s":""} de aprobación</strong> (${hePendientes.length} registro${hePendientes.length!==1?"s":""}) — no incluida${hePendientes.length!==1?"s":""} en esta rendición.
+          ⚠️ <strong>${hePendientes.reduce((a,e)=>a+Number(e.horas||0),0)} hora${hePendientes.reduce((a,e)=>a+Number(e.horas||0),0)!==1?"s":""} extra${hePendientes.reduce((a,e)=>a+Number(e.horas||0),0)!==1?"s":""} pendiente${hePendientes.reduce((a,e)=>a+Number(e.horas||0),0)!==1?"s":""} de aprobación</strong> (${hePendientes.length} registro${hePendientes.length!==1?"s":""}) — aparece${hePendientes.length!==1?"n":""} en el detalle de abajo, pero no se suma${hePendientes.length!==1?"n":""} al total de horas aprobadas hasta que se aprueben.
         </div>`:""}
         `:""}
         ${hePendientes&&hePendientes.length>0&&!filasHE?`
