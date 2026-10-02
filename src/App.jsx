@@ -20409,7 +20409,7 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
   },[bonosMasivos, personal]);
 
   // Construir HTML del informe
-  const construirHTML = (titulo) => {
+  const construirHTML = (titulo, {aprobarAhora=new Set(), excluirAhora=new Set()}={}) => {
     const bonosSel = bonosPendientes.filter(b=>selBonos[b.id]);
     const fechaHoy2 = new Date().toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"});
 
@@ -20418,15 +20418,16 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
       const bonosT = bonosSel.filter(b=>(b.participantes||[]).some(p=>String(p.trabajadorId)===String(t.id)));
       // Eventos "bono" individuales que YA están representados por un bono masivo
       // pendiente — ver esEventoDeBonoMasivo definida arriba, junto a trabajadoresCon.
-      const eventosT = (t.eventos||[]).filter(e=>selEventos[`${t.id}_${e.id}`]&&!esEventoDeBonoMasivo(e));
+      const eventosT = (t.eventos||[]).filter(e=>selEventos[`${t.id}_${e.id}`]&&!esEventoDeBonoMasivo(e)&&!excluirAhora.has(`${t.id}_${e.id}`));
       if(!bonosT.length&&!eventosT.length) return "";
 
       const totalBonos = bonosT.reduce((a,b)=>{
         const bonoP=b.participantes?.find(bp=>String(bp.trabajadorId)===String(t.id));
         return a+Number(bonoP?.monto||0);
       },0) + eventosT.filter(e=>["bonoConstruccion","bonoPesado","bonoEspecializado"].includes(e.tipo)).reduce((a,e)=>a+Number(e.valor||0),0);
-      const totalHE = eventosT.filter(e=>e.tipo==="horaExtra"&&e.estado==="aprobado").reduce((a,e)=>a+Number(e.horas||0),0);
-      const hePendientes = eventosT.filter(e=>e.tipo==="horaExtra"&&e.estado!=="aprobado");
+      const estaAprobada = e => e.estado==="aprobado" || aprobarAhora.has(`${t.id}_${e.id}`);
+      const totalHE = eventosT.filter(e=>e.tipo==="horaExtra"&&estaAprobada(e)).reduce((a,e)=>a+Number(e.horas||0),0);
+      const hePendientes = eventosT.filter(e=>e.tipo==="horaExtra"&&!estaAprobada(e));
       const permisosCount = eventosT.filter(e=>["permiso","vacaciones","licencia"].includes(e.tipo)).length;
       resumenPorTrabajador.push({nombre:t.nombre, cargo:t.cargo||"—", totalBonos, totalHE, horasPend:hePendientes.reduce((a,e)=>a+Number(e.horas||0),0), permisosCount});
 
@@ -20580,8 +20581,50 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
     const winB=window.open("","_blank"); winB.document.write(html); winB.document.close();
   };
 
-  const confirmarRendicion = () => {
-    const paginas = construirHTML("Informe Definitivo de Personal");
+  // Antes de confirmar: si quedaron horas extra PENDIENTES de aprobación incluidas en la rendición,
+  // se pregunta qué hacer — nunca se aprueban en silencio. Devuelve null (cancelar) | {accion:"aprobar"} | {accion:"excluir"}.
+  const decidirHorasPendientesModal = (lista) => new Promise(resolve=>{
+    const el = (tag, css, txt) => { const e=document.createElement(tag); if(css) e.style.cssText=css; if(txt!==undefined) e.textContent=txt; return e; };
+    const totalHrs = lista.reduce((a,x)=>a+Number(x.horas||0),0);
+    const overlay = el("div","position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;font-family:Arial,sans-serif");
+    const box = el("div","background:#fff;border-radius:14px;padding:22px;max-width:480px;width:100%;color:#1a1a1a;box-shadow:0 10px 40px rgba(0,0,0,.4)");
+    const cerrar = (val) => { overlay.remove(); resolve(val); };
+    overlay.addEventListener("mousedown",(e)=>{ if(e.target===overlay) cerrar(null); });
+    box.appendChild(el("div","font-size:16px;font-weight:700;margin-bottom:8px;color:#e65100","⚠️ Hay horas extra pendientes de aprobación"));
+    box.appendChild(el("div","font-size:13px;color:#444;margin-bottom:14px;line-height:1.4",
+      `Esta rendición incluye ${totalHrs} hora${totalHrs!==1?"s":""} extra (${lista.length} registro${lista.length!==1?"s":""}) que aún no se ${lista.length!==1?"han":"ha"} aprobado. ¿Qué quieres hacer?`));
+    const btnCss = (bg,col) => `cursor:pointer;border:none;border-radius:8px;padding:10px 14px;font-size:13px;background:${bg};color:${col};width:100%;margin-bottom:8px;text-align:left;font-family:Arial,sans-serif`;
+    const btnAprobar = el("button",btnCss("#e8f5e9","#1b5e20"),"✅ Aprobarlas ahora y confirmar — quedan en el informe definitivo");
+    btnAprobar.onclick = () => cerrar({accion:"aprobar"});
+    const btnExcluir = el("button",btnCss("#e3f2fd","#0d47a1"),"⏭️ Excluirlas de esta rendición y confirmar — siguen pendientes para la próxima");
+    btnExcluir.onclick = () => cerrar({accion:"excluir"});
+    const btnCancelar = el("button",btnCss("#f5f5f5","#555"),"Cancelar — no confirmar todavía");
+    btnCancelar.onclick = () => cerrar(null);
+    box.appendChild(btnAprobar); box.appendChild(btnExcluir); box.appendChild(btnCancelar);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+  });
+
+  const confirmarRendicion = async () => {
+    // Detectar horas extra pendientes entre lo seleccionado, ANTES de construir nada.
+    const personalArrChk = Array.isArray(personal)?personal:Object.values(personal||{});
+    const pendientesSel = [];
+    personalArrChk.forEach(t=>{
+      (t.eventos||[]).forEach(e=>{
+        if(e.tipo==="horaExtra" && e.estado!=="aprobado" && selEventos[`${t.id}_${e.id}`]){
+          pendientesSel.push({tId:t.id, eId:e.id, horas:e.horas});
+        }
+      });
+    });
+    let aprobarAhora = new Set(), excluirAhora = new Set();
+    if(pendientesSel.length>0){
+      const decision = await decidirHorasPendientesModal(pendientesSel);
+      if(!decision) return; // Cancelar — no se confirma nada.
+      pendientesSel.forEach(({tId,eId})=>{
+        (decision.accion==="aprobar"?aprobarAhora:excluirAhora).add(`${tId}_${eId}`);
+      });
+    }
+    const paginas = construirHTML("Informe Definitivo de Personal", {aprobarAhora, excluirAhora});
     if(!paginas.length) { alert("No hay ítems seleccionados."); return; }
     const bonosSel = bonosPendientes.filter(b=>selBonos[b.id]);
     // Guardar rendición en historial
@@ -20599,7 +20642,7 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
     setBonosMasivos(p=>(Array.isArray(p)?p:Object.values(p||{})).map(b=>selBonos[b.id]?{...b,estado:"rendido",fechaRendicion:fechaHoyStr}:b));
     // Marcar eventos individuales como rendidos
     setPersonal(p=>(Array.isArray(p)?p:Object.values(p||{})).map(t=>({
-      ...t, eventos:(t.eventos||[]).map(e=>selEventos[`${t.id}_${e.id}`]?{...e,estado:"rendido"}:e)
+      ...t, eventos:(t.eventos||[]).map(e=>(selEventos[`${t.id}_${e.id}`]&&!excluirAhora.has(`${t.id}_${e.id}`))?{...e,estado:"rendido"}:e)
     })));
     // Abrir informe definitivo
     abrirInforme(paginas, false);
