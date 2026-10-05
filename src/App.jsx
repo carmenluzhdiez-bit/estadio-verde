@@ -3247,7 +3247,10 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                           return (
                         <div style={{display:"flex",flexDirection:"column",gap:4}}>
                           {nombresGrupos.map(nombreGrupo=>{
-                            const items=grupos[nombreGrupo];
+                            // Dentro de cada grupo de tarea, ordenadas alfabéticamente por zona (y luego por elemento).
+                            const items=[...grupos[nombreGrupo]].sort((a,b)=>
+                              (a.zona||"").localeCompare(b.zona||"","es",{sensitivity:"base",numeric:true}) ||
+                              (a.elemento||"").localeCompare(b.elemento||"","es",{sensitivity:"base",numeric:true}));
                             const grupoKey=`${dia}_${resp}_${nombreGrupo}`;
                             const grupoAbierto=!!gruposTareaAbiertosTurnos[grupoKey];
                             const hechasGrupo=items.filter(x=>["hecha","completada"].includes(x.estado)).length;
