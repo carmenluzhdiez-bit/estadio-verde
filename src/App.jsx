@@ -5342,6 +5342,15 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     // Tareas de HOY que siguen en curso con el turno abierto (a media jornada es lo normal). No se
     // arrastran, pero tampoco se vuelven a proponer como si estuvieran "atrasadas": para saber si
     // toca otra vez mañana se asume que quedarán hechas hoy (ver más abajo).
+    // Tareas con frecuencia que se reprogramaron a una fecha FUTURA (ej. por lluvia): mientras no llegue
+    // esa fecha, "Proponer del día" no debe volver a crearlas — ya existe la copia en el día nuevo.
+    const reprogFuturoSig = new Set();
+    Object.keys(tareas).forEach(diaKeyRF=>{
+      nAprop(tareas[diaKeyRF]).forEach(t=>{
+        if(t.trasladadaA && t.trasladadaA>fecha && t.origenZid && t.origenEid && t.origenFrecId)
+          reprogFuturoSig.add(`${t.origenZid}_${t.origenEid}_${t.origenFrecId}`);
+      });
+    });
     const abiertoHoySig = new Set();
     const abiertoHoyText = new Set();
     Object.keys(tareas).sort().forEach(diaKey => {
@@ -5378,6 +5387,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
         if(frecs.length===0) return; // solo proponer si hay frecuencias — incluye Golf
         frecs.forEach(f => {
           const key = nombreZona+"_"+e.nombre+"_"+f.tarea;
+          if(reprogFuturoSig.has(`${z.id}_${e.id}_${f.id}`)) return; // reprogramada a una fecha posterior
           // Si la de hoy sigue en curso (turno abierto), se proyecta como si se terminara hoy: solo se
           // propone para el día pedido si, contando desde hoy, su frecuencia realmente le toca ese día.
           const enCursoHoy = abiertoHoySig.has(`${z.id}_${e.id}_${f.id}`) || abiertoHoyText.has(key);
@@ -5635,80 +5645,109 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
             {esJefa&&(
               <button onClick={()=>{
                 // MODO LLUVIA
-                const diaSemana = new Date(fecha+"T12:00:00").getDay();
+                // Qué hace (y qué NO hace) — se muestra completo en la confirmación:
+                //  • Tareas de exterior que no son riego → "No se pudo (lluvia)" y se reprograman en 2 días hábiles.
+                //  • Riegos de exterior → no hacen falta (la lluvia los reemplaza): se reprograman igual en 2 días hábiles.
+                //  • Riegos bajo techo / mixtos / sin dato de condición → NO se tocan: quedan hoy, marcados
+                //    "🌧️ Revisar riego" para que los ajustes a mano.
                 const normArr = v=>Array.isArray(v)?v:Object.values(v||{});
                 const tareasHoy = normArr(tareas[fecha]||[]);
 
-                // Palabras clave de tareas que NO se cancelan por lluvia
                 const BAJO_TECHO = ["bajo techo","invernadero","vivero","bodega","sala","interior","oficina","taller"];
-                const EXTERIOR_CANCELAR = ["corte","poda","fumiga","fungicida","pestici","herbicida","siembra","plantaci","trasplant","aireaci","vertic","fertiliz","abono","soplad","barrido"];
-
-                const esBajoTecho = t => {
-                  // 1. Verificar campo condicion en data del elemento
-                  if(t.zona && t.elemento) {
-                    const zonaObj = MACROZONAS_BASE.find(z=>z.nombre===t.zona);
-                    if(zonaObj) {
-                      const zdat = getZD ? getZD(String(zonaObj.id)) : {};
-                      const elemBase = zdat.elementos?.[zonaObj.elementos?.find(e=>e.nombre===t.elemento)?.id];
-                      const elemCustom = (zdat.elementosCustom||[]).find(e=>e.nombre===t.elemento);
-                      const condicion = elemBase?.condicion || elemCustom?.condicion;
-                      if(condicion==="bajo_techo") return true;
-                      if(condicion==="exterior") return false;
-                      if(condicion==="mixto") return false; // mixto = revisar manual
+                // Condición del elemento ("bajo_techo" | "exterior" | "mixto" | null = sin dato). Se busca primero por el
+                // origen exacto de la tarea (zona/elemento de la frecuencia) y, si no, por nombre.
+                const condicionDe = t => {
+                  try{
+                    let elemento = null;
+                    if(t.origenZid && t.origenEid && getZD){
+                      const zd0 = getZD(String(t.origenZid))||{};
+                      elemento = t.origenEsCustom ? (zd0.elementosCustom||[]).find(x=>x.id===t.origenEid) : zd0.elementos?.[t.origenEid];
                     }
-                  }
-                  // 2. Fallback: keywords en texto
-                  return BAJO_TECHO.some(k=>(t.tarea+" "+(t.notas||"")).toLowerCase().includes(k));
+                    if(!elemento && t.zona && t.elemento && getZD){
+                      const zonaObj = (zonas||[]).find(z=>z.nombre===t.zona||(getZD(String(z.id))||{}).nombreCustom===t.zona) || MACROZONAS_BASE.find(z=>z.nombre===t.zona);
+                      if(zonaObj){
+                        const zd = getZD(String(zonaObj.id))||{};
+                        const baseId = (zonaObj.elementos||[]).find(e=>e.nombre===t.elemento)?.id;
+                        elemento = (baseId&&zd.elementos?.[baseId]) || (zd.elementosCustom||[]).find(e=>e.nombre===t.elemento);
+                      }
+                    }
+                    return elemento?.condicion || null;
+                  }catch(err){ return null; }
                 };
-                const esExterior = t => EXTERIOR_CANCELAR.some(k=>(t.tarea||t.elemento||"").toLowerCase().includes(k));
+                const esBajoTecho = t => {
+                  const c = condicionDe(t);
+                  if(c==="bajo_techo") return true;
+                  if(c==="exterior"||c==="mixto") return false;
+                  return BAJO_TECHO.some(k=>((t.tarea||"")+" "+(t.notas||"")).toLowerCase().includes(k));
+                };
                 const esRiego = t => (t.tarea||t.elemento||"").toLowerCase().includes("riego")||(t.tarea||t.elemento||"").toLowerCase().includes("regar");
 
-                const aPosponer = tareasHoy.filter(t=>
-                  normalizarEstado(t.estado)!=="hecha" &&
-                  !esBajoTecho(t) &&
-                  (esExterior(t) || (!esRiego(t) && !esBajoTecho(t)))
-                );
+                // Solo lo que sigue sin resolver y no se ha trasladado ya
+                const sinResolver = tareasHoy.filter(t=>!["hecha","no_pudo"].includes(normalizarEstado(t.estado)) && !t.trasladadaA);
+                const aPosponer = sinResolver.filter(t=>!esRiego(t) && !esBajoTecho(t));
+                const riegos = sinResolver.filter(esRiego);
+                const riegosMover = riegos.filter(t=>condicionDe(t)==="exterior");
+                const riegosManual = riegos.filter(t=>!riegosMover.includes(t));
+                const riegosTecho = riegosManual.filter(esBajoTecho);
+                const riegosSinDato = riegosManual.filter(t=>!esBajoTecho(t));
+                const aMover = [...aPosponer, ...riegosMover];
 
-                const aRevisar = tareasHoy.filter(t=>esRiego(t)&&normalizarEstado(t.estado)!=="hecha");
-
-                if(aPosponer.length===0&&aRevisar.length===0){
+                if(aMover.length===0&&riegosManual.length===0){
                   alert("No hay tareas que posponer por lluvia."); return;
                 }
 
-                const msg = [
-                  aPosponer.length>0 ? aPosponer.length+" tarea(s) de exterior se marcarán como 'No se pudo (lluvia)' y se reprogramarán en 2 días hábiles." : "",
-                  aRevisar.length>0 ? aRevisar.length+" tarea(s) de riego requieren revisión manual (algunas pueden estar bajo techo)." : "",
-                ].filter(Boolean).join("\n");
-                if(!window.confirm("🌧️ MODO LLUVIA\n\n"+msg+"\n\n¿Continuar?")) return;
-                if(!window.confirm("Modo Lluvia: "+msg+" Continuar?")) return;
-
-                // Destino = +2 días hábiles (sin domingo)
                 const destino = diasHabiles(fecha, 2);
+                const etiqueta = t => `${t.zona||"—"} · ${t.elemento||"—"}`;
+                const listar = arr => arr.slice(0,8).map(t=>"   – "+etiqueta(t)).join("\n")+(arr.length>8?`\n   … y ${arr.length-8} más`:"");
+                const msg = [
+                  aPosponer.length>0 ? `• ${aPosponer.length} tarea(s) de exterior (no riego): quedan como "No se pudo — Lluvia" y se reprograman al ${destino}.` : "",
+                  riegosMover.length>0 ? `• ${riegosMover.length} riego(s) de exterior: no hacen falta con lluvia, se reprograman al ${destino}.` : "",
+                  riegosTecho.length>0 ? `• ${riegosTecho.length} riego(s) BAJO TECHO: NO se mueven, quedan hoy para que los ajustes a mano:\n${listar(riegosTecho)}` : "",
+                  riegosSinDato.length>0 ? `• ${riegosSinDato.length} riego(s) sin dato de si son exterior/bajo techo (o mixtos): NO se mueven, quedan hoy para que los revises:\n${listar(riegosSinDato)}\n   (para que el sistema los clasifique solo, marca el elemento como "Exterior" o "Bajo techo" en su ficha)` : "",
+                ].filter(Boolean).join("\n\n");
+                if(!window.confirm("🌧️ MODO LLUVIA — "+fecha+"\n\n"+msg+"\n\n¿Aplicar?")) return;
 
-                // Marcar como no_pudo y reprogramar
-                const nuevasTareasDestino = [];
+                // Copias para el día destino (no se duplica lo que ya esté programado ahí)
+                const existentesDest = new Set(normArr(tareas[destino]||[]).map(x=>`${x.zona}_${x.elemento}_${x.tarea}`));
+                const copias = [];
+                aMover.forEach(t=>{
+                  const k = `${t.zona}_${t.elemento}_${t.tarea}`;
+                  if(existentesDest.has(k)) return;
+                  existentesDest.add(k);
+                  copias.push({...t,
+                    id:Date.now()+Math.random(),
+                    fecha:destino,
+                    estado:"pendiente",
+                    notaWorker:"",
+                    movidoDesde:fecha,
+                    origenTareaId:t.id,
+                    notas:(t.notas?t.notas+" | ":"")+"Reprogramada por lluvia desde "+fecha+(t.notaWorker?" — Obs. anterior: "+t.notaWorker:""),
+                  });
+                });
+                const idsMover = new Set(aMover.map(t=>String(t.id)));
+                const idsRevisar = new Set(riegosManual.map(t=>String(t.id)));
                 setTareas(prev=>{
                   const normA = v=>Array.isArray(v)?v:Object.values(v||{});
-                  const hoy = normA(prev[fecha]||[]).map(t=>{
-                    if(aPosponer.some(p=>p.id===t.id)){
-                      return {...t, estado:"no_pudo", notaWorker:"No se pudo — Lluvia"};
+                  // El original NO se borra: queda en su día marcado como trasladado (historial intacto, y el
+                  // aviso de "No se pudo sin decidir" no lo vuelve a pedir).
+                  const hoyArr = normA(prev[fecha]||[]).map(t=>{
+                    if(idsMover.has(String(t.id))){
+                      return {...t, estado:"no_pudo", notaWorker:esRiego(t)?"Riego no necesario — Lluvia":"No se pudo — Lluvia", trasladadaA:destino};
+                    }
+                    if(idsRevisar.has(String(t.id)) && !(t.notas||"").includes("🌧️ Revisar riego")){
+                      return {...t, notas:(t.notas?t.notas+" | ":"")+"🌧️ Revisar riego: ajustar a mano por lluvia"};
                     }
                     return t;
                   });
-                  // Crear copias para el día destino
-                  aPosponer.forEach(t=>{
-                    nuevasTareasDestino.push({...t,
-                      id:Date.now()+Math.random(),
-                      fecha:destino,
-                      estado:"pendiente",
-                      notas:(t.notas?t.notas+" | ":"")+"Reprogramada por lluvia desde "+fecha+(t.notaWorker?" — Obs. anterior: "+t.notaWorker:""),
-                    });
-                  });
-                  const destArr = [...normA(prev[destino]||[]),...nuevasTareasDestino];
-                  return {...prev,[fecha]:hoy,[destino]:destArr};
+                  return {...prev,[fecha]:hoyArr,[destino]:[...normA(prev[destino]||[]),...copias]};
                 });
 
-                setTimeout(()=>alert("Modo lluvia aplicado. "+aPosponer.length+" tarea(s) reprogramadas para "+destino+". "+(aRevisar.length>0?aRevisar.length+" riego(s) a revisar manualmente.":"")),200);
+                setTimeout(()=>alert(
+                  "🌧️ Modo lluvia aplicado.\n\n"+
+                  `• Reprogramadas al ${destino}: ${copias.length} tarea(s)`+(riegosMover.length>0?` (${riegosMover.length} riego(s) de exterior incluidos)`:"")+".\n"+
+                  (aMover.length-copias.length>0?`• ${aMover.length-copias.length} ya estaban programadas en ${destino} — no se duplicaron.\n`:"")+
+                  (riegosManual.length>0?`• ${riegosManual.length} riego(s) siguen pendientes HOY a propósito (bajo techo o sin clasificar): quedaron marcados "🌧️ Revisar riego" para que los ajustes a mano.`:"")
+                ),200);
               }} style={{...S.btn,background:"rgba(96,165,250,0.1)",color:"#93c5fd",border:"1px solid rgba(96,165,250,0.2)",fontSize:11}}>
                 🌧️ Modo lluvia
               </button>
@@ -17152,6 +17191,13 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           const pendZonaTareaSetGolf=new Map();
           const pendItemsAllGolf=[]; // TODOS los pendientes de Golf de días anteriores, con o sin frecuencia (incluye manuales)
           // Tareas de HOY en curso con el turno abierto: no se arrastran ni se re-proponen como atrasadas.
+          const reprogFuturoSigGolf = new Set();
+          Object.keys(tareasProg||{}).forEach(diaKeyRG=>{
+            nAGolfProp(tareasProg[diaKeyRG]).forEach(t=>{
+              if(t.trasladadaA && t.trasladadaA>fechaProponerGolf && t.origenZid==="31" && t.origenEid && t.origenFrecId)
+                reprogFuturoSigGolf.add(`${t.origenEid}_${t.origenFrecId}`);
+            });
+          });
           const abiertoHoySigGolf = new Set();
           const abiertoHoyTextGolf = new Set();
           Object.keys(tareasProg||{}).sort().forEach(diaKeyG=>{
@@ -17195,6 +17241,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               // se genera aparte, el mismo día que el Corte, más abajo. Ver bloque siguiente.
               const esFertilizAdaptada=(f.tarea||"").toLowerCase().includes("fertiliz")&&f.tareaEnlazada&&f.tareaEnlazada.trim();
               if(esFertilizAdaptada)return;
+              if(reprogFuturoSigGolf.has(`${e.id}_${f.id}`)) return; // reprogramada a una fecha posterior
               const yaExisteEsteMismoGolf = yaExisteTarea(e.nombre,f.tarea);
               // Si la de hoy sigue en curso (turno abierto), se proyecta como si se terminara hoy.
               const enCursoHoyGolf = abiertoHoySigGolf.has(`${e.id}_${f.id}`) || abiertoHoyTextGolf.has(nombreZona+"_"+e.nombre+"_"+f.tarea);
