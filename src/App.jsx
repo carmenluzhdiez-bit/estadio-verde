@@ -270,6 +270,26 @@ const enviarAPapelera = (dia, tareasArr, motivo="") => {
   if(n>0) fbUpdate(ref(db,`${ROOT}/papelera_tareas`), upd).catch(e=>console.error("papelera:",e));
 };
 // Traslado sin borrar: el original queda en su día marcado como trasladado y se crea una copia en el destino.
+// Deshace un traslado: la tarea original vuelve a estar activa en su día y se quita la copia pendiente
+// del día destino. Si alguien ya trabajó en la copia (no está pendiente), NO se deshace solo.
+const calcularDeshacerTraslado = (prev, dia, t) => {
+  const destino = t.trasladadaA;
+  if(!destino) return {ok:false, motivo:"Esta tarea no está trasladada."};
+  const dest = normArrTP(prev[destino]);
+  let copia = dest.find(x=>String(x.origenTareaId)===String(t.id));
+  if(!copia) copia = dest.find(x=>x.zona===t.zona&&x.elemento===t.elemento&&x.tarea===t.tarea&&(x.movidoDesde===dia||(x.notas||"").includes("desde "+dia)));
+  if(copia && !["pendiente","por_designar"].includes(normalizarEstado(copia.estado))){
+    return {ok:false, motivo:`La copia en ${destino} ya está en estado "${normalizarEstado(copia.estado)}" (ya se trabajó en ella). No se puede deshacer solo — edita esa copia directamente en ese día.`};
+  }
+  const eraLluvia = t.estado==="no_pudo" && /lluvia/i.test(t.notaWorker||"");
+  const restaurada = {...t};
+  delete restaurada.trasladadaA;
+  if(eraLluvia){ restaurada.estado = "pendiente"; restaurada.notaWorker = ""; }
+  const next = {...prev};
+  next[dia] = normArrTP(prev[dia]).map(x=>String(x.id)===String(t.id)?restaurada:x);
+  if(copia) next[destino] = dest.filter(x=>x!==copia);
+  return {ok:true, next, destino, eraLluvia, habiaCopia:!!copia};
+};
 const trasladarEnEstado = (prev, dia, t, destino) => {
   const nuevo = {...prev};
   nuevo[dia] = normArrTP(nuevo[dia]).map(x=>String(x.id)===String(t.id)?{...x,trasladadaA:destino}:x);
@@ -3191,6 +3211,31 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                     </span>
                     <div style={{display:"flex",alignItems:"center",gap:8}}>
                       <span style={{fontSize:11,color:"#5a9a7a"}}>{filtroEstadoTurnos!=="todos"?`${tDia.length} de ${tDiaCompleto.length} tareas`:`${tDia.length} tareas`} · {Object.keys(porTrab).length} trabajadores</span>
+                      {esJefa&&(()=>{
+                        const lluviaTrasl = tDiaCompleto.filter(x=>x.trasladadaA&&/lluvia/i.test(x.notaWorker||""));
+                        if(lluviaTrasl.length===0) return null;
+                        return (
+                          <button title="Devuelve a este día todas las tareas que movió el modo lluvia"
+                            onClick={()=>{
+                              if(!window.confirm(`¿Deshacer los ${lluviaTrasl.length} traslado(s) del modo lluvia de este día?\n\nLas tareas vuelven a quedar activas aquí (Pendiente) y se quitan sus copias pendientes del día al que se movieron. Las que ya se trabajaron en el día nuevo no se tocan.`)) return;
+                              let omitidas = 0;
+                              setTareas(prev=>{
+                                let cur = prev; omitidas = 0;
+                                lluviaTrasl.forEach(x=>{
+                                  const actual = normArrTP(cur[dia]).find(y=>String(y.id)===String(x.id));
+                                  if(!actual) return;
+                                  const r = calcularDeshacerTraslado(cur,dia,actual);
+                                  if(r.ok) cur = r.next; else omitidas++;
+                                });
+                                return cur;
+                              });
+                              setTimeout(()=>{ if(omitidas>0) alert(`${omitidas} tarea(s) no se pudieron deshacer solas porque ya se trabajó en su copia — edítalas en el día al que se movieron.`); },300);
+                            }}
+                            style={{cursor:"pointer",border:"1px solid rgba(251,191,36,0.4)",borderRadius:6,padding:"3px 9px",background:"rgba(251,191,36,0.1)",color:"#fbbf24",fontSize:11,fontFamily:"'Georgia',serif"}}>
+                            ↩ Deshacer traslados por lluvia ({lluviaTrasl.length})
+                          </button>
+                        );
+                      })()}
                       <button onClick={()=>imprimirTurnoGeneral(dia)}
                         style={{cursor:"pointer",border:"1px solid rgba(59,130,246,0.3)",borderRadius:6,padding:"3px 9px",background:"rgba(59,130,246,0.1)",color:"#93c5fd",fontSize:11,fontFamily:"'Georgia',serif"}}>
                         🖨️ Imprimir todo el día
@@ -3306,6 +3351,16 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                                 </select>
                                 ):(
                                 <span style={{fontSize:10,color:est.color,flexShrink:0}}>{est.icon} {est.label}</span>
+                                )}
+                                {esJefa&&esTrasl&&(
+                                  <button title={`Deshacer el traslado: la tarea vuelve a este día y se quita la copia del ${hpTask.trasladadaA}`}
+                                    onClick={()=>{
+                                      const r=calcularDeshacerTraslado(tareas,dia,hpTask);
+                                      if(!r.ok){ alert(r.motivo); return; }
+                                      if(!window.confirm(`¿Deshacer el traslado de "${(hpTask.tarea||"").replace("⛳ ","")}" (${hpTask.zona||""} · ${hpTask.elemento||""})?\n\nVuelve a quedar activa en ${dia}${r.eraLluvia?" (de nuevo como Pendiente)":""}${r.habiaCopia?` y se quita la copia pendiente del ${r.destino}`:""}.`)) return;
+                                      setTareas(prev=>{ const rr=calcularDeshacerTraslado(prev,dia,hpTask); return rr.ok?rr.next:prev; });
+                                    }}
+                                    style={{cursor:"pointer",border:"1px solid rgba(251,191,36,0.4)",borderRadius:5,padding:"2px 8px",background:"rgba(251,191,36,0.1)",color:"#fbbf24",fontSize:11,flexShrink:0}}>↩ Deshacer traslado</button>
                                 )}
                                 {esJefa&&!esTrasl&&<input placeholder="nota..." defaultValue={hpTask.notaJefa||""}
                                   onBlur={e=>{if(e.target.value!==hpTask.notaJefa){const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);setTareas(prev=>({...prev,[dia]:nA2(prev[dia]).map(x=>x.id===hpTask.id?{...x,notaJefa:e.target.value}:x)}));}}}
