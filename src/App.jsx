@@ -10755,45 +10755,62 @@ function PanelRecibos({ S, comprasData, setComprasData, personal=[] }) {
   };
 
   const esc = (s)=>String(s??"").replace(/[&<>"]/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]));
-  const imprimir = (r)=>{
+  const [sel,setSel] = React.useState([]);
+  const toggleSel = (id)=>setSel(p=>p.includes(id)?p.filter(x=>x!==id):[...p,id]);
+  // Hoja oficio 8.5" x 13", 4 recibos por hoja en franjas apiladas
+  const imprimirLote = (arr)=>{
+    if(!arr.length) return;
     const V="#14532d";
-    const fechaTxt = new Date(r.fecha+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"});
-    const etiqueta = r.tipo==="recibi"?"Recibí de":"Pagué a";
-    const compra = r.compraId?compras.find(c=>String(c.id)===String(r.compraId)):null;
-    const copia = (titulo)=>`
-      <div class="rec">
+    const franja = (r)=>{
+      if(!r) return '<div class="rec vacio"></div>';
+      const fechaTxt = new Date(r.fecha+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"});
+      const etiqueta = r.tipo==="recibi"?"Recibí de":"Pagué a";
+      const compra = r.compraId?compras.find(c=>String(c.id)===String(r.compraId)):null;
+      return `<div class="rec">
         ${r.anulado?'<div class="anul">ANULADO</div>':""}
-        <div class="hdr"><img src="${LOGO_AREAS_VERDES_B64}" style="height:46px"/>
-          <div style="flex:1"><div style="font-size:18px;font-weight:700;color:${V}">Estadio Español · Áreas Verdes</div><div style="font-size:11px;color:#666">${titulo}</div></div>
-          <div style="text-align:right"><div style="font-size:11px;color:#666">RECIBO DE DINERO</div><div style="font-size:20px;font-weight:700;color:${V}">N° ${esc(r.numero)}</div></div></div>
+        <div class="hdr"><img src="${LOGO_AREAS_VERDES_B64}" style="height:34px"/>
+          <div style="flex:1"><div style="font-size:14px;font-weight:700;color:${V}">Estadio Español · Áreas Verdes</div><div style="font-size:9px;color:#666">RECIBO DE DINERO</div></div>
+          <div style="text-align:right"><div style="font-size:16px;font-weight:700;color:${V}">N° ${esc(r.numero)}</div><div style="font-size:10px;color:#444">${esc(fechaTxt)}</div></div></div>
         <table>
-          <tr><td class="l">Fecha</td><td>${esc(fechaTxt)}</td><td class="l">Monto</td><td style="font-size:18px;font-weight:700">$${Number(r.monto).toLocaleString("es-CL")}</td></tr>
-          <tr><td class="l">${etiqueta}</td><td colspan="3"><b>${esc(r.nombre)}</b>${r.rut?` &nbsp;·&nbsp; RUT ${esc(r.rut)}`:""}</td></tr>
+          <tr><td class="l">${etiqueta}</td><td><b>${esc(r.nombre)}</b>${r.rut?` · RUT ${esc(r.rut)}`:""}</td><td class="l">Monto</td><td class="m">$${Number(r.monto).toLocaleString("es-CL")}</td></tr>
           <tr><td class="l">La suma de</td><td colspan="3">${esc(montoEnPalabrasCL(r.monto))}</td></tr>
-          <tr><td class="l">Por concepto de</td><td colspan="3">${esc(r.concepto)}</td></tr>
-          <tr><td class="l">Forma de pago</td><td>${esc(r.formaPago)}</td><td class="l">Doc. asociado</td><td>${compra?esc(`${compra.tipoDoc||"Compra"} ${compra.nDocumento||""}`):"—"}</td></tr>
-          ${r.obs?`<tr><td class="l">Observaciones</td><td colspan="3">${esc(r.obs)}</td></tr>`:""}
+          <tr><td class="l">Concepto</td><td colspan="3">${esc(r.concepto)}${r.obs?` — <i>${esc(r.obs)}</i>`:""}</td></tr>
+          <tr><td class="l">Forma de pago</td><td>${esc(r.formaPago)}</td><td class="l">Doc.</td><td>${compra?esc(`${compra.tipoDoc||"Compra"} ${compra.nDocumento||""}`):"—"}</td></tr>
           ${r.anulado?`<tr><td class="l">Anulado</td><td colspan="3">${esc(r.motivoAnulacion||"")}</td></tr>`:""}
         </table>
-        <div class="firmas"><div class="fir"><div class="lin">Firma de quien entrega</div><div class="sub">Nombre y RUT</div></div>
-          <div class="fir"><div class="lin">Firma de quien recibe</div><div class="sub">Nombre y RUT</div></div></div>
+        <div class="firmas"><div class="fir"><div class="lin">Firma quien entrega · Nombre y RUT</div></div>
+          <div class="fir"><div class="lin">Firma quien recibe · Nombre y RUT</div></div></div>
       </div>`;
-    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>${esc(r.numero)}</title><style>
-      body{font-family:Calibri,Arial,sans-serif;padding:24px;color:#222;font-size:13px}
-      .rec{position:relative;border:2px solid ${V};border-radius:8px;padding:16px 18px;margin-bottom:22px;page-break-inside:avoid}
-      .hdr{display:flex;align-items:center;gap:12px;border-bottom:2px solid ${V};padding-bottom:8px;margin-bottom:10px}
-      table{width:100%;border-collapse:collapse} td{padding:7px 8px;border-bottom:1px solid #ddd;vertical-align:top}
-      td.l{width:120px;font-size:11px;color:#666;text-transform:uppercase;letter-spacing:.4px}
-      .firmas{display:flex;gap:40px;margin-top:46px}.fir{flex:1;text-align:center}
-      .lin{border-top:1px solid #333;padding-top:5px;font-size:11px}.sub{font-size:9px;color:#888}
-      .anul{position:absolute;top:40%;left:18%;font-size:68px;font-weight:800;color:rgba(220,38,38,.22);transform:rotate(-18deg);pointer-events:none}
-      @media print{.noprint{display:none}body{padding:10px}}</style></head><body>
-      ${copia("Original — quien recibe")}${copia("Copia — Áreas Verdes")}
-      <div class="noprint" style="text-align:center"><button onclick="window.print()" style="background:${V};color:#fff;border:none;padding:9px 22px;border-radius:6px;cursor:pointer">🖨️ Imprimir / PDF</button></div></body></html>`;
-    const w = window.open("","_blank","width=900,height=800");
+    };
+    let hojas="";
+    for(let i=0;i<arr.length;i+=4){
+      const g=[arr[i],arr[i+1],arr[i+2],arr[i+3]];
+      hojas+=`<div class="hoja">${g.map(franja).join("")}</div>`;
+    }
+    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Recibos de dinero</title><style>
+      @page{size:8.5in 13in;margin:0}
+      *{box-sizing:border-box}
+      body{margin:0;font-family:Calibri,Arial,sans-serif;color:#222;font-size:11px;background:#eee}
+      .hoja{width:8.5in;height:13in;padding:0.3in 0.4in;background:#fff;margin:0 auto 10px;display:flex;flex-direction:column;page-break-after:always;overflow:hidden}
+      .hoja:last-of-type{page-break-after:auto}
+      .rec{position:relative;flex:1;border-bottom:1px dashed #888;padding:6px 4px 6px;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden}
+      .rec:last-child{border-bottom:none}
+      .hdr{display:flex;align-items:center;gap:10px;border-bottom:2px solid ${V};padding-bottom:4px;margin-bottom:4px}
+      table{width:100%;border-collapse:collapse} td{padding:3px 6px;border-bottom:1px solid #ddd;vertical-align:top;font-size:11px}
+      td.l{width:82px;font-size:9px;color:#666;text-transform:uppercase;letter-spacing:.3px}
+      td.m{font-size:15px;font-weight:700;width:120px}
+      .firmas{display:flex;gap:40px;margin-top:22px}.fir{flex:1;text-align:center}
+      .lin{border-top:1px solid #333;padding-top:3px;font-size:9px}
+      .anul{position:absolute;top:25%;left:25%;font-size:48px;font-weight:800;color:rgba(220,38,38,.22);transform:rotate(-12deg);pointer-events:none}
+      .noprint{text-align:center;padding:10px}
+      @media print{body{background:#fff}.hoja{margin:0}.noprint{display:none}}</style></head><body>
+      <div class="noprint"><button onclick="window.print()" style="background:${V};color:#fff;border:none;padding:9px 22px;border-radius:6px;cursor:pointer">🖨️ Imprimir / PDF (hoja oficio 8.5×13", 4 por hoja)</button><div style="font-size:11px;color:#666;margin-top:4px">En el diálogo de impresión elige tamaño Oficio/Legal 8.5×13 y márgenes "Ninguno", escala 100%.</div></div>
+      ${hojas}</body></html>`;
+    const w = window.open("","_blank","width=900,height=900");
     if(!w){ alert("El navegador bloqueó la ventana. Permite ventanas emergentes para imprimir."); return; }
     w.document.write(html); w.document.close();
   };
+  const imprimir = (r)=>imprimirLote([r]);
 
   const anios = [...new Set([String(new Date().getFullYear()), ...recibos.map(r=>String(r.anio))])].sort().reverse();
   const lista = recibos.filter(r=>(filtroAnio==="todos"||String(r.anio)===filtroAnio)&&(!desde||r.fecha>=desde)&&(!hasta||r.fecha<=hasta)&&(verAnulados||!r.anulado))
@@ -10817,6 +10834,8 @@ function PanelRecibos({ S, comprasData, setComprasData, personal=[] }) {
       <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
         <button className="btn-p" style={S.btn} onClick={()=>{setForm(vacio);setShowForm(s=>!s);}}>🧾 Nuevo recibo</button>
         <button style={{...S.btn,fontSize:12,background:"rgba(255,255,255,0.06)",color:"#ede9e0",border:"1px solid rgba(255,255,255,0.12)"}} onClick={exportarCSV}>⬇️ Exportar CSV</button>
+        <button style={{...S.btn,fontSize:12,background:sel.length?"rgba(34,197,94,0.18)":"rgba(255,255,255,0.04)",color:sel.length?"#86efac":"#5a8a6a",border:"1px solid rgba(255,255,255,0.12)"}} onClick={()=>{const arr=recibos.filter(r=>sel.includes(r.id)).sort((x,y)=>x.anio-y.anio||x.seq-y.seq);if(!arr.length){alert("Marca los recibos a imprimir (casilla a la izquierda).");return;}imprimirLote(arr);}}>🖨️ Imprimir seleccionados ({sel.length}) · 4 por hoja</button>
+        {lista.length>0&&<button style={{...S.btn,fontSize:11,background:"transparent",color:"#6aaa7a",border:"1px solid rgba(255,255,255,0.1)"}} onClick={()=>setSel(sel.length?[]:lista.filter(r=>!r.anulado).map(r=>r.id))}>{sel.length?"Limpiar selección":"Seleccionar todos"}</button>}
         <select style={{...input,width:"auto",fontSize:12}} value={filtroAnio} onChange={e=>setFiltroAnio(e.target.value)}>
           {anios.map(a=><option key={a} value={a}>{a}</option>)}<option value="todos">Todos los años</option>
         </select>
@@ -10873,6 +10892,7 @@ function PanelRecibos({ S, comprasData, setComprasData, personal=[] }) {
       {lista.length===0?<div style={{color:"#5a8a6a",fontStyle:"italic",padding:20,textAlign:"center"}}>Sin recibos en este filtro.</div>:
         lista.map(r=>(
           <div key={r.id} style={{...S.card,padding:"10px 14px",marginBottom:8,opacity:r.anulado?0.55:1,display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+            <input type="checkbox" checked={sel.includes(r.id)} onChange={()=>toggleSel(r.id)}/>
             <div style={{fontFamily:"monospace",fontWeight:700,color:r.anulado?"#f87171":"#fbbf24",minWidth:110,textDecoration:r.anulado?"line-through":"none"}}>{r.numero}</div>
             <div style={{flex:1,minWidth:180}}>
               <div style={{fontSize:13,color:"#ede9e0"}}>{r.tipo==="recibi"?"📥 Recibí de":"📤 Pagué a"} <b>{r.nombre}</b>{r.rut?` · ${r.rut}`:""}</div>
