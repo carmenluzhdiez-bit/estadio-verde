@@ -10662,6 +10662,231 @@ function BodegaSelector({ items, compra, onConfirm, onCancel, S, bodegasData={} 
   );
 }
 
+// ─── RECIBOS DE DINERO (Compras) ────────────────────────────────────────────
+const numeroAPalabrasCL = (n) => {
+  n = Math.floor(Math.abs(Number(n)||0));
+  if(n===0) return "cero";
+  const U=["","uno","dos","tres","cuatro","cinco","seis","siete","ocho","nueve","diez","once","doce","trece","catorce","quince","dieciséis","diecisiete","dieciocho","diecinueve","veinte","veintiuno","veintidós","veintitrés","veinticuatro","veinticinco","veintiséis","veintisiete","veintiocho","veintinueve"];
+  const D=["","","","treinta","cuarenta","cincuenta","sesenta","setenta","ochenta","noventa"];
+  const C=["","ciento","doscientos","trescientos","cuatrocientos","quinientos","seiscientos","setecientos","ochocientos","novecientos"];
+  const menos1000 = (x)=>{
+    if(x===100) return "cien";
+    let s="";
+    if(x>=100){ s+=C[Math.floor(x/100)]+" "; x%=100; }
+    if(x<30) s+=U[x];
+    else { s+=D[Math.floor(x/10)]; if(x%10) s+=" y "+U[x%10]; }
+    return s.trim();
+  };
+  const grupo = (x, sing, plur, apocopar)=>{ // millones / miles
+    if(x===0) return "";
+    if(x===1) return sing;
+    let t=menos1000(x);
+    if(apocopar) t=t.replace(/veintiuno$/,"veintiún").replace(/uno$/,"un");
+    return t+" "+plur;
+  };
+  const millones=Math.floor(n/1000000), miles=Math.floor((n%1000000)/1000), resto=n%1000;
+  const partes=[];
+  if(millones) partes.push(millones===1?"un millón":grupo(millones,"","millones",true));
+  if(miles) partes.push(miles===1?"mil":menos1000(miles).replace(/veintiuno$/,"veintiún").replace(/uno$/,"un")+" mil");
+  if(resto) partes.push(menos1000(resto));
+  return partes.join(" ").replace(/\s+/g," ").trim();
+};
+const montoEnPalabrasCL = (n) => {
+  const v=Math.floor(Math.abs(Number(n)||0));
+  let p=numeroAPalabrasCL(v);
+  if(v===1) p="un";
+  p=p.replace(/veintiuno$/,"veintiún").replace(/uno$/,"un");
+  const suf=(v>0&&v%1000000===0)?" de pesos":(v===1?" peso":" pesos");
+  return p.charAt(0).toUpperCase()+p.slice(1)+suf;
+};
+
+function PanelRecibos({ S, comprasData, setComprasData, personal=[] }) {
+  const { compras=[], recibos=[], contadorRecibos={} } = comprasData;
+  const hoyISO = new Date().toISOString().slice(0,10);
+  const FORMAS = ["Efectivo","Transferencia","Cheque","Otro"];
+  const vacio = { fecha:hoyISO, tipo:"recibi", nombre:"", rut:"", monto:"", concepto:"", formaPago:"Efectivo", compraId:"", obs:"", responsable:"" };
+  const [form,setForm] = React.useState(vacio);
+  const [showForm,setShowForm] = React.useState(false);
+  const [filtroAnio,setFiltroAnio] = React.useState(String(new Date().getFullYear()));
+  const [desde,setDesde] = React.useState("");
+  const [hasta,setHasta] = React.useState("");
+  const [verAnulados,setVerAnulados] = React.useState(true);
+  const f = (k,v)=>setForm(p=>({...p,[k]:v}));
+  const input = S.input||{};
+
+  const siguienteNumero = (anio) => {
+    const maxExist = recibos.filter(r=>r.anio===anio).reduce((m,r)=>Math.max(m,r.seq||0),0);
+    return Math.max(Number(contadorRecibos[anio])||0, maxExist)+1;
+  };
+  const fmtNum = (anio,seq)=>`RD-${anio}-${String(seq).padStart(3,"0")}`;
+  const anioForm = Number((form.fecha||hoyISO).slice(0,4));
+  const vistaNumero = fmtNum(anioForm, siguienteNumero(anioForm));
+
+  const totalDeCompra = (c)=>Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
+  const precargarCompra = (id)=>{
+    const c = compras.find(x=>String(x.id)===String(id));
+    if(!c){ f("compraId",""); return; }
+    setForm(p=>({...p, compraId:String(c.id), nombre:c.proveedor||p.nombre, rut:c.rut||p.rut,
+      monto:String(totalDeCompra(c)||""), concepto:p.concepto||`${c.tipoDoc||"Compra"}${c.nDocumento?` N° ${c.nDocumento}`:""}`.trim(), tipo:"pague"}));
+  };
+
+  const guardar = ()=>{
+    const monto = Math.round(Number(String(form.monto).replace(/[^\d.]/g,""))||0);
+    if(!form.nombre.trim()){ alert("Falta el nombre de quien entrega/recibe el dinero."); return; }
+    if(monto<=0){ alert("El monto debe ser mayor a 0."); return; }
+    if(!form.concepto.trim()){ alert("Falta el concepto."); return; }
+    const anio = Number(form.fecha.slice(0,4));
+    const seq = siguienteNumero(anio);
+    const rec = { id:Date.now(), anio, seq, numero:fmtNum(anio,seq), ...form, monto, nombre:form.nombre.trim(), concepto:form.concepto.trim(),
+      creadoEn:new Date().toISOString(), anulado:false };
+    setComprasData(p=>{
+      const anioSeq = Math.max(Number(p.contadorRecibos?.[anio])||0, seq);
+      return {...p, recibos:[rec,...(p.recibos||[])], contadorRecibos:{...(p.contadorRecibos||{}),[anio]:anioSeq}};
+    });
+    setShowForm(false); setForm(vacio);
+    imprimir(rec);
+  };
+
+  const anular = (r)=>{
+    const motivo = prompt(`Anular ${r.numero}. El número se conserva marcado como ANULADO.\nMotivo:`);
+    if(motivo===null) return;
+    if(!motivo.trim()){ alert("Indica un motivo para anular."); return; }
+    setComprasData(p=>({...p, recibos:(p.recibos||[]).map(x=>x.id===r.id?{...x,anulado:true,motivoAnulacion:motivo.trim(),anuladoEn:new Date().toISOString()}:x)}));
+  };
+
+  const esc = (s)=>String(s??"").replace(/[&<>"]/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]));
+  const imprimir = (r)=>{
+    const V="#14532d";
+    const fechaTxt = new Date(r.fecha+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"});
+    const etiqueta = r.tipo==="recibi"?"Recibí de":"Pagué a";
+    const compra = r.compraId?compras.find(c=>String(c.id)===String(r.compraId)):null;
+    const copia = (titulo)=>`
+      <div class="rec">
+        ${r.anulado?'<div class="anul">ANULADO</div>':""}
+        <div class="hdr"><img src="${LOGO_AREAS_VERDES_B64}" style="height:46px"/>
+          <div style="flex:1"><div style="font-size:18px;font-weight:700;color:${V}">Estadio Español · Áreas Verdes</div><div style="font-size:11px;color:#666">${titulo}</div></div>
+          <div style="text-align:right"><div style="font-size:11px;color:#666">RECIBO DE DINERO</div><div style="font-size:20px;font-weight:700;color:${V}">N° ${esc(r.numero)}</div></div></div>
+        <table>
+          <tr><td class="l">Fecha</td><td>${esc(fechaTxt)}</td><td class="l">Monto</td><td style="font-size:18px;font-weight:700">$${Number(r.monto).toLocaleString("es-CL")}</td></tr>
+          <tr><td class="l">${etiqueta}</td><td colspan="3"><b>${esc(r.nombre)}</b>${r.rut?` &nbsp;·&nbsp; RUT ${esc(r.rut)}`:""}</td></tr>
+          <tr><td class="l">La suma de</td><td colspan="3">${esc(montoEnPalabrasCL(r.monto))}</td></tr>
+          <tr><td class="l">Por concepto de</td><td colspan="3">${esc(r.concepto)}</td></tr>
+          <tr><td class="l">Forma de pago</td><td>${esc(r.formaPago)}</td><td class="l">Doc. asociado</td><td>${compra?esc(`${compra.tipoDoc||"Compra"} ${compra.nDocumento||""}`):"—"}</td></tr>
+          ${r.obs?`<tr><td class="l">Observaciones</td><td colspan="3">${esc(r.obs)}</td></tr>`:""}
+          ${r.anulado?`<tr><td class="l">Anulado</td><td colspan="3">${esc(r.motivoAnulacion||"")}</td></tr>`:""}
+        </table>
+        <div class="firmas"><div class="fir"><div class="lin">Firma de quien entrega</div><div class="sub">Nombre y RUT</div></div>
+          <div class="fir"><div class="lin">Firma de quien recibe</div><div class="sub">Nombre y RUT</div></div></div>
+      </div>`;
+    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>${esc(r.numero)}</title><style>
+      body{font-family:Calibri,Arial,sans-serif;padding:24px;color:#222;font-size:13px}
+      .rec{position:relative;border:2px solid ${V};border-radius:8px;padding:16px 18px;margin-bottom:22px;page-break-inside:avoid}
+      .hdr{display:flex;align-items:center;gap:12px;border-bottom:2px solid ${V};padding-bottom:8px;margin-bottom:10px}
+      table{width:100%;border-collapse:collapse} td{padding:7px 8px;border-bottom:1px solid #ddd;vertical-align:top}
+      td.l{width:120px;font-size:11px;color:#666;text-transform:uppercase;letter-spacing:.4px}
+      .firmas{display:flex;gap:40px;margin-top:46px}.fir{flex:1;text-align:center}
+      .lin{border-top:1px solid #333;padding-top:5px;font-size:11px}.sub{font-size:9px;color:#888}
+      .anul{position:absolute;top:40%;left:18%;font-size:68px;font-weight:800;color:rgba(220,38,38,.22);transform:rotate(-18deg);pointer-events:none}
+      @media print{.noprint{display:none}body{padding:10px}}</style></head><body>
+      ${copia("Original — quien recibe")}${copia("Copia — Áreas Verdes")}
+      <div class="noprint" style="text-align:center"><button onclick="window.print()" style="background:${V};color:#fff;border:none;padding:9px 22px;border-radius:6px;cursor:pointer">🖨️ Imprimir / PDF</button></div></body></html>`;
+    const w = window.open("","_blank","width=900,height=800");
+    if(!w){ alert("El navegador bloqueó la ventana. Permite ventanas emergentes para imprimir."); return; }
+    w.document.write(html); w.document.close();
+  };
+
+  const anios = [...new Set([String(new Date().getFullYear()), ...recibos.map(r=>String(r.anio))])].sort().reverse();
+  const lista = recibos.filter(r=>(filtroAnio==="todos"||String(r.anio)===filtroAnio)&&(!desde||r.fecha>=desde)&&(!hasta||r.fecha<=hasta)&&(verAnulados||!r.anulado))
+    .sort((a,b)=>b.anio-a.anio||b.seq-a.seq);
+  const totalPeriodo = lista.filter(r=>!r.anulado).reduce((a,r)=>a+Number(r.monto||0),0);
+  const totalRecibido = lista.filter(r=>!r.anulado&&r.tipo==="recibi").reduce((a,r)=>a+Number(r.monto||0),0);
+  const totalPagado = lista.filter(r=>!r.anulado&&r.tipo==="pague").reduce((a,r)=>a+Number(r.monto||0),0);
+
+  const exportarCSV = ()=>{
+    const filas = lista.map(r=>({"N°":r.numero,Fecha:r.fecha,Tipo:r.tipo==="recibi"?"Recibí de":"Pagué a",Nombre:r.nombre,RUT:r.rut||"",Monto:r.monto,
+      "Monto en palabras":montoEnPalabrasCL(r.monto),Concepto:r.concepto,"Forma de pago":r.formaPago,
+      "Doc. asociado":(()=>{const c=compras.find(x=>String(x.id)===String(r.compraId));return c?`${c.tipoDoc||""} ${c.nDocumento||""}`.trim():"";})(),
+      Observaciones:r.obs||"",Estado:r.anulado?"ANULADO":"Vigente","Motivo anulación":r.motivoAnulacion||""}));
+    if(!filas.length){ alert("No hay recibos en el filtro actual."); return; }
+    descargarArchivoCR(`recibos_dinero_${filtroAnio}.csv`,"﻿"+csvDeItems(filas),"text/csv;charset=utf-8");
+  };
+
+  const lbl = {fontSize:11,color:"#6aaa7a",marginBottom:3,display:"block"};
+  return (
+    <div className="ein">
+      <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
+        <button className="btn-p" style={S.btn} onClick={()=>{setForm(vacio);setShowForm(s=>!s);}}>🧾 Nuevo recibo</button>
+        <button style={{...S.btn,fontSize:12,background:"rgba(255,255,255,0.06)",color:"#ede9e0",border:"1px solid rgba(255,255,255,0.12)"}} onClick={exportarCSV}>⬇️ Exportar CSV</button>
+        <select style={{...input,width:"auto",fontSize:12}} value={filtroAnio} onChange={e=>setFiltroAnio(e.target.value)}>
+          {anios.map(a=><option key={a} value={a}>{a}</option>)}<option value="todos">Todos los años</option>
+        </select>
+        <input type="date" style={{...input,width:"auto",fontSize:12}} value={desde} onChange={e=>setDesde(e.target.value)} title="Desde"/>
+        <input type="date" style={{...input,width:"auto",fontSize:12}} value={hasta} onChange={e=>setHasta(e.target.value)} title="Hasta"/>
+        <label style={{fontSize:11,color:"#6aaa7a",display:"flex",alignItems:"center",gap:4}}><input type="checkbox" checked={verAnulados} onChange={e=>setVerAnulados(e.target.checked)}/>Ver anulados</label>
+      </div>
+
+      {showForm&&(
+        <div style={{...S.card,padding:16,marginBottom:16}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+            <div style={{fontWeight:700,color:"#86efac"}}>🧾 Nuevo recibo de dinero</div>
+            <div style={{fontFamily:"monospace",fontSize:15,color:"#fbbf24",fontWeight:700}}>N° {vistaNumero}</div>
+          </div>
+          <div style={{marginBottom:10}}>
+            <label style={lbl}>Asociar a una compra (opcional — precarga proveedor, RUT y monto)</label>
+            <select style={{...input,width:"100%"}} value={form.compraId} onChange={e=>precargarCompra(e.target.value)}>
+              <option value="">— Recibo independiente —</option>
+              {compras.filter(c=>c.tipoDoc!=="Nota de Crédito").slice(0,150).map(c=>(
+                <option key={c.id} value={c.id}>{c.fecha} · {c.proveedor||"s/proveedor"} · {c.tipoDoc||"Compra"} {c.nDocumento||""} · ${totalDeCompra(c).toLocaleString("es-CL")}</option>
+              ))}
+            </select>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:10}}>
+            <div><label style={lbl}>Fecha</label><input type="date" style={{...input,width:"100%"}} value={form.fecha} onChange={e=>f("fecha",e.target.value)}/></div>
+            <div><label style={lbl}>Tipo</label>
+              <select style={{...input,width:"100%"}} value={form.tipo} onChange={e=>f("tipo",e.target.value)}>
+                <option value="recibi">Recibí de (ingreso de dinero)</option><option value="pague">Pagué a (egreso de dinero)</option>
+              </select></div>
+            <div><label style={lbl}>{form.tipo==="recibi"?"Recibí de":"Pagué a"} (nombre)</label><input style={{...input,width:"100%"}} value={form.nombre} onChange={e=>f("nombre",e.target.value)}/></div>
+            <div><label style={lbl}>RUT</label><input style={{...input,width:"100%"}} placeholder="12.345.678-9" value={form.rut} onChange={e=>f("rut",e.target.value)}/></div>
+            <div><label style={lbl}>Monto ($)</label><input inputMode="numeric" style={{...input,width:"100%"}} value={form.monto} onChange={e=>f("monto",e.target.value.replace(/[^\d]/g,""))}/></div>
+            <div><label style={lbl}>Forma de pago</label>
+              <select style={{...input,width:"100%"}} value={form.formaPago} onChange={e=>f("formaPago",e.target.value)}>{FORMAS.map(x=><option key={x}>{x}</option>)}</select></div>
+          </div>
+          {Number(form.monto)>0&&<div style={{margin:"10px 0",padding:"8px 12px",background:"rgba(34,197,94,0.08)",borderRadius:8,fontSize:12,color:"#86efac"}}>
+            <b>${Number(form.monto).toLocaleString("es-CL")}</b> — {montoEnPalabrasCL(form.monto)}</div>}
+          <div style={{marginTop:10}}><label style={lbl}>Por concepto de</label><input style={{...input,width:"100%"}} value={form.concepto} onChange={e=>f("concepto",e.target.value)}/></div>
+          <div style={{marginTop:10}}><label style={lbl}>Observaciones (opcional)</label><input style={{...input,width:"100%"}} value={form.obs} onChange={e=>f("obs",e.target.value)}/></div>
+          <div style={{display:"flex",gap:8,marginTop:14}}>
+            <button className="btn-p" style={S.btn} onClick={guardar}>💾 Guardar e imprimir</button>
+            <button className="btn-g" style={S.btn} onClick={()=>setShowForm(false)}>Cancelar</button>
+          </div>
+          <div style={{fontSize:10,color:"#5a8a6a",marginTop:8}}>El número se asigna al guardar y no se reutiliza. Para corregir un recibo, anúlalo y emite uno nuevo.</div>
+        </div>
+      )}
+
+      <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:12,fontSize:12}}>
+        <span style={{color:"#86efac"}}>📥 Recibido: <b>${totalRecibido.toLocaleString("es-CL")}</b></span>
+        <span style={{color:"#fca5a5"}}>📤 Pagado: <b>${totalPagado.toLocaleString("es-CL")}</b></span>
+        <span style={{color:"#ede9e0"}}>Total vigente: <b>${totalPeriodo.toLocaleString("es-CL")}</b> ({lista.filter(r=>!r.anulado).length} recibos)</span>
+      </div>
+
+      {lista.length===0?<div style={{color:"#5a8a6a",fontStyle:"italic",padding:20,textAlign:"center"}}>Sin recibos en este filtro.</div>:
+        lista.map(r=>(
+          <div key={r.id} style={{...S.card,padding:"10px 14px",marginBottom:8,opacity:r.anulado?0.55:1,display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+            <div style={{fontFamily:"monospace",fontWeight:700,color:r.anulado?"#f87171":"#fbbf24",minWidth:110,textDecoration:r.anulado?"line-through":"none"}}>{r.numero}</div>
+            <div style={{flex:1,minWidth:180}}>
+              <div style={{fontSize:13,color:"#ede9e0"}}>{r.tipo==="recibi"?"📥 Recibí de":"📤 Pagué a"} <b>{r.nombre}</b>{r.rut?` · ${r.rut}`:""}</div>
+              <div style={{fontSize:11,color:"#6aaa7a"}}>{r.fecha} · {r.concepto} · {r.formaPago}{r.anulado?` · ANULADO: ${r.motivoAnulacion||""}`:""}</div>
+            </div>
+            <div style={{fontWeight:700,color:"#ede9e0"}}>${Number(r.monto).toLocaleString("es-CL")}</div>
+            <button style={{...S.btn,padding:"5px 10px",fontSize:12,background:"rgba(255,255,255,0.06)",color:"#ede9e0",border:"1px solid rgba(255,255,255,0.12)"}} onClick={()=>imprimir(r)}>🖨️</button>
+            {!r.anulado&&<button style={{...S.btn,padding:"5px 10px",fontSize:12,background:"rgba(239,68,68,0.12)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}} onClick={()=>anular(r)}>Anular</button>}
+          </div>
+        ))}
+    </div>
+  );
+}
+
 function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={}, updateZona=()=>{}, MACROZONAS_BASE=[], bodegasData={}, setBodegasData=()=>{}, eppEntregas=[], setEppEntregas=()=>{} }) {
   const { compras, rendiciones=[], fondo=3000000, saldoAnterior=0, periodoAnterior="" } = comprasData;
   const set = (patch) => setComprasData(p=>({...p,...patch}));
@@ -11216,13 +11441,14 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
 
       {/* Sub-tabs */}
       <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
-        {[["fondo","📊 Resumen"],["lista","📋 Compras"],["rendiciones","📤 Rendiciones"],["gastos","📊 Gastos por categoría"]].map(([t,l])=>{
+        {[["fondo","📊 Resumen"],["lista","📋 Compras"],["rendiciones","📤 Rendiciones"],["gastos","📊 Gastos por categoría"],["recibos","🧾 Recibos de dinero"]].map(([t,l])=>{
           const badge=t==="lista"?compras.filter(c=>c.estado==="pendiente"&&!["Guía de Despacho","Nota de Pedido","Cotización","Orden de Compra"].includes(c.tipoDoc)).length:t==="rendiciones"?rendiciones.filter(r=>!r.reembolso).length:0;
           return <button key={t} className={`tab${subTab===t?" on":""}`} onClick={()=>{setSubTab(t);setShowForm(false);}} style={{position:"relative"}}>
             {l}{badge>0&&<span style={{position:"absolute",top:1,right:1,background:"#ef4444",color:"#fff",borderRadius:"50%",width:14,height:14,fontSize:9,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>{badge}</span>}
           </button>;
         })}
       </div>
+      {subTab==="recibos"&&<PanelRecibos S={S} comprasData={comprasData} setComprasData={setComprasData} personal={personal}/>}
       {subTab==="fondo"&&(
         <div className="ein">
           {compras.length===0?(
