@@ -1675,6 +1675,156 @@ function ResponsableSelector({ value, personal, onChange, S, fontSize=14, inline
 }
 
 // ─── REPORTE SEMANAL ─────────────────────────────────────────────────────────
+// ─── GESTIÓN (solo jefa): desempeño en el tiempo y atraso por tipo de tarea ───
+const TIPOS_TAREA_GESTION = {
+  Corte:["corte","cortad"], Poda:["poda","podar"], Fertilización:["fertili","abono","novatec","salitre"],
+  Riego:["riego","regar"], Fumigación:["fumig","hongos","plaga"], Limpieza:["limpie","limpieza","sopla","barrid"],
+  Aireación:["airead"], Desmalezado:["desmaleza","maleza"], Medición:["medici","altura","humedad"],
+  Revisión:["revisi"], Orillado:["orill"],
+};
+const tipoDeTareaGestion = (t) => {
+  const tl=(t.tarea||"").toLowerCase();
+  for(const [k,kws] of Object.entries(TIPOS_TAREA_GESTION)) if(kws.some(kw=>tl.includes(kw))) return k;
+  return "Otros";
+};
+const lunesDeFecha = (f) => { const d=new Date(f+"T12:00:00"); d.setDate(d.getDate()-((d.getDay()+6)%7)); return d.toISOString().slice(0,10); };
+const sumarDiasFecha = (f,n) => { const d=new Date(f+"T12:00:00"); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
+const diasEntreFechas = (a,b) => Math.round((new Date(b+"T12:00:00")-new Date(a+"T12:00:00"))/86400000);
+
+function PanelGestion({ S, tareasProg, esJefa=false }) {
+  const [semanas,setSemanas] = React.useState(8);
+  const [vistaG,setVistaG] = React.useState("desempeno");
+  if(!esJefa) return null;
+  const hoy = fechaLocal();
+  const lunesActual = lunesDeFecha(hoy);
+  const listaSem = Array.from({length:semanas},(_,i)=>sumarDiasFecha(lunesActual,-7*(semanas-1-i)));
+  const desde = listaSem[0];
+  const NOFIN = ["pendiente","por_designar","en_curso"];
+
+  // Todas las tareas del período, ya normalizadas
+  const todas = [];
+  Object.entries(tareasProg||{}).forEach(([dia,tds])=>{
+    if(dia<desde||dia>hoy) return;
+    (Array.isArray(tds)?tds:Object.values(tds||{})).forEach(t=>{ if(t) todas.push({...t,dia}); });
+  });
+
+  // ── 1) Desempeño por jardinero y semana ──
+  const porTrab = {};
+  todas.forEach(t=>{
+    const r=(t.responsable||"").trim(); if(!r) return;
+    const lluvia=esNoPudoLluvia(t);
+    const est=normalizarEstado(t.estado);
+    const movida=t.trasladadaA && est!=="hecha" && !lluvia;
+    const sem=lunesDeFecha(t.dia);
+    if(!porTrab[r]) porTrab[r]={sems:{},hechas:0,efect:0,noPudo:0,lluvia:0};
+    const o=porTrab[r];
+    if(!o.sems[sem]) o.sems[sem]={efect:0,hechas:0};
+    if(lluvia){ o.lluvia++; return; }
+    if(movida) return;
+    if(NOFIN.includes(est) && t.dia===hoy) return; // lo de hoy aún está en curso: no se califica
+    o.sems[sem].efect++; o.efect++;
+    if(est==="hecha"){ o.sems[sem].hechas++; o.hechas++; }
+    else if(est==="no_pudo") o.noPudo++;
+  });
+  const filasTrab = Object.entries(porTrab).filter(([,o])=>o.efect>0||o.lluvia>0)
+    .map(([n,o])=>({n,o,pct:o.efect?Math.round(o.hechas/o.efect*100):null}))
+    .sort((a,b)=>(b.pct??-1)-(a.pct??-1));
+  const colPct = p=>p===null?"#4a7a5a":p>=80?"#22c55e":p>=50?"#f59e0b":"#ef4444";
+
+  // ── 2) Atraso por tipo de tarea (solo tareas hechas) ──
+  const porTipo = {};
+  todas.forEach(t=>{
+    if(normalizarEstado(t.estado)!=="hecha") return;
+    const porLluvia=/por lluvia|lluvia/i.test(t.notas||"")||esNoPudoLluvia(t);
+    const base = t.fechaCorrespondiente || t.movidoDesde || t.dia;
+    const atraso = Math.max(Number(t.diasVencida)||0, base<t.dia?diasEntreFechas(base,t.dia):0);
+    const tipo=tipoDeTareaGestion(t);
+    if(!porTipo[tipo]) porTipo[tipo]={n:0,aTiempo:0,suma:0,max:0,conAtraso:0,porLluvia:0};
+    const o=porTipo[tipo];
+    o.n++;
+    if(porLluvia && atraso>0){ o.porLluvia++; o.aTiempo++; return; } // atraso por clima: no se castiga
+    if(atraso===0) o.aTiempo++; else { o.conAtraso++; o.suma+=atraso; o.max=Math.max(o.max,atraso); }
+  });
+  const filasTipo = Object.entries(porTipo).map(([tipo,o])=>({tipo,...o,
+    pctTiempo:o.n?Math.round(o.aTiempo/o.n*100):0, prom:o.conAtraso?Math.round(o.suma/o.conAtraso*10)/10:0})).sort((a,b)=>b.prom-a.prom||b.n-a.n);
+
+  const fmtS = f=>{ const d=new Date(f+"T12:00:00"); return d.getDate()+"/"+(d.getMonth()+1); };
+  const imprimir = ()=>{
+    const V="#1a5c35";
+    const th=(arr)=>`<tr style="background:${V};color:#fff">${arr.map(x=>`<th style="padding:5px 8px;text-align:left">${x}</th>`).join("")}</tr>`;
+    const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Gestión</title><style>body{font-family:Calibri,Arial,sans-serif;padding:24px;font-size:12px;color:#222}h1{color:${V};font-size:20px}h3{color:${V};border-bottom:2px solid ${V};padding-bottom:3px;margin:18px 0 6px}table{width:100%;border-collapse:collapse;font-size:11px}td{padding:4px 8px;border-bottom:1px solid #ddd}@media print{.np{display:none}}</style></head><body>
+    <div style="display:flex;align-items:center;gap:12px"><img src="${LOGO_AREAS_VERDES_B64}" style="height:44px"/><div><h1 style="margin:0">Gestión — Departamento de Áreas Verdes</h1><div style="color:#555">Últimas ${semanas} semanas · hasta ${hoy} · uso interno de jefatura</div></div></div>
+    <h3>Desempeño por jardinero (% de tareas hechas; la lluvia y las tareas movidas no cuentan en contra)</h3>
+    <table>${th(["Jardinero",...listaSem.map(fmtS),"Total","Hechas","No se pudo","🌧️"])}${filasTrab.map(({n,o,pct},i)=>`<tr style="background:${i%2?"#f5fbf5":"#fff"}"><td><b>${n}</b></td>${listaSem.map(w=>{const x=o.sems[w];return `<td style="text-align:center">${x&&x.efect?Math.round(x.hechas/x.efect*100)+"%":"—"}</td>`;}).join("")}<td style="text-align:center;font-weight:700">${pct===null?"—":pct+"%"}</td><td style="text-align:center">${o.hechas}</td><td style="text-align:center">${o.noPudo||"—"}</td><td style="text-align:center">${o.lluvia||"—"}</td></tr>`).join("")}</table>
+    <h3>Atraso por tipo de tarea (tareas hechas)</h3>
+    <table>${th(["Tipo","Hechas","A tiempo","Con atraso","Atraso promedio (d)","Máximo (d)"])}${filasTipo.map((f,i)=>`<tr style="background:${i%2?"#f5fbf5":"#fff"}"><td><b>${f.tipo}</b></td><td style="text-align:center">${f.n}</td><td style="text-align:center">${f.pctTiempo}%</td><td style="text-align:center">${f.conAtraso||"—"}</td><td style="text-align:center">${f.conAtraso?f.prom:"—"}</td><td style="text-align:center">${f.conAtraso?f.max:"—"}</td></tr>`).join("")}</table>
+    <div class="np" style="text-align:center;margin-top:16px"><button onclick="window.print()" style="background:${V};color:#fff;border:none;padding:9px 22px;border-radius:6px;cursor:pointer">🖨️ Imprimir / PDF</button></div></body></html>`;
+    const w=window.open("","_blank","width=1000,height=800"); if(!w){ alert("Permite ventanas emergentes para imprimir."); return; }
+    w.document.write(html); w.document.close();
+  };
+
+  const th = {padding:"4px 8px",color:"#34d399",fontSize:10,textAlign:"center"};
+  return (
+    <div className="ein">
+      <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
+        {[["desempeno","👷 Desempeño por jardinero"],["atraso","⏱️ Atraso por tipo de tarea"]].map(([t,l])=>(
+          <button key={t} onClick={()=>setVistaG(t)} style={{cursor:"pointer",border:`1px solid ${vistaG===t?"#34d399":"rgba(255,255,255,0.12)"}`,borderRadius:8,padding:"5px 14px",fontSize:12,background:vistaG===t?"rgba(52,211,153,0.12)":"transparent",color:vistaG===t?"#34d399":"#6aaa7a"}}>{l}</button>))}
+        <select value={semanas} onChange={e=>setSemanas(Number(e.target.value))} style={{...S.input,width:"auto",fontSize:12}}>
+          {[4,8,12].map(n=><option key={n} value={n}>Últimas {n} semanas</option>)}
+        </select>
+        <button onClick={imprimir} style={{...S.btn,fontSize:12,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}}>🖨️ Imprimir</button>
+      </div>
+
+      {vistaG==="desempeno"&&(
+        <div style={{...S.card,padding:"12px 14px",overflowX:"auto"}}>
+          <div style={{fontSize:11,color:"#5a9a7a",marginBottom:8}}>% de tareas hechas por semana (inicio de semana en lunes). La lluvia y las tareas movidas a otro día no cuentan en contra; lo de hoy aún no se califica.</div>
+          {filasTrab.length===0?<div style={{color:"#4a7a5a",textAlign:"center",padding:20}}>Sin tareas con responsable en el período.</div>:(
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+              <thead><tr style={{background:"rgba(52,211,153,0.08)"}}>
+                <th style={{...th,textAlign:"left"}}>Jardinero</th>
+                {listaSem.map(w=><th key={w} style={th}>{fmtS(w)}</th>)}
+                <th style={th}>Total</th><th style={th}>✅</th><th style={th}>🔴</th><th style={th}>🌧️</th>
+              </tr></thead>
+              <tbody>{filasTrab.map(({n,o,pct})=>(
+                <tr key={n} style={{borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                  <td style={{padding:"5px 8px",fontWeight:600,color:"#ede9e0",whiteSpace:"nowrap"}}>{n}</td>
+                  {listaSem.map(w=>{const x=o.sems[w];const p=x&&x.efect?Math.round(x.hechas/x.efect*100):null;return (
+                    <td key={w} title={x?`${x.hechas}/${x.efect} tareas`:""} style={{textAlign:"center",padding:"4px 2px"}}>
+                      <span style={{display:"inline-block",minWidth:34,padding:"2px 4px",borderRadius:6,fontWeight:700,fontSize:10,color:p===null?"#4a7a5a":"#0b1d12",background:p===null?"transparent":colPct(p)}}>{p===null?"—":p+"%"}</span>
+                    </td>);})}
+                  <td style={{textAlign:"center",fontWeight:700,color:colPct(pct)}}>{pct===null?"—":pct+"%"}</td>
+                  <td style={{textAlign:"center",color:"#22c55e"}}>{o.hechas}</td>
+                  <td style={{textAlign:"center",color:o.noPudo>0?"#ef4444":"#4a7a5a"}}>{o.noPudo||"—"}</td>
+                  <td style={{textAlign:"center",color:o.lluvia>0?"#60a5fa":"#4a7a5a"}}>{o.lluvia||"—"}</td>
+                </tr>))}</tbody>
+            </table>)}
+        </div>
+      )}
+
+      {vistaG==="atraso"&&(
+        <div style={{...S.card,padding:"12px 14px",overflowX:"auto"}}>
+          <div style={{fontSize:11,color:"#5a9a7a",marginBottom:8}}>Solo tareas hechas. Atraso = días entre la fecha que correspondía (o desde la que se movió) y el día en que se hizo. Los atrasos causados por lluvia no se cuentan como atraso.</div>
+          {filasTipo.length===0?<div style={{color:"#4a7a5a",textAlign:"center",padding:20}}>Sin tareas hechas en el período.</div>:(
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+              <thead><tr style={{background:"rgba(52,211,153,0.08)"}}>
+                <th style={{...th,textAlign:"left"}}>Tipo</th><th style={th}>Hechas</th><th style={th}>A tiempo</th><th style={th}>Con atraso</th><th style={th}>Atraso prom. (d)</th><th style={th}>Máx. (d)</th>
+              </tr></thead>
+              <tbody>{filasTipo.map(f=>(
+                <tr key={f.tipo} style={{borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                  <td style={{padding:"5px 8px",fontWeight:600,color:"#ede9e0"}}>{f.tipo}</td>
+                  <td style={{textAlign:"center",color:"#5a9a7a"}}>{f.n}</td>
+                  <td style={{textAlign:"center",fontWeight:700,color:colPct(f.pctTiempo)}}>{f.pctTiempo}%</td>
+                  <td style={{textAlign:"center",color:f.conAtraso>0?"#f59e0b":"#4a7a5a"}}>{f.conAtraso||"—"}</td>
+                  <td style={{textAlign:"center",color:f.prom>3?"#ef4444":f.prom>0?"#f59e0b":"#4a7a5a"}}>{f.conAtraso?f.prom:"—"}</td>
+                  <td style={{textAlign:"center",color:"#9ca3af"}}>{f.conAtraso?f.max:"—"}</td>
+                </tr>))}</tbody>
+            </table>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_BASE, personal, incidenciasFito=[], esJefa=false, frecEstado=[] }) {
 
   const IDS_DEPORTES = [31, 38];
@@ -28029,7 +28179,7 @@ export default function App() {
               <div>
                 <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:24,fontWeight:900,marginBottom:4}}>Reporte General</h1>
                 <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap"}}>
-                  {[["general","📋 Estado Actual"],["semanal","📅 Reporte Semanal"]].map(([t,l])=>(
+                  {[["general","📋 Estado Actual"],["semanal","📅 Reporte Semanal"],...(esJefa?[["gestion","📊 Gestión"]]:[])].map(([t,l])=>(
                     <button key={t} className={`tab${tabReporte===t?" on":""}`} onClick={()=>setTabReporte(t)} style={{fontSize:13}}>{l}</button>
                   ))}
                 </div>
@@ -28113,6 +28263,7 @@ export default function App() {
             {tabReporte==="semanal" && (
               <ReporteSemanal frecEstado={tabReporte==="semanal"?calcFrecuenciasEstado():[]} S={S} tareasProg={tareasProg} semanaBase={semanaBase} setSemanaBase={setSemanaBase} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} incidenciasFito={incidenciasFito} esJefa={esJefa}/>
             )}
+            {tabReporte==="gestion" && esJefa && <PanelGestion S={S} tareasProg={tareasProg} esJefa={esJefa}/>}
             {tabReporte==="general" && <>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(270px,1fr))",gap:18,marginBottom:26}}>
               {(()=>{
