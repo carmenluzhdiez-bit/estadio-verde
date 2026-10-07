@@ -258,6 +258,39 @@ const calcProximaFrecGlobal = (f, refFecha) => {
 // ("papelera_tareas") y se pueden restaurar durante PAPELERA_DIAS días desde Historial → 🗑 Papelera.
 const PAPELERA_DIAS = 30;
 const normArrTP = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+// ── Duplicados de tareas movidas ──
+// Una copia pendiente es "duplicada" si su misma tarea ya quedó HECHA en otro día (mismo linaje de origen,
+// o misma zona+elemento+tarea resuelta desde la fecha de origen en adelante), o si hay dos copias pendientes
+// idénticas el mismo día. Devuelve [{dia, t, motivo}]. Nunca modifica nada.
+const buscarDuplicadosMovidos = (tareasProg) => {
+  const dias = Object.keys(tareasProg||{}).sort();
+  const NO_FINAL = ["pendiente","por_designar","en_curso"];
+  const clave = t=>`${(t.zona||"").trim().toLowerCase()}|${(t.elemento||"").trim().toLowerCase()}|${(t.tarea||"").trim().toLowerCase()}`;
+  const hechas = [];
+  dias.forEach(d=>normArrTP(tareasProg[d]).forEach(t=>{
+    if(t && normalizarEstado(t.estado)==="hecha" && !t.trasladadaA) hechas.push({dia:d, t, k:clave(t)});
+  }));
+  const res = [];
+  const vistoPend = {};
+  dias.forEach(d=>normArrTP(tareasProg[d]).forEach(t=>{
+    if(!t || t.trasladadaA) return;
+    if(!NO_FINAL.includes(normalizarEstado(t.estado))) return;
+    if(!(t.movidoDesde || t.origenTareaId)) return;
+    const k = clave(t);
+    const h = hechas.find(x=>{
+      if(String(x.t.id)===String(t.id)) return false;
+      if(x.dia>d) return false;
+      const linaje = (t.origenTareaId && (String(x.t.origenTareaId)===String(t.origenTareaId) || String(x.t.id)===String(t.origenTareaId)));
+      const porClave = t.movidoDesde && x.k===k && x.dia>=t.movidoDesde;
+      return linaje || porClave;
+    });
+    if(h){ res.push({dia:d, t, motivo:`ya quedó Hecha el ${h.dia}`}); return; }
+    const kk = `${d}|${k}|${t.movidoDesde||""}`;
+    if(vistoPend[kk]){ res.push({dia:d, t, motivo:"copia repetida el mismo día"}); return; }
+    vistoPend[kk] = true;
+  }));
+  return res;
+};
 const claveFbPapelera = (id) => String(id).replace(/[.#$\/\[\]]/g,"_");
 const enviarAPapelera = (dia, tareasArr, motivo="") => {
   const ahora = new Date().toISOString();
@@ -2416,6 +2449,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
   const [turnosTrabAbiertos, setTurnosTrabAbiertos] = React.useState({}); // {"dia_resp": bool} — vista por trabajador colapsada por defecto en "Ver/editar turnos"
   const [gruposTareaAbiertosTurnos, setGruposTareaAbiertosTurnos] = React.useState({}); // {"dia_resp_tarea": bool} — grupos por tipo de tarea colapsados por defecto
   const [filtroEstadoTurnos, setFiltroEstadoTurnos] = React.useState("todos"); // filtro de estado dentro de "Ver/editar turnos"
+  const [dupLimpieza, setDupLimpieza] = React.useState(null); // null | [{id,dia,t,motivo,sel}] — limpieza de copias duplicadas
   const [filtroTareaTurnos, setFiltroTareaTurnos] = React.useState(""); // filtro de tarea dentro de "Ver/editar turnos"
   const esGolfZonaHist = (zona) => zona==="Golf"||(zona||"").includes("Golf");
   const zonaFijaActual = tabHist==="historial_golf" ? "golf" : tabHist==="historial_macro" ? "no-golf" : null;
@@ -3167,8 +3201,49 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                   style={{...S.input,fontSize:12,padding:"5px 8px",width:"auto"}}/>
                 {diaTurnoElegido&&<button onClick={()=>setDiaTurnoElegido("")}
                   style={{cursor:"pointer",border:"1px solid rgba(255,255,255,0.15)",borderRadius:6,padding:"5px 9px",background:"transparent",color:"#94a3b8",fontSize:11}}>✕ Ver últimos 30 días</button>}
+                {esJefa&&<button title="Busca copias pendientes de tareas que ya quedaron hechas en otro día, o repetidas"
+                  onClick={()=>{
+                    const dups = buscarDuplicadosMovidos(tareas);
+                    if(dups.length===0){ alert("✅ No se encontraron copias duplicadas."); return; }
+                    setDupLimpieza(dups.map(d=>({id:String(d.t.id),dia:d.dia,t:d.t,motivo:d.motivo,sel:true})));
+                  }}
+                  style={{cursor:"pointer",border:"1px solid rgba(251,191,36,0.4)",borderRadius:6,padding:"5px 9px",background:"rgba(251,191,36,0.1)",color:"#fbbf24",fontSize:11}}>🧹 Buscar duplicados</button>}
               </div>
             </div>
+            {dupLimpieza&&(
+              <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={()=>setDupLimpieza(null)}>
+                <div style={{...S.card,background:"#0f2517",maxWidth:720,width:"100%",maxHeight:"85vh",overflow:"auto",padding:18}} onClick={e=>e.stopPropagation()}>
+                  <div style={{fontWeight:700,color:"#fbbf24",fontSize:15,marginBottom:4}}>🧹 Copias duplicadas encontradas ({dupLimpieza.length})</div>
+                  <div style={{fontSize:11,color:"#6aaa7a",marginBottom:12}}>Son copias pendientes de tareas que ya quedaron hechas en otro día, o repetidas el mismo día. Las marcadas irán a la Papelera (30 días, se pueden restaurar).</div>
+                  {dupLimpieza.map((d,i)=>(
+                    <label key={d.id+"_"+i} style={{display:"flex",gap:8,alignItems:"flex-start",padding:"7px 8px",borderBottom:"1px solid rgba(255,255,255,0.06)",cursor:"pointer"}}>
+                      <input type="checkbox" checked={d.sel} onChange={()=>setDupLimpieza(p=>p.map((x,j)=>j===i?{...x,sel:!x.sel}:x))}/>
+                      <div style={{fontSize:12,color:"#ede9e0"}}>
+                        <b>{d.dia}</b> · {d.t.zona} · {d.t.elemento} · {d.t.tarea}
+                        <div style={{fontSize:10,color:"#fca5a5"}}>{d.t.responsable||"sin responsable"} — {d.motivo}{d.t.movidoDesde?` · movida desde ${d.t.movidoDesde}`:""}</div>
+                      </div>
+                    </label>
+                  ))}
+                  <div style={{display:"flex",gap:8,marginTop:14,justifyContent:"flex-end"}}>
+                    <button className="btn-g" style={S.btn} onClick={()=>setDupLimpieza(null)}>Cancelar</button>
+                    <button className="btn-p" style={S.btn} onClick={()=>{
+                      const elegidos = dupLimpieza.filter(d=>d.sel);
+                      if(elegidos.length===0){ setDupLimpieza(null); return; }
+                      const porDia = {};
+                      elegidos.forEach(d=>{ (porDia[d.dia] ||= []).push(d.t); });
+                      Object.entries(porDia).forEach(([dia,arr])=>enviarAPapelera(dia,arr,"Copia duplicada de tarea ya resuelta"));
+                      const ids = new Set(elegidos.map(d=>d.dia+"|"+String(d.t.id)));
+                      setTareas(prev=>{
+                        const nuevo = {...prev};
+                        Object.keys(porDia).forEach(dia=>{ nuevo[dia] = normArrTP(prev[dia]).filter(x=>!ids.has(dia+"|"+String(x.id))); });
+                        return nuevo;
+                      });
+                      setDupLimpieza(null);
+                    }}>🗑 Quitar {dupLimpieza.filter(d=>d.sel).length} a la papelera</button>
+                  </div>
+                </div>
+              </div>
+            )}
             <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginBottom:14}}>
               <label style={{fontSize:10,color:"#5a9a7a"}}>Filtrar por estado:</label>
               <button onClick={()=>setFiltroEstadoTurnos("todos")}
@@ -5389,8 +5464,9 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     // (ej. un resabio de una "movida" cuyo borrado del día original no se guardó a tiempo).
     const idsResueltos = new Set();
     Object.keys(tareas).forEach(diaKey => {
-      nAprop(tareas[diaKey]).forEach(t => { if(finalesProp.includes(t.estado)) idsResueltos.add(t.id); });
+      nAprop(tareas[diaKey]).forEach(t => { if(finalesProp.includes(t.estado)){ idsResueltos.add(t.id); if(t.origenTareaId) idsResueltos.add(t.origenTareaId); } });
     });
+    buscarDuplicadosMovidos(tareas).forEach(d=>idsResueltos.add(d.t.id)); // copias duplicadas de algo ya hecho: nunca se re-proponen
     const pendItemsMap = new Map(); // signature -> {dia, item}
     const pendItemsMapText = new Map(); // "zona_elemento_tarea" -> {dia, item}
     const pendItemsAll = []; // TODOS los pendientes de días anteriores, con o sin frecuencia (incluye manuales)
@@ -5738,7 +5814,8 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                 const esRiego = t => (t.tarea||t.elemento||"").toLowerCase().includes("riego")||(t.tarea||t.elemento||"").toLowerCase().includes("regar");
 
                 // Solo lo que sigue sin resolver y no se ha trasladado ya
-                const sinResolver = tareasHoy.filter(t=>!["hecha","no_pudo"].includes(normalizarEstado(t.estado)) && !t.trasladadaA);
+                const idsDupLluvia = new Set(buscarDuplicadosMovidos(tareas).map(d=>String(d.t.id)));
+                const sinResolver = tareasHoy.filter(t=>!["hecha","no_pudo"].includes(normalizarEstado(t.estado)) && !t.trasladadaA && !idsDupLluvia.has(String(t.id)));
                 const aPosponer = sinResolver.filter(t=>!esRiego(t) && !esBajoTecho(t));
                 const riegos = sinResolver.filter(esRiego);
                 const riegosMover = riegos.filter(t=>condicionDe(t)==="exterior");
@@ -17485,8 +17562,9 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           // pendiente aunque quede una copia vieja sin borrar (ver mismo blindaje en el módulo general).
           const idsResueltosGolf = new Set();
           Object.keys(tareasProg||{}).forEach(diaKeyG=>{
-            nAGolfProp(tareasProg[diaKeyG]).forEach(t=>{ if(finalesGolfProp.includes(t.estado)) idsResueltosGolf.add(t.id); });
+            nAGolfProp(tareasProg[diaKeyG]).forEach(t=>{ if(finalesGolfProp.includes(t.estado)){ idsResueltosGolf.add(t.id); if(t.origenTareaId) idsResueltosGolf.add(t.origenTareaId); } });
           });
+          buscarDuplicadosMovidos(tareasProg).forEach(d=>idsResueltosGolf.add(d.t.id));
           const pendSignaturesGolf=new Map();
           const pendTextSetGolf=new Map();
           const pendZonaTareaSetGolf=new Map();
