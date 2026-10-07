@@ -293,7 +293,20 @@ const buscarDuplicadosMovidos = (tareasProg) => {
 };
 // "No se pudo — Lluvia": tarea no realizada por lluvia (la marca el modo lluvia). Se informa aparte y NO castiga
 // el índice de salud ni el cumplimiento del jardinero: no es incumplimiento, es clima.
-const esNoPudoLluvia = (t) => !!t && normalizarEstado(t.estado)==="no_pudo" && /lluvia/i.test(t.notaWorker||"");
+// Causas de "No se pudo" (bitácora de causas). La lluvia además se detecta por el texto, para las tareas antiguas.
+const CAUSAS_NO_PUDO = [
+  {k:"lluvia",   icon:"🌧️", label:"Lluvia / clima",                pref:"No se pudo — Lluvia"},
+  {k:"maquina",  icon:"🔧", label:"Falla de máquina o equipo",     pref:"Falla de máquina o equipo"},
+  {k:"personal", icon:"👥", label:"Falta de personal / tiempo",    pref:"Falta de personal / tiempo"},
+  {k:"zona",     icon:"🚧", label:"Zona ocupada (evento / uso)",   pref:"Zona ocupada por evento o uso deportivo"},
+];
+const causaNoPudoDe = (t) => {
+  if(!t) return "";
+  if(t.causaNoPudo) return t.causaNoPudo;
+  if(/lluvia/i.test(t.notaWorker||"")) return "lluvia";
+  return "";
+};
+const esNoPudoLluvia = (t) => !!t && normalizarEstado(t.estado)==="no_pudo" && causaNoPudoDe(t)==="lluvia";
 const claveFbPapelera = (id) => String(id).replace(/[.#$\/\[\]]/g,"_");
 const enviarAPapelera = (dia, tareasArr, motivo="") => {
   const ahora = new Date().toISOString();
@@ -1691,7 +1704,7 @@ const lunesDeFecha = (f) => { const d=new Date(f+"T12:00:00"); d.setDate(d.getDa
 const sumarDiasFecha = (f,n) => { const d=new Date(f+"T12:00:00"); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
 const diasEntreFechas = (a,b) => Math.round((new Date(b+"T12:00:00")-new Date(a+"T12:00:00"))/86400000);
 
-function PanelGestion({ S, tareasProg, esJefa=false }) {
+function PanelGestion({ S, tareasProg, setTareas=()=>{}, esJefa=false }) {
   const [semanas,setSemanas] = React.useState(8);
   const [vistaG,setVistaG] = React.useState("desempeno");
   if(!esJefa) return null;
@@ -1767,7 +1780,7 @@ function PanelGestion({ S, tareasProg, esJefa=false }) {
   return (
     <div className="ein">
       <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
-        {[["desempeno","👷 Desempeño por jardinero"],["atraso","⏱️ Atraso por tipo de tarea"]].map(([t,l])=>(
+        {[["desempeno","👷 Desempeño por jardinero"],["atraso","⏱️ Atraso por tipo de tarea"],["causas","🔴 Causas de «no se pudo»"]].map(([t,l])=>(
           <button key={t} onClick={()=>setVistaG(t)} style={{cursor:"pointer",border:`1px solid ${vistaG===t?"#34d399":"rgba(255,255,255,0.12)"}`,borderRadius:8,padding:"5px 14px",fontSize:12,background:vistaG===t?"rgba(52,211,153,0.12)":"transparent",color:vistaG===t?"#34d399":"#6aaa7a"}}>{l}</button>))}
         <select value={semanas} onChange={e=>setSemanas(Number(e.target.value))} style={{...S.input,width:"auto",fontSize:12}}>
           {[4,8,12].map(n=><option key={n} value={n}>Últimas {n} semanas</option>)}
@@ -1821,6 +1834,59 @@ function PanelGestion({ S, tareasProg, esJefa=false }) {
             </table>)}
         </div>
       )}
+      {vistaG==="causas"&&(()=>{
+        // Bitácora de causas: por mes (últimos 6) y lista por clasificar
+        const hoyM = hoy.slice(0,7);
+        const meses = Array.from({length:6},(_,i)=>{ const d=new Date(hoyM+"-15T12:00:00"); d.setMonth(d.getMonth()-(5-i)); return d.toISOString().slice(0,7); });
+        const noPudoTodas = [];
+        Object.entries(tareasProg||{}).forEach(([dia,tds])=>{
+          if(dia<meses[0]+"-01"||dia>hoy) return;
+          (Array.isArray(tds)?tds:Object.values(tds||{})).forEach(t=>{ if(t&&normalizarEstado(t.estado)==="no_pudo") noPudoTodas.push({...t,dia}); });
+        });
+        const cols=[...CAUSAS_NO_PUDO,{k:"",icon:"❔",label:"Sin clasificar"}];
+        const cnt={}; meses.forEach(m=>{cnt[m]={}; cols.forEach(c=>{cnt[m][c.k]=0;});});
+        noPudoTodas.forEach(t=>{ const m=t.dia.slice(0,7); if(cnt[m]) cnt[m][causaNoPudoDe(t)]++; });
+        const maxM=Math.max(1,...meses.map(m=>cols.reduce((a,c)=>a+cnt[m][c.k],0)));
+        const COL={lluvia:"#60a5fa",maquina:"#f59e0b",personal:"#a78bfa",zona:"#34d399","":"#6b7280"};
+        const MN=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+        const sinClas = noPudoTodas.filter(t=>!causaNoPudoDe(t)).sort((a,b)=>b.dia.localeCompare(a.dia)).slice(0,30);
+        const clasificar=(t,k)=>{
+          const c=CAUSAS_NO_PUDO.find(x=>x.k===k); if(!c) return;
+          setTareas(prev=>({...prev,[t.dia]:(Array.isArray(prev[t.dia])?prev[t.dia]:Object.values(prev[t.dia]||{})).map(x=>String(x.id)===String(t.id)?{...x,causaNoPudo:k}:x)}));
+        };
+        return (
+          <div style={{...S.card,padding:"12px 14px"}}>
+            <div style={{fontSize:11,color:"#5a9a7a",marginBottom:10}}>Cuántas tareas no se pudieron hacer y por qué, mes a mes. La lluvia se detecta sola; para lo demás el jardinero elige la causa al marcar «No se pudo».</div>
+            <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:10}}>
+              {cols.map(c=><span key={c.k||"sc"} style={{fontSize:10,color:COL[c.k]}}>■ {c.icon} {c.label}</span>)}
+            </div>
+            {meses.map(m=>{
+              const tot=cols.reduce((a,c)=>a+cnt[m][c.k],0);
+              return (
+                <div key={m} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                  <span style={{width:60,fontSize:11,color:"#9ca3af"}}>{MN[Number(m.slice(5))-1]} {m.slice(2,4)}</span>
+                  <div style={{flex:1,display:"flex",height:18,background:"rgba(255,255,255,0.04)",borderRadius:4,overflow:"hidden"}}>
+                    {cols.map(c=>cnt[m][c.k]>0&&<div key={c.k||"sc"} title={`${c.label}: ${cnt[m][c.k]}`} style={{width:`${cnt[m][c.k]/maxM*100}%`,background:COL[c.k],fontSize:10,color:"#0b1d12",textAlign:"center",fontWeight:700}}>{cnt[m][c.k]}</div>)}
+                  </div>
+                  <span style={{width:28,fontSize:11,color:"#ede9e0",textAlign:"right"}}>{tot}</span>
+                </div>);
+            })}
+            {sinClas.length>0&&(
+              <div style={{marginTop:14}}>
+                <div style={{fontSize:12,fontWeight:600,color:"#fbbf24",marginBottom:6}}>❔ Sin clasificar ({noPudoTodas.filter(t=>!causaNoPudoDe(t)).length}) — asígnales una causa</div>
+                {sinClas.map((t,i)=>(
+                  <div key={i} style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,0.05)",fontSize:11}}>
+                    <span style={{color:"#9ca3af",minWidth:76}}>{t.dia}</span>
+                    <span style={{flex:1,minWidth:160,color:"#ede9e0"}}>{t.tarea} <span style={{color:"#5a9a7a"}}>· {t.zona}</span>{t.notaWorker?<span style={{color:"#f87171",fontStyle:"italic"}}> — {t.notaWorker}</span>:null}</span>
+                    <select value="" onChange={e=>clasificar(t,e.target.value)} style={{...S.input,width:"auto",fontSize:11,padding:"2px 6px"}}>
+                      <option value="">Elegir causa…</option>
+                      {CAUSAS_NO_PUDO.map(c=><option key={c.k} value={c.k}>{c.icon} {c.label}</option>)}
+                    </select>
+                  </div>))}
+              </div>)}
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -1991,7 +2057,7 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
   const hCats=(st,titulo)=>{const cats=Object.entries(st.porCategoria).filter(([,d])=>d.total>0).sort((a,b)=>b[1].total-a[1].total);if(!cats.length)return "";return `<h3 style="color:${V};border-bottom:2px solid ${V};padding-bottom:3px;margin:14px 0 8px;font-size:13px">${titulo}</h3>${cats.map(([cat,dat])=>{const pC=dat.total?Math.round(dat.hechas/dat.total*100):0;const tps={};dat.tareas.forEach(t=>{const tp=getTipo(t);if(!tps[tp])tps[tp]={total:0,hechas:0};tps[tp].total++;if(esHecha(t))tps[tp].hechas++;});const np=dat.tareas.filter(t=>t.estado==="no_pudo");return `<div style="margin-bottom:8px;border:1px solid ${BO};border-radius:6px;overflow:hidden;break-inside:avoid"><div style="background:${V};color:#fff;padding:6px 10px;display:flex;justify-content:space-between"><span style="font-weight:700;font-size:12px">${cat}</span><span style="font-size:11px">${dat.hechas}/${dat.total} · ${pC}%</span></div><table style="width:100%;border-collapse:collapse;font-size:10px;margin:4px 10px;width:calc(100% - 20px)"><tr style="background:${VL}"><th style="padding:3px 6px;text-align:left">Tipo</th><th style="padding:3px;text-align:center">Total</th><th style="padding:3px;text-align:center">Real.</th><th style="padding:3px;text-align:center">%</th></tr>${Object.entries(tps).filter(([,d])=>d.total>0).sort((a,b)=>b[1].total-a[1].total).map(([tp,td],i)=>{const p3=td.total?Math.round(td.hechas/td.total*100):0;return `<tr style="background:${i%2===0?"#fff":"#f9fdf9"}"><td style="padding:3px 6px">${tp}</td><td style="padding:3px;text-align:center">${td.total}</td><td style="padding:3px;text-align:center;color:#166534;font-weight:600">${td.hechas}</td><td style="padding:3px;text-align:center;font-weight:700;color:${p3>=80?"#166534":p3>=50?"#92400e":"#991b1b"}">${p3}%</td></tr>`;}).join("")}</table>${np.length>0?`<div style="padding:4px 10px;background:#fff8f0;font-size:10px;border-top:1px solid #fcd34d"><strong style="color:#92400e">No realizadas: </strong>${np.map(t=>`${t.fechaDia} ${t.tarea||""}${t.motivo?" ("+t.motivo+")":""}`).join(" · ")}</div>`:""}</div>`;}).join("")}`;};
 
   const hLluvia=(st)=>{if(!(st.lluviaList||[]).length)return "";return `<h3 style="color:#1e40af;border-bottom:2px solid #1e40af;padding-bottom:3px;margin:14px 0 8px;font-size:13px">🌧️ No se pudo por lluvia — reprogramadas (${st.lluviaList.length})</h3><div style="font-size:10px;color:#555;margin-bottom:4px">No cuentan como incumplimiento: son tareas que el clima impidió y se reprogramaron.</div><table style="width:100%;border-collapse:collapse;font-size:11px"><tr style="background:#1e40af;color:#fff"><th style="padding:5px 8px;text-align:left">Fecha</th><th style="padding:5px;text-align:left">Tarea</th><th style="padding:5px;text-align:left">Zona / Elemento</th><th style="padding:5px;text-align:left">Responsable</th><th style="padding:5px;text-align:left">Reprogramada para</th></tr>${st.lluviaList.map((t,i)=>`<tr style="background:${i%2===0?"#fff":"#eff6ff"}"><td style="padding:4px 8px;white-space:nowrap">${t.fechaDia}</td><td style="padding:4px 8px">${t.tarea||""}</td><td style="padding:4px 8px">${t.zona||""}${t.elemento?" · "+t.elemento:""}</td><td style="padding:4px 8px">${t.responsable||""}</td><td style="padding:4px 8px">${t.trasladadaA||"—"}</td></tr>`).join("")}</table>`;};
-  const hNoPudo=(st)=>{const base=!st.noPudoList.length?"":`<h3 style="color:#991b1b;border-bottom:2px solid #991b1b;padding-bottom:3px;margin:14px 0 8px;font-size:13px">Tareas no realizadas (${st.noPudoList.length})</h3><table style="width:100%;border-collapse:collapse;font-size:11px"><tr style="background:#991b1b;color:#fff"><th style="padding:5px 8px;text-align:left">Fecha</th><th style="padding:5px;text-align:left">Tarea</th><th style="padding:5px;text-align:left">Zona</th><th style="padding:5px;text-align:left">Responsable</th><th style="padding:5px;text-align:left">Motivo</th></tr>${st.noPudoList.map((t,i)=>`<tr style="background:${i%2===0?"#fff":"#fff5f5"}"><td style="padding:4px 8px;white-space:nowrap">${t.fechaDia}</td><td style="padding:4px 8px">${t.tarea||""}</td><td style="padding:4px 8px">${t.zona||""}</td><td style="padding:4px 8px">${t.responsable||""}</td><td style="padding:4px 8px;color:#991b1b;font-style:italic">${t.notaWorker||t.motivo||"Sin motivo"}</td></tr>`).join("")}</table>`;return base+hLluvia(st);};
+  const hNoPudo=(st)=>{const base=!st.noPudoList.length?"":`<h3 style="color:#991b1b;border-bottom:2px solid #991b1b;padding-bottom:3px;margin:14px 0 8px;font-size:13px">Tareas no realizadas (${st.noPudoList.length})</h3><table style="width:100%;border-collapse:collapse;font-size:11px"><tr style="background:#991b1b;color:#fff"><th style="padding:5px 8px;text-align:left">Fecha</th><th style="padding:5px;text-align:left">Tarea</th><th style="padding:5px;text-align:left">Zona</th><th style="padding:5px;text-align:left">Responsable</th><th style="padding:5px;text-align:left">Motivo</th></tr>${st.noPudoList.map((t,i)=>`<tr style="background:${i%2===0?"#fff":"#fff5f5"}"><td style="padding:4px 8px;white-space:nowrap">${t.fechaDia}</td><td style="padding:4px 8px">${t.tarea||""}</td><td style="padding:4px 8px">${t.zona||""}</td><td style="padding:4px 8px">${t.responsable||""}</td><td style="padding:4px 8px;color:#991b1b;font-style:italic">${(CAUSAS_NO_PUDO.find(c=>c.k===causaNoPudoDe(t))?.icon||"")} ${(CAUSAS_NO_PUDO.find(c=>c.k===causaNoPudoDe(t))?.icon||"")} {t.notaWorker||t.motivo||"Sin motivo"}</td></tr>`).join("")}</table>`;return base+hLluvia(st);};
   // Semana día por día: hechas vs pendientes, no se pudo y lluvia
   const hDias=(tareas)=>{
     const filas=dias.map(d=>{
@@ -4431,6 +4497,22 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
     );
   };
 
+  const renderCausaNoPudo = (t) => (
+    <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:5}}>
+      {CAUSAS_NO_PUDO.map(c=>{
+        const sel = causaNoPudoDe(t)===c.k;
+        return (
+          <button key={c.k} type="button"
+            onClick={()=>{
+              const esPreset = CAUSAS_NO_PUDO.some(x=>x.pref===(t.notaWorker||""));
+              onUpdateTarea(fechaVer,t.id,{causaNoPudo:c.k, notaWorker:(t.notaWorker&&!esPreset)?t.notaWorker:c.pref});
+            }}
+            style={{cursor:"pointer",fontSize:11,padding:"4px 9px",borderRadius:14,border:`1px solid ${sel?"#ef4444":"rgba(255,255,255,0.15)"}`,background:sel?"rgba(239,68,68,0.2)":"transparent",color:sel?"#fca5a5":"#9ca3af"}}>
+            {c.icon} {c.label}
+          </button>);
+      })}
+    </div>
+  );
   const renderBloqueGasto = (t) => {
     const textoLimpio=(t.tarea||"").replace(/\p{Emoji}/gu,"").trim().toLowerCase();
     const esTareaAplic = textoLimpio.includes("aplicar")||textoLimpio.includes("aplicac")||textoLimpio.includes("fumigac")||textoLimpio.includes("fungicid");
@@ -4807,7 +4889,7 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                         {puedeEditar ? (
                           <div style={{display:"flex",gap:4,flexWrap:"wrap",alignItems:"center"}}>
                             {Object.entries(ESTADOS_TAREA).map(([k,v])=>(
-                              <button key={k} onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:normalizarEstado(k),notaWorker:k!=="no_pudo"?(t.notaWorker||""):""})}
+                              <button key={k} onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:normalizarEstado(k),notaWorker:k!=="no_pudo"?(t.notaWorker||""):"",causaNoPudo:k!=="no_pudo"?"":(t.causaNoPudo||"")})}
                                 style={{cursor:"pointer",border:`1px solid ${t.estado===k?v.color+"60":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"4px 10px",fontSize:11,background:t.estado===k?`${v.color}15`:"transparent",color:t.estado===k?v.color:"#6aaa7a",fontFamily:"'Georgia',serif"}}>
                                 {v.icon} {v.label}
                               </button>
@@ -4866,7 +4948,9 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                         {renderBloqueEquipoMant(t)}
                         {t.estado==="no_pudo"&&(
                           <div style={{marginTop:6}}>
+                            {renderCausaNoPudo(t)}
                             <textarea rows={2} placeholder="¿Por qué no se pudo? (obligatorio)" value={t.notaWorker||""} onChange={e=>onUpdateTarea(fechaVer,t.id,{notaWorker:e.target.value})} style={{width:"100%",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:8,color:"#ede9e0",padding:"6px 10px",fontFamily:"'Georgia',serif",fontSize:12,resize:"vertical"}}/>
+                            {!causaNoPudoDe(t)&&<div style={{fontSize:10,color:"#ef4444",marginTop:2}}>⚠️ Elige la causa (lluvia, máquina, personal o zona ocupada)</div>}
                             {!t.notaWorker&&<div style={{fontSize:10,color:"#ef4444",marginTop:2}}>⚠️ Explica el motivo para poder guardar</div>}
                           </div>
                         )}
@@ -5088,7 +5172,7 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                                         setFormAplicConfirm({producto:t.productoPlan||"",dosis:t.dosisPlan||"",agua:t.volAguaPlan||""});
                                         return;
                                       }
-                                      onUpdateTarea(fechaVer,t.id,{estado:normalizarEstado(k),notaWorker:k!=="no_pudo"?(t.notaWorker||""):""});
+                                      onUpdateTarea(fechaVer,t.id,{estado:normalizarEstado(k),notaWorker:k!=="no_pudo"?(t.notaWorker||""):"",causaNoPudo:k!=="no_pudo"?"":(t.causaNoPudo||"")});
                                     }}
                                       style={{cursor:"pointer",border:`1px solid ${t.estado===k?v.color+"50":"rgba(255,255,255,0.08)"}`,borderRadius:8,padding:"3px 9px",fontSize:11,background:t.estado===k?`${v.color}12`:"transparent",color:t.estado===k?v.color:"#6aaa7a",fontFamily:"'Georgia',serif"}}>
                                       {v.icon} {v.label}
@@ -5102,7 +5186,8 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                               )}
                               {t.estado==="no_pudo"&&(
                                 <div style={{marginTop:5}}>
-                                  <textarea rows={2} placeholder="¿Por qué no se pudo? (obligatorio)" value={t.notaWorker||""} onChange={e=>onUpdateTarea(fechaVer,t.id,{notaWorker:e.target.value})} style={{width:"100%",background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:8,color:"#ede9e0",padding:"6px 10px",fontFamily:"'Georgia',serif",fontSize:12,resize:"vertical"}}/>
+                                  {renderCausaNoPudo(t)}
+                            <textarea rows={2} placeholder="¿Por qué no se pudo? (obligatorio)" value={t.notaWorker||""} onChange={e=>onUpdateTarea(fechaVer,t.id,{notaWorker:e.target.value})} style={{width:"100%",background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:8,color:"#ede9e0",padding:"6px 10px",fontFamily:"'Georgia',serif",fontSize:12,resize:"vertical"}}/>
                                   {!t.notaWorker&&<div style={{fontSize:10,color:"#ef4444",marginTop:2}}>⚠️ Motivo obligatorio</div>}
                                 </div>
                               )}
@@ -5185,8 +5270,8 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                   ¿Terminaste todas las tareas del día?
                 </div>
                 <button onClick={()=>{
-                  if(misTargets.some(t=>t.estado==="no_pudo"&&!t.notaWorker)){
-                    alert("Hay tareas marcadas como 'No se pudo' sin motivo. Por favor escribe el motivo antes de cerrar el turno.");
+                  if(misTargets.some(t=>t.estado==="no_pudo"&&(!t.notaWorker||!causaNoPudoDe(t)))){
+                    alert("Hay tareas marcadas como 'No se pudo' sin causa o sin motivo. Elige la causa y escribe el motivo antes de cerrar el turno.");
                     return;
                   }
                   if(window.confirm(`¿Cerrar turno del ${fechaVer}?
@@ -6136,7 +6221,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                   // aviso de "No se pudo sin decidir" no lo vuelve a pedir).
                   const hoyArr = normA(prev[fecha]||[]).map(t=>{
                     if(idsMover.has(String(t.id))){
-                      return {...t, estado:"no_pudo", notaWorker:esRiego(t)?"Riego no necesario — Lluvia":"No se pudo — Lluvia", trasladadaA:destino};
+                      return {...t, estado:"no_pudo", causaNoPudo:"lluvia", notaWorker:esRiego(t)?"Riego no necesario — Lluvia":"No se pudo — Lluvia", trasladadaA:destino};
                     }
                     if(idsRevisar.has(String(t.id)) && !(t.notas||"").includes("🌧️ Revisar riego")){
                       return {...t, notas:(t.notas?t.notas+" | ":"")+"🌧️ Revisar riego: ajustar a mano por lluvia"};
@@ -28263,7 +28348,7 @@ export default function App() {
             {tabReporte==="semanal" && (
               <ReporteSemanal frecEstado={tabReporte==="semanal"?calcFrecuenciasEstado():[]} S={S} tareasProg={tareasProg} semanaBase={semanaBase} setSemanaBase={setSemanaBase} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} incidenciasFito={incidenciasFito} esJefa={esJefa}/>
             )}
-            {tabReporte==="gestion" && esJefa && <PanelGestion S={S} tareasProg={tareasProg} esJefa={esJefa}/>}
+            {tabReporte==="gestion" && esJefa && <PanelGestion S={S} tareasProg={tareasProg} setTareas={setTareasProg} esJefa={esJefa}/>}
             {tabReporte==="general" && <>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(270px,1fr))",gap:18,marginBottom:26}}>
               {(()=>{
