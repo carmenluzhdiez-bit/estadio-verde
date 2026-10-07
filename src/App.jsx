@@ -25636,13 +25636,28 @@ const pedirConfigLluviaModal = ({fecha, nTareas, nRiegoMover, nRiegoManual, cont
   box.appendChild(el("div","font-size:11px;color:#666;margin-bottom:6px","Se saltan los domingos. Solo se muestran los tipos que hoy tienen algo para mover."));
   const inputs = {};
   const grid = el("div","display:grid;grid-template-columns:1fr 70px;gap:5px 10px;align-items:center;margin-bottom:10px");
-  const tiposMostrar = TIPOS_LLUVIA.filter(k=>conteo[k]>0);
-  (tiposMostrar.length?tiposMostrar:TIPOS_LLUVIA).forEach(k=>{
-    grid.appendChild(el("div","font-size:13px",k+(conteo[k]?` (${conteo[k]})`:"")));
-    const inp=el("input","width:100%;padding:5px;border:1px solid #bbb;border-radius:6px;font-size:13px;text-align:center");
-    inp.type="number"; inp.min="1"; inp.max="30"; inp.value=String(dias[k]??2); inputs[k]=inp; grid.appendChild(inp);
-  });
+  const nota = el("div","font-size:11px;color:#92400e;margin-bottom:8px");
+  const pintarGrid = ()=>{
+    grid.innerHTML=""; nota.textContent="";
+    let tipos;
+    if(alcance==="riego") tipos=["Riego"];
+    else if(alcance==="tareas"){ tipos=TIPOS_LLUVIA.filter(k=>k!=="Riego"&&conteo[k]>0); if(!tipos.length) tipos=TIPOS_LLUVIA.filter(k=>k!=="Riego"); }
+    else { tipos=TIPOS_LLUVIA.filter(k=>conteo[k]>0||k==="Riego"); }
+    tipos.forEach(k=>{
+      grid.appendChild(el("div","font-size:13px",k+(conteo[k]?` (${conteo[k]})`:" (0 para mover)")));
+      if(!inputs[k]){
+        const inp=el("input","width:100%;padding:5px;border:1px solid #bbb;border-radius:6px;font-size:13px;text-align:center");
+        inp.type="number"; inp.min="1"; inp.max="30"; inp.value=String(dias[k]??2); inputs[k]=inp;
+      }
+      grid.appendChild(inputs[k]);
+    });
+    if(tipos.includes("Riego") && !conteo.Riego && nRiegoManual>0)
+      nota.textContent=`Los ${nRiegoManual} riego(s) de hoy no están marcados como «exterior», por eso no se mueven solos (quedan para revisar a mano). Los días de arriba se guardan igual para cuando haya riegos de exterior.`;
+  };
+  pintarGrid();
+  Object.keys(btns).forEach(k=>{ const prev=btns[k].onclick; btns[k].onclick=()=>{ prev(); pintarGrid(); }; });
   box.appendChild(grid);
+  box.appendChild(nota);
   const lblG=el("label","display:flex;gap:6px;align-items:center;font-size:12px;margin-bottom:14px;color:#333");
   const chk=document.createElement("input"); chk.type="checkbox"; chk.checked=true;
   lblG.appendChild(chk); lblG.appendChild(document.createTextNode("Guardar estos días como valores por defecto"));
