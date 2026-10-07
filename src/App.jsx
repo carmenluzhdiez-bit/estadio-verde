@@ -1738,12 +1738,12 @@ const horasAusenciaDia = (p, fecha) => {
   return desc;
 };
 
-function PanelGestion({ S, tareasProg, setTareas=()=>{}, esJefa=false, personal=[], comprasData={} }) {
+function PanelGestion({ S, tareasProg, setTareas=()=>{}, esJefa=false, personal=[], comprasData={}, configSemanal={}, setConfigSemanal=()=>{} }) {
   const [semanas,setSemanas] = React.useState(8);
   const [vistaG,setVistaG] = React.useState("desempeno");
   const [mesesCosto,setMesesCosto] = React.useState(6);
   const [mesRes,setMesRes] = React.useState(()=>fechaLocal().slice(0,7));
-  const [edRes,setEdRes] = React.useState({mes:"",hitos:null,desafios:null,coment:""});
+  const [edRes,setEdRes] = React.useState({mes:"",hitos:null,desafios:null,coment:null});
   const [nuevoItemRes,setNuevoItemRes] = React.useState({h:"",d:""});
   if(!esJefa) return null;
   const hoy = fechaLocal();
@@ -1925,8 +1925,12 @@ function PanelGestion({ S, tareasProg, setTareas=()=>{}, esJefa=false, personal=
     return L;
   })();
   const edActivo=edRes.mes===mesRes;
-  const listaH=edActivo&&edRes.hitos?edRes.hitos:autoHitos, listaD=edActivo&&edRes.desafios?edRes.desafios:autoDesaf, comentRes=edActivo?edRes.coment:"";
-  const setEd=(patch)=>setEdRes(prev=>({mes:mesRes,hitos:prev.mes===mesRes?prev.hitos:null,desafios:prev.mes===mesRes?prev.desafios:null,coment:prev.mes===mesRes?prev.coment:"",...patch}));
+  const guardadoRes=((configSemanal||{}).resumenMensual||{})[mesRes]||null;
+  const listaH=edActivo&&edRes.hitos?edRes.hitos:(guardadoRes?.hitos||autoHitos), listaD=edActivo&&edRes.desafios?edRes.desafios:(guardadoRes?.desafios||autoDesaf), comentRes=edActivo&&edRes.coment!==null?edRes.coment:(guardadoRes?.coment||"");
+  const guardarResumen=()=>{ setConfigSemanal(prev=>({...(prev||{}),resumenMensual:{...((prev||{}).resumenMensual||{}),[mesRes]:{hitos:listaH,desafios:listaD,coment:comentRes,guardado:hoy}}})); setEdRes({mes:"",hitos:null,desafios:null,coment:null}); };
+  const borrarResumenGuardado=()=>{ setConfigSemanal(prev=>{ const rm={...((prev||{}).resumenMensual||{})}; delete rm[mesRes]; return {...(prev||{}),resumenMensual:rm}; }); setEdRes({mes:"",hitos:null,desafios:null,coment:null}); };
+  const hayCambiosRes=edActivo&&(edRes.hitos||edRes.desafios||edRes.coment!==null);
+  const setEd=(patch)=>setEdRes(prev=>({mes:mesRes,hitos:prev.mes===mesRes?prev.hitos:null,desafios:prev.mes===mesRes?prev.desafios:null,coment:prev.mes===mesRes?prev.coment:null,...patch}));
   const imprimirResumen=()=>{
     const V="#1a5c35"; const esc=x=>String(x).replace(/&/g,"&amp;").replace(/</g,"&lt;");
     const kpi=(t,v,sub)=>`<div style="flex:1;border:1px solid #cfe3d4;border-radius:8px;padding:8px 10px"><div style="font-size:10px;color:#555">${t}</div><div style="font-size:22px;font-weight:700;color:${V}">${v}</div><div style="font-size:10px;color:#666">${sub}</div></div>`;
@@ -2116,7 +2120,9 @@ function PanelGestion({ S, tareasProg, setTareas=()=>{}, esJefa=false, personal=
                 {meses.map(m=><option key={m} value={m}>{nombreMes(m)}</option>)}
               </select>
               <button onClick={imprimirResumen} style={{...S.btn,fontSize:12,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}}>🖨️ Imprimir resumen (1 página)</button>
-              {edActivo&&(edRes.hitos||edRes.desafios)&&<button onClick={()=>setEdRes({mes:"",hitos:null,desafios:null,coment:edRes.coment})} style={{...S.btn,fontSize:11,background:"transparent",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.3)"}}>↺ Volver a lo automático</button>}
+              <button onClick={guardarResumen} style={{...S.btn,fontSize:12,background:hayCambiosRes?"rgba(34,197,94,0.25)":"rgba(52,211,153,0.12)",color:"#34d399",border:"1px solid rgba(52,211,153,0.4)"}}>💾 Guardar {hayCambiosRes?"cambios":"resumen"}</button>
+              {(hayCambiosRes||guardadoRes)&&<button onClick={borrarResumenGuardado} style={{...S.btn,fontSize:11,background:"transparent",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.3)"}}>↺ Volver a lo automático</button>}
+              <span style={{fontSize:11,color:hayCambiosRes?"#fbbf24":"#5a9a7a"}}>{hayCambiosRes?"Cambios sin guardar":guardadoRes?`Guardado el ${guardadoRes.guardado||""}`:"Aún no guardado (se muestra lo automático)"}</span>
             </div>
             <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:6}}>
               {kp("Salud operativa (mensual)",RM.salud===null?"—":RM.salud,dif(RM.salud,RP.salud))}
@@ -25888,6 +25894,30 @@ const diasHabiles = (fechaStr, n=1) => {
   return d.toISOString().slice(0,10);
 };
 
+// Botón «Descargar» en todos los informes que se abren en ventana nueva (se guarda como .html con nombre ordenado;
+// si la carpeta de destino está sincronizada con OneDrive, queda respaldado ahí). Abrir el archivo e imprimir da PDF.
+const instalarDescargaInformes = () => {
+  if(typeof window==="undefined" || window.__descargaInformes) return;
+  window.__descargaInformes = true;
+  const abrirOrig = window.open.bind(window);
+  const barra = `<div data-dl="1" class="np" style="position:fixed;top:8px;right:8px;z-index:99999;font-family:Arial,sans-serif"><style>@media print{[data-dl]{display:none!important}}</style><button onclick="(function(){var c=document.documentElement.cloneNode(true);c.querySelectorAll('[data-dl]').forEach(function(e){e.remove();});var t=(document.title||'Informe').replace(/[^A-Za-z0-9ÁÉÍÓÚáéíóúÑñ _-]+/g,'').trim().replace(/\\s+/g,'_')||'Informe';var d=new Date();var f=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');var b=new Blob(['<!DOCTYPE html>'+c.outerHTML],{type:'text/html;charset=utf-8'});var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=t+'_'+f+'.html';document.body.appendChild(a);a.click();setTimeout(function(){a.remove();},500);})()" style="background:#1e40af;color:#fff;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.25)">⬇️ Descargar (guardar en OneDrive)</button></div>`;
+  window.open = function(...args){
+    const w = abrirOrig(...args);
+    try{
+      if(w && (args[0]===""||args[0]===undefined) && w.document){
+        const dw = w.document.write.bind(w.document);
+        w.document.write = function(h){
+          if(typeof h==="string" && h.includes("window.print()") && !h.includes('data-dl="1"')){
+            h = /<\/body>/i.test(h) ? h.replace(/<\/body>/i, barra+"</body>") : h+barra;
+          }
+          return dw(h);
+        };
+      }
+    }catch(e){}
+    return w;
+  };
+};
+
 export default function App() {
   const [zonas, setZonas] = useState(()=>MACROZONAS_BASE);
   const [vista, setVista] = useState("dashboard");
@@ -25911,6 +25941,7 @@ export default function App() {
   // cancelar, quedaba abierto con los datos de la zona anterior y al guardar los escribía en la nueva
   // (ej. renombraba "Refugio Farellones" como "Patinaje"). Ahora se cierra al cambiar de zona.
   useEffect(()=>{ setEditZonaForm(null); },[zonaId]);
+  useEffect(()=>{ instalarDescargaInformes(); },[]);
   const [condicionesLocales, setCondicionesLocales] = useState({}); // condicion UI inmediata por elemento
   const [showPlantacionForm, setShowPlantacionForm] = useState(null);
 
@@ -28741,7 +28772,7 @@ export default function App() {
             {tabReporte==="semanal" && (
               <ReporteSemanal frecEstado={tabReporte==="semanal"?calcFrecuenciasEstado():[]} S={S} tareasProg={tareasProg} semanaBase={semanaBase} setSemanaBase={setSemanaBase} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} incidenciasFito={incidenciasFito} esJefa={esJefa}/>
             )}
-            {tabReporte==="gestion" && esJefa && <PanelGestion S={S} tareasProg={tareasProg} setTareas={setTareasProg} esJefa={esJefa} personal={personal} comprasData={comprasData}/>}
+            {tabReporte==="gestion" && esJefa && <PanelGestion S={S} tareasProg={tareasProg} setTareas={setTareasProg} esJefa={esJefa} personal={personal} comprasData={comprasData} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal}/>}
             {tabReporte==="general" && <>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(270px,1fr))",gap:18,marginBottom:26}}>
               {(()=>{
