@@ -28670,7 +28670,7 @@ export default function App() {
                     const propZ=MACROZONAS_BASE.find(zz=>zz.nombre===nuevaTarea.zona);
                     if(propZ) addHistorial(propZ.id,`🆕 [${nuevaTarea.responsable}] Tarea emergente: ${nuevaTarea.tarea}`);
                   }}
-                  esJefaApp={rolLogueado==="jefa"}
+                  esJefaApp={rolLogueado==="jefa"||rolLogueado==="programador"}
                   cierresTurno={cierresTurno}
                   onCerrarTurno={(fecha,nombre)=>{
                     const key=`${fecha}_${nombre.split(" ")[0].toLowerCase()}`;
