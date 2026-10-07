@@ -6131,7 +6131,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
               setShowAgregar(true);
             }} style={{...S.btn,background:"rgba(61,122,82,0.25)",color:"#90d0a0",border:"1px solid rgba(61,122,82,0.35)",fontSize:13}}>➕ Agregar tarea</button>
             {esJefa&&(
-              <button onClick={()=>{
+              <button onClick={async()=>{
                 // MODO LLUVIA
                 // Qué hace (y qué NO hace) — se muestra completo en la confirmación:
                 //  • Tareas de exterior que no son riego → "No se pudo (lluvia)" y se reprograman en 2 días hábiles.
@@ -6179,63 +6179,87 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                 const riegosManual = riegos.filter(t=>!riegosMover.includes(t));
                 const riegosTecho = riegosManual.filter(esBajoTecho);
                 const riegosSinDato = riegosManual.filter(t=>!esBajoTecho(t));
-                const aMover = [...aPosponer, ...riegosMover];
-
-                if(aMover.length===0&&riegosManual.length===0){
+                if(aPosponer.length===0&&riegosMover.length===0&&riegosManual.length===0){
                   alert("No hay tareas que posponer por lluvia."); return;
                 }
 
-                const destino = diasHabiles(fecha, 2);
                 const etiqueta = t => `${t.zona||"—"} · ${t.elemento||"—"}`;
                 const listar = arr => arr.slice(0,8).map(t=>"   – "+etiqueta(t)).join("\n")+(arr.length>8?`\n   … y ${arr.length-8} más`:"");
-                const msg = [
-                  aPosponer.length>0 ? `• ${aPosponer.length} tarea(s) de exterior (no riego): quedan como "No se pudo — Lluvia" y se reprograman al ${destino}.` : "",
-                  riegosMover.length>0 ? `• ${riegosMover.length} riego(s) de exterior: no hacen falta con lluvia, se reprograman al ${destino}.` : "",
-                  riegosTecho.length>0 ? `• ${riegosTecho.length} riego(s) BAJO TECHO: NO se mueven, quedan hoy para que los ajustes a mano:\n${listar(riegosTecho)}` : "",
-                  riegosSinDato.length>0 ? `• ${riegosSinDato.length} riego(s) sin dato de si son exterior/bajo techo (o mixtos): NO se mueven, quedan hoy para que los revises:\n${listar(riegosSinDato)}\n   (para que el sistema los clasifique solo, marca el elemento como "Exterior" o "Bajo techo" en su ficha)` : "",
-                ].filter(Boolean).join("\n\n");
-                if(!window.confirm("🌧️ MODO LLUVIA — "+fecha+"\n\n"+msg+"\n\n¿Aplicar?")) return;
+                const tipoDe = t => esRiego(t) ? "Riego" : (()=>{ const k=tipoDeTareaGestion(t); return TIPOS_LLUVIA.includes(k)?k:"Otros"; })();
+                const conteo = {};
+                [...aPosponer,...riegosMover].forEach(t=>{ const k=tipoDe(t); conteo[k]=(conteo[k]||0)+1; });
+                const avisoRiegoManual = [
+                  riegosTecho.length>0 ? `• ${riegosTecho.length} riego(s) BAJO TECHO: NO se mueven, quedan hoy para que los ajustes a mano.` : "",
+                  riegosSinDato.length>0 ? `• ${riegosSinDato.length} riego(s) sin dato exterior/bajo techo (o mixtos): NO se mueven, quedan hoy para revisar.` : "",
+                ].filter(Boolean).join("\n");
+                const dec = await pedirConfigLluviaModal({
+                  fecha, nTareas:aPosponer.length, nRiegoMover:riegosMover.length, nRiegoManual:riegosManual.length,
+                  conteo, dias:{...DIAS_LLUVIA_DEFAULT,...((configSemanal||{}).lluviaDias||{})},
+                  avisoRiegoManual: avisoRiegoManual?avisoRiegoManual+"\n(Si eliges «Solo tareas», el riego no se toca ni se marca.)":"",
+                });
+                if(!dec) return;
+                if(dec.guardar && setConfigSemanal) setConfigSemanal(prev=>({...(prev||{}),lluviaDias:dec.dias}));
+                const aplicaTareas = dec.alcance!=="riego", aplicaRiego = dec.alcance!=="tareas";
+                const aMover = [...(aplicaTareas?aPosponer:[]), ...(aplicaRiego?riegosMover:[])];
+                const riegosManualAplica = aplicaRiego ? riegosManual : [];
+                if(aMover.length===0&&riegosManualAplica.length===0){
+                  alert("Con esa opción no hay nada que posponer."); return;
+                }
+                const destDe = t => diasHabiles(fecha, Math.max(1,Number(dec.dias[tipoDe(t)])||2));
+                const destinoPorId = {};
+                aMover.forEach(t=>{ destinoPorId[String(t.id)] = destDe(t); });
+                const destinosUsados = [...new Set(Object.values(destinoPorId))].sort();
 
-                // Copias para el día destino (no se duplica lo que ya esté programado ahí)
-                const existentesDest = new Set(normArr(tareas[destino]||[]).map(x=>`${x.zona}_${x.elemento}_${x.tarea}`));
-                const copias = [];
+                // Copias para los días destino (no se duplica lo que ya esté programado ahí)
+                const existentesDest = {};
+                destinosUsados.forEach(d=>{ existentesDest[d]=new Set(normArr(tareas[d]||[]).map(x=>`${x.zona}_${x.elemento}_${x.tarea}`)); });
+                const copiasPorDia = {};
+                let nCopias = 0;
                 aMover.forEach(t=>{
+                  const dest = destinoPorId[String(t.id)];
                   const k = `${t.zona}_${t.elemento}_${t.tarea}`;
-                  if(existentesDest.has(k)) return;
-                  existentesDest.add(k);
-                  copias.push({...t,
+                  if(existentesDest[dest].has(k)) return;
+                  existentesDest[dest].add(k);
+                  const copiaLl = {...t,
                     id:Date.now()+Math.random(),
-                    fecha:destino,
+                    fecha:dest,
                     estado:"pendiente",
                     notaWorker:"",
+                    causaNoPudo:"",
                     movidoDesde:fecha,
                     origenTareaId:t.id,
                     notas:(t.notas?t.notas+" | ":"")+"Reprogramada por lluvia desde "+fecha+(t.notaWorker?" — Obs. anterior: "+t.notaWorker:""),
-                  });
+                  };
+                  delete copiaLl.trasladadaA;
+                  (copiasPorDia[dest] ||= []).push(copiaLl);
+                  nCopias++;
                 });
                 const idsMover = new Set(aMover.map(t=>String(t.id)));
-                const idsRevisar = new Set(riegosManual.map(t=>String(t.id)));
+                const idsRevisar = new Set(riegosManualAplica.map(t=>String(t.id)));
                 setTareas(prev=>{
                   const normA = v=>Array.isArray(v)?v:Object.values(v||{});
                   // El original NO se borra: queda en su día marcado como trasladado (historial intacto, y el
                   // aviso de "No se pudo sin decidir" no lo vuelve a pedir).
                   const hoyArr = normA(prev[fecha]||[]).map(t=>{
                     if(idsMover.has(String(t.id))){
-                      return {...t, estado:"no_pudo", causaNoPudo:"lluvia", notaWorker:esRiego(t)?"Riego no necesario — Lluvia":"No se pudo — Lluvia", trasladadaA:destino};
+                      return {...t, estado:"no_pudo", causaNoPudo:"lluvia", notaWorker:esRiego(t)?"Riego no necesario — Lluvia":"No se pudo — Lluvia", trasladadaA:destinoPorId[String(t.id)]};
                     }
                     if(idsRevisar.has(String(t.id)) && !(t.notas||"").includes("🌧️ Revisar riego")){
                       return {...t, notas:(t.notas?t.notas+" | ":"")+"🌧️ Revisar riego: ajustar a mano por lluvia"};
                     }
                     return t;
                   });
-                  return {...prev,[fecha]:hoyArr,[destino]:[...normA(prev[destino]||[]),...copias]};
+                  const nuevoEstado = {...prev,[fecha]:hoyArr};
+                  Object.entries(copiasPorDia).forEach(([d,arr])=>{ nuevoEstado[d]=[...normA(prev[d]||[]),...arr]; });
+                  return nuevoEstado;
                 });
 
+                const resumenDest = destinosUsados.map(d=>`${d} (${(copiasPorDia[d]||[]).length})`).join(", ");
                 setTimeout(()=>alert(
                   "🌧️ Modo lluvia aplicado.\n\n"+
-                  `• Reprogramadas al ${destino}: ${copias.length} tarea(s)`+(riegosMover.length>0?` (${riegosMover.length} riego(s) de exterior incluidos)`:"")+".\n"+
-                  (aMover.length-copias.length>0?`• ${aMover.length-copias.length} ya estaban programadas en ${destino} — no se duplicaron.\n`:"")+
-                  (riegosManual.length>0?`• ${riegosManual.length} riego(s) siguen pendientes HOY a propósito (bajo techo o sin clasificar): quedaron marcados "🌧️ Revisar riego" para que los ajustes a mano.`:"")
+                  `• Reprogramadas: ${nCopias} tarea(s) → ${resumenDest||"—"}.\n`+
+                  (aMover.length-nCopias>0?`• ${aMover.length-nCopias} ya estaban programadas en su día destino — no se duplicaron.\n`:"")+
+                  (riegosManualAplica.length>0?`• ${riegosManualAplica.length} riego(s) siguen pendientes HOY a propósito (bajo techo o sin clasificar): quedaron marcados "🌧️ Revisar riego" para que los ajustes a mano.`:"")
                 ),200);
               }} style={{...S.btn,background:"rgba(96,165,250,0.1)",color:"#93c5fd",border:"1px solid rgba(96,165,250,0.2)",fontSize:11}}>
                 🌧️ Modo lluvia
@@ -25485,6 +25509,55 @@ const sumarDiasStr = (fechaStr, dias) => {
   d.setDate(d.getDate()+Number(dias));
   return d.toISOString().slice(0,10);
 };
+// ── Modo lluvia: días a correr por tipo de tarea + alcance (riego / tareas / ambos) ──
+const TIPOS_LLUVIA = ["Riego","Corte","Poda","Fertilización","Fumigación","Limpieza","Aireación","Desmalezado","Medición","Revisión","Orillado","Otros"];
+const DIAS_LLUVIA_DEFAULT = Object.fromEntries(TIPOS_LLUVIA.map(k=>[k,2]));
+const pedirConfigLluviaModal = ({fecha, nTareas, nRiegoMover, nRiegoManual, conteo, dias, avisoRiegoManual}) => new Promise(resolve=>{
+  const el = (tag, css, txt) => { const e=document.createElement(tag); if(css) e.style.cssText=css; if(txt!==undefined) e.textContent=txt; return e; };
+  const overlay = el("div","position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;font-family:Arial,sans-serif");
+  const box = el("div","background:#fff;border-radius:14px;padding:20px;max-width:520px;width:100%;max-height:90vh;overflow:auto;color:#1a1a1a;box-shadow:0 10px 40px rgba(0,0,0,.4)");
+  const cerrar = (v)=>{ overlay.remove(); resolve(v); };
+  overlay.addEventListener("mousedown",(e)=>{ if(e.target===overlay) cerrar(null); });
+  box.appendChild(el("div","font-size:16px;font-weight:700;margin-bottom:4px;color:#1e40af","🌧️ Modo lluvia — "+fecha));
+  box.appendChild(el("div","font-size:12px;color:#555;margin-bottom:12px",`Hay ${nTareas} tarea(s) de exterior y ${nRiegoMover} riego(s) de exterior para mover; ${nRiegoManual} riego(s) quedan para revisar a mano.`));
+  // alcance
+  box.appendChild(el("div","font-size:12px;font-weight:700;margin-bottom:4px","¿A qué lo aplico?"));
+  let alcance = "ambos";
+  const opts = [["ambos","Riego y tareas"],["riego","Solo riego"],["tareas","Solo tareas (sin riego)"]];
+  const radios = el("div","display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px");
+  const btns = {};
+  const pintar = ()=>Object.entries(btns).forEach(([k,b])=>{ b.style.background=k===alcance?"#1e40af":"#eef2ff"; b.style.color=k===alcance?"#fff":"#1e3a8a"; });
+  opts.forEach(([k,l])=>{ const b=el("button","cursor:pointer;border:1px solid #93c5fd;border-radius:18px;padding:6px 14px;font-size:12px",l); b.onclick=()=>{alcance=k;pintar();}; btns[k]=b; radios.appendChild(b); });
+  box.appendChild(radios); pintar();
+  // días por tipo
+  box.appendChild(el("div","font-size:12px;font-weight:700;margin-bottom:2px","Días hábiles que se corre cada tipo de tarea"));
+  box.appendChild(el("div","font-size:11px;color:#666;margin-bottom:6px","Se saltan los domingos. Solo se muestran los tipos que hoy tienen algo para mover."));
+  const inputs = {};
+  const grid = el("div","display:grid;grid-template-columns:1fr 70px;gap:5px 10px;align-items:center;margin-bottom:10px");
+  const tiposMostrar = TIPOS_LLUVIA.filter(k=>conteo[k]>0);
+  (tiposMostrar.length?tiposMostrar:TIPOS_LLUVIA).forEach(k=>{
+    grid.appendChild(el("div","font-size:13px",k+(conteo[k]?` (${conteo[k]})`:"")));
+    const inp=el("input","width:100%;padding:5px;border:1px solid #bbb;border-radius:6px;font-size:13px;text-align:center");
+    inp.type="number"; inp.min="1"; inp.max="30"; inp.value=String(dias[k]??2); inputs[k]=inp; grid.appendChild(inp);
+  });
+  box.appendChild(grid);
+  const lblG=el("label","display:flex;gap:6px;align-items:center;font-size:12px;margin-bottom:14px;color:#333");
+  const chk=document.createElement("input"); chk.type="checkbox"; chk.checked=true;
+  lblG.appendChild(chk); lblG.appendChild(document.createTextNode("Guardar estos días como valores por defecto"));
+  box.appendChild(lblG);
+  if(avisoRiegoManual) box.appendChild(el("div","font-size:11px;color:#92400e;background:#fffbeb;border-radius:8px;padding:8px;margin-bottom:12px;white-space:pre-wrap",avisoRiegoManual));
+  const fila=el("div","display:flex;gap:8px;justify-content:flex-end");
+  const bc=el("button","cursor:pointer;border:none;border-radius:8px;padding:9px 16px;font-size:13px;background:#f5f5f5;color:#555","Cancelar"); bc.onclick=()=>cerrar(null);
+  const ba=el("button","cursor:pointer;border:none;border-radius:8px;padding:9px 16px;font-size:13px;background:#1e40af;color:#fff","🌧️ Aplicar");
+  ba.onclick=()=>{
+    const d={...dias};
+    Object.entries(inputs).forEach(([k,i])=>{ const n=Math.round(Number(i.value)); d[k]=(n>=1&&n<=30)?n:2; });
+    cerrar({alcance,dias:d,guardar:chk.checked});
+  };
+  fila.appendChild(bc); fila.appendChild(ba); box.appendChild(fila);
+  overlay.appendChild(box); document.body.appendChild(overlay);
+});
+
 const diasHabiles = (fechaStr, n=1) => {
   const d = new Date(fechaStr+"T12:00:00");
   let sumados = 0;
