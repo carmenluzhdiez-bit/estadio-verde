@@ -1738,9 +1738,13 @@ const horasAusenciaDia = (p, fecha) => {
   return desc;
 };
 
-function PanelGestion({ S, tareasProg, setTareas=()=>{}, esJefa=false, personal=[] }) {
+function PanelGestion({ S, tareasProg, setTareas=()=>{}, esJefa=false, personal=[], comprasData={} }) {
   const [semanas,setSemanas] = React.useState(8);
   const [vistaG,setVistaG] = React.useState("desempeno");
+  const [mesesCosto,setMesesCosto] = React.useState(6);
+  const [mesRes,setMesRes] = React.useState(()=>fechaLocal().slice(0,7));
+  const [edRes,setEdRes] = React.useState({mes:"",hitos:null,desafios:null,coment:""});
+  const [nuevoItemRes,setNuevoItemRes] = React.useState({h:"",d:""});
   if(!esJefa) return null;
   const hoy = fechaLocal();
   const lunesActual = lunesDeFecha(hoy);
@@ -1796,11 +1800,11 @@ function PanelGestion({ S, tareasProg, setTareas=()=>{}, esJefa=false, personal=
     pctTiempo:o.n?Math.round(o.aTiempo/o.n*100):0, prom:o.conAtraso?Math.round(o.suma/o.conAtraso*10)/10:0})).sort((a,b)=>b.prom-a.prom||b.n-a.n);
 
   // ── 4) Horas hombre estimadas ──
-  const hh = (()=>{
+  const calcHH = (todasX, desdeX, hastaX)=>{
     const porZona={}, porTipo={}, porTrabHH={}; let total=0, sinTarea=0, sinJornada=0, diasAus=0;
     const trabByName={}; (personal||[]).forEach(p=>{ trabByName[String(p.nombre||"").trim().toLowerCase()]=p; });
     const porDiaTrab={};
-    todas.forEach(t=>{
+    todasX.forEach(t=>{
       const r=(t.responsable||"").trim().toLowerCase(); if(!r) return;
       if(normalizarEstado(t.estado)!=="hecha") return;
       const k=t.dia+"|"+r; (porDiaTrab[k]=porDiaTrab[k]||[]).push(t);
@@ -1808,7 +1812,7 @@ function PanelGestion({ S, tareasProg, setTareas=()=>{}, esJefa=false, personal=
     // días con jornada de cada persona con tareas o con horas extra en el período
     const claves=new Set(Object.keys(porDiaTrab));
     (personal||[]).forEach(p=>(p.eventos||[]).forEach(e=>{
-      if(e.tipo==="horaExtra"&&e.estado==="aprobado"&&e.fecha&&e.fecha>=desde&&e.fecha<=hoy) claves.add(e.fecha+"|"+String(p.nombre||"").trim().toLowerCase());
+      if(e.tipo==="horaExtra"&&e.estado==="aprobado"&&e.fecha&&e.fecha>=desdeX&&e.fecha<=hastaX) claves.add(e.fecha+"|"+String(p.nombre||"").trim().toLowerCase());
     }));
     claves.forEach(k=>{
       const [dia,r]=k.split("|"); const p=trabByName[r]; const tareasDia=porDiaTrab[k]||[];
@@ -1830,9 +1834,122 @@ function PanelGestion({ S, tareasProg, setTareas=()=>{}, esJefa=false, personal=
     });
     const ord=o=>Object.entries(o).map(([n,h])=>({n,h})).sort((a,b)=>b.h-a.h);
     return {zonas:ord(porZona),tipos:ord(porTipo),trabs:ord(porTrabHH),total,sinTarea,sinJornada,diasAus};
-  })();
+  };
+  const hh = calcHH(todas, desde, hoy);
   const fh=h=>(Math.round(h*10)/10).toLocaleString("es-CL")+" h";
 
+  // ── 5) Costos: por categoría de compra y por máquina (compras con máquina asociada) ──
+  const cs = (()=>{
+    const d0=new Date(hoy+"T12:00:00"); d0.setMonth(d0.getMonth()-(mesesCosto-1)); const desdeM=d0.toISOString().slice(0,7)+"-01";
+    const meses=Array.from({length:mesesCosto},(_,i)=>{ const d=new Date(hoy+"T12:00:00"); d.setDate(1); d.setMonth(d.getMonth()-(mesesCosto-1-i)); return d.toISOString().slice(0,7); });
+    const porCat={}, porMaq={}; let total=0, sinCat=0;
+    (comprasData.compras||[]).forEach(c=>{
+      if(!c.fecha||c.fecha<desdeM||c.fecha>hoy) return;
+      if(["Cotización","Nota de Pedido","Guía de Despacho"].includes(c.tipoDoc)) return;
+      const signo=c.tipoDoc==="Nota de Crédito"?-1:1; const mes=c.fecha.slice(0,7);
+      (c.items||[]).forEach(it=>{
+        const monto=signo*Number(it.totalBruto||it.totalNeto||0); if(!monto) return;
+        const cat=it.categoria||"Sin categoría"; if(!it.categoria) sinCat+=monto;
+        if(!porCat[cat]) porCat[cat]={n:cat,meses:{},tot:0}; porCat[cat].meses[mes]=(porCat[cat].meses[mes]||0)+monto; porCat[cat].tot+=monto;
+        total+=monto;
+        const maq=(it.maquinaAsociada||"").trim();
+        if(maq){ if(!porMaq[maq]) porMaq[maq]={n:maq,tot:0,compras:0,items:[]}; porMaq[maq].tot+=monto; porMaq[maq].compras++; porMaq[maq].items.push({fecha:c.fecha,d:it.descripcion||"",prov:c.proveedor||"",m:monto}); }
+      });
+    });
+    const cats=Object.values(porCat).sort((a,b)=>b.tot-a.tot);
+    const maqs=Object.values(porMaq).sort((a,b)=>b.tot-a.tot);
+    return {meses,cats,maqs,total,sinCat};
+  })();
+  const fp=n=>"$"+Math.round(n).toLocaleString("es-CL");
+  const MNC=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+
+  // ── 6) Resumen mensual a jefatura ──
+  const calcMes = (mes)=>{
+    const [yy,mm]=mes.split("-").map(Number);
+    const ini=mes+"-01", finMes=mes+"-"+String(new Date(yy,mm,0).getDate()).padStart(2,"0");
+    const fin=finMes>hoy?hoy:finMes;
+    const ts=[]; Object.entries(tareasProg||{}).forEach(([dia,tds])=>{ if(dia<ini||dia>fin) return; (Array.isArray(tds)?tds:Object.values(tds||{})).forEach(t=>{ if(t) ts.push({...t,dia}); }); });
+    let hechas=0,noPudo=0,lluvia=0,venc=0,autoTot=0,autoOk=0;
+    const tipos={},zonasH={},zonasV={},tiposV={},causas={},diasLluvia=new Set();
+    ts.forEach(t=>{
+      const est=normalizarEstado(t.estado);
+      if(esNoPudoLluvia(t)){ lluvia++; diasLluvia.add(t.dia); return; }
+      if(t.trasladadaA && est!=="hecha") return;
+      const z=t.zona||"(sin zona)", ti=tipoDeTareaGestion(t);
+      if(t.auto){ autoTot++; if(est==="hecha") autoOk++; }
+      if(est==="hecha"){ hechas++; tipos[ti]=(tipos[ti]||0)+1; zonasH[z]=(zonasH[z]||0)+1; }
+      else if(est==="no_pudo"){ noPudo++; const c=causaNoPudoDe(t)||"sinclas"; causas[c]=(causas[c]||0)+1; }
+      else if(t.dia<hoy){ venc++; zonasV[z]=(zonasV[z]||0)+1; tiposV[ti]=(tiposV[ti]||0)+1; }
+    });
+    const efect=hechas+noPudo+venc;
+    const pct=efect?Math.round(hechas/efect*100):null;
+    const sFrec=autoTot?autoOk/autoTot*100:100, sVenc=efect?(1-venc/efect)*100:100, sNP=(hechas+noPudo)?(1-noPudo/(hechas+noPudo))*100:100;
+    const salud=efect?Math.round((0.35*sFrec+0.30*sVenc+0.15*sNP)/0.80):null;
+    // costos del mes
+    let gasto=0; const cats={}; let mayor=null;
+    (comprasData.compras||[]).forEach(c=>{
+      if(!c.fecha||c.fecha<ini||c.fecha>fin) return;
+      if(["Cotización","Nota de Pedido","Guía de Despacho"].includes(c.tipoDoc)) return;
+      const sg=c.tipoDoc==="Nota de Crédito"?-1:1;
+      (c.items||[]).forEach(it=>{ const m=sg*Number(it.totalBruto||it.totalNeto||0); if(!m) return; gasto+=m; const k=it.categoria||"Sin categoría"; cats[k]=(cats[k]||0)+m; if(sg>0&&(!mayor||m>mayor.m)) mayor={m,d:it.descripcion||k,prov:c.proveedor||""}; });
+    });
+    const top=(o,n=3)=>Object.entries(o).sort((a,b)=>b[1]-a[1]).slice(0,n);
+    const hhm=calcHH(ts,ini,fin);
+    return {mes,ini,fin,hechas,noPudo,lluvia,venc,pct,salud,tipos:top(tipos,4),zonasH:top(zonasH,3),zonasV:top(zonasV,3),tiposV:top(tiposV,3),causas,diasLluvia:diasLluvia.size,gasto,catsTop:top(cats,3),mayor,hh:hhm,nTareas:ts.length};
+  };
+  const MESES_L=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+  const nombreMes=m=>MESES_L[Number(m.slice(5))-1]+" "+m.slice(0,4);
+  const mesAnteriorDe=m=>{ const d=new Date(m+"-15T12:00:00"); d.setMonth(d.getMonth()-1); return d.toISOString().slice(0,7); };
+  const RM=calcMes(mesRes), RP=calcMes(mesAnteriorDe(mesRes));
+  const dif=(a,b,suf="")=>(a===null||b===null)?"sin base de comparación":(a-b===0?"igual que":(a-b>0?"▲ +":"▼ ")+(a-b)+suf+" vs")+" "+nombreMes(RP.mes);
+  const autoHitos=(()=>{
+    const L=[];
+    if(RM.hechas>0) L.push(`${RM.hechas} tareas realizadas${RM.pct!==null?` (${RM.pct}% de cumplimiento)`:""}${RP.pct!==null&&RM.pct!==null?` — ${dif(RM.pct,RP.pct," pts")}`:""}.`);
+    if(RM.tipos.length) L.push("Principales trabajos: "+RM.tipos.map(([k,n])=>`${k} (${n})`).join(", ")+".");
+    if(RM.zonasH.length) L.push("Zonas con más trabajo: "+RM.zonasH.map(([k,n])=>`${k} (${n})`).join(", ")+".");
+    if(RM.salud!==null&&RP.salud!==null&&RM.salud>RP.salud) L.push(`Mejora de la salud operativa: ${RP.salud} → ${RM.salud}.`);
+    if(RM.lluvia>0) L.push(`Lluvia: ${RM.diasLluvia} día(s) con lluvia y ${RM.lluvia} tarea(s) reprogramadas sin afectar el cumplimiento.`);
+    if(RM.hh.total>0) L.push(`≈ ${Math.round(RM.hh.total-RM.hh.sinTarea).toLocaleString("es-CL")} horas hombre estimadas dedicadas a tareas.`);
+    if(RM.mayor) L.push(`Mayor compra del mes: ${RM.mayor.d}${RM.mayor.prov?" ("+RM.mayor.prov+")":""}, ${fp(RM.mayor.m)}.`);
+    return L;
+  })();
+  const autoDesaf=(()=>{
+    const L=[];
+    if(RM.venc>0) L.push(`${RM.venc} tarea(s) vencidas sin hacer${RM.zonasV.length?", sobre todo en "+RM.zonasV.map(([k,n])=>`${k} (${n})`).join(", "):""}${RM.tiposV.length?"; tipos: "+RM.tiposV.map(([k,n])=>`${k} (${n})`).join(", "):""}.`);
+    const NC={maquina:"falla de máquina",personal:"falta de personal/tiempo",zona:"zona ocupada",sinclas:"sin clasificar"};
+    const cs2=Object.entries(RM.causas).filter(([k])=>NC[k]);
+    if(RM.noPudo>0) L.push(`${RM.noPudo} tarea(s) «no se pudo»${cs2.length?": "+cs2.map(([k,n])=>`${NC[k]} ${n}`).join(", "):""}.`);
+    if(RM.salud!==null&&RP.salud!==null&&RM.salud<RP.salud) L.push(`La salud operativa bajó (${RP.salud} → ${RM.salud}); revisar causas.`);
+    if(RM.pct!==null&&RM.pct<70) L.push(`Cumplimiento bajo la meta de 70% (${RM.pct}%).`);
+    if(RM.hh.sinJornada>0) L.push(`Completar la jornada en la ficha del personal (${RM.hh.sinJornada} día(s) sin horas definidas).`);
+    return L;
+  })();
+  const edActivo=edRes.mes===mesRes;
+  const listaH=edActivo&&edRes.hitos?edRes.hitos:autoHitos, listaD=edActivo&&edRes.desafios?edRes.desafios:autoDesaf, comentRes=edActivo?edRes.coment:"";
+  const setEd=(patch)=>setEdRes(prev=>({mes:mesRes,hitos:prev.mes===mesRes?prev.hitos:null,desafios:prev.mes===mesRes?prev.desafios:null,coment:prev.mes===mesRes?prev.coment:"",...patch}));
+  const imprimirResumen=()=>{
+    const V="#1a5c35"; const esc=x=>String(x).replace(/&/g,"&amp;").replace(/</g,"&lt;");
+    const kpi=(t,v,sub)=>`<div style="flex:1;border:1px solid #cfe3d4;border-radius:8px;padding:8px 10px"><div style="font-size:10px;color:#555">${t}</div><div style="font-size:22px;font-weight:700;color:${V}">${v}</div><div style="font-size:10px;color:#666">${sub}</div></div>`;
+    const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Resumen ${nombreMes(mesRes)}</title><style>@page{size:A4;margin:14mm}body{font-family:Calibri,Arial,sans-serif;font-size:12px;color:#222}h1{color:${V};font-size:20px;margin:0}h3{color:${V};border-bottom:2px solid ${V};padding-bottom:2px;margin:14px 0 5px;font-size:14px}ul{margin:4px 0 0 18px;padding:0}li{margin-bottom:3px}table{width:100%;border-collapse:collapse;font-size:11px}td,th{padding:3px 6px;border-bottom:1px solid #ddd;text-align:left}@media print{.np{display:none}}</style></head><body>
+    <div style="display:flex;align-items:center;gap:12px"><img src="${LOGO_AREAS_VERDES_B64}" style="height:46px"/><div><h1>Resumen mensual — Áreas Verdes</h1><div style="color:#555">${nombreMes(mesRes)} · Estadio Español de Las Condes</div></div></div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      ${kpi("Salud operativa (mensual)",RM.salud===null?"—":RM.salud,dif(RM.salud,RP.salud))}
+      ${kpi("Cumplimiento",RM.pct===null?"—":RM.pct+"%",dif(RM.pct,RP.pct," pts"))}
+      ${kpi("Tareas hechas",RM.hechas,RP.hechas+" en "+nombreMes(RP.mes))}
+      ${kpi("🌧️ Lluvia (sin castigo)",RM.lluvia,RM.diasLluvia+" día(s)")}
+    </div>
+    <div style="font-size:10px;color:#777;margin-top:4px">Salud operativa mensual: reconstruida con las tareas del mes (frecuencias cumplidas, vencidas y «no se pudo»); no incluye incidencias ni condición de elementos.</div>
+    <h3>Hitos del mes</h3><ul>${listaH.map(x=>`<li>${esc(x)}</li>`).join("")||"<li>—</li>"}</ul>
+    <h3>Desafíos pendientes</h3><ul>${listaD.map(x=>`<li>${esc(x)}</li>`).join("")||"<li>Sin desafíos destacados.</li>"}</ul>
+    <h3>Costos y horas hombre</h3>
+    <table><tr><th>Gasto del mes (compras, IVA incl.)</th><td><b>${fp(RM.gasto)}</b> ${RP.gasto?`(mes anterior ${fp(RP.gasto)})`:""}</td></tr>
+    <tr><th>Principales categorías</th><td>${RM.catsTop.map(([k,n])=>`${esc(k)} ${fp(n)}`).join(" · ")||"—"}</td></tr>
+    <tr><th>Horas hombre estimadas</th><td><b>${Math.round(RM.hh.total-RM.hh.sinTarea).toLocaleString("es-CL")} h</b> — por zona: ${RM.hh.zonas.slice(0,4).map(f=>`${esc(f.n)} ${Math.round(f.h)} h`).join(" · ")||"—"} <span style="color:#777">(estimación)</span></td></tr></table>
+    ${comentRes?`<h3>Comentarios de la Jefa</h3><div style="white-space:pre-wrap">${esc(comentRes)}</div>`:""}
+    <div class="np" style="text-align:center;margin-top:16px"><button onclick="window.print()" style="background:${V};color:#fff;border:none;padding:9px 22px;border-radius:6px;cursor:pointer">🖨️ Imprimir / PDF</button></div></body></html>`;
+    const w=window.open("","_blank","width=900,height=900"); if(!w){ alert("Permite ventanas emergentes para imprimir."); return; }
+    w.document.write(html); w.document.close();
+  };
   const fmtS = f=>{ const d=new Date(f+"T12:00:00"); return d.getDate()+"/"+(d.getMonth()+1); };
   const imprimir = ()=>{
     const V="#1a5c35";
@@ -1848,6 +1965,10 @@ function PanelGestion({ S, tareasProg, setTareas=()=>{}, esJefa=false, personal=
     <h3>Horas hombre estimadas por tipo de tarea</h3>
     <table>${th(["Tipo","Horas"])}${hh.tipos.map((f,i)=>`<tr style="background:${i%2?"#f5fbf5":"#fff"}"><td>${f.n}</td><td style="text-align:right"><b>${fh(f.h)}</b></td></tr>`).join("")}</table>
     <div style="color:#555;margin-top:6px">Total asignado: ${fh(hh.total-hh.sinTarea)} · Horas de jornada sin tarea hecha registrada: ${fh(hh.sinTarea)} · Valores estimados (no son horas medidas); se descuentan los días con permiso, vacaciones o licencia aprobados.</div>
+    <h3>Costos de compras por categoría (últimos ${mesesCosto} meses, IVA incluido, notas de crédito restan)</h3>
+    <table>${th(["Categoría",...cs.meses.map(m=>MNC[Number(m.slice(5))-1]+" "+m.slice(2,4)),"Total"])}${cs.cats.map((f,i)=>`<tr style="background:${i%2?"#f5fbf5":"#fff"}"><td>${f.n}</td>${cs.meses.map(m=>`<td style="text-align:right">${f.meses[m]?fp(f.meses[m]):"—"}</td>`).join("")}<td style="text-align:right"><b>${fp(f.tot)}</b></td></tr>`).join("")}<tr><td><b>TOTAL</b></td>${cs.meses.map(()=>"<td></td>").join("")}<td style="text-align:right"><b>${fp(cs.total)}</b></td></tr></table>
+    <h3>Costo por máquina / equipo (compras con máquina asociada)</h3>
+    <table>${th(["Máquina / equipo","N° ítems","Costo"])}${cs.maqs.map((f,i)=>`<tr style="background:${i%2?"#f5fbf5":"#fff"}"><td>${f.n}</td><td style="text-align:center">${f.compras}</td><td style="text-align:right"><b>${fp(f.tot)}</b></td></tr>`).join("")}</table>
     <div class="np" style="text-align:center;margin-top:16px"><button onclick="window.print()" style="background:${V};color:#fff;border:none;padding:9px 22px;border-radius:6px;cursor:pointer">🖨️ Imprimir / PDF</button></div></body></html>`;
     const w=window.open("","_blank","width=1000,height=800"); if(!w){ alert("Permite ventanas emergentes para imprimir."); return; }
     w.document.write(html); w.document.close();
@@ -1857,7 +1978,7 @@ function PanelGestion({ S, tareasProg, setTareas=()=>{}, esJefa=false, personal=
   return (
     <div className="ein">
       <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
-        {[["desempeno","👷 Desempeño por jardinero"],["atraso","⏱️ Atraso por tipo de tarea"],["causas","🔴 Causas de «no se pudo»"],["horas","⏱ Horas hombre"]].map(([t,l])=>(
+        {[["desempeno","👷 Desempeño por jardinero"],["atraso","⏱️ Atraso por tipo de tarea"],["causas","🔴 Causas de «no se pudo»"],["horas","⏱ Horas hombre"],["costos","💲 Costos"],["resumen","📄 Resumen mensual"]].map(([t,l])=>(
           <button key={t} onClick={()=>setVistaG(t)} style={{cursor:"pointer",border:`1px solid ${vistaG===t?"#34d399":"rgba(255,255,255,0.12)"}`,borderRadius:8,padding:"5px 14px",fontSize:12,background:vistaG===t?"rgba(52,211,153,0.12)":"transparent",color:vistaG===t?"#34d399":"#6aaa7a"}}>{l}</button>))}
         <select value={semanas} onChange={e=>setSemanas(Number(e.target.value))} style={{...S.input,width:"auto",fontSize:12}}>
           {[4,8,12].map(n=><option key={n} value={n}>Últimas {n} semanas</option>)}
@@ -1933,6 +2054,88 @@ function PanelGestion({ S, tareasProg, setTareas=()=>{}, esJefa=false, personal=
               <div style={{fontSize:12,fontWeight:600,color:"#34d399",margin:"14px 0 6px"}}>Por tipo de tarea</div>{barra(hh.tipos,"#60a5fa")}
               <div style={{fontSize:12,fontWeight:600,color:"#34d399",margin:"14px 0 6px"}}>Por jardinero</div>{barra(hh.trabs,"#a78bfa")}
             </>)}
+          </div>
+        );
+      })()}
+      {vistaG==="costos"&&(
+        <div style={{...S.card,padding:"12px 14px",overflowX:"auto"}}>
+          <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:8,flexWrap:"wrap"}}>
+            <span style={{fontSize:11,color:"#5a9a7a"}}>Compras con IVA; las notas de crédito restan; no cuentan cotizaciones, notas de pedido ni guías.</span>
+            <select value={mesesCosto} onChange={e=>setMesesCosto(Number(e.target.value))} style={{...S.input,width:"auto",fontSize:12}}>
+              {[3,6,12].map(n=><option key={n} value={n}>Últimos {n} meses</option>)}
+            </select>
+          </div>
+          <div style={{fontSize:12,color:"#ede9e0",marginBottom:10}}>Total del período: <b>{fp(cs.total)}</b>{cs.sinCat!==0&&<span style={{color:"#fbbf24"}}> · sin categoría: {fp(cs.sinCat)}</span>}</div>
+          <div style={{fontSize:12,fontWeight:600,color:"#34d399",marginBottom:6}}>Por categoría de compra</div>
+          {cs.cats.length===0?<div style={{color:"#4a7a5a",padding:12}}>Sin compras en el período.</div>:(
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+            <thead><tr style={{background:"rgba(52,211,153,0.08)"}}>
+              <th style={{...th,textAlign:"left"}}>Categoría</th>{cs.meses.map(m=><th key={m} style={th}>{MNC[Number(m.slice(5))-1]} {m.slice(2,4)}</th>)}<th style={th}>Total</th>
+            </tr></thead>
+            <tbody>{cs.cats.map(f=>(
+              <tr key={f.n} style={{borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                <td style={{padding:"4px 8px",color:"#ede9e0"}}>{f.n}</td>
+                {cs.meses.map(m=><td key={m} style={{padding:"4px 8px",textAlign:"right",color:"#9ca3af"}}>{f.meses[m]?fp(f.meses[m]):"—"}</td>)}
+                <td style={{padding:"4px 8px",textAlign:"right",color:"#34d399",fontWeight:700}}>{fp(f.tot)}</td>
+              </tr>))}</tbody>
+          </table>)}
+          <div style={{fontSize:12,fontWeight:600,color:"#34d399",margin:"16px 0 6px"}}>Por máquina / equipo</div>
+          <div style={{fontSize:11,color:"#5a9a7a",marginBottom:6}}>Repuestos y servicios comprados con «Máquina / Equipo asociado» elegido en la compra. Lo que se compra sin asignar máquina no aparece aquí.</div>
+          {cs.maqs.length===0?<div style={{color:"#4a7a5a",padding:12}}>Aún no hay compras asignadas a una máquina en el período.</div>:cs.maqs.map(f=>(
+            <details key={f.n} style={{marginBottom:4,borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+              <summary style={{cursor:"pointer",fontSize:12,color:"#ede9e0",padding:"4px 0",display:"flex",justifyContent:"space-between"}}>
+                <span>🔩 {f.n} <span style={{color:"#5a9a7a"}}>· {f.compras} ítem(s)</span></span><b style={{color:"#f59e0b"}}>{fp(f.tot)}</b>
+              </summary>
+              {f.items.sort((a,b)=>b.fecha.localeCompare(a.fecha)).map((x,i)=>(
+                <div key={i} style={{fontSize:11,color:"#9ca3af",padding:"2px 0 2px 18px",display:"flex",gap:8}}>
+                  <span style={{minWidth:76}}>{x.fecha}</span><span style={{flex:1}}>{x.d} <span style={{color:"#5a9a7a"}}>· {x.prov}</span></span><span>{fp(x.m)}</span>
+                </div>))}
+            </details>))}
+        </div>
+      )}
+      {vistaG==="resumen"&&(()=>{
+        const meses=Array.from({length:12},(_,i)=>{ const d=new Date(hoy.slice(0,7)+"-15T12:00:00"); d.setMonth(d.getMonth()-i); return d.toISOString().slice(0,7); });
+        const lista=(arr,key,color,ph)=>(
+          <div style={{marginBottom:12}}>
+            {arr.map((x,i)=>(
+              <div key={i} style={{display:"flex",gap:6,alignItems:"flex-start",marginBottom:4}}>
+                <span style={{color}}>•</span>
+                <textarea value={x} rows={Math.max(1,Math.ceil(x.length/90))} onChange={e=>{const n=[...arr]; n[i]=e.target.value; setEd({[key]:n});}} style={{...S.input,flex:1,fontSize:12,resize:"vertical"}}/>
+                <button onClick={()=>setEd({[key]:arr.filter((_,j)=>j!==i)})} title="Quitar" style={{...S.btn,fontSize:11,padding:"2px 8px",background:"rgba(239,68,68,0.12)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.25)"}}>✕</button>
+              </div>))}
+            <div style={{display:"flex",gap:6}}>
+              <input value={nuevoItemRes[key==="hitos"?"h":"d"]} onChange={e=>setNuevoItemRes(p=>({...p,[key==="hitos"?"h":"d"]:e.target.value}))} placeholder={ph} style={{...S.input,flex:1,fontSize:12}}/>
+              <button onClick={()=>{ const k=key==="hitos"?"h":"d"; const v=nuevoItemRes[k].trim(); if(!v) return; setEd({[key]:[...arr,v]}); setNuevoItemRes(p=>({...p,[k]:""})); }} style={{...S.btn,fontSize:12,background:"rgba(52,211,153,0.15)",color:"#34d399",border:"1px solid rgba(52,211,153,0.3)"}}>+ Agregar</button>
+            </div>
+          </div>);
+        const kp=(t,v,sub,c="#34d399")=>(<div style={{flex:"1 1 150px",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,padding:"8px 10px"}}><div style={{fontSize:10,color:"#6aaa7a"}}>{t}</div><div style={{fontSize:22,fontWeight:700,color:c}}>{v}</div><div style={{fontSize:10,color:"#9ca3af"}}>{sub}</div></div>);
+        return (
+          <div style={{...S.card,padding:"12px 14px"}}>
+            <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:10}}>
+              <select value={mesRes} onChange={e=>setMesRes(e.target.value)} style={{...S.input,width:"auto",fontSize:12}}>
+                {meses.map(m=><option key={m} value={m}>{nombreMes(m)}</option>)}
+              </select>
+              <button onClick={imprimirResumen} style={{...S.btn,fontSize:12,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}}>🖨️ Imprimir resumen (1 página)</button>
+              {edActivo&&(edRes.hitos||edRes.desafios)&&<button onClick={()=>setEdRes({mes:"",hitos:null,desafios:null,coment:edRes.coment})} style={{...S.btn,fontSize:11,background:"transparent",color:"#fbbf24",border:"1px solid rgba(251,191,36,0.3)"}}>↺ Volver a lo automático</button>}
+            </div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:6}}>
+              {kp("Salud operativa (mensual)",RM.salud===null?"—":RM.salud,dif(RM.salud,RP.salud))}
+              {kp("Cumplimiento",RM.pct===null?"—":RM.pct+"%",dif(RM.pct,RP.pct," pts"))}
+              {kp("Tareas hechas",RM.hechas,RP.hechas+" en "+nombreMes(RP.mes),"#60a5fa")}
+              {kp("🌧️ Lluvia",RM.lluvia,RM.diasLluvia+" día(s), sin castigo","#60a5fa")}
+            </div>
+            <div style={{fontSize:10,color:"#5a9a7a",marginBottom:12}}>Salud mensual reconstruida con las tareas del mes (frecuencias cumplidas, vencidas y «no se pudo»); no incluye incidencias ni condición de elementos, por eso puede diferir del índice del día.</div>
+            <div style={{fontSize:12,fontWeight:600,color:"#34d399",marginBottom:6}}>Hitos del mes (editables)</div>
+            {lista(listaH,"hitos","#34d399","Agregar un hito…")}
+            <div style={{fontSize:12,fontWeight:600,color:"#f59e0b",marginBottom:6}}>Desafíos pendientes (editables)</div>
+            {lista(listaD,"desafios","#f59e0b","Agregar un desafío…")}
+            <div style={{fontSize:12,fontWeight:600,color:"#34d399",marginBottom:6}}>Costos y horas hombre</div>
+            <div style={{fontSize:12,color:"#ede9e0",marginBottom:12}}>
+              Gasto en compras: <b>{fp(RM.gasto)}</b>{RM.catsTop.length>0&&<span style={{color:"#9ca3af"}}> ({RM.catsTop.map(([k,n])=>`${k} ${fp(n)}`).join(" · ")})</span>}<br/>
+              Horas hombre estimadas: <b>{Math.round(RM.hh.total-RM.hh.sinTarea).toLocaleString("es-CL")} h</b>{RM.hh.zonas.length>0&&<span style={{color:"#9ca3af"}}> ({RM.hh.zonas.slice(0,4).map(f=>`${f.n} ${Math.round(f.h)} h`).join(" · ")})</span>}
+            </div>
+            <div style={{fontSize:12,fontWeight:600,color:"#34d399",marginBottom:6}}>Comentarios de la Jefa (opcional, se imprimen)</div>
+            <textarea value={comentRes} onChange={e=>setEd({coment:e.target.value})} rows={3} placeholder="Escribe aquí observaciones para jefatura…" style={{...S.input,width:"100%",fontSize:12,resize:"vertical"}}/>
           </div>
         );
       })()}
@@ -28538,7 +28741,7 @@ export default function App() {
             {tabReporte==="semanal" && (
               <ReporteSemanal frecEstado={tabReporte==="semanal"?calcFrecuenciasEstado():[]} S={S} tareasProg={tareasProg} semanaBase={semanaBase} setSemanaBase={setSemanaBase} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} incidenciasFito={incidenciasFito} esJefa={esJefa}/>
             )}
-            {tabReporte==="gestion" && esJefa && <PanelGestion S={S} tareasProg={tareasProg} setTareas={setTareasProg} esJefa={esJefa} personal={personal}/>}
+            {tabReporte==="gestion" && esJefa && <PanelGestion S={S} tareasProg={tareasProg} setTareas={setTareasProg} esJefa={esJefa} personal={personal} comprasData={comprasData}/>}
             {tabReporte==="general" && <>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(270px,1fr))",gap:18,marginBottom:26}}>
               {(()=>{
