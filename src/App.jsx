@@ -1704,7 +1704,41 @@ const lunesDeFecha = (f) => { const d=new Date(f+"T12:00:00"); d.setDate(d.getDa
 const sumarDiasFecha = (f,n) => { const d=new Date(f+"T12:00:00"); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
 const diasEntreFechas = (a,b) => Math.round((new Date(b+"T12:00:00")-new Date(a+"T12:00:00"))/86400000);
 
-function PanelGestion({ S, tareasProg, setTareas=()=>{}, esJefa=false }) {
+// Horas hombre estimadas: jornada del día (tabla horaria de la ficha) repartida entre las tareas hechas ese día
+const DIAS_ABREV_HH = ["dom","lun","mar","mie","jue","vie","sab"];
+const normDiaHH = (x)=>String(x||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").slice(0,3);
+const horasJornadaDia = (p, fecha) => {
+  const wd = new Date(fecha+"T12:00:00").getDay();
+  const horario = Array.isArray(p?.horario)?p.horario:[];
+  for(const fila of horario){
+    const txt = String(fila.dias||"");
+    const rangos = txt.split(/[·,;\/y]+/).map(x=>x.trim()).filter(Boolean);
+    let aplica=false;
+    rangos.forEach(r=>{
+      const m = r.split(/\s*[-–—]\s*/).map(normDiaHH).filter(Boolean);
+      if(m.length===2){
+        const a=DIAS_ABREV_HH.indexOf(m[0]), b=DIAS_ABREV_HH.indexOf(m[1]);
+        if(a>=0&&b>=0){ for(let i=a;;i=(i+1)%7){ if(i===wd) aplica=true; if(i===b) break; } }
+      } else if(m.length===1 && DIAS_ABREV_HH.indexOf(m[0])===wd) aplica=true;
+    });
+    if(aplica){ const h=parseFloat(String(fila.hrsDia).replace(",",".")); return isNaN(h)?0:h; }
+  }
+  return 0;
+};
+const horasAusenciaDia = (p, fecha) => {
+  // devuelve horas a descontar: null = día completo, número = parcial, 0 = sin ausencia
+  let desc=0;
+  for(const e of (p?.eventos||[])){
+    if(!["permiso","vacaciones","licencia"].includes(e.tipo) || e.estado!=="aprobado" || !e.fecha) continue;
+    const fin = e.fechaFin||e.fecha;
+    if(fecha<e.fecha||fecha>fin) continue;
+    const h=Number(e.horas)||0;
+    if(e.tipo==="permiso" && h>0 && !e.fechaFin) desc+=h; else return null;
+  }
+  return desc;
+};
+
+function PanelGestion({ S, tareasProg, setTareas=()=>{}, esJefa=false, personal=[] }) {
   const [semanas,setSemanas] = React.useState(8);
   const [vistaG,setVistaG] = React.useState("desempeno");
   if(!esJefa) return null;
@@ -1761,6 +1795,44 @@ function PanelGestion({ S, tareasProg, setTareas=()=>{}, esJefa=false }) {
   const filasTipo = Object.entries(porTipo).map(([tipo,o])=>({tipo,...o,
     pctTiempo:o.n?Math.round(o.aTiempo/o.n*100):0, prom:o.conAtraso?Math.round(o.suma/o.conAtraso*10)/10:0})).sort((a,b)=>b.prom-a.prom||b.n-a.n);
 
+  // ── 4) Horas hombre estimadas ──
+  const hh = (()=>{
+    const porZona={}, porTipo={}, porTrabHH={}; let total=0, sinTarea=0, sinJornada=0, diasAus=0;
+    const trabByName={}; (personal||[]).forEach(p=>{ trabByName[String(p.nombre||"").trim().toLowerCase()]=p; });
+    const porDiaTrab={};
+    todas.forEach(t=>{
+      const r=(t.responsable||"").trim().toLowerCase(); if(!r) return;
+      if(normalizarEstado(t.estado)!=="hecha") return;
+      const k=t.dia+"|"+r; (porDiaTrab[k]=porDiaTrab[k]||[]).push(t);
+    });
+    // días con jornada de cada persona con tareas o con horas extra en el período
+    const claves=new Set(Object.keys(porDiaTrab));
+    (personal||[]).forEach(p=>(p.eventos||[]).forEach(e=>{
+      if(e.tipo==="horaExtra"&&e.estado==="aprobado"&&e.fecha&&e.fecha>=desde&&e.fecha<=hoy) claves.add(e.fecha+"|"+String(p.nombre||"").trim().toLowerCase());
+    }));
+    claves.forEach(k=>{
+      const [dia,r]=k.split("|"); const p=trabByName[r]; const tareasDia=porDiaTrab[k]||[];
+      if(!p){ return; }
+      let h=horasJornadaDia(p,dia);
+      const aus=horasAusenciaDia(p,dia);
+      if(aus===null){ h=0; diasAus++; } else h=Math.max(0,h-aus);
+      const extra=(p.eventos||[]).filter(e=>e.tipo==="horaExtra"&&e.estado==="aprobado"&&e.fecha===dia).reduce((a,e)=>a+(Number(e.horas)||0),0);
+      h+=extra;
+      if(h<=0){ if(tareasDia.length) sinJornada++; return; }
+      if(!tareasDia.length){ sinTarea+=h; return; }
+      const parte=h/tareasDia.length;
+      tareasDia.forEach(t=>{
+        const z=t.zona||"(sin zona)", ti=tipoDeTareaGestion(t), nom=p.nombre;
+        porZona[z]=(porZona[z]||0)+parte; porTipo[ti]=(porTipo[ti]||0)+parte;
+        if(!porTrabHH[nom]) porTrabHH[nom]=0; porTrabHH[nom]+=parte;
+      });
+      total+=h;
+    });
+    const ord=o=>Object.entries(o).map(([n,h])=>({n,h})).sort((a,b)=>b.h-a.h);
+    return {zonas:ord(porZona),tipos:ord(porTipo),trabs:ord(porTrabHH),total,sinTarea,sinJornada,diasAus};
+  })();
+  const fh=h=>(Math.round(h*10)/10).toLocaleString("es-CL")+" h";
+
   const fmtS = f=>{ const d=new Date(f+"T12:00:00"); return d.getDate()+"/"+(d.getMonth()+1); };
   const imprimir = ()=>{
     const V="#1a5c35";
@@ -1771,6 +1843,11 @@ function PanelGestion({ S, tareasProg, setTareas=()=>{}, esJefa=false }) {
     <table>${th(["Jardinero",...listaSem.map(fmtS),"Total","Hechas","No se pudo","🌧️"])}${filasTrab.map(({n,o,pct},i)=>`<tr style="background:${i%2?"#f5fbf5":"#fff"}"><td><b>${n}</b></td>${listaSem.map(w=>{const x=o.sems[w];return `<td style="text-align:center">${x&&x.efect?Math.round(x.hechas/x.efect*100)+"%":"—"}</td>`;}).join("")}<td style="text-align:center;font-weight:700">${pct===null?"—":pct+"%"}</td><td style="text-align:center">${o.hechas}</td><td style="text-align:center">${o.noPudo||"—"}</td><td style="text-align:center">${o.lluvia||"—"}</td></tr>`).join("")}</table>
     <h3>Atraso por tipo de tarea (tareas hechas)</h3>
     <table>${th(["Tipo","Hechas","A tiempo","Con atraso","Atraso promedio (d)","Máximo (d)"])}${filasTipo.map((f,i)=>`<tr style="background:${i%2?"#f5fbf5":"#fff"}"><td><b>${f.tipo}</b></td><td style="text-align:center">${f.n}</td><td style="text-align:center">${f.pctTiempo}%</td><td style="text-align:center">${f.conAtraso||"—"}</td><td style="text-align:center">${f.conAtraso?f.prom:"—"}</td><td style="text-align:center">${f.conAtraso?f.max:"—"}</td></tr>`).join("")}</table>
+    <h3>Horas hombre estimadas por zona (jornada repartida entre las tareas hechas del día + horas extra aprobadas)</h3>
+    <table>${th(["Zona","Horas"])}${hh.zonas.map((f,i)=>`<tr style="background:${i%2?"#f5fbf5":"#fff"}"><td>${f.n}</td><td style="text-align:right"><b>${fh(f.h)}</b></td></tr>`).join("")}</table>
+    <h3>Horas hombre estimadas por tipo de tarea</h3>
+    <table>${th(["Tipo","Horas"])}${hh.tipos.map((f,i)=>`<tr style="background:${i%2?"#f5fbf5":"#fff"}"><td>${f.n}</td><td style="text-align:right"><b>${fh(f.h)}</b></td></tr>`).join("")}</table>
+    <div style="color:#555;margin-top:6px">Total asignado: ${fh(hh.total-hh.sinTarea)} · Horas de jornada sin tarea hecha registrada: ${fh(hh.sinTarea)} · Valores estimados (no son horas medidas); se descuentan los días con permiso, vacaciones o licencia aprobados.</div>
     <div class="np" style="text-align:center;margin-top:16px"><button onclick="window.print()" style="background:${V};color:#fff;border:none;padding:9px 22px;border-radius:6px;cursor:pointer">🖨️ Imprimir / PDF</button></div></body></html>`;
     const w=window.open("","_blank","width=1000,height=800"); if(!w){ alert("Permite ventanas emergentes para imprimir."); return; }
     w.document.write(html); w.document.close();
@@ -1780,7 +1857,7 @@ function PanelGestion({ S, tareasProg, setTareas=()=>{}, esJefa=false }) {
   return (
     <div className="ein">
       <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
-        {[["desempeno","👷 Desempeño por jardinero"],["atraso","⏱️ Atraso por tipo de tarea"],["causas","🔴 Causas de «no se pudo»"]].map(([t,l])=>(
+        {[["desempeno","👷 Desempeño por jardinero"],["atraso","⏱️ Atraso por tipo de tarea"],["causas","🔴 Causas de «no se pudo»"],["horas","⏱ Horas hombre"]].map(([t,l])=>(
           <button key={t} onClick={()=>setVistaG(t)} style={{cursor:"pointer",border:`1px solid ${vistaG===t?"#34d399":"rgba(255,255,255,0.12)"}`,borderRadius:8,padding:"5px 14px",fontSize:12,background:vistaG===t?"rgba(52,211,153,0.12)":"transparent",color:vistaG===t?"#34d399":"#6aaa7a"}}>{l}</button>))}
         <select value={semanas} onChange={e=>setSemanas(Number(e.target.value))} style={{...S.input,width:"auto",fontSize:12}}>
           {[4,8,12].map(n=><option key={n} value={n}>Últimas {n} semanas</option>)}
@@ -1834,6 +1911,31 @@ function PanelGestion({ S, tareasProg, setTareas=()=>{}, esJefa=false }) {
             </table>)}
         </div>
       )}
+      {vistaG==="horas"&&(()=>{
+        const barra=(arr,color)=>{ const mx=Math.max(1,...arr.map(x=>x.h)); return arr.map(f=>(
+          <div key={f.n} style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+            <span style={{width:170,fontSize:11,color:"#ede9e0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={f.n}>{f.n}</span>
+            <div style={{flex:1,height:14,background:"rgba(255,255,255,0.04)",borderRadius:4,overflow:"hidden"}}><div style={{width:`${f.h/mx*100}%`,height:"100%",background:color}}/></div>
+            <span style={{width:62,fontSize:11,color:"#9ca3af",textAlign:"right"}}>{fh(f.h)}</span>
+          </div>)); };
+        return (
+          <div style={{...S.card,padding:"12px 14px"}}>
+            <div style={{background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.25)",borderRadius:8,padding:"8px 10px",fontSize:11,color:"#fbbf24",marginBottom:10}}>
+              ⚠️ Horas <b>estimadas</b>, no medidas: la jornada del día (tabla horaria de la ficha) se reparte en partes iguales entre las tareas hechas ese día, más las horas extra aprobadas. Los días con permiso, vacaciones o licencia aprobados no suman horas.
+            </div>
+            <div style={{fontSize:12,color:"#ede9e0",marginBottom:12}}>
+              Total asignado a tareas: <b>{fh(hh.total-hh.sinTarea)}</b> · Jornada sin tarea hecha registrada: <b>{fh(hh.sinTarea)}</b>
+              {hh.diasAus>0&&<> · Días-persona descontados por ausencia: <b>{hh.diasAus}</b></>}
+              {hh.sinJornada>0&&<span style={{color:"#f87171"}}> · {hh.sinJornada} día(s) con tareas sin jornada definida en la ficha (revisar «Hrs/día»)</span>}
+            </div>
+            {hh.zonas.length===0?<div style={{color:"#4a7a5a",textAlign:"center",padding:20}}>Sin datos: faltan tareas hechas con responsable o la jornada en la ficha del personal.</div>:(<>
+              <div style={{fontSize:12,fontWeight:600,color:"#34d399",margin:"4px 0 6px"}}>Por zona</div>{barra(hh.zonas,"#34d399")}
+              <div style={{fontSize:12,fontWeight:600,color:"#34d399",margin:"14px 0 6px"}}>Por tipo de tarea</div>{barra(hh.tipos,"#60a5fa")}
+              <div style={{fontSize:12,fontWeight:600,color:"#34d399",margin:"14px 0 6px"}}>Por jardinero</div>{barra(hh.trabs,"#a78bfa")}
+            </>)}
+          </div>
+        );
+      })()}
       {vistaG==="causas"&&(()=>{
         // Bitácora de causas: por mes (últimos 6) y lista por clasificar
         const hoyM = hoy.slice(0,7);
@@ -28421,7 +28523,7 @@ export default function App() {
             {tabReporte==="semanal" && (
               <ReporteSemanal frecEstado={tabReporte==="semanal"?calcFrecuenciasEstado():[]} S={S} tareasProg={tareasProg} semanaBase={semanaBase} setSemanaBase={setSemanaBase} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} incidenciasFito={incidenciasFito} esJefa={esJefa}/>
             )}
-            {tabReporte==="gestion" && esJefa && <PanelGestion S={S} tareasProg={tareasProg} setTareas={setTareasProg} esJefa={esJefa}/>}
+            {tabReporte==="gestion" && esJefa && <PanelGestion S={S} tareasProg={tareasProg} setTareas={setTareasProg} esJefa={esJefa} personal={personal}/>}
             {tabReporte==="general" && <>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(270px,1fr))",gap:18,marginBottom:26}}>
               {(()=>{
