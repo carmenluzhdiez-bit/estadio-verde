@@ -27070,6 +27070,7 @@ export default function App() {
               const tdTrabs=tdPersonal.filter(w=>{
                 const wN=normaliz(w.nombre);
                 return tdTareasAll.some(x=>{
+                  if(x.trasladadaA) return false; // igual que el panel del jardinero: lo ya trasladado no cuenta
                   const rN=normaliz(x.responsable);
                   if(rN===wN) return true;
                   if(wN.includes("bhalu")&&rN.includes("bhalu")) return true;
@@ -27087,15 +27088,14 @@ export default function App() {
                       const tdKey=`${tdHoy}_${w.nombre.split(" ")[0].toLowerCase()}`;
                       const tdCerrado=cierresTurno?.[tdKey];
                       const wN=normaliz(w.nombre);
+                      // Mismo criterio que el panel del jardinero: nombre igual (o Bhalú/Osmar) y sin tareas ya trasladadas
                       const tdTT=tdTareasAll.filter(x=>{
+                        if(x.trasladadaA) return false;
                         const rN=normaliz(x.responsable);
                         if(rN===wN) return true;
                         if(wN.includes("bhalu")&&(rN.includes("bhalu")||rN.includes("osmar"))) return true;
                         if(rN.includes("bhalu")&&wN.includes("osmar")) return true;
-                        // Coincidencia parcial: primer apellido
-                        const wParts=wN.split(" ").filter(p=>p.length>2);
-                        const rParts=rN.split(" ").filter(p=>p.length>2);
-                        return wParts.length>0&&rParts.length>0&&wParts.some(p=>rParts.includes(p));
+                        return false;
                       });
                       const tdHechas=tdTT.filter(t=>["hecha","completada"].includes(t.estado)).length;
                       const tdPct=tdTT.length?Math.round((tdHechas/tdTT.length)*100):0;
