@@ -6227,6 +6227,14 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           reprogFuturoSig.add(`${t.origenZid}_${t.origenEid}_${t.origenFrecId}`);
       });
     });
+    // Copias MOVIDAS (reprogramadas) que ya esperan en un día posterior: la frecuencia no vuelve a generar la misma tarea.
+    const movidasFuturasText = new Set();
+    Object.keys(tareas).forEach(diaKeyMF=>{
+      if(diaKeyMF<=fecha) return;
+      nAprop(tareas[diaKeyMF]).forEach(t=>{
+        if(t && (t.movidoDesde||t.origenTareaId) && !t.trasladadaA && !["hecha","completada","no_pudo"].includes(t.estado)) movidasFuturasText.add(`${t.zona}_${t.elemento}_${t.tarea}`);
+      });
+    });
     const abiertoHoySig = new Set();
     const abiertoHoyText = new Set();
     Object.keys(tareas).sort().forEach(diaKey => {
@@ -6266,6 +6274,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           const key = nombreZona+"_"+e.nombre+"_"+f.tarea;
           if(reprogFuturoSig.has(`${z.id}_${e.id}_${f.id}`)) return; // reprogramada a una fecha posterior
           if(bloqueaSigNP.has(`${z.id}_${e.id}_${f.id}`) || bloqueaTextNP.has(key)) return; // hay una «No se pudo» viva de esta frecuencia
+          if(movidasFuturasText.has(key)) return; // ya está reprogramada para un día posterior
           // Si la de hoy sigue en curso (turno abierto), se proyecta como si se terminara hoy: solo se
           // propone para el día pedido si, contando desde hoy, su frecuencia realmente le toca ese día.
           const enCursoHoy = abiertoHoySig.has(`${z.id}_${e.id}_${f.id}`) || abiertoHoyText.has(key);
@@ -18405,6 +18414,13 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                 reprogFuturoSigGolf.add(`${t.origenEid}_${t.origenFrecId}`);
             });
           });
+          const movidasFuturasTextGolf = new Set();
+          Object.keys(tareasProg||{}).forEach(diaKeyMFG=>{
+            if(diaKeyMFG<=fechaProponerGolf) return;
+            nAGolfProp(tareasProg[diaKeyMFG]).forEach(t=>{
+              if(t && (t.movidoDesde||t.origenTareaId) && !t.trasladadaA && !["hecha","completada","no_pudo"].includes(t.estado)) movidasFuturasTextGolf.add(`${t.zona}_${t.elemento}_${t.tarea}`);
+            });
+          });
           const abiertoHoySigGolf = new Set();
           const abiertoHoyTextGolf = new Set();
           Object.keys(tareasProg||{}).sort().forEach(diaKeyG=>{
@@ -18451,6 +18467,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               if(esFertilizAdaptada)return;
               if(reprogFuturoSigGolf.has(`${e.id}_${f.id}`)) return; // reprogramada a una fecha posterior
               if(bloqueaSigGolfNP.has(`${e.id}_${f.id}`) || bloqueaTextGolfNP.has(nombreZona+"_"+e.nombre+"_"+f.tarea)) return; // hay una «No se pudo» viva de esta frecuencia
+              if(movidasFuturasTextGolf.has(nombreZona+"_"+e.nombre+"_"+f.tarea)) return; // ya está reprogramada para un día posterior
               const yaExisteEsteMismoGolf = yaExisteTarea(e.nombre,f.tarea);
               // Si la de hoy sigue en curso (turno abierto), se proyecta como si se terminara hoy.
               const enCursoHoyGolf = abiertoHoySigGolf.has(`${e.id}_${f.id}`) || abiertoHoyTextGolf.has(nombreZona+"_"+e.nombre+"_"+f.tarea);
@@ -18547,6 +18564,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               const clave=t.zona+"_"+t.elemento+"_"+t.tarea;
               const est=normalizarEstado(t.estado);
               if(est==="no_pudo"){
+                if(t.trasladadaA||t.anuladaNoPudo)return; // ya reprogramada (o anulada): no se resucita
                 if(!noPudoPorClave[clave]||f>noPudoPorClave[clave].fecha)noPudoPorClave[clave]={tarea:t,fecha:f};
               }else if(est==="hecha"){
                 if(noPudoPorClave[clave]&&f>noPudoPorClave[clave].fecha)delete noPudoPorClave[clave];
