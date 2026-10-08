@@ -3992,6 +3992,9 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                               style={{cursor:"pointer",border:"1px solid rgba(59,130,246,0.3)",borderRadius:6,padding:"2px 7px",background:"rgba(59,130,246,0.06)",color:"#93c5fd",fontSize:10,fontFamily:"'Georgia',serif"}}>
                               🖨️ Imprimir
                             </button>
+                            {cerrado&&tareasTrasCierre(tds,cerrado).length>0&&(
+                              <span style={{fontSize:10,color:"#fbbf24",background:"rgba(245,158,11,0.12)",border:"1px solid rgba(245,158,11,0.35)",borderRadius:7,padding:"2px 9px"}}>⚠️ {tareasTrasCierre(tds,cerrado).length} agregada(s) tras el cierre</span>
+                            )}
                             {cerrado?(
                               <span style={{fontSize:10,color:"#22c55e",background:"rgba(34,197,94,0.1)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:7,padding:"2px 9px"}}>✅ Cerrado {cerrado.hora} · Puedes editar igual</span>
                             ):(
@@ -5566,6 +5569,17 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                     <div style={{fontSize:14,fontWeight:700,color:"#22c55e",marginBottom:2}}>✅ Turno cerrado</div>
                     <div style={{fontSize:11,color:"#5a9a7a"}}>Cerrado a las {turnoCerrado.hora} por {turnoCerrado.nombre?.split(" ")[0]}</div>
                     <div style={{fontSize:10,color:"#4a7a5a",marginTop:4}}>Las tareas han sido enviadas para revisión de la jefa.</div>
+                    {(()=>{
+                      const tras = tareasTrasCierre(misTargets, turnoCerrado);
+                      if(!tras.length) return null;
+                      return (
+                        <div style={{marginTop:10,padding:"8px 10px",border:"1px solid rgba(245,158,11,0.4)",borderRadius:8,background:"rgba(245,158,11,0.08)"}}>
+                          <div style={{fontSize:12,fontWeight:700,color:"#fbbf24",marginBottom:4}}>⚠️ Agregadas después del cierre ({tras.length})</div>
+                          {tras.map(t=>(<div key={t.id} style={{fontSize:11,color:"#ede9e0"}}>• {t.tarea}{t.zona?` — ${t.zona}`:""} <span style={{color:"#9ca3af"}}>({normalizarEstado(t.estado)})</span></div>))}
+                          <div style={{fontSize:10,color:"#9ca3af",marginTop:4}}>Estas tareas no estaban en el turno cuando se cerró. {esJefaApp?"Reabre el turno para que se hagan y se cierren con el resto.":"La jefa debe reabrir el turno para que se cierren."}</div>
+                        </div>
+                      );
+                    })()}
                   </div>
                   {esJefaApp&&(
                     <button onClick={()=>onReabrirTurno?.(fechaVer,trabajador.nombre)}
@@ -6080,15 +6094,32 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
   const esDomingo = (f) => new Date(f + "T12:00:00").getDay() === 0;
   const getTareasDelDia = (f) => tareas[f] || [];
   const setTareasDelDia = (f, arr) => setTareas(p => ({ ...p, [f]: arr.map(limpiarUndef) }));
-  const addTarea = (t) => {
-    setTareasDelDia(fecha, [...getTareasDelDia(fecha), { ...t, id: Date.now()+Math.random(), fecha }]);
-    if (esDomingo(fecha)) setAviso("⚠️ El día seleccionado es domingo. Considera mover esta tarea a otro día.");
+  const addTarea = async (t) => {
+    let destino = fecha;
+    const nuevaT = { ...t, id: Date.now()+Math.random(), fecha };
+    if(t.responsable && cierresTurno?.[claveCierre(fecha,t.responsable)]){
+      const r = await avisoTurnoCerradoModal({fecha, nombres:[t.responsable], proximo:diasHabiles(fecha,1)});
+      if(!r) return;
+      if(r==="reabrir") onReabrirTurno?.(fecha, t.responsable);
+      else if(r==="proximo"){ destino = diasHabiles(fecha,1); nuevaT.fecha = destino; }
+      else nuevaT.agregadaTrasCierre = true;
+    }
+    setTareasDelDia(destino, [...getTareasDelDia(destino), nuevaT]);
+    if (esDomingo(destino)) setAviso("⚠️ El día seleccionado es domingo. Considera mover esta tarea a otro día.");
+    else if(destino!==fecha) setAviso(`📅 El turno estaba cerrado: la tarea quedó programada para ${destino}.`);
   };
-  const updateTarea = (id, patch) => {
+  const updateTarea = async (id, patch) => {
     const tareasDia = getTareasDelDia(fecha);
     const tarea = tareasDia.find(t=>t.id===id);
+    if(patch.responsable && tarea && patch.responsable!==tarea.responsable && cierresTurno?.[claveCierre(fecha,patch.responsable)]){
+      const r = await avisoTurnoCerradoModal({fecha, nombres:[patch.responsable], proximo:"", permitirProximo:false});
+      if(!r) return;
+      if(r==="reabrir") onReabrirTurno?.(fecha, patch.responsable);
+      else patch = {...patch, agregadaTrasCierre:true};
+    }
+    const tareasDiaAct = getTareasDelDia(fecha);
     const patchFinal = patch.estado!==undefined ? aplicarCambioFrecuencia(tarea, patch, getElemFrecs, setElemFrecs) : patch;
-    setTareasDelDia(fecha, cerrarLoteSiCorresponde(tareasDia, id, patchFinal));
+    setTareasDelDia(fecha, cerrarLoteSiCorresponde(tareasDiaAct, id, patchFinal));
   };
   // Convierte una tarea existente (con un solo responsable) en una copia por cada persona del equipo.
   const asignarATodos = (id) => {
@@ -6322,9 +6353,20 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     if(nuevos.length>0) setTareasDelDia(fecha, [...getTareasDelDia(fecha), ...nuevos]);
   };
 
-  const confirmarPreviewProp = () => {
+  // Si alguna tarea propuesta es para un jardinero cuyo turno de ese día ya está cerrado, avisa y deja elegir.
+  const resolverCierresEnvio = async (envio) => {
+    const cerr = [...new Set(envio.nuevos.filter(t=>t.responsable && cierresTurno?.[claveCierre(fecha,t.responsable)]).map(t=>t.responsable))];
+    if(!cerr.length) return envio;
+    const r = await avisoTurnoCerradoModal({fecha, nombres:cerr, proximo:"", permitirProximo:false});
+    if(!r) return null;
+    if(r==="reabrir"){ cerr.forEach(n=>onReabrirTurno?.(fecha,n)); return envio; }
+    return {...envio, nuevos: envio.nuevos.map(t=>cerr.includes(t.responsable)?{...t,agregadaTrasCierre:true}:t)};
+  };
+  const confirmarPreviewProp = async () => {
     const seleccion = (previewProp||[]).filter(p=>p.incluir);
-    const envio = prepararEnvioProp(seleccion);
+    let envio = prepararEnvioProp(seleccion);
+    envio = await resolverCierresEnvio(envio);
+    if(!envio) return;
     const aEnviar = envio.nuevos;
     const yaEstabanConfirm = seleccion.length - aEnviar.length;
     if(aEnviar.length===0 && yaEstabanConfirm===0){ alert("No hay tareas seleccionadas."); return; }
@@ -6340,10 +6382,12 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     });
   };
 
-  const enviarUnaPreviewProp = (id) => {
+  const enviarUnaPreviewProp = async (id) => {
     const item = (previewProp||[]).find(p=>p.id===id);
     if(!item) return;
-    const envio = prepararEnvioProp([item]);
+    let envio = prepararEnvioProp([item]);
+    envio = await resolverCierresEnvio(envio);
+    if(!envio) return;
     if(envio.nuevos.length>0){
       aplicarEnvioProp(envio);
       setAviso(`✅ "${item.tarea}" (${item.elemento}) confirmada y asignada a ${item.responsable||"sin asignar"}.`);
@@ -6356,11 +6400,13 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     });
   };
 
-  const enviarGrupoPreviewProp = (idsGrupo) => {
+  const enviarGrupoPreviewProp = async (idsGrupo) => {
     if(idsGrupo.length===0) return;
     const items = (previewProp||[]).filter(p=>idsGrupo.includes(p.id));
     if(items.length===0) return;
-    const envio = prepararEnvioProp(items);
+    let envio = prepararEnvioProp(items);
+    envio = await resolverCierresEnvio(envio);
+    if(!envio) return;
     aplicarEnvioProp(envio);
     const yaEstabanGrupo = items.length - envio.nuevos.length;
     setAviso(`✅ ${envio.nuevos.length} tarea(s) de "${items[0].tarea}" confirmadas y enviadas.${yaEstabanGrupo>0?` (${yaEstabanGrupo} ya estaban agregadas.)`:""}`);
@@ -7221,16 +7267,26 @@ function VistaDesignacion({ S, tareasProg, setTareasProg, personal, MACROZONAS_B
     setMotivoCancelacion("");
   };
 
-  const agregarTarea = () => {
+  const agregarTarea = async () => {
     if(!nuevaTarea.zona||!nuevaTarea.tarea) return;
     if(modoVariosJardinerosVD&&responsablesMultipleVD.length===0) return;
+    let destinoVD = fecha, marcaTrasCierre = false;
+    const cerradosVD = modoVariosJardinerosVD ? responsablesMultipleVD.filter(r=>cierresTurno?.[claveCierre(fecha,r)]) : [];
+    if(cerradosVD.length){
+      const r = await avisoTurnoCerradoModal({fecha, nombres:cerradosVD, proximo:diasHabiles(fecha,1)});
+      if(!r) return;
+      if(r==="reabrir") cerradosVD.forEach(n=>onReabrirTurno?.(fecha,n));
+      else if(r==="proximo") destinoVD = diasHabiles(fecha,1);
+      else marcaTrasCierre = true;
+    }
     const loteIdVD = "lote_"+Date.now()+"_"+Math.random().toString(36).slice(2);
     const nuevas = modoVariosJardinerosVD
       ? responsablesMultipleVD.map(resp=>({
-          id: Date.now()+Math.random(), fecha,
+          id: Date.now()+Math.random(), fecha:destinoVD,
           zona: nuevaTarea.zona, elemento: nuevaTarea.elemento,
           tarea: nuevaTarea.tarea, responsable:resp, estado:"pendiente",
           notas:"", supervisorAgregada: true, loteTodosId:loteIdVD,
+          ...(marcaTrasCierre && cierresTurno?.[claveCierre(fecha,resp)] ? {agregadaTrasCierre:true} : {}),
         }))
       : [{
           id: Date.now()+Math.random(), fecha,
@@ -7238,7 +7294,8 @@ function VistaDesignacion({ S, tareasProg, setTareasProg, personal, MACROZONAS_B
           tarea: nuevaTarea.tarea, responsable:"", estado:"por_designar",
           notas:"", supervisorAgregada: true,
         }];
-    setDia([...(tareasProg[fecha]||[]), ...nuevas]);
+    if(destinoVD===fecha) setDia([...(tareasProg[fecha]||[]), ...nuevas]);
+    else setTareasDelDia(destinoVD, [...getTareasDelDia(destinoVD), ...nuevas]);
     setNuevaTarea({zona:"",tarea:"",elemento:""});
     setModoVariosJardinerosVD(false);
     setResponsablesMultipleVD([]);
@@ -16036,7 +16093,7 @@ function HistorialElementoGolf({ S, nombreElemento, hoyoElemento="", tareasProg,
   );
 }
 
-function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito, onCierreSectorial, onNuevaAlerta, configSemanal={}, setConfigSemanal, getAllElems, getZD, setElemFrecs, setElemFrecsBulk, bodegasData, setBodegasData, cierresTurno={} }) {
+function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito, onCierreSectorial, onNuevaAlerta, configSemanal={}, setConfigSemanal, getAllElems, getZD, setElemFrecs, setElemFrecsBulk, bodegasData, setBodegasData, cierresTurno={}, onReabrirTurno }) {
   const GOLF_ZONA_ID = 31; // ID macrozona Golf
   // Alinea el nombre de un elemento con el catálogo configurado en Macrozonas → zona Golf → Frecuencias,
   // para que las tareas creadas desde el Módulo Golf usen exactamente el mismo nombre que ahí (evita
@@ -18456,8 +18513,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           const propOrdenadas=[...propuestas].sort((a,b)=>a.tarea.localeCompare(b.tarea,"es",{sensitivity:"base"}));
           setPreviewGolfProp(propOrdenadas.map(p=>({...p,incluir:false,abierta:false})));
         };
-        const confirmarEnvioGolf=()=>{
-          const aEnviar=(previewGolfProp||[]).filter(p=>p.incluir).map(({incluir,abierta,...t})=>{
+        const confirmarEnvioGolf=async ()=>{
+          let aEnviar=(previewGolfProp||[]).filter(p=>p.incluir).map(({incluir,abierta,...t})=>{
             // Si editó la altura de corte en la vista previa, actualizar también
             // el texto de la nota para que no quede desincronizado.
             if(t.alturaCorte!==undefined&&t.alturaCorte!==""&&t.tarea.toLowerCase().includes("corte")) {
@@ -18474,6 +18531,15 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           });
           if(aEnviar.length===0){setPreviewGolfProp(null);return;}
           const fechaDestinoGolf=aEnviar[0]?.fecha||fechaProponerGolf;
+          { // Aviso: tareas para un jardinero cuyo turno de ese día ya está cerrado
+            const cerrGolf=[...new Set(aEnviar.filter(t=>t.responsable && cierresTurno?.[claveCierre(fechaDestinoGolf,t.responsable)]).map(t=>t.responsable))];
+            if(cerrGolf.length){
+              const r=await avisoTurnoCerradoModal({fecha:fechaDestinoGolf,nombres:cerrGolf,proximo:"",permitirProximo:false});
+              if(!r) return;
+              if(r==="reabrir") cerrGolf.forEach(n=>onReabrirTurno?.(fechaDestinoGolf,n));
+              else aEnviar=aEnviar.map(t=>cerrGolf.includes(t.responsable)?{...t,agregadaTrasCierre:true}:t);
+            }
+          }
           // Tareas movidas desde un día anterior sin resolver: el original NO se borra — queda en su
           // día marcado como "trasladada" (el historial de ese día no se altera) y aquí se crea una
           // copia con id nuevo.
@@ -25987,6 +26053,30 @@ const instalarDescargaInformes = () => {
   };
 };
 
+// ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
+const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
+const tareasTrasCierre = (listaTareas, cierre) => {
+  if(!cierre) return [];
+  const ms = cierre.cerradoEn ? Date.parse(cierre.cerradoEn) : NaN;
+  return (listaTareas||[]).filter(t=>t && !t.trasladadaA && (t.agregadaTrasCierre || (!isNaN(ms) && Number(t.id)>ms)));
+};
+// Devuelve "reabrir" | "proximo" | "igual" | null (cancelar)
+const avisoTurnoCerradoModal = ({fecha, nombres, proximo, permitirProximo=true}) => new Promise(resolve=>{
+  const el=(tag,css,txt)=>{ const e=document.createElement(tag); if(css) e.style.cssText=css; if(txt!==undefined) e.textContent=txt; return e; };
+  const overlay=el("div","position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;font-family:Arial,sans-serif");
+  const box=el("div","background:#fff;border-radius:14px;padding:20px;max-width:470px;width:100%;color:#1a1a1a;box-shadow:0 10px 40px rgba(0,0,0,.4)");
+  const cerrar=v=>{ overlay.remove(); resolve(v); };
+  overlay.addEventListener("mousedown",e=>{ if(e.target===overlay) cerrar(null); });
+  box.appendChild(el("div","font-size:16px;font-weight:700;color:#b45309;margin-bottom:6px","🔒 Turno ya cerrado"));
+  box.appendChild(el("div","font-size:13px;margin-bottom:12px;line-height:1.4",`El turno de ${nombres.join(", ")} del ${fecha} ya está cerrado. Si agregas la tarea ahí, el trabajador no la verá como parte de su turno y no quedará en su cierre.`));
+  const btn=(txt,bg,col,val)=>{ const b=el("button",`display:block;width:100%;text-align:left;cursor:pointer;border:1px solid ${bg};border-radius:8px;padding:9px 12px;margin-bottom:7px;font-size:13px;background:${bg};color:${col}`,txt); b.onclick=()=>cerrar(val); return b; };
+  box.appendChild(btn("🔓 Reabrir el turno y agregar la tarea","#1e40af","#fff","reabrir"));
+  if(permitirProximo) box.appendChild(btn(`📅 Dejarla para el próximo día hábil (${proximo})`,"#dcfce7","#14532d","proximo"));
+  box.appendChild(btn("➕ Guardarla igual en este día (queda marcada «agregada después del cierre»)","#fef3c7","#78350f","igual"));
+  const c=el("button","cursor:pointer;border:none;background:none;color:#666;font-size:12px;margin-top:2px","Cancelar"); c.onclick=()=>cerrar(null); box.appendChild(c);
+  overlay.appendChild(box); document.body.appendChild(overlay);
+});
+
 export default function App() {
   const [zonas, setZonas] = useState(()=>MACROZONAS_BASE);
   const [vista, setVista] = useState("dashboard");
@@ -29131,7 +29221,7 @@ export default function App() {
             onRegistroGuardado={(tipo)=>{
               if(rolLogueado==="trabajador"){ setVista("miturno"); setGolfInitTab(null); }
             }}
-          />
+           onReabrirTurno={(fecha,nombre)=>{ const key=`${fecha}_${nombre.split(" ")[0].toLowerCase()}`; setCierresTurno(prev=>{ const n={...prev}; delete n[key]; return n; }); }}/>
         )}
 
         {/* BODEGAS */}
