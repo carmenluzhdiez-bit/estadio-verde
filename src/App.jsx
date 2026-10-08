@@ -6135,6 +6135,14 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
       nAprop(tareas[diaKey]).forEach(t => { if(finalesProp.includes(t.estado)){ idsResueltos.add(t.id); if(t.origenTareaId) idsResueltos.add(t.origenTareaId); } });
     });
     buscarDuplicadosMovidos(tareas).forEach(d=>idsResueltos.add(d.t.id)); // copias duplicadas de algo ya hecho: nunca se re-proponen
+    // Blindaje 2: si la MISMA tarea (zona+elemento+tarea) quedó Hecha en un día igual o posterior al día de
+    // un pendiente viejo, ese pendiente ya está resuelto por esa realización (típico: tarea reprogramada por
+    // lluvia, hecha en el día nuevo, y el registro viejo seguía "pendiente"). No se arrastra al día nuevo.
+    const claveTareaProp = t=>`${(t.zona||"").trim().toLowerCase()}|${(t.elemento||"").trim().toLowerCase()}|${(t.tarea||"").trim().toLowerCase()}`;
+    const ultimaHechaPorClave = {};
+    Object.keys(tareas).forEach(diaKey => {
+      nAprop(tareas[diaKey]).forEach(t => { if(t && normalizarEstado(t.estado)==="hecha" && !t.trasladadaA){ const k=claveTareaProp(t); if(!ultimaHechaPorClave[k] || diaKey>ultimaHechaPorClave[k]) ultimaHechaPorClave[k]=diaKey; } });
+    });
     const pendItemsMap = new Map(); // signature -> {dia, item}
     const pendItemsMapText = new Map(); // "zona_elemento_tarea" -> {dia, item}
     const pendItemsAll = []; // TODOS los pendientes de días anteriores, con o sin frecuencia (incluye manuales)
@@ -6156,6 +6164,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
       if(diaKey >= fecha) return; // solo días ANTERIORES al que se está proponiendo
       nAprop(tareas[diaKey]).forEach(t => {
         if(finalesProp.includes(t.estado) || idsResueltos.has(t.id) || t.trasladadaA) return;
+        if(ultimaHechaPorClave[claveTareaProp(t)] && ultimaHechaPorClave[claveTareaProp(t)]>=diaKey) return; // ya se hizo ese día o después
         // El día de HOY es especial: si el turno de ESTE trabajador todavía está abierto, lo
         // pendiente es normal a media jornada (no "atrasado") — no se arrastra todavía. En cuanto
         // cierre su turno (aunque sea hoy mismo), sí se arrastra con normalidad.
@@ -18262,6 +18271,11 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             nAGolfProp(tareasProg[diaKeyG]).forEach(t=>{ if(finalesGolfProp.includes(t.estado)){ idsResueltosGolf.add(t.id); if(t.origenTareaId) idsResueltosGolf.add(t.origenTareaId); } });
           });
           buscarDuplicadosMovidos(tareasProg).forEach(d=>idsResueltosGolf.add(d.t.id));
+          const claveTareaGolf = t=>`${(t.zona||"").trim().toLowerCase()}|${(t.elemento||"").trim().toLowerCase()}|${(t.tarea||"").trim().toLowerCase()}`;
+          const ultimaHechaGolf = {};
+          Object.keys(tareasProg).forEach(diaKeyG=>{
+            nAGolfProp(tareasProg[diaKeyG]).forEach(t=>{ if(t && normalizarEstado(t.estado)==="hecha" && !t.trasladadaA){ const k=claveTareaGolf(t); if(!ultimaHechaGolf[k] || diaKeyG>ultimaHechaGolf[k]) ultimaHechaGolf[k]=diaKeyG; } });
+          });
           const pendSignaturesGolf=new Map();
           const pendTextSetGolf=new Map();
           const pendZonaTareaSetGolf=new Map();
@@ -18280,6 +18294,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             if(diaKeyG>=fechaProponerGolf) return;
             nAGolfProp(tareasProg[diaKeyG]).forEach(t=>{
               if(finalesGolfProp.includes(t.estado) || idsResueltosGolf.has(t.id) || t.trasladadaA) return;
+              if(ultimaHechaGolf[claveTareaGolf(t)] && ultimaHechaGolf[claveTareaGolf(t)]>=diaKeyG) return; // ya se hizo ese día o después
               // Mismo criterio que el módulo general: el día de hoy no se arrastra mientras el
               // turno de este trabajador siga abierto — solo en cuanto cierre (aunque sea hoy mismo).
               if(diaKeyG===hoy){
