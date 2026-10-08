@@ -6171,8 +6171,8 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
   // o el modo lluvia la movió), deja de mostrarse. Evita que sigan «proponiéndose» tareas que ya están resueltas.
   React.useEffect(()=>{
     if(!previewProp) return;
-    const clavesDia = new Set(getTareasDelDia(fecha).map(t=>`${t.zona}_${t.elemento}_${t.tarea}`));
-    const restantes = previewProp.filter(pp=>!clavesDia.has(`${pp.zona}_${pp.elemento}_${pp.tarea}`));
+    const clavesDia = new Set(getTareasDelDia(fecha).map(t=>normKeyTarea(t.zona,t.elemento,t.tarea)));
+    const restantes = previewProp.filter(pp=>!clavesDia.has(normKeyTarea(pp.zona,pp.elemento,pp.tarea)));
     if(restantes.length!==previewProp.length) setPreviewProp(restantes.length>0?restantes:null);
   },[tareas, fecha, previewProp]);
   const proponerTareas = async () => {
@@ -6196,6 +6196,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     const propuestas = [];
     const vencidas = [];
     const existentes = getTareasDelDia(fecha).map(t => t.zona+"_"+t.elemento+"_"+t.tarea);
+    const existentesN = new Set(getTareasDelDia(fecha).map(t => normKeyTarea(t.zona,t.elemento,t.tarea))); // misma tarea aunque cambien mayúsculas/espacios
     // ── Tareas SIN RESOLVER de un día anterior (turno aún no cerrado) ── No se duplican: se
     // MUEVEN al día que se está programando (mismo registro, misma id, mismo estado — solo cambia
     // su fecha). Así nunca desaparecen de la vista ni quedan "atrapadas" en un día viejo que ya
@@ -6289,7 +6290,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           const prox = enCursoHoy ? calcProximaFrecGlobal({...f, ultimaVez:hoy, proximaFechaManual:""}, fecha) : calcProximaFrecGlobal(f, fecha);
           if(!prox) return; // sin frecuencia activa, sin última realización registrada, o "según necesidad"/"una vez"
           const pendienteAntes = pendItemsMap.get(`${z.id}_${e.id}_${f.id}_${prox.fecha}`) || pendItemsMapText.get(key);
-          const yaExisteEsteMismo = existentes.includes(key) || propuestas.some(p=>p.zona===nombreZona&&p.elemento===e.nombre&&p.tarea.trim().toLowerCase()===f.tarea.trim().toLowerCase()) || !!pendienteAntes;
+          const yaExisteEsteMismo = existentes.includes(key) || existentesN.has(normKeyTarea(nombreZona,e.nombre,f.tarea)) || propuestas.some(p=>p.zona===nombreZona&&p.elemento===e.nombre&&p.tarea.trim().toLowerCase()===f.tarea.trim().toLowerCase()) || !!pendienteAntes;
           // Solo seguir si la fecha calculada ya llegó (vencida o es hoy) — ni ella ni su enlazada se
           // disparan si todavía falta. Esto se evalúa SIEMPRE, exista ya la tarea o no — para que el
           // enlace (más abajo) funcione también cuando "Corte" ya estaba creada de antes.
@@ -6302,7 +6303,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
             : getResponsablePorTipo(f.tarea, configSemanal, nombreZona)||"";
           const notaAltura = f.alturaCorte ? `Cortar a: ${f.alturaCorte} ${f.unidadAlturaCorte==="cm"?"centímetros":f.unidadAlturaCorte==="pulgadas"?"pulgadas":"milímetros"}.` : "";
           const etiquetaFrec = f.modo==="diasSemana" ? `cada ${f.diasMinimos||"?"} días` : f.intervaloDias ? `cada ${f.intervaloDias} días` : (f[estProp]||"");
-          if(pendienteAntes && !existentes.includes(key)){
+          if(pendienteAntes && !existentes.includes(key) && !existentesN.has(normKeyTarea(nombreZona,e.nombre,f.tarea))){
             // Mover la tarea sin resolver: mismo id/estado/notaWorker, solo cambia la fecha.
             const it = pendienteAntes.item;
             propuestas.push({...it, fecha, diasVencida:esVencida?Math.abs(prox.diff):(it.diasVencida||0), incluir:true, abierta:false, _movidoDesde:pendienteAntes.dia});
@@ -6783,7 +6784,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
             return (
             <div style={{...S.card,padding:16,marginBottom:16,marginTop:12,border:"1px solid rgba(96,165,250,0.3)",background:"rgba(96,165,250,0.03)"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#93c5fd"}}>👁️ Vista previa — tareas para {fecha}</div>
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#93c5fd"}}>👁️ Vista previa — tareas para {fecha} <span style={{fontSize:9,color:"#4a7a8a",fontFamily:"monospace"}}>v{BUILD_STAMP}</span></div>
                 <span style={{fontSize:11,color:"#5a9a7a"}}>{previewProp.filter(p=>p.incluir).length}/{previewProp.length} seleccionadas</span>
               </div>
               <div style={{fontSize:11,color:"#5a9a7a",marginBottom:10}}>Revisa el responsable de cada tarea antes de confirmar. Desmarca las que no quieras enviar hoy.</div>
@@ -26140,6 +26141,8 @@ const instalarDescargaInformes = () => {
   };
 };
 
+const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
+const BUILD_STAMP = "2026-10-08.7";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
