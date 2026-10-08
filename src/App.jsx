@@ -6167,6 +6167,14 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
   const [previewReprogramar, setPreviewReprogramar] = React.useState(null); // [{...tarea, seleccionada:true}]
   const [buscarPreviewProp, setBuscarPreviewProp] = React.useState("");
   const [gruposPreviewPropAbiertos, setGruposPreviewPropAbiertos] = React.useState({});
+  // La vista previa se mantiene al día: si una propuesta ya existe como tarea de ese día (se confirmó por otro lado,
+  // o el modo lluvia la movió), deja de mostrarse. Evita que sigan «proponiéndose» tareas que ya están resueltas.
+  React.useEffect(()=>{
+    if(!previewProp) return;
+    const clavesDia = new Set(getTareasDelDia(fecha).map(t=>`${t.zona}_${t.elemento}_${t.tarea}`));
+    const restantes = previewProp.filter(pp=>!clavesDia.has(`${pp.zona}_${pp.elemento}_${pp.tarea}`));
+    if(restantes.length!==previewProp.length) setPreviewProp(restantes.length>0?restantes:null);
+  },[tareas, fecha, previewProp]);
   const proponerTareas = async () => {
     const noGolfProp = t=>!((t.zona||"")==="Golf"||(t.zona||"").toLowerCase().includes("golf"));
     // "No se pudo" sin decisión: se resuelve primero (reprogramar/anular), antes de seguir programando.
