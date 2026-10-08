@@ -342,7 +342,11 @@ const calcularDeshacerTraslado = (prev, dia, t) => {
 const trasladarEnEstado = (prev, dia, t, destino) => {
   const nuevo = {...prev};
   nuevo[dia] = normArrTP(nuevo[dia]).map(x=>String(x.id)===String(t.id)?{...x,trasladadaA:destino}:x);
-  nuevo[destino] = [...normArrTP(nuevo[destino]), {...t, id:Date.now()+Math.random(), fecha:destino, origenTareaId:t.id, notas:(t.notas?t.notas+" | ":"")+"Reprogramada desde "+dia}];
+  const eraNoPudo = normalizarEstado(t.estado)==="no_pudo";
+  const copia = {...t, id:Date.now()+Math.random(), fecha:destino, origenTareaId:t.id, movidoDesde:dia, notas:(t.notas?t.notas+" | ":"")+"Reprogramada desde "+dia+(eraNoPudo&&t.notaWorker?" — Obs. anterior: "+t.notaWorker:"")};
+  delete copia.trasladadaA;
+  if(eraNoPudo){ copia.estado = t.responsable ? "pendiente" : "por_designar"; copia.notaWorker = ""; copia.causaNoPudo = ""; }
+  nuevo[destino] = [...normArrTP(nuevo[destino]), copia];
   return nuevo;
 };
 // Diálogo: si la tarea sigue sin resolver ofrece REPROGRAMAR o enviar a la papelera; si ya está resuelta,
@@ -518,12 +522,18 @@ const calcularAlertasDatos = (f) => {
 // decidir qué hacer con ella. Ahora, al programar, se avisa de las que siguen sin una decisión
 // (reprogramarlas o anularlas) y se pueden resolver ahí mismo, con el motivo que dejó el jardinero.
 const normArrNP = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v).filter(Boolean):[]);
-const noPudoSinResolver = (tareas, hoy, filtroTarea=()=>true) => {
+const noPudoSinResolver = (tareas, hoy, filtroTarea=()=>true, opts={}) => {
   const res = [];
+  const { cierresTurno=null, fechaProponer=null } = opts||{};
   Object.keys(tareas||{}).sort().forEach(dia=>{
-    if(dia>=hoy) return;
+    if(dia>hoy) return;
     normArrNP(tareas[dia]).forEach(t=>{
-      if(t.estado!=="no_pudo" || t.trasladadaA || t.anuladaNoPudo || !filtroTarea(t)) return;
+      if(normalizarEstado(t.estado)!=="no_pudo" || t.trasladadaA || t.anuladaNoPudo || !filtroTarea(t)) return;
+      // Las de HOY solo se preguntan si el turno de ese jardinero ya cerró, o si se está programando otro día
+      if(dia===hoy){
+        const cerrado = cierresTurno && t.responsable && cierresTurno[`${dia}_${(t.responsable||"").split(" ")[0].toLowerCase()}`];
+        if(!cerrado && !(fechaProponer && fechaProponer>hoy)) return;
+      }
       res.push({dia, item:t});
     });
   });
@@ -532,13 +542,14 @@ const noPudoSinResolver = (tareas, hoy, filtroTarea=()=>true) => {
 // Modal de decisión: para cada tarea, "📅 Reprogramar" (elige fecha) o "🚫 Anular" (queda archivada,
 // no se vuelve a avisar). "Revisar después" cierra sin decidir nada — se vuelve a preguntar la próxima vez.
 // setter = setTareas/setTareasProg del módulo correspondiente.
-const resolverNoPudoModal = (lista, setter) => new Promise(resolveAll=>{
-  if(lista.length===0){ resolveAll(); return; }
+const resolverNoPudoModal = (lista, setter, opts={}) => new Promise(resolveAll=>{
+  if(lista.length===0){ resolveAll([]); return; }
+  const anuladasIds = []; // ids anuladas en esta sesión (la frecuencia sí puede volver a generarlas)
   const el = (tag, css, txt) => { const e=document.createElement(tag); if(css) e.style.cssText=css; if(txt!==undefined) e.textContent=txt; return e; };
   const overlay = el("div","position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;font-family:Georgia,serif");
   const box = el("div","background:#10281a;border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:20px;max-width:560px;width:100%;max-height:82vh;overflow:auto;color:#ede9e0;box-shadow:0 10px 40px rgba(0,0,0,.6)");
   let pendientesLocal = [...lista];
-  const cerrar = () => { document.removeEventListener("keydown",onKey); overlay.remove(); resolveAll(); };
+  const cerrar = () => { document.removeEventListener("keydown",onKey); overlay.remove(); resolveAll(anuladasIds); };
   const onKey = (e) => { if(e.key==="Escape") cerrar(); };
   document.addEventListener("keydown",onKey);
   overlay.addEventListener("mousedown",(e)=>{ if(e.target===overlay) cerrar(); });
@@ -547,13 +558,30 @@ const resolverNoPudoModal = (lista, setter) => new Promise(resolveAll=>{
     box.appendChild(el("div","font-size:16px;font-weight:700;margin-bottom:4px",`⚠️ ${pendientesLocal.length} tarea${pendientesLocal.length!==1?"s":""} marcada${pendientesLocal.length!==1?"s":""} "No se pudo" sin decidir`));
     box.appendChild(el("div","font-size:12px;color:#c9d6cf;margin-bottom:14px;line-height:1.4","Quedaron así porque el jardinero no pudo hacerlas. Decide para cada una si se reprograma o se anula — si no decides, se vuelve a preguntar la próxima vez que programes."));
     const btnCss = (bg,col,brd) => `cursor:pointer;border:1px solid ${brd};border-radius:8px;padding:6px 11px;font-size:12px;background:${bg};color:${col};font-family:Georgia,serif`;
+    // Día sugerido: días hábiles guardados para el tipo de tarea (los mismos del modo lluvia), contados desde hoy
+    const diasCfg = {...DIAS_LLUVIA_DEFAULT, ...((opts&&opts.dias)||{})};
+    const tipoDeNP = (t)=>{ const x=((t.tarea||"")+" "+(t.elemento||"")).toLowerCase(); if(x.includes("riego")||x.includes("regar")) return "Riego"; const k=tipoDeTareaGestion(t); return TIPOS_LLUVIA.includes(k)?k:"Otros"; };
+    const sugeridaDe = (t)=>{ const tp=tipoDeNP(t); return {tipo:tp, n:Math.max(1,Number(diasCfg[tp])||2), fecha:diasHabiles(fechaLocal(), Math.max(1,Number(diasCfg[tp])||2))}; };
+    if(pendientesLocal.length>1){
+      const btnTodas = el("button","cursor:pointer;border:1px solid rgba(59,130,246,.5);border-radius:8px;padding:7px 12px;font-size:12px;background:rgba(59,130,246,.2);color:#bfdbfe;margin-bottom:12px;font-family:Georgia,serif","📅 Reprogramar todas a su día sugerido");
+      btnTodas.onclick = ()=>{
+        const todas=[...pendientesLocal];
+        todas.forEach(({dia,item:t})=>{ const sg=sugeridaDe(t).fecha; setter(prev=>trasladarEnEstado(prev,dia,t,sg)); });
+        pendientesLocal=[]; render();
+      };
+      box.appendChild(btnTodas);
+    }
     pendientesLocal.forEach(({dia,item:t})=>{
       const fila = el("div","border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 12px;margin-bottom:9px");
       fila.appendChild(el("div","font-size:13px;font-weight:600",(t.tarea||"Tarea").replace("⛳ ","")));
       fila.appendChild(el("div","font-size:11px;color:#8aa89a;margin-bottom:4px",[t.zona,t.elemento,t.responsable].filter(Boolean).join(" · ")+" — "+dia));
-      fila.appendChild(el("div","font-size:12px;color:#fca5a5;margin-bottom:8px",t.notaWorker?`💬 Motivo: ${t.notaWorker}`:"Sin motivo registrado por el jardinero."));
+      const causaK = causaNoPudoDe(t); const causaO = CAUSAS_NO_PUDO.find(c=>c.k===causaK);
+      fila.appendChild(el("div","font-size:12px;font-weight:600;color:#fbbf24;margin-bottom:2px",causaO?`${causaO.icon} Causa: ${causaO.label}`:"❔ Causa sin clasificar"));
+      fila.appendChild(el("div","font-size:12px;color:#fca5a5;margin-bottom:6px",t.notaWorker?`💬 Motivo: ${t.notaWorker}`:"Sin motivo registrado por el jardinero."));
+      const sg = sugeridaDe(t);
+      fila.appendChild(el("div","font-size:11px;color:#93c5fd;margin-bottom:6px",`📅 Día sugerido: ${sg.fecha} (${sg.n} día${sg.n!==1?"s":""} hábil${sg.n!==1?"es":""} · ${sg.tipo})`));
       const inp = el("input","background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.2);border-radius:7px;color:#ede9e0;padding:5px 8px;font-size:12px;margin-right:8px");
-      inp.type = "date"; const base = new Date(fechaLocal()+"T12:00:00"); base.setDate(base.getDate()+1); inp.value = base.toISOString().slice(0,10);
+      inp.type = "date"; inp.value = sg.fecha;
       const btnRep = el("button",btnCss("rgba(59,130,246,.18)","#93c5fd","rgba(59,130,246,.45)"),"📅 Reprogramar");
       const btnAnular = el("button",btnCss("rgba(239,68,68,.14)","#fca5a5","rgba(239,68,68,.4)"),"🚫 Anular");
       const err = el("span","font-size:11px;color:#f87171;margin-left:8px");
@@ -564,6 +592,7 @@ const resolverNoPudoModal = (lista, setter) => new Promise(resolveAll=>{
         quitarDeLista();
       };
       btnAnular.onclick = () => {
+        anuladasIds.push(t.id);
         setter(prev=>({...prev,[dia]:normArrNP(prev[dia]).map(x=>String(x.id)===String(t.id)?{...x,anuladaNoPudo:true}:x)}));
         quitarDeLista();
       };
@@ -6141,8 +6170,17 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
   const proponerTareas = async () => {
     const noGolfProp = t=>!((t.zona||"")==="Golf"||(t.zona||"").toLowerCase().includes("golf"));
     // "No se pudo" sin decisión: se resuelve primero (reprogramar/anular), antes de seguir programando.
-    const noPudoProp = noPudoSinResolver(tareas, hoy, noGolfProp);
-    if(noPudoProp.length>0) await resolverNoPudoModal(noPudoProp, setTareas);
+    const optsNP = { dias:(configSemanal||{}).lluviaDias };
+    const noPudoProp = noPudoSinResolver(tareas, hoy, noGolfProp, { cierresTurno, fechaProponer:fecha });
+    const anuladasNP = noPudoProp.length>0 ? ((await resolverNoPudoModal(noPudoProp, setTareas, optsNP))||[]) : [];
+    // Una sola tarea viva por frecuencia: mientras una «No se pudo» siga sin decidir (o se acabe de reprogramar),
+    // la frecuencia NO genera otra igual. Si se anula, la frecuencia sí puede volver a generarla.
+    const bloqueaSigNP = new Set(), bloqueaTextNP = new Set();
+    noPudoProp.forEach(({item:t})=>{
+      if(anuladasNP.includes(t.id)) return;
+      if(t.origenZid && t.origenEid && t.origenFrecId) bloqueaSigNP.add(`${t.origenZid}_${t.origenEid}_${t.origenFrecId}`);
+      bloqueaTextNP.add(`${t.zona}_${t.elemento}_${t.tarea}`);
+    });
     // Recordatorio (no bloquea): turnos anteriores sin cerrar con tareas pendientes.
     const sinCerrarProp = turnosSinCerrarPrevios(tareas, cierresTurno, hoy, noGolfProp);
     if(sinCerrarProp.length>0 && !window.confirm(avisoTurnosSinCerrar(sinCerrarProp))) return;
@@ -6227,6 +6265,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
         frecs.forEach(f => {
           const key = nombreZona+"_"+e.nombre+"_"+f.tarea;
           if(reprogFuturoSig.has(`${z.id}_${e.id}_${f.id}`)) return; // reprogramada a una fecha posterior
+          if(bloqueaSigNP.has(`${z.id}_${e.id}_${f.id}`) || bloqueaTextNP.has(key)) return; // hay una «No se pudo» viva de esta frecuencia
           // Si la de hoy sigue en curso (turno abierto), se proyecta como si se terminara hoy: solo se
           // propone para el día pedido si, contando desde hoy, su frecuencia realmente le toca ese día.
           const enCursoHoy = abiertoHoySig.has(`${z.id}_${e.id}_${f.id}`) || abiertoHoyText.has(key);
@@ -6731,6 +6770,21 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                 <span style={{fontSize:11,color:"#5a9a7a"}}>{previewProp.filter(p=>p.incluir).length}/{previewProp.length} seleccionadas</span>
               </div>
               <div style={{fontSize:11,color:"#5a9a7a",marginBottom:10}}>Revisa el responsable de cada tarea antes de confirmar. Desmarca las que no quieras enviar hoy.</div>
+              {(()=>{
+                const nps = noPudoSinResolver(tareas, hoy, t=>!((t.zona||"")==="Golf"||(t.zona||"").toLowerCase().includes("golf")), { cierresTurno, fechaProponer:fecha });
+                if(!nps.length) return null;
+                return (
+                  <div style={{background:"rgba(245,158,11,0.1)",border:"1px solid rgba(245,158,11,0.4)",borderRadius:8,padding:"8px 10px",marginBottom:10}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                      <span style={{fontSize:12,fontWeight:700,color:"#fbbf24"}}>🔴 {nps.length} tarea(s) «No se pudo» sin decidir</span>
+                      <button onClick={()=>resolverNoPudoModal(nps,setTareas,{dias:(configSemanal||{}).lluviaDias})} style={{...S.btn,fontSize:11,padding:"3px 10px",background:"rgba(245,158,11,0.2)",color:"#fbbf24",border:"1px solid rgba(245,158,11,0.4)"}}>Decidir ahora</button>
+                    </div>
+                    {nps.slice(0,5).map(({dia,item:t},i)=>{ const co=CAUSAS_NO_PUDO.find(c=>c.k===causaNoPudoDe(t)); return (
+                      <div key={i} style={{fontSize:11,color:"#ede9e0",marginTop:3}}>• {t.tarea} — {t.zona||""} <span style={{color:"#9ca3af"}}>({dia}{t.responsable?` · ${t.responsable.split(" ")[0]}`:""})</span> <span style={{color:"#fbbf24"}}>{co?`${co.icon} ${co.label}`:"❔ sin clasificar"}</span>{t.notaWorker?<span style={{color:"#fca5a5",fontStyle:"italic"}}> — {t.notaWorker}</span>:null}</div>); })}
+                    {nps.length>5&&<div style={{fontSize:10,color:"#9ca3af",marginTop:3}}>… y {nps.length-5} más</div>}
+                  </div>
+                );
+              })()}
               <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap",alignItems:"center"}}>
                 <input style={{...S.input,flex:1,minWidth:200}} placeholder="🔍 Buscar por tarea, elemento o zona..." value={buscarPreviewProp} onChange={e=>setBuscarPreviewProp(e.target.value)}/>
                 <button className="btn-g" style={{...S.btn,fontSize:11}} onClick={()=>setPreviewProp(prev=>prev.map(p=>previewFiltradoProp.some(f=>f.id===p.id)?{...p,incluir:true}:p))}>✓ Marcar todas</button>
@@ -18303,8 +18357,14 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           if(!getAllElems||!getZD||!setTareasProg)return;
           const esGolfProp = t=>(t.zona||"")==="Golf"||(t.zona||"").includes("Golf");
           // "No se pudo" sin decisión: se resuelve primero (reprogramar/anular), antes de seguir programando.
-          const noPudoGolf = noPudoSinResolver(tareasProg, hoy, esGolfProp);
-          if(noPudoGolf.length>0) await resolverNoPudoModal(noPudoGolf, setTareasProg);
+          const noPudoGolf = noPudoSinResolver(tareasProg, hoy, esGolfProp, { cierresTurno, fechaProponer:fechaProponerGolf });
+          const anuladasGolfNP = noPudoGolf.length>0 ? ((await resolverNoPudoModal(noPudoGolf, setTareasProg, { dias:(configSemanal||{}).lluviaDias }))||[]) : [];
+          const bloqueaSigGolfNP = new Set(), bloqueaTextGolfNP = new Set();
+          noPudoGolf.forEach(({item:t})=>{
+            if(anuladasGolfNP.includes(t.id)) return;
+            if(t.origenEid && t.origenFrecId) bloqueaSigGolfNP.add(`${t.origenEid}_${t.origenFrecId}`);
+            bloqueaTextGolfNP.add(`${t.zona}_${t.elemento}_${t.tarea}`);
+          });
           // Recordatorio (no bloquea): turnos anteriores sin cerrar con tareas de Golf pendientes.
           const sinCerrarGolf = turnosSinCerrarPrevios(tareasProg, cierresTurno, hoy, esGolfProp);
           if(sinCerrarGolf.length>0 && !window.confirm(avisoTurnosSinCerrar(sinCerrarGolf))) return;
@@ -18390,6 +18450,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               const esFertilizAdaptada=(f.tarea||"").toLowerCase().includes("fertiliz")&&f.tareaEnlazada&&f.tareaEnlazada.trim();
               if(esFertilizAdaptada)return;
               if(reprogFuturoSigGolf.has(`${e.id}_${f.id}`)) return; // reprogramada a una fecha posterior
+              if(bloqueaSigGolfNP.has(`${e.id}_${f.id}`) || bloqueaTextGolfNP.has(nombreZona+"_"+e.nombre+"_"+f.tarea)) return; // hay una «No se pudo» viva de esta frecuencia
               const yaExisteEsteMismoGolf = yaExisteTarea(e.nombre,f.tarea);
               // Si la de hoy sigue en curso (turno abierto), se proyecta como si se terminara hoy.
               const enCursoHoyGolf = abiertoHoySigGolf.has(`${e.id}_${f.id}`) || abiertoHoyTextGolf.has(nombreZona+"_"+e.nombre+"_"+f.tarea);
