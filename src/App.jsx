@@ -26240,7 +26240,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-09.4";
+const BUILD_STAMP = "2026-10-09.5";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
@@ -27470,10 +27470,10 @@ export default function App() {
 
             {/* Condición: exterior / bajo techo */}
             <div style={{marginTop:10}}>
-              <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",textTransform:"uppercase",display:"block",marginBottom:4}}>Condición</label>
+              <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",textTransform:"uppercase",display:"block",marginBottom:4}}>Condición{!(condicionesLocales[e.id] ?? e.edData.condicion)&&<span style={{marginLeft:8,color:"#fbbf24",textTransform:"none",letterSpacing:0}}>⚠️ Sin definir — elige una opción</span>}</label>
               <div style={{display:"flex",gap:6}}>
                 {[["exterior","🌿 Exterior","#34d399"],["bajo_techo","🏠 Bajo techo","#60a5fa"],["mixto","🔀 Mixto","#f59e0b"]].map(([k,lbl,color])=>{
-                  const condActual = condicionesLocales[e.id] ?? (e.edData.condicion||"exterior");
+                  const condActual = condicionesLocales[e.id] ?? (e.edData.condicion||null);
                   return (
                     <button key={k} onClick={()=>{
                       setCondicionesLocales(p=>({...p,[e.id]:k}));
