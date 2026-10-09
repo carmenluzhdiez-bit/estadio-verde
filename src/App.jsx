@@ -53,6 +53,22 @@ const getRolByEmail = (email, emailsExtra={}) => {
 // Hook genérico Firebase ↔ React state
 // Sincroniza un nodo de Firebase con un estado local.
 // defaultValue se usa solo si Firebase devuelve null.
+// Aviso visible cuando un guardado en Firebase falla (antes fallaba sin que nadie se enterara)
+let __ultimoAvisoGuardado = 0;
+function avisoErrorGuardado(path, err) {
+  try {
+    const ahora = Date.now();
+    if(ahora - __ultimoAvisoGuardado < 8000) return; // no repetir en ráfaga
+    __ultimoAvisoGuardado = ahora;
+    const d = document.createElement("div");
+    d.style.cssText = "position:fixed;left:12px;right:12px;bottom:14px;z-index:99999;background:#7f1d1d;color:#fff;border:1px solid #f87171;border-radius:10px;padding:12px 14px;font:13px Georgia,serif;box-shadow:0 4px 20px rgba(0,0,0,.5)";
+    d.innerHTML = "❌ <b>No se pudo guardar un cambio</b> («" + String(path).replace(/[<>&]/g,"") + "»). " + String((err&&err.message)||"").replace(/[<>&]/g,"").slice(0,140) + "<br>Revisa la señal y repite la acción. <u style='cursor:pointer'>Cerrar</u>";
+    d.onclick = () => d.remove();
+    document.body.appendChild(d);
+    setTimeout(()=>{ try{ d.remove(); }catch(e){} }, 20000);
+  } catch(e) {}
+}
+
 function useFirebaseState(path, defaultValue) {
   const fullPath = `${ROOT}/${path}`;
   const [value, setValueLocal] = useState(defaultValue);
@@ -84,13 +100,24 @@ function useFirebaseState(path, defaultValue) {
   }, [fullPath]);
 
   const setValue = (newVal) => {
-    const resolved = typeof newVal === "function" ? newVal(valueRef.current) : newVal;
+    const resuelto = typeof newVal === "function" ? newVal(valueRef.current) : newVal;
+    // Firebase rechaza "undefined" (y funciones/NaN) en cualquier parte del dato: se limpian antes de guardar
+    // para que un campo vacío no haga fallar en silencio todo el guardado.
+    let resolved = resuelto;
+    if(resuelto!==undefined && resuelto!==null && typeof resuelto==="object") {
+      try { resolved = limpiarUndef(resuelto); } catch(e) { resolved = resuelto; }
+    }
     valueRef.current = resolved;
     setValueLocal(resolved);
     pendingRef.current = true;
-    return fbSet(ref(db, fullPath), resolved)
+    return fbSet(ref(db, fullPath), resolved === undefined ? null : resolved)
       .then(() => { setTimeout(() => { pendingRef.current = false; }, 3000); return true; })
-      .catch((err) => { pendingRef.current = false; console.error("Error al guardar en Firebase:", fullPath, err); return false; });
+      .catch((err) => {
+        pendingRef.current = false;
+        console.error("Error al guardar en Firebase:", fullPath, err);
+        avisoErrorGuardado(path, err);
+        return false;
+      });
   };
 
   const setValueLocalOnly = (newVal) => {
@@ -6172,7 +6199,28 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
   React.useEffect(()=>{
     if(!previewProp) return;
     const clavesDia = new Set(getTareasDelDia(fecha).map(t=>normKeyTarea(t.zona,t.elemento,t.tarea)));
-    const restantes = previewProp.filter(pp=>!clavesDia.has(normKeyTarea(pp.zona,pp.elemento,pp.tarea)));
+    // Lo que ya se reprogramó (modo lluvia, traslados) a un día POSTERIOR no debe seguir en la vista previa:
+    // la propuesta se calculó antes del cambio y quedó vieja.
+    const sigFuturas = new Set(), clavesFuturas = new Set(), porId = new Map();
+    Object.entries(tareas||{}).forEach(([dKey,arr])=>{
+      (Array.isArray(arr)?arr:Object.values(arr||{})).forEach(t=>{
+        if(!t) return;
+        porId.set(String(t.id), t);
+        if(t.trasladadaA && t.trasladadaA>fecha && t.origenZid && t.origenEid && t.origenFrecId) sigFuturas.add(`${t.origenZid}_${t.origenEid}_${t.origenFrecId}`);
+        if(dKey>fecha && (t.movidoDesde||t.origenTareaId) && !t.trasladadaA && !["hecha","completada","no_pudo"].includes(t.estado)) clavesFuturas.add(normKeyTarea(t.zona,t.elemento,t.tarea));
+      });
+    });
+    const yaResuelta = pp=>{
+      if(clavesDia.has(normKeyTarea(pp.zona,pp.elemento,pp.tarea))) return true;
+      if(pp._movidoDesde){
+        const src = porId.get(String(pp.id));
+        if(src && (src.trasladadaA || ["hecha","completada","no_pudo"].includes(src.estado))) return true;
+        return false;
+      }
+      if(pp.origenZid && pp.origenEid && pp.origenFrecId && sigFuturas.has(`${pp.origenZid}_${pp.origenEid}_${pp.origenFrecId}`)) return true;
+      return clavesFuturas.has(normKeyTarea(pp.zona,pp.elemento,pp.tarea));
+    };
+    const restantes = previewProp.filter(pp=>!yaResuelta(pp));
     if(restantes.length!==previewProp.length) setPreviewProp(restantes.length>0?restantes:null);
   },[tareas, fecha, previewProp]);
   const proponerTareas = async () => {
@@ -6628,7 +6676,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                 if(aMover.length===0&&riegosManualAplica.length===0){
                   alert("Con esa opción no hay nada que posponer."); return;
                 }
-                const destDe = t => diasHabiles(fecha, Math.max(1,Number(dec.dias[tipoDe(t)])||2));
+                const destDe = t => dec.fechaExacta || diasHabiles(fecha, Math.max(1,Number(dec.dias[tipoDe(t)])||2));
                 const destinoPorId = {};
                 aMover.forEach(t=>{ destinoPorId[String(t.id)] = destDe(t); });
                 const destinosUsados = [...new Set(Object.values(destinoPorId))].sort();
@@ -14784,7 +14832,11 @@ const DECISIONES_HUM=[
 ];
 
 function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasProg, setTareasProg, showHumForm, setShowHumForm, humForm, setHumForm, emptyHumForm, onRegistroGuardado, crearNotificacion }) {
-  const humedades = Array.isArray(golfData.humedades)?golfData.humedades:Object.values(golfData.humedades||{});
+  const humedadesFb = Array.isArray(golfData.humedades)?golfData.humedades:Object.values(golfData.humedades||{});
+  // Registros guardados en este dispositivo que aún no llegan por Firebase (se muestran igual)
+  const [humLocales, setHumLocales] = React.useState([]);
+  const [guardandoHum, setGuardandoHum] = React.useState(false);
+  const humedades = [...humLocales.filter(l=>!humedadesFb.some(x=>String(x.id)===String(l.id))), ...humedadesFb];
   const setHumedades = (arr) => setG({humedades:arr});
   const labelSt = {fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
   const estacionActual = getMesEstacion();
@@ -14803,10 +14855,36 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
     return "sin-cambio";
   };
 
-  const guardarHumedad = () => {
-    if(!humForm.responsable) return;
-    const nueva = {...humForm, id:Date.now()};
-    setHumedades([nueva,...humedades].slice(0,200));
+  const guardarHumedad = async () => {
+    if(!humForm.responsable || guardandoHum) return;
+    setGuardandoHum(true);
+    const nueva = limpiarUndef({...humForm, id:Date.now(), guardadoEn:new Date().toISOString()});
+    // Guardado directo en su propio nodo (no reescribe todo "golf"), leyendo antes lo que ya hay
+    // en el servidor para no pisar mediciones de otros celulares.
+    try {
+      const refHum = ref(db, `${ROOT}/golf/humedades`);
+      let actuales = [];
+      try {
+        const snap = await Promise.race([get(refHum), new Promise((_,rej)=>setTimeout(()=>rej(new Error("timeout-lectura")),6000))]);
+        const v = snap.val();
+        actuales = Array.isArray(v)?v:Object.values(v||{});
+      } catch(e) {
+        actuales = humedadesFb; // sin lectura: usar lo que se ve en pantalla
+      }
+      const lista = [nueva, ...actuales.filter(x=>x && String(x.id)!==String(nueva.id))].slice(0,200);
+      const escritura = fbSet(refHum, limpiarUndef(lista)).then(()=>"ok");
+      const resultado = await Promise.race([escritura, new Promise(res=>setTimeout(()=>res("espera"),8000))]);
+      setHumLocales(p=>[nueva,...p]);
+      if(resultado==="espera") {
+        alert("⚠️ Sin señal estable: la medición de humedad quedó en cola y se guardará sola al reconectar. No la vuelvas a ingresar.");
+      }
+    } catch(err) {
+      console.error("Error al guardar humedad:", err);
+      setGuardandoHum(false);
+      alert("❌ NO se guardó la medición de humedad (" + (err?.message||"error de conexión") + "). Revisa la señal y presiona Guardar nuevamente; los valores siguen en pantalla.");
+      return;
+    }
+    setGuardandoHum(false);
     if(humForm.generarTarea&&(humForm.decision==="cerrar-cancha"||humForm.decision==="abrir-cancha"||humForm.decision==="riego-urgente")){
       const txt = humForm.decision==="cerrar-cancha"
         ?"🚫 Cierre cancha golf"
@@ -15040,7 +15118,7 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
             </div>
           )}
           <div style={{display:"flex",gap:8}}>
-            <button className="btn-p" style={S.btn} onClick={guardarHumedad} disabled={!humForm.responsable}>✓ Guardar</button>
+            <button className="btn-p" style={S.btn} onClick={guardarHumedad} disabled={!humForm.responsable||guardandoHum}>{guardandoHum?"Guardando…":"✓ Guardar"}</button>
             <button className="btn-g" style={S.btn} onClick={()=>setShowHumForm(false)}>Cancelar</button>
           </div>
         </div>
@@ -26013,6 +26091,16 @@ const pedirConfigLluviaModal = ({fecha, nTareas, nRiegoMover, nRiegoManual, cont
   // días por tipo
   box.appendChild(el("div","font-size:12px;font-weight:700;margin-bottom:2px","Días hábiles que se corre cada tipo de tarea"));
   box.appendChild(el("div","font-size:11px;color:#666;margin-bottom:6px","Se saltan los domingos. Solo se muestran los tipos que hoy tienen algo para mover."));
+  // Modo de destino: días hábiles por tipo de tarea, o una fecha exacta para todo
+  let modoDestino = "dias";
+  const filaModo = el("div","display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px");
+  const btnsModo = {};
+  const inpFecha = el("input","padding:6px 8px;border:1px solid #bbb;border-radius:6px;font-size:13px"); inpFecha.type="date";
+  { const d0=new Date(fecha+"T12:00:00"); d0.setDate(d0.getDate()+1); if(d0.getDay()===0) d0.setDate(d0.getDate()+1); inpFecha.value=d0.toISOString().slice(0,10); inpFecha.min=fecha; }
+  const filaFecha = el("div","margin-bottom:10px;display:none");
+  filaFecha.appendChild(el("div","font-size:11px;color:#666;margin-bottom:4px","Todas las tareas que se posponen pasan a esta fecha:")); filaFecha.appendChild(inpFecha);
+  const pintarModo = ()=>{ Object.entries(btnsModo).forEach(([k,b])=>{ b.style.background=k===modoDestino?"#1e40af":"#eef2ff"; b.style.color=k===modoDestino?"#fff":"#1e3a8a"; }); grid.style.display=modoDestino==="dias"?"grid":"none"; nota.style.display=modoDestino==="dias"?"block":"none"; filaFecha.style.display=modoDestino==="fecha"?"block":"none"; };
+  [["dias","📆 Días hábiles (por tipo de tarea)"],["fecha","📅 Fecha exacta"]].forEach(([k,l])=>{ const b=el("button","cursor:pointer;border:1px solid #93c5fd;border-radius:18px;padding:5px 12px;font-size:12px",l); b.onclick=()=>{ modoDestino=k; pintarModo(); }; btnsModo[k]=b; filaModo.appendChild(b); });
   const inputs = {};
   const grid = el("div","display:grid;grid-template-columns:1fr 70px;gap:5px 10px;align-items:center;margin-bottom:10px");
   const nota = el("div","font-size:11px;color:#92400e;margin-bottom:8px");
@@ -26035,8 +26123,11 @@ const pedirConfigLluviaModal = ({fecha, nTareas, nRiegoMover, nRiegoManual, cont
   };
   pintarGrid();
   Object.keys(btns).forEach(k=>{ const prev=btns[k].onclick; btns[k].onclick=()=>{ prev(); pintarGrid(); }; });
+  box.appendChild(filaModo);
   box.appendChild(grid);
   box.appendChild(nota);
+  box.appendChild(filaFecha);
+  pintarModo();
   const lblG=el("label","display:flex;gap:6px;align-items:center;font-size:12px;margin-bottom:14px;color:#333");
   const chk=document.createElement("input"); chk.type="checkbox"; chk.checked=true;
   lblG.appendChild(chk); lblG.appendChild(document.createTextNode("Guardar estos días como valores por defecto"));
@@ -26048,7 +26139,12 @@ const pedirConfigLluviaModal = ({fecha, nTareas, nRiegoMover, nRiegoManual, cont
   ba.onclick=()=>{
     const d={...dias};
     Object.entries(inputs).forEach(([k,i])=>{ const n=Math.round(Number(i.value)); d[k]=(n>=1&&n<=30)?n:2; });
-    cerrar({alcance,dias:d,guardar:chk.checked});
+    let fechaExacta = null;
+    if(modoDestino==="fecha"){
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(inpFecha.value) || inpFecha.value<=fecha){ alert("Elige una fecha posterior al "+fecha+"."); return; }
+      fechaExacta = inpFecha.value;
+    }
+    cerrar({alcance,dias:d,guardar:chk.checked,fechaExacta});
   };
   fila.appendChild(bc); fila.appendChild(ba); box.appendChild(fila);
   overlay.appendChild(box); document.body.appendChild(overlay);
@@ -26092,7 +26188,7 @@ const aplicarModoLluviaGolf = async ({ fecha, tareas, setTareas, configSemanal, 
   const aMover=[...(dec.alcance!=="riego"?aPosponer:[]),...(dec.alcance!=="tareas"?riegosMover:[])];
   const manualAplica = dec.alcance!=="tareas"?riegosManual:[];
   if(!aMover.length&&!manualAplica.length){ alert("Con esa opción no hay nada que posponer."); return false; }
-  const destinoPorId={}; aMover.forEach(t=>{ destinoPorId[String(t.id)]=diasHabiles(fecha,Math.max(1,Number(dec.dias[tipoDe(t)])||2)); });
+  const destinoPorId={}; aMover.forEach(t=>{ destinoPorId[String(t.id)]=dec.fechaExacta||diasHabiles(fecha,Math.max(1,Number(dec.dias[tipoDe(t)])||2)); });
   const destinos=[...new Set(Object.values(destinoPorId))].sort();
   const existentes={}; destinos.forEach(d=>{ existentes[d]=new Set(normArr(tareas[d]||[]).map(x=>`${x.zona}_${x.elemento}_${x.tarea}`)); });
   const copiasPorDia={}; let nCopias=0;
@@ -26143,7 +26239,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-08.7";
+const BUILD_STAMP = "2026-10-09.2";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
