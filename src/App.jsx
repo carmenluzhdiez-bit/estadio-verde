@@ -26240,7 +26240,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-09.3";
+const BUILD_STAMP = "2026-10-09.4";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
@@ -26948,7 +26948,7 @@ export default function App() {
           isCustom:false,
           edData:{estado:"bueno",notas:"",...(override||{})}};
       });
-    const custom = (zdat.elementosCustom||[]).map(e=>({...e,isCustom:true,edData:{estado:e.estado||"bueno",notas:e.notas||""}}));
+    const custom = (zdat.elementosCustom||[]).map(e=>({...e,isCustom:true,edData:{estado:e.estado||"bueno",notas:e.notas||"",condicion:e.condicion}}));
     return [...base,...custom].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
   };
 
@@ -27184,16 +27184,15 @@ export default function App() {
 
   const setElemCondicion = (zid,eid,isCustom,condicion) => {
     if(isCustom){ updateCustomElemField(zid,eid,{condicion}); return; }
-    // Actualizar estado local con protección (evita que una snapshot vieja de Firebase pise este cambio)
-    setData(prev=>{
+    // Solo se actualiza la copia local (no se reescribe todo el nodo "data") y se guarda con ruta dirigida
+    setDataLocal(prev=>{
       const zidStr=String(zid);
       const ex=prev[zidStr]||{};
       const exElems=ex.elementos||{};
       return {...prev,[zidStr]:{...ex,elementos:{...exElems,[eid]:{...exElems[eid],condicion}}}};
     });
-    // Escribir también con path notation para no sobreescribir otros campos que puedan cambiar mientras tanto
     fbUpdate(ref(db, ROOT+"/data/"+String(zid)+"/elementos/"+eid), {condicion})
-      .catch(e=>console.error("setElemCondicion error:",e));
+      .catch(e=>{ console.error("setElemCondicion error:",e); avisoErrorGuardado("condición del elemento",e); });
   };
 
   const setElemEstado = (zid,eid,isCustom,estado) => {
