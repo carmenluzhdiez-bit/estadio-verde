@@ -18349,9 +18349,10 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                       {Object.entries(porResp).map(([resp,tareas])=>{
                         const tareasUnicas=[...new Set(tareas.map(t=>t.tarea))];
                         const nombreBaseSem = (nombre) => (nombre||"").split(" · ")[0].trim();
-                        const basesUnicasSem = [...new Set(tareasUnicas.map(nombreBaseSem))];
+                        const ordenAZ = (x,y)=>(x||"").localeCompare(y||"","es",{sensitivity:"base",numeric:true});
+                        const basesUnicasSem = [...new Set(tareasUnicas.map(nombreBaseSem))].sort(ordenAZ);
                         return basesUnicasSem.map((base,gi)=>{
-                          const nombresDelGrupo = tareasUnicas.filter(n=>nombreBaseSem(n)===base);
+                          const nombresDelGrupo = tareasUnicas.filter(n=>nombreBaseSem(n)===base).sort(ordenAZ);
                           const isFirstGrupo = gi===0;
                           const grupoKey = resp+"__"+base;
                           if(nombresDelGrupo.length===1) {
@@ -26239,7 +26240,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-09.2";
+const BUILD_STAMP = "2026-10-09.3";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
