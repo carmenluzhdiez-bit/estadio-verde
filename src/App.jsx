@@ -289,6 +289,25 @@ const normArrTP = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(
 // Una copia pendiente es "duplicada" si su misma tarea ya quedó HECHA en otro día (mismo linaje de origen,
 // o misma zona+elemento+tarea resuelta desde la fecha de origen en adelante), o si hay dos copias pendientes
 // idénticas el mismo día. Devuelve [{dia, t, motivo}]. Nunca modifica nada.
+// Condición (exterior / bajo_techo / mixto / null) del elemento al que pertenece una tarea.
+const condicionElementoDeTarea = (t, getZD, zonas=[], base=[]) => {
+  try{
+    let el = null;
+    if(t.origenZid && t.origenEid && getZD){
+      const zd0 = getZD(String(t.origenZid))||{};
+      el = t.origenEsCustom ? (zd0.elementosCustom||[]).find(x=>x.id===t.origenEid) : zd0.elementos?.[t.origenEid];
+    }
+    if(!el && t.zona && t.elemento && getZD){
+      const zonaObj = (zonas||[]).find(z=>z.nombre===t.zona||(getZD(String(z.id))||{}).nombreCustom===t.zona) || (base||[]).find(z=>z.nombre===t.zona);
+      if(zonaObj){
+        const zd = getZD(String(zonaObj.id))||{};
+        const baseId = (zonaObj.elementos||[]).find(e=>e.nombre===t.elemento)?.id;
+        el = (baseId&&zd.elementos?.[baseId]) || (zd.elementosCustom||[]).find(e=>e.nombre===t.elemento);
+      }
+    }
+    return el?.condicion || null;
+  }catch(e){ return null; }
+};
 const buscarDuplicadosMovidos = (tareasProg) => {
   const dias = Object.keys(tareasProg||{}).sort();
   const NO_FINAL = ["pendiente","por_designar","en_curso"];
@@ -5532,6 +5551,18 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                               {t.alturaCorte&&<div style={{fontSize:12,color:"#fbbf24",fontWeight:600,marginBottom:4,background:"rgba(251,191,36,0.08)",border:"1px solid rgba(251,191,36,0.2)",borderRadius:6,padding:"3px 8px",display:"inline-block"}}>✂️ Cortar a: {t.alturaCorte} {t.unidadAlturaCorte==="cm"?"cm":t.unidadAlturaCorte==="pulgadas"?"pulgadas":"mm"}</div>}
                               {t.metodoLimpieza&&<span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.08)",padding:"1px 8px",borderRadius:8,border:"1px solid rgba(251,191,36,0.2)",display:"inline-block",marginBottom:4}}>{t.metodoLimpieza==="sopladora"?"🌬️ Sopladora":t.metodoLimpieza==="barrido"?"🧹 Barrido":"🌬️+🧹 Sopladora + Barrido"}</span>}
                               {t.notas&&<div style={{fontSize:11,color:"#5a8a6a",marginTop:2,marginBottom:4,fontStyle:"italic"}}>💡 {t.notas}</div>}
+                              {(t.revisarRiego||(t.notas||"").includes("🌧️ Revisar riego"))&&!["hecha","completada","no_pudo"].includes(normalizarEstado(t.estado))&&(
+                                <div style={{marginBottom:6,padding:"7px 10px",border:"1px solid rgba(245,158,11,0.4)",borderRadius:8,background:"rgba(245,158,11,0.08)"}}>
+                                  <div style={{fontSize:11,color:"#fbbf24",marginBottom:6,fontWeight:600}}>🌧️ Llovió: revisa en terreno si este riego hace falta.</div>
+                                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                                    <button onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:"hecha",notaWorker:"Regado — decidido en terreno tras la lluvia"})}
+                                      style={{fontSize:12,fontWeight:700,padding:"6px 14px",borderRadius:8,border:"1px solid rgba(34,197,94,0.5)",background:"rgba(34,197,94,0.15)",color:"#4ade80",cursor:"pointer"}}>💧 Se regó</button>
+                                    <button onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:"no_pudo",causaNoPudo:"lluvia",anuladaNoPudo:true,riegoNoNecesario:true,notaWorker:"Riego no necesario — revisado en terreno tras la lluvia"})}
+                                      style={{fontSize:12,fontWeight:700,padding:"6px 14px",borderRadius:8,border:"1px solid rgba(96,165,250,0.5)",background:"rgba(96,165,250,0.15)",color:"#93c5fd",cursor:"pointer"}}>🌧️ No era necesario</button>
+                                  </div>
+                                  <div style={{fontSize:10,color:"#9ca3af",marginTop:4}}>«No era necesario» no cuenta como incumplimiento.</div>
+                                </div>
+                              )}
                               {t.movidoDesde&&<div style={{fontSize:10,color:"#93c5fd",marginBottom:4}}>🔁 Movida desde {t.movidoDesde} (seguía sin resolver)</div>}
                               {puedeEditar ? (
                                 <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
@@ -6717,7 +6748,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                       return {...t, estado:"no_pudo", causaNoPudo:"lluvia", notaWorker:esRiego(t)?"Riego no necesario — Lluvia":"No se pudo — Lluvia", trasladadaA:destinoPorId[String(t.id)]};
                     }
                     if(idsRevisar.has(String(t.id)) && !(t.notas||"").includes("🌧️ Revisar riego")){
-                      return {...t, revisarRiego:true, notas:(t.notas?t.notas+" | ":"")+"🌧️ Revisar riego: ajustar a mano por lluvia"};
+                      return {...t, revisarRiego:condicionDe(t)||"sin_dato", notas:(t.notas?t.notas+" | ":"")+"🌧️ Revisar riego: ajustar a mano por lluvia"};
                     }
                     return t;
                   });
@@ -6731,7 +6762,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                   "🌧️ Modo lluvia aplicado.\n\n"+
                   `• Reprogramadas: ${nCopias} tarea(s) → ${resumenDest||"—"}.\n`+
                   (aMover.length-nCopias>0?`• ${aMover.length-nCopias} ya estaban programadas en su día destino — no se duplicaron.\n`:"")+
-                  (riegosManualAplica.length>0?`• ${riegosManualAplica.length} riego(s) siguen pendientes HOY a propósito (bajo techo o sin clasificar): quedaron marcados "🌧️ Revisar riego" y los ves en un recuadro amarillo sobre la lista de tareas del día, bajo la vista previa.`:"")
+                  (riegosManualAplica.length>0?`• ${riegosManualAplica.length} riego(s) siguen pendientes HOY a propósito (mixtos, bajo techo o sin clasificar): se deciden en terreno si se riegan y cuáles: quedaron marcados "🌧️ Revisar riego" y los ves en un recuadro amarillo sobre la lista de tareas del día, bajo la vista previa.`:"")
                 ),200);
               }} style={{...S.btn,background:"rgba(96,165,250,0.1)",color:"#93c5fd",border:"1px solid rgba(96,165,250,0.2)",fontSize:11}}>
                 🌧️ Modo lluvia
@@ -7292,14 +7323,23 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
           {(()=>{
             const revisar = tareasHoy.filter(t=>(t.revisarRiego||(t.notas||"").includes("🌧️ Revisar riego")) && !["hecha","completada","no_pudo"].includes(t.estado));
             if(revisar.length===0) return null;
+            const condDe = t => (["mixto","bajo_techo","exterior"].includes(t.revisarRiego)?t.revisarRiego:null) || condicionElementoDeTarea(t, getZD, zonas, MACROZONAS_BASE) || "sin_dato";
+            const ETQ = {mixto:"🔀 Mixtos (parte expuesta a la lluvia)", bajo_techo:"🏠 Bajo techo", sin_dato:"❔ Sin clasificar", exterior:"🌿 Exteriores"};
+            const grupos = {};
+            revisar.forEach(t=>{ const c=condDe(t); (grupos[c] ||= []).push(t); });
             return (
               <details style={{marginBottom:12,border:"1px solid rgba(245,158,11,0.45)",borderRadius:10,background:"rgba(245,158,11,0.08)",padding:"8px 12px"}}>
-                <summary style={{cursor:"pointer",fontSize:13,fontWeight:700,color:"#fbbf24"}}>🌧️ {revisar.length} riego(s) para revisar a mano — bajo techo o sin clasificar (toca para ver la lista)</summary>
-                <div style={{marginTop:8,display:"flex",flexDirection:"column",gap:3}}>
-                  {revisar.map(t=>(
-                    <div key={t.id} style={{fontSize:12,color:"#ede9e0"}}>• <b>{t.zona}</b> · {t.elemento||"—"} · {t.tarea}{t.responsable?` · ${t.responsable.split(" ")[0]}`:""}</div>
+                <summary style={{cursor:"pointer",fontSize:13,fontWeight:700,color:"#fbbf24"}}>🌧️ {revisar.length} riego(s) para decidir en terreno: se riega o no, y cuáles (toca para ver la lista)</summary>
+                <div style={{marginTop:8,display:"flex",flexDirection:"column",gap:8}}>
+                  {Object.entries(grupos).map(([c,arr])=>(
+                    <div key={c}>
+                      <div style={{fontSize:11,fontWeight:700,color:"#fcd34d",marginBottom:3}}>{ETQ[c]||c} ({arr.length})</div>
+                      {arr.map(t=>(
+                        <div key={t.id} style={{fontSize:12,color:"#ede9e0"}}>• <b>{t.zona}</b> · {t.elemento||"—"} · {t.tarea}{t.responsable?` · ${t.responsable.split(" ")[0]}`:""}</div>
+                      ))}
+                    </div>
                   ))}
-                  <div style={{fontSize:10,color:"#9ca3af",marginTop:4}}>Si el elemento está bajo techo o no se moja con la lluvia, déjalo hoy; si es exterior, márcalo como «Exterior» en su ficha de la macrozona para que el Modo lluvia lo mueva solo.</div>
+                  <div style={{fontSize:10,color:"#9ca3af"}}>Estos riegos no se mueven solos con la lluvia: el jardinero revisa en terreno si hay que regar y cuáles. Los exteriores sí se mueven con el Modo lluvia.</div>
                 </div>
               </details>
             );
@@ -26444,7 +26484,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-13.5";
+const BUILD_STAMP = "2026-10-13.7";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
