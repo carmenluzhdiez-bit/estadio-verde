@@ -16520,6 +16520,72 @@ function HistorialElementoGolf({ S, nombreElemento, hoyoElemento="", tareasProg,
   );
 }
 
+function UltimosCortesGolf({ S, nombre, tareasProg, setTareasProg, esVivero=false }) {
+  const hoyStr = new Date().toISOString().slice(0,10);
+  const normUC=x=>(x||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"");
+  const nombreNorm=normUC(nombre);
+  const cortes = Object.entries(tareasProg||{})
+    .flatMap(([fecha,ts])=>(Array.isArray(ts)?ts:Object.values(ts||{})).map(t=>({...t,fecha})))
+    .filter(t=>{
+      if(t.zona!=="Golf"||t.fecha>hoyStr||!["hecha","completada"].includes(t.estado)) return false;
+      if(!normUC(t.tarea).includes("corte")) return false;
+      const el=normUC(t.elemento), ta=normUC(t.tarea);
+      if(esVivero) return el.includes("vivero")||ta.includes("vivero");
+      return el.startsWith(nombreNorm)||ta.includes(nombreNorm)||el.includes("todoslosgreens")||ta.includes("todoslosgreens");
+    })
+    .sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""))
+    .slice(0,5);
+  if(!cortes.length) return esVivero?(
+    <div style={{...S.card,padding:"12px 16px",marginBottom:12,borderLeft:"3px solid rgba(52,211,153,0.4)",fontSize:11,color:"#5a9a7a"}}>✂️ Últimos cortes — {nombre}: aún no hay cortes hechos registrados.</div>
+  ):null;
+  const guardar=(t,val)=>{
+    const campo=t.alturaCorteReal?"alturaCorteReal":"alturaCorte";
+    setTareasProg(p=>{
+      const nuevo={...p};
+      const arr=Array.isArray(nuevo[t.fecha])?nuevo[t.fecha]:Object.values(nuevo[t.fecha]||{});
+      nuevo[t.fecha]=arr.map(x=>x.id===t.id?{...x,[campo]:val}:x);
+      return nuevo;
+    });
+  };
+  return (
+    <div style={{...S.card,padding:"12px 16px",marginBottom:12,borderLeft:"3px solid rgba(52,211,153,0.4)"}}>
+      <div style={{fontSize:12,fontWeight:700,color:"#34d399",marginBottom:8}}>✂️ Últimos cortes — {nombre}</div>
+      <div style={{display:"flex",flexDirection:"column",gap:6}}>
+        {cortes.map(t=>{
+          const altAct=t.alturaCorteReal||t.alturaCorte;
+          return (
+          <div key={t.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:6,padding:"6px 8px",background:"rgba(255,255,255,0.03)",borderRadius:6}}>
+            <div>
+              <span style={{fontSize:12,fontWeight:600}}>📅 {t.fecha}</span>
+              <span style={{fontSize:11,color:"#5a9a7a",marginLeft:8}}>{(t.tarea||"").replace(`· ${nombre}`,"").replace("⛳ ","")}</span>
+            </div>
+            <div style={{display:"flex",gap:6,alignItems:"center"}}>
+              <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                {!altAct&&<span style={{fontSize:10,color:"#f59e0b"}}>Sin altura</span>}
+                <input type="number" step="0.1" min="0" max="50"
+                  style={{...S.input,width:55,fontSize:11,padding:"2px 4px",textAlign:"center",fontWeight:700,color:altAct?"#34d399":undefined,borderColor:altAct?"rgba(52,211,153,0.4)":"rgba(245,158,11,0.4)"}}
+                  defaultValue={altAct||""}
+                  placeholder="mm"
+                  onBlur={e=>{
+                    const val=e.target.value;
+                    if(!val || Number(val)===Number(altAct||NaN)) return;
+                    guardar(t,val);
+                  }}/>
+                {altAct&&<span style={{fontSize:9,color:"#5a9a7a"}}>mm</span>}
+              </div>
+              {t.alturaObjetivo&&(<span style={{fontSize:10,color:"#fbbf24"}}>→ {t.alturaObjetivo}mm</span>)}
+            </div>
+          </div>
+          );
+        })}
+      </div>
+      {cortes.some(t=>!(t.alturaCorteReal||t.alturaCorte))&&(
+        <div style={{fontSize:10,color:"#f59e0b",marginTop:6}}>💡 Ingresa la altura de corte para activar la proyección automática</div>
+      )}
+    </div>
+  );
+}
+
 function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, setTareasProg, rolLogueado, updateZona, addHistorial, onRegistroGuardado, crearNotificacion, initialSubTab, setVista, aplicaciones=[], setAplicaciones, incidenciasFito=[], setIncidenciasFito, onCierreSectorial, onNuevaAlerta, configSemanal={}, setConfigSemanal, getAllElems, getZD, setElemFrecs, setElemFrecsBulk, bodegasData, setBodegasData, cierresTurno={}, onReabrirTurno }) {
   const GOLF_ZONA_ID = 31; // ID macrozona Golf
   // Alinea el nombre de un elemento con el catálogo configurado en Macrozonas → zona Golf → Frecuencias,
@@ -17377,6 +17443,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                   </div>
                 </div>
                 {showHistorialElemento&&<HistorialElementoGolf S={S} nombreElemento="Vivero" tareasProg={tareasProg} aplicaciones={aplicaciones}/>}
+                <UltimosCortesGolf S={S} nombre="Vivero" esVivero tareasProg={tareasProg} setTareasProg={setTareasProg}/>
                 {/* Botones de acción para Vivero */}
                 {esJefa&&(
                   <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
@@ -17547,68 +17614,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                 {showHistorialElemento&&<HistorialElementoGolf S={S} nombreElemento={pgG.nombre} tareasProg={tareasProg} aplicaciones={aplicaciones}/>}
 
                 {/* ── Últimos cortes registrados para este green ── */}
-                {(()=>{
-                  const nombreG = pgG.nombre;
-                  const hoyStr = new Date().toISOString().slice(0,10);
-                  const normUC=s=>(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"");
-                  const nombreGNormUC=normUC(nombreG);
-                  const cortesEsteGreen = Object.entries(tareasProg)
-                    .flatMap(([fecha,ts])=>(Array.isArray(ts)?ts:Object.values(ts||{})).map(t=>({...t,fecha})))
-                    .filter(t=>
-                      t.zona==="Golf" &&
-                      t.fecha<=hoyStr &&
-                      ["hecha","completada"].includes(t.estado) &&
-                      normUC(t.tarea).includes("corte")&&
-                      (normUC(t.elemento).startsWith(nombreGNormUC)||normUC(t.tarea).includes(nombreGNormUC)||
-                       normUC(t.elemento).includes("todoslosgreens")||normUC(t.tarea).includes("todoslosgreens")))
-                    .sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""))
-                    .slice(0,5);
-                  if(!cortesEsteGreen.length) return null;
-                  return (
-                    <div style={{...S.card,padding:"12px 16px",marginBottom:12,borderLeft:"3px solid rgba(52,211,153,0.4)"}}>
-                      <div style={{fontSize:12,fontWeight:700,color:"#34d399",marginBottom:8}}>✂️ Últimos cortes — {nombreG}</div>
-                      <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                        {cortesEsteGreen.map(t=>(
-                          <div key={t.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:6,padding:"6px 8px",background:"rgba(255,255,255,0.03)",borderRadius:6}}>
-                            <div>
-                              <span style={{fontSize:12,fontWeight:600}}>📅 {t.fecha}</span>
-                              <span style={{fontSize:11,color:"#5a9a7a",marginLeft:8}}>{t.tarea?.replace(`· ${nombreG}`,"").replace("⛳ ","")}</span>
-                            </div>
-                            <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                              <div style={{display:"flex",gap:4,alignItems:"center"}}>
-                                {!t.alturaCorte&&<span style={{fontSize:10,color:"#f59e0b"}}>Sin altura</span>}
-                                <input type="number" step="0.1" min="2" max="15"
-                                  style={{...S.input,width:55,fontSize:11,padding:"2px 4px",textAlign:"center",fontWeight:700,color:t.alturaCorte?"#34d399":undefined,borderColor:t.alturaCorte?"rgba(52,211,153,0.4)":"rgba(245,158,11,0.4)"}}
-                                  defaultValue={t.alturaCorte||""}
-                                  placeholder="mm"
-                                  onBlur={e=>{
-                                    const val=e.target.value;
-                                    if(!val || Number(val)===Number(t.alturaCorte||NaN)) return;
-                                    setTareasProg(p=>{
-                                      const nuevo={...p};
-                                      if(nuevo[t.fecha]){
-                                        nuevo[t.fecha]=nuevo[t.fecha].map(x=>x.id===t.id?{...x,alturaCorte:val}:x);
-                                      }
-                                      return nuevo;
-                                    });
-                                  }}/>
-                                {t.alturaCorte&&<span style={{fontSize:9,color:"#5a9a7a"}}>mm</span>}
-                              </div>
-                              {t.alturaObjetivo&&(
-                                <span style={{fontSize:10,color:"#fbbf24"}}>→ {t.alturaObjetivo}mm</span>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                      {cortesEsteGreen.some(t=>!t.alturaCorte)&&(
-                        <div style={{fontSize:10,color:"#f59e0b",marginTop:6}}>
-                          💡 Ingresa la altura de corte para activar la proyección automática
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
+                <UltimosCortesGolf S={S} nombre={pgG.nombre} tareasProg={tareasProg} setTareasProg={setTareasProg}/>
 
                 {/* Formulario registro diario */}
                 {showDiariaForm&&(
@@ -26517,7 +26523,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-13.9";
+const BUILD_STAMP = "2026-10-13.10";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
