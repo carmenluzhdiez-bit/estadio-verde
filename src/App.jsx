@@ -10106,6 +10106,11 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
   const [showIncidForm, setShowIncidForm] = React.useState(()=>!!leerBorradorIncid());
   const [incidPaso, setIncidPaso] = React.useState(()=>leerBorradorIncid()?.incidPaso||1);
   const [guardandoIncid, setGuardandoIncid] = React.useState(false);
+  // Tareas que se generan al registrar la incidencia: se muestran en el paso 4 para elegir cuáles y quién
+  const [tareasGen, setTareasGen] = React.useState({});
+  const respJefaInc = (Array.isArray(personal)?personal:Object.values(personal||{})).find(x=>/hermosilla/i.test(x.nombre||""))?.nombre || "Carmen Luz Hermosilla Diez";
+  const genInc = (key, defResp) => ({ incluir: tareasGen[key]?.incluir!==false, responsable: tareasGen[key]?.responsable ?? defResp });
+  const setGenInc = (key, patch) => setTareasGen(p=>({...p,[key]:{...(p[key]||{}),...patch}}));
   const [incidError, setIncidError] = React.useState("");
   const [expandIncid, setExpandIncid] = React.useState(null);
   const [mostrarArchivadasFito, setMostrarArchivadasFito] = React.useState(false);
@@ -10175,18 +10180,20 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
 
     // Tareas al programa del día
     const fp = incidForm.fechaAplicacion;
-    if(fp && incidForm.productoAplicar) {
+    const gFum = genInc("fumig", incidForm.responsableGolf||incidForm.diagnosticadoPor||RESPONSABLE_GOLF_DEFAULT);
+    if(fp && incidForm.productoAplicar && gFum.incluir) {
       const sectLabel = (incidForm.sectoresCerrados||[]).join(", ") || "Sector no especificado";
       setTareasProg(prev=>{const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);return{ ...prev, [fp]: [...normArr(prev[fp]||[]), {
         id:Date.now()+Math.random(), fecha:fp,
         zona: sectLabel, elemento:"",
         tarea:`🧪 Fumigación: ${incidForm.productoAplicar} — ${incidForm.agenteCausal||incidForm.diagnostico}`,
-        responsable: incidForm.responsableGolf||incidForm.diagnosticadoPor||RESPONSABLE_GOLF_DEFAULT, estado:"pendiente",
+        responsable: gFum.responsable, estado:gFum.responsable?"pendiente":"por_designar",
         notas:`Reingreso estimado: ${reap?.label||""}. ${reap?.nota||""}`, auto:false, origenFungicida:true,
       }]};});
     }
     // Cierre de cancha al programa
-    if(incidForm.sectoresCerrados.length>0) {
+    const gCierre = genInc("cierre", incidForm.flujo==="evento"?(incidForm.organizador||""):(incidForm.responsableGolf||incidForm.diagnosticadoPor||""));
+    if(incidForm.sectoresCerrados.length>0 && gCierre.incluir) {
       const fc = incidForm.fechaObservacion;
       setTareasProg(prev=>{const normArr2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);return{ ...prev, [fc]: [...normArr2(prev[fc]||[]), {
         id:Date.now()+Math.random()+1, fecha:fc,
@@ -10196,8 +10203,8 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
           incidForm.flujo==="recuperacion"?({resiembra:"Resiembra",aireacion:"Aireación",fertilizacion:"Fertilización",renovacion:"Renovación",recuperacion_general:"Recuperación"}[incidForm.tipoRecuperacion]||"Recuperación"):
           incidForm.flujo==="evento"?(incidForm.nombreEvento||"Evento/Montaje"):
           incidForm.tipoCierre==="clima"?"Condición climática":"Mantenimiento"}`,
-        responsable: incidForm.flujo==="evento"?(incidForm.organizador||""):incidForm.diagnosticadoPor||"",
-        estado:"por_designar",
+        responsable: gCierre.responsable,
+        estado:gCierre.responsable?"pendiente":"por_designar",
         notas:`${incidForm.flujo==="fitosanitario"?`Reapertura: ${reap.label||"por determinar"}`:incidForm.flujo==="recuperacion"?`Cierre estimado: ${incidForm.diasRecuperacion} días`:incidForm.flujo==="evento"?`Evento: ${incidForm.fechaInicioEvento} al ${incidForm.fechaFinEvento}. Org: ${incidForm.organizador}`:""}`,
         auto:false, origenCierre:true, flujo:incidForm.flujo,
       }]};});
@@ -10216,14 +10223,14 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
         {texto:"⚽ Informar a Gerencia Deportes", resp:"jefa"},
         {texto:"⚙️ Informar a Gerencia Operaciones (Marco Romero)", resp:"jefa"},
         {texto:"🏢 Informar a Gerencia General (Javier Viñales)", resp:"jefa"},
-      ].map((t,i)=>({
+      ].map((t,i)=>({t,i,g:genInc("inst"+i, respJefaInc)})).filter(x=>x.g.incluir).map(({t,i,g})=>({
         id: Date.now()+Math.random()+i+10,
         fecha: hoyStr,
         zona: "Administración",
         elemento: "",
         tarea: t.texto + ` — Incidencia fitosanitaria golf: ${incidForm.agenteCausal||incidForm.diagnostico||"ver registro"}`,
-        responsable: "",
-        estado: "pendiente",
+        responsable: g.responsable,
+        estado: g.responsable?"pendiente":"por_designar",
         obs: `Ref. incidencia Golf ${hoyStr}: ${incidForm.observacion?.slice(0,80)}`,
         auto: true,
         origenFitoGolf: true,
@@ -10241,7 +10248,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
         });
       }
     }
-    setIncidForm(emptyIncid); setShowIncidForm(false); setIncidPaso(1);
+    setIncidForm(emptyIncid); setShowIncidForm(false); setIncidPaso(1); setTareasGen({});
     try{ localStorage.removeItem(BORRADOR_INCID_KEY); }catch(e){}
     setGuardandoIncid(false);
     alert("✅ Incidencia registrada.");
@@ -10768,6 +10775,32 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                         <div style={{fontSize:12,color:"#86efac",fontWeight:600,marginBottom:3}}>✅ Reapertura estimada</div>
                         <div style={{fontSize:16,color:"#4ade80",fontWeight:700}}>{reapert2.label}</div>
                         <div style={{fontSize:11,color:"#5a9a7a",marginTop:4,fontStyle:"italic"}}>{reapert2.nota}</div>
+                      </div>
+                    );
+                  })()}
+                  {(()=>{
+                    const filas = [];
+                    if(incidForm.fechaAplicacion && incidForm.productoAplicar) filas.push({k:"fumig", txt:`🧪 Fumigación: ${incidForm.productoAplicar} (${incidForm.fechaAplicacion})`, def:incidForm.responsableGolf||incidForm.diagnosticadoPor||RESPONSABLE_GOLF_DEFAULT});
+                    if((incidForm.sectoresCerrados||[]).length>0) filas.push({k:"cierre", txt:`🚫 Cierre: ${(incidForm.sectoresCerrados||[]).join(", ")}`, def:incidForm.responsableGolf||incidForm.diagnosticadoPor||""});
+                    if(incidForm.flujo==="fitosanitario") ["🏌️ Avisar a socios Rama Golf","⚽ Informar a Gerencia Deportes","⚙️ Informar a Gerencia Operaciones (Marco Romero)","🏢 Informar a Gerencia General (Javier Viñales)"].forEach((t,i)=>filas.push({k:"inst"+i, txt:t, def:respJefaInc}));
+                    if(filas.length===0) return null;
+                    return (
+                      <div style={{...S.card,padding:14,marginBottom:12,border:"1px solid rgba(96,165,250,0.3)",background:"rgba(96,165,250,0.05)"}}>
+                        <div style={{fontSize:12,color:"#93c5fd",fontWeight:700,marginBottom:2}}>📋 Tareas que se crearán en Programación</div>
+                        <div style={{fontSize:10,color:"#6aaa7a",marginBottom:8}}>Desmarca las que no quieras y elige quién las hace.</div>
+                        {filas.map(f=>{
+                          const g = genInc(f.k, f.def);
+                          return (
+                            <div key={f.k} style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",padding:"5px 0",borderTop:"1px solid rgba(255,255,255,0.05)",opacity:g.incluir?1:0.45}}>
+                              <input type="checkbox" checked={g.incluir} onChange={e=>setGenInc(f.k,{incluir:e.target.checked})}/>
+                              <span style={{flex:1,minWidth:180,fontSize:12}}>{f.txt}</span>
+                              <select style={{...S.input,width:210,fontSize:11,padding:"4px 8px"}} disabled={!g.incluir} value={g.responsable} onChange={e=>setGenInc(f.k,{responsable:e.target.value})}>
+                                <option value="">— Por designar —</option>
+                                {listaPersonal.map(t=><option key={t.id} value={t.nombre}>{t.nombre}</option>)}
+                              </select>
+                            </div>
+                          );
+                        })}
                       </div>
                     );
                   })()}
@@ -26484,7 +26517,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-13.8";
+const BUILD_STAMP = "2026-10-13.9";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
