@@ -465,12 +465,12 @@ const listasConTope = (f) => {
   const out = [];
   const add = (id,nombre,tope,items) => out.push({id,nombre,tope,items:arrDeCR(items)});
   const g = f.golfData || {};
-  add("golf_mediciones","Golf — mediciones de altura de greens",100,g.mediciones);
-  add("golf_registros_diarios","Golf — registros diarios",200,g.registrosDiarios);
-  add("golf_humedad","Golf — humedad de greens",200,g.humedades);
-  Object.keys(g).filter(k=>k.startsWith("registros_")).forEach(k=>add("golf_"+k,`Golf — registros de zona especial (${k.replace("registros_","")})`,100,g[k]));
-  add("fito_aplicaciones","Fitosanitarios — aplicaciones",200,f.aplicaciones);
-  add("fito_incidencias","Fitosanitarios — incidencias",100,f.incidenciasFito);
+  add("golf_mediciones","Golf — mediciones de altura de greens",1000,g.mediciones);
+  add("golf_registros_diarios","Golf — registros diarios",1000,g.registrosDiarios);
+  add("golf_humedad","Golf — humedad de greens",1000,g.humedades);
+  Object.keys(g).filter(k=>k.startsWith("registros_")).forEach(k=>add("golf_"+k,`Golf — registros de zona especial (${k.replace("registros_","")})`,500,g[k]));
+  add("fito_aplicaciones","Fitosanitarios — aplicaciones",1000,f.aplicaciones);
+  add("fito_incidencias","Fitosanitarios — incidencias",500,f.incidenciasFito);
   add("notificaciones","Notificaciones de la app",100,f.notificaciones);
   const b = f.bodegasData || {};
   Object.keys(b).forEach(id=>{
@@ -10175,7 +10175,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
       const arr=Array.isArray(prev)?prev:Object.values(prev||{});
       // Si se completó una observación ya existente (ej. enviada por el jardinero), se reemplaza en vez de duplicar
       if(incidForm.id && arr.some(x=>String(x.id)===String(incidForm.id))) return arr.map(x=>String(x.id)===String(incidForm.id)?{...x,...nueva}:x);
-      return [nueva,...arr].slice(0,100);
+      return [nueva,...arr].slice(0,500);
     });
 
     // Tareas al programa del día
@@ -10294,7 +10294,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
     if(!productoFinal.trim()||!form.fecha) return;
     const reingAplic = calcReingresoAplic(productoFinal, form.fecha, form.horaAplicacion);
     const nueva = { ...form, producto:productoFinal, id:Date.now(), mes:mesActual, sectorFinal, reingresoHasta:reingAplic?.finISO||"", reingresoHoras:reingAplic?.horas||"" };
-    setAplicaciones(prev=>[nueva, ...prev].slice(0,200));
+    setAplicaciones(prev=>[nueva, ...prev].slice(0,1000));
     // Descontar stock en bodegas reales si hay producto y cantidad usada
     if(form.producto && form.cantidadUsada && setBodegasData) {
       const cant = Number(form.cantidadUsada);
@@ -14992,7 +14992,7 @@ function ZonaGolfSimple({ S, labelSt, zonas, tareas, titulo, colorAcento, golfDa
     const nombreTareaZGS = form.tipo==="Otra" ? (form.tipoOtro||"").trim() : form.tipo;
     if(form.tipo==="Otra"&&!nombreTareaZGS){ alert("Escribe el nombre de la tarea en el cuadro que aparece debajo de \"Otra...\"."); return; }
     const reg = {...form,tipo:nombreTareaZGS,id:Date.now()};
-    setG({[clave]:[reg,...registros].slice(0,100)});
+    setG({[clave]:[reg,...registros].slice(0,500)});
     // Enviar al programa
     if(form.responsable&&form.fecha) {
       setTareasProg(p=>({...p,[form.fecha]:[...(p[form.fecha]||[]),{
@@ -15148,7 +15148,7 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
       } catch(e) {
         actuales = humedadesFb; // sin lectura: usar lo que se ve en pantalla
       }
-      const lista = [nueva, ...actuales.filter(x=>x && String(x.id)!==String(nueva.id))].slice(0,200);
+      const lista = [nueva, ...actuales.filter(x=>x && String(x.id)!==String(nueva.id))].slice(0,1000);
       const escritura = fbSet(refHum, limpiarUndef(lista)).then(()=>"ok");
       const resultado = await Promise.race([escritura, new Promise(res=>setTimeout(()=>res("espera"),8000))]);
       setHumLocales(p=>[nueva,...p]);
@@ -16520,6 +16520,28 @@ function HistorialElementoGolf({ S, nombreElemento, hoyoElemento="", tareasProg,
   );
 }
 
+// Respaldo del historial de Golf en un solo CSV para Excel (mediciones, humedad, cortes, aplicaciones, incidencias).
+const descargarHistorialGolf = ({ golfData, tareasProg, aplicaciones, incidenciasFito }) => {
+  const filas = [];
+  const nomG = id => id==="vivero"?"Vivero":(GREENS_DEF.find(g=>g.id===id)?.nombre||id);
+  arrDeCR(golfData?.mediciones).forEach(m=>Object.entries(m.alturas||{}).forEach(([gid,v])=>{ if(v!==""&&v!=null) filas.push({categoria:"Medición de altura",fecha:m.fecha,elemento:nomG(gid),valor:v,unidad:"mm",responsable:m.responsable||"",detalle:[m.tipo,m.obsGreen?.[gid],m.obs].filter(Boolean).join(" · ")}); }));
+  arrDeCR(golfData?.humedades).forEach(m=>{
+    Object.entries(m.valores||{}).forEach(([gid,o])=>{ const v=o?.valor; if(v!==""&&v!=null) filas.push({categoria:"Humedad",fecha:m.fecha,elemento:nomG(gid),valor:v,unidad:"escala",responsable:m.responsable||"",detalle:[o?.obs,m.obs].filter(Boolean).join(" · ")}); });
+    if(m.valorVivero) filas.push({categoria:"Humedad",fecha:m.fecha,elemento:"Vivero",valor:m.valorVivero,unidad:"escala",responsable:m.responsable||"",detalle:m.obs||""});
+  });
+  Object.entries(tareasProg||{}).forEach(([fecha,ts])=>arrDeCR(ts).forEach(t=>{
+    if(t.zona!=="Golf") return;
+    if(/corte/i.test(t.tarea||"") && ["hecha","completada"].includes(t.estado)) filas.push({categoria:"Corte",fecha,elemento:t.elemento||"",valor:t.alturaCorteReal||t.alturaCorte||"",unidad:"mm",responsable:t.responsable||"",detalle:t.tarea||""});
+    else if(["hecha","completada"].includes(t.estado)) filas.push({categoria:"Tarea realizada",fecha,elemento:t.elemento||"",valor:"",unidad:"",responsable:t.responsable||"",detalle:t.tarea||""});
+  }));
+  arrDeCR(golfData?.registrosDiarios).forEach(r=>filas.push({categoria:"Registro diario",fecha:r.fecha,elemento:r.esVivero?"Vivero":nomG(r.greenId),valor:r.alturaVivero||"",unidad:r.alturaVivero?"mm":"",responsable:r.responsable||"",detalle:[r.tipo,r.obs].filter(Boolean).join(" · ")}));
+  arrDeCR(aplicaciones).forEach(a=>filas.push({categoria:"Aplicación fitosanitaria",fecha:a.fecha,elemento:a.sectorFinal||a.sector||"",valor:a.dosis||"",unidad:"",responsable:a.responsable||a.aplicador||"",detalle:[a.producto,a.horaAplicacion&&("hora "+a.horaAplicacion),a.obs].filter(Boolean).join(" · ")}));
+  arrDeCR(incidenciasFito).forEach(i=>filas.push({categoria:"Incidencia fitosanitaria",fecha:i.fecha,elemento:i.sector||i.elemento||"",valor:"",unidad:"",responsable:i.responsable||"",detalle:[i.tipo,i.diagnostico,i.estado,i.obs].filter(Boolean).join(" · ")}));
+  filas.sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
+  descargarListaCSV(`historial_golf_${fechaLocal()}.csv`, filas);
+  return filas.length;
+};
+
 function UltimosCortesGolf({ S, nombre, tareasProg, setTareasProg, esVivero=false }) {
   const hoyStr = new Date().toISOString().slice(0,10);
   const normUC=x=>(x||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"");
@@ -16842,7 +16864,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
     const hayAlturas = Object.values(medForm.alturas||{}).some(v=>v);
     if(!hayAlturas && !medForm.alturas?.vivero) return;
     const nueva = {...medForm, id:Date.now()};
-    const nuevasMed = [nueva, ...mediciones].slice(0,100);
+    const nuevasMed = [nueva, ...mediciones].slice(0,1000);
     setG({mediciones:nuevasMed});
     sincronizarMacrozona("Medición de alturas", `${medForm.tipo} — ${medForm.responsable||"Sin responsable"}`);
     // Registro invisible (no aparece como tarea aparte en Mi Turno) solo para
@@ -16976,7 +16998,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
     if(!diariaForm.responsable) return;
     const reg = {...diariaForm, id:Date.now()};
     const tareasRealizadas = Object.entries(diariaForm.tareas||{}).filter(([,v])=>v).map(([k])=>k);
-    setG({registrosDiarios:[reg,...(golfData.registrosDiarios||[])].slice(0,200)});
+    setG({registrosDiarios:[reg,...(golfData.registrosDiarios||[])].slice(0,1000)});
     sincronizarMacrozona("Registro diario", `${tareasRealizadas.length} tareas — ${diariaForm.responsable}`);
     setDiariaForm(emptyDiaria); setShowDiariaForm(false);
   };
@@ -17116,6 +17138,10 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       <div style={{marginBottom:14}}>
         <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:24,fontWeight:900,marginBottom:2}}>🏌️ Golf</h1>
         <p style={{color:"#34d399",fontSize:13}}>Gestión integral cancha · Estadio Español</p>
+        {esJefa&&<button style={{...S.btn,marginTop:8,fontSize:11,padding:"5px 12px",background:"rgba(34,197,94,0.12)",color:"#86efac",border:"1px solid rgba(34,197,94,0.3)"}}
+          title="Descarga un CSV (Excel) con mediciones, humedad, cortes, aplicaciones e incidencias de Golf"
+          onClick={()=>{const n=descargarHistorialGolf({golfData,tareasProg,aplicaciones,incidenciasFito});alert("✅ Se descargó el historial de Golf ("+n+" registros). Guárdalo fuera de la app, por ejemplo en Drive.");}}>
+          ⬇ Respaldar historial Golf</button>}
       </div>
 
       {/* Alerta evento activo */}
@@ -26523,7 +26549,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-13.10";
+const BUILD_STAMP = "2026-10-13.11";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
@@ -26824,7 +26850,7 @@ export default function App() {
           responsableGolf:respGolfDef, diagnostico:"", agenteCausal:"", severidad:"media", diagnosticadoPor:"", otrosDiagnosticos:"",
           tratamiento:"completo", productoAplicar:"", fechaAplicacion:fechaAlerta, horaAplicacion:"", motivoCierre:"", obs:"",
         };
-        return [obsFito,...arr].slice(0,100);
+        return [obsFito,...arr].slice(0,500);
       });
     }
     tareasBase.forEach((t,i)=>{
@@ -26923,7 +26949,7 @@ export default function App() {
     };
     setNotificaciones(prev => {
       const arr = Array.isArray(prev) ? prev : Object.values(prev||{});
-      return [nueva, ...arr].slice(0, 100);
+      return [nueva, ...arr].slice(0, 500);
     });
   }, [setNotificaciones]);
 
