@@ -9975,13 +9975,53 @@ const REINGRESO_DIAS = {
 // Estado inicial vacío — se inicializa desde localStorage
 const INCIDENCIAS_INICIAL = [];
 
+// ─── REFERENCIA: INGREDIENTES ACTIVOS Y GRUPOS FRAC (fungicidas de césped) ───────────────────────────────
+// Tabla de referencia para sugerir alternativas y controlar la rotación. Verificar siempre con la etiqueta
+// del producto y su registro SAG vigente antes de aplicar.
+const AGENTES_FITO_REF = {
+  fusarium:  { label:"Fusarium / Microdochium (fusarium patch)", match:["fusarium","microdochium"] },
+  rhizoctonia:{ label:"Rhizoctonia (large patch / brown patch)", match:["rhizoctonia"] },
+  dollar:    { label:"Dollar Spot (Clarireedia)", match:["dollar"] },
+  pythium:   { label:"Pythium", match:["pythium"] },
+  helmin:    { label:"Helminthosporium / Drechslera", match:["helminthosporium","drechslera"] },
+  antrac:    { label:"Antracnosis (Colletotrichum)", match:["antracnosis","colletotrichum"] },
+};
+const INGREDIENTES_FITO_REF = [
+  { id:"azox",   nombre:"Azoxistrobina",       frac:"11",  grupo:"QoI · estrobilurina", claves:["azoxistrobina","amistar"], comerciales:"Amistar, Amistar Top (con difenoconazol)", agentes:["fusarium","rhizoctonia","helmin","antrac","pythium"], nota:"Riesgo de resistencia alto: máx. 2 aplicaciones seguidas del grupo 11." },
+  { id:"trifl",  nombre:"Trifloxistrobina",    frac:"11",  grupo:"QoI · estrobilurina", claves:["trifloxistrobina","compass"], comerciales:"Compass", agentes:["fusarium","rhizoctonia","helmin","antrac"], nota:"Mismo grupo que azoxistrobina: no alternar entre ellas como si fueran rotación." },
+  { id:"pirac",  nombre:"Piraclostrobina",     frac:"11",  grupo:"QoI · estrobilurina", claves:["piraclostrobina","insignia","headway"], comerciales:"Insignia, Headway (con propiconazol)", agentes:["fusarium","rhizoctonia","helmin","antrac"], nota:"Mismo grupo 11." },
+  { id:"difen",  nombre:"Difenoconazol",       frac:"3",   grupo:"DMI · triazol", claves:["difenoconazol","score","amistar top"], comerciales:"Score 250 EC, Amistar Top", agentes:["fusarium","dollar","rhizoctonia","helmin","antrac"], nota:"Curativo y sistémico. Limitar a 2–3 aplicaciones por temporada del grupo 3; puede frenar crecimiento." },
+  { id:"tebuc",  nombre:"Tebuconazol",         frac:"3",   grupo:"DMI · triazol", claves:["tebuconazol","apolo","folicur"], comerciales:"Apolo 25 EW, Folicur", agentes:["fusarium","dollar","rhizoctonia","helmin"], nota:"Mismo grupo 3 que difenoconazol: cuentan juntos para el límite de rotación." },
+  { id:"propic", nombre:"Propiconazol",        frac:"3",   grupo:"DMI · triazol", claves:["propiconazol","banner","tilt"], comerciales:"Banner, Tilt", agentes:["fusarium","dollar","rhizoctonia","helmin","antrac"], nota:"Mismo grupo 3." },
+  { id:"manco",  nombre:"Mancozeb",            frac:"M03", grupo:"Multisitio · ditiocarbamato", claves:["mancozeb","fungizeb","dithane"], comerciales:"Fungizeb 800 WP, Dithane", agentes:["fusarium","dollar","helmin","antrac","rhizoctonia"], nota:"Protectante. Sin riesgo de resistencia: buen acompañante/rotación entre sistémicos." },
+  { id:"cloro",  nombre:"Clorotalonil",        frac:"M05", grupo:"Multisitio · cloronitrilo", claves:["clorotalonil","daconil","bravo"], comerciales:"Daconil, Bravo", agentes:["fusarium","dollar","helmin","antrac"], nota:"Protectante multisitio. Verificar que su registro vigente permita uso en césped." },
+  { id:"iprod",  nombre:"Iprodiona",           frac:"2",   grupo:"Dicarboximida", claves:["iprodiona","rovral"], comerciales:"Rovral", agentes:["fusarium","dollar","helmin","rhizoctonia"], nota:"Rotar: riesgo de resistencia medio–alto." },
+  { id:"mbc",    nombre:"Benomil / Carbendazim / Tiofanato", frac:"1", grupo:"MBC · bencimidazol", claves:["benomil","carbendazim","poliben","tiofanato"], comerciales:"Benomil 50% WP, Poliben", agentes:["fusarium","dollar","antrac"], nota:"Resistencia frecuente en Dollar Spot. Mezclar con multisitio." },
+  { id:"sdhi",   nombre:"Boscalid / Fluopyram / Fluxapiroxad", frac:"7", grupo:"SDHI", claves:["boscalid","fluopyram","fluxapiroxad","emerald","xemium"], comerciales:"Emerald, Xzemplar", agentes:["dollar","rhizoctonia","fusarium"], nota:"Buena alternativa para salir de triazoles y estrobilurinas." },
+  { id:"fluto",  nombre:"Flutolanil",          frac:"7",   grupo:"SDHI", claves:["flutolanil","prostar"], comerciales:"Prostar", agentes:["rhizoctonia"], nota:"Específico para Rhizoctonia." },
+  { id:"pencic", nombre:"Pencicuron",          frac:"20",  grupo:"Fenilurea", claves:["pencicuron","monceren"], comerciales:"Monceren", agentes:["rhizoctonia"], nota:"Específico para Rhizoctonia." },
+  { id:"fluaz",  nombre:"Fluazinam",           frac:"29",  grupo:"Desacoplante", claves:["fluazinam","omega"], comerciales:"Omega", agentes:["dollar","fusarium","rhizoctonia"], nota:"Bajo riesgo de resistencia; revisar fitotoxicidad en greens." },
+  { id:"propam", nombre:"Propamocarb",         frac:"28",  grupo:"Carbamato", claves:["propamocarb","previcur"], comerciales:"Previcur", agentes:["pythium"], nota:"Específico para Pythium." },
+  { id:"metal",  nombre:"Metalaxil / Mefenoxam", frac:"4", grupo:"Fenilamida", claves:["metalaxil","mefenoxam","ridomil"], comerciales:"Ridomil", agentes:["pythium"], nota:"Alto riesgo de resistencia: no repetir seguido." },
+  { id:"fosetil",nombre:"Fosetil-Al / fosfitos",frac:"P07",grupo:"Inductor de defensas", claves:["fosetil","fosfito","aliette"], comerciales:"Aliette, fosfitos", agentes:["pythium","fusarium"], nota:"Preventivo; sin riesgo de resistencia." },
+  { id:"cyaz",   nombre:"Cyazofamid",          frac:"21",  grupo:"QiI", claves:["cyazofamid","ranman"], comerciales:"Ranman", agentes:["pythium"], nota:"Específico para Pythium." },
+];
+const ingredientesDeProducto = (nombre) => {
+  const n = (nombre||"").toLowerCase();
+  if(!n) return [];
+  return INGREDIENTES_FITO_REF.filter(i=>i.claves.some(c=>n.includes(c)));
+};
+
+// Borrador del asistente de incidencia fitosanitaria: se conserva si la pantalla se recarga o se vuelve a montar
+const BORRADOR_INCID_KEY = "ev2-incid-borrador";
+const leerBorradorIncid = () => { try { const r=localStorage.getItem(BORRADOR_INCID_KEY); const d=r?JSON.parse(r):null; return d&&d.incidForm?d:null; } catch(e){ return null; } };
 function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, tareasProg, setTareasProg, incidenciasFito, setIncidenciasFito, crearNotificacion, zonasFito, stockFito, setStockFito, bodegasData, setBodegasData }) {
   const hoy = new Date();
   const mesActual = hoy.getMonth() + 1;
   const [subTab, setSubTab] = React.useState("historial");
   const [showForm, setShowForm] = React.useState(false);
   const [form, setForm] = React.useState({
-    fecha: hoy.toISOString().slice(0,10),
+    fecha: hoy.toISOString().slice(0,10), horaAplicacion: hoy.toTimeString().slice(0,5),
     producto:"", dosis:"", cantidadUsada:"", unidadUsada:"L",
     superficie:"", sectorGrupo:"", sectorDetalle:"", sectorCustom:"",
     responsable:"", obs:"", clima:"", volAgua:"",
@@ -10006,11 +10046,13 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
 
   // ── Incidencias / Cierres ────────────────────────────────────────────────────
   // (estado manejado desde App vía props incidenciasFito / setIncidenciasFito)
-  const [showIncidForm, setShowIncidForm] = React.useState(false);
-  const [incidPaso, setIncidPaso] = React.useState(1);
+  const [showIncidForm, setShowIncidForm] = React.useState(()=>!!leerBorradorIncid());
+  const [incidPaso, setIncidPaso] = React.useState(()=>leerBorradorIncid()?.incidPaso||1);
+  const [guardandoIncid, setGuardandoIncid] = React.useState(false);
   const [incidError, setIncidError] = React.useState("");
   const [expandIncid, setExpandIncid] = React.useState(null);
   const [mostrarArchivadasFito, setMostrarArchivadasFito] = React.useState(false);
+  const [agenteRot, setAgenteRot] = React.useState("fusarium");
 
   const RESPONSABLE_GOLF_DEFAULT = "Osmar Bhalú Armijo Zúñiga";
   const emptyIncid = {
@@ -10020,7 +10062,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
     responsableGolf: RESPONSABLE_GOLF_DEFAULT,
     tipoCierre:"fitosanitario", diagnostico:"", agenteCausal:"", severidad:"media",
     diagnosticadoPor:"", otrosDiagnosticos:"",
-    tratamiento:"completo", productoAplicar:"", fechaAplicacion: hoy.toISOString().slice(0,10), horaAplicacion:"14:00",
+    tratamiento:"completo", productoAplicar:"", fechaAplicacion: hoy.toISOString().slice(0,10), horaAplicacion:hoy.toTimeString().slice(0,5),
     sectoresCerrados:[], motivoCierre:"", obs:"",
     // Recuperación
     tipoRecuperacion:"resiembra", diasRecuperacion:14,
@@ -10029,7 +10071,13 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
     // Común
     estado:"observacion", fechaReaperturaISO:"", notaReingreso:"",
   };
-  const [incidForm, setIncidForm] = React.useState(emptyIncid);
+  const [incidForm, setIncidForm] = React.useState(()=>({...emptyIncid, ...(leerBorradorIncid()?.incidForm||{})}));
+  React.useEffect(()=>{
+    try {
+      if(showIncidForm) localStorage.setItem(BORRADOR_INCID_KEY, JSON.stringify({incidForm, incidPaso}));
+      else localStorage.removeItem(BORRADOR_INCID_KEY);
+    } catch(e) {}
+  },[showIncidForm, incidForm, incidPaso]);
 
   const todosSectoresGolf = [
     ...Array.from({length:18},(_,i)=>`Green ${String(i+1).padStart(2,"0")}`),
@@ -10051,7 +10099,13 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
   };
 
   const guardarIncidencia = () => {
-    if(!incidForm.observacion.trim()) return;
+    if(guardandoIncid) return;
+    if(!incidForm.observacion.trim()){
+      alert("⚠️ Falta la descripción de la observación (paso 1). Vuelve al paso 1, descríbela y luego registra.");
+      setIncidPaso(1);
+      return;
+    }
+    setGuardandoIncid(true);
     try {
     const reap = calcReapertura(incidForm.productoAplicar, incidForm.fechaAplicacion, incidForm.horaAplicacion);
     const nueva = { ...incidForm, id:Date.now(), fechaReaperturaISO:reap?.fechaISO||"", notaReingreso:reap?.nota||"", estado: (incidForm.sectoresCerrados||[]).length>0?"cerrada":"observacion" };
@@ -10126,7 +10180,14 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
       }
     }
     setIncidForm(emptyIncid); setShowIncidForm(false); setIncidPaso(1);
-    } catch(e) { console.error("guardarIncidencia error:", e); }
+    try{ localStorage.removeItem(BORRADOR_INCID_KEY); }catch(e){}
+    setGuardandoIncid(false);
+    alert("✅ Incidencia registrada.");
+    } catch(e) {
+      console.error("guardarIncidencia error:", e);
+      setGuardandoIncid(false);
+      alert("❌ La incidencia NO se guardó por completo (" + (e?.message||"error") + "). Tus datos siguen en pantalla: revisa la conexión y presiona Registrar otra vez.");
+    }
   };
 
   const progMes = PROGRAMA_FUNGICIDAS.filter(p => p.mes === mesActual);
@@ -10135,10 +10196,35 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
 
   const sectorFinal = (form.sectoresSeleccionados||[]).length>0 ? (form.sectoresSeleccionados||[]).join(", ") : (form.sectorDetalle==="Otro" ? form.sectorCustom : form.sectorDetalle);
 
+  // Hora de término del reingreso: hora de aplicación + horas de reingreso (de la bodega/HDS, o de la ficha por defecto)
+  const calcReingresoAplic = (producto, fecha, hora) => {
+    if(!producto||!fecha) return null;
+    let horas = null, nota = "";
+    try {
+      Object.values(bodegasData||{}).forEach(bd=>(bd.items||[]).forEach(it=>{
+        if(horas===null && it.nombre===producto && it.tiempoReingreso){
+          const n = Number(String(it.tiempoReingreso).replace(",","."));
+          if(n>0) horas = (it.tiempoReingresoUnidad||"horas")==="días" || (it.tiempoReingresoUnidad||"")==="dias" ? n*24 : n;
+        }
+      }));
+    } catch(e) {}
+    if(horas===null){
+      const clave = Object.keys(REINGRESO_DIAS).find(k=>k!=="Otro" && (producto.toLowerCase().includes(k.split(" ")[0].toLowerCase())));
+      if(clave){ horas = REINGRESO_DIAS[clave].dias*24; nota = REINGRESO_DIAS[clave].nota; }
+    }
+    if(horas===null) return null;
+    const base = new Date(`${fecha}T${hora||"12:00"}:00`);
+    if(isNaN(base.getTime())) return null;
+    const fin = new Date(base.getTime()+horas*3600000);
+    return { horas, nota, finISO: fin.toISOString().slice(0,16),
+      label: fin.toLocaleDateString("es-CL",{weekday:"long",day:"numeric",month:"long"})+" a las "+fin.toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"}) };
+  };
+
   const guardarAplicacion = () => {
     const productoFinal = form.producto==="Otro (escribir abajo)"?(form.productoCustom||"Otro"):form.producto;
     if(!productoFinal.trim()||!form.fecha) return;
-    const nueva = { ...form, producto:productoFinal, id:Date.now(), mes:mesActual, sectorFinal };
+    const reingAplic = calcReingresoAplic(productoFinal, form.fecha, form.horaAplicacion);
+    const nueva = { ...form, producto:productoFinal, id:Date.now(), mes:mesActual, sectorFinal, reingresoHasta:reingAplic?.finISO||"", reingresoHoras:reingAplic?.horas||"" };
     setAplicaciones(prev=>[nueva, ...prev].slice(0,200));
     // Descontar stock en bodegas reales si hay producto y cantidad usada
     if(form.producto && form.cantidadUsada && setBodegasData) {
@@ -10178,7 +10264,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
         tarea: `🧪 Aplicación fungicida: ${productoFinal}${form.dosis ? " · "+form.dosis : ""}${sectorFinal ? " → "+sectorFinal : ""}`,
         responsable: form.responsable || (sectorFinal==="Golf"||(sectorFinal||"").toLowerCase().includes("golf")?"Osmar Bhalú Armijo Zúñiga":""),
         estado: form.responsable ? "pendiente" : "por_designar",
-        notas: form.obs || "",
+        notas: [form.horaAplicacion?`Aplicación a las ${form.horaAplicacion}.`:"", reingAplic?`Reingreso desde: ${reingAplic.label} (${reingAplic.horas} h).`:"", form.obs||""].filter(Boolean).join(" "),
         auto: false,
         origenFungicida: true,
       };
@@ -10188,7 +10274,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
       }));
     }
 
-    setForm({ fecha:hoy.toISOString().slice(0,10), producto:"", productoCustom:"", dosis:"", cantidadUsada:"", unidadUsada:"L", superficie:"", sectorGrupo:"", sectorDetalle:"", sectorCustom:"", sectoresSeleccionados:[], responsable:"", obs:"", clima:"", volAgua:"", costoUnitario:"", costoTotal:"", cuentaImputar:"", enviarProg:true });
+    setForm({ fecha:hoy.toISOString().slice(0,10), horaAplicacion:new Date().toTimeString().slice(0,5), producto:"", productoCustom:"", dosis:"", cantidadUsada:"", unidadUsada:"L", superficie:"", sectorGrupo:"", sectorDetalle:"", sectorCustom:"", sectoresSeleccionados:[], responsable:"", obs:"", clima:"", volAgua:"", costoUnitario:"", costoTotal:"", cuentaImputar:"", enviarProg:true });
     setShowForm(false);
   };
 
@@ -10243,7 +10329,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
 
       {/* Sub-tabs */}
       <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
-        {[["alerta","📅 Programa"],["incidencias","🦠 Incidencias Fitosanitarias"],["stock","📦 Stock"],["proveedor","🏪 Proveedor"],["registro","📝 Registrar"],["historial","🗂️ Historial"]].map(([t,l])=>{
+        {[["alerta","📅 Programa"],["incidencias","🦠 Incidencias Fitosanitarias"],["stock","📦 Stock"],["proveedor","🏪 Proveedor"],["rotacion","🔄 Rotación y alternativas"],["registro","📝 Registrar"],["historial","🗂️ Historial"]].map(([t,l])=>{
           const hayAlerta = t==="incidencias" && incidencias.some(i=>i.estado==="cerrada"||i.estado==="observacion");
           return (
             <button key={t} className={`tab${subTab===t?" on":""}`} onClick={()=>{setSubTab(t);setShowForm(false);}} style={{position:"relative"}}>
@@ -10629,7 +10715,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                   </div>
                   <div style={{display:"flex",gap:10}}>
                     <button className="btn-g" style={S.btn} onClick={()=>setIncidPaso(3)}>← Volver</button>
-                    <button className="btn-p" style={{...S.btn,background:"#3d7a52"}} onClick={guardarIncidencia}>✓ Registrar incidencia y cerrar cancha</button>
+                    <button className="btn-p" style={{...S.btn,background:"#3d7a52"}} onClick={guardarIncidencia} disabled={guardandoIncid}>{guardandoIncid?"Guardando…":"✓ Registrar incidencia y cerrar cancha"}</button>
                   </div>
                 </div>
               )}
@@ -10798,6 +10884,87 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
       )}
 
       {/* ── REGISTRAR APLICACIÓN ── */}
+      {/* ── ROTACIÓN Y ALTERNATIVAS ── */}
+      {subTab==="rotacion"&&(()=>{
+        const apps = [...(Array.isArray(aplicaciones)?aplicaciones:Object.values(aplicaciones||{}))]
+          .filter(a=>a&&a.producto&&a.producto!=="—")
+          .sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
+        const hoyISO = new Date().toISOString().slice(0,10);
+        const diasDesde = (f)=>f?Math.round((new Date(hoyISO+"T12:00:00")-new Date(f+"T12:00:00"))/86400000):999;
+        const recientes = apps.slice(0,8).map(a=>({...a, ings:ingredientesDeProducto(a.producto), dias:diasDesde(a.fecha)}));
+        // Grupos usados en las últimas 2 aplicaciones o en los últimos 21 días → "repetirlos rompe la rotación"
+        const fracRecientes = new Set();
+        recientes.forEach((a,i)=>{ if(i<2||a.dias<=21) a.ings.forEach(g=>{ if(!g.frac.startsWith("M")) fracRecientes.add(g.frac); }); });
+        const conteoTemporada = {};
+        apps.filter(a=>diasDesde(a.fecha)<=180).forEach(a=>ingredientesDeProducto(a.producto).forEach(g=>{ conteoTemporada[g.frac]=(conteoTemporada[g.frac]||0)+1; }));
+        // Productos en stock (bodegas + stock fito)
+        const nombresStock = [];
+        try { Object.values(bodegasData||{}).forEach(bd=>(bd.items||[]).forEach(it=>{ if(it.nombre && Number(it.stockActual||0)>0) nombresStock.push(it.nombre); })); } catch(e) {}
+        (Array.isArray(STOCK_INICIAL)?STOCK_INICIAL:[]).forEach(it=>{ if(Number(it.stockActual||0)>0 && !nombresStock.some(n=>n.toLowerCase().includes((it.producto||"").toLowerCase().split(" ")[0]))) nombresStock.push(it.producto); });
+        const enStock = (ing)=>nombresStock.filter(n=>ing.claves.some(c=>n.toLowerCase().includes(c)));
+        const esInsecto = false;
+        const candidatos = INGREDIENTES_FITO_REF.filter(i=>i.agentes.includes(agenteRot)).map(i=>{
+          const stk = enStock(i);
+          const multisitio = i.frac.startsWith("M")||i.frac.startsWith("P");
+          const repite = !multisitio && fracRecientes.has(i.frac);
+          const usos = conteoTemporada[i.frac]||0;
+          return {...i, stk, multisitio, repite, usos, puntaje:(repite?0:2)+(stk.length?1:0)+(multisitio?0.5:0)};
+        }).sort((a,b)=>b.puntaje-a.puntaje || a.nombre.localeCompare(b.nombre,"es"));
+        const chip = (txt,color)=><span style={{display:"inline-block",fontSize:10,fontWeight:700,padding:"1px 7px",borderRadius:6,background:color+"22",color,border:`1px solid ${color}55`,marginRight:4}}>{txt}</span>;
+        return (
+          <div className="ein">
+            <div style={{...S.card,padding:16,marginBottom:14}}>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#a0d8b0",marginBottom:4}}>🔄 Rotación de grupos FRAC</div>
+              <div style={{fontSize:11,color:"#5a9a7a",marginBottom:10}}>Calculada con las aplicaciones registradas en <b>Registrar</b>. Evita repetir un grupo sistémico en aplicaciones seguidas.</div>
+              {recientes.length===0?(
+                <div style={{fontSize:12,color:"#6aaa7a"}}>Aún no hay aplicaciones registradas. Registra la próxima para activar el control de rotación.</div>
+              ):(
+                <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                  {recientes.map(a=>(
+                    <div key={a.id} style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",fontSize:12,padding:"6px 10px",background:"rgba(255,255,255,0.03)",borderRadius:8}}>
+                      <span style={{color:"#6aaa7a",minWidth:78}}>{a.fecha}</span>
+                      <span style={{flex:1,minWidth:140}}>{a.producto}</span>
+                      <span>{a.ings.length?a.ings.map(g=>chip("FRAC "+g.frac,g.frac.startsWith("M")?"#94a3b8":"#60a5fa")):<span style={{fontSize:10,color:"#fbbf24"}}>grupo no identificado</span>}</span>
+                      <span style={{fontSize:10,color:"#5a9a7a"}}>hace {a.dias} d</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {Object.keys(conteoTemporada).length>0&&(
+                <div style={{marginTop:10,fontSize:11,color:"#6aaa7a"}}>
+                  Usos en los últimos 6 meses: {Object.entries(conteoTemporada).sort().map(([k,v])=><span key={k} style={{marginRight:10}}><b style={{color:v>=3&&!k.startsWith("M")?"#f87171":"#a0d8b0"}}>FRAC {k}: {v}</b></span>)}
+                </div>
+              )}
+            </div>
+
+            <div style={{...S.card,padding:16,marginBottom:14}}>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,color:"#a0d8b0",marginBottom:8}}>🧪 Alternativas según agente causal</div>
+              <select style={{...S.input,marginBottom:12}} value={agenteRot} onChange={e=>setAgenteRot(e.target.value)}>
+                {Object.entries(AGENTES_FITO_REF).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
+              </select>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {candidatos.map(c=>(
+                  <div key={c.id} style={{padding:"10px 12px",borderRadius:10,border:`1px solid ${c.repite?"rgba(245,158,11,0.35)":"rgba(34,197,94,0.3)"}`,background:c.repite?"rgba(245,158,11,0.06)":"rgba(34,197,94,0.05)"}}>
+                    <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:4}}>
+                      <b style={{fontSize:13}}>{c.nombre}</b>
+                      {chip("FRAC "+c.frac,c.multisitio?"#94a3b8":"#60a5fa")}
+                      <span style={{fontSize:10,color:"#5a9a7a"}}>{c.grupo}</span>
+                      {c.repite?chip("⚠️ repite grupo reciente","#f59e0b"):chip(c.multisitio?"✅ compatible con la rotación":"✅ rota el grupo","#22c55e")}
+                      {c.stk.length>0?chip("📦 En stock","#34d399"):chip("sin stock","#94a3b8")}
+                    </div>
+                    <div style={{fontSize:11,color:"#a0c0a0"}}>Productos: {c.comerciales}{c.stk.length>0&&<> · <b style={{color:"#34d399"}}>tienes: {c.stk.join(", ")}</b></>}</div>
+                    <div style={{fontSize:11,color:"#6aaa7a",marginTop:2,fontStyle:"italic"}}>{c.nota}{c.usos>0&&!c.multisitio?` · usado ${c.usos} vez/veces en 6 meses`:""}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{fontSize:10,color:"#5a8a6a",marginTop:12,lineHeight:1.5}}>
+                Tabla de referencia técnica (ingredientes activos y grupos FRAC). Antes de aplicar confirma con la etiqueta, la hoja de seguridad y el registro SAG vigente del producto para césped; algunos activos pueden no estar autorizados o disponibles en Chile. Los insectos (gusano blanco, trips, pulgones) no se rotan con fungicidas.
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {subTab==="registro"&&(
         <div className="ein">
           {!showForm&&(
@@ -10816,6 +10983,11 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                   <input type="date" style={S.input} value={form.fecha} onChange={e=>setForm(p=>({...p,fecha:e.target.value}))}/>
                 </div>
                 <div>
+                  <label style={labelSt}>Hora de aplicación</label>
+                  <input type="time" style={S.input} value={form.horaAplicacion||""} onChange={e=>setForm(p=>({...p,horaAplicacion:e.target.value}))}/>
+                  {(()=>{ const r=calcReingresoAplic(form.producto,form.fecha,form.horaAplicacion); return r?<div style={{fontSize:11,color:"#4ade80",marginTop:4}}>⏱️ Reingreso desde: <strong>{r.label}</strong> ({r.horas} h)</div>:null; })()}
+                </div>
+                <div>
                   <label style={labelSt}>Responsable</label>
                   <select style={S.input} value={form.responsable} onChange={e=>setForm(p=>({...p,responsable:e.target.value}))}>
                     <option value="">Seleccionar...</option>
@@ -10827,12 +10999,16 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                 <div style={{gridColumn:"1/-1"}}>
                   <label style={labelSt}>Producto aplicado</label>
                   {(()=>{
-                    // Construir lista de productos desde todas las bodegas
+                    // Solo FUNGICIDAS de la bodega de Pesticidas (b05): por categoría "Fungicida", o por ingrediente activo
+                    // conocido cuando el producto no tiene categoría asignada.
                     const productosEnBodegas = [];
                     if(bodegasData) {
                       Object.entries(bodegasData).forEach(([bid,bd])=>{
+                        if(bid!=="b05" && (bd.nombre||"")!=="Pesticidas") return;
                         (bd.items||[]).forEach(it=>{
-                          if(it.nombre) productosEnBodegas.push({
+                          const cat = (it.categoria||"").toLowerCase();
+                          const esFungicida = cat==="fungicida" || ((cat===""||cat==="otro") && ingredientesDeProducto(it.nombre).length>0);
+                          if(it.nombre && esFungicida) productosEnBodegas.push({
                             nombre:it.nombre, stockActual:it.stockActual||0, unidad:it.unidad||"", bodega:bd.nombre||bid, id:it.id
                           });
                         });
@@ -10844,7 +11020,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                         setForm(p=>({...p,producto:e.target.value}));
                       }}>
                         <option value="">Seleccionar producto...</option>
-                        {productosEnBodegas.length>0&&<optgroup label="── Desde bodega ──">
+                        {productosEnBodegas.length>0&&<optgroup label="── Fungicidas en bodega ──">
                           {productosEnBodegas.sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(p=>(
                             <option key={p.id||p.nombre} value={p.nombre}>{p.nombre} ({p.stockActual} {p.unidad} en {p.bodega})</option>
                           ))}
@@ -26240,7 +26416,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-09.5";
+const BUILD_STAMP = "2026-10-13.3";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
