@@ -5825,6 +5825,7 @@ function ZonaRow({ zona, tz, zonasColapsadas, toggleZonaColapso, MACROZONAS_BASE
                           </select>
                         </div>
                         {t.alturaCorte&&<div style={{fontSize:11,color:"#fbbf24",fontWeight:600,marginTop:3}}>✂️ Cortar a: {t.alturaCorte} {t.unidadAlturaCorte==="cm"?"cm":t.unidadAlturaCorte==="pulgadas"?"pulgadas":"mm"}</div>}
+                        {(t.revisarRiego||(t.notas||"").includes("🌧️ Revisar riego"))&&<span style={{display:"inline-block",marginTop:3,fontSize:10,fontWeight:700,color:"#fbbf24",background:"rgba(245,158,11,0.15)",border:"1px solid rgba(245,158,11,0.4)",borderRadius:8,padding:"1px 8px"}}>🌧️ Revisar riego (lluvia)</span>}
                         {t.notas && <div style={{fontSize:11,color:"#5a8a6a",marginTop:3,fontStyle:"italic"}}>{t.notas}</div>}
                         {t.notaWorker && <div style={{fontSize:11,color:t.estado==="no_pudo"?"#fca5a5":"#7aaa80",marginTop:2}}>💬 {t.notaWorker}</div>}
                       </div>
@@ -6716,7 +6717,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                       return {...t, estado:"no_pudo", causaNoPudo:"lluvia", notaWorker:esRiego(t)?"Riego no necesario — Lluvia":"No se pudo — Lluvia", trasladadaA:destinoPorId[String(t.id)]};
                     }
                     if(idsRevisar.has(String(t.id)) && !(t.notas||"").includes("🌧️ Revisar riego")){
-                      return {...t, notas:(t.notas?t.notas+" | ":"")+"🌧️ Revisar riego: ajustar a mano por lluvia"};
+                      return {...t, revisarRiego:true, notas:(t.notas?t.notas+" | ":"")+"🌧️ Revisar riego: ajustar a mano por lluvia"};
                     }
                     return t;
                   });
@@ -6730,7 +6731,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                   "🌧️ Modo lluvia aplicado.\n\n"+
                   `• Reprogramadas: ${nCopias} tarea(s) → ${resumenDest||"—"}.\n`+
                   (aMover.length-nCopias>0?`• ${aMover.length-nCopias} ya estaban programadas en su día destino — no se duplicaron.\n`:"")+
-                  (riegosManualAplica.length>0?`• ${riegosManualAplica.length} riego(s) siguen pendientes HOY a propósito (bajo techo o sin clasificar): quedaron marcados "🌧️ Revisar riego" para que los ajustes a mano.`:"")
+                  (riegosManualAplica.length>0?`• ${riegosManualAplica.length} riego(s) siguen pendientes HOY a propósito (bajo techo o sin clasificar): quedaron marcados "🌧️ Revisar riego" y los ves en un recuadro amarillo sobre la lista de tareas del día, bajo la vista previa.`:"")
                 ),200);
               }} style={{...S.btn,background:"rgba(96,165,250,0.1)",color:"#93c5fd",border:"1px solid rgba(96,165,250,0.2)",fontSize:11}}>
                 🌧️ Modo lluvia
@@ -7287,6 +7288,22 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
               📅 Mostrando tareas de: {new Date(fecha+"T12:00:00").toLocaleDateString("es-CL",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}
             </div>
           )}
+
+          {(()=>{
+            const revisar = tareasHoy.filter(t=>(t.revisarRiego||(t.notas||"").includes("🌧️ Revisar riego")) && !["hecha","completada","no_pudo"].includes(t.estado));
+            if(revisar.length===0) return null;
+            return (
+              <details style={{marginBottom:12,border:"1px solid rgba(245,158,11,0.45)",borderRadius:10,background:"rgba(245,158,11,0.08)",padding:"8px 12px"}}>
+                <summary style={{cursor:"pointer",fontSize:13,fontWeight:700,color:"#fbbf24"}}>🌧️ {revisar.length} riego(s) para revisar a mano — bajo techo o sin clasificar (toca para ver la lista)</summary>
+                <div style={{marginTop:8,display:"flex",flexDirection:"column",gap:3}}>
+                  {revisar.map(t=>(
+                    <div key={t.id} style={{fontSize:12,color:"#ede9e0"}}>• <b>{t.zona}</b> · {t.elemento||"—"} · {t.tarea}{t.responsable?` · ${t.responsable.split(" ")[0]}`:""}</div>
+                  ))}
+                  <div style={{fontSize:10,color:"#9ca3af",marginTop:4}}>Si el elemento está bajo techo o no se moja con la lluvia, déjalo hoy; si es exterior, márcalo como «Exterior» en su ficha de la macrozona para que el Modo lluvia lo mueva solo.</div>
+                </div>
+              </details>
+            );
+          })()}
 
           {Object.entries(porZona).sort(([a],[b])=>a.localeCompare(b,"es")).map(([zona,tz])=>(
             <ZonaRow key={zona} zona={zona} tz={tz}
@@ -26391,7 +26408,7 @@ const aplicarModoLluviaGolf = async ({ fecha, tareas, setTareas, configSemanal, 
   setTareas(prev=>{
     const hoyArr=normArr(prev[fecha]||[]).map(t=>{
       if(idsMover.has(String(t.id))) return {...t,estado:"no_pudo",causaNoPudo:"lluvia",notaWorker:esRiego(t)?"Riego no necesario — Lluvia":"No se pudo — Lluvia",trasladadaA:destinoPorId[String(t.id)]};
-      if(idsRevisar.has(String(t.id))&&!(t.notas||"").includes("🌧️ Revisar riego")) return {...t,notas:(t.notas?t.notas+" | ":"")+"🌧️ Revisar riego: ajustar a mano por lluvia"};
+      if(idsRevisar.has(String(t.id))&&!(t.notas||"").includes("🌧️ Revisar riego")) return {...t,revisarRiego:true,notas:(t.notas?t.notas+" | ":"")+"🌧️ Revisar riego: ajustar a mano por lluvia"};
       return t;
     });
     const nuevo={...prev,[fecha]:hoyArr};
@@ -26427,7 +26444,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-13.4";
+const BUILD_STAMP = "2026-10-13.5";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
