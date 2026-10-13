@@ -10108,8 +10108,13 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
     setGuardandoIncid(true);
     try {
     const reap = calcReapertura(incidForm.productoAplicar, incidForm.fechaAplicacion, incidForm.horaAplicacion);
-    const nueva = { ...incidForm, id:Date.now(), fechaReaperturaISO:reap?.fechaISO||"", notaReingreso:reap?.nota||"", estado: (incidForm.sectoresCerrados||[]).length>0?"cerrada":"observacion" };
-    setIncidenciasFito(prev=>{const arr=Array.isArray(prev)?prev:Object.values(prev||{});return [nueva,...arr].slice(0,100);});
+    const nueva = { ...incidForm, id:incidForm.id||Date.now(), fechaReaperturaISO:reap?.fechaISO||"", notaReingreso:reap?.nota||"", estado: (incidForm.sectoresCerrados||[]).length>0?"cerrada":"observacion" };
+    setIncidenciasFito(prev=>{
+      const arr=Array.isArray(prev)?prev:Object.values(prev||{});
+      // Si se completó una observación ya existente (ej. enviada por el jardinero), se reemplaza en vez de duplicar
+      if(incidForm.id && arr.some(x=>String(x.id)===String(incidForm.id))) return arr.map(x=>String(x.id)===String(incidForm.id)?{...x,...nueva}:x);
+      return [nueva,...arr].slice(0,100);
+    });
 
     // Tareas al programa del día
     const fp = incidForm.fechaAplicacion;
@@ -10800,6 +10805,12 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                             Al registrar con ✓ Enviar a programación, la tarea de aplicación queda asignada en Programación General
                           </div>
                         </div>
+                      )}
+                      {esJefa&&inc.estado==="observacion"&&(
+                        <button style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(245,158,11,0.15)",color:"#fcd34d",border:"1px solid rgba(245,158,11,0.35)"}}
+                          onClick={()=>{ setIncidForm({...emptyIncid,...inc,sectoresObservados:inc.sectoresObservados||[],sectoresCerrados:inc.sectoresCerrados||[],horaAplicacion:inc.horaAplicacion||new Date().toTimeString().slice(0,5),fechaAplicacion:inc.fechaAplicacion||new Date().toISOString().slice(0,10)}); setIncidPaso(2); setShowIncidForm(true); window.scrollTo?.({top:0,behavior:"smooth"}); }}>
+                          🩺 Completar diagnóstico y cierre
+                        </button>
                       )}
                       {inc.estado==="cerrada"&&(
                         <button style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(34,197,94,0.15)",color:"#86efac",border:"1px solid rgba(34,197,94,0.3)"}}
@@ -26416,7 +26427,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-13.3";
+const BUILD_STAMP = "2026-10-13.4";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
@@ -26703,6 +26714,23 @@ export default function App() {
       const arr=Array.isArray(prev)?prev:Object.values(prev||{});
       return [nuevaIncidencia,...arr];
     });
+    // Alerta de Golf: queda también registrada en Golf → Fitosanitario → Incidencias (como observación pendiente de diagnóstico)
+    if(esGolfAlerta){
+      const respGolfDef = "Osmar Bhalú Armijo Zúñiga";
+      setIncidenciasFito(prev=>{
+        const arr=Array.isArray(prev)?prev:Object.values(prev||{});
+        if(arr.some(x=>x.origenAlertaId===nuevaId)) return arr;
+        const obsFito = {
+          id:Date.now()+Math.random(), origenAlertaId:nuevaId, origen:"trabajador",
+          flujo:"fitosanitario", tipoCierre:"fitosanitario", estado:"observacion",
+          fechaObservacion:fechaAlerta, horaObservacion:new Date().toTimeString().slice(0,5),
+          observador:nombreTrab||"", observacion:String(obs||""), sectoresObservados:[], sectoresCerrados:[],
+          responsableGolf:respGolfDef, diagnostico:"", agenteCausal:"", severidad:"media", diagnosticadoPor:"", otrosDiagnosticos:"",
+          tratamiento:"completo", productoAplicar:"", fechaAplicacion:fechaAlerta, horaAplicacion:"", motivoCierre:"", obs:"",
+        };
+        return [obsFito,...arr].slice(0,100);
+      });
+    }
     tareasBase.forEach((t,i)=>{
       const nuevaTarea = {
         id:Date.now()+i+Math.random(),
