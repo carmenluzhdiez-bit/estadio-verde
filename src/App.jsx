@@ -4998,6 +4998,19 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
 
 const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
   const ORDEN_ESTADO = {pendiente:0, haciendose:1, no_pudo:2, hecha:3, por_designar:4};
+  // Tarea marcada pero con datos obligatorios sin completar (causa/motivo si no se pudo; altura real si fue un corte de Golf).
+  // Mientras falten, la tarea conserva su lugar en la lista (no baja) y se resalta; al completarla, baja sola.
+  const datosPendientesVW = (t) => {
+    const e = normalizarEstado(t.estado);
+    if(e==="no_pudo") return !causaNoPudoDe(t) || !String(t.notaWorker||"").trim();
+    if(e==="hecha"){
+      const n=(t.tarea||"").toLowerCase();
+      const esCorte = (n.includes("corte")||n.includes("cortar")||n.includes("mow")||n.includes("hoc")) &&
+        (t.zona==="Golf"||(t.zona||"").includes("Golf")||(t.elemento||"").toLowerCase().includes("green")||(t.elemento||"").toLowerCase().includes("vivero")||n.includes("green"));
+      return esCorte && !String(t.alturaCorteReal||"").trim();
+    }
+    return false;
+  };
   function esDiariaVW(tareaObj) {
     if(tareaObj.diaria === true) return true;
     const nombreED = (tareaObj.tarea||"").toLowerCase();
@@ -5017,8 +5030,8 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
   const esDiaria = esDiariaVW;
   function sortTareasVW(arr) {
     return [...arr].sort(function(sortItemA, sortItemB){
-      const sortEA = ORDEN_ESTADO[sortItemA.estado]??0;
-      const sortEB = ORDEN_ESTADO[sortItemB.estado]??0;
+      const sortEA = datosPendientesVW(sortItemA) ? 0 : (ORDEN_ESTADO[sortItemA.estado]??0);
+      const sortEB = datosPendientesVW(sortItemB) ? 0 : (ORDEN_ESTADO[sortItemB.estado]??0);
       if(sortEA!==sortEB) return sortEA-sortEB;
       return (sortItemA.zona||"").localeCompare(sortItemB.zona||"","es",{sensitivity:"base"});
     });
@@ -5298,6 +5311,7 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                             <span style={{fontSize:10,color:"#4a7a5a"}}>· Turno cerrado</span>
                           </div>
                         )}
+                        {datosPendientesVW(t)&&<div style={{marginTop:6,padding:"5px 10px",borderRadius:6,background:"rgba(245,158,11,0.12)",border:"1px solid rgba(245,158,11,0.4)",fontSize:11,fontWeight:700,color:"#f59e0b"}}>⚠️ Completa los datos de esta tarea (abajo). Cuando termines, pasará sola al final de la lista.</div>}
                         {/* Campo altura real de corte — aparece al marcar como hecha si la tarea es de corte */}
                         {(()=>{
                           const esCorteGolf = (
@@ -26549,7 +26563,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-13.11";
+const BUILD_STAMP = "2026-10-14.1";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
