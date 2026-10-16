@@ -6476,11 +6476,14 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
   // nuevo se crea una COPIA con id nuevo. Así, aunque el turno anterior no se haya cerrado, su
   // historial (informes, % de avance, cierre) no se altera.
   const prepararEnvioProp = (items) => {
-    const yaExisten = getTareasDelDia(fecha).map(t=>t.zona+"_"+t.elemento+"_"+t.tarea);
+    // La clave incluye al responsable: la misma tarea para OTRA persona no es un duplicado
+    // (antes solo se enviaba la copia de la primera persona y las demás se descartaban como "ya agregadas").
+    const claveEnvioProp = t => t.zona+"_"+t.elemento+"_"+t.tarea+"_"+(t.responsable||"");
+    const yaExisten = getTareasDelDia(fecha).map(claveEnvioProp);
     const nuevos = [];
     const traslados = {}; // díaOrigen -> [ids originales]
     items.forEach(({incluir,abierta,_movidoDesde,...t})=>{
-      if(yaExisten.includes(t.zona+"_"+t.elemento+"_"+t.tarea)) return;
+      if(yaExisten.includes(claveEnvioProp(t))) return;
       if(_movidoDesde){
         (traslados[_movidoDesde] ||= []).push(String(t.id));
         nuevos.push({...t, id:Date.now()+Math.random(), movidoDesde:_movidoDesde, origenTareaId:t.id});
@@ -26563,7 +26566,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-14.1";
+const BUILD_STAMP = "2026-10-16.1";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
