@@ -346,6 +346,8 @@ const CAUSAS_NO_PUDO = [
   {k:"personal", icon:"👥", label:"Falta de personal / tiempo",    pref:"Falta de personal / tiempo"},
   {k:"zona",     icon:"🚧", label:"Zona ocupada (evento / uso)",   pref:"Zona ocupada por evento o uso deportivo"},
 ];
+// Personal retirado: no aparece para asignar tareas ni para elegir responsables (su historial se conserva).
+const noRetirado = (p) => !!p && p.estado!=="retirado";
 const causaNoPudoDe = (t) => {
   if(!t) return "";
   if(t.causaNoPudo) return t.causaNoPudo;
@@ -1677,13 +1679,13 @@ function ResponsableSelector({ value, personal, onChange, S, fontSize=14, inline
 
   // Si el valor actual no está en la lista, mostrar modo custom
   React.useEffect(() => {
-    if (value && !personal.find(p=>p.nombre===value)) {
+    if (value && !personal.filter(noRetirado).find(p=>p.nombre===value)) {
       setModo("custom");
       setCustomVal(value);
     }
   }, []);
 
-  const listaOrdenada = [...personal].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+  const listaOrdenada = [...personal].filter(noRetirado).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
 
   if (inline) {
     // Versión compacta para las tarjetas de tarea
@@ -5809,7 +5811,7 @@ function ZonaRow({ zona, tz, zonasColapsadas, toggleZonaColapso, MACROZONAS_BASE
   const hechasZona = tz.filter(t=>["hecha","completada"].includes(t.estado)).length;
   const icono = (zonas.find(z=>z.nombre===zona)||MACROZONAS_BASE.find(z=>z.nombre===zona)||{icono:"📍"}).icono;
   const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
-  const listaPersonalZR = [...personalArr].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+  const listaPersonalZR = [...personalArr].filter(noRetirado).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
 
   // Calcular grupos de tareas ANTES del return
   const TIPOS_PD = [
@@ -6228,7 +6230,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     const tareasDia = getTareasDelDia(fecha);
     const tarea = tareasDia.find(t=>t.id===id);
     if(!tarea) return;
-    const listaTodos = (Array.isArray(personal)?personal:Object.values(personal||{})).filter(p=>!(p.cargo||"").toLowerCase().includes("jefa"));
+    const listaTodos = (Array.isArray(personal)?personal:Object.values(personal||{})).filter(noRetirado).filter(p=>!(p.cargo||"").toLowerCase().includes("jefa"));
     if(listaTodos.length===0) return;
     const loteId = "lote_"+Date.now()+"_"+Math.random().toString(36).slice(2);
     const copias = listaTodos.map(p=>({...tarea, id:Date.now()+Math.random(), responsable:p.nombre, estado:"pendiente", loteTodosId:loteId}));
@@ -6604,7 +6606,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
         <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:900,marginBottom:3}}>Programación Diaria</h1>
         <p style={{color:"#6aaa7a",fontSize:14}}>Asignación y seguimiento de tareas por día</p>
       </div>
-      <ConfiguradorSemanal S={S} personal={personal} configSemanal={configSemanal||{}} setConfigSemanal={setConfigSemanal} esJefa={esJefa}/>
+      <ConfiguradorSemanal S={S} personal={(Array.isArray(personal)?personal:Object.values(personal||{})).filter(noRetirado)} configSemanal={configSemanal||{}} setConfigSemanal={setConfigSemanal} esJefa={esJefa}/>
 
       {/* ══════ Historial y Ver/editar turnos — accesos rápidos, uno al lado del otro ══════ */}
       <div style={{display:"flex",gap:14,marginBottom:14,flexWrap:"wrap"}}>
@@ -6959,7 +6961,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                                   </div>
                                   <select value={p.responsable||""} onChange={e=>{
                                       if(e.target.value==="__todos__"){
-                                        const listaTodosProp = (Array.isArray(personal)?personal:Object.values(personal||{})).filter(p=>!(p.cargo||"").toLowerCase().includes("jefa"));
+                                        const listaTodosProp = (Array.isArray(personal)?personal:Object.values(personal||{})).filter(noRetirado).filter(p=>!(p.cargo||"").toLowerCase().includes("jefa"));
                                         setPreviewProp(prev=>{
                                           const sinEsta = prev.filter((x,xi)=>xi!==iRealProp);
                                           const loteId = "lote_"+Date.now()+"_"+Math.random().toString(36).slice(2);
@@ -6973,7 +6975,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                                     style={{...S.input,fontSize:11,padding:"3px 7px",maxWidth:170}}>
                                     <option value="">— Por designar —</option>
                                     <option value="__todos__">👥 Todos (crea c/u)</option>
-                                    {(Array.isArray(personal)?personal:Object.values(personal||{})).map(pp=><option key={pp.id} value={pp.nombre}>{pp.nombre}</option>)}
+                                    {(Array.isArray(personal)?personal:Object.values(personal||{})).filter(noRetirado).map(pp=><option key={pp.id} value={pp.nombre}>{pp.nombre}</option>)}
                                   </select>
                                   <button onClick={()=>enviarUnaPreviewProp(p.id)} title="Enviar solo esta tarea al programa"
                                     style={{...S.btn,fontSize:10,padding:"3px 10px",background:"rgba(34,197,94,0.12)",color:"#4ade80",border:"1px solid rgba(34,197,94,0.3)",whiteSpace:"nowrap"}}>
@@ -7268,7 +7270,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
                   </label>
                   {modoVariosJardineros ? (
                     <div style={{display:"flex",gap:5,flexWrap:"wrap",padding:"8px 10px",background:"rgba(255,255,255,0.03)",borderRadius:8,border:"1px solid rgba(255,255,255,0.08)"}}>
-                      {(Array.isArray(personal)?personal:Object.values(personal||{})).map(p=>{
+                      {(Array.isArray(personal)?personal:Object.values(personal||{})).filter(noRetirado).map(p=>{
                         const sel = responsablesMultiple.includes(p.nombre);
                         return (
                           <button key={p.id} onClick={()=>setResponsablesMultiple(prev=>sel?prev.filter(x=>x!==p.nombre):[...prev,p.nombre])}
@@ -7508,7 +7510,7 @@ function VistaDesignacion({ S, tareasProg, setTareasProg, personal, MACROZONAS_B
     return [...set].sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
   };
 
-  const listaPersonal = [...personal]
+  const listaPersonal = [...personal].filter(noRetirado)
     .filter(p=>p.cargo!=="Jefa de Áreas Verdes")
     .sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
 
@@ -7690,7 +7692,7 @@ function VistaDesignacion({ S, tareasProg, setTareasProg, personal, MACROZONAS_B
                 </label>
                 {modoVariosJardinerosVD&&(
                   <div style={{display:"flex",gap:5,flexWrap:"wrap",padding:"8px 10px",background:"rgba(255,255,255,0.03)",borderRadius:8,border:"1px solid rgba(255,255,255,0.08)"}}>
-                    {(Array.isArray(personal)?personal:Object.values(personal||{})).map(p=>{
+                    {(Array.isArray(personal)?personal:Object.values(personal||{})).filter(noRetirado).map(p=>{
                       const sel = responsablesMultipleVD.includes(p.nombre);
                       return (
                         <button key={p.id} onClick={()=>setResponsablesMultipleVD(prev=>sel?prev.filter(x=>x!==p.nombre):[...prev,p.nombre])}
@@ -7884,7 +7886,7 @@ function GestionRecursos({ zonaId, S, personal, recursos, setRecursos, esJefa })
     set("materiales",arr); setShowMovimiento(null); setMovForm({tipo:"entrada",cantidad:"",responsable:"",motivo:"",fecha:new Date().toISOString().slice(0,10)});
   };
 
-  const listaPersonal = [...personal].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+  const listaPersonal = [...personal].filter(noRetirado).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
   const inputSt = {background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:7,color:"#ede9e0",padding:"7px 10px",fontFamily:"'Georgia',serif",fontSize:13,width:"100%",outline:"none"};
   const labelSt = {fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
 
@@ -8975,9 +8977,10 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
   const chip = (bg,color,border,children) => ({display:"inline-flex",alignItems:"center",gap:4,padding:"3px 10px",borderRadius:20,fontSize:12,background:bg,color,border});
 
   return (
-    <div className="ein">
+    <div className="ein" style={t.estado==="retirado"?{position:"relative"}:undefined}>
+      {t.estado==="retirado"&&<div aria-hidden="true" style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:0,display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}><div style={{transform:"rotate(-20deg)",fontSize:"clamp(48px,14vw,150px)",fontWeight:900,letterSpacing:"0.1em",color:"rgba(248,113,113,0.09)",whiteSpace:"nowrap",userSelect:"none"}}>RETIRADO</div></div>}
       <button className="btn-g" style={S.btn} onClick={onVolver}>← Volver</button>
-      <div style={{...S.card,padding:22,marginTop:16,marginBottom:16}}>
+      <div style={{...S.card,padding:22,marginTop:16,marginBottom:16,...(t.estado==="retirado"?{borderColor:"rgba(248,113,113,0.35)",background:"rgba(248,113,113,0.04)"}:{})}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:14}}>
           <div style={{display:"flex",alignItems:"center",gap:16}}>
             <div style={{width:60,height:60,borderRadius:"50%",background:"linear-gradient(135deg,#3d7a52,#1a4a2e)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,flexShrink:0}}>{t.nombre[0].toUpperCase()}</div>
@@ -10282,7 +10285,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
 
   const progMes = PROGRAMA_FUNGICIDAS.filter(p => p.mes === mesActual);
   const progAll = [...PROGRAMA_FUNGICIDAS].sort((a,b)=>a.mes-b.mes);
-  const listaPersonal = [...personal].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+  const listaPersonal = [...personal].filter(noRetirado).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
 
   const sectorFinal = (form.sectoresSeleccionados||[]).length>0 ? (form.sectoresSeleccionados||[]).join(", ") : (form.sectorDetalle==="Otro" ? form.sectorCustom : form.sectorDetalle);
 
@@ -12580,7 +12583,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   const porMes=mesesDisp.map(m=>({...m,total:compras.filter(c=>(c.fecha||"").startsWith(m.key)).reduce((a,c)=>a+(c.tipoDoc==="Nota de Crédito"?-1:1)*Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0)}));
   const maxMes=Math.max(...porMes.map(m=>m.total),1);
   const mesesUnicos=[...new Set(compras.map(compraC=>(compraC.fecha||"").slice(0,7)).filter(Boolean))].sort((a,b)=>b.localeCompare(a));
-  const listaPersonal=[...personal].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+  const listaPersonal=[...personal].filter(noRetirado).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
 
   const ESTADO_C={
     pendiente:      {color:"#f59e0b",bg:"rgba(245,158,11,0.1)",   label:"⏳ Pendiente pago"},
@@ -16766,7 +16769,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
   const rango = RANGOS_ALTURA[estacion];
   const labelSt = {fontSize:10,color:"#34d399",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
   const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
-  const listaPersonal = [...personalArr].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+  const listaPersonal = [...personalArr].filter(noRetirado).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
 
   const [subTabZona, setSubTabZona] = React.useState(null);
   const [subTab, setSubTab] = React.useState(initialSubTab||(rolLogueado==="trabajador"?"mediciones":"panel"));
@@ -16843,7 +16846,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       </label>
       {modoVariosJardinerosGolf ? (
         <div style={{display:"flex",gap:5,flexWrap:"wrap",padding:"8px 10px",background:"rgba(255,255,255,0.03)",borderRadius:8,border:"1px solid rgba(255,255,255,0.08)"}}>
-          {(Array.isArray(personal)?personal:Object.values(personal||{})).map(p=>{
+          {(Array.isArray(personal)?personal:Object.values(personal||{})).filter(noRetirado).map(p=>{
             const sel = responsablesMultipleGolf.includes(p.nombre);
             return (
               <button key={p.id} type="button" onClick={()=>setResponsablesMultipleGolf(prev=>sel?prev.filter(x=>x!==p.nombre):[...prev,p.nombre])}
@@ -16858,7 +16861,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       ) : (
         <select style={S.input} value={tareaForm.responsable} onChange={e=>setTareaForm(p=>({...p,responsable:e.target.value}))}>
           <option value="">— Por designar —</option>
-          {(Array.isArray(personal)?personal:Object.values(personal||{})).map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+          {(Array.isArray(personal)?personal:Object.values(personal||{})).filter(noRetirado).map(p=><option key={p.id} value={p.nombre}>{p.nombre}</option>)}
         </select>
       )}
     </div>
@@ -19145,7 +19148,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                                   </div>
                                   <select value={p.responsable||""} onClick={e=>e.stopPropagation()} onChange={e=>{
                                       if(e.target.value==="__todos__"){
-                                        const listaTodosGolf = (Array.isArray(personal)?personal:Object.values(personal||{})).filter(p=>!(p.cargo||"").toLowerCase().includes("jefa"));
+                                        const listaTodosGolf = (Array.isArray(personal)?personal:Object.values(personal||{})).filter(noRetirado).filter(p=>!(p.cargo||"").toLowerCase().includes("jefa"));
                                         setPreviewGolfProp(prev=>{
                                           const sinEsta = prev.filter((x,xi)=>xi!==iReal);
                                           const loteId = "lote_"+Date.now()+"_"+Math.random().toString(36).slice(2);
@@ -19783,7 +19786,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
   const setbd = (patch) => setBodegasData(p=>({...p,[bodegaActiva]:{...bd,...patch}}));
 
   const labelSt = {fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
-  const listaPersonal = [...personal].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+  const listaPersonal = [...personal].filter(noRetirado).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
 
   const emptyItem = {nombre:"",categoria:"",descripcion:"",unidad:"unidad",stockActual:0,stockMinimo:0,ubicacion:"",obs:""};
   const [itemForm, setItemForm] = React.useState(emptyItem);
@@ -21864,7 +21867,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
 function TareaPlantacion({ modo, zona, zonaId, bodegasData, setBodegasData, tareasProg, setTareasProg, personal, S, addTareaZona, addHistorial, onClose }) {
   const hoy = fechaLocal();
   const labelSt = {fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
-  const listaPersonal = [...personal].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+  const listaPersonal = [...personal].filter(noRetirado).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
 
   // Stock vivero
   const vivero = bodegasData["b01"]||{items:[]};
@@ -22642,7 +22645,7 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
   },[]);
 
   const personalArr = Array.isArray(personal) ? personal : Object.values(personal||{});
-  const listaPersonal = [...personalArr].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+  const listaPersonal = [...personalArr].filter(noRetirado).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
   const getNombre = (id) => {
     if(!id) return "—";
     return personalArr.find(p=>String(p.id)===String(id))?.nombre || "—";
@@ -23524,7 +23527,7 @@ function PanelFrecuenciasZona({ S, zonas, getAllElems, getZD, setElemFrecs, esJe
 function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZONAS_BASE, zonas=[], personal, tareasEditables, setTareasEditables, onGuardar, onClose, bodegasData={}, getAllElems, getZD }) {
   // Usar zonas reales si están disponibles, si no usar MACROZONAS_BASE
   const zonasLista = (zonas.length>0 ? zonas : MACROZONAS_BASE).slice().sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
-  const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
+  const personalArr = (Array.isArray(personal)?personal:Object.values(personal||{})).filter(noRetirado);
   const esFito = alertaForm.tipo==="enfermedad";
   const [stepFito, setStepFito] = React.useState(1); // 1=Detección 2=Tratamiento 3=Seguridad 4=Tareas
 
@@ -24054,7 +24057,7 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
     finally{ setVientoLoading(false); }
   },[]);
 
-  const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
+  const personalArr = (Array.isArray(personal)?personal:Object.values(personal||{})).filter(noRetirado);
   const incArr = Array.isArray(incidencias)?incidencias:Object.values(incidencias||{});
   const incActivas = incArr.filter(i=>i.estado==="activa"||i.estado==="en_gestion").sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
   const incResueltas = incArr.filter(i=>i.estado==="resuelta").sort((a,b)=>(b.fechaResolucion||b.fecha||"").localeCompare(a.fechaResolucion||a.fecha||""));
@@ -25453,7 +25456,7 @@ function ChecklistEsmeril({ S, personal, esJefa }) {
     return ()=>unsub();
   },[]);
 
-  const personalArr = Array.isArray(personal)?personal:Object.values(personal||{});
+  const personalArr = (Array.isArray(personal)?personal:Object.values(personal||{})).filter(noRetirado);
   const set = (k,v) => setForm(p=>({...p,[k]:v}));
   const setItem = (k,v) => setForm(p=>({...p,items:{...p.items,[k]:v}}));
 
@@ -26227,7 +26230,7 @@ function PanelFitosanitarioGlobal({ S, MACROZONAS_BASE, getAllElems, personal, a
     },1500);
   };
 
-  const listaPersonal = Array.isArray(personal)?personal:Object.values(personal||{});
+  const listaPersonal = (Array.isArray(personal)?personal:Object.values(personal||{})).filter(noRetirado);
   const aplicFiltradas = (Array.isArray(aplicaciones)?aplicaciones:Object.values(aplicaciones||{}))
     .filter(a=>!zonaSelId||(a.superficie===zonaSel?.nombre||(a.sectorDetalle||a.superficie||"")===(zonaSel?.nombre)))
     .slice(0,20);
@@ -26570,7 +26573,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-19.1";
+const BUILD_STAMP = "2026-10-19.2";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
@@ -29779,7 +29782,7 @@ export default function App() {
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",marginBottom:22,flexWrap:"wrap",gap:12}}>
               <div>
                 <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:24,fontWeight:900,marginBottom:3}}>Personal</h1>
-                <p style={{color:"#6aaa7a",fontSize:14}}>{personal.length} trabajador{personal.length!==1?"es":""} registrado{personal.length!==1?"s":""}</p>
+                <p style={{color:"#6aaa7a",fontSize:14}}>{personal.filter(noRetirado).length} trabajador{personal.filter(noRetirado).length!==1?"es":""} activo{personal.filter(noRetirado).length!==1?"s":""}{personal.some(p=>!noRetirado(p))?` · ${personal.filter(p=>!noRetirado(p)).length} retirado(s) al final`:""}</p>
               </div>
               <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                 <button style={{...S.btn,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}} onClick={()=>setPersonalVista("informe-rrhh")}>📄 Informe RRHH</button>
@@ -29795,12 +29798,13 @@ export default function App() {
               </div>
             )}
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:14}}>
-              {personal.sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(t=>{
+              {[...personal].sort((a,b)=>(noRetirado(b)-noRetirado(a))||a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"})).map(t=>{
+                const retiradoCard=!noRetirado(t);
                 const eventosAbiertos=(t.eventos||[]).filter(e=>e.estado==="pendiente").length;
                 const vacDias=(t.eventos||[]).filter(e=>e.tipo==="vacaciones"&&e.estado==="aprobado").reduce((a,e)=>{if(!e.fecha||!e.fechaFin) return a;return a+Math.round((new Date(e.fechaFin)-new Date(e.fecha))/(1000*60*60*24))+1;},0);
                 const heHoras=(t.eventos||[]).filter(e=>e.tipo==="horaExtra"&&e.estado==="aprobado").reduce((a,e)=>a+Number(e.horas||0),0);
                 return (
-                  <div key={t.id} className="hov" style={{...S.card,padding:18,cursor:"pointer"}} onClick={()=>{setPersonalId(t.id);setPersonalVista("ficha");setPersonalTab("ficha");}}>
+                  <div key={t.id} className="hov" style={{...S.card,padding:18,cursor:"pointer",...(retiradoCard?{opacity:0.5,filter:"grayscale(0.8)",borderStyle:"dashed"}:{})}} onClick={()=>{setPersonalId(t.id);setPersonalVista("ficha");setPersonalTab("ficha");}}>
                     <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
                       <div style={{width:44,height:44,borderRadius:"50%",background:"linear-gradient(135deg,#3d7a52,#1a4a2e)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{t.nombre?t.nombre[0].toUpperCase():"?"}</div>
                       <div>
@@ -29809,6 +29813,7 @@ export default function App() {
                       </div>
                     </div>
                     <div style={{fontSize:12,color:"#5a8a6a",marginBottom:10}}>{t.zona||"Sin zona asignada"}</div>
+                    {retiradoCard&&<div style={{fontSize:11,fontWeight:700,color:"#f87171",marginBottom:8,letterSpacing:"1px"}}>🚫 RETIRADO · sin acceso</div>}
                     <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                       <span style={{...S.chip,background:"rgba(255,255,255,0.07)",color:"#8ab0c0",border:"1px solid rgba(255,255,255,0.1)",fontSize:11}}>📄 {t.contrato||"—"}</span>
                       {eventosAbiertos>0&&<span style={{...S.chip,background:"rgba(245,158,11,0.12)",color:"#fcd34d",border:"1px solid rgba(245,158,11,0.25)",fontSize:11}}>⏳ {eventosAbiertos} pend.</span>}
