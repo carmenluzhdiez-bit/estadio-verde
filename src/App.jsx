@@ -6244,7 +6244,11 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
   // o el modo lluvia la movió), deja de mostrarse. Evita que sigan «proponiéndose» tareas que ya están resueltas.
   React.useEffect(()=>{
     if(!previewProp) return;
-    const clavesDia = new Set(getTareasDelDia(fecha).map(t=>normKeyTarea(t.zona,t.elemento,t.tarea)));
+    // La clave incluye al responsable: si una tarea se asigna a varios y se envía la de uno, las de los demás siguen en la vista previa.
+    const kR = (z,e,ta,r)=>normKeyTarea(z,e,ta)+"|"+(r||"");
+    const tareasDiaPV = getTareasDelDia(fecha);
+    const clavesDia = new Set(tareasDiaPV.map(t=>kR(t.zona,t.elemento,t.tarea,t.responsable)));
+    const clavesDiaBase = new Set(tareasDiaPV.map(t=>normKeyTarea(t.zona,t.elemento,t.tarea)));
     // Lo que ya se reprogramó (modo lluvia, traslados) a un día POSTERIOR no debe seguir en la vista previa:
     // la propuesta se calculó antes del cambio y quedó vieja.
     const sigFuturas = new Set(), clavesFuturas = new Set(), porId = new Map();
@@ -6253,18 +6257,18 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
         if(!t) return;
         porId.set(String(t.id), t);
         if(t.trasladadaA && t.trasladadaA>fecha && t.origenZid && t.origenEid && t.origenFrecId) sigFuturas.add(`${t.origenZid}_${t.origenEid}_${t.origenFrecId}`);
-        if(dKey>fecha && (t.movidoDesde||t.origenTareaId) && !t.trasladadaA && !["hecha","completada","no_pudo"].includes(t.estado)) clavesFuturas.add(normKeyTarea(t.zona,t.elemento,t.tarea));
+        if(dKey>fecha && (t.movidoDesde||t.origenTareaId) && !t.trasladadaA && !["hecha","completada","no_pudo"].includes(t.estado)) clavesFuturas.add(kR(t.zona,t.elemento,t.tarea,t.responsable));
       });
     });
     const yaResuelta = pp=>{
-      if(clavesDia.has(normKeyTarea(pp.zona,pp.elemento,pp.tarea))) return true;
+      if(pp.responsable ? clavesDia.has(kR(pp.zona,pp.elemento,pp.tarea,pp.responsable)) : clavesDiaBase.has(normKeyTarea(pp.zona,pp.elemento,pp.tarea))) return true;
       if(pp._movidoDesde){
         const src = porId.get(String(pp.id));
         if(src && (src.trasladadaA || ["hecha","completada","no_pudo"].includes(src.estado))) return true;
         return false;
       }
       if(pp.origenZid && pp.origenEid && pp.origenFrecId && sigFuturas.has(`${pp.origenZid}_${pp.origenEid}_${pp.origenFrecId}`)) return true;
-      return clavesFuturas.has(normKeyTarea(pp.zona,pp.elemento,pp.tarea));
+      return clavesFuturas.has(kR(pp.zona,pp.elemento,pp.tarea,pp.responsable));
     };
     const restantes = previewProp.filter(pp=>!yaResuelta(pp));
     if(restantes.length!==previewProp.length) setPreviewProp(restantes.length>0?restantes:null);
@@ -26566,7 +26570,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-16.1";
+const BUILD_STAMP = "2026-10-19.1";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
