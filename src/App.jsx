@@ -6485,6 +6485,8 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
     pendItemsAll.forEach(({dia,item})=>{
       if(idsYaMovidos.has(item.id)) return;
       if(existentes.includes(`${item.zona}_${item.elemento}_${item.tarea}`)) return;
+      // Dos copias pendientes de la misma tarea (mismo elemento) se proponen una sola vez
+      if(propuestas.some(pp=>pp.zona===item.zona&&pp.elemento===item.elemento&&(pp.tarea||"").trim().toLowerCase()===(item.tarea||"").trim().toLowerCase())) return;
       idsYaMovidos.add(item.id);
       propuestas.push({...item, fecha, incluir:true, abierta:false, _movidoDesde:dia});
     });
@@ -18860,6 +18862,17 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               if(t && (t.movidoDesde||t.origenTareaId) && !t.trasladadaA && !["hecha","completada","no_pudo"].includes(t.estado)) movidasFuturasTextGolf.add(`${t.zona}_${t.elemento}_${t.tarea}`);
             });
           });
+          // Última realización registrada en cada frecuencia de Golf: si ya figura hecha en/después del día de un
+          // pendiente viejo, ese pendiente está resuelto y no se arrastra (ej. se limpió hoy y la frecuencia ya dice 27/10).
+          const ultimaVezSigGolf = {}, ultimaVezTxtGolf = {};
+          elems.forEach(eU=>{
+            const zeU=zdatG.elementos?.[eU.id]||(zdatG.elementosCustom||[]).find(x=>x.id===eU.id);
+            (zeU?.frecuencias||[]).forEach(fU=>{
+              if(!fU.ultimaVez) return;
+              ultimaVezSigGolf[`${eU.id}_${fU.id}`]=fU.ultimaVez;
+              ultimaVezTxtGolf[`${nombreZona}_${eU.nombre}_${fU.tarea}`]=fU.ultimaVez;
+            });
+          });
           const abiertoHoySigGolf = new Set();
           const abiertoHoyTextGolf = new Set();
           Object.keys(tareasProg||{}).sort().forEach(diaKeyG=>{
@@ -18877,6 +18890,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                   return;
                 }
               }
+              { const uvG = (t.origenEid && t.origenFrecId && ultimaVezSigGolf[`${t.origenEid}_${t.origenFrecId}`]) || ultimaVezTxtGolf[`${t.zona}_${t.elemento}_${t.tarea}`];
+                if(uvG && uvG>=diaKeyG) return; }
               if(t.origenZid==="31" && t.origenEid && t.origenFrecId){
                 pendSignaturesGolf.set(`${t.origenEid}_${t.origenFrecId}_${t.fechaCorrespondiente||""}`, {dia:diaKeyG, item:t});
               }
@@ -19024,6 +19039,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           pendItemsAllGolf.forEach(({dia,item})=>{
             if(idsYaMovidosGolf.has(item.id)) return;
             if(yaExisteTarea(item.elemento,item.tarea)) return;
+            // Dos copias pendientes de la misma tarea (mismo elemento) se proponen una sola vez
+            if(propuestas.some(pp=>pp.zona===item.zona&&pp.elemento===item.elemento&&(pp.tarea||"").trim().toLowerCase()===(item.tarea||"").trim().toLowerCase())) return;
             idsYaMovidosGolf.add(item.id);
             propuestas.push({...item, fecha:fechaProponerGolf, _movidoDesde:dia});
           });
@@ -26592,7 +26609,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-20.1";
+const BUILD_STAMP = "2026-10-20.2";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
