@@ -18934,7 +18934,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
               if(pendienteAntesGolf && !yaExisteEsteMismoGolf){
                 propuestas.push({...pendienteAntesGolf.item, fecha:fechaProponerGolf, diasVencida:esVencida?diasVencida:(pendienteAntesGolf.item.diasVencida||0), _movidoDesde:pendienteAntesGolf.dia});
               } else if(!pendienteAntesGolf && !yaExisteEsteMismoGolf){
-                propuestas.push({id:Date.now()+Math.random(),fecha:fechaProponerGolf,zona:nombreZona,elemento:e.nombre,tarea:f.tarea,responsable:respDefault,estado:respDefault?"pendiente":"por_designar",notas:[notaAltura,f.obs].filter(Boolean).join(" "),alturaCorte:f.alturaCorte||"",unidadAlturaCorte:f.unidadAlturaCorte||"mm",estacion:estProp,auto:true,fechaCorrespondiente:prox.fecha,origenZid:"31",origenEid:e.id,origenFrecId:f.id,origenEsCustom:!!e.isCustom,diasVencida:esVencida?diasVencida:0});
+                propuestas.push({id:Date.now()+Math.random(),fecha:fechaProponerGolf,zona:nombreZona,elemento:e.nombre,tarea:f.tarea,responsable:respDefault,estado:respDefault?"pendiente":"por_designar",notas:[notaAltura,f.obs].filter(Boolean).join(" "),alturaCorte:f.alturaCorte||"",unidadAlturaCorte:f.unidadAlturaCorte||"mm",estacion:estProp,auto:true,fechaCorrespondiente:prox.fecha,origenZid:"31",origenEid:e.id,origenFrecId:f.id,origenEsCustom:!!e.isCustom,diasVencida:esVencida?diasVencida:0,_motivo:`Por frecuencia «${f.tarea}» de ${e.nombre} · modo: ${f.intervaloDias?`cada ${f.intervaloDias} días`:(f.modo||"estación")} · última vez: ${f.ultimaVez||"—"}${f.proximaFechaManual?` · próxima manual: ${f.proximaFechaManual}`:""}${enCursoHoyGolf?" · (tarea de hoy abierta: se proyectó como hecha hoy)":""} · diferencia calculada: ${prox.diff} día(s) · id ${e.id}/${f.id}`});
                 if(esVencida)vencidas.push(e.nombre+" — "+f.tarea+" ("+diasVencida+"d vencida)");
               }
               // ── Tarea enlazada genérica (ej. Bioestimulante → "Corte de greens + Vivero") ──
@@ -19077,7 +19077,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           setPreviewGolfProp(propOrdenadas.map(p=>({...p,incluir:false,abierta:false})));
         };
         const confirmarEnvioGolf=async ()=>{
-          let aEnviar=(previewGolfProp||[]).filter(p=>p.incluir).map(({incluir,abierta,...t})=>{
+          let aEnviar=(previewGolfProp||[]).filter(p=>p.incluir).map(({incluir,abierta,_motivo,...t})=>{
             // Si editó la altura de corte en la vista previa, actualizar también
             // el texto de la nota para que no quede desincronizado.
             if(t.alturaCorte!==undefined&&t.alturaCorte!==""&&t.tarea.toLowerCase().includes("corte")) {
@@ -19245,6 +19245,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                                       </div>
                                     ):null}
                                     <div>📍 {p.zona} · {p.elemento}</div>
+                                    {p._motivo&&<div style={{fontSize:10,color:"#7a8a9a",marginTop:3}}>🔎 {p._motivo}</div>}
                                   </div>
                                 )}
                               </div>
@@ -26637,7 +26638,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-20.3";
+const BUILD_STAMP = "2026-10-20.4";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
