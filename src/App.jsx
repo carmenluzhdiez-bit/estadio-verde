@@ -19044,6 +19044,34 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             idsYaMovidosGolf.add(item.id);
             propuestas.push({...item, fecha:fechaProponerGolf, _movidoDesde:dia});
           });
+          // ── Filtro final (red de seguridad) ──
+          // 1) Un pendiente arrastrado cuya frecuencia ya figura realizada en/después de su día NO se propone. Se compara por
+          //    nombre aproximado de elemento y tarea (ej. tarea de "Tee 01" ↔ frecuencia de "Tee 01A"/"Tee 01B"), porque no
+          //    todas las tareas conservan el id de su frecuencia.
+          // 2) Una misma tarea del mismo elemento no se propone dos veces (queda la que trae días de atraso, o la primera).
+          const frecsPlanasGolf=[];
+          elems.forEach(eU=>{
+            const zeU=zdatG.elementos?.[eU.id]||(zdatG.elementosCustom||[]).find(x=>x.id===eU.id);
+            (zeU?.frecuencias||[]).forEach(fU=>{ if(fU.tarea) frecsPlanasGolf.push({e:norm(eU.nombre),t:norm(fU.tarea),uv:fU.ultimaVez||""}); });
+          });
+          const resueltaPorFrecGolf=(t,dia)=>{
+            const en=norm(t.elemento), tn=norm(t.tarea);
+            if(!en||!tn) return false;
+            const ms=frecsPlanasGolf.filter(m=>m.t&&m.e&&(en.startsWith(m.e)||m.e.startsWith(en))&&(tn.includes(m.t)||m.t.includes(tn)));
+            return ms.length>0 && ms.every(m=>m.uv && m.uv>=dia);
+          };
+          for(let iP=propuestas.length-1;iP>=0;iP--){
+            const pP=propuestas[iP];
+            if(pP._movidoDesde && resueltaPorFrecGolf(pP,pP._movidoDesde)) propuestas.splice(iP,1);
+          }
+          const vistasGolf=new Map();
+          propuestas.forEach(pP=>{
+            const kP=norm(pP.zona)+"|"+norm(pP.elemento)+"|"+norm(pP.tarea);
+            const prev=vistasGolf.get(kP);
+            if(!prev || ((pP.diasVencida||0)>(prev.diasVencida||0))) vistasGolf.set(kP,pP);
+          });
+          const propuestasUnicas=propuestas.filter(pP=>vistasGolf.get(norm(pP.zona)+"|"+norm(pP.elemento)+"|"+norm(pP.tarea))===pP);
+          propuestas.length=0; propuestasUnicas.forEach(pP=>propuestas.push(pP));
           if(propuestas.length===0){alert("No hay tareas de Golf pendientes según las frecuencias definidas para "+fechaProponerGolf+".");return;}
           const propOrdenadas=[...propuestas].sort((a,b)=>a.tarea.localeCompare(b.tarea,"es",{sensitivity:"base"}));
           setPreviewGolfProp(propOrdenadas.map(p=>({...p,incluir:false,abierta:false})));
@@ -26609,7 +26637,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-20.2";
+const BUILD_STAMP = "2026-10-20.3";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
