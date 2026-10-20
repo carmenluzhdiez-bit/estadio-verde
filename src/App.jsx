@@ -6344,6 +6344,21 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
         if(t && (t.movidoDesde||t.origenTareaId) && !t.trasladadaA && !["hecha","completada","no_pudo"].includes(t.estado)) movidasFuturasText.add(`${t.zona}_${t.elemento}_${t.tarea}`);
       });
     });
+    // Última realización registrada en cada FRECUENCIA (por id y por texto). Si la frecuencia ya figura como hecha
+    // en una fecha igual o posterior al día de un pendiente viejo, ese pendiente está resuelto: no se arrastra a hoy.
+    const ultimaVezSig = {}, ultimaVezTxt = {};
+    zonas.forEach(zU=>{
+      if(zU.id===31||(zU.nombre||"").toLowerCase().includes("golf")) return;
+      const zdU = getZD(zU.id); const nomU = zdU.nombreCustom || zU.nombre;
+      getAllElems(zU.id).forEach(eU=>{
+        const zeU = zdU.elementos?.[eU.id] || (zdU.elementosCustom||[]).find(x=>x.id===eU.id);
+        (zeU?.frecuencias||[]).forEach(fU=>{
+          if(!fU.ultimaVez) return;
+          ultimaVezSig[`${zU.id}_${eU.id}_${fU.id}`] = fU.ultimaVez;
+          ultimaVezTxt[`${nomU}_${eU.nombre}_${fU.tarea}`] = fU.ultimaVez;
+        });
+      });
+    });
     const abiertoHoySig = new Set();
     const abiertoHoyText = new Set();
     Object.keys(tareas).sort().forEach(diaKey => {
@@ -6361,6 +6376,10 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
             abiertoHoyText.add(`${t.zona}_${t.elemento}_${t.tarea}`);
             return;
           }
+        }
+        { // La frecuencia de esta tarea ya se registró como realizada en/después de ese día: no está atrasada.
+          const uvF = (t.origenZid && t.origenEid && t.origenFrecId && ultimaVezSig[`${t.origenZid}_${t.origenEid}_${t.origenFrecId}`]) || ultimaVezTxt[`${t.zona}_${t.elemento}_${t.tarea}`];
+          if(uvF && uvF>=diaKey) return;
         }
         if(t.origenZid && t.origenEid && t.origenFrecId){
           pendItemsMap.set(`${t.origenZid}_${t.origenEid}_${t.origenFrecId}_${t.fechaCorrespondiente||""}`, {dia:diaKey, item:t});
@@ -26573,7 +26592,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-19.2";
+const BUILD_STAMP = "2026-10-20.1";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
