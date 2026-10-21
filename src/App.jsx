@@ -6160,12 +6160,14 @@ function SimplificarFrecuenciasGeneral({ S, zonas, getAllElems, getZD, setElemFr
   );
 }
 
-function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACROZONAS_BASE, tareas, setTareas, tareasZonaHoy=0, esJefa=false, esSupervisor=false, configSemanal={}, setConfigSemanal, puedeCrear=false, cierresTurno={}, onReabrirTurno, onCerrarTurno, getElemFrecs, setElemFrecs, setElemFrecsBulk, aplicaciones=[], setAplicaciones, stockFito, setStockFito, crearNotificacion, fechaInicial=null, onIrARegistrarAplicacion=()=>{}, setVista=()=>{} }) {
+function ProgramacionDiaria({ S, zonas, data, personal, bodegasData={}, getZD, getAllElems, MACROZONAS_BASE, tareas, setTareas, tareasZonaHoy=0, esJefa=false, esSupervisor=false, configSemanal={}, setConfigSemanal, puedeCrear=false, cierresTurno={}, onReabrirTurno, onCerrarTurno, getElemFrecs, setElemFrecs, setElemFrecsBulk, aplicaciones=[], setAplicaciones, stockFito, setStockFito, crearNotificacion, fechaInicial=null, onIrARegistrarAplicacion=()=>{}, setVista=()=>{} }) {
   const hoy = fechaLocal();
   const [fecha, setFecha] = React.useState(fechaInicial||hoy);
   const [tabProg, setTabProg] = React.useState("programa");
   const [histTabInicial, setHistTabInicial] = React.useState(null); // sub-tab con la que abre HistorialProg (ej. "turnos")
   const [showAgregar, setShowAgregar] = React.useState(false);
+  const [hojasVidaMaqPD] = useFirebaseState(`${ROOT}/hojaVidaMaq`, {});
+  const [horometroPD] = useFirebaseState(`${ROOT}/horometro`, {});
   const EC = {hecha:{color:"#22c55e",icon:"✅",label:"Hecha"},completada:{color:"#22c55e",icon:"✅",label:"Hecha"},no_pudo:{color:"#ef4444",icon:"🔴",label:"No se pudo"},haciendose:{color:"#3b82f6",icon:"🔵",label:"Haciéndose"},en_curso:{color:"#3b82f6",icon:"🔵",label:"En curso"},pendiente:{color:"#f59e0b",icon:"⏳",label:"Pendiente"},por_designar:{color:"#94a3b8",icon:"⬜",label:"Por designar"},cancelada:{color:"#ef4444",icon:"❌",label:"Cancelada"},no_pudo_lluvia:{color:"#60a5fa",icon:"🌧️",label:"No se pudo — Lluvia"}};
   const [zonasColapsadas, setZonasColapsadas] = React.useState({__init:true}); // {zona: true/false}
   const toggleZonaColapso = (zona) => setZonasColapsadas(p=>{
@@ -6477,6 +6479,23 @@ function ProgramacionDiaria({ S, zonas, data, personal, getZD, getAllElems, MACR
         });
       });
     });
+    // ── Alarmas de mantención de Maquinaria y Equipos (Hoja de vida) ── Una alarma vencida (por tiempo u horas)
+    // se propone como tarea «🔧 parte» del equipo, sin responsable (por designar). Si esa tarea ya se hizo
+    // en/después de la fecha base de la alarma, no se vuelve a proponer.
+    try{
+      const alVenc = calcAlarmasMaq(equiposMaq(bodegasData), hojasVidaMaqPD, horometroPD, fecha).filter(a=>a.estado==="vencida");
+      alVenc.forEach(a=>{
+        const tareaMaq = `🔧 ${a.alarma.parte}`;
+        const zonaMaq = "Maquinaria y Equipos";
+        if(existentes.includes(`${zonaMaq}_${a.eq.nombre}_${tareaMaq}`)) return;
+        if(propuestas.some(pp=>pp.zona===zonaMaq&&pp.elemento===a.eq.nombre&&pp.tarea===tareaMaq)) return;
+        const hechaDespues = Object.entries(tareas||{}).some(([dK,arr])=>nAprop(arr).some(t=>t && t.zona===zonaMaq && t.elemento===a.eq.nombre && t.tarea===tareaMaq && normalizarEstado(t.estado)==="hecha" && dK>=(a.baseFecha||"0000-00-00")));
+        if(hechaDespues) return;
+        propuestas.push({ id:Date.now()+Math.random(), fecha, zona:zonaMaq, elemento:a.eq.nombre, tarea:tareaMaq, responsable:"", estado:"por_designar",
+          notas:`Alarma de mantención (${textoRestanteAlarmaMaq(a)}). Al terminar, registra el cambio en Maquinaria y Equipos → Hoja de vida para reiniciar la alarma.`,
+          auto:true, origenAlarmaMaq:`${a.eq.id}_${a.alarma.id}`, diasVencida:a.diasRest!==null&&a.diasRest<0?-a.diasRest:0, incluir:true, abierta:false });
+      });
+    }catch(errMaq){ console.error("Alarmas de maquinaria:", errMaq); }
     // ── Tareas MANUALES pendientes de días anteriores (sin frecuencia configurada) ── El barrido
     // de arriba solo mueve tareas ligadas a una frecuencia; una tarea puntual (ej. un encargo del
     // supervisor) no corresponde a ninguna, así que nunca entra en ese barrido. Aquí se arrastran
@@ -12238,7 +12257,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
         if(idx>=0) {
           nuevosItems[idx] = {...nuevosItems[idx], stockActual:(Number(nuevosItems[idx].stockActual)||0)+cant};
         } else {
-          nuevosItems.push({id:Date.now()+Math.random(), nombre:it.descripcion, categoria:it.categoriaBodega||it.categoria||"", unidad:it.unidad||"unidad", stockActual:cant, stockMinimo:0, ubicacion:"", obs:`Ingresado desde ${docRef}`, maquinaAsociada:it.maquinaAsociada||""});
+          nuevosItems.push({id:Date.now()+Math.random(), nombre:it.descripcion, categoria:it.categoriaBodega||it.categoria||"", unidad:it.unidad||"unidad", stockActual:cant, stockMinimo:0, ubicacion:"", obs:`Ingresado desde ${docRef}`, maquinaAsociada:it.maquinaAsociada||"", ...(bodId==="b04"?{fechaCompra:docFecha}:{})});
         }
         const itemId = idx>=0?nuevosItems[idx].id:nuevosItems[nuevosItems.length-1].id;
         nuevosMovs.unshift({id:Date.now()+Math.random(), fecha:docFecha, tipo:"entrada", cantidad:cant, unidad:it.unidad||"unidad", motivo:`Compra — ${docRef}`, responsable:"", itemId:String(itemId), docRef, itemNombre:it.descripcion.trim(), maquinaAsociada:it.maquinaAsociada||""});
@@ -19528,6 +19547,271 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
 }
 
 // ─── PANEL BODEGAS ───────────────────────────────────────────────────────────
+// ═══════════════ HOJA DE VIDA DE MAQUINARIA Y EQUIPOS ═══════════════
+// Datos en un nodo propio (${ROOT}/hojaVidaMaq): { [idEquipo]: { eventos:{id:{...}}, alarmas:{id:{...}} } }
+const TIPOS_COMBUSTIBLE = ["Bencina","Petróleo","Electricidad","Sin combustible"];
+const TIPOS_EVENTO_MAQ = ["Cambio de repuesto / parte","Mantención preventiva","Reparación","Reparación externa (taller)","Revisión"];
+const PARTES_SUGERIDAS_MAQ = ["Aceite","Filtro de aceite","Filtro de aire","Bujía","Batería","Correa","Cuchillas / afilado","Asiento","Panel","Perno delantero con tuercas","Chicharra","Parachoque","Neumático","Frenos","Cadena","Luces","Manubrio","Engrasado","Cargador"];
+const UNIDADES_ALARMA_MAQ = [["dias","días",1],["semanas","semanas",7],["meses","meses",30],["anios","años",365]];
+const normParteMaq = s => (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]/g,"");
+const sumarDiasISO = (f,n) => { const d=new Date(f+"T12:00:00"); d.setDate(d.getDate()+Math.round(n)); return d.toISOString().slice(0,10); };
+const diasEntreISO = (a,b) => Math.round((new Date(b+"T12:00:00")-new Date(a+"T12:00:00"))/86400000);
+const horasEquipoMaq = (item, horometro) => {
+  const regs = Object.values((horometro?.[item.id]||{}).registros||{});
+  const suma = regs.reduce((a,r)=>a+Number(r.horas||0),0);
+  return suma>0 ? suma : (Number(item.horasUso)||0);
+};
+const equiposMaq = (bodegasData) => arrDeCR(bodegasData?.b04?.items).filter(i=>{ const c=(i.categoria||"").toLowerCase(); return c!=="combustible"&&c!=="repuesto"; });
+// Calcula el estado de cada alarma. Base = último cambio registrado de esa parte; si no hay, la fecha base de la alarma o la fecha de compra.
+const calcAlarmasMaq = (items, hojas, horometro, hoy) => {
+  const out = [];
+  (items||[]).forEach(eq=>{
+    const hv = (hojas||{})[eq.id]||{};
+    const eventos = Object.values(hv.eventos||{});
+    const horasAct = horasEquipoMaq(eq, horometro);
+    Object.values(hv.alarmas||{}).forEach(al=>{
+      if(!al || al.activa===false) return;
+      const k = normParteMaq(al.parte);
+      const ult = eventos.filter(e=>normParteMaq(e.parte)===k && e.fecha).sort((a,b)=>b.fecha.localeCompare(a.fecha))[0]||null;
+      const baseFecha = ult?.fecha || al.baseFecha || eq.fechaCompra || "";
+      const baseHoras = (ult && ult.horas!=="" && ult.horas!==undefined && ult.horas!==null) ? Number(ult.horas) : Number(al.baseHoras||0);
+      const cadaDias = Number(al.cadaDias)||0, cadaHoras = Number(al.cadaHoras)||0;
+      const proxFecha = (cadaDias>0 && baseFecha) ? sumarDiasISO(baseFecha,cadaDias) : "";
+      const diasRest = proxFecha ? diasEntreISO(hoy,proxFecha) : null;
+      const proxHoras = cadaHoras>0 ? baseHoras+cadaHoras : null;
+      const horasRest = proxHoras!==null ? proxHoras-horasAct : null;
+      let estado = "ok";
+      if(diasRest===null && horasRest===null) estado = "sin_base";
+      else if((diasRest!==null&&diasRest<=0)||(horasRest!==null&&horasRest<=0)) estado = "vencida";
+      else if((diasRest!==null&&diasRest<=15)||(horasRest!==null&&horasRest<=Math.max(10,cadaHoras*0.1))) estado = "proxima";
+      out.push({eq, alarma:al, ultimo:ult, baseFecha, proxFecha, diasRest, proxHoras, horasRest, horasAct, estado});
+    });
+  });
+  const orden = {vencida:0,proxima:1,sin_base:2,ok:3};
+  return out.sort((a,b)=>(orden[a.estado]-orden[b.estado])||((a.diasRest??9999)-(b.diasRest??9999)));
+};
+const textoRestanteAlarmaMaq = (a) => {
+  const p = [];
+  if(a.diasRest!==null) p.push(a.diasRest<0?`${-a.diasRest} d de atraso`:a.diasRest===0?"vence hoy":`en ${a.diasRest} d`);
+  if(a.horasRest!==null) p.push(a.horasRest<=0?`${Math.round(-a.horasRest)} h de atraso`:`faltan ${Math.round(a.horasRest)} h`);
+  return p.join(" · ")||"sin base de cálculo";
+};
+const colorEstadoAlarmaMaq = (e) => e==="vencida"?"#f87171":e==="proxima"?"#fbbf24":e==="sin_base"?"#94a3b8":"#4ade80";
+
+// Aviso de mantenciones vencidas / próximas (Panel general de la Jefa y Bodega Maquinaria).
+function AlertasMantMaquinaria({ S, bodegasData, onAbrir=null }) {
+  const [hojas] = useFirebaseState(`${ROOT}/hojaVidaMaq`, {});
+  const [horometro] = useFirebaseState(`${ROOT}/horometro`, {});
+  const lista = calcAlarmasMaq(equiposMaq(bodegasData), hojas, horometro, fechaLocal()).filter(a=>a.estado==="vencida"||a.estado==="proxima");
+  if(lista.length===0) return null;
+  const venc = lista.filter(a=>a.estado==="vencida").length;
+  return (
+    <div style={{...S.card,padding:"12px 16px",marginBottom:14,borderLeft:`3px solid ${venc>0?"#f87171":"#fbbf24"}`}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:6}}>
+        <div style={{fontSize:13,fontWeight:700,color:venc>0?"#f87171":"#fbbf24"}}>🔧 Mantenciones de maquinaria: {venc>0?`${venc} vencida(s)`:""}{venc>0&&lista.length>venc?" · ":""}{lista.length>venc?`${lista.length-venc} próxima(s)`:""}</div>
+        {onAbrir&&<button className="btn-g" style={{...S.btn,fontSize:11,padding:"3px 10px"}} onClick={onAbrir}>Abrir hoja de vida</button>}
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:3}}>
+        {lista.slice(0,8).map((a,i)=>(
+          <div key={i} style={{fontSize:12,color:"#c0dac0"}}>
+            <span style={{color:colorEstadoAlarmaMaq(a.estado),fontWeight:700}}>{a.estado==="vencida"?"⛔":"⏳"}</span> {a.eq.nombre} — <b>{a.alarma.parte}</b> <span style={{color:"#8aa89a"}}>· {textoRestanteAlarmaMaq(a)}</span>
+          </div>
+        ))}
+        {lista.length>8&&<div style={{fontSize:11,color:"#6a8a7a"}}>… y {lista.length-8} más</div>}
+      </div>
+    </div>
+  );
+}
+
+// Pestaña «Hoja de vida» de un equipo.
+function HojaVidaMaquinaria({ S, bodegasData, setBodegasData, hojas, setHojas, horometro, personal, puedeEditar }) {
+  const hoy = fechaLocal();
+  const equipos = equiposMaq(bodegasData).sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||"","es",{sensitivity:"base"}));
+  const [eqId, setEqId] = React.useState("");
+  const eq = equipos.find(e=>String(e.id)===String(eqId)) || null;
+  const hv = (eq && hojas?.[eq.id]) || {};
+  const eventos = Object.values(hv.eventos||{}).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")||String(b.id).localeCompare(String(a.id)));
+  const alarmasEq = calcAlarmasMaq(eq?[eq]:[], hojas, horometro, hoy);
+  const horasAct = eq ? horasEquipoMaq(eq, horometro) : 0;
+  const nombresPersonal = (Array.isArray(personal)?personal:Object.values(personal||{})).filter(noRetirado).map(p=>p.nombre).sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
+  const labelSt = {fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
+  const vacioEv = {fecha:hoy,tipo:TIPOS_EVENTO_MAQ[0],parte:"",detalle:"",responsable:"",costo:"",horas:""};
+  const [evForm, setEvForm] = React.useState(null);   // {…, id?} — null = cerrado
+  const vacioAl = {parte:"",valor:"",unidad:"meses",cadaHoras:"",baseFecha:"",activa:true};
+  const [alForm, setAlForm] = React.useState(null);
+  const [abiertas, setAbiertas] = React.useState({});
+
+  const setEq = (patch) => setBodegasData(p=>({...p,b04:{...(p.b04||{}),items:arrDeCR(p.b04?.items).map(i=>String(i.id)===String(eq.id)?{...i,...patch}:i)}}));
+  const setHV = (fn) => setHojas(prev=>{ const cur=(prev||{})[eq.id]||{}; return {...(prev||{}),[eq.id]:fn(cur)}; });
+
+  const guardarEv = () => {
+    if(!evForm.parte.trim()){ alert("Escribe la parte o el trabajo (ej. Aceite, Asiento, Chicharra)."); return; }
+    if(!evForm.fecha){ alert("Falta la fecha."); return; }
+    const id = evForm.id || ("e"+Date.now());
+    const reg = {id,fecha:evForm.fecha,tipo:evForm.tipo,parte:evForm.parte.trim(),detalle:evForm.detalle||"",responsable:evForm.responsable||"",costo:evForm.costo===""?"":Number(evForm.costo),horas:evForm.horas===""?"":Number(evForm.horas),creadoEn:evForm.creadoEn||new Date().toISOString()};
+    setHV(cur=>({...cur,eventos:{...(cur.eventos||{}),[id]:reg}}));
+    setEvForm(null);
+  };
+  const borrarEv = (id) => { if(!window.confirm("¿Eliminar este registro del historial?")) return; setHV(cur=>{ const ev={...(cur.eventos||{})}; delete ev[id]; return {...cur,eventos:ev}; }); };
+  const guardarAl = () => {
+    if(!alForm.parte.trim()){ alert("Escribe la parte o mantención (ej. Aceite)."); return; }
+    const u = UNIDADES_ALARMA_MAQ.find(x=>x[0]===alForm.unidad)||UNIDADES_ALARMA_MAQ[0];
+    const cadaDias = Number(alForm.valor)>0 ? Number(alForm.valor)*u[2] : 0;
+    const cadaHoras = Number(alForm.cadaHoras)>0 ? Number(alForm.cadaHoras) : 0;
+    if(!cadaDias && !cadaHoras){ alert("Indica cada cuánto tiempo (días/meses…) o cada cuántas horas."); return; }
+    const id = alForm.id || ("a"+Date.now());
+    const reg = {id,parte:alForm.parte.trim(),valor:alForm.valor===""?"":Number(alForm.valor),unidad:alForm.unidad,cadaDias,cadaHoras,baseFecha:alForm.baseFecha||"",baseHoras:alForm.id?(alForm.baseHoras??0):horasAct,activa:alForm.activa!==false};
+    setHV(cur=>({...cur,alarmas:{...(cur.alarmas||{}),[id]:reg}}));
+    setAlForm(null);
+  };
+  const borrarAl = (id) => { if(!window.confirm("¿Eliminar esta alarma?")) return; setHV(cur=>{ const a={...(cur.alarmas||{})}; delete a[id]; return {...cur,alarmas:a}; }); };
+
+  // Resumen por parte: cuántas veces, último cambio, cada cuánto se ha cambiado
+  const porParte = {};
+  eventos.forEach(e=>{ const k=normParteMaq(e.parte); if(!k) return; (porParte[k] ||= {nombre:e.parte,lista:[]}).lista.push(e); });
+  const resumen = Object.values(porParte).map(g=>{
+    const asc = [...g.lista].sort((a,b)=>a.fecha.localeCompare(b.fecha));
+    const difs = []; for(let i=1;i<asc.length;i++) difs.push(diasEntreISO(asc[i-1].fecha,asc[i].fecha));
+    const prom = difs.length ? Math.round(difs.reduce((a,b)=>a+b,0)/difs.length) : null;
+    return {...g, n:asc.length, ultimo:asc[asc.length-1], prom, difs};
+  }).sort((a,b)=>(b.ultimo.fecha||"").localeCompare(a.ultimo.fecha||""));
+  const fmt = f => f ? f.split("-").reverse().join("-") : "—";
+
+  return (
+    <div className="ein">
+      <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,color:"#f97316",marginBottom:4}}>🛠️ Hoja de vida</div>
+      <div style={{fontSize:12,color:"#5a9a7a",marginBottom:12}}>Compra, combustible, cambios de partes y mantenciones de cada equipo, quién las hizo y alarmas para saber cuándo toca la siguiente.</div>
+      <select style={{...S.input,marginBottom:14,maxWidth:420}} value={eqId} onChange={e=>{setEqId(e.target.value);setEvForm(null);setAlForm(null);}}>
+        <option value="">— Elige una máquina o equipo —</option>
+        {equipos.map(e=><option key={e.id} value={e.id}>{e.nombre}{e.marca?` · ${e.marca}`:""}</option>)}
+      </select>
+      {!eq&&equipos.length===0&&<div style={{...S.card,padding:24,textAlign:"center",color:"#4a7a5a"}}>No hay equipos en Maquinaria y Equipos. Agrégalos en la pestaña Stock.</div>}
+      {eq&&(<>
+        {/* Ficha */}
+        <div style={{...S.card,padding:16,marginBottom:12,borderLeft:"3px solid #f97316"}}>
+          <div style={{fontSize:15,fontWeight:700,color:"#ede9e0",marginBottom:2}}>{eq.nombre}</div>
+          <div style={{fontSize:12,color:"#6aaa7a",marginBottom:10}}>{[eq.categoria,eq.marca,eq.modelo,eq.patente].filter(Boolean).join(" · ")||"Sin datos de marca/modelo"}</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:10}}>
+            <div><label style={labelSt}>📅 Fecha de compra</label>
+              <input type="date" style={S.input} value={eq.fechaCompra||""} disabled={!puedeEditar} onChange={e=>setEq({fechaCompra:e.target.value})}/>
+              {eq.fechaCompra&&<div style={{fontSize:10,color:"#6a8a7a",marginTop:2}}>Antigüedad: {Math.floor(diasEntreISO(eq.fechaCompra,hoy)/365)} año(s) {Math.floor((diasEntreISO(eq.fechaCompra,hoy)%365)/30)} mes(es)</div>}
+            </div>
+            <div><label style={labelSt}>⛽ Tipo de combustible</label>
+              <select style={S.input} value={eq.tipoCombustible||""} disabled={!puedeEditar} onChange={e=>setEq({tipoCombustible:e.target.value})}>
+                <option value="">— Sin definir —</option>
+                {TIPOS_COMBUSTIBLE.map(t=><option key={t}>{t}</option>)}
+              </select>
+            </div>
+            <div><label style={labelSt}>⏱️ Horas de uso</label><div style={{fontSize:16,fontWeight:700,color:"#fb923c",padding:"6px 0"}}>{Math.round(horasAct)} h</div></div>
+          </div>
+        </div>
+
+        {/* Alarmas */}
+        <div style={{...S.card,padding:16,marginBottom:12}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:8}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#fbbf24"}}>⏰ Alarmas de mantención</div>
+            {puedeEditar&&<button className="btn-p" style={{...S.btn,fontSize:12,padding:"4px 12px"}} onClick={()=>setAlForm({...vacioAl})}>➕ Nueva alarma</button>}
+          </div>
+          {alarmasEq.length===0&&!alForm&&<div style={{fontSize:12,color:"#6a8a7a"}}>Sin alarmas. Ej.: «Aceite — cada 6 meses o 100 horas». Al registrar un cambio de esa parte, la alarma se reinicia sola.</div>}
+          {alarmasEq.map(a=>(
+            <div key={a.alarma.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,padding:"7px 10px",marginBottom:5,background:"rgba(255,255,255,0.03)",borderRadius:8,border:`1px solid ${colorEstadoAlarmaMaq(a.estado)}40`,opacity:a.alarma.activa===false?0.5:1}}>
+              <div>
+                <span style={{fontSize:13,fontWeight:700,color:"#ede9e0"}}>{a.alarma.parte}</span>
+                <span style={{fontSize:11,color:"#6aaa7a",marginLeft:8}}>cada {[a.alarma.cadaDias>0?`${a.alarma.valor} ${(UNIDADES_ALARMA_MAQ.find(u=>u[0]===a.alarma.unidad)||[0,"días"])[1]}`:"",a.alarma.cadaHoras>0?`${a.alarma.cadaHoras} h`:""].filter(Boolean).join(" o ")}</span>
+                <div style={{fontSize:11,color:"#8aa89a"}}>Último: {a.ultimo?`${fmt(a.ultimo.fecha)}${a.ultimo.responsable?` (${a.ultimo.responsable})`:""}`:(a.baseFecha?`base ${fmt(a.baseFecha)}`:"sin registro")}{a.proxFecha?` · próxima: ${fmt(a.proxFecha)}`:""}{a.proxHoras!==null?` · a las ${Math.round(a.proxHoras)} h`:""}</div>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                <span style={{fontSize:11,fontWeight:700,color:colorEstadoAlarmaMaq(a.estado),padding:"2px 8px",borderRadius:10,background:`${colorEstadoAlarmaMaq(a.estado)}18`}}>{a.estado==="vencida"?"⛔ ":a.estado==="proxima"?"⏳ ":a.estado==="ok"?"✅ ":""}{textoRestanteAlarmaMaq(a)}</span>
+                {puedeEditar&&<><button className="btn-g" style={{...S.btn,fontSize:11,padding:"3px 8px"}} onClick={()=>setAlForm({...a.alarma})}>✏️</button>
+                <button className="btn-d" style={{...S.btn,fontSize:11,padding:"3px 8px"}} onClick={()=>borrarAl(a.alarma.id)}>🗑</button></>}
+              </div>
+            </div>
+          ))}
+          {alForm&&(
+            <div style={{padding:12,marginTop:8,background:"rgba(251,191,36,0.05)",border:"1px solid rgba(251,191,36,0.25)",borderRadius:8}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10}}>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Parte / mantención</label>
+                  <input list="partes-maq" style={S.input} value={alForm.parte} onChange={e=>setAlForm(p=>({...p,parte:e.target.value}))} placeholder="Ej: Aceite"/></div>
+                <div><label style={labelSt}>Cada</label>
+                  <div style={{display:"flex",gap:6}}><input type="number" min={0} style={{...S.input,width:80}} value={alForm.valor} onChange={e=>setAlForm(p=>({...p,valor:e.target.value}))}/>
+                  <select style={S.input} value={alForm.unidad} onChange={e=>setAlForm(p=>({...p,unidad:e.target.value}))}>{UNIDADES_ALARMA_MAQ.map(u=><option key={u[0]} value={u[0]}>{u[1]}</option>)}</select></div></div>
+                <div><label style={labelSt}>y/o cada (horas de uso)</label><input type="number" min={0} style={S.input} value={alForm.cadaHoras} onChange={e=>setAlForm(p=>({...p,cadaHoras:e.target.value}))} placeholder="Opcional"/></div>
+                <div><label style={labelSt}>Último cambio (si no hay registro)</label><input type="date" style={S.input} value={alForm.baseFecha||""} onChange={e=>setAlForm(p=>({...p,baseFecha:e.target.value}))}/></div>
+              </div>
+              <div style={{fontSize:10,color:"#6a8a7a",marginTop:6}}>Vence lo que ocurra primero (tiempo u horas). Si ya hay un cambio registrado de esta parte, se cuenta desde él; si no, desde la fecha que pongas aquí o la fecha de compra.</div>
+              <div style={{display:"flex",gap:8,marginTop:10}}><button className="btn-p" style={S.btn} onClick={guardarAl}>✓ Guardar alarma</button><button className="btn-g" style={S.btn} onClick={()=>setAlForm(null)}>Cancelar</button></div>
+            </div>
+          )}
+        </div>
+
+        {/* Registrar cambio / mantención */}
+        <div style={{...S.card,padding:16,marginBottom:12}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:8}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#34d399"}}>🔩 Cambios, mantenciones y reparaciones</div>
+            {puedeEditar&&<button className="btn-p" style={{...S.btn,fontSize:12,padding:"4px 12px"}} onClick={()=>setEvForm({...vacioEv,horas:Math.round(horasAct)||""})}>➕ Registrar</button>}
+          </div>
+          {evForm&&(
+            <div style={{padding:12,marginBottom:10,background:"rgba(52,211,153,0.05)",border:"1px solid rgba(52,211,153,0.25)",borderRadius:8}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:10}}>
+                <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={evForm.fecha} onChange={e=>setEvForm(p=>({...p,fecha:e.target.value}))}/></div>
+                <div><label style={labelSt}>Tipo</label><select style={S.input} value={evForm.tipo} onChange={e=>setEvForm(p=>({...p,tipo:e.target.value}))}>{TIPOS_EVENTO_MAQ.map(t=><option key={t}>{t}</option>)}</select></div>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Parte / trabajo</label>
+                  <input list="partes-maq" style={S.input} value={evForm.parte} onChange={e=>setEvForm(p=>({...p,parte:e.target.value}))} placeholder="Ej: Asiento, Aceite, Panel, Perno delantero con tuercas, Chicharra…"/></div>
+                <div><label style={labelSt}>Quién lo hizo</label>
+                  <input list="resp-maq" style={S.input} value={evForm.responsable} onChange={e=>setEvForm(p=>({...p,responsable:e.target.value}))} placeholder="Persona o taller"/></div>
+                <div><label style={labelSt}>Horas del equipo</label><input type="number" min={0} style={S.input} value={evForm.horas} onChange={e=>setEvForm(p=>({...p,horas:e.target.value}))}/></div>
+                <div><label style={labelSt}>Costo (opcional)</label><input type="number" min={0} style={S.input} value={evForm.costo} onChange={e=>setEvForm(p=>({...p,costo:e.target.value}))}/></div>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Detalle</label><input style={S.input} value={evForm.detalle} onChange={e=>setEvForm(p=>({...p,detalle:e.target.value}))} placeholder="Marca/repuesto usado, motivo, observaciones…"/></div>
+              </div>
+              <div style={{display:"flex",gap:8,marginTop:10}}><button className="btn-p" style={S.btn} onClick={guardarEv}>✓ {evForm.id?"Guardar cambios":"Guardar"}</button><button className="btn-g" style={S.btn} onClick={()=>setEvForm(null)}>Cancelar</button></div>
+            </div>
+          )}
+          {eventos.length===0&&!evForm&&<div style={{fontSize:12,color:"#6a8a7a"}}>Aún no hay registros. Puedes ingresar también cambios antiguos con su fecha real.</div>}
+
+          {resumen.length>0&&(
+            <div style={{overflowX:"auto",marginBottom:10}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                <thead><tr style={{color:"#6aaa7a",textAlign:"left",fontSize:10,textTransform:"uppercase"}}><th style={{padding:"4px 6px"}}>Parte</th><th style={{padding:"4px 6px"}}>Veces</th><th style={{padding:"4px 6px"}}>Último</th><th style={{padding:"4px 6px"}}>Quién</th><th style={{padding:"4px 6px"}}>Cada (promedio)</th></tr></thead>
+                <tbody>{resumen.map(g=>(
+                  <tr key={g.nombre} style={{borderTop:"1px solid rgba(255,255,255,0.06)",cursor:"pointer"}} onClick={()=>setAbiertas(p=>({...p,[normParteMaq(g.nombre)]:!p[normParteMaq(g.nombre)]}))}>
+                    <td style={{padding:"5px 6px",fontWeight:700,color:"#ede9e0"}}>{abiertas[normParteMaq(g.nombre)]?"▼":"▶"} {g.nombre}</td>
+                    <td style={{padding:"5px 6px"}}>{g.n}</td>
+                    <td style={{padding:"5px 6px"}}>{fmt(g.ultimo.fecha)}</td>
+                    <td style={{padding:"5px 6px"}}>{g.ultimo.responsable||"—"}</td>
+                    <td style={{padding:"5px 6px",color:"#fbbf24"}}>{g.prom!==null?`${g.prom} días`:"— (1 solo registro)"}</td>
+                  </tr>))}</tbody>
+              </table>
+            </div>
+          )}
+
+          <div style={{display:"flex",flexDirection:"column",gap:5}}>
+            {eventos.filter(e=>resumen.length===0||abiertas[normParteMaq(e.parte)]||Object.values(abiertas).every(v=>!v)).map(e=>{
+              const asc = (porParte[normParteMaq(e.parte)]?.lista||[]).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+              const i = asc.findIndex(x=>x.id===e.id);
+              const dPrev = i>0 ? diasEntreISO(asc[i-1].fecha,e.fecha) : null;
+              return (
+                <div key={e.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:6,padding:"6px 10px",background:"rgba(255,255,255,0.03)",borderRadius:8}}>
+                  <div>
+                    <span style={{fontSize:12,fontWeight:700,color:"#ede9e0"}}>{e.parte}</span>
+                    <span style={{fontSize:11,color:"#6aaa7a",marginLeft:8}}>{fmt(e.fecha)} · {e.tipo}</span>
+                    <div style={{fontSize:11,color:"#8aa89a"}}>{[e.responsable&&`👤 ${e.responsable}`,e.horas!==""&&e.horas!==undefined&&`${e.horas} h`,e.costo!==""&&e.costo!==undefined&&`$${Number(e.costo).toLocaleString("es-CL")}`,dPrev!==null&&`${dPrev} d desde el cambio anterior`,e.detalle].filter(Boolean).join(" · ")}</div>
+                  </div>
+                  {puedeEditar&&<div style={{display:"flex",gap:6}}>
+                    <button className="btn-g" style={{...S.btn,fontSize:11,padding:"3px 8px"}} onClick={()=>setEvForm({...vacioEv,...e,costo:e.costo??"",horas:e.horas??""})}>✏️</button>
+                    <button className="btn-d" style={{...S.btn,fontSize:11,padding:"3px 8px"}} onClick={()=>borrarEv(e.id)}>🗑</button>
+                  </div>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <datalist id="partes-maq">{[...new Set([...PARTES_SUGERIDAS_MAQ,...resumen.map(g=>g.nombre)])].map(p=><option key={p} value={p}/>)}</datalist>
+        <datalist id="resp-maq">{nombresPersonal.map(n=><option key={n} value={n}/>)}<option value="Taller externo"/></datalist>
+      </>)}
+    </div>
+  );
+}
+
 function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLectura=false, rolLogueado="", currentUserId="", tareasProg, setTareasProg, compras=[], crearNotificacion=()=>{},
   eppEntregas=[], setEppEntregas=()=>{}, eppFiltros=[], setEppFiltros=()=>{}, eppVidaUtil=[], setEppVidaUtil=()=>{},
   eppInspecciones=[], setEppInspecciones=()=>{}, eppFitTests=[], setEppFitTests=()=>{}, eppDisposiciones=[], setEppDisposiciones=()=>{},
@@ -19551,6 +19835,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
   const [repCatsAb, setRepCatsAb] = React.useState({}); // {maquina: bool} — abierto/cerrado en tab Repuestos
   // ── Horómetro (Maquinaria) ──
   const [horometroData, setHorometroData] = useFirebaseState(`${ROOT}/horometro`, {});
+  const [hojasVidaMaq, setHojasVidaMaq] = useFirebaseState(`${ROOT}/hojaVidaMaq`, {});
   const [showHoroForm, setShowHoroForm] = React.useState(false);
   const [horoEquipoSel, setHoroEquipoSel] = React.useState("");
   const [horoHoras, setHoroHoras] = React.useState("");
@@ -19861,7 +20146,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
   const [tareaForm, setTareaForm] = React.useState(emptyTarea);
   const emptyTrasl = {fecha:hoy,itemId:"",cantidad:1,destino:"",motivo:"",conRegreso:true,fechaRegreso:"",responsable:"",obs:"",estado:"en_camino"};
   const [traslForm, setTraslForm] = React.useState(emptyTrasl);
-  const emptyMaq = {marca:"",modelo:"",patente:"",horasUso:0,nivelAceite:"OK",nivelCombustible:"OK",proxMantención:"",trackHoras:false,trackAceite:false};
+  const emptyMaq = {marca:"",modelo:"",patente:"",horasUso:0,nivelAceite:"OK",nivelCombustible:"OK",proxMantención:"",trackHoras:false,trackAceite:false,fechaCompra:"",tipoCombustible:""};
   const [maqForm, setMaqForm] = React.useState(emptyMaq);
 
   const guardarInventario = () => {
@@ -19996,6 +20281,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
         </div>
       </div>
 
+      {bodegaActiva==="b04"&&subTab!=="hojavida"&&<AlertasMantMaquinaria S={S} bodegasData={bodegasData} onAbrir={()=>setSubTab("hojavida")}/>}
       {/* Sub-tabs */}
       <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
         {(bodegaActiva==="b08" ? [
@@ -20003,7 +20289,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
           ["epp_inspecciones","🔍 Inspecciones"],["epp_fittest","😮‍💨 Fit test"],["epp_disposicion","🗑️ Disposición final"],["epp_catalogo","📖 Catálogo de riesgos"],
         ] : [["stock","📦 Stock"],["movimientos","🔄 Movimientos"],["traslados","🚛 Traslados"],["tareas","✅ Tareas"],["historial","📜 Historial"],
           ...(bodegaActiva==="b05"?[["hojas_seguridad","🛡️ Hojas de Seguridad"]]:[]),
-          ...(bodegaActiva==="b04"?[["horometro","⏱️ Horómetro"],["repuestos","🔩 Repuestos"]]:[]),
+          ...(bodegaActiva==="b04"?[["horometro","⏱️ Horómetro"],["hojavida","🛠️ Hoja de vida"],["repuestos","🔩 Repuestos"]]:[]),
           ...(bodegaActiva==="b06"?[["repuestos","🔩 Repuestos"]]:[]),
         ]).map(([t,l])=>(
           <button key={t} className={`tab${subTab===t?" on":""}`} onClick={()=>setSubTab(t)}>{l}</button>
@@ -20807,11 +21093,20 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                               {["OK","Bajo","Crítico","Recién cambiado"].map(v=><option key={v}>{v}</option>)}
                             </select>
                           </div>
-                          <div><label style={labelSt}>Nivel combustible</label>
+                          <div><label style={labelSt}>📅 Fecha de compra</label>
+                            <input type="date" style={S.input} value={maqForm.fechaCompra||""} onChange={e=>setMaqForm(p=>({...p,fechaCompra:e.target.value}))}/>
+                          </div>
+                          <div><label style={labelSt}>⛽ Tipo de combustible</label>
+                            <select style={S.input} value={maqForm.tipoCombustible||""} onChange={e=>setMaqForm(p=>({...p,tipoCombustible:e.target.value}))}>
+                              <option value="">— Sin definir —</option>
+                              {TIPOS_COMBUSTIBLE.map(t=><option key={t}>{t}</option>)}
+                            </select>
+                          </div>
+                          {!["Electricidad","Sin combustible"].includes(maqForm.tipoCombustible)&&<div><label style={labelSt}>Nivel combustible</label>
                             <select style={S.input} value={maqForm.nivelCombustible} onChange={e=>setMaqForm(p=>({...p,nivelCombustible:e.target.value}))}>
                               {["Lleno","3/4","1/2","1/4","Vacío"].map(v=><option key={v}>{v}</option>)}
                             </select>
-                          </div>
+                          </div>}
                           <div><label style={labelSt}>Próx. mantención (horas)</label><input type="number" min={0} style={S.input} value={maqForm.proxMantención} onChange={e=>setMaqForm(p=>({...p,proxMantención:e.target.value}))}/></div>
                         </div>
                         <div style={{display:"flex",gap:16,marginTop:12,paddingTop:10,borderTop:"1px solid rgba(249,115,22,0.15)"}}>
@@ -21219,7 +21514,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                                       {esJefa&&(
                                         <div style={{display:"flex",gap:6,flexShrink:0}}>
                                           <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(34,197,94,0.12)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)"}} onClick={()=>{setMovForm({...emptyMov,itemId:String(item.id),unidad:item.unidad||"unidad"});setShowMovForm(true);setSubTab("movimientos");}}>± Mov.</button>
-                                          <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>{setItemForm({nombre:item.nombre,categoria:item.categoria||"",descripcion:item.descripcion||"",unidad:item.unidad||"unidad",stockActual:item.stockActual||0,stockMinimo:item.stockMinimo||0,ubicacion:item.ubicacion||"",obs:item.obs||"",vencimiento:item.vencimiento||"",tiempoReingreso:item.tiempoReingreso||"",tiempoReingresoUnidad:item.tiempoReingresoUnidad||"horas",maquinaAsociada:item.maquinaAsociada||""});setMaqForm({marca:item.marca||"",modelo:item.modelo||"",patente:item.patente||"",horasUso:item.horasUso||0,nivelAceite:item.nivelAceite||"OK",nivelCombustible:item.nivelCombustible||"OK",proxMantención:item.proxMantención||"",trackHoras:!!item.trackHoras,trackAceite:!!item.trackAceite});setEditItemId(item.id);setShowItemForm(true);}}>✏️</button>
+                                          <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>{setItemForm({nombre:item.nombre,categoria:item.categoria||"",descripcion:item.descripcion||"",unidad:item.unidad||"unidad",stockActual:item.stockActual||0,stockMinimo:item.stockMinimo||0,ubicacion:item.ubicacion||"",obs:item.obs||"",vencimiento:item.vencimiento||"",tiempoReingreso:item.tiempoReingreso||"",tiempoReingresoUnidad:item.tiempoReingresoUnidad||"horas",maquinaAsociada:item.maquinaAsociada||""});setMaqForm({marca:item.marca||"",modelo:item.modelo||"",patente:item.patente||"",horasUso:item.horasUso||0,nivelAceite:item.nivelAceite||"OK",nivelCombustible:item.nivelCombustible||"OK",proxMantención:item.proxMantención||"",trackHoras:!!item.trackHoras,trackAceite:!!item.trackAceite,fechaCompra:item.fechaCompra||"",tipoCombustible:item.tipoCombustible||""});setEditItemId(item.id);setShowItemForm(true);}}>✏️</button>
                                           <button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>eliminarItem(item.id)}>🗑</button>
                                         </div>
                                       )}
@@ -21443,6 +21738,11 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
       )}
 
       {/* ── HORÓMETRO ── */}
+      {subTab==="hojavida"&&bodegaActiva==="b04"&&(
+        <HojaVidaMaquinaria S={S} bodegasData={bodegasData} setBodegasData={setBodegasData} hojas={hojasVidaMaq} setHojas={setHojasVidaMaq}
+          horometro={horometroData} personal={personal} puedeEditar={!!esJefa&&!soloLectura}/>
+      )}
+
       {subTab==="horometro"&&bodegaActiva==="b04"&&(()=>{
         const equipos = (bd.items||[]).filter(i=>(i.categoria||"").toLowerCase()!=="combustible");
         const TIPOS_MANT = ["Cambio de aceite (con filtro)","Afilado de cuchillas","Engrasado","Revisión general","Limpieza filtro aire","Revisión correas","Otro"];
@@ -26638,7 +26938,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-20.4";
+const BUILD_STAMP = "2026-10-21.1";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
@@ -28489,6 +28789,7 @@ export default function App() {
               <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:26,fontWeight:900,marginBottom:3}}>Panel General</h1>
               <p style={{color:"#6aaa7a",fontSize:15}}>Estado global de las {stats.total} macrozonas</p>
             </div>
+            {esJefa&&<AlertasMantMaquinaria S={S} bodegasData={bodegasData}/>}
             {esJefa&&<CentroRespaldos S={S} crearNotificacion={crearNotificacion}
               fuentes={{data,personal,macrozonasCust,tareasProg,cierresTurno,configSemanal,aplicaciones,incidenciasFito,stockFito,comprasData,bodegasData,memosData,herramientasCustodia,golfData,bonosConfig,bonosMasivos,rendicionesRRHH,notificaciones,incidencias,hojasSeguridad,eppEntregas,eppFiltros,eppVidaUtil,eppInspecciones,eppFitTests,eppDisposiciones}}/>}
             {(fbRol==="jefa"||fbRol==="supervisor"||fbRol==="programador")&&(()=>{
@@ -29646,7 +29947,7 @@ export default function App() {
 
         {/* PROGRAMACIÓN */}
         {vista==="programacion"&&(
-          <ProgramacionDiaria key={"prog-"+progNonce} S={S} zonas={zonasConCust} data={data} personal={personal} getZD={getZD} getAllElems={getAllElems} MACROZONAS_BASE={MACROZONAS_BASE} tareas={tareasProg} setTareas={setTareasProg} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal}
+          <ProgramacionDiaria key={"prog-"+progNonce} S={S} zonas={zonasConCust} data={data} personal={personal} bodegasData={bodegasData} getZD={getZD} getAllElems={getAllElems} MACROZONAS_BASE={MACROZONAS_BASE} tareas={tareasProg} setTareas={setTareasProg} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal}
             getElemFrecs={getElemFrecs} setElemFrecs={setElemFrecs} setElemFrecsBulk={setElemFrecsBulk} aplicaciones={aplicaciones} setAplicaciones={setAplicaciones} stockFito={stockFito} setStockFito={setStockFito} crearNotificacion={crearNotificacion}
             tareasZonaHoy={(tareasProg[new Date().toISOString().slice(0,10)]||[]).filter(t=>t.origenZona&&t.estado==="por_designar").length}
             esJefa={esJefa}
