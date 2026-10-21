@@ -19554,6 +19554,7 @@ const TIPOS_EVENTO_MAQ = ["Cambio de repuesto / parte","Mantención preventiva",
 const PARTES_SUGERIDAS_MAQ = ["Aceite","Filtro de aceite","Filtro de aire","Bujía","Batería","Correa","Cuchillas / afilado","Asiento","Panel","Perno delantero con tuercas","Chicharra","Parachoque","Neumático","Frenos","Cadena","Luces","Manubrio","Engrasado","Cargador"];
 const UNIDADES_ALARMA_MAQ = [["dias","días",1],["semanas","semanas",7],["meses","meses",30],["anios","años",365]];
 // Firebase no admite "." # $ / [ ] en claves: los ids de equipos pueden traer decimales
+const uniUsoMaq = eq => eq?.unidadUso==="km"?"km":"h";
 const kEqMaq = id => String(id).replace(/[.#$\/\[\]]/g,"_");
 const normParteMaq = s => (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]/g,"");
 const sumarDiasISO = (f,n) => { const d=new Date(f+"T12:00:00"); d.setDate(d.getDate()+Math.round(n)); return d.toISOString().slice(0,10); };
@@ -19595,7 +19596,7 @@ const calcAlarmasMaq = (items, hojas, horometro, hoy) => {
 const textoRestanteAlarmaMaq = (a) => {
   const p = [];
   if(a.diasRest!==null) p.push(a.diasRest<0?`${-a.diasRest} d de atraso`:a.diasRest===0?"vence hoy":`en ${a.diasRest} d`);
-  if(a.horasRest!==null) p.push(a.horasRest<=0?`${Math.round(-a.horasRest)} h de atraso`:`faltan ${Math.round(a.horasRest)} h`);
+  if(a.horasRest!==null) p.push(a.horasRest<=0?`${Math.round(-a.horasRest)} ${uniUsoMaq(a.eq)} de atraso`:`faltan ${Math.round(a.horasRest)} ${uniUsoMaq(a.eq)}`);
   return p.join(" · ")||"sin base de cálculo";
 };
 const colorEstadoAlarmaMaq = (e) => e==="vencida"?"#f87171":e==="proxima"?"#fbbf24":e==="sin_base"?"#94a3b8":"#4ade80";
@@ -19683,6 +19684,7 @@ function HojaVidaMaquinaria({ S, bodegasData, setBodegasData, hojas, setHojas, h
   const eventos = Object.values(hv.eventos||{}).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")||String(b.id).localeCompare(String(a.id)));
   const alarmasEq = calcAlarmasMaq(eq?[eq]:[], hojas, horometro, hoy);
   const horasAct = eq ? horasEquipoMaq(eq, horometro) : 0;
+  const uni = uniUsoMaq(eq); const uniNom = uni==="km"?"Kilómetros":"Horas";
   const nombresPersonal = (Array.isArray(personal)?personal:Object.values(personal||{})).filter(noRetirado).map(p=>p.nombre).sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
   const labelSt = {fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
   const vacioEv = {fecha:hoy,tipo:TIPOS_EVENTO_MAQ[0],parte:"",detalle:"",responsable:"",costo:"",horas:""};
@@ -19690,6 +19692,7 @@ function HojaVidaMaquinaria({ S, bodegasData, setBodegasData, hojas, setHojas, h
   const vacioAl = {parte:"",valor:"",unidad:"meses",cadaHoras:"",baseFecha:"",activa:true};
   const [alForm, setAlForm] = React.useState(null);
   const [abiertas, setAbiertas] = React.useState({});
+  const evFormRef = React.useRef(null);
   const [horoForm, setHoroForm] = React.useState(null);   // {fecha,horas,obs}
   const [verTodasHoras, setVerTodasHoras] = React.useState(false);
   const regsHoro = eq ? Object.values(horometro?.[kEqMaq(eq.id)]?.registros||{}).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")||String(b.id).localeCompare(String(a.id))) : [];
@@ -19711,7 +19714,7 @@ function HojaVidaMaquinaria({ S, bodegasData, setBodegasData, hojas, setHojas, h
     const u = UNIDADES_ALARMA_MAQ.find(x=>x[0]===alForm.unidad)||UNIDADES_ALARMA_MAQ[0];
     const cadaDias = Number(alForm.valor)>0 ? Number(alForm.valor)*u[2] : 0;
     const cadaHoras = Number(alForm.cadaHoras)>0 ? Number(alForm.cadaHoras) : 0;
-    if(!cadaDias && !cadaHoras){ alert("Indica cada cuánto tiempo (días/meses…) o cada cuántas horas."); return; }
+    if(!cadaDias && !cadaHoras){ alert("Indica cada cuánto tiempo (días/meses…) o cada cuántas horas/km."); return; }
     const id = alForm.id || ("a"+Date.now());
     const reg = {id,parte:alForm.parte.trim(),valor:alForm.valor===""?"":Number(alForm.valor),unidad:alForm.unidad,cadaDias,cadaHoras,baseFecha:alForm.baseFecha||"",baseHoras:alForm.id?(alForm.baseHoras??0):horasAct,activa:alForm.activa!==false};
     setHV(cur=>({...cur,alarmas:{...(cur.alarmas||{}),[id]:reg}}));
@@ -19722,7 +19725,7 @@ function HojaVidaMaquinaria({ S, bodegasData, setBodegasData, hojas, setHojas, h
   const fmt = f => f ? f.split("-").reverse().join("-") : "—";
   const guardarHoras = () => {
     const n = Number(horoForm.horas);
-    if(!(n>0)){ alert("Escribe las horas trabajadas (mayor que 0)."); return; }
+    if(!(n>0)){ alert("Escribe el valor recorrido o trabajado (mayor que 0)."); return; }
     if(!horoForm.fecha){ alert("Falta la fecha."); return; }
     const id = "h"+Date.now();
     setHorometro(prev=>{ const cur=(prev||{})[kEqMaq(eq.id)]||{}; return {...(prev||{}),[kEqMaq(eq.id)]:{...cur,registros:{...(cur.registros||{}),[id]:{id,fecha:horoForm.fecha,horas:n,obs:horoForm.obs||"",creadoEn:new Date().toISOString()}}}}; });
@@ -19734,15 +19737,15 @@ function HojaVidaMaquinaria({ S, bodegasData, setBodegasData, hojas, setHojas, h
     const esc = x => String(x??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
     const w = window.open("","_blank","width=900,height=700");
     if(!w){ alert("El navegador bloqueó la ventana emergente. Permítela para imprimir."); return; }
-    const filasAl = alarmasEq.map(a=>`<tr><td>${esc(a.alarma.parte)}</td><td>${esc([a.alarma.cadaDias>0?`${a.alarma.valor} ${(UNIDADES_ALARMA_MAQ.find(u=>u[0]===a.alarma.unidad)||[0,"días"])[1]}`:"",a.alarma.cadaHoras>0?`${a.alarma.cadaHoras} h`:""].filter(Boolean).join(" o "))}</td><td>${esc(a.ultimo?fmt(a.ultimo.fecha):"—")}</td><td>${esc(a.proxFecha?fmt(a.proxFecha):"—")}${a.proxHoras!==null?` / ${Math.round(a.proxHoras)} h`:""}</td><td>${esc(textoRestanteAlarmaMaq(a))}</td></tr>`).join("");
-    const filasEv = eventos.map(e=>`<tr><td>${esc(fmt(e.fecha))}</td><td>${esc(e.parte)}</td><td>${esc(e.tipo)}</td><td>${esc(e.responsable||"—")}</td><td>${e.horas!==""&&e.horas!==undefined?esc(e.horas)+" h":"—"}</td><td>${e.costo!==""&&e.costo!==undefined?"$"+Number(e.costo).toLocaleString("es-CL"):"—"}</td><td>${esc(e.detalle||"")}</td></tr>`).join("");
-    const filasHo = regsHoro.slice(0,40).map(r=>`<tr><td>${esc(fmt(r.fecha))}</td><td>${esc(r.horas)} h</td><td>${esc(r.obs||"")}</td></tr>`).join("");
+    const filasAl = alarmasEq.map(a=>`<tr><td>${esc(a.alarma.parte)}</td><td>${esc([a.alarma.cadaDias>0?`${a.alarma.valor} ${(UNIDADES_ALARMA_MAQ.find(u=>u[0]===a.alarma.unidad)||[0,"días"])[1]}`:"",a.alarma.cadaHoras>0?`${a.alarma.cadaHoras} ${uni}`:""].filter(Boolean).join(" o "))}</td><td>${esc(a.ultimo?fmt(a.ultimo.fecha):"—")}</td><td>${esc(a.proxFecha?fmt(a.proxFecha):"—")}${a.proxHoras!==null?` / ${Math.round(a.proxHoras)} ${uni}`:""}</td><td>${esc(textoRestanteAlarmaMaq(a))}</td></tr>`).join("");
+    const filasEv = eventos.map(e=>`<tr><td>${esc(fmt(e.fecha))}</td><td>${esc(e.parte)}</td><td>${esc(e.tipo)}</td><td>${esc(e.responsable||"—")}</td><td>${e.horas!==""&&e.horas!==undefined?esc(e.horas)+" "+uni:"—"}</td><td>${e.costo!==""&&e.costo!==undefined?"$"+Number(e.costo).toLocaleString("es-CL"):"—"}</td><td>${esc(e.detalle||"")}</td></tr>`).join("");
+    const filasHo = regsHoro.slice(0,40).map(r=>`<tr><td>${esc(fmt(r.fecha))}</td><td>${esc(r.horas)} ${uni}</td><td>${esc(r.obs||"")}</td></tr>`).join("");
     w.document.write(`<html><head><meta charset="utf-8"><title>Hoja de vida — ${esc(eq.nombre)}</title><style>body{font-family:Arial,sans-serif;font-size:12px;color:#222;padding:18px}h1{font-size:18px;margin:0}h2{font-size:14px;margin:16px 0 6px;border-bottom:1px solid #999;padding-bottom:2px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #bbb;padding:4px 6px;text-align:left;vertical-align:top}th{background:#eee}</style></head><body>
       <div style="display:flex;align-items:center;gap:12px"><img src="${LOGO_AREAS_VERDES_B64}" style="height:46px"/><div><h1>Hoja de vida — ${esc(eq.nombre)}</h1><div style="color:#555">${esc([eq.categoria,eq.marca,eq.modelo,eq.patente].filter(Boolean).join(" · "))} · Impreso el ${esc(fmt(hoy))}</div></div></div>
-      <h2>Ficha</h2><table><tr><th>Fecha de compra</th><td>${esc(fmt(eq.fechaCompra))}</td><th>Combustible</th><td>${esc(eq.tipoCombustible||"—")}</td><th>Horas acumuladas</th><td>${Math.round(horasAct)} h</td></tr></table>
+      <h2>Ficha</h2><table><tr><th>Fecha de compra</th><td>${esc(fmt(eq.fechaCompra))}</td><th>Combustible</th><td>${esc(eq.tipoCombustible||"—")}</td><th>${uniNom} acumulados</th><td>${Math.round(horasAct)} ${uni}</td></tr></table>
       <h2>Alarmas de mantención</h2>${filasAl?`<table><tr><th>Parte</th><th>Cada</th><th>Último</th><th>Próxima</th><th>Estado</th></tr>${filasAl}</table>`:"<div>Sin alarmas.</div>"}
-      <h2>Historial de cambios, mantenciones y reparaciones</h2>${filasEv?`<table><tr><th>Fecha</th><th>Parte / trabajo</th><th>Tipo</th><th>Quién</th><th>Horas</th><th>Costo</th><th>Detalle</th></tr>${filasEv}</table>`:"<div>Sin registros.</div>"}
-      <h2>Registro de horas de uso (últimos 40)</h2>${filasHo?`<table><tr><th>Fecha</th><th>Horas</th><th>Observación</th></tr>${filasHo}</table>`:"<div>Sin registros de horas.</div>"}
+      <h2>Historial de cambios, mantenciones y reparaciones</h2>${filasEv?`<table><tr><th>Fecha</th><th>Parte / trabajo</th><th>Tipo</th><th>Quién</th><th>${uniNom}</th><th>Costo</th><th>Detalle</th></tr>${filasEv}</table>`:"<div>Sin registros.</div>"}
+      <h2>Registro de ${uni==="km"?"kilometraje":"horas de uso"} (últimos 40)</h2>${filasHo?`<table><tr><th>Fecha</th><th>${uniNom}</th><th>Observación</th></tr>${filasHo}</table>`:"<div>Sin registros de horas.</div>"}
       </body></html>`);
     w.document.close();
     setTimeout(()=>{ try{ w.focus(); w.print(); }catch(e){} },400);
@@ -19786,31 +19789,33 @@ function HojaVidaMaquinaria({ S, bodegasData, setBodegasData, hojas, setHojas, h
                 {TIPOS_COMBUSTIBLE.map(t=><option key={t}>{t}</option>)}
               </select>
             </div>
-            <div><label style={labelSt}>⏱️ Horas de uso</label><div style={{fontSize:16,fontWeight:700,color:"#fb923c",padding:"6px 0"}}>{Math.round(horasAct)} h</div></div>
+            <div><label style={labelSt}>📏 Medida de uso</label>
+              <select style={S.input} value={uni} disabled={!puedeEditar} onChange={e=>setEq({unidadUso:e.target.value})}><option value="h">Horas</option><option value="km">Kilómetros</option></select>
+              <div style={{fontSize:13,fontWeight:700,color:"#fb923c",marginTop:3}}>{Math.round(horasAct)} {uni} acumulados</div></div>
           </div>
         </div>
 
         {/* Horas de uso (ex Horómetro) */}
         <div style={{...S.card,padding:16,marginBottom:12}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:8}}>
-            <div style={{fontSize:13,fontWeight:700,color:"#fb923c"}}>⏱️ Horas de uso · acumuladas: {Math.round(horasAct)} h</div>
-            {puedeEditar&&<button className="btn-p" style={{...S.btn,fontSize:12,padding:"4px 12px"}} onClick={()=>setHoroForm({fecha:hoy,horas:"",obs:""})}>➕ Registrar horas</button>}
+            <div style={{fontSize:13,fontWeight:700,color:"#fb923c"}}>{uni==="km"?"📏 Kilometraje":"⏱️ Horas de uso"} · acumulado: {Math.round(horasAct)} {uni}</div>
+            {puedeEditar&&<button className="btn-p" style={{...S.btn,fontSize:12,padding:"4px 12px"}} onClick={()=>setHoroForm({fecha:hoy,horas:"",obs:""})}>➕ Registrar {uni==="km"?"kilómetros":"horas"}</button>}
           </div>
           {horoForm&&(
             <div style={{padding:12,marginBottom:10,background:"rgba(251,146,60,0.06)",border:"1px solid rgba(251,146,60,0.3)",borderRadius:8}}>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:10}}>
                 <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={horoForm.fecha} onChange={e=>setHoroForm(p=>({...p,fecha:e.target.value}))}/></div>
-                <div><label style={labelSt}>Horas trabajadas (se suman)</label><input type="number" min={0} step="0.1" style={S.input} value={horoForm.horas} onChange={e=>setHoroForm(p=>({...p,horas:e.target.value}))}/></div>
-                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observación</label><input style={S.input} value={horoForm.obs} onChange={e=>setHoroForm(p=>({...p,obs:e.target.value}))} placeholder="Ej: corte de fairways · o «Horas iniciales» para equipos antiguos"/></div>
+                <div><label style={labelSt}>{uni==="km"?"Kilómetros recorridos (se suman)":"Horas trabajadas (se suman)"}</label><input type="number" min={0} step="0.1" style={S.input} value={horoForm.horas} onChange={e=>setHoroForm(p=>({...p,horas:e.target.value}))}/></div>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observación</label><input style={S.input} value={horoForm.obs} onChange={e=>setHoroForm(p=>({...p,obs:e.target.value}))} placeholder="Ej: corte de fairways · o «Lectura inicial» para equipos antiguos"/></div>
               </div>
-              <div style={{display:"flex",gap:8,marginTop:10}}><button className="btn-p" style={S.btn} onClick={guardarHoras}>✓ Guardar horas</button><button className="btn-g" style={S.btn} onClick={()=>setHoroForm(null)}>Cancelar</button></div>
+              <div style={{display:"flex",gap:8,marginTop:10}}><button className="btn-p" style={S.btn} onClick={guardarHoras}>✓ Guardar</button><button className="btn-g" style={S.btn} onClick={()=>setHoroForm(null)}>Cancelar</button></div>
             </div>
           )}
-          {regsHoro.length===0&&!horoForm&&<div style={{fontSize:12,color:"#6a8a7a"}}>Sin registros de horas. Las alarmas por horas cuentan desde estas horas acumuladas.</div>}
+          {regsHoro.length===0&&!horoForm&&<div style={{fontSize:12,color:"#6a8a7a"}}>Sin registros. Las alarmas por horas/km cuentan desde lo acumulado aquí.</div>}
           <div style={{display:"flex",flexDirection:"column",gap:4}}>
             {(verTodasHoras?regsHoro:regsHoro.slice(0,5)).map(r=>(
               <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:6,padding:"5px 10px",background:"rgba(255,255,255,0.03)",borderRadius:8,fontSize:12}}>
-                <span><b style={{color:"#fb923c"}}>{r.horas} h</b> <span style={{color:"#6aaa7a"}}>· {fmt(r.fecha)}</span>{r.obs&&<span style={{color:"#8aa89a"}}> · {r.obs}</span>}</span>
+                <span><b style={{color:"#fb923c"}}>{r.horas} {uni}</b> <span style={{color:"#6aaa7a"}}>· {fmt(r.fecha)}</span>{r.obs&&<span style={{color:"#8aa89a"}}> · {r.obs}</span>}</span>
                 {puedeEditar&&<button className="btn-d" style={{...S.btn,fontSize:11,padding:"2px 8px"}} onClick={()=>borrarHoras(r.id)}>🗑</button>}
               </div>
             ))}
@@ -19829,8 +19834,8 @@ function HojaVidaMaquinaria({ S, bodegasData, setBodegasData, hojas, setHojas, h
             <div key={a.alarma.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,padding:"7px 10px",marginBottom:5,background:"rgba(255,255,255,0.03)",borderRadius:8,border:`1px solid ${colorEstadoAlarmaMaq(a.estado)}40`,opacity:a.alarma.activa===false?0.5:1}}>
               <div>
                 <span style={{fontSize:13,fontWeight:700,color:"#ede9e0"}}>{a.alarma.parte}</span>
-                <span style={{fontSize:11,color:"#6aaa7a",marginLeft:8}}>cada {[a.alarma.cadaDias>0?`${a.alarma.valor} ${(UNIDADES_ALARMA_MAQ.find(u=>u[0]===a.alarma.unidad)||[0,"días"])[1]}`:"",a.alarma.cadaHoras>0?`${a.alarma.cadaHoras} h`:""].filter(Boolean).join(" o ")}</span>
-                <div style={{fontSize:11,color:"#8aa89a"}}>Último: {a.ultimo?`${fmt(a.ultimo.fecha)}${a.ultimo.responsable?` (${a.ultimo.responsable})`:""}`:(a.baseFecha?`base ${fmt(a.baseFecha)}`:"sin registro")}{a.proxFecha?` · próxima: ${fmt(a.proxFecha)}`:""}{a.proxHoras!==null?` · a las ${Math.round(a.proxHoras)} h`:""}</div>
+                <span style={{fontSize:11,color:"#6aaa7a",marginLeft:8}}>cada {[a.alarma.cadaDias>0?`${a.alarma.valor} ${(UNIDADES_ALARMA_MAQ.find(u=>u[0]===a.alarma.unidad)||[0,"días"])[1]}`:"",a.alarma.cadaHoras>0?`${a.alarma.cadaHoras} ${uni}`:""].filter(Boolean).join(" o ")}</span>
+                <div style={{fontSize:11,color:"#8aa89a"}}>Último: {a.ultimo?`${fmt(a.ultimo.fecha)}${a.ultimo.responsable?` (${a.ultimo.responsable})`:""}`:(a.baseFecha?`base ${fmt(a.baseFecha)}`:"sin registro")}{a.proxFecha?` · próxima: ${fmt(a.proxFecha)}`:""}{a.proxHoras!==null?` · a las ${Math.round(a.proxHoras)} ${uni}`:""}</div>
               </div>
               <div style={{display:"flex",alignItems:"center",gap:6}}>
                 <span style={{fontSize:11,fontWeight:700,color:colorEstadoAlarmaMaq(a.estado),padding:"2px 8px",borderRadius:10,background:`${colorEstadoAlarmaMaq(a.estado)}18`}}>{a.estado==="vencida"?"⛔ ":a.estado==="proxima"?"⏳ ":a.estado==="ok"?"✅ ":""}{textoRestanteAlarmaMaq(a)}</span>
@@ -19847,7 +19852,7 @@ function HojaVidaMaquinaria({ S, bodegasData, setBodegasData, hojas, setHojas, h
                 <div><label style={labelSt}>Cada</label>
                   <div style={{display:"flex",gap:6}}><input type="number" min={0} style={{...S.input,width:80}} value={alForm.valor} onChange={e=>setAlForm(p=>({...p,valor:e.target.value}))}/>
                   <select style={S.input} value={alForm.unidad} onChange={e=>setAlForm(p=>({...p,unidad:e.target.value}))}>{UNIDADES_ALARMA_MAQ.map(u=><option key={u[0]} value={u[0]}>{u[1]}</option>)}</select></div></div>
-                <div><label style={labelSt}>y/o cada (horas de uso)</label><input type="number" min={0} style={S.input} value={alForm.cadaHoras} onChange={e=>setAlForm(p=>({...p,cadaHoras:e.target.value}))} placeholder="Opcional"/></div>
+                <div><label style={labelSt}>y/o cada ({uni==="km"?"kilómetros":"horas de uso"})</label><input type="number" min={0} style={S.input} value={alForm.cadaHoras} onChange={e=>setAlForm(p=>({...p,cadaHoras:e.target.value}))} placeholder="Opcional"/></div>
                 <div><label style={labelSt}>Último cambio (si no hay registro)</label><input type="date" style={S.input} value={alForm.baseFecha||""} onChange={e=>setAlForm(p=>({...p,baseFecha:e.target.value}))}/></div>
               </div>
               <div style={{fontSize:10,color:"#6a8a7a",marginTop:6}}>Vence lo que ocurra primero (tiempo u horas). Si ya hay un cambio registrado de esta parte, se cuenta desde él; si no, desde la fecha que pongas aquí o la fecha de compra.</div>
@@ -19863,7 +19868,7 @@ function HojaVidaMaquinaria({ S, bodegasData, setBodegasData, hojas, setHojas, h
             {puedeEditar&&<button className="btn-p" style={{...S.btn,fontSize:12,padding:"4px 12px"}} onClick={()=>setEvForm({...vacioEv,horas:Math.round(horasAct)||""})}>➕ Registrar</button>}
           </div>
           {evForm&&(
-            <div style={{padding:12,marginBottom:10,background:"rgba(52,211,153,0.05)",border:"1px solid rgba(52,211,153,0.25)",borderRadius:8}}>
+            <div ref={evFormRef} style={{padding:12,marginBottom:10,background:"rgba(52,211,153,0.05)",border:"1px solid rgba(52,211,153,0.25)",borderRadius:8}}>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:10}}>
                 <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={evForm.fecha} onChange={e=>setEvForm(p=>({...p,fecha:e.target.value}))}/></div>
                 <div><label style={labelSt}>Tipo</label><select style={S.input} value={evForm.tipo} onChange={e=>setEvForm(p=>({...p,tipo:e.target.value}))}>{TIPOS_EVENTO_MAQ.map(t=><option key={t}>{t}</option>)}</select></div>
@@ -19871,7 +19876,7 @@ function HojaVidaMaquinaria({ S, bodegasData, setBodegasData, hojas, setHojas, h
                   <input list="partes-maq" style={S.input} value={evForm.parte} onChange={e=>setEvForm(p=>({...p,parte:e.target.value}))} placeholder="Ej: Asiento, Aceite, Panel, Perno delantero con tuercas, Chicharra…"/></div>
                 <div><label style={labelSt}>Quién lo hizo</label>
                   <input list="resp-maq" style={S.input} value={evForm.responsable} onChange={e=>setEvForm(p=>({...p,responsable:e.target.value}))} placeholder="Persona o taller"/></div>
-                <div><label style={labelSt}>Horas del equipo</label><input type="number" min={0} style={S.input} value={evForm.horas} onChange={e=>setEvForm(p=>({...p,horas:e.target.value}))}/></div>
+                <div><label style={labelSt}>{uni==="km"?"Kilómetros del equipo":"Horas del equipo"}</label><input type="number" min={0} style={S.input} value={evForm.horas} onChange={e=>setEvForm(p=>({...p,horas:e.target.value}))}/></div>
                 <div><label style={labelSt}>Costo (opcional)</label><input type="number" min={0} style={S.input} value={evForm.costo} onChange={e=>setEvForm(p=>({...p,costo:e.target.value}))}/></div>
                 <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Detalle</label><input style={S.input} value={evForm.detalle} onChange={e=>setEvForm(p=>({...p,detalle:e.target.value}))} placeholder="Marca/repuesto usado, motivo, observaciones…"/></div>
               </div>
@@ -19909,7 +19914,7 @@ function HojaVidaMaquinaria({ S, bodegasData, setBodegasData, hojas, setHojas, h
                     <div style={{fontSize:11,color:"#8aa89a"}}>{[e.responsable&&`👤 ${e.responsable}`,e.horas!==""&&e.horas!==undefined&&`${e.horas} h`,e.costo!==""&&e.costo!==undefined&&`$${Number(e.costo).toLocaleString("es-CL")}`,dPrev!==null&&`${dPrev} d desde el cambio anterior`,e.detalle].filter(Boolean).join(" · ")}</div>
                   </div>
                   {puedeEditar&&<div style={{display:"flex",gap:6}}>
-                    <button className="btn-g" style={{...S.btn,fontSize:11,padding:"3px 8px"}} onClick={()=>setEvForm({...vacioEv,...e,costo:e.costo??"",horas:e.horas??""})}>✏️</button>
+                    <button className="btn-g" style={{...S.btn,fontSize:11,padding:"3px 8px"}} onClick={()=>{setEvForm({...vacioEv,...e,costo:e.costo??"",horas:e.horas??""});setTimeout(()=>{try{evFormRef.current?.scrollIntoView({behavior:"smooth",block:"center"});}catch(_){}},60);}}>✏️ Editar</button>
                     <button className="btn-d" style={{...S.btn,fontSize:11,padding:"3px 8px"}} onClick={()=>borrarEv(e.id)}>🗑</button>
                   </div>}
                 </div>
@@ -26757,7 +26762,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-21.3";
+const BUILD_STAMP = "2026-10-21.4";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
