@@ -3170,6 +3170,12 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
   const [filtroResponsable, setFiltroResponsable] = React.useState("todos");
   const [filtroElemento, setFiltroElemento] = React.useState(""); // texto libre: coincide con cualquier parte del nombre del elemento
   const [diaImpresion, setDiaImpresion] = React.useState("");
+  const [modoPer, setModoPer] = React.useState("semana"); // "semana" | "mes"
+  const pad2P = n => String(n).padStart(2,"0");
+  const isoLocalP = d => `${d.getFullYear()}-${pad2P(d.getMonth()+1)}-${pad2P(d.getDate())}`;
+  const semanaISOStr = (d0) => { const d=new Date(d0.getFullYear(),d0.getMonth(),d0.getDate()); d.setDate(d.getDate()+3-((d.getDay()+6)%7)); const w1=new Date(d.getFullYear(),0,4); const w=1+Math.round(((d-w1)/86400000-3+((w1.getDay()+6)%7))/7); return `${d.getFullYear()}-W${pad2P(w)}`; };
+  const [valSemana, setValSemana] = React.useState(()=>semanaISOStr(new Date()));
+  const [valMes, setValMes] = React.useState(()=>isoLocalP(new Date()).slice(0,7));
   const [tabHist,      setTabHist]      = React.useState(tabInicial||"historial_macro"); // "historial_macro" | "historial_golf" | "buscar" | "turnos" | "renombrar"
   const [diaTurnoElegido, setDiaTurnoElegido] = React.useState(tabInicial==="turnos"?new Date().toISOString().slice(0,10):""); // fecha específica elegida para editar en "Ver/editar turnos"
   const [turnosTrabAbiertos, setTurnosTrabAbiertos] = React.useState({}); // {"dia_resp": bool} — vista por trabajador colapsada por defecto en "Ver/editar turnos"
@@ -3227,6 +3233,74 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
     return resultado;
   }
   const filtrarTareas = (tArr) => filtrarTareasHist(tArr, filtroEstado, filtroTarea, filtroZona);
+
+  const imprimirPeriodo = () => {
+    let desde, hasta, etiqueta;
+    if(modoPer==="mes"){
+      if(!valMes){ alert("Elige el mes."); return; }
+      const [y,m]=valMes.split("-").map(Number);
+      desde=`${valMes}-01`; hasta=`${valMes}-${pad2P(new Date(y,m,0).getDate())}`;
+      etiqueta=new Date(y,m-1,1).toLocaleDateString("es-CL",{month:"long",year:"numeric"});
+    } else {
+      const mm=/^(\d{4})-W(\d{2})$/.exec(valSemana||"");
+      if(!mm){ alert("Elige la semana."); return; }
+      const y=Number(mm[1]), w=Number(mm[2]);
+      const j4=new Date(y,0,4); const mon=new Date(y,0,4-((j4.getDay()+6)%7)+(w-1)*7); const sun=new Date(mon.getFullYear(),mon.getMonth(),mon.getDate()+6);
+      desde=isoLocalP(mon); hasta=isoLocalP(sun);
+      etiqueta=`Semana ${w} (${desde.split("-").reverse().join("-")} al ${hasta.split("-").reverse().join("-")})`;
+    }
+    const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+    const esc = x => String(x??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+    const dias = Object.keys(tareas).filter(d=>d>=desde&&d<=hasta).sort();
+    const porDia = dias.map(d=>({d,arr:filtrarTareas(normArr(tareas[d]))})).filter(x=>x.arr.length>0);
+    if(porDia.length===0){ alert("No hay tareas en ese período con los filtros actuales."); return; }
+    const todas = porDia.flatMap(x=>x.arr);
+    const cuenta = arr => { const c={hecha:0,no_pudo:0,en_curso:0,por_designar:0,pendiente:0}; arr.forEach(t=>{ const e=normalizarEstado(t.estado); if(c[e]!==undefined) c[e]++; else c.pendiente++; }); return c; };
+    const ct = cuenta(todas);
+    const pctDe = (c,n) => n?Math.round(c.hecha/n*100):0;
+    const porResp = {}; todas.forEach(t=>{ const r=t.responsable||"(sin asignar)"; (porResp[r] ||= []).push(t); });
+    const filasResp = Object.entries(porResp).sort((a,b)=>b[1].length-a[1].length).map(([r,arr])=>{ const c=cuenta(arr); return `<tr><td>${esc(r)}</td><td>${arr.length}</td><td>${c.hecha}</td><td>${c.no_pudo}</td><td>${arr.length-c.hecha-c.no_pudo}</td><td>${pctDe(c,arr.length)}%</td></tr>`; }).join("");
+    const porZona = {}; todas.forEach(t=>{ const z=t.zona||"(sin zona)"; (porZona[z] ||= []).push(t); });
+    const filasZona = Object.entries(porZona).sort((a,b)=>b[1].length-a[1].length).map(([z,arr])=>{ const c=cuenta(arr); return `<tr><td>${esc(z)}</td><td>${arr.length}</td><td>${c.hecha}</td><td>${c.no_pudo}</td><td>${arr.length-c.hecha-c.no_pudo}</td><td>${pctDe(c,arr.length)}%</td></tr>`; }).join("");
+    const nombreAmbito = zonaFijaActual==="golf"?"Golf":zonaFijaActual==="no-golf"?"Macrozonas (sin Golf)":"Todas las zonas";
+    const filtrosAct = [filtroEstado!=="todos"&&`Estado: ${EC[filtroEstado]?.label||filtroEstado}`,filtroTarea&&`Tarea: ${filtroTarea}`,filtroZona!=="todas"&&`Zona: ${filtroZona}`,filtroResponsable!=="todos"&&`Responsable: ${filtroResponsable}`,filtroElemento.trim()&&`Elemento: ${filtroElemento}`].filter(Boolean).join(" · ");
+    const nombreDia = d => new Date(d+"T12:00:00").toLocaleDateString("es-CL",{weekday:"long",day:"2-digit",month:"2-digit",year:"numeric"});
+    const bloquesDia = porDia.map(({d,arr})=>{
+      const c=cuenta(arr);
+      const filas=[...arr].sort((a,b)=>(a.zona||"").localeCompare(b.zona||"","es",{sensitivity:"base"})||(a.tarea||"").localeCompare(b.tarea||"","es",{sensitivity:"base"})).map(t=>{
+        const e=normalizarEstado(t.estado);
+        const cls=e==="hecha"?"est-ok":e==="no_pudo"?"est-bad":e==="en_curso"?"est-blue":e==="pendiente"?"est-pend":"est-gray";
+        const obs=[t.notas&&"📋 "+t.notas,t.notaWorker&&"⚠️ "+t.notaWorker].filter(Boolean).map(esc).join("<br>")||"-";
+        return `<tr><td class="${cls}">${EC[e]?.icon||"-"} ${esc(EC[e]?.label||t.estado)}</td><td><b>${esc(t.tarea)}</b></td><td>${esc(t.elemento||"")}</td><td>${esc(t.zona||"")}</td><td>${esc(t.responsable||"—")}</td><td>${obs}</td></tr>`;
+      }).join("");
+      return `<div class="dia"><h3>${esc(nombreDia(d))} <span class="mini">${arr.length} tareas · ✅ ${c.hecha}${c.no_pudo?` · 🔴 ${c.no_pudo}`:""} · ${pctDe(c,arr.length)}%</span></h3><table><thead><tr><th>Estado</th><th>Tarea</th><th>Elemento</th><th>Zona</th><th>Responsable</th><th>Observación</th></tr></thead><tbody>${filas}</tbody></table></div>`;
+    }).join("");
+    const win = window.open("","_blank","width=900,height=700");
+    if(!win){ alert("El navegador bloqueó la ventana emergente. Permítela para imprimir."); return; }
+    win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Informe ${esc(etiqueta)} — Estadio Español</title>
+    <style>
+      body{font-family:Georgia,serif;color:#1a2e1a;padding:28px;max-width:900px;margin:0 auto}
+      h1{font-size:21px;margin:0;color:#0d3320} h2{font-size:15px;margin:18px 0 6px;color:#0d3320;border-bottom:1px solid #9bbf9b;padding-bottom:2px}
+      h3{font-size:13px;margin:14px 0 4px;color:#14532d;text-transform:capitalize} .mini{font-size:11px;font-weight:400;color:#4b5563;text-transform:none}
+      .sub{font-size:13px;color:#4a7a4a;margin:4px 0 14px}
+      .stats{display:flex;flex-wrap:wrap;gap:18px;padding:10px 14px;background:#f0f7f0;border-radius:8px;font-size:14px}
+      table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:6px}
+      th{text-align:left;padding:6px 8px;background:#1a4a2e;color:#fff;font-size:10px;letter-spacing:0.6px;text-transform:uppercase}
+      tr:nth-child(even){background:#f5fbf5} td{padding:5px 8px;border-bottom:1px solid #dce8dc;vertical-align:top}
+      .est-ok{color:#166534}.est-bad{color:#991b1b}.est-pend{color:#92400e}.est-blue{color:#1e40af}.est-gray{color:#4b5563}
+      .dia{page-break-inside:auto} .pie{margin-top:20px;font-size:11px;color:#6b7280;border-top:1px solid #dce8dc;padding-top:10px}
+      @media print{body{padding:12px} tr{page-break-inside:avoid} h3{page-break-after:avoid}}
+    </style></head><body>
+    <div style="display:flex;align-items:center;gap:14px"><img src="${LOGO_AREAS_VERDES_B64}" style="height:46px"/><h1>📋 Informe de actividad — ${esc(etiqueta)}</h1></div>
+    <div class="sub">${esc(nombreAmbito)}${filtrosAct?" · "+esc(filtrosAct):""} · Generado: ${new Date().toLocaleDateString("es-CL")} ${new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"})}</div>
+    <div class="stats"><span>Días con actividad: <b>${porDia.length}</b></span><span>Total tareas: <b>${todas.length}</b></span><span style="color:#166534">✅ Hechas: <b>${ct.hecha}</b></span><span>⏳ Pendientes: ${ct.pendiente}</span><span>🔵 En curso: ${ct.en_curso}</span><span>⬜ Por designar: ${ct.por_designar}</span><span style="color:#991b1b">🔴 No pudieron: <b>${ct.no_pudo}</b></span><span style="color:#1e40af"><b>${pctDe(ct,todas.length)}%</b> completado</span></div>
+    <h2>Resumen por trabajador</h2><table><thead><tr><th>Trabajador</th><th>Tareas</th><th>Hechas</th><th>No pudo</th><th>Otras</th><th>% hecho</th></tr></thead><tbody>${filasResp}</tbody></table>
+    <h2>Resumen por zona</h2><table><thead><tr><th>Zona</th><th>Tareas</th><th>Hechas</th><th>No pudo</th><th>Otras</th><th>% hecho</th></tr></thead><tbody>${filasZona}</tbody></table>
+    <h2>Detalle por día</h2>${bloquesDia}
+    <div class="pie">Estadio Español de Las Condes · Departamento de Áreas Verdes</div>
+    <script>window.onload=()=>{window.print();}<\/script></body></html>`);
+    win.document.close();
+  };
 
   const imprimirDia = (dia) => {
     const hpTdArr = filtrarTareas(tareas[dia]||[]);
@@ -3622,6 +3696,18 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
 
       {/* ── Historial normal (solo si tab es historial) ── */}
       {(tabHist==="historial_macro"||tabHist==="historial_golf")&&(<>
+      {/* Imprimir por semana / mes */}
+      <div style={{...S.card,padding:14,marginBottom:14,display:"flex",flexWrap:"wrap",alignItems:"flex-end",gap:10}}>
+        <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:"#a0d8b0",width:"100%"}}>🖨️ Imprimir informe por período <span style={{fontSize:11,fontWeight:400,color:"#6a8a7a"}}>({tabHist==="historial_golf"?"solo Golf":"macrozonas, sin Golf"} · respeta los filtros de abajo)</span></div>
+        <div style={{display:"flex",gap:6}}>
+          <button className={modoPer==="semana"?"btn-p":"btn-g"} style={{...S.btn,fontSize:12,padding:"5px 14px"}} onClick={()=>setModoPer("semana")}>Semana</button>
+          <button className={modoPer==="mes"?"btn-p":"btn-g"} style={{...S.btn,fontSize:12,padding:"5px 14px"}} onClick={()=>setModoPer("mes")}>Mes</button>
+        </div>
+        {modoPer==="semana"
+          ? <input type="week" style={{...S.input,fontSize:13,width:190}} value={valSemana} onChange={e=>setValSemana(e.target.value)}/>
+          : <input type="month" style={{...S.input,fontSize:13,width:190}} value={valMes} onChange={e=>setValMes(e.target.value)}/>}
+        <button className="btn-p" style={{...S.btn,fontSize:12,padding:"6px 16px"}} onClick={imprimirPeriodo}>🖨️ Imprimir {modoPer==="semana"?"semana":"mes"}</button>
+      </div>
       {/* Filtros */}
       <div style={{...S.card,padding:16,marginBottom:18}}>
         <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:12,color:"#a0d8b0"}}>🔍 Filtros</div>
@@ -26762,7 +26848,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-21.4";
+const BUILD_STAMP = "2026-10-21.5";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
