@@ -19553,11 +19553,13 @@ const TIPOS_COMBUSTIBLE = ["Bencina","Petróleo","Electricidad","Sin combustible
 const TIPOS_EVENTO_MAQ = ["Cambio de repuesto / parte","Mantención preventiva","Reparación","Reparación externa (taller)","Revisión"];
 const PARTES_SUGERIDAS_MAQ = ["Aceite","Filtro de aceite","Filtro de aire","Bujía","Batería","Correa","Cuchillas / afilado","Asiento","Panel","Perno delantero con tuercas","Chicharra","Parachoque","Neumático","Frenos","Cadena","Luces","Manubrio","Engrasado","Cargador"];
 const UNIDADES_ALARMA_MAQ = [["dias","días",1],["semanas","semanas",7],["meses","meses",30],["anios","años",365]];
+// Firebase no admite "." # $ / [ ] en claves: los ids de equipos pueden traer decimales
+const kEqMaq = id => String(id).replace(/[.#$\/\[\]]/g,"_");
 const normParteMaq = s => (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]/g,"");
 const sumarDiasISO = (f,n) => { const d=new Date(f+"T12:00:00"); d.setDate(d.getDate()+Math.round(n)); return d.toISOString().slice(0,10); };
 const diasEntreISO = (a,b) => Math.round((new Date(b+"T12:00:00")-new Date(a+"T12:00:00"))/86400000);
 const horasEquipoMaq = (item, horometro) => {
-  const regs = Object.values((horometro?.[item.id]||{}).registros||{});
+  const regs = Object.values((horometro?.[kEqMaq(item.id)]||{}).registros||{});
   const suma = regs.reduce((a,r)=>a+Number(r.horas||0),0);
   return suma>0 ? suma : (Number(item.horasUso)||0);
 };
@@ -19566,7 +19568,7 @@ const equiposMaq = (bodegasData) => arrDeCR(bodegasData?.b04?.items).filter(i=>{
 const calcAlarmasMaq = (items, hojas, horometro, hoy) => {
   const out = [];
   (items||[]).forEach(eq=>{
-    const hv = (hojas||{})[eq.id]||{};
+    const hv = (hojas||{})[kEqMaq(eq.id)]||{};
     const eventos = Object.values(hv.eventos||{});
     const horasAct = horasEquipoMaq(eq, horometro);
     Object.values(hv.alarmas||{}).forEach(al=>{
@@ -19610,14 +19612,14 @@ function MigradorHorometroMaq({ bodegasData, activo }) {
     const equipos = equiposMaq(bodegasData);
     if(equipos.length===0) return;
     corrio.current = true;
-    const pend = equipos.filter(eq=>!(hojas?.[eq.id]?.migradoHorometro));
+    const pend = equipos.filter(eq=>!(hojas?.[kEqMaq(eq.id)]?.migradoHorometro));
     if(pend.length===0) return;
     setHojas(prev=>{
       const out = {...(prev||{})};
       pend.forEach(eq=>{
-        const cur = out[eq.id]||{};
+        const cur = out[kEqMaq(eq.id)]||{};
         if(cur.migradoHorometro) return;
-        const h = (horometro||{})[eq.id]||{};
+        const h = (horometro||{})[kEqMaq(eq.id)]||{};
         const regs = Object.values(h.registros||{});
         const mants = Object.values(h.mantenimientos||{});
         const planCustom = h.plan ? (Array.isArray(h.plan)?h.plan:Object.values(h.plan)).filter(x=>x&&x.tarea) : null;
@@ -19638,7 +19640,7 @@ function MigradorHorometroMaq({ bodegasData, activo }) {
           if(yaExiste||alarmas[id]) return;
           alarmas[id] = {id,parte:pl.tarea,valor:"",unidad:"dias",cadaDias:0,cadaHoras:ch,baseFecha:"",baseHoras:0,activa:true,origen:"horometro"};
         });
-        out[eq.id] = {...cur,eventos,alarmas,migradoHorometro:true};
+        out[kEqMaq(eq.id)] = {...cur,eventos,alarmas,migradoHorometro:true};
       });
       return out;
     });
@@ -19677,7 +19679,7 @@ function HojaVidaMaquinaria({ S, bodegasData, setBodegasData, hojas, setHojas, h
   const equipos = equiposMaq(bodegasData).sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||"","es",{sensitivity:"base"}));
   const [eqId, setEqId] = React.useState("");
   const eq = equipos.find(e=>String(e.id)===String(eqId)) || null;
-  const hv = (eq && hojas?.[eq.id]) || {};
+  const hv = (eq && hojas?.[kEqMaq(eq.id)]) || {};
   const eventos = Object.values(hv.eventos||{}).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")||String(b.id).localeCompare(String(a.id)));
   const alarmasEq = calcAlarmasMaq(eq?[eq]:[], hojas, horometro, hoy);
   const horasAct = eq ? horasEquipoMaq(eq, horometro) : 0;
@@ -19690,10 +19692,10 @@ function HojaVidaMaquinaria({ S, bodegasData, setBodegasData, hojas, setHojas, h
   const [abiertas, setAbiertas] = React.useState({});
   const [horoForm, setHoroForm] = React.useState(null);   // {fecha,horas,obs}
   const [verTodasHoras, setVerTodasHoras] = React.useState(false);
-  const regsHoro = eq ? Object.values(horometro?.[eq.id]?.registros||{}).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")||String(b.id).localeCompare(String(a.id))) : [];
+  const regsHoro = eq ? Object.values(horometro?.[kEqMaq(eq.id)]?.registros||{}).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")||String(b.id).localeCompare(String(a.id))) : [];
 
   const setEq = (patch) => setBodegasData(p=>({...p,b04:{...(p.b04||{}),items:arrDeCR(p.b04?.items).map(i=>String(i.id)===String(eq.id)?{...i,...patch}:i)}}));
-  const setHV = (fn) => setHojas(prev=>{ const cur=(prev||{})[eq.id]||{}; return {...(prev||{}),[eq.id]:fn(cur)}; });
+  const setHV = (fn) => setHojas(prev=>{ const cur=(prev||{})[kEqMaq(eq.id)]||{}; return {...(prev||{}),[kEqMaq(eq.id)]:fn(cur)}; });
 
   const guardarEv = () => {
     if(!evForm.parte.trim()){ alert("Escribe la parte o el trabajo (ej. Aceite, Asiento, Chicharra)."); return; }
@@ -19723,10 +19725,10 @@ function HojaVidaMaquinaria({ S, bodegasData, setBodegasData, hojas, setHojas, h
     if(!(n>0)){ alert("Escribe las horas trabajadas (mayor que 0)."); return; }
     if(!horoForm.fecha){ alert("Falta la fecha."); return; }
     const id = "h"+Date.now();
-    setHorometro(prev=>{ const cur=(prev||{})[eq.id]||{}; return {...(prev||{}),[eq.id]:{...cur,registros:{...(cur.registros||{}),[id]:{id,fecha:horoForm.fecha,horas:n,obs:horoForm.obs||"",creadoEn:new Date().toISOString()}}}}; });
+    setHorometro(prev=>{ const cur=(prev||{})[kEqMaq(eq.id)]||{}; return {...(prev||{}),[kEqMaq(eq.id)]:{...cur,registros:{...(cur.registros||{}),[id]:{id,fecha:horoForm.fecha,horas:n,obs:horoForm.obs||"",creadoEn:new Date().toISOString()}}}}; });
     setHoroForm(null);
   };
-  const borrarHoras = (id) => { if(!window.confirm("¿Eliminar este registro de horas?")) return; setHorometro(prev=>{ const cur=(prev||{})[eq.id]||{}; const r={...(cur.registros||{})}; delete r[id]; return {...(prev||{}),[eq.id]:{...cur,registros:r}}; }); };
+  const borrarHoras = (id) => { if(!window.confirm("¿Eliminar este registro de horas?")) return; setHorometro(prev=>{ const cur=(prev||{})[kEqMaq(eq.id)]||{}; const r={...(cur.registros||{})}; delete r[id]; return {...(prev||{}),[kEqMaq(eq.id)]:{...cur,registros:r}}; }); };
 
   const imprimirHoja = () => {
     const esc = x => String(x??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -26755,7 +26757,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-21.2";
+const BUILD_STAMP = "2026-10-21.3";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
