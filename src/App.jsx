@@ -19854,7 +19854,8 @@ function HojaVidaMaquinaria({ S, bodegasData, setBodegasData, hojas, setHojas, h
   const uni = uniUsoMaq(eq); const uniNom = uni==="km"?"Kilómetros":"Horas";
   const nombresPersonal = (Array.isArray(personal)?personal:Object.values(personal||{})).filter(noRetirado).map(p=>p.nombre).sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
   const labelSt = {fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"};
-  const vacioEv = {fecha:hoy,tipo:TIPOS_EVENTO_MAQ[0],parte:"",detalle:"",responsable:"",costo:"",horas:""};
+  const lineaVacia = () => ({tipo:TIPOS_EVENTO_MAQ[0],parte:"",detalle:"",costo:""});
+  const vacioEv = {fecha:hoy,tipo:TIPOS_EVENTO_MAQ[0],parte:"",detalle:"",responsable:"",costo:"",horas:"",lineas:[lineaVacia()]};
   const [evForm, setEvForm] = React.useState(null);   // {…, id?} — null = cerrado
   const vacioAl = {parte:"",valor:"",unidad:"meses",cadaHoras:"",baseFecha:"",activa:true};
   const [alForm, setAlForm] = React.useState(null);
@@ -19868,11 +19869,20 @@ function HojaVidaMaquinaria({ S, bodegasData, setBodegasData, hojas, setHojas, h
   const setHV = (fn) => setHojas(prev=>{ const cur=(prev||{})[kEqMaq(eq.id)]||{}; return {...(prev||{}),[kEqMaq(eq.id)]:fn(cur)}; });
 
   const guardarEv = () => {
-    if(!evForm.parte.trim()){ alert("Escribe la parte o el trabajo (ej. Aceite, Asiento, Chicharra)."); return; }
     if(!evForm.fecha){ alert("Falta la fecha."); return; }
-    const id = evForm.id || ("e"+Date.now());
-    const reg = {id,fecha:evForm.fecha,tipo:evForm.tipo,parte:evForm.parte.trim(),detalle:evForm.detalle||"",responsable:evForm.responsable||"",costo:evForm.costo===""?"":Number(evForm.costo),horas:evForm.horas===""?"":Number(evForm.horas),creadoEn:evForm.creadoEn||new Date().toISOString()};
-    setHV(cur=>({...cur,eventos:{...(cur.eventos||{}),[id]:reg}}));
+    const horasV = evForm.horas===""?"":Number(evForm.horas);
+    if(evForm.id){
+      if(!evForm.parte.trim()){ alert("Escribe la parte o el trabajo (ej. Aceite, Asiento, Chicharra)."); return; }
+      const reg = {id:evForm.id,fecha:evForm.fecha,tipo:evForm.tipo,parte:evForm.parte.trim(),detalle:evForm.detalle||"",responsable:(evForm.responsable||"").trim(),costo:evForm.costo===""?"":Number(evForm.costo),horas:horasV,creadoEn:evForm.creadoEn||new Date().toISOString()};
+      setHV(cur=>({...cur,eventos:{...(cur.eventos||{}),[evForm.id]:reg}}));
+    } else {
+      const lineas = (evForm.lineas||[]).filter(l=>(l.parte||"").trim());
+      if(lineas.length===0){ alert("Escribe al menos una parte o trabajo (ej. Aceite, Asiento, Chicharra)."); return; }
+      const base = Date.now();
+      const nuevos = {};
+      lineas.forEach((l,i)=>{ const id = "e"+base+"_"+i; nuevos[id] = {id,fecha:evForm.fecha,tipo:l.tipo||TIPOS_EVENTO_MAQ[0],parte:l.parte.trim(),detalle:l.detalle||"",responsable:(evForm.responsable||"").trim(),costo:l.costo===""||l.costo===undefined?"":Number(l.costo),horas:horasV,creadoEn:new Date().toISOString()}; });
+      setHV(cur=>({...cur,eventos:{...(cur.eventos||{}),...nuevos}}));
+    }
     setEvForm(null);
   };
   const borrarEv = (id) => { if(!window.confirm("¿Eliminar este registro del historial?")) return; setHV(cur=>{ const ev={...(cur.eventos||{})}; delete ev[id]; return {...cur,eventos:ev}; }); };
@@ -20038,16 +20048,34 @@ function HojaVidaMaquinaria({ S, bodegasData, setBodegasData, hojas, setHojas, h
             <div ref={evFormRef} style={{padding:12,marginBottom:10,background:"rgba(52,211,153,0.05)",border:"1px solid rgba(52,211,153,0.25)",borderRadius:8}}>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:10}}>
                 <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={evForm.fecha} onChange={e=>setEvForm(p=>({...p,fecha:e.target.value}))}/></div>
-                <div><label style={labelSt}>Tipo</label><select style={S.input} value={evForm.tipo} onChange={e=>setEvForm(p=>({...p,tipo:e.target.value}))}>{TIPOS_EVENTO_MAQ.map(t=><option key={t}>{t}</option>)}</select></div>
-                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Parte / trabajo</label>
-                  <input list="partes-maq" style={S.input} value={evForm.parte} onChange={e=>setEvForm(p=>({...p,parte:e.target.value}))} placeholder="Ej: Asiento, Aceite, Panel, Perno delantero con tuercas, Chicharra…"/></div>
-                <div><label style={labelSt}>Quién lo hizo</label>
-                  <input list="resp-maq" style={S.input} value={evForm.responsable} onChange={e=>setEvForm(p=>({...p,responsable:e.target.value}))} placeholder="Persona o taller"/></div>
+                <div><label style={labelSt}>Quién lo hizo (escribe el nombre o elige)</label>
+                  <input list="resp-maq" style={S.input} value={evForm.responsable} onChange={e=>setEvForm(p=>({...p,responsable:e.target.value}))} placeholder="Nombre de la persona o del taller"/></div>
                 <div><label style={labelSt}>{uni==="km"?"Kilómetros del equipo":"Horas del equipo"}</label><input type="number" min={0} style={S.input} value={evForm.horas} onChange={e=>setEvForm(p=>({...p,horas:e.target.value}))}/></div>
-                <div><label style={labelSt}>Costo (opcional)</label><input type="number" min={0} style={S.input} value={evForm.costo} onChange={e=>setEvForm(p=>({...p,costo:e.target.value}))}/></div>
-                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Detalle</label><input style={S.input} value={evForm.detalle} onChange={e=>setEvForm(p=>({...p,detalle:e.target.value}))} placeholder="Marca/repuesto usado, motivo, observaciones…"/></div>
               </div>
-              <div style={{display:"flex",gap:8,marginTop:10}}><button className="btn-p" style={S.btn} onClick={guardarEv}>✓ {evForm.id?"Guardar cambios":"Guardar"}</button><button className="btn-g" style={S.btn} onClick={()=>setEvForm(null)}>Cancelar</button></div>
+              {evForm.id ? (
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:10,marginTop:10}}>
+                  <div><label style={labelSt}>Tipo</label><select style={S.input} value={evForm.tipo} onChange={e=>setEvForm(p=>({...p,tipo:e.target.value}))}>{TIPOS_EVENTO_MAQ.map(t=><option key={t}>{t}</option>)}</select></div>
+                  <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Parte / trabajo</label>
+                    <input list="partes-maq" style={S.input} value={evForm.parte} onChange={e=>setEvForm(p=>({...p,parte:e.target.value}))} placeholder="Ej: Asiento, Aceite, Panel…"/></div>
+                  <div><label style={labelSt}>Costo (opcional)</label><input type="number" min={0} style={S.input} value={evForm.costo} onChange={e=>setEvForm(p=>({...p,costo:e.target.value}))}/></div>
+                  <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Detalle</label><input style={S.input} value={evForm.detalle} onChange={e=>setEvForm(p=>({...p,detalle:e.target.value}))} placeholder="Marca/repuesto usado, motivo, observaciones…"/></div>
+                </div>
+              ) : (
+                <div style={{marginTop:10}}>
+                  <div style={{fontSize:11,color:"#6aaa7a",marginBottom:6}}>Partes o trabajos hechos ese día por la misma persona/taller:</div>
+                  {(evForm.lineas||[]).map((l,i)=>(
+                    <div key={i} style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:8,padding:8,marginBottom:6,background:"rgba(255,255,255,0.03)",borderRadius:8,alignItems:"end"}}>
+                      <div><label style={labelSt}>Tipo</label><select style={S.input} value={l.tipo} onChange={e=>setEvForm(p=>({...p,lineas:p.lineas.map((x,j)=>j===i?{...x,tipo:e.target.value}:x)}))}>{TIPOS_EVENTO_MAQ.map(t=><option key={t}>{t}</option>)}</select></div>
+                      <div style={{gridColumn:"span 2"}}><label style={labelSt}>Parte / trabajo</label><input list="partes-maq" style={S.input} value={l.parte} onChange={e=>setEvForm(p=>({...p,lineas:p.lineas.map((x,j)=>j===i?{...x,parte:e.target.value}:x)}))} placeholder="Ej: Asiento, Aceite, Panel, Chicharra…"/></div>
+                      <div><label style={labelSt}>Costo</label><input type="number" min={0} style={S.input} value={l.costo} onChange={e=>setEvForm(p=>({...p,lineas:p.lineas.map((x,j)=>j===i?{...x,costo:e.target.value}:x)}))}/></div>
+                      <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Detalle</label><input style={S.input} value={l.detalle} onChange={e=>setEvForm(p=>({...p,lineas:p.lineas.map((x,j)=>j===i?{...x,detalle:e.target.value}:x)}))} placeholder="Marca/repuesto usado, motivo…"/></div>
+                      {(evForm.lineas||[]).length>1&&<button className="btn-d" style={{...S.btn,fontSize:11,padding:"3px 8px",justifySelf:"start"}} onClick={()=>setEvForm(p=>({...p,lineas:p.lineas.filter((_,j)=>j!==i)}))}>✕ Quitar</button>}
+                    </div>
+                  ))}
+                  <button className="btn-g" style={{...S.btn,fontSize:12,padding:"4px 12px"}} onClick={()=>setEvForm(p=>({...p,lineas:[...(p.lineas||[]),{...lineaVacia(),tipo:(p.lineas||[]).slice(-1)[0]?.tipo||TIPOS_EVENTO_MAQ[0]}]}))}>➕ Agregar otra parte</button>
+                </div>
+              )}
+              <div style={{display:"flex",gap:8,marginTop:10}}><button className="btn-p" style={S.btn} onClick={guardarEv}>✓ {evForm.id?"Guardar cambios":((evForm.lineas||[]).filter(l=>(l.parte||"").trim()).length>1?"Guardar todas":"Guardar")}</button><button className="btn-g" style={S.btn} onClick={()=>setEvForm(null)}>Cancelar</button></div>
             </div>
           )}
           {eventos.length===0&&!evForm&&<div style={{fontSize:12,color:"#6a8a7a"}}>Aún no hay registros. Puedes ingresar también cambios antiguos con su fecha real.</div>}
@@ -26929,7 +26957,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-22.8";
+const BUILD_STAMP = "2026-10-22.9";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
