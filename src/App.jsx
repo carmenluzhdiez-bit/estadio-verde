@@ -14099,6 +14099,7 @@ const PLANTILLA_PRE_TORNEO = {
 
 // ─── ANÁLISIS MEDICIONES GOLF ────────────────────────────────────────────────
 function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisisTasas, colorCategoria, S }) {
+  const [semOffset, setSemOffset] = React.useState(0); // 0 = semana actual, -1 = anterior…
   const [showHistCortes, setShowHistCortes] = React.useState(false);
   const [showRegIndividuales, setShowRegIndividuales] = React.useState(false);
   const hoyProjStr = fechaLocal();
@@ -14228,13 +14229,120 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
       ...dd,
       altProj: valoresPorFecha[dd.fecha] !== undefined ? valoresPorFecha[dd.fecha] : d.altBase,
     }));
-    return {zona:d.z, tasaGlobal:d.tasaGlobal, tasaReal:d.tasaReal, tasaProyeccion:tasaFinal, diasUltimoIntervalo:d.diasUltimoIntervalo, deltaUltimo:d.deltaUltimo, altBase:d.altBase, fechaBase:d.fechaBase, baseOrigen:d.baseOrigen, proj, categoria:d.categoria, datoPocoConfiable:d.datoPocoConfiable, diasDesdeBase:d.diasDesdeBase, usoPromedioOtros};
+    return {zona:d.z, eventos:d.eventos, tasaGlobal:d.tasaGlobal, tasaReal:d.tasaReal, tasaProyeccion:tasaFinal, diasUltimoIntervalo:d.diasUltimoIntervalo, deltaUltimo:d.deltaUltimo, altBase:d.altBase, fechaBase:d.fechaBase, baseOrigen:d.baseOrigen, proj, categoria:d.categoria, datoPocoConfiable:d.datoPocoConfiable, diasDesdeBase:d.diasDesdeBase, usoPromedioOtros};
   });
 
   if(!zonasDatos.length) return null;
 
   const altCorte = 4.5;
+  const colorTasaCrec = v => v<0.3?"#ef4444":v<0.6?"#f59e0b":"#22c55e";
+  const lunesSel = new Date(lunesSemana); lunesSel.setDate(lunesSel.getDate()+semOffset*7);
+  const diasSel = Array.from({length:7},(_,i)=>{ const d=new Date(lunesSel); d.setDate(d.getDate()+i); const ds=d.toISOString().slice(0,10); return {fecha:ds,label:diasSemana[i]+" "+d.getDate(),esHoy:ds===hoyProjStr,futuro:ds>hoyProjStr}; });
+  // Crecimiento (mm) de un green en un día: real si el día queda entre dos mediciones; estimado con la tasa usada si no; ✂️ si ese día se cortó.
+  const crecDia = (zd, ds) => {
+    const ev = zd.eventos||[];
+    if(!ev.length || ds < ev[0].fecha) return null;
+    const delDia = ev.filter(e=>e.fecha===ds);
+    const corte = delDia.find(e=>e.tipo==="corte");
+    if(corte) return {tipo:"corte", alt:corte.alt};
+    const prev = [...ev].reverse().find(e=>e.fecha<ds);
+    if(!prev) return null;
+    const sig = ev.find(e=>e.fecha>=ds);
+    if(sig && sig.tipo==="medicion"){
+      const n = diasEntreISO(prev.fecha, sig.fecha);
+      const v = n>0 ? (sig.alt-prev.alt)/n : null;
+      if(v!==null && v>=0) return {tipo:"real", v};
+    }
+    return {tipo:"est", v:zd.tasaProyeccion};
+  };
+  const totalSem = (zd, dias) => {
+    let tot=0, n=0;
+    dias.forEach(dd=>{ if(dd.fecha>hoyProjStr) return; const c=crecDia(zd,dd.fecha); if(c&&c.tipo!=="corte"&&c.v!==undefined&&c.v!==null){ tot+=c.v; n++; } });
+    return {tot:Math.round(tot*100)/100, n};
+  };
+  const r2 = v => Math.round(v*100)/100;
+  const fmtF = f => f.split("-").slice(1).reverse().join("-");
+  const bloqueClasificacion = (
+    <div style={{...S.card,padding:16,marginBottom:14}}>
+      <div style={{fontSize:13,fontWeight:700,color:"#34d399",marginBottom:12}}>⚡ Clasificación por tasa de crecimiento</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+        {[{modo:"dia",label:"📅 Hoy — tasa usada (mm/día)",maxW:1.5},{modo:"sem",label:`📆 Esta semana — crecimiento acumulado (mm)`,maxW:10}].map(({modo,label,maxW})=>(
+          <div key={modo}>
+            <div style={{fontSize:11,color:"#5a9a7a",marginBottom:8,fontWeight:600,letterSpacing:"0.5px",textTransform:"uppercase"}}>{label}</div>
+            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              {zonasDatos.map(zd=>{
+                const tasaDia = zd.tasaProyeccion;
+                let val, color;
+                if(modo==="dia"){ val=r2(tasaDia); color=colorTasaCrec(tasaDia); }
+                else { const t=totalSem(zd,diasProx); if(!t.n) return null; val=t.tot; color=colorTasaCrec(t.tot/t.n); }
+                const barW = Math.min(Math.abs(val)/maxW*100,100);
+                return (
+                  <div key={zd.zona.id} style={{display:"flex",alignItems:"center",gap:6}}>
+                    <div style={{width:70,fontSize:10,color:"#7aaa80",flexShrink:0,textAlign:"right"}}>{zd.zona.nombre}</div>
+                    <div style={{flex:1,background:"rgba(255,255,255,0.06)",borderRadius:3,height:16,overflow:"hidden"}}><div style={{width:`${barW}%`,height:"100%",background:color,borderRadius:3,opacity:0.85}}/></div>
+                    <div style={{width:70,fontSize:11,fontWeight:700,color:zd.usoPromedioOtros?"#38bdf8":"#fbbf24",flexShrink:0}}>{val>0?"+":""}{val}{zd.usoPromedioOtros&&<span style={{fontSize:8,marginLeft:2}}>🔗</span>}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{fontSize:10,color:"#5a9a7a",marginTop:10}}>
+        Lento &lt;0.3 mm/d (rojo) · Medio 0.3–0.6 (ámbar) · Rápido &gt;0.6 (verde) · 🔗 = green sin medición posterior al corte: usa el promedio de los otros greens. El acumulado semanal suma el crecimiento real (entre mediciones) o estimado de cada día hasta hoy.
+      </div>
+    </div>
+  );
+  const bloqueCrecSemanal = (
+    <div style={{...S.card,padding:16,marginBottom:14}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:10}}>
+        <div style={{fontSize:13,fontWeight:700,color:"#34d399"}}>📊 Crecimiento diario por green (mm/día)</div>
+        <div style={{display:"flex",alignItems:"center",gap:6}}>
+          <button className="btn-g" style={{...S.btn,fontSize:12,padding:"3px 10px"}} onClick={()=>setSemOffset(o=>o-1)}>◀</button>
+          <span style={{fontSize:12,color:"#a0d8b0",minWidth:150,textAlign:"center"}}>{semOffset===0?"Semana actual · ":""}{fmtF(diasSel[0].fecha)} al {fmtF(diasSel[6].fecha)}</span>
+          <button className="btn-g" style={{...S.btn,fontSize:12,padding:"3px 10px",opacity:semOffset>=0?0.4:1}} disabled={semOffset>=0} onClick={()=>setSemOffset(o=>Math.min(0,o+1))}>▶</button>
+          {semOffset!==0&&<button className="btn-g" style={{...S.btn,fontSize:11,padding:"3px 10px"}} onClick={()=>setSemOffset(0)}>Hoy</button>}
+        </div>
+      </div>
+      <div style={{overflowX:"auto"}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:560}}>
+          <thead><tr style={{borderBottom:"1px solid rgba(255,255,255,0.08)"}}>
+            <th style={{padding:"6px 8px",textAlign:"left",color:"#6aaa7a",fontSize:10}}>GREEN</th>
+            {diasSel.map(dd=><th key={dd.fecha} style={{padding:"6px 6px",textAlign:"center",fontSize:10,color:dd.esHoy?"#60a5fa":dd.futuro?"#4a7a5a":"#6aaa7a",background:dd.esHoy?"rgba(96,165,250,0.08)":"transparent"}}>{dd.esHoy?"Hoy "+dd.label.split(" ")[1]:dd.label}</th>)}
+            <th style={{padding:"6px 8px",textAlign:"center",color:"#fbbf24",fontSize:10}}>Total (mm)</th>
+            <th style={{padding:"6px 8px",textAlign:"center",color:"#fbbf24",fontSize:10}}>Prom. mm/d</th>
+          </tr></thead>
+          <tbody>
+            {zonasDatos.map(zd=>{
+              const t=totalSem(zd,diasSel);
+              return (
+                <tr key={zd.zona.id} style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                  <td style={{padding:"6px 8px",fontWeight:700,color:"#ede9e0"}}>{zd.zona.nombre}</td>
+                  {diasSel.map(dd=>{
+                    const c=crecDia(zd,dd.fecha);
+                    const bg=dd.esHoy?"rgba(96,165,250,0.06)":"transparent";
+                    if(!c) return <td key={dd.fecha} style={{padding:"6px",textAlign:"center",color:"#3a5a4a",background:bg}}>—</td>;
+                    if(c.tipo==="corte") return <td key={dd.fecha} style={{padding:"6px",textAlign:"center",color:"#93c5fd",fontSize:10,background:bg}} title="Día de corte">✂️ {c.alt}mm</td>;
+                    const v=r2(c.v);
+                    return <td key={dd.fecha} style={{padding:"6px",textAlign:"center",fontWeight:c.tipo==="real"?700:400,color:colorTasaCrec(c.v),opacity:dd.futuro?0.45:(c.tipo==="est"?0.8:1),background:bg}} title={c.tipo==="real"?"Real: calculado entre dos mediciones":dd.futuro?"Proyección":"Estimado con la tasa usada"}>{c.tipo==="est"?"~":""}{v>0?"+":""}{v}</td>;
+                  })}
+                  <td style={{padding:"6px 8px",textAlign:"center",fontWeight:700,color:"#fbbf24"}}>{t.n?`${t.tot>0?"+":""}${t.tot}`:"—"}</td>
+                  <td style={{padding:"6px 8px",textAlign:"center",color:t.n?colorTasaCrec(t.tot/t.n):"#4a7a5a"}}>{t.n?r2(t.tot/t.n):"—"}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div style={{fontSize:10,color:"#5a9a7a",marginTop:8}}>
+        <b style={{color:"#a0d8b0"}}>Negrita</b> = crecimiento real (el día queda entre dos mediciones) · <b style={{color:"#a0d8b0"}}>~</b> = estimado con la tasa usada · tenue = proyección futura · ✂️ = día de corte (altura de corte). El total suma hasta hoy.
+      </div>
+    </div>
+  );
   return (
+    <>
+    {bloqueClasificacion}
+    {bloqueCrecSemanal}
     <div style={{...S.card,padding:16,marginBottom:14}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
         <div style={{fontSize:13,fontWeight:700,color:"#60a5fa"}}>📅 Proyección semanal de altura (mm)</div>
@@ -14245,7 +14353,7 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
           <thead>
             <tr style={{background:"rgba(96,165,250,0.08)"}}>
               <th style={{padding:"6px 10px",textAlign:"left",color:"#60a5fa",fontWeight:700,fontSize:10,textTransform:"uppercase"}}>Green</th>
-              <th style={{padding:"6px 8px",textAlign:"center",color:"#fbbf24",fontSize:10,fontWeight:700}}>Tasa real</th>
+              <th style={{padding:"6px 8px",textAlign:"center",color:"#fbbf24",fontSize:10,fontWeight:700}} title="Rebrote en mm por día con el que se calcula la proyección de la derecha">Tasa usada (mm/día)</th>
               <th style={{padding:"6px 8px",textAlign:"center",color:"#5a9a7a",fontSize:10}}>Histórica</th>
               {diasProx.map(prD=>(
                 <th key={prD.fecha} style={{padding:"6px 8px",textAlign:"center",color:"#60a5fa",fontSize:10,fontWeight:700}}>{prD.label}</th>
@@ -14265,10 +14373,14 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
                   {usoPromedioOtros&&<span style={{fontSize:9,display:"block",color:"#38bdf8",fontWeight:700}}>🔗 Sin medición propia post-corte — usando promedio de rebrote de los otros greens ({tasaProyeccion>0?"+":""}{tasaProyeccion}mm/d) para proyectar</span>}
                 </td>
                 <td style={{padding:"7px 8px",textAlign:"center",fontSize:12,fontWeight:700}}>
-                  {tasaReal!==null
-                    ? <span style={{color:"#fbbf24"}}>
-                        {tasaReal>0?"+":""}{Math.round(tasaReal*100)/100}
-                        {diasUltimoIntervalo&&<span style={{fontSize:9,color:"#5a9a7a",display:"block"}}>{diasUltimoIntervalo}d · +{Math.round(Number(deltaUltimo)*100)/100}mm</span>}
+                  {(tasaProyeccion!==null&&tasaProyeccion!==undefined)
+                    ? <span style={{color:usoPromedioOtros?"#38bdf8":"#fbbf24"}}>
+                        {tasaProyeccion>0?"+":""}{Math.round(tasaProyeccion*100)/100}
+                        <span style={{fontSize:9,color:usoPromedioOtros?"#38bdf8":"#5a9a7a",display:"block",fontWeight:400}}>
+                          {usoPromedioOtros
+                            ? `🔗 promedio de otros greens${tasaReal!==null?` · propia pre-corte: ${tasaReal>0?"+":""}${Math.round(tasaReal*100)/100}`:""}`
+                            : (diasUltimoIntervalo?`propia · último tramo ${diasUltimoIntervalo}d · +${Math.round(Number(deltaUltimo)*100)/100}mm`:"propia")}
+                        </span>
                       </span>
                     : <span style={{color:"#4a7a5a"}}>—</span>
                   }
@@ -14332,6 +14444,7 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
         </div>
       )}
     </div>
+    </>
   );
 }
 
@@ -14991,50 +15104,6 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
               const a=analisisTasas(id);
               return {id,nombre:z.nombre,color:COLORES_ZONA[id],extra:a?`${a.tasaGlobal>0?"+":""}${a.tasaGlobal}mm/d ${a.categoria.split(" ")[0]}`:"",extraColor:a?colorCategoria(a.categoria):"#7aaa80"};
             }).filter(Boolean))}
-          </div>
-        )}
-
-        {/* Vista Tasas resumen */}
-        {vistaGrafico==="tasas"&&(
-          <div style={{...S.card,padding:16,marginBottom:14}}>
-            <div style={{fontSize:13,fontWeight:700,color:"#34d399",marginBottom:12}}>⚡ Clasificación por tasa de crecimiento</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
-              {[{factor:1,unidad:"mm/día",label:"📅 Últimos datos (mm/día)",maxW:1.5},{factor:7,unidad:"mm/sem",label:"📆 Proyección semanal (mm/sem)",maxW:10}].map(({factor,unidad,label,maxW})=>(
-                <div key={unidad}>
-                  <div style={{fontSize:11,color:"#5a9a7a",marginBottom:8,fontWeight:600,letterSpacing:"0.5px",textTransform:"uppercase"}}>{label}</div>
-                  <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                    {ZONAS.map(z=>{
-                      const tasasZ = calcTasa(z.id);
-                      if(!tasasZ||!tasasZ.length) return null;
-                      // Misma lógica que la tabla "Proyección semanal" (Tasa real):
-                      // el último intervalo real, no un promedio — para que ambos
-                      // lugares muestren siempre el mismo número.
-                      const tasaDia = tasasZ[tasasZ.length-1].tasa;
-                      const tasaMostrar = Math.round(tasaDia*factor*100)/100;
-                      const barW = Math.min(Math.abs(tasaMostrar)/maxW*100,100);
-                      const catColor = tasaDia<0.3?"#ef4444":tasaDia<0.6?"#f59e0b":"#22c55e";
-                      const hace7Clasif = new Date(fechaLocal()+"T12:00:00"); hace7Clasif.setDate(hace7Clasif.getDate()-7);
-                      const esSemReciente = tasasZ[tasasZ.length-1].fecha >= hace7Clasif.toISOString().slice(0,10);
-                      return (
-                        <div key={z.id} style={{display:"flex",alignItems:"center",gap:6}}>
-                          <div style={{width:70,fontSize:10,color:"#7aaa80",flexShrink:0,textAlign:"right"}}>{z.nombre}</div>
-                          <div style={{flex:1,background:"rgba(255,255,255,0.06)",borderRadius:3,height:16,overflow:"hidden"}}>
-                            <div style={{width:`${barW}%`,height:"100%",background:catColor,borderRadius:3,opacity:0.85}}/>
-                          </div>
-                          <div style={{width:70,fontSize:11,fontWeight:700,color:esSemReciente?"#fbbf24":catColor,flexShrink:0}}>
-                            {tasaMostrar>0?"+":""}{tasaMostrar}
-                            {!esSemReciente&&<span style={{fontSize:8,color:"#5a9a7a",marginLeft:2}}>↩</span>}
-                          </div>
-                        </div>
-                      );
-                    }).filter(Boolean)}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div style={{fontSize:10,color:"#5a9a7a",marginTop:10}}>
-              <span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:"#ef4444",marginRight:4,verticalAlign:"middle"}}/> Lento: &lt;0.3 mm/d · <span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:"#f59e0b",marginRight:4,verticalAlign:"middle"}}/> Medio: 0.3–0.6 mm/d · <span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:"#22c55e",marginRight:4,verticalAlign:"middle"}}/> Rápido: &gt;0.6 mm/d
-            </div>
           </div>
         )}
 
@@ -26848,7 +26917,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-21.5";
+const BUILD_STAMP = "2026-10-22.2";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
