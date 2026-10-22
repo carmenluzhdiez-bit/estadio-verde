@@ -19729,6 +19729,8 @@ const horasEquipoMaq = (item, horometro) => {
   const suma = regs.reduce((a,r)=>a+Number(r.horas||0),0);
   return suma>0 ? suma : (Number(item.horasUso)||0);
 };
+// Orden alfabético estándar (español, sin distinguir mayúsculas/tildes, números en orden natural)
+const cmpEs = (a,b) => String(a||"").trim().localeCompare(String(b||"").trim(),"es",{sensitivity:"base",numeric:true});
 const equiposMaq = (bodegasData) => arrDeCR(bodegasData?.b04?.items).filter(i=>{ const c=(i.categoria||"").toLowerCase(); return c!=="combustible"&&c!=="repuesto"; });
 // Calcula el estado de cada alarma. Base = último cambio registrado de esa parte; si no hay, la fecha base de la alarma o la fecha de compra.
 const calcAlarmasMaq = (items, hojas, horometro, hoy) => {
@@ -19842,7 +19844,7 @@ function AlertasMantMaquinaria({ S, bodegasData, onAbrir=null }) {
 // Pestaña «Hoja de vida» de un equipo.
 function HojaVidaMaquinaria({ S, bodegasData, setBodegasData, hojas, setHojas, horometro, setHorometro, personal, puedeEditar }) {
   const hoy = fechaLocal();
-  const equipos = equiposMaq(bodegasData).sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||"","es",{sensitivity:"base"}));
+  const equipos = equiposMaq(bodegasData).sort((a,b)=>cmpEs(a.nombre,b.nombre)||cmpEs(a.marca,b.marca)||cmpEs(a.modelo,b.modelo));
   const [eqId, setEqId] = React.useState("");
   const eq = equipos.find(e=>String(e.id)===String(eqId)) || null;
   const hv = (eq && hojas?.[kEqMaq(eq.id)]) || {};
@@ -21356,7 +21358,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                         <div style={{fontSize:11,color:"#fb923c",marginBottom:8,textTransform:"uppercase"}}>🔩 Repuesto — Máquina asociada</div>
                         <select style={S.input} value={itemForm.maquinaAsociada||""} onChange={e=>setItemForm(p=>({...p,maquinaAsociada:e.target.value}))}>
                           <option value="">— Sin asignar —</option>
-                          {equiposMaq.map(eq=><option key={eq.id} value={eq.nombre}>{eq.nombre}</option>)}
+                          {[...equiposMaq].sort((a,b)=>cmpEs(a.nombre,b.nombre)).map(eq=><option key={eq.id} value={eq.nombre}>{eq.nombre}</option>)}
                           <option value="General">General (sirve para varios)</option>
                         </select>
                       </div>
@@ -22027,7 +22029,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
 
       {/* ── REPUESTOS (Maquinaria) ── */}
       {subTab==="repuestos"&&(bodegaActiva==="b04"||bodegaActiva==="b06")&&(()=>{
-        const equipos = (bd.items||[]).filter(i=>(i.categoria||"").toLowerCase()!=="combustible"&&(i.categoria||"").toLowerCase()!=="repuesto");
+        const equipos = (bd.items||[]).filter(i=>(i.categoria||"").toLowerCase()!=="combustible"&&(i.categoria||"").toLowerCase()!=="repuesto").sort((a,b)=>cmpEs(a.nombre,b.nombre));
         const repuestos = (bd.items||[]).filter(i=>(i.categoria||"").toLowerCase()==="repuesto")
           .sort((a,b)=>(a.maquinaAsociada||"").localeCompare(b.maquinaAsociada||"","es",{sensitivity:"base"})||a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
         // Repuestos por máquina
@@ -26927,7 +26929,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-22.7";
+const BUILD_STAMP = "2026-10-22.8";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
