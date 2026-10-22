@@ -14600,6 +14600,7 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
   const [unidadTasa, setUnidadTasa] = React.useState("dia");
   const [informePeriodo, setInformePeriodo] = React.useState("global");
   const [informeAnio, setInformeAnio] = React.useState(String(new Date().getFullYear()));
+  const [informeEstacion, setInformeEstacion] = React.useState(getMesEstacion()); // antes compartía estado con el año y rompía el informe por mes
   const [informeMes, setInformeMes] = React.useState(String(new Date().getMonth()+1).padStart(2,"0"));
   const [informeSemana, setInformeSemana] = React.useState(fechaLocal());
 
@@ -14851,12 +14852,12 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
       medsFiltradas = medOrdenadas.filter(m=>m.fecha?.startsWith(`${informeAnio}-${informeMes}`));
       periodoLabel = `${MESES_NOM[Number(informeMes)-1]} ${informeAnio}`;
     } else if(informePeriodo==="estacion"){
-      const mesesEst = ESTACIONES_MAP[informeAnio]||[];
+      const mesesEst = ESTACIONES_MAP[informeEstacion]||[];
       medsFiltradas = medOrdenadas.filter(m=>{
         const mes = m.fecha?.slice(5,7);
         return mesesEst.includes(mes);
       });
-      periodoLabel = `${informeAnio.charAt(0).toUpperCase()+informeAnio.slice(1)} (${mesesEst.map(m=>MESES_NOM[Number(m)-1]).join(", ")})`;
+      periodoLabel = `${informeEstacion.charAt(0).toUpperCase()+informeEstacion.slice(1)} (${mesesEst.map(m=>MESES_NOM[Number(m)-1]).join(", ")})`;
     } else if(informePeriodo==="semana"){
       // Semana que contiene la fecha seleccionada
       const fechaRef = new Date(informeSemana+"T12:00:00");
@@ -14890,7 +14891,7 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
       const ultMed = [...medsFiltradas].reverse().find(m=>m.alturas?.[z.id]!==undefined);
       const ultAlt = ultMed ? Number(ultMed.alturas[z.id]).toFixed(1) : "—";
       const ultFecha = ultMed ? new Date(ultMed.fecha+"T12:00:00").toLocaleDateString("es-CL",{day:"2-digit",month:"short"}) : "—";
-      const tasa = tasaData?.tasa;
+      const tasa = tasaData ? tasaData.tasa : null;
       const cat = tasa===null?"Sin datos":Math.abs(tasa)<0.3?"🐢 Lento":Math.abs(tasa)<0.6?"➡️ Medio":"🚀 Rápido";
       const colorTasa = tasa===null?"#888":tasa<0?"#60a5fa":tasa<0.3?"#ef4444":tasa<0.6?"#f59e0b":"#22c55e";
       const nMeds = tasaData?.nMeds||0;
@@ -14982,7 +14983,7 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
             </select>
           )}
           {informePeriodo==="estacion"&&(
-            <select style={{...S.input,fontSize:11,padding:"2px 6px",width:"auto"}} value={informeAnio} onChange={e=>setInformeAnio(e.target.value)}>
+            <select style={{...S.input,fontSize:11,padding:"2px 6px",width:"auto"}} value={informeEstacion} onChange={e=>setInformeEstacion(e.target.value)}>
               {["verano","otono","invierno","primavera"].map(e=><option key={e} value={e}>{e.charAt(0).toUpperCase()+e.slice(1)}</option>)}
             </select>
           )}
@@ -26918,7 +26919,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-22.4";
+const BUILD_STAMP = "2026-10-22.5";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
