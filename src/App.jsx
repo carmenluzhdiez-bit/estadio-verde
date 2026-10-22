@@ -14266,8 +14266,8 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
   const bloqueClasificacion = (
     <div style={{...S.card,padding:16,marginBottom:14}}>
       <div style={{fontSize:13,fontWeight:700,color:"#34d399",marginBottom:12}}>⚡ Clasificación por tasa de crecimiento</div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
-        {[{modo:"dia",label:"📅 Hoy — tasa usada (mm/día)",maxW:1.5},{modo:"sem",label:`📆 Esta semana — crecimiento acumulado (mm)`,maxW:10}].map(({modo,label,maxW})=>(
+      <div style={{display:"grid",gridTemplateColumns:"1fr",gap:16}}>
+        {[{modo:"dia",label:"📅 Hoy — tasa usada (mm/día)",maxW:1.5}].map(({modo,label,maxW})=>(
           <div key={modo}>
             <div style={{fontSize:11,color:"#5a9a7a",marginBottom:8,fontWeight:600,letterSpacing:"0.5px",textTransform:"uppercase"}}>{label}</div>
             <div style={{display:"flex",flexDirection:"column",gap:6}}>
@@ -14290,7 +14290,7 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
         ))}
       </div>
       <div style={{fontSize:10,color:"#5a9a7a",marginTop:10}}>
-        Lento &lt;0.3 mm/d (rojo) · Medio 0.3–0.6 (ámbar) · Rápido &gt;0.6 (verde) · 🔗 = green sin medición posterior al corte: usa el promedio de los otros greens. El acumulado semanal suma el crecimiento real (entre mediciones) o estimado de cada día hasta hoy.
+        Lento &lt;0.3 mm/d (rojo) · Medio 0.3–0.6 (ámbar) · Rápido &gt;0.6 (verde) · 🔗 = green sin medición posterior al corte: usa el promedio de los otros greens.
       </div>
     </div>
   );
@@ -26918,7 +26918,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-22.3";
+const BUILD_STAMP = "2026-10-22.4";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
