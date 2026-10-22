@@ -14098,7 +14098,7 @@ const PLANTILLA_PRE_TORNEO = {
 };
 
 // ─── ANÁLISIS MEDICIONES GOLF ────────────────────────────────────────────────
-function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisisTasas, colorCategoria, S }) {
+function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisisTasas, colorCategoria, S, golfData }) {
   const [semOffset, setSemOffset] = React.useState(0); // 0 = semana actual, -1 = anterior…
   const [showHistCortes, setShowHistCortes] = React.useState(false);
   const [showRegIndividuales, setShowRegIndividuales] = React.useState(false);
@@ -14234,7 +14234,8 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
 
   if(!zonasDatos.length) return null;
 
-  const altCorte = 4.5;
+  // Umbral de alerta = HOC de greens de la estación actual, definida en Golf ⚙️ Programación Golf (si no hay, el valor por defecto)
+  const altCorte = getHocObjetivo(golfData,"greens",getMesEstacion());
   const colorTasaCrec = v => v<0.3?"#ef4444":v<0.6?"#f59e0b":"#22c55e";
   const lunesSel = new Date(lunesSemana); lunesSel.setDate(lunesSel.getDate()+semOffset*7);
   const diasSel = Array.from({length:7},(_,i)=>{ const d=new Date(lunesSel); d.setDate(d.getDate()+i); const ds=d.toISOString().slice(0,10); return {fecha:ds,label:diasSemana[i]+" "+d.getDate(),esHoy:ds===hoyProjStr,futuro:ds>hoyProjStr}; });
@@ -14346,7 +14347,7 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
     <div style={{...S.card,padding:16,marginBottom:14}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
         <div style={{fontSize:13,fontWeight:700,color:"#60a5fa"}}>📅 Proyección semanal de altura (mm)</div>
-        <div style={{fontSize:10,color:"#5a9a7a"}}>⬛ desde medición · ✂️ desde corte · Umbral: {altCorte}mm</div>
+        <div style={{fontSize:10,color:"#5a9a7a"}}>⬛ desde medición · ✂️ desde corte · Umbral HOC {getMesEstacion()==="otono"?"otoño":getMesEstacion()}: {altCorte}mm</div>
       </div>
       <div style={{overflowX:"auto"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:500}}>
@@ -14409,7 +14410,7 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
         </table>
       </div>
       <div style={{display:"flex",gap:12,marginTop:8,fontSize:10,color:"#5a9a7a",flexWrap:"wrap"}}>
-        <span><span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:"#22c55e",marginRight:4}}/>Bajo umbral ({altCorte}mm)</span>
+        <span><span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:"#22c55e",marginRight:4}}/>Bajo HOC ({altCorte}mm)</span>
         <span><span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:"#f59e0b",marginRight:4}}/>Sobre umbral — considerar corte</span>
         <span><span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:"#ef4444",marginRight:4}}/>Muy sobre umbral — corte urgente</span>
       </div>
@@ -14575,7 +14576,7 @@ function GraficoCrecimiento({ series, siembras, cortes, rango, inicioT, finT, le
   );
 }
 
-function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJefa, onBorrar, onBorrarTodo, tareasProg }) {
+function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJefa, onBorrar, onBorrarTodo, tareasProg, golfData }) {
   const [showRegIndividuales, setShowRegIndividuales] = React.useState(false);
   const ZONAS = [...GREENS_DEF,{id:"vivero",nombre:"Vivero",hoyos:"Vivero"}].map((g,gi)=>({id:g.id,nombre:g.nombre,hoyos:g.hoyos,color:["#34d399","#60a5fa","#f59e0b","#a78bfa","#f472b6","#22d3ee","#fb923c","#86efac","#fcd34d","#4ade80"][gi]||"#34d399"}));
   const COLORES_ZONA = {
@@ -15108,7 +15109,7 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
         )}
 
         {/* ── PROYECCIÓN SEMANAL ── */}
-        {vistaGrafico==="tasas"&&<ProyeccionSemanal ZONAS={ZONAS} medOrdenadas={medOrdenadas} tareasProg={tareasProg} calcTasa={calcTasa} analisisTasas={analisisTasas} colorCategoria={colorCategoria} S={S}/>}
+        {vistaGrafico==="tasas"&&<ProyeccionSemanal ZONAS={ZONAS} medOrdenadas={medOrdenadas} tareasProg={tareasProg} calcTasa={calcTasa} analisisTasas={analisisTasas} colorCategoria={colorCategoria} S={S} golfData={golfData}/>}
       </>)}
 
       {/* Historial individual con borrar */}
@@ -18735,7 +18736,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             <MedicionesAnalisis
               mediciones={mediciones} GREENS_DEF={GREENS_DEF} rango={rango}
               colorAltura={colorAltura} S={S} esJefa={esJefa}
-              tareasProg={tareasProg}
+              tareasProg={tareasProg} golfData={golfData}
               onBorrar={(id)=>setG({mediciones:mediciones.filter(m=>m.id!==id)})}
               onBorrarTodo={()=>setG({mediciones:[]})}
             />
@@ -26917,7 +26918,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-22.2";
+const BUILD_STAMP = "2026-10-22.3";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
