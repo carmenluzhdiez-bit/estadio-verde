@@ -14871,20 +14871,22 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
     }
 
     // Calcular tasa para cada zona con las mediciones filtradas
+    // Tasa del período = rebrote real entre cortes (calcTasa descuenta los cortes), ponderado por días,
+    // usando los intervalos que terminan en una medición del período. Antes se comparaba primera vs última medición,
+    // lo que da ~0 cuando el green se corta durante el mes.
     const calcTasaFiltrada = (zonaId) => {
-      const zonaMeds = medsFiltradas.filter(m=>m.alturas?.[zonaId]!==undefined).map(m=>({
-        fecha:m.fecha, alt:Number(m.alturas[zonaId])
-      })).sort((a,b)=>a.fecha.localeCompare(b.fecha));
-      if(zonaMeds.length<2) return null;
-      const primera = zonaMeds[0];
-      const ultima = zonaMeds[zonaMeds.length-1];
-      const diasTotal = Math.round((new Date(ultima.fecha+"T12:00:00")-new Date(primera.fecha+"T12:00:00"))/(1000*60*60*24));
-      if(diasTotal<=0) return null;
-      const delta = ultima.alt - primera.alt;
-      const tasa = Math.round((delta/diasTotal)*100)/100;
-      return {tasa, primera, ultima, nMeds:zonaMeds.length, diasTotal};
+      const fechasPer = new Set(medsFiltradas.map(m=>m.fecha));
+      const tasasZ = (calcTasa(zonaId)||[]).filter(tc=>fechasPer.has(tc.fecha));
+      if(!tasasZ.length) return null;
+      const sumD = tasasZ.reduce((acc,tc)=>acc+Number(tc.delta||0),0);
+      const sumDias = tasasZ.reduce((acc,tc)=>acc+Number(tc.dias||0),0);
+      if(sumDias<=0) return null;
+      const nMeds = medsFiltradas.filter(m=>m.alturas?.[zonaId]!==undefined).length;
+      return {tasa:Math.round((sumD/sumDias)*100)/100, nMeds, nInt:tasasZ.length, diasTotal:sumDias};
     };
 
+    // Columnas extra según el período: global/año → tasas por estación; estación → contraste con las otras estaciones; mes/semana → ninguna
+    const colExtra = (informePeriodo==="global"||informePeriodo==="anio") ? "global" : informePeriodo==="estacion" ? "contraste" : "";
     const filas = ZONAS.map(z=>{
       const tasaData = calcTasaFiltrada(z.id);
       const analisisGlobal = analisisTasas(z.id);
@@ -14895,6 +14897,12 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
       const cat = tasa===null?"Sin datos":Math.abs(tasa)<0.3?"🐢 Lento":Math.abs(tasa)<0.6?"➡️ Medio":"🚀 Rápido";
       const colorTasa = tasa===null?"#888":tasa<0?"#60a5fa":tasa<0.3?"#ef4444":tasa<0.6?"#f59e0b":"#22c55e";
       const nMeds = tasaData?.nMeds||0;
+      const nombreEst = e => ({otono:"otoño"}[e]||e);
+      const celdaExtra = colExtra==="global"
+        ? `<td style="padding:7px 12px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#888">${analisisGlobal?analisisGlobal.porEstacion.map(e=>`${e.est}:${e.tasa>0?"+":""}${e.tasa}`).join(" · "):"—"}</td>`
+        : colExtra==="contraste"
+          ? `<td style="padding:7px 12px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#555">${(analisisGlobal?analisisGlobal.porEstacion.filter(e=>e.est!==informeEstacion&&tasa!==null):[]).map(e=>{ const d=Math.round((tasa-e.tasa)*100)/100; return `${nombreEst(e.est)} ${e.tasa>0?"+":""}${e.tasa} <b style="color:${d>0?"#16a34a":d<0?"#dc2626":"#888"}">(Δ ${d>0?"+":""}${d})</b>`; }).join(" · ")||"—"}</td>`
+          : "";
       return `<tr>
         <td style="padding:7px 12px;font-weight:600;border-bottom:1px solid #e5e7eb">${z.nombre}</td>
         <td style="padding:7px 12px;text-align:center;border-bottom:1px solid #e5e7eb">${ultAlt} mm</td>
@@ -14902,7 +14910,7 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
         <td style="padding:7px 12px;text-align:center;border-bottom:1px solid #e5e7eb;font-size:11px;color:#888">${nMeds}</td>
         <td style="padding:7px 12px;text-align:center;border-bottom:1px solid #e5e7eb;font-weight:700;color:${colorTasa}">${tasa!==null?(tasa>0?"+":"")+tasa+" mm/d":"—"}</td>
         <td style="padding:7px 12px;text-align:center;border-bottom:1px solid #e5e7eb;font-size:12px">${cat}</td>
-        <td style="padding:7px 12px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#888">${analisisGlobal?analisisGlobal.porEstacion.map(e=>`${e.est}:${e.tasa>0?"+":""}${e.tasa}`).join(" · "):"—"}</td>
+        ${celdaExtra}
       </tr>`;
     }).join("");
     win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
@@ -14920,13 +14928,13 @@ function MedicionesAnalisis({ mediciones, GREENS_DEF, rango, colorAltura, S, esJ
     <div class="periodo">📅 Período: ${periodoLabel} · ${medsFiltradas.length} medición(es) incluida(s)</div>
     <table>
       <thead><tr>
-        <th>Zona</th><th class="r">Última altura</th><th class="r">Fecha</th><th class="r">N° meds</th><th class="r">Tasa período</th><th class="r">Categoría</th><th>Por estación (global)</th>
+        <th>Zona</th><th class="r">Última altura</th><th class="r">Fecha</th><th class="r">N° meds</th><th class="r">Tasa período</th><th class="r">Categoría</th>${colExtra==="global"?"<th>Por estación (global)</th>":colExtra==="contraste"?"<th>Contraste con otras estaciones (Δ = esta − otra, mm/d)</th>":""}
       </tr></thead>
       <tbody>${filas}</tbody>
     </table>
     <div class="footer">
-      Tasa período = crecimiento diario promedio en el período seleccionado (primera vs última medición).<br/>
-      Por estación = tasa global histórica. 🐢 Lento &lt;0.3 · ➡️ Medio 0.3–0.6 · 🚀 Rápido &gt;0.6 mm/día
+      Tasa período = rebrote diario promedio entre cortes dentro del período (se descuentan los cortes; ponderado por días).<br/>
+      ${colExtra==="global"?"Por estación = tasa global histórica.":colExtra==="contraste"?"Contraste = tasa histórica de cada otra estación y diferencia (Δ) respecto a la del período.":""} 🐢 Lento &lt;0.3 · ➡️ Medio 0.3–0.6 · 🚀 Rápido &gt;0.6 mm/día
     </div>
     <div style="margin-top:14px;text-align:center">
       <button onclick="window.print()" style="background:#14532d;color:#fff;border:none;padding:9px 22px;border-radius:6px;cursor:pointer;font-size:13px">🖨️ Imprimir / Guardar PDF</button>
@@ -26919,7 +26927,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-22.5";
+const BUILD_STAMP = "2026-10-22.7";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
