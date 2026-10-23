@@ -343,6 +343,9 @@ const buscarDuplicadosMovidos = (tareasProg) => {
 // Boleta de honorarios: retención de impuesto del 15,25 % (2026) sobre el monto bruto de la boleta. El gasto es el bruto; al prestador se le paga el líquido.
 const RETENCION_HONORARIOS = 0.1525;
 const retencionHonorarios = (tipoDoc, bruto) => tipoDoc==="Boleta de Honorarios" ? Math.round(Number(bruto||0)*RETENCION_HONORARIOS) : 0;
+// Monto bruto del documento y monto que realmente sale del fondo: en boleta de honorarios se paga solo el líquido (Contabilidad paga la retención); en el resto, el bruto.
+const brutoCompra = (c) => Number(c?.totalBrutoDoc||c?.totalBruto||c?.totalNeto||0);
+const montoCompra = (c) => brutoCompra(c) - retencionHonorarios(c?.tipoDoc, brutoCompra(c));
 const CAUSAS_NO_PUDO = [
   {k:"lluvia",   icon:"🌧️", label:"Lluvia / clima",                pref:"No se pudo — Lluvia"},
   {k:"maquina",  icon:"🔧", label:"Falla de máquina o equipo",     pref:"Falla de máquina o equipo"},
@@ -12121,7 +12124,7 @@ function PanelRecibos({ S, comprasData, setComprasData, personal=[] }) {
   const anioForm = Number((form.fecha||hoyISO).slice(0,4));
   const vistaNumero = fmtNum(anioForm, siguienteNumero(anioForm));
 
-  const totalDeCompra = (c)=>Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
+  const totalDeCompra = (c)=>montoCompra(c);
   const precargarCompra = (id)=>{
     const c = compras.find(x=>String(x.id)===String(id));
     if(!c){ f("compraId",""); return; }
@@ -12556,7 +12559,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   const crearRendicion = () => {
     if(!seleccionadas.length) return;
     const items = compras.filter(c=>seleccionadas.includes(c.id));
-    const total = items.reduce((a,c)=>a+(c.tipoDoc==="Nota de Crédito"?-1:1)*Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
+    const total = items.reduce((a,c)=>a+(c.tipoDoc==="Nota de Crédito"?-1:1)*montoCompra(c),0);
     const nueva = {id:Date.now(),fecha:rendForm.fecha,obs:rendForm.obs,items:seleccionadas,total,estado:"presentada",reembolso:false,montoReembolso:0,fechaReembolso:"",nTransReembolso:""};
     set({compras:compras.map(compraC=>seleccionadas.includes(compraC.id)?{...compraC,estado:"en_rendicion"}:compraC),rendiciones:[nueva,...rendiciones]});
     setSeleccionadas([]); setRendForm({fecha:hoy.toISOString().slice(0,10),obs:""}); setShowRendForm(false);
@@ -12596,19 +12599,19 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     const porCuentaRend = {};
     itemsRend.forEach(c=>{
       if(!porCuentaRend[c.cuenta]) porCuentaRend[c.cuenta]={total:0,n:0};
-      porCuentaRend[c.cuenta].total += (c.tipoDoc==="Nota de Crédito"?-1:1)*Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
+      porCuentaRend[c.cuenta].total += (c.tipoDoc==="Nota de Crédito"?-1:1)*montoCompra(c);
       porCuentaRend[c.cuenta].n++;
     });
     const filas = itemsRend.map(c=>{
       const items = c.items||[{descripcion:c.descripcion,cantidad:c.cantidad||1,unidad:c.unidad||"unidad",totalNeto:c.totalNeto||0,iva:c.iva||0,totalBruto:c.totalBruto||0}];
       const esNC = c.tipoDoc==="Nota de Crédito";
       const esSinIvaDoc = ["Boleta","Boleta de Honorarios","Nota de Crédito"].includes(c.tipoDoc);
-      const totalDoc = Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
+      const totalDoc = montoCompra(c);
       const notasVinc = compras.filter(np=>np.facturaId===c.id);
       const notasHtml = notasVinc.length>0?`<tr><td colspan="8" style="padding:3px 8px 3px 24px;font-size:10px;color:#777;background:#fffde7;border:1px solid #e0e0e0"><em>NP vinculadas: ${notasVinc.map(np=>"NP "+np.nDocumento+" ("+np.fecha+")").join(", ")}</em></td></tr>`:"";
       return `<tr>
         <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.fecha}</td>
-        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.tipoDoc} N°${c.nDocumento||"—"}${c.tipoDoc==="Boleta de Honorarios"?`<br><span style="font-size:9px;color:#92400e">Retención 15,25 %: $${retencionHonorarios(c.tipoDoc,totalDoc).toLocaleString("es-CL")} · Líquido: $${(totalDoc-retencionHonorarios(c.tipoDoc,totalDoc)).toLocaleString("es-CL")}</span>`:""}</td>
+        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.tipoDoc} N°${c.nDocumento||"—"}${c.tipoDoc==="Boleta de Honorarios"?`<br><span style="font-size:9px;color:#92400e">Bruto boleta: $${brutoCompra(c).toLocaleString("es-CL")} · Retención 15,25 % (la paga Contabilidad): $${retencionHonorarios(c.tipoDoc,brutoCompra(c)).toLocaleString("es-CL")}</span>`:""}</td>
         <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.proveedor||"—"}</td>
         <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${items.map(it=>it.descripcion+(it.categoria?" ("+it.categoria+")":"")).join("<br>")}</td>
         <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right">${esSinIvaDoc?"":(esNC?"-":"")+"$"+items.reduce((a,it)=>a+Number(it.totalNeto||0),0).toLocaleString("es-CL")}</td>
@@ -12693,7 +12696,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   // Fondo disponible real = saldo anterior (si no hay reembolso pendiente → fondo base)
   // Si hay rendición pendiente de reembolso → el fondo real es el saldo anterior
   // Cuando llega el reembolso → el fondo vuelve a $3.000.000
-  const totalGeneral = compras.filter(c=>!["Guía de Despacho","Nota de Pedido","Cotización","Orden de Compra"].includes(c.tipoDoc)).reduce((a,c)=>a+(c.tipoDoc==="Nota de Crédito"?-1:1)*Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
+  const totalGeneral = compras.filter(c=>!["Guía de Despacho","Nota de Pedido","Cotización","Orden de Compra"].includes(c.tipoDoc)).reduce((a,c)=>a+(c.tipoDoc==="Nota de Crédito"?-1:1)*montoCompra(c),0);
   const totalReembolsado = rendiciones.reduce((a,r)=>a+(r.reembolso?Number(r.montoReembolso||0):0),0);
   const hayRendicionPendiente = rendiciones.some(r=>!r.reembolso);
   // Si hay saldo anterior ingresado → ese es el fondo actual (reembolso pendiente)
@@ -12703,7 +12706,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     .filter(c=>["pendiente","pagada","pagada_efectivo","pagada_debito","en_rendicion"].includes(c.estado)
       && !["Guía de Despacho","Nota de Pedido","Cotización","Orden de Compra"].includes(c.tipoDoc))
     .reduce((a,c)=>{
-      const monto = Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
+      const monto = montoCompra(c);
       // Nota de Crédito descuenta del gasto (recuperación de dinero)
       return a + (c.tipoDoc==="Nota de Crédito" ? -monto : monto);
     },0);
@@ -12713,13 +12716,13 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
 
   const porCuenta = TODAS_CUENTAS.map(cu=>{
     const items=compras.filter(c=>c.cuenta===cu&&!["Guía de Despacho","Nota de Pedido","Cotización","Orden de Compra"].includes(c.tipoDoc));
-    const total=items.reduce((a,c)=>a+Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0);
+    const total=items.reduce((a,c)=>a+montoCompra(c),0);
     return {cuenta:cu,total,n:items.length,esInterna:CUENTAS_INTERNAS.includes(cu)};
   }).filter(x=>x.total>0).sort((a,b)=>b.total-a.total);
 
   const mesesDisp=[];
   for(let i=5;i>=0;i--){const dMes=new Date(hoy.getFullYear(),hoy.getMonth()-i,1);mesesDisp.push({key:`${dMes.getFullYear()}-${String(dMes.getMonth()+1).padStart(2,"0")}`,label:`${MESES_COMPRAS[dMes.getMonth()]} ${dMes.getFullYear()}`});}
-  const porMes=mesesDisp.map(m=>({...m,total:compras.filter(c=>(c.fecha||"").startsWith(m.key)).reduce((a,c)=>a+(c.tipoDoc==="Nota de Crédito"?-1:1)*Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0)}));
+  const porMes=mesesDisp.map(m=>({...m,total:compras.filter(c=>(c.fecha||"").startsWith(m.key)).reduce((a,c)=>a+(c.tipoDoc==="Nota de Crédito"?-1:1)*montoCompra(c),0)}));
   const maxMes=Math.max(...porMes.map(m=>m.total),1);
   const mesesUnicos=[...new Set(compras.map(compraC=>(compraC.fecha||"").slice(0,7)).filter(Boolean))].sort((a,b)=>b.localeCompare(a));
   const listaPersonal=[...personal].filter(noRetirado).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
@@ -12910,7 +12913,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                           <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${optC.tipoDoc} N°${optC.nDocumento||"—"}</td>
                           <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${optC.proveedor||"—"}</td>
                           <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${optC.cuenta||"—"}</td>
-                          <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right;font-weight:600;color:${optC.tipoDoc==='Nota de Crédito'?'#ef4444':'inherit'}">${optC.tipoDoc==="Nota de Crédito"?"-":""}$${Math.abs(Number(optC.totalBrutoDoc||optC.totalBruto||optC.totalNeto||0)).toLocaleString("es-CL")}</td>
+                          <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right;font-weight:600;color:${optC.tipoDoc==='Nota de Crédito'?'#ef4444':'inherit'}">${optC.tipoDoc==="Nota de Crédito"?"-":""}$${Math.abs(montoCompra(optC)).toLocaleString("es-CL")}</td>
                         </tr>`).join("");
                     // Rendiciones pendientes
                     const rendPend = rendiciones.filter(r=>!r.reembolso);
@@ -13175,7 +13178,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
           {showRendForm&&(
             <div style={{...S.card,padding:16,marginBottom:14,background:"rgba(167,139,250,0.06)",borderColor:"rgba(167,139,250,0.25)"}}>
               <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,marginBottom:12,color:"#c4b5fd"}}>
-                📤 Crear rendición — {seleccionadas.length} compra{seleccionadas.length!==1?"s":""} · ${compras.filter(c=>seleccionadas.includes(c.id)).reduce((a,c)=>a+(c.tipoDoc==="Nota de Crédito"?-1:1)*Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0),0).toLocaleString("es-CL")}
+                📤 Crear rendición — {seleccionadas.length} compra{seleccionadas.length!==1?"s":""} · ${compras.filter(c=>seleccionadas.includes(c.id)).reduce((a,c)=>a+(c.tipoDoc==="Nota de Crédito"?-1:1)*montoCompra(c),0).toLocaleString("es-CL")}
               </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
                 <div><label style={labelSt}>Fecha presentación</label><input type="date" style={S.input} value={rendForm.fecha} onChange={e=>setRendForm(p=>({...p,fecha:e.target.value}))}/></div>
@@ -13242,7 +13245,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                             </div>
                             <div style={{flex:1,minWidth:0}}>
                               <div style={{fontSize:12,fontWeight:600}}>{prefijo} {np.nDocumento} — {np.proveedor} <span style={{fontSize:10,color:"#8a7050"}}>RUT {np.rut}</span></div>
-                              <div style={{fontSize:11,color:"#a08050"}}>{np.fecha} · {(np.items||[{descripcion:np.descripcion}]).map(i=>i.descripcion).filter(Boolean).join(", ")} · <strong>${Number(np.totalBrutoDoc||np.totalBruto||np.totalNeto||0).toLocaleString("es-CL")}</strong></div>
+                              <div style={{fontSize:11,color:"#a08050"}}>{np.fecha} · {(np.items||[{descripcion:np.descripcion}]).map(i=>i.descripcion).filter(Boolean).join(", ")} · <strong>${montoCompra(np).toLocaleString("es-CL")}</strong></div>
                             </div>
                           </div>
                         );
@@ -13453,7 +13456,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                   : (ESTADO_C[c.estado]||ESTADO_C.pendiente);
                 const sel=seleccionadas.includes(c.id);
                 const selectable=esDocPagable&&["pendiente","pagada","pagada_efectivo"].includes(c.estado);
-                const totalDoc = Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
+                const totalDoc = montoCompra(c);
                 const items = c.items||[{descripcion:c.descripcion,cantidad:c.cantidad,unidad:c.unidad}];
                 return (
                   <div key={c.id} style={{...S.card,padding:14,borderLeft:`3px solid ${sel?"#a78bfa":est.color}40`,background:sel?"rgba(167,139,250,0.06)":"transparent"}}>
@@ -13866,7 +13869,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                         return <div key={c.id} style={{fontSize:12,color:"#7aaa80",padding:"3px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
                           <div style={{display:"flex",justifyContent:"space-between"}}>
                             <span>{c.proveedor} · {c.tipoDoc} {c.nDocumento} ({items.length} ítem{items.length!==1?"s":""}){esNC&&<span style={{color:"#f87171",fontWeight:600}}> · descuenta del total</span>}</span>
-                            <span style={{fontWeight:600,color:esNC?"#f87171":"#93c5fd"}}>{esNC?"− ":""}${Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0).toLocaleString("es-CL")}{c.tipoDoc==="Boleta de Honorarios"&&<span style={{display:"block",fontSize:10,fontWeight:400,color:"#fbbf24"}}>Ret. 15,25 %: ${retencionHonorarios(c.tipoDoc,Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0)).toLocaleString("es-CL")} · líquido ${(Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0)-retencionHonorarios(c.tipoDoc,Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0))).toLocaleString("es-CL")}</span>}</span>
+                            <span style={{fontWeight:600,color:esNC?"#f87171":"#93c5fd"}}>{esNC?"− ":""}${montoCompra(c).toLocaleString("es-CL")}{c.tipoDoc==="Boleta de Honorarios"&&<span style={{display:"block",fontSize:10,fontWeight:400,color:"#fbbf24"}}>líquido a pagar · bruto ${brutoCompra(c).toLocaleString("es-CL")} − ret. 15,25 % ${retencionHonorarios(c.tipoDoc,brutoCompra(c)).toLocaleString("es-CL")}</span>}</span>
                           </div>
                         </div>;
                       })}
@@ -21570,7 +21573,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                   </div>
                 );
                 const getLitros=(c)=>(c.items||[]).filter(i=>{const u=(i.unidad||"").toLowerCase();const cat=(i.categoria||"").toLowerCase();return(u==="l"||u==="litros"||u==="litro")&&cat.includes("combustib");}).reduce((a,i)=>a+Number(i.cantidad||0),0);
-                const getMonto=(c)=>Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
+                const getMonto=(c)=>montoCompra(c);
                 const porMes={};
                 comprasBenc.forEach(c=>{const mes=(c.fecha||"").slice(0,7);if(!mes)return;if(!porMes[mes])porMes[mes]={monto:0,litros:0,n:0};porMes[mes].monto+=getMonto(c);porMes[mes].litros+=getLitros(c);porMes[mes].n++;});
                 const estesMes=comprasBenc.filter(c=>(c.fecha||"").startsWith(mesActual));
@@ -21729,7 +21732,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                             const comprasBenc=compras.filter(c=>{const d=((c.descripcion||"")+(c.items||[]).map(i=>i.descripcion||"").join(" ")).toLowerCase();const cat=(c.items||[]).some(i=>(i.categoria||"").toLowerCase().includes("combustib"));return d.includes("bencin")||d.includes("combustib")||d.includes("gasolina")||cat;});
                             if(!comprasBenc.length)return"";
                             const getLts=c=>(c.items||[]).filter(i=>{const u=(i.unidad||"").toLowerCase();const ct=(i.categoria||"").toLowerCase();return(u==="l"||u==="litros"||u==="litro")&&ct.includes("combustib");}).reduce((a,i)=>a+Number(i.cantidad||0),0);
-                            const getMto=c=>Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0);
+                            const getMto=c=>montoCompra(c);
                             const pm={};comprasBenc.forEach(c=>{const mes=(c.fecha||"").slice(0,7);if(!mes)return;if(!pm[mes])pm[mes]={monto:0,litros:0,n:0};pm[mes].monto+=getMto(c);pm[mes].litros+=getLts(c);pm[mes].n++;});
                             const totalMonto=comprasBenc.reduce((a,c)=>a+getMto(c),0);
                             const totalLts=comprasBenc.reduce((a,c)=>a+getLts(c),0);
@@ -27071,7 +27074,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-23.4";
+const BUILD_STAMP = "2026-10-23.5";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
