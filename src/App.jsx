@@ -20606,6 +20606,13 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
     const items = editItemId
       ? (bd.items||[]).map(i=>i.id===editItemId?{...itemForm,id:editItemId,...(bodegaActiva==="b04"?maqForm:{})}:i)
       : [{...itemForm,id:Date.now(),...(bodegaActiva==="b04"?maqForm:{})}, ...(bd.items||[])];
+    // Si se editó el stock a mano, dejar un movimiento de ajuste para que el historial cuadre
+    const itemPrev = editItemId ? (bd.items||[]).find(i=>i.id===editItemId) : null;
+    const difStock = itemPrev ? (Number(itemForm.stockActual)||0)-(Number(itemPrev.stockActual)||0) : 0;
+    if(itemPrev && Math.abs(difStock)>1e-9){
+      const movAj = {id:Date.now()+Math.random(),fecha:hoy,tipo:difStock>0?"entrada":"salida",cantidad:Math.abs(Math.round(difStock*1000)/1000),unidad:itemForm.unidad||"unidad",motivo:"Ajuste manual de stock",itemId:String(editItemId),itemNombre:itemForm.nombre.trim(),responsable:""};
+      setbd({items,movimientos:[movAj,...(bd.movimientos||[])].slice(0,200)});
+    } else
     setbd({items});
     setItemForm(emptyItem); setMaqForm(emptyMaq); setShowItemForm(false); setEditItemId(null);
   };
@@ -21354,6 +21361,31 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
               setBodegasData(prev=>({...prev,[bodegaActiva]:{...(prev[bodegaActiva]||{}),items:nuevosItems}}));
               alert(`✅ Se recrearon ${reparados.length} ítem(s) que tenían movimiento pero no stock:\n\n${reparados.join("\n")}`);
             }}>🔧 Reparar stock desde movimientos</button>}
+            {esJefa&&<button style={{...S.btn,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}} onClick={()=>{
+              const nz=x=>(x||"").toString().trim().toLowerCase();
+              const items = bd.items||[];
+              const movs = bd.movimientos||[];
+              const trs = bd.traslados||[];
+              const idsItems = new Set(items.map(i=>String(i.id)));
+              const dif = [];
+              items.forEach(i=>{
+                const delMov = movs.filter(m=>String(m.itemId)===String(i.id)||((!m.itemId||!idsItems.has(String(m.itemId)))&&m.itemNombre&&nz(m.itemNombre)===nz(i.nombre)));
+                const delTr = trs.filter(t=>String(t.itemId)===String(i.id));
+                if(delMov.length===0) return; // sin movimientos no se puede comparar
+                let calc = delMov.reduce((a,m)=>a+((m.tipo==="entrada"||m.tipo==="ajuste")?1:-1)*(Number(m.cantidad)||0),0);
+                delTr.forEach(t=>{ calc -= Number(t.cantidad)||0; if(t.estado==="regresó") calc += Number(t.cantidad)||0; });
+                calc = Math.max(0,Math.round(calc*1000)/1000);
+                const act = Number(i.stockActual)||0;
+                if(Math.abs(calc-act)>1e-9) dif.push({id:i.id,nombre:i.nombre,unidad:i.unidad||"",act,calc});
+              });
+              if(dif.length===0){ alert("✅ El stock de todos los ítems coincide con sus movimientos."); return; }
+              dif.sort((x,y)=>cmpEs(x.nombre,y.nombre));
+              const txt = dif.map(d=>`• ${d.nombre}: stock actual ${d.act} → según movimientos ${d.calc} ${d.unidad}`).join("\n");
+              if(!window.confirm(`${dif.length} ítem(s) con stock distinto a la suma de sus movimientos (entradas − salidas − traslados + regresos):\n\n${txt}\n\nNota: la bodega guarda solo los últimos 200 movimientos; si hay movimientos antiguos ya descartados, el cálculo puede quedar bajo.\n\n¿Corregir el stock de todos a lo calculado?`)) return;
+              const mapa = new Map(dif.map(d=>[String(d.id),d.calc]));
+              setbd({items:items.map(i=>mapa.has(String(i.id))?{...i,stockActual:mapa.get(String(i.id))}:i)});
+              alert(`✅ Stock corregido en ${dif.length} ítem(s).`);
+            }}>🧮 Recalcular stock desde movimientos</button>}
             {esJefa&&<button style={{...S.btn,background:"rgba(167,139,250,0.15)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.3)"}} onClick={()=>{
               const normFus=s=>(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/\s+/g,"").trim();
               const items = bd.items||[];
@@ -27097,7 +27129,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-23.7";
+const BUILD_STAMP = "2026-10-23.8";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
