@@ -340,6 +340,9 @@ const buscarDuplicadosMovidos = (tareasProg) => {
 // "No se pudo — Lluvia": tarea no realizada por lluvia (la marca el modo lluvia). Se informa aparte y NO castiga
 // el índice de salud ni el cumplimiento del jardinero: no es incumplimiento, es clima.
 // Causas de "No se pudo" (bitácora de causas). La lluvia además se detecta por el texto, para las tareas antiguas.
+// Boleta de honorarios: retención de impuesto del 15,25 % (2026) sobre el monto bruto de la boleta. El gasto es el bruto; al prestador se le paga el líquido.
+const RETENCION_HONORARIOS = 0.1525;
+const retencionHonorarios = (tipoDoc, bruto) => tipoDoc==="Boleta de Honorarios" ? Math.round(Number(bruto||0)*RETENCION_HONORARIOS) : 0;
 const CAUSAS_NO_PUDO = [
   {k:"lluvia",   icon:"🌧️", label:"Lluvia / clima",                pref:"No se pudo — Lluvia"},
   {k:"maquina",  icon:"🔧", label:"Falla de máquina o equipo",     pref:"Falla de máquina o equipo"},
@@ -12605,7 +12608,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
       const notasHtml = notasVinc.length>0?`<tr><td colspan="8" style="padding:3px 8px 3px 24px;font-size:10px;color:#777;background:#fffde7;border:1px solid #e0e0e0"><em>NP vinculadas: ${notasVinc.map(np=>"NP "+np.nDocumento+" ("+np.fecha+")").join(", ")}</em></td></tr>`:"";
       return `<tr>
         <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.fecha}</td>
-        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.tipoDoc} N°${c.nDocumento||"—"}</td>
+        <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.tipoDoc} N°${c.nDocumento||"—"}${c.tipoDoc==="Boleta de Honorarios"?`<br><span style="font-size:9px;color:#92400e">Retención 15,25 %: $${retencionHonorarios(c.tipoDoc,totalDoc).toLocaleString("es-CL")} · Líquido: $${(totalDoc-retencionHonorarios(c.tipoDoc,totalDoc)).toLocaleString("es-CL")}</span>`:""}</td>
         <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${c.proveedor||"—"}</td>
         <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px">${items.map(it=>it.descripcion+(it.categoria?" ("+it.categoria+")":"")).join("<br>")}</td>
         <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:11px;text-align:right">${esSinIvaDoc?"":(esNC?"-":"")+"$"+items.reduce((a,it)=>a+Number(it.totalNeto||0),0).toLocaleString("es-CL")}</td>
@@ -13369,8 +13372,12 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                   </div>
                 ))}
                 {/* Totales documento */}
-                <div style={{display:"grid",gridTemplateColumns:esSinIva?"1fr":"1fr 1fr 1fr",gap:8,marginTop:10,background:"rgba(59,130,246,0.06)",borderRadius:8,padding:"10px 12px",border:"1px solid rgba(59,130,246,0.15)"}}>
-                  {esSinIva ? (
+                <div style={{display:"grid",gridTemplateColumns:(esSinIva&&form.tipoDoc!=="Boleta de Honorarios")?"1fr":"1fr 1fr 1fr",gap:8,marginTop:10,background:"rgba(59,130,246,0.06)",borderRadius:8,padding:"10px 12px",border:"1px solid rgba(59,130,246,0.15)"}}>
+                  {form.tipoDoc==="Boleta de Honorarios" ? (<>
+                    <div><label style={labelSt}>Monto bruto boleta</label><input type="number" style={{...S.input,background:"rgba(59,130,246,0.12)",fontWeight:700,color:"#93c5fd"}} value={form.totalBrutoDoc} readOnly/></div>
+                    <div><label style={labelSt}>Retención 15,25 %</label><input type="number" style={{...S.input,background:"rgba(245,158,11,0.10)",color:"#fbbf24",fontWeight:700}} value={retencionHonorarios(form.tipoDoc,form.totalBrutoDoc)||""} readOnly/></div>
+                    <div><label style={labelSt}>Líquido a pagar</label><input type="number" style={{...S.input,background:"rgba(34,197,94,0.10)",color:"#86efac",fontWeight:700}} value={form.totalBrutoDoc?(Number(form.totalBrutoDoc)-retencionHonorarios(form.tipoDoc,form.totalBrutoDoc)):""} readOnly/></div>
+                  </>) : esSinIva ? (
                     <div><label style={labelSt}>Total documento</label><input type="number" style={{...S.input,background:"rgba(59,130,246,0.12)",fontWeight:700,color:"#93c5fd"}} value={form.totalBrutoDoc} readOnly/></div>
                   ) : (<>
                     <div><label style={labelSt}>Total neto</label><input type="number" style={{...S.input,background:"rgba(59,130,246,0.08)"}} value={form.totalNetoDoc} readOnly/></div>
@@ -13859,7 +13866,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                         return <div key={c.id} style={{fontSize:12,color:"#7aaa80",padding:"3px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
                           <div style={{display:"flex",justifyContent:"space-between"}}>
                             <span>{c.proveedor} · {c.tipoDoc} {c.nDocumento} ({items.length} ítem{items.length!==1?"s":""}){esNC&&<span style={{color:"#f87171",fontWeight:600}}> · descuenta del total</span>}</span>
-                            <span style={{fontWeight:600,color:esNC?"#f87171":"#93c5fd"}}>{esNC?"− ":""}${Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0).toLocaleString("es-CL")}</span>
+                            <span style={{fontWeight:600,color:esNC?"#f87171":"#93c5fd"}}>{esNC?"− ":""}${Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0).toLocaleString("es-CL")}{c.tipoDoc==="Boleta de Honorarios"&&<span style={{display:"block",fontSize:10,fontWeight:400,color:"#fbbf24"}}>Ret. 15,25 %: ${retencionHonorarios(c.tipoDoc,Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0)).toLocaleString("es-CL")} · líquido ${(Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0)-retencionHonorarios(c.tipoDoc,Number(c.totalBrutoDoc||c.totalBruto||c.totalNeto||0))).toLocaleString("es-CL")}</span>}</span>
                           </div>
                         </div>;
                       })}
@@ -27064,7 +27071,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-23.3";
+const BUILD_STAMP = "2026-10-23.4";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
