@@ -19744,10 +19744,14 @@ const kEqMaq = id => String(id).replace(/[.#$\/\[\]]/g,"_");
 const normParteMaq = s => (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]/g,"");
 const sumarDiasISO = (f,n) => { const d=new Date(f+"T12:00:00"); d.setDate(d.getDate()+Math.round(n)); return d.toISOString().slice(0,10); };
 const diasEntreISO = (a,b) => Math.round((new Date(b+"T12:00:00")-new Date(a+"T12:00:00"))/86400000);
+// Valor actual de uso del equipo: se recorren los registros en orden; una «lectura» fija el valor del contador, y un registro de «horas» (modo antiguo / km del día) se suma.
+const ordenRegsHoro = (regs) => [...regs].sort((x,y)=>(x.fecha||"").localeCompare(y.fecha||"")||String(x.creadoEn||x.id||"").localeCompare(String(y.creadoEn||y.id||"")));
 const horasEquipoMaq = (item, horometro) => {
-  const regs = Object.values((horometro?.[kEqMaq(item.id)]||{}).registros||{});
-  const suma = regs.reduce((a,r)=>a+Number(r.horas||0),0);
-  return suma>0 ? suma : (Number(item.horasUso)||0);
+  const regs = ordenRegsHoro(Object.values((horometro?.[kEqMaq(item.id)]||{}).registros||{}));
+  if(regs.length===0) return Number(item.horasUso)||0;
+  let v = 0;
+  regs.forEach(r=>{ if(r.lectura!==undefined&&r.lectura!==null&&r.lectura!=="") v = Number(r.lectura)||0; else v += Number(r.horas||0); });
+  return v;
 };
 // Orden alfabético estándar (español, sin distinguir mayúsculas/tildes, números en orden natural)
 const cmpEs = (a,b) => String(a||"").trim().localeCompare(String(b||"").trim(),"es",{sensitivity:"base",numeric:true});
@@ -19769,12 +19773,14 @@ const calcAlarmasMaq = (items, hojas, horometro, hoy) => {
       const proxFecha = (cadaDias>0 && baseFecha) ? sumarDiasISO(baseFecha,cadaDias) : "";
       const diasRest = proxFecha ? diasEntreISO(hoy,proxFecha) : null;
       const proxHoras = cadaHoras>0 ? baseHoras+cadaHoras : null;
-      const horasRest = proxHoras!==null ? proxHoras-horasAct : null;
+      // Si el último cambio figura con MÁS horas que las actuales del equipo, esa base no es confiable (lecturas en distinta escala): no se calcula la parte de horas.
+      const baseInconsistente = cadaHoras>0 && baseHoras>horasAct;
+      const horasRest = (proxHoras!==null && !baseInconsistente) ? proxHoras-horasAct : null;
       let estado = "ok";
       if(diasRest===null && horasRest===null) estado = "sin_base";
       else if((diasRest!==null&&diasRest<=0)||(horasRest!==null&&horasRest<=0)) estado = "vencida";
       else if((diasRest!==null&&diasRest<=15)||(horasRest!==null&&horasRest<=Math.max(10,cadaHoras*0.1))) estado = "proxima";
-      out.push({eq, alarma:al, ultimo:ult, baseFecha, proxFecha, diasRest, proxHoras, horasRest, horasAct, estado});
+      out.push({eq, alarma:al, ultimo:ult, baseFecha, proxFecha, diasRest, proxHoras:baseInconsistente?null:proxHoras, horasRest, horasAct, estado, baseInconsistente, baseHoras});
     });
   });
   const orden = {vencida:0,proxima:1,sin_base:2,ok:3};
@@ -19784,6 +19790,7 @@ const textoRestanteAlarmaMaq = (a) => {
   const p = [];
   if(a.diasRest!==null) p.push(a.diasRest<0?`${-a.diasRest} d de atraso`:a.diasRest===0?"vence hoy":`en ${a.diasRest} d`);
   if(a.horasRest!==null) p.push(a.horasRest<=0?`${Math.round(-a.horasRest)} ${uniUsoMaq(a.eq)} de atraso`:`faltan ${Math.round(a.horasRest)} ${uniUsoMaq(a.eq)}`);
+  if(a.baseInconsistente) p.push("⚠️ revisa las horas del último cambio");
   return p.join(" · ")||"sin base de cálculo";
 };
 const colorEstadoAlarmaMaq = (e) => e==="vencida"?"#f87171":e==="proxima"?"#fbbf24":e==="sin_base"?"#94a3b8":"#4ade80";
@@ -19800,13 +19807,22 @@ function MigradorHorometroMaq({ bodegasData, activo }) {
     const equipos = equiposMaq(bodegasData);
     if(equipos.length===0) return;
     corrio.current = true;
-    const pend = equipos.filter(eq=>!(hojas?.[kEqMaq(eq.id)]?.migradoHorometro));
+    const pend = equipos.filter(eq=>!(hojas?.[kEqMaq(eq.id)]?.migradoHorometro) || !(hojas?.[kEqMaq(eq.id)]?.baseHorasAjustada));
     if(pend.length===0) return;
     setHojas(prev=>{
       const out = {...(prev||{})};
       pend.forEach(eq=>{
         const cur = out[kEqMaq(eq.id)]||{};
-        if(cur.migradoHorometro) return;
+        if(cur.migradoHorometro && cur.baseHorasAjustada) return;
+        if(cur.migradoHorometro){
+          // Solo ajustar la base: alarmas por horas sin ningún cambio registrado parten desde las horas actuales (y no desde 0)
+          const horasNow = horasEquipoMaq(eq, horometro);
+          const evs = Object.values(cur.eventos||{});
+          const alarmas2 = {...(cur.alarmas||{})};
+          Object.keys(alarmas2).forEach(k=>{ const a=alarmas2[k]; if(a&&Number(a.cadaHoras)>0&&!Number(a.baseHoras)&&!a.baseFecha&&!evs.some(e=>normParteMaq(e.parte)===normParteMaq(a.parte))) alarmas2[k]={...a,baseHoras:horasNow}; });
+          out[kEqMaq(eq.id)] = {...cur,alarmas:alarmas2,baseHorasAjustada:true};
+          return;
+        }
         const h = (horometro||{})[kEqMaq(eq.id)]||{};
         const regs = Object.values(h.registros||{});
         const mants = Object.values(h.mantenimientos||{});
@@ -19828,7 +19844,9 @@ function MigradorHorometroMaq({ bodegasData, activo }) {
           if(yaExiste||alarmas[id]) return;
           alarmas[id] = {id,parte:pl.tarea,valor:"",unidad:"dias",cadaDias:0,cadaHoras:ch,baseFecha:"",baseHoras:0,activa:true,origen:"horometro"};
         });
-        out[kEqMaq(eq.id)] = {...cur,eventos,alarmas,migradoHorometro:true};
+        const horasNow0 = horasEquipoMaq(eq, horometro);
+        Object.keys(alarmas).forEach(k=>{ const a=alarmas[k]; if(a&&Number(a.cadaHoras)>0&&!Number(a.baseHoras)&&!a.baseFecha&&!Object.values(eventos).some(e=>normParteMaq(e.parte)===normParteMaq(a.parte))) alarmas[k]={...a,baseHoras:horasNow0}; });
+        out[kEqMaq(eq.id)] = {...cur,eventos,alarmas,migradoHorometro:true,baseHorasAjustada:true};
       });
       return out;
     });
@@ -19881,7 +19899,7 @@ function HojaVidaMaquinaria({ S, bodegasData, setBodegasData, hojas, setHojas, h
   const [alForm, setAlForm] = React.useState(null);
   const [abiertas, setAbiertas] = React.useState({});
   const evFormRef = React.useRef(null);
-  const [horoForm, setHoroForm] = React.useState(null);   // {fecha,horas,obs}
+  const [horoForm, setHoroForm] = React.useState(null);   // {fecha,horas,obs,modo:"lectura"|"suma"}
   const [verTodasHoras, setVerTodasHoras] = React.useState(false);
   const regsHoro = eq ? Object.values(horometro?.[kEqMaq(eq.id)]?.registros||{}).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")||String(b.id).localeCompare(String(a.id))) : [];
 
@@ -19922,10 +19940,10 @@ function HojaVidaMaquinaria({ S, bodegasData, setBodegasData, hojas, setHojas, h
   const fmt = f => f ? f.split("-").reverse().join("-") : "—";
   const guardarHoras = () => {
     const n = Number(horoForm.horas);
-    if(!(n>0)){ alert("Escribe el valor recorrido o trabajado (mayor que 0)."); return; }
+    if(horoForm.horas===""||!(n>=0)||(horoForm.modo!=="lectura"&&!(n>0))){ alert(horoForm.modo==="lectura"?"Escribe la lectura actual del contador.":"Escribe el valor recorrido o trabajado (mayor que 0)."); return; }
     if(!horoForm.fecha){ alert("Falta la fecha."); return; }
     const id = "h"+Date.now();
-    setHorometro(prev=>{ const cur=(prev||{})[kEqMaq(eq.id)]||{}; return {...(prev||{}),[kEqMaq(eq.id)]:{...cur,registros:{...(cur.registros||{}),[id]:{id,fecha:horoForm.fecha,horas:n,obs:horoForm.obs||"",creadoEn:new Date().toISOString()}}}}; });
+    setHorometro(prev=>{ const cur=(prev||{})[kEqMaq(eq.id)]||{}; return {...(prev||{}),[kEqMaq(eq.id)]:{...cur,registros:{...(cur.registros||{}),[id]:(horoForm.modo==="lectura"?{id,fecha:horoForm.fecha,lectura:n,obs:horoForm.obs||"",creadoEn:new Date().toISOString()}:{id,fecha:horoForm.fecha,horas:n,obs:horoForm.obs||"",creadoEn:new Date().toISOString()})}}}; });
     setHoroForm(null);
   };
   const borrarHoras = (id) => { if(!window.confirm("¿Eliminar este registro de horas?")) return; setHorometro(prev=>{ const cur=(prev||{})[kEqMaq(eq.id)]||{}; const r={...(cur.registros||{})}; delete r[id]; return {...(prev||{}),[kEqMaq(eq.id)]:{...cur,registros:r}}; }); };
@@ -19996,23 +20014,28 @@ function HojaVidaMaquinaria({ S, bodegasData, setBodegasData, hojas, setHojas, h
         <div style={{...S.card,padding:16,marginBottom:12}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:8}}>
             <div style={{fontSize:13,fontWeight:700,color:"#fb923c"}}>{uni==="km"?"📏 Kilometraje":"⏱️ Horas de uso"} · acumulado: {Math.round(horasAct)} {uni}</div>
-            {puedeEditar&&<button className="btn-p" style={{...S.btn,fontSize:12,padding:"4px 12px"}} onClick={()=>setHoroForm({fecha:hoy,horas:"",obs:""})}>➕ Registrar {uni==="km"?"kilómetros":"horas"}</button>}
+            {puedeEditar&&<button className="btn-p" style={{...S.btn,fontSize:12,padding:"4px 12px"}} onClick={()=>setHoroForm({fecha:hoy,horas:"",obs:"",modo:uni==="km"?"suma":"lectura"})}>➕ Registrar {uni==="km"?"kilómetros":"horas"}</button>}
           </div>
           {horoForm&&(
             <div style={{padding:12,marginBottom:10,background:"rgba(251,146,60,0.06)",border:"1px solid rgba(251,146,60,0.3)",borderRadius:8}}>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:10}}>
                 <div><label style={labelSt}>Fecha</label><input type="date" style={S.input} value={horoForm.fecha} onChange={e=>setHoroForm(p=>({...p,fecha:e.target.value}))}/></div>
-                <div><label style={labelSt}>{uni==="km"?"Kilómetros recorridos (se suman)":"Horas trabajadas (se suman)"}</label><input type="number" min={0} step="0.1" style={S.input} value={horoForm.horas} onChange={e=>setHoroForm(p=>({...p,horas:e.target.value}))}/></div>
+                <div style={{gridColumn:"1/-1"}}><label style={labelSt}>¿Qué vas a anotar?</label>
+                  <select style={S.input} value={horoForm.modo} onChange={e=>setHoroForm(p=>({...p,modo:e.target.value}))}>
+                    <option value="lectura">Lectura actual del contador ({uni==="km"?"odómetro":"horómetro"})</option>
+                    <option value="suma">{uni==="km"?"Kilómetros recorridos hoy (se suman)":"Horas trabajadas hoy (se suman)"}</option>
+                  </select></div>
+                <div><label style={labelSt}>{horoForm.modo==="lectura"?(uni==="km"?"Lectura del odómetro (km)":"Lectura del horómetro (h)"):(uni==="km"?"Kilómetros recorridos (se suman)":"Horas trabajadas (se suman)")}</label><input type="number" min={0} step="0.1" style={S.input} value={horoForm.horas} onChange={e=>setHoroForm(p=>({...p,horas:e.target.value}))}/></div>
                 <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Observación</label><input style={S.input} value={horoForm.obs} onChange={e=>setHoroForm(p=>({...p,obs:e.target.value}))} placeholder="Ej: corte de fairways · o «Lectura inicial» para equipos antiguos"/></div>
               </div>
               <div style={{display:"flex",gap:8,marginTop:10}}><button className="btn-p" style={S.btn} onClick={guardarHoras}>✓ Guardar</button><button className="btn-g" style={S.btn} onClick={()=>setHoroForm(null)}>Cancelar</button></div>
             </div>
           )}
-          {regsHoro.length===0&&!horoForm&&<div style={{fontSize:12,color:"#6a8a7a"}}>Sin registros. Las alarmas por horas/km cuentan desde lo acumulado aquí.</div>}
+          {regsHoro.length===0&&!horoForm&&<div style={{fontSize:12,color:"#6a8a7a"}}>Sin registros. Anota la lectura actual del contador: las alarmas por horas/km se calculan contra esa lectura.</div>}
           <div style={{display:"flex",flexDirection:"column",gap:4}}>
             {(verTodasHoras?regsHoro:regsHoro.slice(0,5)).map(r=>(
               <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:6,padding:"5px 10px",background:"rgba(255,255,255,0.03)",borderRadius:8,fontSize:12}}>
-                <span><b style={{color:"#fb923c"}}>{r.horas} {uni}</b> <span style={{color:"#6aaa7a"}}>· {fmt(r.fecha)}</span>{r.obs&&<span style={{color:"#8aa89a"}}> · {r.obs}</span>}</span>
+                <span><b style={{color:"#fb923c"}}>{r.lectura!==undefined&&r.lectura!==null&&r.lectura!==""?`lectura ${r.lectura} ${uni}`:`+${r.horas} ${uni}`}</b> <span style={{color:"#6aaa7a"}}>· {fmt(r.fecha)}</span>{r.obs&&<span style={{color:"#8aa89a"}}> · {r.obs}</span>}</span>
                 {puedeEditar&&<button className="btn-d" style={{...S.btn,fontSize:11,padding:"2px 8px"}} onClick={()=>borrarHoras(r.id)}>🗑</button>}
               </div>
             ))}
@@ -27074,7 +27097,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-23.5";
+const BUILD_STAMP = "2026-10-23.6";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
