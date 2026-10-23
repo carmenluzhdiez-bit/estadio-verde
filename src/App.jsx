@@ -12313,8 +12313,9 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   const { compras, rendiciones=[], fondo=3000000, saldoAnterior=0, periodoAnterior="" } = comprasData;
   const set = (patch) => setComprasData(p=>({...p,...patch}));
 
+  const refsVinculadas = (doc) => compras.filter(c=>(doc.notasVinculadas||[]).includes(c.id)).map(c=>`${c.tipoDoc} ${c.nDocumento||""} ${c.proveedor||""}`);
   // ── Ingreso automático a bodega ───────────────────────────────────────────
-  const ingresarItemsABodega = (docFecha, docRef, items, compraId, proveedorDoc="") => {
+  const ingresarItemsABodega = (docFecha, docRef, items, compraId, proveedorDoc="", vinculadasRefs=[]) => {
     const porBodega = {};
     const itemsEPP = [];
     items.forEach(it=>{
@@ -12356,6 +12357,16 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
         const yaIngresado = nuevosMovs.some(m=>m.docRef===docRef&&m.itemNombre?.toLowerCase()===it.descripcion.trim().toLowerCase());
         if(yaIngresado) return;
         const idx = nuevosItems.findIndex(i=>i.nombre.trim().toLowerCase()===it.descripcion.trim().toLowerCase());
+        // Si este documento viene de una cotización/nota/guía ya ingresada: no duplicar,
+        // actualizar ese ingreso para que muestre ambos documentos.
+        const iPrev = (vinculadasRefs&&vinculadasRefs.length)?nuevosMovs.findIndex(m=>m.tipo==="entrada"&&vinculadasRefs.includes(m.docRef)&&m.itemNombre?.toLowerCase()===it.descripcion.trim().toLowerCase()):-1;
+        if(iPrev>=0 && idx>=0){
+          const prev = nuevosMovs[iPrev];
+          const dCant = cant-(Number(prev.cantidad)||0);
+          if(dCant!==0) nuevosItems[idx] = {...nuevosItems[idx], stockActual:Math.max(0,(Number(nuevosItems[idx].stockActual)||0)+dCant)};
+          nuevosMovs[iPrev] = {...prev, cantidad:cant, docRef, docRefPrevio:prev.docRef, fecha:docFecha||prev.fecha, motivo:`Compra — ${docRef} (${prev.docRef})`};
+          return;
+        }
         if(idx>=0) {
           nuevosItems[idx] = {...nuevosItems[idx], stockActual:(Number(nuevosItems[idx].stockActual)||0)+cant};
         } else {
@@ -12512,7 +12523,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
       if(doc.tipoDoc==="Nota de Crédito") {
         descontarItemsDeBodega(doc.fecha, `NC ${doc.nDocumento||""} ${doc.proveedor||""}`, doc.items||[]);
       } else {
-        ingresarItemsABodega(doc.fecha, `${doc.tipoDoc} ${doc.nDocumento||""} ${doc.proveedor||""}`, doc.items||[], undefined, doc.proveedor||"");
+        ingresarItemsABodega(doc.fecha, `${doc.tipoDoc} ${doc.nDocumento||""} ${doc.proveedor||""}`, doc.items||[], undefined, doc.proveedor||"", refsVinculadas(doc));
       }
     } else {
       set({compras:[doc,...compras.map(compraC=>notasVinculadas.includes(compraC.id)?{...compraC,estado:"facturada",facturaId:docId}:compraC)]});
@@ -12521,7 +12532,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
         // NC: descontar stock de bodega
         descontarItemsDeBodega(doc.fecha, `NC ${doc.nDocumento||""} ${doc.proveedor||""}`, doc.items||[]);
       } else {
-        ingresarItemsABodega(doc.fecha, `${doc.tipoDoc} ${doc.nDocumento||""} ${doc.proveedor||""}`, doc.items||[], undefined, doc.proveedor||"");
+        ingresarItemsABodega(doc.fecha, `${doc.tipoDoc} ${doc.nDocumento||""} ${doc.proveedor||""}`, doc.items||[], undefined, doc.proveedor||"", refsVinculadas(doc));
       }
     }
     setForm(emptyForm); setShowForm(false); setAlertaDuplicado(null);
@@ -12538,7 +12549,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
     if(doc.tipoDoc==="Nota de Crédito") {
       descontarItemsDeBodega(doc.fecha, `NC ${doc.nDocumento||""} ${doc.proveedor||""}`, doc.items||[]);
     } else {
-      ingresarItemsABodega(doc.fecha, `${doc.tipoDoc} ${doc.nDocumento||""} ${doc.proveedor||""}`, doc.items||[], undefined, doc.proveedor||"");
+      ingresarItemsABodega(doc.fecha, `${doc.tipoDoc} ${doc.nDocumento||""} ${doc.proveedor||""}`, doc.items||[], undefined, doc.proveedor||"", refsVinculadas(doc));
     }
     setForm(emptyForm); setShowForm(false); setAlertaDuplicado(null);
   };
@@ -13122,6 +13133,35 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
         <div className="ein">
           <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
             <button className="btn-p" style={S.btn} onClick={()=>{setForm(emptyForm);setEditId(null);setShowForm(true);}}>➕ Nueva compra</button>
+            {esJefa&&<button style={{...S.btn,fontSize:11,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}} onClick={()=>{
+              const refDe=c=>`${c.tipoDoc} ${c.nDocumento||""} ${c.proveedor||""}`;
+              const pares=[]; // {fact, cot}
+              compras.forEach(f=>{ (f.notasVinculadas||[]).forEach(id=>{ const l=compras.find(c=>c.id===id); if(l) pares.push({f,l}); }); });
+              compras.forEach(l=>{ if(l.facturaId && !pares.some(p=>p.l.id===l.id)){ const f=compras.find(c=>c.id===l.facturaId); if(f) pares.push({f,l}); } });
+              const nz=x=>(x||"").toString().trim().toLowerCase();
+              const nuevo={...bodegasData}; const res=[];
+              Object.keys(nuevo).forEach(bid=>{
+                const bd=nuevo[bid]; if(!bd) return;
+                let movs=[...(bd.movimientos||[])]; let items=[...(bd.items||[])]; let cambio=false;
+                pares.forEach(({f,l})=>{
+                  const rF=refDe(f), rL=refDe(l);
+                  movs.filter(m=>m.tipo==="entrada"&&m.docRef===rL).forEach(mL=>{
+                    const iF=movs.findIndex(m=>m.tipo==="entrada"&&m.docRef===rF&&nz(m.itemNombre)===nz(mL.itemNombre)&&Number(m.cantidad)===Number(mL.cantidad));
+                    if(iF<0) return;
+                    movs=movs.filter(m=>m!==mL);
+                    const iF2=movs.findIndex(m=>m.tipo==="entrada"&&m.docRef===rF&&nz(m.itemNombre)===nz(mL.itemNombre)&&Number(m.cantidad)===Number(mL.cantidad));
+                    if(iF2>=0) movs[iF2]={...movs[iF2],motivo:`Compra — ${rF} (${rL})`};
+                    items=items.map(i=>String(i.id)===String(mL.itemId)?{...i,stockActual:Math.max(0,(Number(i.stockActual)||0)-(Number(mL.cantidad)||0))}:i);
+                    res.push(`${mL.itemNombre}: −${mL.cantidad} (${rL} → ${rF})`); cambio=true;
+                  });
+                });
+                if(cambio) nuevo[bid]={...bd,items,movimientos:movs};
+              });
+              if(res.length===0){ alert("✅ No hay ingresos duplicados entre cotizaciones/notas y sus facturas vinculadas."); return; }
+              if(!window.confirm(`Se encontraron ${res.length} ingreso(s) duplicado(s). Se quitará el ingreso de la cotización/nota y se descontará su cantidad del stock; el ingreso de la factura quedará con ambos documentos:\n\n${res.join("\n")}\n\n¿Corregir?`)) return;
+              setBodegasData(nuevo);
+              alert(`✅ ${res.length} ingreso(s) duplicado(s) corregidos.`);
+            }}>🧹 Limpiar ingresos duplicados</button>}
             {seleccionadas.length>0
               ? <button style={{...S.btn,background:"rgba(167,139,250,0.2)",color:"#c4b5fd",border:"1px solid rgba(167,139,250,0.35)",fontSize:12}} onClick={()=>setShowRendForm(true)}>📤 Rendir ({seleccionadas.length})</button>
               : <span style={{fontSize:11,color:"#6aaa7a",fontStyle:"italic"}}>☑️ Marca compras abajo para habilitar "Rendir"</span>}
@@ -13521,7 +13561,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
                         bodegasData={bodegasData}
                         onConfirm={(asignaciones, maquinas=[], categoriasBod=[], modelosEpp=[], registrosISP=[])=>{
                           const itemsConBodega = items.map((it,i)=>({...it,bodegaDestino:asignaciones[i]||"",maquinaAsociada:maquinas[i]||"",categoriaBodega:categoriasBod[i]||"",modelo:modelosEpp[i]||it.modelo||"",registroISP:registrosISP[i]||it.registroISP||""}));
-                          ingresarItemsABodega(c.fecha,`${c.tipoDoc} ${c.nDocumento||""} ${c.proveedor||""}`,itemsConBodega,c.id,c.proveedor||"");
+                          ingresarItemsABodega(c.fecha,`${c.tipoDoc} ${c.nDocumento||""} ${c.proveedor||""}`,itemsConBodega,c.id,c.proveedor||"",refsVinculadas(c));
                           setSelectBodegaId(null);
                         }}
                         onCancel={()=>setSelectBodegaId(null)}
@@ -21861,7 +21901,12 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                                 } else {
                                   extraTd=`<td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px;overflow:hidden;text-overflow:ellipsis">${it.ubicacion||"—"}</td>`;
                                 }
-                                const movsIt=(bd.movimientos||[]).filter(m=>m.itemId!==undefined&&m.itemId!==null&&m.itemId!==""&&String(m.itemId)===String(it.id)).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
+                                const movsIt=(bd.movimientos||[]).filter(m=>m.itemId!==undefined&&m.itemId!==null&&m.itemId!==""&&String(m.itemId)===String(it.id)).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")).reduce((acc,m)=>{
+                                  const k=[m.fecha,m.tipo,m.motivo||m.docRef||"",m.docRef||"",m.responsable||"",m.unidad||""].join("|");
+                                  const ex=acc.find(x=>x._k===k);
+                                  if(ex) ex.cantidad=(Number(ex.cantidad)||0)+(Number(m.cantidad)||0); else acc.push({...m,_k:k,cantidad:Number(m.cantidad)||0});
+                                  return acc;
+                                },[]);
                                 const trIt=(bd.traslados||[]).filter(t=>String(t.itemId)===String(it.id)).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
                                 const nColsIt=esMaq?5:4;
                                 const thMini='padding:3px 8px;font-size:9px;border:1px solid #e0ece0;text-align:left;background:#f3faf3;color:#2e7d32';
@@ -27129,7 +27174,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-23.8";
+const BUILD_STAMP = "2026-10-23.9";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
