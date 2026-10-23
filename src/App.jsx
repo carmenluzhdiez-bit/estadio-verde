@@ -345,7 +345,15 @@ const CAUSAS_NO_PUDO = [
   {k:"maquina",  icon:"🔧", label:"Falla de máquina o equipo",     pref:"Falla de máquina o equipo"},
   {k:"personal", icon:"👥", label:"Falta de personal / tiempo",    pref:"Falta de personal / tiempo"},
   {k:"zona",     icon:"🚧", label:"Zona ocupada (evento / uso)",   pref:"Zona ocupada por evento o uso deportivo"},
+  {k:"otro",     icon:"✏️", label:"Otro (escribir)",               pref:""},
 ];
+// Subtítulo destacado de cada tarea: 📍 zona · elemento (turno de jardineros, supervisores y jefa)
+const SubZonaTarea = ({ zona, elemento, icono="📍" }) => !zona ? null : (
+  <span style={{display:"inline-flex",alignItems:"center",flexWrap:"wrap",gap:5,fontSize:13,fontWeight:700,color:"#86efac",background:"rgba(52,211,153,0.10)",border:"1px solid rgba(52,211,153,0.30)",borderRadius:8,padding:"2px 9px",lineHeight:1.35}}>
+    <span>{icono} {zona}</span>
+    {elemento&&<><span style={{opacity:0.5}}>·</span><span style={{color:"#fde68a"}}>{elemento}</span></>}
+  </span>
+);
 // Personal retirado: no aparece para asignar tareas ni para elegir responsables (su historial se conserva).
 const noRetirado = (p) => !!p && p.estado!=="retirado";
 const causaNoPudoDe = (t) => {
@@ -1993,7 +2001,7 @@ function PanelGestion({ S, tareasProg, setTareas=()=>{}, esJefa=false, personal=
   const autoDesaf=(()=>{
     const L=[];
     if(RM.venc>0) L.push(`${RM.venc} tarea(s) vencidas sin hacer${RM.zonasV.length?", sobre todo en "+RM.zonasV.map(([k,n])=>`${k} (${n})`).join(", "):""}${RM.tiposV.length?"; tipos: "+RM.tiposV.map(([k,n])=>`${k} (${n})`).join(", "):""}.`);
-    const NC={maquina:"falla de máquina",personal:"falta de personal/tiempo",zona:"zona ocupada",sinclas:"sin clasificar"};
+    const NC={maquina:"falla de máquina",personal:"falta de personal/tiempo",zona:"zona ocupada",otro:"otro motivo",sinclas:"sin clasificar"};
     const cs2=Object.entries(RM.causas).filter(([k])=>NC[k]);
     if(RM.noPudo>0) L.push(`${RM.noPudo} tarea(s) «no se pudo»${cs2.length?": "+cs2.map(([k,n])=>`${NC[k]} ${n}`).join(", "):""}.`);
     if(RM.salud!==null&&RP.salud!==null&&RM.salud<RP.salud) L.push(`La salud operativa bajó (${RP.salud} → ${RM.salud}); revisar causas.`);
@@ -2235,7 +2243,7 @@ function PanelGestion({ S, tareasProg, setTareas=()=>{}, esJefa=false, personal=
         const cnt={}; meses.forEach(m=>{cnt[m]={}; cols.forEach(c=>{cnt[m][c.k]=0;});});
         noPudoTodas.forEach(t=>{ const m=t.dia.slice(0,7); if(cnt[m]) cnt[m][causaNoPudoDe(t)]++; });
         const maxM=Math.max(1,...meses.map(m=>cols.reduce((a,c)=>a+cnt[m][c.k],0)));
-        const COL={lluvia:"#60a5fa",maquina:"#f59e0b",personal:"#a78bfa",zona:"#34d399","":"#6b7280"};
+        const COL={lluvia:"#60a5fa",maquina:"#f59e0b",personal:"#a78bfa",zona:"#34d399",otro:"#f472b6","":"#6b7280"};
         const MN=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
         const sinClas = noPudoTodas.filter(t=>!causaNoPudoDe(t)).sort((a,b)=>b.dia.localeCompare(a.dia)).slice(0,30);
         const clasificar=(t,k)=>{
@@ -4210,7 +4218,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                                 <span style={{fontSize:12,flexShrink:0}}>{est.icon}</span>
                                 <div style={{flex:1,minWidth:120}}>
                                   <div style={{fontSize:11,color:"#8aa89a"}}>
-                                    {hpTask.zona&&<>📍 {hpTask.zona}{hpTask.elemento?` · ${hpTask.elemento}`:""}</>}
+                                    {hpTask.zona&&<SubZonaTarea zona={hpTask.zona} elemento={hpTask.elemento}/>}
                                     {hpTask.emergente&&<span style={{marginLeft:6,fontSize:9,fontWeight:700,color:"#fbbf24",background:"rgba(251,191,36,0.12)",border:"1px solid rgba(251,191,36,0.3)",padding:"1px 6px",borderRadius:7}}>⚡ Emergente</span>}
                                     {esTrasl&&<span style={{marginLeft:6,fontSize:9,fontWeight:700,color:"#93c5fd",background:"rgba(59,130,246,0.12)",border:"1px solid rgba(59,130,246,0.3)",padding:"1px 6px",borderRadius:7}}>➡️ Trasladada al {hpTask.trasladadaA}</span>}
                                   </div>
@@ -5443,8 +5451,8 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                         {t.estado==="no_pudo"&&(
                           <div style={{marginTop:6}}>
                             {renderCausaNoPudo(t)}
-                            <textarea rows={2} placeholder="¿Por qué no se pudo? (obligatorio)" value={t.notaWorker||""} onChange={e=>onUpdateTarea(fechaVer,t.id,{notaWorker:e.target.value})} style={{width:"100%",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:8,color:"#ede9e0",padding:"6px 10px",fontFamily:"'Georgia',serif",fontSize:12,resize:"vertical"}}/>
-                            {!causaNoPudoDe(t)&&<div style={{fontSize:10,color:"#ef4444",marginTop:2}}>⚠️ Elige la causa (lluvia, máquina, personal o zona ocupada)</div>}
+                            <textarea rows={2} placeholder={causaNoPudoDe(t)==="otro"?"Escribe la causa (obligatorio)":"¿Por qué no se pudo? (obligatorio)"} value={t.notaWorker||""} onChange={e=>onUpdateTarea(fechaVer,t.id,{notaWorker:e.target.value})} style={{width:"100%",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:8,color:"#ede9e0",padding:"6px 10px",fontFamily:"'Georgia',serif",fontSize:12,resize:"vertical"}}/>
+                            {!causaNoPudoDe(t)&&<div style={{fontSize:10,color:"#ef4444",marginTop:2}}>⚠️ Elige la causa (lluvia, máquina, personal, zona ocupada u otro)</div>}
                             {!t.notaWorker&&<div style={{fontSize:10,color:"#ef4444",marginTop:2}}>⚠️ Explica el motivo para poder guardar</div>}
                           </div>
                         )}
@@ -5652,7 +5660,7 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                                 <div style={{fontSize:13,fontWeight:600}}>{t.tarea?.replace("⛳ ","")}{t.emergente&&<span style={{marginLeft:6,fontSize:10,fontWeight:700,color:"#fbbf24",background:"rgba(251,191,36,0.12)",border:"1px solid rgba(251,191,36,0.3)",padding:"1px 7px",borderRadius:8,verticalAlign:"middle"}}>⚡ Emergente</span>}</div>
                                 <span style={{fontSize:10,fontWeight:600,color:est.color,background:`${est.color}12`,padding:"2px 7px",borderRadius:8,border:`1px solid ${est.color}25`,whiteSpace:"nowrap",flexShrink:0}}>{est.icon} {est.label}</span>
                               </div>
-                              {t.zona&&<div style={{fontSize:11,color:"#5a9a7a",marginTop:1,marginBottom:4}}>📍 {t.zona}{t.elemento?` · ${t.elemento}`:""}</div>}
+                              {t.zona&&<div style={{marginTop:3,marginBottom:5}}><SubZonaTarea zona={t.zona} elemento={t.elemento}/></div>}
                               {t.alturaCorte&&<div style={{fontSize:12,color:"#fbbf24",fontWeight:600,marginBottom:4,background:"rgba(251,191,36,0.08)",border:"1px solid rgba(251,191,36,0.2)",borderRadius:6,padding:"3px 8px",display:"inline-block"}}>✂️ Cortar a: {t.alturaCorte} {t.unidadAlturaCorte==="cm"?"cm":t.unidadAlturaCorte==="pulgadas"?"pulgadas":"mm"}</div>}
                               {t.metodoLimpieza&&<span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.08)",padding:"1px 8px",borderRadius:8,border:"1px solid rgba(251,191,36,0.2)",display:"inline-block",marginBottom:4}}>{t.metodoLimpieza==="sopladora"?"🌬️ Sopladora":t.metodoLimpieza==="barrido"?"🧹 Barrido":"🌬️+🧹 Sopladora + Barrido"}</span>}
                               {t.notas&&<div style={{fontSize:11,color:"#5a8a6a",marginTop:2,marginBottom:4,fontStyle:"italic"}}>💡 {t.notas}</div>}
@@ -5693,7 +5701,7 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                               {t.estado==="no_pudo"&&(
                                 <div style={{marginTop:5}}>
                                   {renderCausaNoPudo(t)}
-                            <textarea rows={2} placeholder="¿Por qué no se pudo? (obligatorio)" value={t.notaWorker||""} onChange={e=>onUpdateTarea(fechaVer,t.id,{notaWorker:e.target.value})} style={{width:"100%",background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:8,color:"#ede9e0",padding:"6px 10px",fontFamily:"'Georgia',serif",fontSize:12,resize:"vertical"}}/>
+                            <textarea rows={2} placeholder={causaNoPudoDe(t)==="otro"?"Escribe la causa (obligatorio)":"¿Por qué no se pudo? (obligatorio)"} value={t.notaWorker||""} onChange={e=>onUpdateTarea(fechaVer,t.id,{notaWorker:e.target.value})} style={{width:"100%",background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.25)",borderRadius:8,color:"#ede9e0",padding:"6px 10px",fontFamily:"'Georgia',serif",fontSize:12,resize:"vertical"}}/>
                                   {!t.notaWorker&&<div style={{fontSize:10,color:"#ef4444",marginTop:2}}>⚠️ Motivo obligatorio</div>}
                                 </div>
                               )}
@@ -7664,8 +7672,7 @@ function VistaDesignacion({ S, tareasProg, setTareasProg, personal, MACROZONAS_B
                 {t.supervisorAgregada&&<span style={{fontSize:10,color:"#f59e0b",background:"rgba(245,158,11,0.1)",padding:"1px 5px",borderRadius:6,border:"1px solid rgba(245,158,11,0.2)",marginLeft:5}}>+sup</span>}
               </div>
               <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
-                <span style={{fontSize:11,color:"#5a8a6a"}}>{icono} {t.zona}</span>
-                {t.elemento&&<span style={{fontSize:11,color:"#4a7a6a"}}>{t.elemento}</span>}
+                <SubZonaTarea zona={t.zona} elemento={t.elemento} icono={icono}/>
                 {t.responsable
                   ? <span style={{fontSize:11,color:"#86c4a0"}}>👤 <b>{t.responsable}</b></span>
                   : <span style={{fontSize:11,color:"#94a3b8",fontStyle:"italic"}}>Sin asignar</span>}
@@ -27057,7 +27064,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-23.2";
+const BUILD_STAMP = "2026-10-23.3";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
