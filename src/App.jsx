@@ -21789,12 +21789,23 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                                 } else {
                                   extraTd=`<td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px;overflow:hidden;text-overflow:ellipsis">${it.ubicacion||"—"}</td>`;
                                 }
+                                const movsIt=(bd.movimientos||[]).filter(m=>m.itemId!==undefined&&m.itemId!==null&&m.itemId!==""&&String(m.itemId)===String(it.id)).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
+                                const trIt=(bd.traslados||[]).filter(t=>String(t.itemId)===String(it.id)).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
+                                const nColsIt=esMaq?5:4;
+                                const thMini='padding:3px 8px;font-size:9px;border:1px solid #e0ece0;text-align:left;background:#f3faf3;color:#2e7d32';
+                                const tdMini='padding:3px 8px;border:1px solid #eef5ee;font-size:10px';
+                                const filasMovIt=movsIt.slice(0,30).map(m=>`<tr><td style="${tdMini}">${m.fecha||"—"}</td><td style="${tdMini};font-weight:600;color:${m.tipo==="entrada"?"#2e7d32":"#c62828"}">${m.tipo==="entrada"?"⬆️ Entrada":"⬇️ Salida"}</td><td style="${tdMini};text-align:right">${m.cantidad||0} ${m.unidad||""}</td><td style="${tdMini}">${m.motivo||m.docRef||"—"}</td><td style="${tdMini}">${m.responsable||"—"}</td></tr>`).join("");
+                                const filasTrIt=trIt.slice(0,30).map(t=>`<tr><td style="${tdMini}">${t.fecha||"—"}</td><td style="${tdMini};text-align:right">${t.cantidad||0}</td><td style="${tdMini}">${t.destino||"—"}</td><td style="${tdMini}">${t.conRegreso?(t.estado==="regresó"?`✅ Regresó ${t.fechaRegresoReal||""}`:`🔄 En camino${t.fechaRegreso?` (vuelve ${t.fechaRegreso})`:""}`):"➡️ Sin regreso"}</td><td style="${tdMini}">${t.responsable||"—"}</td></tr>`).join("");
+                                const subFila=`<tr><td colspan="${nColsIt}" style="padding:4px 10px 12px 22px;border:1px solid #e8f5e9;background:#fcfffc">
+                                  ${filasMovIt?`<div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">🔄 Movimientos${movsIt.length>30?` (últimos 30 de ${movsIt.length})`:` (${movsIt.length})`}</div><table style="width:100%;border-collapse:collapse;table-layout:auto;margin:0 0 6px"><thead><tr><th style="${thMini}">Fecha</th><th style="${thMini}">Tipo</th><th style="${thMini};text-align:right">Cantidad</th><th style="${thMini}">Motivo / Doc.</th><th style="${thMini}">Responsable</th></tr></thead><tbody>${filasMovIt}</tbody></table>`:`<div style="font-size:10px;color:#999;margin-bottom:4px">Sin movimientos registrados</div>`}
+                                  ${filasTrIt?`<div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">🚛 Traslados (${trIt.length})</div><table style="width:100%;border-collapse:collapse;table-layout:auto;margin:0"><thead><tr><th style="${thMini}">Fecha</th><th style="${thMini};text-align:right">Cantidad</th><th style="${thMini}">Destino</th><th style="${thMini}">Estado</th><th style="${thMini}">Responsable</th></tr></thead><tbody>${filasTrIt}</tbody></table>`:""}
+                                </td></tr>`;
                                 return`<tr style="background:${idx%2?"#fafafa":"#fff"}">
                                   <td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px;overflow:hidden;text-overflow:ellipsis"><b>${it.nombre}</b>${it.obs?`<br><span style="font-size:9px;color:#888;font-style:italic">${it.obs}</span>`:""}</td>
                                   ${extraTd}
                                   <td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:12px;text-align:right;font-weight:700;color:#1a5c2a">${fmtStock(it.stockActual)} <span style="font-size:10px;font-weight:400;color:#666">${it.unidad||""}</span></td>
                                   <td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px;text-align:center;color:${estColor};font-weight:600">${estTxt}</td>
-                                </tr>`;
+                                </tr>${subFila}`;
                               }).join("")}
                               </tbody></table>`;
                           }).join("");
@@ -21826,8 +21837,8 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                           ${itemsHTML}
                           ${(()=>{
                             const nombreItem = (id)=>(bd.items||[]).find(i=>String(i.id)===String(id))?.nombre||"—";
-                            const movsRecientes = (bd.movimientos||[]).filter(m=>!m.itemId||itemsParaInf.some(i=>String(i.id)===String(m.itemId))).slice(0,50);
-                            const traslRecientes = (bd.traslados||[]).slice(0,50);
+                            const movsRecientes = (bd.movimientos||[]).filter(m=>!m.itemId).slice(0,50); // los movimientos con ítem van dentro de cada ítem
+                            const traslRecientes = []; // los traslados van dentro de cada ítem
                             const filasMov = movsRecientes.map(m=>`<tr>
                               <td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px">${m.fecha||"—"}</td>
                               <td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px;font-weight:600;color:${m.tipo==="entrada"?"#2e7d32":"#c62828"}">${m.tipo==="entrada"?"⬆️ Entrada":"⬇️ Salida"}</td>
@@ -21844,15 +21855,12 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                               <td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px">${t.conRegreso?(t.estado==="regresó"?`✅ Regresó ${t.fechaRegresoReal||""}`:`🔄 En camino${t.fechaRegreso?` (vuelve ${t.fechaRegreso})`:""}`):"➡️ Sin regreso"}</td>
                               <td style="padding:6px 10px;border:1px solid #e8f5e9;font-size:11px">${t.responsable||"—"}</td>
                             </tr>`).join("");
+                            if(!movsRecientes.length) return "";
                             return `
-                              <h3>🔄 Movimientos recientes${movsRecientes.length?` (últimos ${movsRecientes.length})`:""}</h3>
-                              ${filasMov?`<table><thead><tr>
+                              <h3>🔄 Movimientos sin ítem asociado (últimos ${movsRecientes.length})</h3>
+                              <table><thead><tr>
                                 <th>Fecha</th><th>Tipo</th><th>Ítem</th><th>Cantidad</th><th>Motivo/Doc.</th><th>Responsable</th>
-                              </tr></thead><tbody>${filasMov}</tbody></table>`:`<div style="font-size:11px;color:#888;margin-bottom:16px">Sin movimientos registrados.</div>`}
-                              <h3>🚛 Traslados${traslRecientes.length?` (últimos ${traslRecientes.length})`:""}</h3>
-                              ${filasTrasl?`<table><thead><tr>
-                                <th>Fecha</th><th>Ítem</th><th>Cantidad</th><th>Destino</th><th>Estado</th><th>Responsable</th>
-                              </tr></thead><tbody>${filasTrasl}</tbody></table>`:`<div style="font-size:11px;color:#888;margin-bottom:16px">Sin traslados registrados.</div>`}
+                              </tr></thead><tbody>${filasMov}</tbody></table>
                             `;
                           })()}</body></html>`;
                           const url=URL.createObjectURL(new Blob([html],{type:"text/html"}));const a=document.createElement("a");a.href=url;a.target="_blank";a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);
@@ -27049,7 +27057,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-23.1";
+const BUILD_STAMP = "2026-10-23.2";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
