@@ -4816,7 +4816,7 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
       }));
       ejecutarDescuentoStock(descuentos);
       const totalTxt = Object.entries(porUnidad).map(([u,c])=>`${c} ${u}`).join(" + ");
-      onUpdateTarea(fechaVer, t.id, { arenaRegistrada:true, arenaDetalle:detalle, arenaCantidadTotal:totalTxt });
+      onUpdateTarea(fechaVer, t.id, { arenaRegistrada:true, arenaDetalle:detalle, arenaCantidadTotal:totalTxt, arenaPorGreen:filas.map(f=>({green:f.green.trim(),cantidad:Number(f.cantidad),unidad:f.unidad||"sacos"})) });
     };
 
     return (
@@ -4831,8 +4831,11 @@ function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, 
             <div style={{fontSize:11,color:"#d97706",fontWeight:700,marginBottom:6}}>🏖️ Arena usada por green</div>
             {(arenaFilas[tid]||[]).map((f,i)=>(
               <div key={i} style={{display:"flex",gap:6,marginBottom:6,alignItems:"center"}}>
-                <input value={f.green} onChange={e=>updateFilaGolf(i,"green",e.target.value)} placeholder="ej: Green 04"
-                  style={{flex:1,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(217,119,6,0.3)",borderRadius:6,color:"#ede9e0",padding:"6px 10px",fontSize:13}}/>
+                <select value={f.green} onChange={e=>updateFilaGolf(i,"green",e.target.value)}
+                  style={{flex:1,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(217,119,6,0.3)",borderRadius:6,color:"#ede9e0",padding:"6px 10px",fontSize:13}}>
+                  <option value="">— Green —</option>
+                  {[...GREENS_DEF.map(g=>g.nombre),"Vivero"].map(n=><option key={n} value={n}>{n}</option>)}
+                </select>
                 <input type="number" step="0.1" value={f.cantidad} onChange={e=>updateFilaGolf(i,"cantidad",e.target.value)} placeholder="cant."
                   style={{width:70,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(217,119,6,0.3)",borderRadius:6,color:"#ede9e0",padding:"6px 8px",fontSize:13}}/>
                 <select value={f.unidad} onChange={e=>updateFilaGolf(i,"unidad",e.target.value)}
@@ -20124,6 +20127,93 @@ function HojaVidaMaquinaria({ S, bodegasData, setBodegasData, hojas, setHojas, h
   );
 }
 
+// ═══════════════ ARENA USADA EN AIREACIONES (Bodega Golf) ═══════════════
+// Se arma a partir de las tareas de Golf con arena registrada (arenaPorGreen, o el texto antiguo «Green 04: 5 sacos, …»).
+const filasArenaDeTarea = (t) => {
+  if(Array.isArray(t.arenaPorGreen) && t.arenaPorGreen.length) return t.arenaPorGreen.map(f=>({green:f.green||"—",cantidad:Number(f.cantidad)||0,unidad:f.unidad||"sacos"}));
+  const out = [];
+  (t.arenaDetalle||"").split(/,\s*/).forEach(par=>{
+    const m = /^(.+?):\s*([\d.,]+)\s*(\S+)\s*$/.exec(par.trim());
+    if(m) out.push({green:m[1].trim(),cantidad:Number(m[2].replace(",","."))||0,unidad:m[3]});
+  });
+  if(out.length) return out;
+  const m2 = /^([\d.,]+)\s*(\S+)/.exec(String(t.arenaCantidadTotal||""));
+  return m2 ? [{green:t.elemento||"(sin detalle por green)",cantidad:Number(m2[1].replace(",","."))||0,unidad:m2[2]}] : [];
+};
+function ArenaAireacionesGolf({ S, tareasProg }) {
+  const [anio, setAnio] = React.useState("todos");
+  const registros = [];
+  Object.entries(tareasProg||{}).forEach(([fecha,ts])=>{
+    const arr = Array.isArray(ts)?ts:(ts&&typeof ts==="object"?Object.values(ts):[]);
+    arr.forEach(t=>{
+      if(!t||!t.arenaRegistrada) return;
+      if(!(t.zona==="Golf"||(t.zona||"").includes("Golf"))) return;
+      const filas = filasArenaDeTarea(t);
+      if(filas.length) registros.push({fecha,tarea:(t.tarea||"Aireación").replace(/\p{Emoji}/gu,"").trim(),responsable:t.responsable||"",filas});
+    });
+  });
+  registros.sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const anios = [...new Set(registros.map(r=>r.fecha.slice(0,4)))].sort().reverse();
+  const vis = registros.filter(r=>anio==="todos"||r.fecha.startsWith(anio));
+  const porGreen = {};
+  vis.forEach(r=>r.filas.forEach(f=>{
+    const g = (porGreen[f.green] ||= {green:f.green,porUnidad:{},fechas:new Set(),ultima:""});
+    g.porUnidad[f.unidad] = (g.porUnidad[f.unidad]||0)+f.cantidad;
+    g.fechas.add(r.fecha); if(r.fecha>g.ultima) g.ultima=r.fecha;
+  }));
+  const filasGreen = Object.values(porGreen).sort((a,b)=>cmpEs(a.green,b.green));
+  const totalUn = {}; vis.forEach(r=>r.filas.forEach(f=>{ totalUn[f.unidad]=(totalUn[f.unidad]||0)+f.cantidad; }));
+  const txtUn = o => Object.entries(o).map(([u,c])=>`${Math.round(c*100)/100} ${u}`).join(" + ")||"—";
+  const fmt = f => f.split("-").reverse().join("-");
+  const imprimir = () => {
+    const esc = x => String(x??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+    const w = window.open("","_blank","width=900,height=700");
+    if(!w){ alert("El navegador bloqueó la ventana emergente. Permítela para imprimir."); return; }
+    const tG = filasGreen.map(g=>`<tr><td>${esc(g.green)}</td><td>${g.fechas.size}</td><td><b>${esc(txtUn(g.porUnidad))}</b></td><td>${esc(fmt(g.ultima))}</td></tr>`).join("");
+    const tR = vis.map(r=>`<tr><td>${esc(fmt(r.fecha))}</td><td>${esc(r.tarea)}</td><td>${esc(r.responsable||"—")}</td><td>${r.filas.map(f=>`${esc(f.green)}: <b>${f.cantidad} ${esc(f.unidad)}</b>`).join(" · ")}</td></tr>`).join("");
+    w.document.write(`<html><head><meta charset="utf-8"><title>Arena en aireaciones — Golf</title><style>body{font-family:Arial,sans-serif;font-size:12px;color:#222;padding:18px}h1{font-size:18px;margin:0}h2{font-size:14px;margin:16px 0 6px;border-bottom:1px solid #999}table{width:100%;border-collapse:collapse}th,td{border:1px solid #bbb;padding:4px 6px;text-align:left;vertical-align:top}th{background:#eee}</style></head><body>
+      <div style="display:flex;align-items:center;gap:12px"><img src="${LOGO_AREAS_VERDES_B64}" style="height:44px"/><div><h1>Arena usada en aireaciones — Golf</h1><div style="color:#555">${anio==="todos"?"Todos los registros":"Año "+esc(anio)} · Total: ${esc(txtUn(totalUn))} · Impreso el ${esc(fmt(fechaLocal()))}</div></div></div>
+      <h2>Acumulado por green</h2><table><tr><th>Green</th><th>Aireaciones</th><th>Arena total</th><th>Última vez</th></tr>${tG}</table>
+      <h2>Detalle por aireación</h2><table><tr><th>Fecha</th><th>Tarea</th><th>Quién</th><th>Arena por green</th></tr>${tR}</table></body></html>`);
+    w.document.close(); setTimeout(()=>{ try{w.focus();w.print();}catch(e){} },400);
+  };
+  return (
+    <div className="ein">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:6}}>
+        <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,color:"#d97706"}}>🏖️ Arena usada en aireaciones</div>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <select style={{...S.input,fontSize:12,padding:"4px 8px",width:"auto"}} value={anio} onChange={e=>setAnio(e.target.value)}>
+            <option value="todos">Todos los años</option>{anios.map(a=><option key={a} value={a}>{a}</option>)}
+          </select>
+          {vis.length>0&&<button className="btn-g" style={{...S.btn,fontSize:12,padding:"4px 12px"}} onClick={imprimir}>🖨️ Imprimir</button>}
+        </div>
+      </div>
+      <div style={{fontSize:12,color:"#5a9a7a",marginBottom:12}}>Se llena cuando el jardinero completa una aireación y usa «🏖️ Registrar arena usada» en su tarea. Cada registro también descuenta el stock de arena de esta bodega.</div>
+      {vis.length===0&&<div style={{...S.card,padding:24,textAlign:"center",color:"#4a7a5a"}}>Aún no hay arena registrada en aireaciones{anio!=="todos"?` del ${anio}`:""}.</div>}
+      {vis.length>0&&(<>
+        <div style={{...S.card,padding:14,marginBottom:12}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#fbbf24",marginBottom:8}}>Acumulado por green · total {txtUn(totalUn)}</div>
+          <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+            <thead><tr style={{color:"#6aaa7a",textAlign:"left",fontSize:10,textTransform:"uppercase"}}><th style={{padding:"4px 6px"}}>Green</th><th style={{padding:"4px 6px"}}>Aireaciones</th><th style={{padding:"4px 6px"}}>Arena total</th><th style={{padding:"4px 6px"}}>Última vez</th></tr></thead>
+            <tbody>{filasGreen.map(g=>(<tr key={g.green} style={{borderTop:"1px solid rgba(255,255,255,0.06)"}}><td style={{padding:"5px 6px",fontWeight:700,color:"#ede9e0"}}>{g.green}</td><td style={{padding:"5px 6px"}}>{g.fechas.size}</td><td style={{padding:"5px 6px",fontWeight:700,color:"#fb923c"}}>{txtUn(g.porUnidad)}</td><td style={{padding:"5px 6px"}}>{fmt(g.ultima)}</td></tr>))}</tbody>
+          </table></div>
+        </div>
+        <div style={{...S.card,padding:14}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#34d399",marginBottom:8}}>Detalle por aireación</div>
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            {vis.map((r,i)=>(
+              <div key={i} style={{padding:"8px 10px",background:"rgba(255,255,255,0.03)",borderRadius:8}}>
+                <div style={{fontSize:12,fontWeight:700,color:"#ede9e0"}}>{fmt(r.fecha)} · {r.tarea}{r.responsable&&<span style={{fontWeight:400,color:"#6aaa7a"}}> · 👤 {r.responsable}</span>}</div>
+                <div style={{fontSize:12,color:"#c0dac0",marginTop:3}}>{r.filas.map((f,j)=><span key={j} style={{marginRight:12}}>{f.green}: <b style={{color:"#fb923c"}}>{f.cantidad} {f.unidad}</b></span>)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </>)}
+    </div>
+  );
+}
+
 function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLectura=false, rolLogueado="", currentUserId="", tareasProg, setTareasProg, compras=[], crearNotificacion=()=>{},
   eppEntregas=[], setEppEntregas=()=>{}, eppFiltros=[], setEppFiltros=()=>{}, eppVidaUtil=[], setEppVidaUtil=()=>{},
   eppInspecciones=[], setEppInspecciones=()=>{}, eppFitTests=[], setEppFitTests=()=>{}, eppDisposiciones=[], setEppDisposiciones=()=>{},
@@ -20602,7 +20692,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
         ] : [["stock","📦 Stock"],["movimientos","🔄 Movimientos"],["traslados","🚛 Traslados"],["tareas","✅ Tareas"],["historial","📜 Historial"],
           ...(bodegaActiva==="b05"?[["hojas_seguridad","🛡️ Hojas de Seguridad"]]:[]),
           ...(bodegaActiva==="b04"?[["hojavida","🛠️ Hoja de vida"],["repuestos","🔩 Repuestos"]]:[]),
-          ...(bodegaActiva==="b06"?[["repuestos","🔩 Repuestos"]]:[]),
+          ...(bodegaActiva==="b06"?[["arena","🏖️ Arena aireaciones"],["repuestos","🔩 Repuestos"]]:[]),
         ]).map(([t,l])=>(
           <button key={t} className={`tab${subTab===t?" on":""}`} onClick={()=>setSubTab(t)}>{l}</button>
         ))}
@@ -22054,6 +22144,8 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
         <HojaVidaMaquinaria S={S} bodegasData={bodegasData} setBodegasData={setBodegasData} hojas={hojasVidaMaq} setHojas={setHojasVidaMaq}
           horometro={horometroData} setHorometro={setHorometroData} personal={personal} puedeEditar={!!esJefa&&!soloLectura}/>
       )}
+
+      {subTab==="arena"&&bodegaActiva==="b06"&&<ArenaAireacionesGolf S={S} tareasProg={tareasProg}/>}
 
       {/* ── REPUESTOS (Maquinaria) ── */}
       {subTab==="repuestos"&&(bodegaActiva==="b04"||bodegaActiva==="b06")&&(()=>{
@@ -26957,7 +27049,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-22.9";
+const BUILD_STAMP = "2026-10-23.1";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
