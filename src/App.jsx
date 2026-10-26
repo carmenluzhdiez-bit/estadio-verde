@@ -14513,10 +14513,10 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
                 else { const t=totalSem(zd,diasProx); if(!t.n) return null; val=t.tot; color=colorTasaCrec(t.tot/t.n); }
                 const barW = Math.min(Math.abs(val)/maxW*100,100);
                 return (
-                  <div key={zd.zona.id} style={{display:"flex",alignItems:"center",gap:6}}>
+                  <div key={zd.zona.id} title={zd.tg?.origen||""} style={{display:"flex",alignItems:"center",gap:6}}>
                     <div style={{width:70,fontSize:10,color:"#7aaa80",flexShrink:0,textAlign:"right"}}>{zd.zona.nombre}</div>
                     <div style={{flex:1,background:"rgba(255,255,255,0.06)",borderRadius:3,height:16,overflow:"hidden"}}><div style={{width:`${barW}%`,height:"100%",background:color,borderRadius:3,opacity:0.85}}/></div>
-                    <div style={{width:70,fontSize:11,fontWeight:700,color:zd.usoPromedioOtros?"#38bdf8":"#fbbf24",flexShrink:0}}>{val>0?"+":""}{val}{zd.usoPromedioOtros&&<span style={{fontSize:8,marginLeft:2}}>🔗</span>}</div>
+                    <div style={{width:110,fontSize:11,fontWeight:700,color:zd.usoPromedioOtros?"#38bdf8":"#fbbf24",flexShrink:0}}>{val>0?"+":""}{val}{zd.usoPromedioOtros&&<span style={{fontSize:8,marginLeft:2}}>🔗</span>}{zd.tg&&<span style={{fontSize:8,marginLeft:3,fontWeight:400,color:zd.tg.tipo==="propia"?"#86efac":"#38bdf8"}}>{zd.tg.tipo==="propia"?"propia":"grupo "+(zd.tg.grupo||"")}</span>}</div>
                   </div>
                 );
               })}
@@ -27364,7 +27364,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-26.6";
+const BUILD_STAMP = "2026-10-26.7";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
