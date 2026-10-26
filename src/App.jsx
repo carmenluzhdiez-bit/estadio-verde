@@ -14245,15 +14245,28 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
     // Misma lógica que "⚡ Clasificación por tasa de crecimiento" (Últimos datos
     // mm/día): promedio de las tasas de la última semana, no solo la última
     // individual — para que ambas pantallas muestren el mismo número.
-    // Ventana mínima de 3 días: los tramos de 1 día multiplican el error de medición (±0.3mm)
-    // y daban tasas irreales (0.7 mm/d). Se juntan tramos hacia atrás hasta sumar >=3 días
-    // y la tasa es ponderada por días: suma(delta)/suma(días).
-    const tasasOrd = [...(tasasCalc||[])].sort((x,y)=>x.fecha.localeCompare(y.fecha));
-    let diasVentana=0, deltaVentana=0;
-    for(let k=tasasOrd.length-1;k>=0 && diasVentana<3;k--){ diasVentana+=tasasOrd[k].dias; deltaVentana+=tasasOrd[k].delta; }
-    const tasaUsar = diasVentana>0
-      ? Math.round((deltaVentana/diasVentana)*100)/100
-      : (tasaGlobal || 0.4);
+    // Mismo método que el Panel de Golf: tasa entre las 2 últimas mediciones posteriores al último corte;
+    // si no se puede, desde la altura del corte hasta la medición más reciente; si no, las 2 últimas mediciones.
+    const difDias=(f1,f2)=>Math.round((new Date(f1+"T12:00:00")-new Date(f2+"T12:00:00"))/(1000*60*60*24));
+    const cortesPasados = cortesZona.filter(c=>c.fecha<=hoyProjStr);
+    const corteUlt = cortesPasados.length?cortesPasados[cortesPasados.length-1]:null;
+    const medDesc = [...medicionesZona].sort((x,y)=>y.fecha.localeCompare(x.fecha));
+    const medPost = corteUlt?medDesc.filter(m=>m.fecha>=corteUlt.fecha):medDesc;
+    let diasVentana=0, deltaVentana=0, tasaPanel=null;
+    if(medPost.length>=2){
+      const dd=difDias(medPost[0].fecha,medPost[1].fecha), dl=medPost[0].alt-medPost[1].alt;
+      if(dd>0&&dl>0){ tasaPanel=dl/dd; diasVentana=dd; deltaVentana=dl; }
+    }
+    if(tasaPanel===null && corteUlt?.alturaCorte && medDesc.length){
+      const ref=medPost[0]||medDesc[0];
+      const dd=difDias(ref.fecha,corteUlt.fecha), dl=ref.alt-corteUlt.alturaCorte;
+      if(dd>0&&dl>0){ tasaPanel=dl/dd; diasVentana=dd; deltaVentana=dl; }
+    }
+    if(tasaPanel===null && medDesc.length>=2){
+      const dd=difDias(medDesc[0].fecha,medDesc[1].fecha), dl=medDesc[0].alt-medDesc[1].alt;
+      if(dd>0&&dl>0){ tasaPanel=dl/dd; diasVentana=dd; deltaVentana=dl; }
+    }
+    const tasaUsar = tasaPanel!==null ? Math.round(tasaPanel*100)/100 : (tasaGlobal || 0.4);
     const categoria = anal ? anal.categoria : "Sin datos";
 
     // Último evento conocido, para mostrar en la columna "Green"
@@ -14445,7 +14458,7 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
                         <span style={{fontSize:9,color:usoPromedioOtros?"#38bdf8":"#5a9a7a",display:"block",fontWeight:400}}>
                           {usoPromedioOtros
                             ? `🔗 promedio de otros greens${tasaReal!==null?` · propia pre-corte: ${tasaReal>0?"+":""}${Math.round(tasaReal*100)/100}`:""}`
-                            : (diasUltimoIntervalo?`propia · ventana ${diasUltimoIntervalo}d · +${Math.round(Number(deltaUltimo)*100)/100}mm`:"propia")}
+                            : (diasUltimoIntervalo?`propia · tramo ${diasUltimoIntervalo}d · +${Math.round(Number(deltaUltimo)*100)/100}mm`:"propia")}
                           {tasaDudosa&&<span style={{display:"block",color:"#f59e0b",fontWeight:700}} title="Tasa calculada con menos de 3 días de datos o más del doble que los otros greens">⚠️ poco confiable</span>}
                         </span>
                       </span>
@@ -27180,7 +27193,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-26.1";
+const BUILD_STAMP = "2026-10-26.2";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
