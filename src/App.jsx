@@ -1858,18 +1858,25 @@ function PanelGestion({ S, tareasProg, setTareas=()=>{}, esJefa=false, personal=
     const est=normalizarEstado(t.estado);
     const movida=t.trasladadaA && est!=="hecha" && !lluvia;
     const sem=lunesDeFecha(t.dia);
-    if(!porTrab[r]) porTrab[r]={sems:{},hechas:0,efect:0,noPudo:0,lluvia:0};
+    if(!porTrab[r]) porTrab[r]={sems:{},hechas:0,efect:0,noPudo:0,lluvia:0,aTiempo:0,movidas:0,pend:0};
     const o=porTrab[r];
-    if(!o.sems[sem]) o.sems[sem]={efect:0,hechas:0};
+    if(!o.sems[sem]) o.sems[sem]={efect:0,hechas:0,aTiempo:0,movidas:0};
     if(lluvia){ o.lluvia++; return; }
-    if(movida) return;
+    if(movida){ o.movidas++; o.sems[sem].movidas++; return; }
     if(NOFIN.includes(est) && t.dia===hoy) return; // lo de hoy aún está en curso: no se califica
     o.sems[sem].efect++; o.efect++;
-    if(est==="hecha"){ o.sems[sem].hechas++; o.hechas++; }
+    if(est==="hecha"){
+      o.sems[sem].hechas++; o.hechas++;
+      // "a tiempo": hecha el día que correspondía (sin atraso ni reprogramación)
+      const baseT = t.fechaCorrespondiente || t.movidoDesde || t.dia;
+      const atrasoT = Math.max(Number(t.diasVencida)||0, baseT<t.dia?diasEntreFechas(baseT,t.dia):0);
+      if(atrasoT===0){ o.aTiempo++; o.sems[sem].aTiempo++; }
+    }
     else if(est==="no_pudo") o.noPudo++;
+    else if(NOFIN.includes(est)) o.pend++; // quedó sin cerrar en un día pasado
   });
   const filasTrab = Object.entries(porTrab).filter(([,o])=>o.efect>0||o.lluvia>0)
-    .map(([n,o])=>({n,o,pct:o.efect?Math.round(o.hechas/o.efect*100):null}))
+    .map(([n,o])=>({n,o,pct:o.efect?Math.round(o.hechas/o.efect*100):null,pctT:o.efect?Math.round(o.aTiempo/o.efect*100):null}))
     .sort((a,b)=>(b.pct??-1)-(a.pct??-1));
   const colPct = p=>p===null?"#4a7a5a":p>=80?"#22c55e":p>=50?"#f59e0b":"#ef4444";
 
@@ -2052,7 +2059,7 @@ function PanelGestion({ S, tareasProg, setTareas=()=>{}, esJefa=false, personal=
     const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Gestión</title><style>body{font-family:Calibri,Arial,sans-serif;padding:24px;font-size:12px;color:#222}h1{color:${V};font-size:20px}h3{color:${V};border-bottom:2px solid ${V};padding-bottom:3px;margin:18px 0 6px}table{width:100%;border-collapse:collapse;font-size:11px}td{padding:4px 8px;border-bottom:1px solid #ddd}@media print{.np{display:none}}</style></head><body>
     <div style="display:flex;align-items:center;gap:12px"><img src="${LOGO_AREAS_VERDES_B64}" style="height:44px"/><div><h1 style="margin:0">Gestión — Departamento de Áreas Verdes</h1><div style="color:#555">Últimas ${semanas} semanas · hasta ${hoy} · uso interno de jefatura</div></div></div>
     <h3>Desempeño por jardinero (% de tareas hechas; la lluvia y las tareas movidas no cuentan en contra)</h3>
-    <table>${th(["Jardinero",...listaSem.map(fmtS),"Total","Hechas","No se pudo","🌧️"])}${filasTrab.map(({n,o,pct},i)=>`<tr style="background:${i%2?"#f5fbf5":"#fff"}"><td><b>${n}</b></td>${listaSem.map(w=>{const x=o.sems[w];return `<td style="text-align:center">${x&&x.efect?Math.round(x.hechas/x.efect*100)+"%":"—"}</td>`;}).join("")}<td style="text-align:center;font-weight:700">${pct===null?"—":pct+"%"}</td><td style="text-align:center">${o.hechas}</td><td style="text-align:center">${o.noPudo||"—"}</td><td style="text-align:center">${o.lluvia||"—"}</td></tr>`).join("")}</table>
+    <table>${th(["Jardinero",...listaSem.map(fmtS),"Total","A tiempo","Hechas","No se pudo","Movidas","Sin cerrar","🌧️"])}${filasTrab.map(({n,o,pct,pctT},i)=>`<tr style="background:${i%2?"#f5fbf5":"#fff"}"><td><b>${n}</b></td>${listaSem.map(w=>{const x=o.sems[w];return `<td style="text-align:center">${x&&x.efect?Math.round(x.hechas/x.efect*100)+"%":"—"}</td>`;}).join("")}<td style="text-align:center;font-weight:700">${pct===null?"—":pct+"%"}</td><td style="text-align:center;font-weight:700">${pctT===null?"—":pctT+"%"}</td><td style="text-align:center">${o.hechas}</td><td style="text-align:center">${o.noPudo||"—"}</td><td style="text-align:center">${o.movidas||"—"}</td><td style="text-align:center">${o.pend||"—"}</td><td style="text-align:center">${o.lluvia||"—"}</td></tr>`).join("")}</table>
     <h3>Atraso por tipo de tarea (tareas hechas)</h3>
     <table>${th(["Tipo","Hechas","A tiempo","Con atraso","Atraso promedio (d)","Máximo (d)"])}${filasTipo.map((f,i)=>`<tr style="background:${i%2?"#f5fbf5":"#fff"}"><td><b>${f.tipo}</b></td><td style="text-align:center">${f.n}</td><td style="text-align:center">${f.pctTiempo}%</td><td style="text-align:center">${f.conAtraso||"—"}</td><td style="text-align:center">${f.conAtraso?f.prom:"—"}</td><td style="text-align:center">${f.conAtraso?f.max:"—"}</td></tr>`).join("")}</table>
     <h3>Horas hombre estimadas por zona (jornada repartida entre las tareas hechas del día + horas extra aprobadas)</h3>
@@ -2083,24 +2090,28 @@ function PanelGestion({ S, tareasProg, setTareas=()=>{}, esJefa=false, personal=
 
       {vistaG==="desempeno"&&(
         <div style={{...S.card,padding:"12px 14px",overflowX:"auto"}}>
-          <div style={{fontSize:11,color:"#5a9a7a",marginBottom:8}}>% de tareas hechas por semana (inicio de semana en lunes). La lluvia y las tareas movidas a otro día no cuentan en contra; lo de hoy aún no se califica.</div>
+          <div style={{fontSize:11,color:"#5a9a7a",marginBottom:8}}>% de tareas hechas por semana (inicio de semana en lunes); debajo, ⏱ % hechas a tiempo (el día que correspondía, sin reprogramar) y 🔀 tareas movidas. La lluvia y las tareas movidas no cuentan en el %; se muestran aparte (🔀). ⏳ = tareas de días pasados que quedaron sin cerrar (cuentan como no hechas). Lo de hoy aún no se califica.</div>
           {filasTrab.length===0?<div style={{color:"#4a7a5a",textAlign:"center",padding:20}}>Sin tareas con responsable en el período.</div>:(
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
               <thead><tr style={{background:"rgba(52,211,153,0.08)"}}>
                 <th style={{...th,textAlign:"left"}}>Jardinero</th>
                 {listaSem.map(w=><th key={w} style={th}>{fmtS(w)}</th>)}
-                <th style={th}>Total</th><th style={th}>✅</th><th style={th}>🔴</th><th style={th}>🌧️</th>
+                <th style={th}>Total</th><th style={th} title="% de tareas hechas el día que correspondía">⏱ A tiempo</th><th style={th}>✅</th><th style={th}>🔴</th><th style={th} title="Tareas que movió/postergó a otro día">🔀</th><th style={th} title="Quedaron pendientes o en curso en días pasados, sin cerrar">⏳</th><th style={th}>🌧️</th>
               </tr></thead>
-              <tbody>{filasTrab.map(({n,o,pct})=>(
+              <tbody>{filasTrab.map(({n,o,pct,pctT})=>(
                 <tr key={n} style={{borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
                   <td style={{padding:"5px 8px",fontWeight:600,color:"#ede9e0",whiteSpace:"nowrap"}}>{n}</td>
                   {listaSem.map(w=>{const x=o.sems[w];const p=x&&x.efect?Math.round(x.hechas/x.efect*100):null;return (
-                    <td key={w} title={x?`${x.hechas}/${x.efect} tareas`:""} style={{textAlign:"center",padding:"4px 2px"}}>
+                    <td key={w} title={x?`${x.hechas}/${x.efect} hechas · ${x.aTiempo} a tiempo · ${x.movidas} movidas`:""} style={{textAlign:"center",padding:"4px 2px"}}>
                       <span style={{display:"inline-block",minWidth:34,padding:"2px 4px",borderRadius:6,fontWeight:700,fontSize:10,color:p===null?"#4a7a5a":"#0b1d12",background:p===null?"transparent":colPct(p)}}>{p===null?"—":p+"%"}</span>
+                      {x&&x.efect>0&&<span style={{display:"block",fontSize:9,color:colPct(Math.round(x.aTiempo/x.efect*100))}}>⏱ {Math.round(x.aTiempo/x.efect*100)}%{x.movidas>0?` · 🔀${x.movidas}`:""}</span>}
                     </td>);})}
                   <td style={{textAlign:"center",fontWeight:700,color:colPct(pct)}}>{pct===null?"—":pct+"%"}</td>
+                  <td style={{textAlign:"center",fontWeight:700,color:colPct(pctT)}}>{pctT===null?"—":pctT+"%"}</td>
                   <td style={{textAlign:"center",color:"#22c55e"}}>{o.hechas}</td>
                   <td style={{textAlign:"center",color:o.noPudo>0?"#ef4444":"#4a7a5a"}}>{o.noPudo||"—"}</td>
+                  <td style={{textAlign:"center",color:o.movidas>0?"#f59e0b":"#4a7a5a"}}>{o.movidas||"—"}</td>
+                  <td style={{textAlign:"center",color:o.pend>0?"#f97316":"#4a7a5a"}}>{o.pend||"—"}</td>
                   <td style={{textAlign:"center",color:o.lluvia>0?"#60a5fa":"#4a7a5a"}}>{o.lluvia||"—"}</td>
                 </tr>))}</tbody>
             </table>)}
@@ -27345,7 +27356,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-26.4";
+const BUILD_STAMP = "2026-10-26.5";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
