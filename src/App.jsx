@@ -14279,7 +14279,7 @@ function calcTasasGruposGolf(zonas, mediciones, tareasProg){
     centros=nuevos;
   }
   const orden=centros.map((c,ci)=>[c,ci]).sort((a,b)=>a[0]-b[0]).map(x=>x[1]);
-  const nomG=k===1?["general"]:k===2?["lento","rápido"]:["lento","medio","rápido"];
+  const nomG=k===1?["general"]:k===2?["bajo","alto"]:["bajo","medio","alto"]; // relativo entre greens, no es la clasificación absoluta lento/medio/rápido
   const grupos=orden.map((ci,pos)=>{
     const miembros=ids.filter(i=>asign[i]===ci);
     const rec=miembros.filter(reciente);
@@ -27359,7 +27359,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-26.8";
+const BUILD_STAMP = "2026-10-26.9";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
