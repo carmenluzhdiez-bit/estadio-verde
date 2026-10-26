@@ -14229,8 +14229,8 @@ const PLANTILLA_PRE_TORNEO = {
 
 // ─── ANÁLISIS MEDICIONES GOLF ────────────────────────────────────────────────
 // ── Tasa de rebrote por GRUPOS de velocidad (bajo / medio / alto) ─────────────
-// Cada green con medición reciente usa su propia tasa (corte → medición, o medición → medición,
-// con tramos de al menos 3 días). Los greens sin medición reciente usan la tasa de su grupo
+// Cada green con medición reciente usa su propia tasa (medición → medición del mismo ciclo de corte,
+// con tramos de al menos 3 días; no se usa la altura de corte registrada). Los greens sin medición reciente usan la tasa de su grupo
 // (3 grupos por cercanía de velocidad, k-means 1D). Al volver a medir todos, se recalcula todo.
 function calcTasasGruposGolf(zonas, mediciones, tareasProg){
   const dif=(a,b)=>Math.round((new Date(a+"T12:00:00")-new Date(b+"T12:00:00"))/86400000);
@@ -14238,31 +14238,26 @@ function calcTasasGruposGolf(zonas, mediciones, tareasProg){
   const cortesAll=Object.entries(tareasProg||{}).flatMap(([fecha,ts])=>{
     const arr=Array.isArray(ts)?ts:(ts&&typeof ts==="object"?Object.values(ts):[]);
     return arr.filter(t=>t&&(t.estado==="hecha"||t.estado==="completada")&&(t.tarea||"").toLowerCase().includes("corte")&&(t.zona==="Golf"||(t.zona||"").includes("Golf"))&&fecha<=hoyS)
-      .map(t=>{
-        let alt=t.alturaCorteReal?Number(t.alturaCorteReal):(t.alturaCorte?Number(t.alturaCorte):null);
-        if(!alt){const m=(t.tarea||t.descripcion||"").match(/(?:HOC|a)\s*([0-9]+(?:\.[0-9]+))\s*mm/i); if(m) alt=Number(m[1]);}
-        return {fecha,alt,tarea:(t.tarea||"").toLowerCase(),elem:(t.elemento||"").toLowerCase()};
-      });
-  }).filter(c=>c.alt).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+      .map(t=>({fecha,tarea:(t.tarea||"").toLowerCase(),elem:(t.elemento||"").toLowerCase()}));
+  }).sort((a,b)=>a.fecha.localeCompare(b.fecha));
   const greens=(zonas||[]).filter(z=>!String(z.id).includes("vivero"));
   const cand={};
   greens.forEach(z=>{
     const num=String(z.id).replace(/\D/g,"");
     const cs=cortesAll.filter(c=>c.tarea.includes("todos")||c.elem.includes("todos")||(num&&(c.elem.includes(`green ${num.padStart(2,"0")}`)||c.elem.includes(`green ${Number(num)}`)||c.tarea.includes(`green ${num.padStart(2,"0")}`))));
     const ms=(mediciones||[]).filter(m=>m.fecha&&m.alturas?.[z.id]).map(m=>({fecha:m.fecha,alt:Number(m.alturas[z.id])})).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+    // Solo mediciones: la altura de corte registrada es el ajuste de la máquina, no la altura medida.
+    // Tras un corte, la 1ª medición posterior es la base del nuevo ciclo; el rebrote se mide entre mediciones
+    // del mismo ciclo (≥3 días, hasta 14 días atrás).
+    const ff=f=>`${f.slice(8,10)}/${f.slice(5,7)}`;
     let mejor=null;
     ms.forEach((m,j)=>{
-      const corte=[...cs].reverse().find(c=>c.fecha<m.fecha);
-      const prev=j>0?ms[j-1]:null;
-      let c=null;
-      if(corte&&(!prev||corte.fecha>=prev.fecha)){
-        const d=dif(m.fecha,corte.fecha), dl=m.alt-corte.alt;
-        if(d>=3&&dl>0) c={fecha:m.fecha,dias:d,delta:dl,tasa:dl/d,origen:`corte ${corte.alt}mm el ${corte.fecha.slice(8,10)}/${corte.fecha.slice(5,7)} → ${m.alt}mm el ${m.fecha.slice(8,10)}/${m.fecha.slice(5,7)} (${d}d)`};
-      } else if(prev){
-        const d=dif(m.fecha,prev.fecha), dl=m.alt-prev.alt;
-        if(d>=3&&dl>0) c={fecha:m.fecha,dias:d,delta:dl,tasa:dl/d,origen:`medición ${prev.alt}mm el ${prev.fecha.slice(8,10)}/${prev.fecha.slice(5,7)} → ${m.alt}mm el ${m.fecha.slice(8,10)}/${m.fecha.slice(5,7)} (${d}d)`};
-      }
-      if(c) mejor=c;
+      const corteAnt=[...cs].reverse().find(c=>c.fecha<m.fecha); // medición el mismo día del corte = antes de cortar
+      const ciclo=ms.filter((x,k)=>k<j&&(!corteAnt||x.fecha>corteAnt.fecha)&&dif(m.fecha,x.fecha)<=14);
+      const base=ciclo.find(x=>dif(m.fecha,x.fecha)>=3);
+      if(!base) return;
+      const d=dif(m.fecha,base.fecha), dl=m.alt-base.alt;
+      if(d>=3&&dl>0) mejor={fecha:m.fecha,dias:d,delta:dl,tasa:dl/d,origen:`medición ${base.alt}mm el ${ff(base.fecha)} → ${m.alt}mm el ${ff(m.fecha)} (${d}d)`};
     });
     if(mejor) cand[z.id]={...mejor,nombre:z.nombre};
   });
@@ -27364,7 +27359,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-26.7";
+const BUILD_STAMP = "2026-10-26.8";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
