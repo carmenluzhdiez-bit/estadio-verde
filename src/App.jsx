@@ -14245,12 +14245,14 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
     // Misma lógica que "⚡ Clasificación por tasa de crecimiento" (Últimos datos
     // mm/día): promedio de las tasas de la última semana, no solo la última
     // individual — para que ambas pantallas muestren el mismo número.
-    const hace7Tasa = new Date(hoyProjStr+"T12:00:00"); hace7Tasa.setDate(hace7Tasa.getDate()-7);
-    const hace7TasaStr = hace7Tasa.toISOString().slice(0,10);
-    const tasasUltSem = (tasasCalc||[]).filter(tc=>tc.fecha >= hace7TasaStr);
-    const tasasParaPromedio = tasasUltSem.length > 0 ? tasasUltSem : (ultimaTasaReal ? [ultimaTasaReal] : []);
-    const tasaUsar = tasasParaPromedio.length > 0
-      ? Math.round((tasasParaPromedio.reduce((s,tc)=>s+tc.tasa,0)/tasasParaPromedio.length)*100)/100
+    // Ventana mínima de 3 días: los tramos de 1 día multiplican el error de medición (±0.3mm)
+    // y daban tasas irreales (0.7 mm/d). Se juntan tramos hacia atrás hasta sumar >=3 días
+    // y la tasa es ponderada por días: suma(delta)/suma(días).
+    const tasasOrd = [...(tasasCalc||[])].sort((x,y)=>x.fecha.localeCompare(y.fecha));
+    let diasVentana=0, deltaVentana=0;
+    for(let k=tasasOrd.length-1;k>=0 && diasVentana<3;k--){ diasVentana+=tasasOrd[k].dias; deltaVentana+=tasasOrd[k].delta; }
+    const tasaUsar = diasVentana>0
+      ? Math.round((deltaVentana/diasVentana)*100)/100
       : (tasaGlobal || 0.4);
     const categoria = anal ? anal.categoria : "Sin datos";
 
@@ -14269,7 +14271,7 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
     const ultimoCorte = cortesZona.length ? cortesZona[cortesZona.length-1] : null;
     const esFresco = ultEvento.tipo==="medicion" && (!ultimoCorte || ultEvento.fecha > ultimoCorte.fecha);
 
-    return {z, tasaGlobal, tasaReal: ultimaTasaReal?ultimaTasaReal.tasa:null, tasaProyeccion: tasaUsar, diasUltimoIntervalo: ultimaTasaReal?ultimaTasaReal.dias:null, deltaUltimo: ultimaTasaReal?ultimaTasaReal.delta:null, altBase, fechaBase, baseOrigen, categoria, datoPocoConfiable, diasDesdeBase, eventos, esFresco};
+    return {z, tasaGlobal, tasaReal: ultimaTasaReal?ultimaTasaReal.tasa:null, tasaProyeccion: tasaUsar, diasUltimoIntervalo: diasVentana||null, deltaUltimo: diasVentana?deltaVentana:null, diasVentana, altBase, fechaBase, baseOrigen, categoria, datoPocoConfiable, diasDesdeBase, eventos, esFresco};
   }).filter(Boolean);
 
   // Promedio de la tasa de rebrote real entre las zonas que SÍ tienen medición fresca
@@ -14284,12 +14286,15 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
   const zonasDatos = datosCrudos.map(d=>{
     const usoPromedioOtros = !d.esFresco && promedioFresco!==null;
     const tasaFinal = usoPromedioOtros ? promedioFresco : d.tasaProyeccion;
+    const otrosFr = frescos.filter(x=>x!==d);
+    const promOtros = otrosFr.length?otrosFr.reduce((t,x)=>t+x.tasaProyeccion,0)/otrosFr.length:null;
+    const tasaDudosa = !usoPromedioOtros && ((d.diasVentana||0)<3 || (promOtros!==null && promOtros>0 && tasaFinal>promOtros*2));
     const valoresPorFecha = simularProyeccion(d.eventos, tasaFinal, ultimaFechaSemanaGreens);
     const proj = diasProx.map(dd=>({
       ...dd,
       altProj: valoresPorFecha[dd.fecha] !== undefined ? valoresPorFecha[dd.fecha] : d.altBase,
     }));
-    return {zona:d.z, eventos:d.eventos, tasaGlobal:d.tasaGlobal, tasaReal:d.tasaReal, tasaProyeccion:tasaFinal, diasUltimoIntervalo:d.diasUltimoIntervalo, deltaUltimo:d.deltaUltimo, altBase:d.altBase, fechaBase:d.fechaBase, baseOrigen:d.baseOrigen, proj, categoria:d.categoria, datoPocoConfiable:d.datoPocoConfiable, diasDesdeBase:d.diasDesdeBase, usoPromedioOtros};
+    return {zona:d.z, eventos:d.eventos, tasaGlobal:d.tasaGlobal, tasaReal:d.tasaReal, tasaProyeccion:tasaFinal, diasUltimoIntervalo:d.diasUltimoIntervalo, deltaUltimo:d.deltaUltimo, tasaDudosa, altBase:d.altBase, fechaBase:d.fechaBase, baseOrigen:d.baseOrigen, proj, categoria:d.categoria, datoPocoConfiable:d.datoPocoConfiable, diasDesdeBase:d.diasDesdeBase, usoPromedioOtros};
   });
 
   if(!zonasDatos.length) return null;
@@ -14422,7 +14427,7 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
             </tr>
           </thead>
           <tbody>
-            {zonasDatos.map(({zona,tasaGlobal,tasaReal,tasaProyeccion,diasUltimoIntervalo,deltaUltimo,altBase,fechaBase,baseOrigen,proj,categoria,datoPocoConfiable,diasDesdeBase,usoPromedioOtros})=>(
+            {zonasDatos.map(({zona,tasaGlobal,tasaReal,tasaProyeccion,diasUltimoIntervalo,deltaUltimo,tasaDudosa,altBase,fechaBase,baseOrigen,proj,categoria,datoPocoConfiable,diasDesdeBase,usoPromedioOtros})=>(
               <tr key={zona.id} style={{borderTop:"1px solid rgba(255,255,255,0.05)"}}>
                 <td style={{padding:"7px 10px",fontWeight:600,fontSize:12}}>
                   {zona.nombre}
@@ -14440,7 +14445,8 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
                         <span style={{fontSize:9,color:usoPromedioOtros?"#38bdf8":"#5a9a7a",display:"block",fontWeight:400}}>
                           {usoPromedioOtros
                             ? `🔗 promedio de otros greens${tasaReal!==null?` · propia pre-corte: ${tasaReal>0?"+":""}${Math.round(tasaReal*100)/100}`:""}`
-                            : (diasUltimoIntervalo?`propia · último tramo ${diasUltimoIntervalo}d · +${Math.round(Number(deltaUltimo)*100)/100}mm`:"propia")}
+                            : (diasUltimoIntervalo?`propia · ventana ${diasUltimoIntervalo}d · +${Math.round(Number(deltaUltimo)*100)/100}mm`:"propia")}
+                          {tasaDudosa&&<span style={{display:"block",color:"#f59e0b",fontWeight:700}} title="Tasa calculada con menos de 3 días de datos o más del doble que los otros greens">⚠️ poco confiable</span>}
                         </span>
                       </span>
                     : <span style={{color:"#4a7a5a"}}>—</span>
@@ -27174,7 +27180,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-23.9";
+const BUILD_STAMP = "2026-10-26.1";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
