@@ -4732,6 +4732,55 @@ const getNombreRef = (nombreCompleto) => {
   return nombreCompleto.trim().split(" ")[0]||nombreCompleto;
 };
 
+// ── Nota del día para un trabajador/supervisor (la escribe jefa o programador) ──
+function NotaDiaTrabajador({ trabajador, fecha, puedeEscribir=false }){
+  const tid = String(trabajador?.id??"").replace(/[.#$\/\[\]]/g,"_");
+  const [nota, setNota, ready] = useFirebaseState(`notas_dia/${fecha}/${tid}`, null);
+  const [edit, setEdit] = React.useState(false);
+  const [txt, setTxt] = React.useState("");
+  if(!tid || !ready) return null;
+  const hay = nota && nota.texto;
+  const hhmm = () => new Date().toTimeString().slice(0,5);
+  if(!puedeEscribir && !hay) return null;
+  const guardar = () => {
+    const t = txt.trim();
+    if(!t){ setNota(null); setEdit(false); return; }
+    setNota({texto:t, por:"Jefatura", fecha, hora:hhmm(), creadoEn:Date.now()});
+    setEdit(false);
+  };
+  const marcarLeida = () => setNota({...nota, leidaEn:Date.now(), leidaHora:hhmm()});
+  return (
+    <div style={{background:"rgba(250,204,21,0.12)",border:"2px solid rgba(250,204,21,0.55)",borderRadius:12,padding:"12px 14px",marginBottom:14}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,marginBottom:hay||edit?6:0,flexWrap:"wrap"}}>
+        <div style={{fontSize:13,fontWeight:700,color:"#facc15"}}>📝 Nota para {trabajador.nombre.split(" ")[0]}{fecha===fechaLocal()?" hoy":` (${fecha})`}</div>
+        {puedeEscribir&&!edit&&<button className="btn-g" style={{fontSize:11,padding:"3px 10px",borderRadius:8,cursor:"pointer"}} onClick={()=>{setTxt(nota?.texto||"");setEdit(true);}}>{hay?"✏️ Editar":"➕ Escribir nota"}</button>}
+      </div>
+      {edit ? (
+        <div>
+          <textarea value={txt} onChange={e=>setTxt(e.target.value)} rows={3} placeholder="Ej.: Hoy prioriza el riego del hoyo 3 y avísame al terminar" style={{width:"100%",boxSizing:"border-box",background:"rgba(0,0,0,0.3)",border:"1px solid rgba(250,204,21,0.4)",borderRadius:8,color:"#ede9e0",padding:8,fontSize:13,fontFamily:"inherit"}}/>
+          <div style={{display:"flex",gap:8,marginTop:6}}>
+            <button className="btn-p" style={{fontSize:12,padding:"5px 14px",borderRadius:8,cursor:"pointer"}} onClick={guardar}>Guardar</button>
+            <button className="btn-g" style={{fontSize:12,padding:"5px 14px",borderRadius:8,cursor:"pointer"}} onClick={()=>setEdit(false)}>Cancelar</button>
+            {hay&&<button className="btn-g" style={{fontSize:12,padding:"5px 14px",borderRadius:8,cursor:"pointer",color:"#fca5a5"}} onClick={()=>{setNota(null);setEdit(false);}}>🗑️ Quitar</button>}
+          </div>
+        </div>
+      ) : hay ? (
+        <div>
+          <div style={{fontSize:15,color:"#fef9c3",lineHeight:1.4,whiteSpace:"pre-wrap"}}>{nota.texto}</div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8,gap:8,flexWrap:"wrap"}}>
+            <span style={{fontSize:10,color:"#a3a37a"}}>{nota.por||"Jefatura"} · {nota.hora||""}</span>
+            {nota.leidaEn
+              ? <span style={{fontSize:11,color:"#86efac",fontWeight:700}}>✅ Leída{nota.leidaHora?` a las ${nota.leidaHora}`:""}</span>
+              : puedeEscribir
+                ? <span style={{fontSize:11,color:"#fbbf24"}}>⏳ Aún no leída</span>
+                : <button className="btn-p" style={{fontSize:12,padding:"5px 14px",borderRadius:8,cursor:"pointer"}} onClick={marcarLeida}>✅ Leída</button>}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function VistaWorker({ trabajador, fecha, tareas, S, onUpdateTarea, onAddTarea, onSetFrecs, getFrecs, MACROZONAS_BASE, onAccesoRapido, onCambiarMetodo, cierresTurno={}, onCerrarTurno, onReabrirTurno, crearNotificacion, esJefaApp=false, onGuardarRutinas, onGuardarAlertaFito, onCrearAlertaCompleta=()=>{}, hojasSeguridad=[], personal=[], bodegasData={}, setBodegasData=()=>{}, ejecutarDescuentoStock=()=>{} }) {
   const [showProtocolosWorker, setShowProtocolosWorker] = React.useState(false);
   const hoy = fechaLocal();
@@ -5245,6 +5294,8 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
       </div>
 
       <div style={{padding:"16px 14px",maxWidth:600,margin:"0 auto"}}>
+
+        <NotaDiaTrabajador key={`${fechaVer}_${trabajador.id}`} trabajador={trabajador} fecha={fechaVer} puedeEscribir={!!esJefaApp}/>
 
         {/* ── BARRA DE PROGRESO ── */}
         {stats.total>0&&(
@@ -27294,7 +27345,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-26.3";
+const BUILD_STAMP = "2026-10-26.4";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
