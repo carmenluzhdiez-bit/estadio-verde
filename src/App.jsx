@@ -14158,6 +14158,91 @@ const PLANTILLA_PRE_TORNEO = {
 };
 
 // ─── ANÁLISIS MEDICIONES GOLF ────────────────────────────────────────────────
+// ── Tasa de rebrote por GRUPOS de velocidad (bajo / medio / alto) ─────────────
+// Cada green con medición reciente usa su propia tasa (corte → medición, o medición → medición,
+// con tramos de al menos 3 días). Los greens sin medición reciente usan la tasa de su grupo
+// (3 grupos por cercanía de velocidad, k-means 1D). Al volver a medir todos, se recalcula todo.
+function calcTasasGruposGolf(zonas, mediciones, tareasProg){
+  const dif=(a,b)=>Math.round((new Date(a+"T12:00:00")-new Date(b+"T12:00:00"))/86400000);
+  const hoyS=fechaLocal();
+  const cortesAll=Object.entries(tareasProg||{}).flatMap(([fecha,ts])=>{
+    const arr=Array.isArray(ts)?ts:(ts&&typeof ts==="object"?Object.values(ts):[]);
+    return arr.filter(t=>t&&(t.estado==="hecha"||t.estado==="completada")&&(t.tarea||"").toLowerCase().includes("corte")&&(t.zona==="Golf"||(t.zona||"").includes("Golf"))&&fecha<=hoyS)
+      .map(t=>{
+        let alt=t.alturaCorteReal?Number(t.alturaCorteReal):(t.alturaCorte?Number(t.alturaCorte):null);
+        if(!alt){const m=(t.tarea||t.descripcion||"").match(/(?:HOC|a)\s*([0-9]+(?:\.[0-9]+))\s*mm/i); if(m) alt=Number(m[1]);}
+        return {fecha,alt,tarea:(t.tarea||"").toLowerCase(),elem:(t.elemento||"").toLowerCase()};
+      });
+  }).filter(c=>c.alt).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  const greens=(zonas||[]).filter(z=>!String(z.id).includes("vivero"));
+  const cand={};
+  greens.forEach(z=>{
+    const num=String(z.id).replace(/\D/g,"");
+    const cs=cortesAll.filter(c=>c.tarea.includes("todos")||c.elem.includes("todos")||(num&&(c.elem.includes(`green ${num.padStart(2,"0")}`)||c.elem.includes(`green ${Number(num)}`)||c.tarea.includes(`green ${num.padStart(2,"0")}`))));
+    const ms=(mediciones||[]).filter(m=>m.fecha&&m.alturas?.[z.id]).map(m=>({fecha:m.fecha,alt:Number(m.alturas[z.id])})).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+    let mejor=null;
+    ms.forEach((m,j)=>{
+      const corte=[...cs].reverse().find(c=>c.fecha<m.fecha);
+      const prev=j>0?ms[j-1]:null;
+      let c=null;
+      if(corte&&(!prev||corte.fecha>=prev.fecha)){
+        const d=dif(m.fecha,corte.fecha), dl=m.alt-corte.alt;
+        if(d>=3&&dl>0) c={fecha:m.fecha,dias:d,delta:dl,tasa:dl/d,origen:`corte ${corte.alt}mm el ${corte.fecha.slice(8,10)}/${corte.fecha.slice(5,7)} → ${m.alt}mm el ${m.fecha.slice(8,10)}/${m.fecha.slice(5,7)} (${d}d)`};
+      } else if(prev){
+        const d=dif(m.fecha,prev.fecha), dl=m.alt-prev.alt;
+        if(d>=3&&dl>0) c={fecha:m.fecha,dias:d,delta:dl,tasa:dl/d,origen:`medición ${prev.alt}mm el ${prev.fecha.slice(8,10)}/${prev.fecha.slice(5,7)} → ${m.alt}mm el ${m.fecha.slice(8,10)}/${m.fecha.slice(5,7)} (${d}d)`};
+      }
+      if(c) mejor=c;
+    });
+    if(mejor) cand[z.id]={...mejor,nombre:z.nombre};
+  });
+  const ids=Object.keys(cand);
+  if(ids.length===0) return {porId:{},grupos:[],fechaRef:null};
+  const fechaRef=ids.map(i=>cand[i].fecha).sort().pop();
+  const reciente=i=>cand[i]&&dif(fechaRef,cand[i].fecha)<=2;
+  // k-means 1D con hasta 3 centros
+  const vals=ids.map(i=>cand[i].tasa);
+  const dist=[...new Set(vals.map(v=>Math.round(v*1000)))].length;
+  const k=Math.max(1,Math.min(3,dist,ids.length));
+  const ord=[...vals].sort((a,b)=>a-b);
+  let centros=k===1?[ord[Math.floor(ord.length/2)]]:k===2?[ord[0],ord[ord.length-1]]:[ord[0],ord[Math.floor(ord.length/2)],ord[ord.length-1]];
+  let asign={};
+  for(let it=0;it<30;it++){
+    ids.forEach(i=>{let b=0;centros.forEach((c,ci)=>{if(Math.abs(cand[i].tasa-c)<Math.abs(cand[i].tasa-centros[b])) b=ci;});asign[i]=b;});
+    const nuevos=centros.map((c,ci)=>{const m=ids.filter(i=>asign[i]===ci);return m.length?m.reduce((t,i)=>t+cand[i].tasa,0)/m.length:c;});
+    if(nuevos.every((c,ci)=>Math.abs(c-centros[ci])<1e-9)) break;
+    centros=nuevos;
+  }
+  const orden=centros.map((c,ci)=>[c,ci]).sort((a,b)=>a[0]-b[0]).map(x=>x[1]);
+  const nomG=k===1?["general"]:k===2?["lento","rápido"]:["lento","medio","rápido"];
+  const grupos=orden.map((ci,pos)=>{
+    const miembros=ids.filter(i=>asign[i]===ci);
+    const rec=miembros.filter(reciente);
+    const base=rec.length?rec:miembros;
+    const tasaG=base.reduce((t,i)=>t+cand[i].tasa,0)/base.length;
+    const centro=miembros.reduce((t,i)=>t+cand[i].tasa,0)/miembros.length;
+    const monitor=[...miembros].sort((a,b)=>Math.abs(cand[a].tasa-centro)-Math.abs(cand[b].tasa-centro))[0];
+    return {nombre:nomG[pos],ci,miembros,tasaG:Math.round(tasaG*100)/100,centro,monitor,monitorNombre:cand[monitor]?.nombre,fechaMonitor:cand[monitor]?.fecha,desactualizado:!rec.length,medidos:rec.map(i=>cand[i].nombre)};
+  });
+  const porId={};
+  const fmtF=f=>`${f.slice(8,10)}/${f.slice(5,7)}`;
+  const recAll=ids.filter(reciente);
+  const tasaGeneral=recAll.length?recAll.reduce((t,i)=>t+cand[i].tasa,0)/recAll.length:vals.reduce((a,b)=>a+b,0)/vals.length;
+  greens.forEach(z=>{
+    const i=z.id;
+    if(cand[i]&&reciente(i)){
+      const g=grupos.find(x=>x.ci===asign[i]);
+      porId[i]={tasa:Math.round(cand[i].tasa*100)/100,tipo:"propia",grupo:g?.nombre,dudosa:false,origen:`Propia (grupo ${g?.nombre}) · ${cand[i].origen}`};
+    } else if(cand[i]){
+      const g=grupos.find(x=>x.ci===asign[i]);
+      porId[i]={tasa:g.tasaG,tipo:"grupo",grupo:g.nombre,dudosa:g.desactualizado,origen:`Grupo ${g.nombre} · ${g.tasaG} mm/d · ${g.desactualizado?"último ajuste, sin medición reciente del grupo":"promedio de "+g.medidos.join(", ")+" (medición "+fmtF(fechaRef)+")"}. Propia anterior: ${cand[i].origen}`};
+    } else {
+      porId[i]={tasa:Math.round(tasaGeneral*100)/100,tipo:"general",grupo:null,dudosa:true,origen:`Sin dato propio · promedio de los greens medidos (${recAll.map(x=>cand[x].nombre).join(", ")||"—"})`};
+    }
+  });
+  return {porId,grupos,fechaRef,cand};
+}
+
 function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisisTasas, colorCategoria, S, golfData }) {
   const [semOffset, setSemOffset] = React.useState(0); // 0 = semana actual, -1 = anterior…
   const [showHistCortes, setShowHistCortes] = React.useState(false);
@@ -14203,6 +14288,7 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
     return valoresPorFecha;
   };
 
+  const gruposTasa = calcTasasGruposGolf(ZONAS, medOrdenadas, tareasProg);
   const datosCrudos = ZONAS.map(z=>{
     const anal = analisisTasas(z.id);
     const zonaNum = z.id.replace(/[^0-9]/g,"");
@@ -14267,6 +14353,7 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
       if(dd>0&&dl>0){ tasaPanel=dl/dd; diasVentana=dd; deltaVentana=dl; }
     }
     const tasaUsar = tasaPanel!==null ? Math.round(tasaPanel*100)/100 : (tasaGlobal || 0.4);
+    const tg = gruposTasa.porId[z.id]||null;
     const categoria = anal ? anal.categoria : "Sin datos";
 
     // Último evento conocido, para mostrar en la columna "Green"
@@ -14284,7 +14371,7 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
     const ultimoCorte = cortesZona.length ? cortesZona[cortesZona.length-1] : null;
     const esFresco = ultEvento.tipo==="medicion" && (!ultimoCorte || ultEvento.fecha > ultimoCorte.fecha);
 
-    return {z, tasaGlobal, tasaReal: ultimaTasaReal?ultimaTasaReal.tasa:null, tasaProyeccion: tasaUsar, diasUltimoIntervalo: diasVentana||null, deltaUltimo: diasVentana?deltaVentana:null, diasVentana, altBase, fechaBase, baseOrigen, categoria, datoPocoConfiable, diasDesdeBase, eventos, esFresco};
+    return {z, tasaGlobal, tasaReal: ultimaTasaReal?ultimaTasaReal.tasa:null, tasaProyeccion: tg?tg.tasa:tasaUsar, tg, diasUltimoIntervalo: diasVentana||null, deltaUltimo: diasVentana?deltaVentana:null, diasVentana, altBase, fechaBase, baseOrigen, categoria, datoPocoConfiable, diasDesdeBase, eventos, esFresco};
   }).filter(Boolean);
 
   // Promedio de la tasa de rebrote real entre las zonas que SÍ tienen medición fresca
@@ -14297,17 +14384,17 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
 
   const ultimaFechaSemanaGreens = diasProx[diasProx.length-1].fecha;
   const zonasDatos = datosCrudos.map(d=>{
-    const usoPromedioOtros = !d.esFresco && promedioFresco!==null;
-    const tasaFinal = usoPromedioOtros ? promedioFresco : d.tasaProyeccion;
+    const usoPromedioOtros = !d.esFresco && promedioFresco!==null && !d.tg;
+    const tasaFinal = (usoPromedioOtros && !d.tg) ? promedioFresco : d.tasaProyeccion;
     const otrosFr = frescos.filter(x=>x!==d);
     const promOtros = otrosFr.length?otrosFr.reduce((t,x)=>t+x.tasaProyeccion,0)/otrosFr.length:null;
-    const tasaDudosa = !usoPromedioOtros && ((d.diasVentana||0)<3 || (promOtros!==null && promOtros>0 && tasaFinal>promOtros*2));
+    const tasaDudosa = d.tg ? d.tg.dudosa : !usoPromedioOtros && ((d.diasVentana||0)<3 || (promOtros!==null && promOtros>0 && tasaFinal>promOtros*2));
     const valoresPorFecha = simularProyeccion(d.eventos, tasaFinal, ultimaFechaSemanaGreens);
     const proj = diasProx.map(dd=>({
       ...dd,
       altProj: valoresPorFecha[dd.fecha] !== undefined ? valoresPorFecha[dd.fecha] : d.altBase,
     }));
-    return {zona:d.z, eventos:d.eventos, tasaGlobal:d.tasaGlobal, tasaReal:d.tasaReal, tasaProyeccion:tasaFinal, diasUltimoIntervalo:d.diasUltimoIntervalo, deltaUltimo:d.deltaUltimo, tasaDudosa, altBase:d.altBase, fechaBase:d.fechaBase, baseOrigen:d.baseOrigen, proj, categoria:d.categoria, datoPocoConfiable:d.datoPocoConfiable, diasDesdeBase:d.diasDesdeBase, usoPromedioOtros};
+    return {zona:d.z, eventos:d.eventos, tasaGlobal:d.tasaGlobal, tasaReal:d.tasaReal, tasaProyeccion:tasaFinal, diasUltimoIntervalo:d.diasUltimoIntervalo, deltaUltimo:d.deltaUltimo, tasaDudosa, tg:d.tg, altBase:d.altBase, fechaBase:d.fechaBase, baseOrigen:d.baseOrigen, proj, categoria:d.categoria, datoPocoConfiable:d.datoPocoConfiable, diasDesdeBase:d.diasDesdeBase, usoPromedioOtros};
   });
 
   if(!zonasDatos.length) return null;
@@ -14440,7 +14527,7 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
             </tr>
           </thead>
           <tbody>
-            {zonasDatos.map(({zona,tasaGlobal,tasaReal,tasaProyeccion,diasUltimoIntervalo,deltaUltimo,tasaDudosa,altBase,fechaBase,baseOrigen,proj,categoria,datoPocoConfiable,diasDesdeBase,usoPromedioOtros})=>(
+            {zonasDatos.map(({zona,tasaGlobal,tasaReal,tasaProyeccion,diasUltimoIntervalo,deltaUltimo,tasaDudosa,tg,altBase,fechaBase,baseOrigen,proj,categoria,datoPocoConfiable,diasDesdeBase,usoPromedioOtros})=>(
               <tr key={zona.id} style={{borderTop:"1px solid rgba(255,255,255,0.05)"}}>
                 <td style={{padding:"7px 10px",fontWeight:600,fontSize:12}}>
                   {zona.nombre}
@@ -14456,7 +14543,7 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
                     ? <span style={{color:usoPromedioOtros?"#38bdf8":"#fbbf24"}}>
                         {tasaProyeccion>0?"+":""}{Math.round(tasaProyeccion*100)/100}
                         <span style={{fontSize:9,color:usoPromedioOtros?"#38bdf8":"#5a9a7a",display:"block",fontWeight:400}}>
-                          {usoPromedioOtros
+                          {tg ? <span title={tg.origen} style={{display:"block",maxWidth:230,margin:"0 auto",lineHeight:1.25,color:tg.tipo==="propia"?"#86efac":"#38bdf8"}}>{tg.origen}</span> : usoPromedioOtros
                             ? `🔗 promedio de otros greens${tasaReal!==null?` · propia pre-corte: ${tasaReal>0?"+":""}${Math.round(tasaReal*100)/100}`:""}`
                             : (diasUltimoIntervalo?`propia · tramo ${diasUltimoIntervalo}d · +${Math.round(Number(deltaUltimo)*100)/100}mm`:"propia")}
                           {tasaDudosa&&<span style={{display:"block",color:"#f59e0b",fontWeight:700}} title="Tasa calculada con menos de 3 días de datos o más del doble que los otros greens">⚠️ poco confiable</span>}
@@ -14493,6 +14580,18 @@ function ProyeccionSemanal({ ZONAS, medOrdenadas, tareasProg, calcTasa, analisis
         <span><span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:"#f59e0b",marginRight:4}}/>Sobre umbral — considerar corte</span>
         <span><span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:"#ef4444",marginRight:4}}/>Muy sobre umbral — corte urgente</span>
       </div>
+      {gruposTasa.grupos.length>0&&(
+        <div style={{marginTop:14,padding:"10px 12px",borderRadius:10,background:"rgba(56,189,248,0.07)",border:"1px solid rgba(56,189,248,0.2)"}}>
+          <div style={{fontSize:12,fontWeight:700,color:"#38bdf8",marginBottom:6}}>📍 Greens a monitorear para mantener la tasa de todos</div>
+          {gruposTasa.grupos.map(g=>(
+            <div key={g.nombre} style={{fontSize:11,color:"#a0d8b0",marginBottom:3}}>
+              <b style={{color:"#ede9e0"}}>{g.monitorNombre||"—"}</b> → grupo <b>{g.nombre}</b> ({g.tasaG} mm/d) · integrantes: {g.miembros.map(i=>gruposTasa.cand[i].nombre).sort(cmpEs).join(", ")}
+              {g.desactualizado&&<span style={{color:"#f59e0b",fontWeight:700}}> · ⚠️ sin medición reciente en este grupo</span>}
+            </div>
+          ))}
+          <div style={{fontSize:10,color:"#5a9a7a",marginTop:4}}>Los grupos se arman por velocidad de rebrote real (tramos corte → medición de ≥3 días). Un green medido en los últimos 2 días usa su propia tasa; los demás usan la de su grupo. Al medir todos, se recalcula todo.</div>
+        </div>
+      )}
       {todosLosCortes.length>0&&(
         <div style={{marginTop:16,paddingTop:14,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
           <div onClick={()=>setShowHistCortes(p=>!p)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
@@ -17514,6 +17613,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             const ESCALA_URG={1:"#ef4444",2:"#ef4444",3:"#f97316",4:"#f59e0b",5:"#f59e0b",6:"#22c55e",7:"#22c55e",8:"#3b82f6"};
             const colorUrg={cortar:"#ef4444",urgente:"#f97316",pronto:"#f59e0b",normal:"#22c55e",ok:"#4ade80","sin-tasa":"#5a9a7a","sin-datos":"#3a6a5a"};
             const labelUrg={cortar:"✂️ Cortar ya",urgente:"⏰ Urgente",pronto:"📅 Pronto",normal:"✅ Normal",ok:"✅ OK","sin-tasa":"📏 Sin tasa","sin-datos":"— Sin datos"};
+            const tasasGrupo=calcTasasGruposGolf(GREENS_DEF,mediciones,tareasProg);
             const urgencias=[...GREENS_DEF,{id:"vivero",nombre:"Vivero",hoyos:"Vivero"}].map(g=>{
               const alt=ultimaMed?.alturas?.[g.id];
               if(!alt) return {g,diasRestantes:null,urgencia:"sin-datos",alt:null,tasa:null,altObjetivo:null,infoCorte:null};
@@ -17555,6 +17655,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                 const dHist3=Math.round((new Date(histG[0].fecha+"T12:00:00")-new Date(histG[1].fecha+"T12:00:00"))/(1000*60*60*24));
                 if(dHist3>0&&a1>a2) tasa=(a1-a2)/dHist3;
               }
+              if(tasasGrupo.porId[g.id]) tasa=tasasGrupo.porId[g.id].tasa;
               const altN=Number(alt);
               if(altN>=altObjetivo) return {g,diasRestantes:0,urgencia:"cortar",alt:altN,tasa,altObjetivo,infoCorte};
               if(!tasa||tasa<=0) return {g,diasRestantes:null,urgencia:"sin-tasa",alt:altN,tasa:null,altObjetivo,infoCorte};
@@ -17617,8 +17718,8 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
                                   {u.altObjetivo?`${Number(u.altObjetivo).toFixed(1)}`:"—"}
                                 </td>
                                 {/* Tasa */}
-                                <td style={{padding:"4px 6px",textAlign:"center",color:"#5a9a7a",fontSize:10}}>
-                                  {u.tasa?`${u.tasa.toFixed(2)}`:"—"}
+                                <td title={tasasGrupo.porId[u.g.id]?.origen||""} style={{padding:"4px 6px",textAlign:"center",color:tasasGrupo.porId[u.g.id]?.tipo==="propia"?"#86efac":"#5a9a7a",fontSize:10}}>
+                                  {u.tasa?`${u.tasa.toFixed(2)}`:"—"}{tasasGrupo.porId[u.g.id]&&<span style={{display:"block",fontSize:8,color:"#4a7a5a"}}>{tasasGrupo.porId[u.g.id].tipo==="propia"?"propia":`grupo ${tasasGrupo.porId[u.g.id].grupo||""}`}</span>}
                                 </td>
                                 {/* Proyección */}
                                 <td style={{padding:"4px 6px",textAlign:"center"}}>
@@ -27193,7 +27294,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-26.2";
+const BUILD_STAMP = "2026-10-26.3";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
