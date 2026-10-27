@@ -354,6 +354,13 @@ const CAUSAS_NO_PUDO = [
   {k:"otro",     icon:"✏️", label:"Otro (escribir)",               pref:""},
 ];
 // Subtítulo destacado de cada tarea: 📍 zona · elemento (turno de jardineros, supervisores y jefa)
+// Solo las tareas «Riego manual» llevan la leyenda de revisión por lluvia («Llovió: revisa en terreno…»).
+// Otras tareas con la palabra riego (p. ej. «Adaptar riego») usan los estados normales.
+const _normTxtRM = x => (x||"").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+const esRiegoManualTarea = t => /riego\s*manual/.test(_normTxtRM(t?.tarea));
+const flagRevisarRiego = t => esRiegoManualTarea(t) && !!(t.revisarRiego || (t.notas||"").includes("🌧️ Revisar riego"));
+const notasSinRevisarRiego = t => esRiegoManualTarea(t) ? (t.notas||"") : (t.notas||"").replace(/\s*\|?\s*🌧️ Revisar riego: ajustar a mano por lluvia/g,"").trim();
+
 const SubZonaTarea = ({ zona, elemento, icono="📍" }) => !zona ? null : (
   <span style={{display:"inline-flex",alignItems:"center",flexWrap:"wrap",gap:5,fontSize:13,fontWeight:700,color:"#86efac",background:"rgba(52,211,153,0.10)",border:"1px solid rgba(52,211,153,0.30)",borderRadius:8,padding:"2px 9px",lineHeight:1.35}}>
     <span>{icono} {zona}</span>
@@ -4752,6 +4759,7 @@ const getNombreRef = (nombreCompleto) => {
 };
 
 // ── Nota del día para un trabajador/supervisor (la escribe jefa o programador) ──
+const _diaSigNota = f => { const d=new Date(f+"T12:00:00"); d.setDate(d.getDate()+1); return d.toISOString().slice(0,10); };
 function NotaDiaTrabajador({ trabajador, fecha, puedeEscribir=false }){
   const tid = String(trabajador?.id??"").replace(/[.#$\/\[\]]/g,"_");
   const [nota, setNota, ready] = useFirebaseState(`notas_dia/${fecha}/${tid}`, null);
@@ -4771,7 +4779,7 @@ function NotaDiaTrabajador({ trabajador, fecha, puedeEscribir=false }){
   return (
     <div style={{background:"rgba(250,204,21,0.12)",border:"2px solid rgba(250,204,21,0.55)",borderRadius:12,padding:"12px 14px",marginBottom:14}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,marginBottom:hay||edit?6:0,flexWrap:"wrap"}}>
-        <div style={{fontSize:13,fontWeight:700,color:"#facc15"}}>📝 Nota para {trabajador.nombre.split(" ")[0]}{fecha===fechaLocal()?" hoy":` (${fecha})`}</div>
+        <div style={{fontSize:13,fontWeight:700,color:"#facc15"}}>📝 Nota para {trabajador.nombre.split(" ")[0]}{fecha===fechaLocal()?" hoy":fecha===_diaSigNota(fechaLocal())?" mañana":` (${fecha})`}</div>
         {puedeEscribir&&!edit&&<button className="btn-g" style={{fontSize:11,padding:"3px 10px",borderRadius:8,cursor:"pointer"}} onClick={()=>{setTxt(nota?.texto||"");setEdit(true);}}>{hay?"✏️ Editar":"➕ Escribir nota"}</button>}
       </div>
       {edit ? (
@@ -5315,6 +5323,7 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
       <div style={{padding:"16px 14px",maxWidth:600,margin:"0 auto"}}>
 
         <NotaDiaTrabajador key={`${fechaVer}_${trabajador.id}`} trabajador={trabajador} fecha={fechaVer} puedeEscribir={!!esJefaApp}/>
+        <NotaDiaTrabajador key={`sig_${_diaSigNota(fechaVer)}_${trabajador.id}`} trabajador={trabajador} fecha={_diaSigNota(fechaVer)} puedeEscribir={!!esJefaApp}/>
 
         {/* ── BARRA DE PROGRESO ── */}
         {stats.total>0&&(
@@ -5739,8 +5748,8 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                               {t.zona&&<div style={{marginTop:3,marginBottom:5}}><SubZonaTarea zona={t.zona} elemento={t.elemento}/></div>}
                               {t.alturaCorte&&<div style={{fontSize:12,color:"#fbbf24",fontWeight:600,marginBottom:4,background:"rgba(251,191,36,0.08)",border:"1px solid rgba(251,191,36,0.2)",borderRadius:6,padding:"3px 8px",display:"inline-block"}}>✂️ Cortar a: {t.alturaCorte} {t.unidadAlturaCorte==="cm"?"cm":t.unidadAlturaCorte==="pulgadas"?"pulgadas":"mm"}</div>}
                               {t.metodoLimpieza&&<span style={{fontSize:11,color:"#fbbf24",background:"rgba(251,191,36,0.08)",padding:"1px 8px",borderRadius:8,border:"1px solid rgba(251,191,36,0.2)",display:"inline-block",marginBottom:4}}>{t.metodoLimpieza==="sopladora"?"🌬️ Sopladora":t.metodoLimpieza==="barrido"?"🧹 Barrido":"🌬️+🧹 Sopladora + Barrido"}</span>}
-                              {t.notas&&<div style={{fontSize:11,color:"#5a8a6a",marginTop:2,marginBottom:4,fontStyle:"italic"}}>💡 {t.notas}</div>}
-                              {(t.revisarRiego||(t.notas||"").includes("🌧️ Revisar riego"))&&!["hecha","completada","no_pudo"].includes(normalizarEstado(t.estado))&&(
+                              {notasSinRevisarRiego(t)&&<div style={{fontSize:11,color:"#5a8a6a",marginTop:2,marginBottom:4,fontStyle:"italic"}}>💡 {notasSinRevisarRiego(t)}</div>}
+                              {flagRevisarRiego(t)&&!["hecha","completada","no_pudo"].includes(normalizarEstado(t.estado))&&(
                                 <div style={{marginBottom:6,padding:"7px 10px",border:"1px solid rgba(245,158,11,0.4)",borderRadius:8,background:"rgba(245,158,11,0.08)"}}>
                                   <div style={{fontSize:11,color:"#fbbf24",marginBottom:6,fontWeight:600}}>🌧️ Llovió: revisa en terreno si este riego hace falta.</div>
                                   <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
@@ -6045,8 +6054,8 @@ function ZonaRow({ zona, tz, zonasColapsadas, toggleZonaColapso, MACROZONAS_BASE
                           </select>
                         </div>
                         {t.alturaCorte&&<div style={{fontSize:11,color:"#fbbf24",fontWeight:600,marginTop:3}}>✂️ Cortar a: {t.alturaCorte} {t.unidadAlturaCorte==="cm"?"cm":t.unidadAlturaCorte==="pulgadas"?"pulgadas":"mm"}</div>}
-                        {(t.revisarRiego||(t.notas||"").includes("🌧️ Revisar riego"))&&!["hecha","completada","no_pudo"].includes(t.estado)&&<span style={{display:"inline-block",marginTop:3,fontSize:10,fontWeight:700,color:"#fbbf24",background:"rgba(245,158,11,0.15)",border:"1px solid rgba(245,158,11,0.4)",borderRadius:8,padding:"1px 8px"}}>🌧️ Revisar riego (lluvia)</span>}
-                        {t.notas && <div style={{fontSize:11,color:"#5a8a6a",marginTop:3,fontStyle:"italic"}}>{t.notas}</div>}
+                        {flagRevisarRiego(t)&&!["hecha","completada","no_pudo"].includes(t.estado)&&<span style={{display:"inline-block",marginTop:3,fontSize:10,fontWeight:700,color:"#fbbf24",background:"rgba(245,158,11,0.15)",border:"1px solid rgba(245,158,11,0.4)",borderRadius:8,padding:"1px 8px"}}>🌧️ Revisar riego (lluvia)</span>}
+                        {notasSinRevisarRiego(t) && <div style={{fontSize:11,color:"#5a8a6a",marginTop:3,fontStyle:"italic"}}>{notasSinRevisarRiego(t)}</div>}
                         {t.notaWorker && <div style={{fontSize:11,color:t.estado==="no_pudo"?"#fca5a5":"#7aaa80",marginTop:2}}>💬 {t.notaWorker}</div>}
                       </div>
                       <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0,flexWrap:"wrap"}}>
@@ -6981,9 +6990,9 @@ function ProgramacionDiaria({ S, zonas, data, personal, bodegasData={}, getZD, g
                   // aviso de "No se pudo sin decidir" no lo vuelve a pedir).
                   const hoyArr = normA(prev[fecha]||[]).map(t=>{
                     if(idsMover.has(String(t.id))){
-                      return {...t, estado:"no_pudo", causaNoPudo:"lluvia", notaWorker:esRiego(t)?"Riego no necesario — Lluvia":"No se pudo — Lluvia", trasladadaA:destinoPorId[String(t.id)]};
+                      return {...t, estado:"no_pudo", causaNoPudo:"lluvia", notaWorker:(esRiego(t)&&!/adapt/.test(_normTxtRM(t.tarea)))?"Riego no necesario — Lluvia":"No se pudo — Lluvia", trasladadaA:destinoPorId[String(t.id)]};
                     }
-                    if(idsRevisar.has(String(t.id)) && !(t.notas||"").includes("🌧️ Revisar riego")){
+                    if(idsRevisar.has(String(t.id)) && esRiegoManualTarea(t) && !(t.notas||"").includes("🌧️ Revisar riego")){
                       return {...t, revisarRiego:condicionDe(t)||"sin_dato", notas:(t.notas?t.notas+" | ":"")+"🌧️ Revisar riego: ajustar a mano por lluvia"};
                     }
                     return t;
@@ -7557,7 +7566,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, bodegasData={}, getZD, g
           )}
 
           {(()=>{
-            const revisar = tareasHoy.filter(t=>(t.revisarRiego||(t.notas||"").includes("🌧️ Revisar riego")) && !["hecha","completada","no_pudo"].includes(t.estado));
+            const revisar = tareasHoy.filter(t=>flagRevisarRiego(t) && !["hecha","completada","no_pudo"].includes(t.estado));
             if(revisar.length===0) return null;
             const condDe = t => (["mixto","bajo_techo","exterior"].includes(t.revisarRiego)?t.revisarRiego:null) || condicionElementoDeTarea(t, getZD, zonas, MACROZONAS_BASE) || "sin_dato";
             const ETQ = {mixto:"🔀 Mixtos (parte expuesta a la lluvia)", bajo_techo:"🏠 Bajo techo", sin_dato:"❔ Sin clasificar", exterior:"🌿 Exteriores"};
@@ -27322,8 +27331,8 @@ const aplicarModoLluviaGolf = async ({ fecha, tareas, setTareas, configSemanal, 
   const idsMover=new Set(aMover.map(t=>String(t.id))), idsRevisar=new Set(manualAplica.map(t=>String(t.id)));
   setTareas(prev=>{
     const hoyArr=normArr(prev[fecha]||[]).map(t=>{
-      if(idsMover.has(String(t.id))) return {...t,estado:"no_pudo",causaNoPudo:"lluvia",notaWorker:esRiego(t)?"Riego no necesario — Lluvia":"No se pudo — Lluvia",trasladadaA:destinoPorId[String(t.id)]};
-      if(idsRevisar.has(String(t.id))&&!(t.notas||"").includes("🌧️ Revisar riego")) return {...t,revisarRiego:true,notas:(t.notas?t.notas+" | ":"")+"🌧️ Revisar riego: ajustar a mano por lluvia"};
+      if(idsMover.has(String(t.id))) return {...t,estado:"no_pudo",causaNoPudo:"lluvia",notaWorker:(esRiego(t)&&!/adapt/.test(_normTxtRM(t.tarea)))?"Riego no necesario — Lluvia":"No se pudo — Lluvia",trasladadaA:destinoPorId[String(t.id)]};
+      if(idsRevisar.has(String(t.id))&&esRiegoManualTarea(t)&&!(t.notas||"").includes("🌧️ Revisar riego")) return {...t,revisarRiego:true,notas:(t.notas?t.notas+" | ":"")+"🌧️ Revisar riego: ajustar a mano por lluvia"};
       return t;
     });
     const nuevo={...prev,[fecha]:hoyArr};
@@ -27359,7 +27368,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-26.9";
+const BUILD_STAMP = "2026-10-27.2";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
