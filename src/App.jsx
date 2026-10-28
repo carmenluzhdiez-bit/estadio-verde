@@ -3060,7 +3060,7 @@ function CentroRespaldos({ S, fuentes, crearNotificacion }) {
 
   const alertas = calcularAlertasDatos({...fuentes, papelera, tamanos, ultimoRespaldo, respaldoListo});
   const hayCritica = alertas.some(a=>a.nivel==="critico");
-  const abierto = abiertoUsuario===null ? hayCritica : abiertoUsuario;
+  const abierto = abiertoUsuario===null ? false : abiertoUsuario; // siempre colapsado hasta que se abra a mano
 
   // Aviso dentro de la app (un solo mensaje resumen, como máximo una vez por semana por alerta)
   const clavesAlertas = alertas.map(a=>a.key+"|"+a.nivel).join(",");
@@ -20187,22 +20187,26 @@ function AlertasMantMaquinaria({ S, bodegasData, onAbrir=null }) {
   const [hojas] = useFirebaseState(`${ROOT}/hojaVidaMaq`, {});
   const [horometro] = useFirebaseState(`${ROOT}/horometro`, {});
   const lista = calcAlarmasMaq(equiposMaq(bodegasData), hojas, horometro, fechaLocal()).filter(a=>a.estado==="vencida"||a.estado==="proxima");
+  const [abiertoMant, setAbiertoMant] = React.useState(false);
   if(lista.length===0) return null;
   const venc = lista.filter(a=>a.estado==="vencida").length;
   return (
     <div style={{...S.card,padding:"12px 16px",marginBottom:14,borderLeft:`3px solid ${venc>0?"#f87171":"#fbbf24"}`}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:6}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:abiertoMant?6:0}}>
         <div style={{fontSize:13,fontWeight:700,color:venc>0?"#f87171":"#fbbf24"}}>🔧 Mantenciones de maquinaria: {venc>0?`${venc} vencida(s)`:""}{venc>0&&lista.length>venc?" · ":""}{lista.length>venc?`${lista.length-venc} próxima(s)`:""}</div>
-        {onAbrir&&<button className="btn-g" style={{...S.btn,fontSize:11,padding:"3px 10px"}} onClick={onAbrir}>Abrir hoja de vida</button>}
+        <div style={{display:"flex",gap:6}}>
+          {abiertoMant&&onAbrir&&<button className="btn-g" style={{...S.btn,fontSize:11,padding:"3px 10px"}} onClick={onAbrir}>Abrir hoja de vida</button>}
+          <button className="btn-g" style={{...S.btn,fontSize:11,padding:"3px 10px"}} onClick={()=>setAbiertoMant(v=>!v)}>{abiertoMant?"Ocultar detalle":"Ver detalle"}</button>
+        </div>
       </div>
-      <div style={{display:"flex",flexDirection:"column",gap:3}}>
+      {abiertoMant&&<div style={{display:"flex",flexDirection:"column",gap:3}}>
         {lista.slice(0,8).map((a,i)=>(
           <div key={i} style={{fontSize:12,color:"#c0dac0"}}>
             <span style={{color:colorEstadoAlarmaMaq(a.estado),fontWeight:700}}>{a.estado==="vencida"?"⛔":"⏳"}</span> {a.eq.nombre} — <b>{a.alarma.parte}</b> <span style={{color:"#8aa89a"}}>· {textoRestanteAlarmaMaq(a)}</span>
           </div>
         ))}
         {lista.length>8&&<div style={{fontSize:11,color:"#6a8a7a"}}>… y {lista.length-8} más</div>}
-      </div>
+      </div>}
     </div>
   );
 }
@@ -27464,7 +27468,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-28.3";
+const BUILD_STAMP = "2026-10-28.4";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
