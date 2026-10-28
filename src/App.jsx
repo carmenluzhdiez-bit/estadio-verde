@@ -25784,9 +25784,11 @@ function usePushNotifications(esJefa) {
           token,
           fecha: fechaLocal(),
           agente: navigator.userAgent.slice(0,80),
-          email: (auth.currentUser?.email||"").toLowerCase(),
-          workerId: String(window.__evWorkerId||"")
+          email: ((window.__evPushOwner?.email)||auth.currentUser?.email||"").toLowerCase(),
+          workerId: String((window.__evPushOwner?.workerId)||window.__evWorkerId||""),
+          rol: String(window.__evPushOwner?.rol||"")
         });
+        window.__evPushDev = devId;
       }
     };
     navigator.serviceWorker.addEventListener("message", handler);
@@ -27490,7 +27492,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-28.6";
+const BUILD_STAMP = "2026-10-28.7";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
@@ -28107,6 +28109,13 @@ export default function App() {
   const [pushTokensMap, setPushTokensMap] = useState({});
   useEffect(()=>{ const un=onValue(ref(db,"pushTokens"),snap=>setPushTokensMap(snap.val()||{}),()=>{}); return ()=>{try{un();}catch(e){}}; },[]);
   useEffect(()=>{ window.__evWorkerId = workerLogueado||""; },[workerLogueado]);
+  // Dueño del dispositivo para el push: se (re)escribe cada vez que cambia la sesión, así no depende del momento en que llega el token
+  useEffect(()=>{
+    const own = {email:(fbUser?.email||"").toLowerCase(), workerId:String(workerLogueado||""), rol:String(rolLogueado||"")};
+    window.__evPushOwner = own;
+    const dev = window.__evPushDev;
+    if(dev && (own.email||own.workerId||own.rol)) fbUpdate(ref(db,"pushTokens/"+dev), own).catch(()=>{});
+  },[fbUser, workerLogueado, rolLogueado, pushActivo]);
 
   const esSupervisor = fbRol === "supervisor";
   const esTrabajador = fbRol === "trabajador";
@@ -30720,7 +30729,8 @@ export default function App() {
                       {!retiradoCard&&(()=>{
                         const tk=Object.values(pushTokensMap||{});
                         const mail=(t.email||"").toLowerCase();
-                        const tiene=tk.some(x=>x&&((mail&&x.email===mail)||(x.workerId&&String(x.workerId)===String(t.id))));
+                        const esJefaFicha=/jefa/i.test(t.cargo||"");
+                        const tiene=tk.some(x=>x&&((mail&&x.email===mail)||(x.workerId&&String(x.workerId)===String(t.id))||(esJefaFicha&&x.rol==="jefa")));
                         return <span title={tiene?"Tiene notificaciones push activas en un dispositivo":"No ha activado las notificaciones push (alertas de viento/UV fuera de la app)"} style={{...S.chip,background:tiene?"rgba(52,211,153,0.12)":"rgba(239,68,68,0.10)",color:tiene?"#6ee7b7":"#fca5a5",border:`1px solid ${tiene?"rgba(52,211,153,0.3)":"rgba(239,68,68,0.3)"}`,fontSize:11}}>{tiene?"🔔 Push ✓":"🔕 Sin push"}</span>;
                       })()}
                     </div>
