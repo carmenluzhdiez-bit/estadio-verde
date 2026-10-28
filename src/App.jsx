@@ -4765,7 +4765,24 @@ const ACCIONES_VIENTO_TURNO = {
   3:{label:"ALERTA ALTA de viento",color:"#ef4444",acc:["EVACUACIÓN INMEDIATA de todas las zonas verdes","Cerrar acceso al estadio y zonas deportivas","Activar protocolo de emergencia con administración","Contactar Defensa Civil si corresponde","Documentar fotográficamente post-evento","Inspección completa antes de reabrir"]},
 };
 function AlertaClimaActual({ trabajador=null }){
-  const [clima] = useFirebaseState("clima_actual", null);
+  const [climaFb] = useFirebaseState("clima_actual", null);
+  // Lectura propia y fresca de Open-Meteo (no depende de que el Worker esté escribiendo); si falla, se usa lo del Worker
+  const [climaLive, setClimaLive] = React.useState(null);
+  React.useEffect(()=>{
+    let vivo = true;
+    const cargar = async()=>{
+      try{
+        const r = await fetch("https://api.open-meteo.com/v1/forecast?latitude=-33.4127&longitude=-70.5775&current=uv_index,wind_speed_10m,wind_gusts_10m&wind_speed_unit=kmh&timezone=America/Santiago");
+        if(!r.ok) return;
+        const c = (await r.json()).current; if(!c) return;
+        if(vivo) setClimaLive({uv:Math.round((c.uv_index||0)*10)/10, velocidad:Math.round(c.wind_speed_10m||0), rafaga:Math.round(c.wind_gusts_10m||0), hora:(c.time||"").slice(11,16)});
+      }catch(e){}
+    };
+    cargar();
+    const iv = setInterval(cargar, 10*60*1000);
+    return ()=>{ vivo=false; clearInterval(iv); };
+  },[]);
+  const clima = climaLive || climaFb;
   const hoyC = fechaLocal();
   const tid = String(trabajador?.id??"").replace(/[.#$\/\[\]]/g,"_");
   const [leida, setLeida] = useFirebaseState(tid?`clima_leida/${hoyC}/${tid}`:"clima_leida/_sin", null);
@@ -27468,7 +27485,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-28.4";
+const BUILD_STAMP = "2026-10-28.5";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
