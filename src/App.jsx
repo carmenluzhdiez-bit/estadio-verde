@@ -4764,12 +4764,12 @@ const ACCIONES_VIENTO_TURNO = {
   2:{label:"Alerta media de viento",color:"#f97316",acc:["Suspender labores de jardinería en exterior","Retirar herramientas y equipos livianos","Encintar zonas de riesgo por caída de ramas","Revisar árboles con riesgo de volcamiento","Notificar a administración del estadio","Cierre sectorial de zonas arboladas"]},
   3:{label:"ALERTA ALTA de viento",color:"#ef4444",acc:["EVACUACIÓN INMEDIATA de todas las zonas verdes","Cerrar acceso al estadio y zonas deportivas","Activar protocolo de emergencia con administración","Contactar Defensa Civil si corresponde","Documentar fotográficamente post-evento","Inspección completa antes de reabrir"]},
 };
-function AlertaClimaTurno({ trabajador=null }){
+function AlertaClimaActual({ trabajador=null }){
   const [clima] = useFirebaseState("clima_actual", null);
   const hoyC = fechaLocal();
   const tid = String(trabajador?.id??"").replace(/[.#$\/\[\]]/g,"_");
   const [leida, setLeida] = useFirebaseState(tid?`clima_leida/${hoyC}/${tid}`:"clima_leida/_sin", null);
-  if(!clima) return null;
+  if(!clima) return <div style={{fontSize:11,color:"#9ca3af",marginBottom:10}}>🌤️ Clima: sin datos por ahora</div>;
   const vel = Math.max(Number(clima.velocidad)||0, Number(clima.rafaga)||0);
   const nv = vel>=82?3:vel>=60?2:vel>=40?1:0;
   const uv = Number(clima.uv)||0;
@@ -4778,7 +4778,7 @@ function AlertaClimaTurno({ trabajador=null }){
   if(uv>=11){ catUv="Extremo"; medUv=`${NIVEL_MODERADO}, manga larga obligatoria. Evitar exposición 10:00–16:00h, cuello protegido, hidratación constante.`; }
   else if(uv>=8){ catUv="Muy alto"; medUv=`${NIVEL_MODERADO}, buscar sombra entre 11:00–15:00h. Manga larga obligatoria, reducir exposición 11:00–15:00h.`; }
   else if(uv>=6){ catUv="Alto"; medUv=`${NIVEL_MODERADO}. Buscar sombra entre 11:00–15:00h, manga larga recomendada.`; }
-  if(nv===0 && !catUv) return null;
+  if(nv===0 && !catUv) return <div style={{fontSize:11,color:"#86efac",marginBottom:10,opacity:0.9}}>🌤️ Clima: viento {clima.velocidad||0} km/h (ráfaga {clima.rafaga||0}) · UV {uv} — sin alertas{clima.hora?` · ${clima.hora}`:""}</div>;
   const clave = `v${nv}_u${catUv||"-"}`;
   const yaLeida = leida && leida.clave===clave;
   const info = nv?ACCIONES_VIENTO_TURNO[nv]:null;
@@ -4802,6 +4802,53 @@ function AlertaClimaTurno({ trabajador=null }){
       </div>
     </div>
   );
+}
+
+// ── Informe del día: pronóstico de viento y UV para la jornada (07:00–19:00) ──
+function InformeClimaDia(){
+  const [pron, setPron] = React.useState(null);
+  React.useEffect(()=>{
+    let vivo = true;
+    (async()=>{
+      try{
+        const r = await fetch("https://api.open-meteo.com/v1/forecast?latitude=-33.4127&longitude=-70.5775&hourly=wind_speed_10m,wind_gusts_10m,uv_index&wind_speed_unit=kmh&timezone=America/Santiago&forecast_days=1");
+        if(!r.ok) return;
+        const j = await r.json();
+        const h = j.hourly; if(!h?.time) return;
+        const filas = h.time.map((t,i)=>({hh:Number(t.slice(11,13)),hora:t.slice(11,16),vel:Math.round(h.wind_speed_10m[i]),raf:Math.round(h.wind_gusts_10m[i]),uv:Math.round(h.uv_index[i]*10)/10})).filter(x=>x.hh>=7&&x.hh<=19);
+        if(vivo) setPron(filas);
+      }catch(e){}
+    })();
+    return ()=>{ vivo=false; };
+  },[]);
+  if(!pron || !pron.length) return null;
+  const nivV = x => { const v=Math.max(x.vel,x.raf); return v>=82?3:v>=60?2:v>=40?1:0; };
+  const rango = arr => arr.length?`${arr[0].hora}–${String(arr[arr.length-1].hh+1).padStart(2,"0")}:00`:"";
+  const vMax = pron.reduce((a,x)=>Math.max(a,x.vel,x.raf),0);
+  const nvMax = Math.max(...pron.map(nivV));
+  const hViento = pron.filter(x=>nivV(x)>=1);
+  const uvMax = pron.reduce((a,x)=>x.uv>a.uv?x:a,pron[0]);
+  const hUv = pron.filter(x=>x.uv>=6);
+  const catU = u => u>=11?"Extremo":u>=8?"Muy alto":u>=6?"Alto":"Moderado/bajo";
+  const hayAlerta = nvMax>=1 || hUv.length>0;
+  const col = nvMax>=3?"#ef4444":nvMax>=2?"#f97316":hayAlerta?"#f59e0b":"#34d399";
+  const info = nvMax?ACCIONES_VIENTO_TURNO[nvMax]:null;
+  return (
+    <div style={{background:"rgba(0,0,0,0.22)",border:`1px solid ${col}66`,borderRadius:10,padding:"10px 14px",marginBottom:10}}>
+      <div style={{fontSize:12.5,fontWeight:700,color:col,marginBottom:4}}>📋 Informe del día {hayAlerta?"— se prevén alertas, tomar resguardos antes de iniciar":"— sin alertas previstas"}</div>
+      <div style={{fontSize:12,color:"#e5e7eb",lineHeight:1.5}}>
+        🌬️ Viento: máx. {vMax} km/h (vel./ráfaga){hViento.length?<> · <b style={{color:ACCIONES_VIENTO_TURNO[nvMax].color}}>{ACCIONES_VIENTO_TURNO[nvMax].label}</b> entre {rango(hViento)}</>:" · sin alerta"}
+      </div>
+      <div style={{fontSize:12,color:"#e5e7eb",lineHeight:1.5}}>
+        ☀️ UV: máx. {uvMax.uv} a las {uvMax.hora} ({catU(uvMax.uv)}){hUv.length?<> · <b style={{color:"#fbbf24"}}>índice ≥ 6</b> entre {rango(hUv)}</>:""}
+      </div>
+      {info&&<div style={{fontSize:11,color:"#fde68a",marginTop:4}}>Resguardos: {info.acc.slice(0,3).join(" · ")}</div>}
+      <div style={{fontSize:10,color:"#c0dac0",opacity:0.7,marginTop:3}}>Pronóstico Open-Meteo, jornada 07:00–19:00</div>
+    </div>
+  );
+}
+function AlertaClimaTurno({ trabajador=null }){
+  return <><InformeClimaDia/><AlertaClimaActual trabajador={trabajador}/></>;
 }
 
 // ── Nota del día para un trabajador/supervisor (la escribe jefa o programador) ──
@@ -27417,7 +27464,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-28.1";
+const BUILD_STAMP = "2026-10-28.3";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
