@@ -4871,11 +4871,16 @@ function AlertaClimaTurno({ trabajador=null }){
 // ── Nota del día para un trabajador/supervisor (la escribe jefa o programador) ──
 const _diaSigNota = f => { const d=new Date(f+"T12:00:00"); d.setDate(d.getDate()+1); return d.toISOString().slice(0,10); };
 function NotaDiaTrabajador({ trabajador, fecha, puedeEscribir=false }){
-  const tid = String(trabajador?.id??"").replace(/[.#$\/\[\]]/g,"_");
+  const idBase = (trabajador?.id!==undefined&&trabajador?.id!==null&&trabajador?.id!=="") ? trabajador.id : ("n_"+(trabajador?.nombre||""));
+  const tid = String(idBase).replace(/[.#$\/\[\]\s]/g,"_");
   const [nota, setNota, ready] = useFirebaseState(`notas_dia/${fecha}/${tid}`, null);
   const [edit, setEdit] = React.useState(false);
   const [txt, setTxt] = React.useState("");
-  if(!tid || !ready) return null;
+  const [tarde, setTarde] = React.useState(false);
+  React.useEffect(()=>{ const t=setTimeout(()=>setTarde(true),4000); return ()=>clearTimeout(t); },[]);
+  // Quien escribe (jefa/programador) siempre ve el espacio, aunque la conexión tarde; el resto solo si ya cargó
+  if(!trabajador || (!ready && !puedeEscribir)) return null;
+  if(!ready && puedeEscribir && !tarde) return <div style={{fontSize:11,color:"#a3a37a",marginBottom:10}}>📝 Cargando nota…</div>;
   const hay = nota && nota.texto;
   const hhmm = () => new Date().toTimeString().slice(0,5);
   if(!puedeEscribir && !hay) return null;
@@ -27485,7 +27490,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-28.5";
+const BUILD_STAMP = "2026-10-28.6";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
