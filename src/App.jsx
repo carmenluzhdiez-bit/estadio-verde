@@ -4758,6 +4758,52 @@ const getNombreRef = (nombreCompleto) => {
   return nombreCompleto.trim().split(" ")[0]||nombreCompleto;
 };
 
+// ── Alerta de clima (viento / UV) con acciones y botón «Leída» por trabajador ──
+const ACCIONES_VIENTO_TURNO = {
+  1:{label:"Alerta temprana de viento",color:"#f59e0b",acc:["Asegurar macetas y elementos móviles","Revisar y asegurar señalética","Alertar al equipo","Suspender trabajos en altura"]},
+  2:{label:"Alerta media de viento",color:"#f97316",acc:["Suspender labores de jardinería en exterior","Retirar herramientas y equipos livianos","Encintar zonas de riesgo por caída de ramas","Revisar árboles con riesgo de volcamiento","Notificar a administración del estadio","Cierre sectorial de zonas arboladas"]},
+  3:{label:"ALERTA ALTA de viento",color:"#ef4444",acc:["EVACUACIÓN INMEDIATA de todas las zonas verdes","Cerrar acceso al estadio y zonas deportivas","Activar protocolo de emergencia con administración","Contactar Defensa Civil si corresponde","Documentar fotográficamente post-evento","Inspección completa antes de reabrir"]},
+};
+function AlertaClimaTurno({ trabajador=null }){
+  const [clima] = useFirebaseState("clima_actual", null);
+  const hoyC = fechaLocal();
+  const tid = String(trabajador?.id??"").replace(/[.#$\/\[\]]/g,"_");
+  const [leida, setLeida] = useFirebaseState(tid?`clima_leida/${hoyC}/${tid}`:"clima_leida/_sin", null);
+  if(!clima) return null;
+  const vel = Math.max(Number(clima.velocidad)||0, Number(clima.rafaga)||0);
+  const nv = vel>=82?3:vel>=60?2:vel>=40?1:0;
+  const uv = Number(clima.uv)||0;
+  const NIVEL_MODERADO = "Lentes de sol, sombrero ala ancha, protector solar FPS 30+";
+  let catUv=null, medUv="";
+  if(uv>=11){ catUv="Extremo"; medUv=`${NIVEL_MODERADO}, manga larga obligatoria. Evitar exposición 10:00–16:00h, cuello protegido, hidratación constante.`; }
+  else if(uv>=8){ catUv="Muy alto"; medUv=`${NIVEL_MODERADO}, buscar sombra entre 11:00–15:00h. Manga larga obligatoria, reducir exposición 11:00–15:00h.`; }
+  else if(uv>=6){ catUv="Alto"; medUv=`${NIVEL_MODERADO}. Buscar sombra entre 11:00–15:00h, manga larga recomendada.`; }
+  if(nv===0 && !catUv) return null;
+  const clave = `v${nv}_u${catUv||"-"}`;
+  const yaLeida = leida && leida.clave===clave;
+  const info = nv?ACCIONES_VIENTO_TURNO[nv]:null;
+  const col = info?info.color:"#f59e0b";
+  return (
+    <div style={{background:"rgba(0,0,0,0.25)",border:`2px solid ${col}88`,borderRadius:10,padding:"10px 14px",marginBottom:12,display:"flex",flexDirection:"column",gap:8}}>
+      {info&&(
+        <div>
+          <div style={{fontSize:13,fontWeight:700,color:info.color}}>🌬️ {info.label} — {vel} km/h (vel. {clima.velocidad||0} · ráfaga {clima.rafaga||0})</div>
+          <ul style={{margin:"4px 0 0 18px",fontSize:12,color:"#e5e7eb",lineHeight:1.5}}>{info.acc.map((a,i)=><li key={i}>{a}</li>)}</ul>
+        </div>
+      )}
+      {catUv&&(
+        <div style={{fontSize:12.5,color:"#fbbf24",fontWeight:600}}>☀️ Radiación UV {catUv} — índice {uv}. <span style={{fontWeight:400,color:"#fde68a"}}>{medUv}</span></div>
+      )}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+        <span style={{fontSize:10,color:"#c0dac0",opacity:0.8}}>Actualizado {clima.hora||""} · Open-Meteo</span>
+        {trabajador&&(yaLeida
+          ? <span style={{fontSize:11,color:"#86efac",fontWeight:700}}>✅ Leída{leida.hora?` a las ${leida.hora}`:""}</span>
+          : <button className="btn-p" style={{fontSize:12,padding:"5px 14px",borderRadius:8,cursor:"pointer"}} onClick={()=>setLeida({clave,hora:new Date().toTimeString().slice(0,5),nombre:trabajador.nombre||"",creadoEn:Date.now()})}>✅ Leída</button>)}
+      </div>
+    </div>
+  );
+}
+
 // ── Nota del día para un trabajador/supervisor (la escribe jefa o programador) ──
 const _diaSigNota = f => { const d=new Date(f+"T12:00:00"); d.setDate(d.getDate()+1); return d.toISOString().slice(0,10); };
 function NotaDiaTrabajador({ trabajador, fecha, puedeEscribir=false }){
@@ -5322,6 +5368,7 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
 
       <div style={{padding:"16px 14px",maxWidth:600,margin:"0 auto"}}>
 
+        {fechaVer===hoy&&<AlertaClimaTurno trabajador={trabajador}/>}
         <NotaDiaTrabajador key={`${fechaVer}_${trabajador.id}`} trabajador={trabajador} fecha={fechaVer} puedeEscribir={!!esJefaApp}/>
         <NotaDiaTrabajador key={`sig_${_diaSigNota(fechaVer)}_${trabajador.id}`} trabajador={trabajador} fecha={_diaSigNota(fechaVer)} puedeEscribir={!!esJefaApp}/>
 
@@ -25663,7 +25710,9 @@ function usePushNotifications(esJefa) {
         fbSet(ref(db, "pushTokens/" + devId), {
           token,
           fecha: fechaLocal(),
-          agente: navigator.userAgent.slice(0,80)
+          agente: navigator.userAgent.slice(0,80),
+          email: (auth.currentUser?.email||"").toLowerCase(),
+          workerId: String(window.__evWorkerId||"")
         });
       }
     };
@@ -27368,7 +27417,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-27.2";
+const BUILD_STAMP = "2026-10-28.1";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
@@ -27982,6 +28031,9 @@ export default function App() {
   const esProgramador = fbRol === "programador";
   const esGerencia = fbRol === "gerencia";
   const { pushActivo, activarPush } = usePushNotifications(esJefa);
+  const [pushTokensMap, setPushTokensMap] = useState({});
+  useEffect(()=>{ const un=onValue(ref(db,"pushTokens"),snap=>setPushTokensMap(snap.val()||{}),()=>{}); return ()=>{try{un();}catch(e){}}; },[]);
+  useEffect(()=>{ window.__evWorkerId = workerLogueado||""; },[workerLogueado]);
 
   const esSupervisor = fbRol === "supervisor";
   const esTrabajador = fbRol === "trabajador";
@@ -28994,32 +29046,8 @@ export default function App() {
       </div>
 
       <div style={S.main}>
-        {/* Banner de alerta de clima (viento/UV) — visible para todos los roles */}
-        {climaActual&&(climaActual.nivelViento>=2||climaActual.uv>=6)&&(
-          <div style={{
-            background: climaActual.nivelViento>=3?"rgba(239,68,68,0.12)":climaActual.nivelViento>=2?"rgba(249,115,22,0.12)":"rgba(245,158,11,0.12)",
-            border: `1px solid ${climaActual.nivelViento>=3?"rgba(239,68,68,0.4)":climaActual.nivelViento>=2?"rgba(249,115,22,0.4)":"rgba(245,158,11,0.4)"}`,
-            borderRadius:8,padding:"10px 16px",marginBottom:12,display:"flex",flexDirection:"column",gap:4}}>
-            {climaActual.nivelViento>=2&&(
-              <div style={{display:"flex",alignItems:"center",gap:8,fontSize:12.5,color:climaActual.nivelViento>=3?"#fca5a5":"#fdba74",fontWeight:700}}>
-                🌬️ {climaActual.nivelViento>=3?"ALERTA ALTA de viento":"Alerta media de viento"} — {Math.max(climaActual.velocidad,climaActual.rafaga)} km/h (vel./ráfaga)
-              </div>
-            )}
-            {climaActual.uv>=6&&(()=>{
-              const NIVEL_MODERADO = "Lentes de sol, sombrero ala ancha, protector solar FPS 30+";
-              let categoria, medidas;
-              if(climaActual.uv>=11){ categoria="Extremo"; medidas = `${NIVEL_MODERADO}, manga larga obligatoria. Evitar exposición 10:00–16:00h, cuello protegido, hidratación constante.`; }
-              else if(climaActual.uv>=8){ categoria="Muy alto"; medidas = `${NIVEL_MODERADO}, buscar sombra entre 11:00–15:00h. Manga larga obligatoria, reducir exposición 11:00–15:00h.`; }
-              else { categoria="Alto"; medidas = `${NIVEL_MODERADO}. Buscar sombra entre 11:00–15:00h, manga larga recomendada.`; }
-              return (
-                <div style={{display:"flex",alignItems:"center",gap:8,fontSize:12.5,color:"#fbbf24",fontWeight:700}}>
-                  ☀️ Radiación UV {categoria} — índice {climaActual.uv}. {medidas}
-                </div>
-              );
-            })()}
-            <div style={{fontSize:10,color:"#c0dac0",opacity:0.8}}>Actualizado {climaActual.hora} · Open-Meteo</div>
-          </div>
-        )}
+        {/* Banner de alerta de clima (viento/UV) — jefa, programador y gerencia; trabajadores y supervisores lo ven dentro de su turno (con «Leída») */}
+        {!(vista==="miturno"&&(rolLogueado==="trabajador"||rolLogueado==="supervisor"))&&<AlertaClimaTurno/>}
         {/* Banner modo solo lectura para Gerencia */}
         {soloLectura&&(
           <div style={{background:"rgba(245,158,11,0.1)",border:"1px solid rgba(245,158,11,0.3)",borderRadius:8,padding:"8px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:10}}>
@@ -30616,6 +30644,12 @@ export default function App() {
                       {eventosAbiertos>0&&<span style={{...S.chip,background:"rgba(245,158,11,0.12)",color:"#fcd34d",border:"1px solid rgba(245,158,11,0.25)",fontSize:11}}>⏳ {eventosAbiertos} pend.</span>}
                       {vacDias>0&&<span style={{...S.chip,background:"rgba(59,130,246,0.12)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.25)",fontSize:11}}>🏖️ {vacDias}d</span>}
                       {heHoras>0&&<span style={{...S.chip,background:"rgba(34,197,94,0.12)",color:"#86efac",border:"1px solid rgba(34,197,94,0.25)",fontSize:11}}>⏰ {heHoras}h</span>}
+                      {!retiradoCard&&(()=>{
+                        const tk=Object.values(pushTokensMap||{});
+                        const mail=(t.email||"").toLowerCase();
+                        const tiene=tk.some(x=>x&&((mail&&x.email===mail)||(x.workerId&&String(x.workerId)===String(t.id))));
+                        return <span title={tiene?"Tiene notificaciones push activas en un dispositivo":"No ha activado las notificaciones push (alertas de viento/UV fuera de la app)"} style={{...S.chip,background:tiene?"rgba(52,211,153,0.12)":"rgba(239,68,68,0.10)",color:tiene?"#6ee7b7":"#fca5a5",border:`1px solid ${tiene?"rgba(52,211,153,0.3)":"rgba(239,68,68,0.3)"}`,fontSize:11}}>{tiene?"🔔 Push ✓":"🔕 Sin push"}</span>;
+                      })()}
                     </div>
                   </div>
                 );
