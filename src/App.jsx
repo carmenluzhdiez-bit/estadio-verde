@@ -361,6 +361,29 @@ const esRiegoManualTarea = t => /riego\s*manual/.test(_normTxtRM(t?.tarea));
 const flagRevisarRiego = t => esRiegoManualTarea(t) && !!(t.revisarRiego || (t.notas||"").includes("🌧️ Revisar riego"));
 const notasSinRevisarRiego = t => esRiegoManualTarea(t) ? (t.notas||"") : (t.notas||"").replace(/\s*\|?\s*🌧️ Revisar riego: ajustar a mano por lluvia/g,"").trim();
 
+// ── Alternativas propias de «Riego manual» (reemplazan a los estados genéricos) ──
+const OPC_RIEGO_MANUAL = [
+  {k:"pendiente", icon:"○",  label:"Pendiente",          color:"#f59e0b", patch:{estado:"pendiente",riegoNoNecesario:false,anuladaNoPudo:false,causaNoPudo:"",notaWorker:""}},
+  {k:"en_curso",  icon:"◑",  label:"En curso",           color:"#3b82f6", patch:{estado:"en_curso",riegoNoNecesario:false,anuladaNoPudo:false,causaNoPudo:"",notaWorker:""}},
+  {k:"regado",    icon:"💧", label:"Se regó",            color:"#22c55e", patch:{estado:"hecha",riegoNoNecesario:false,anuladaNoPudo:false,causaNoPudo:"",notaWorker:"Regado"}},
+  {k:"no_necesario",icon:"🌧️",label:"No era necesario",  color:"#60a5fa", patch:{estado:"no_pudo",causaNoPudo:"lluvia",anuladaNoPudo:true,riegoNoNecesario:true,notaWorker:"Riego no necesario — revisado en terreno"}},
+  {k:"no_pudo",   icon:"✗",  label:"No se pudo",         color:"#ef4444", patch:{estado:"no_pudo",riegoNoNecesario:false,anuladaNoPudo:false}},
+];
+const claveRiegoManual = t => {
+  const e = normalizarEstado(t?.estado);
+  if(e==="hecha") return "regado";
+  if(e==="no_pudo") return t?.riegoNoNecesario ? "no_necesario" : "no_pudo";
+  return e==="en_curso" ? "en_curso" : "pendiente";
+};
+function BotonesRiegoManual({ t, fecha, onUpdateTarea, pad="4px 10px" }){
+  const act = claveRiegoManual(t);
+  return <>{OPC_RIEGO_MANUAL.map(o=>(
+    <button key={o.k} onClick={()=>onUpdateTarea(fecha,t.id,o.patch)}
+      style={{cursor:"pointer",border:`1px solid ${act===o.k?o.color+"60":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:pad,fontSize:11,background:act===o.k?`${o.color}15`:"transparent",color:act===o.k?o.color:"#6aaa7a",fontFamily:"'Georgia',serif"}}>
+      {o.icon} {o.label}
+    </button>
+  ))}</>;
+}
 const SubZonaTarea = ({ zona, elemento, icono="📍" }) => !zona ? null : (
   <span style={{display:"inline-flex",alignItems:"center",flexWrap:"wrap",gap:5,fontSize:13,fontWeight:700,color:"#86efac",background:"rgba(52,211,153,0.10)",border:"1px solid rgba(52,211,153,0.30)",borderRadius:8,padding:"2px 9px",lineHeight:1.35}}>
     <span>{icono} {zona}</span>
@@ -5590,7 +5613,8 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                         {(t.alturaCorteObj||t.alturaCorte)&&<div style={{fontSize:11,color:"#fbbf24",marginTop:2,marginLeft:17,fontWeight:600}}>✂️ Altura de corte indicada: {t.alturaCorteObj||t.alturaCorte}mm</div>}
                         {puedeEditar ? (
                           <div style={{display:"flex",gap:4,flexWrap:"wrap",alignItems:"center"}}>
-                            {Object.entries(ESTADOS_TAREA).map(([k,v])=>(
+                            {esRiegoManualTarea(t)&&<BotonesRiegoManual t={t} fecha={fechaVer} onUpdateTarea={onUpdateTarea}/>}
+                            {!esRiegoManualTarea(t)&&Object.entries(ESTADOS_TAREA).map(([k,v])=>(
                               <button key={k} onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:normalizarEstado(k),notaWorker:k!=="no_pudo"?(t.notaWorker||""):"",causaNoPudo:k!=="no_pudo"?"":(t.causaNoPudo||"")})}
                                 style={{cursor:"pointer",border:`1px solid ${t.estado===k?v.color+"60":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"4px 10px",fontSize:11,background:t.estado===k?`${v.color}15`:"transparent",color:t.estado===k?v.color:"#6aaa7a",fontFamily:"'Georgia',serif"}}>
                                 {v.icon} {v.label}
@@ -5868,19 +5892,14 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                               {flagRevisarRiego(t)&&!["hecha","completada","no_pudo"].includes(normalizarEstado(t.estado))&&(
                                 <div style={{marginBottom:6,padding:"7px 10px",border:"1px solid rgba(245,158,11,0.4)",borderRadius:8,background:"rgba(245,158,11,0.08)"}}>
                                   <div style={{fontSize:11,color:"#fbbf24",marginBottom:6,fontWeight:600}}>🌧️ Llovió: revisa en terreno si este riego hace falta.</div>
-                                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                                    <button onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:"hecha",notaWorker:"Regado — decidido en terreno tras la lluvia"})}
-                                      style={{fontSize:12,fontWeight:700,padding:"6px 14px",borderRadius:8,border:"1px solid rgba(34,197,94,0.5)",background:"rgba(34,197,94,0.15)",color:"#4ade80",cursor:"pointer"}}>💧 Se regó</button>
-                                    <button onClick={()=>onUpdateTarea(fechaVer,t.id,{estado:"no_pudo",causaNoPudo:"lluvia",anuladaNoPudo:true,riegoNoNecesario:true,notaWorker:"Riego no necesario — revisado en terreno tras la lluvia"})}
-                                      style={{fontSize:12,fontWeight:700,padding:"6px 14px",borderRadius:8,border:"1px solid rgba(96,165,250,0.5)",background:"rgba(96,165,250,0.15)",color:"#93c5fd",cursor:"pointer"}}>🌧️ No era necesario</button>
-                                  </div>
-                                  <div style={{fontSize:10,color:"#9ca3af",marginTop:4}}>«No era necesario» no cuenta como incumplimiento.</div>
+                                  <div style={{fontSize:10,color:"#9ca3af",marginTop:2}}>Elige abajo «💧 Se regó» o «🌧️ No era necesario» (no cuenta como incumplimiento).</div>
                                 </div>
                               )}
                               {t.movidoDesde&&<div style={{fontSize:10,color:"#93c5fd",marginBottom:4}}>🔁 Movida desde {t.movidoDesde} (seguía sin resolver)</div>}
                               {puedeEditar ? (
                                 <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-                                  {Object.entries(ESTADOS_TAREA).map(([k,v])=>(
+                                  {esRiegoManualTarea(t)&&<BotonesRiegoManual t={t} fecha={fechaVer} onUpdateTarea={onUpdateTarea} pad="3px 9px"/>}
+                                  {!esRiegoManualTarea(t)&&Object.entries(ESTADOS_TAREA).map(([k,v])=>(
                                     <button key={k} onClick={()=>{
                                       if(t.esAplicacion&&k==="hecha"){
                                         setConfirmandoAplicId(t.id);
@@ -6175,10 +6194,17 @@ function ZonaRow({ zona, tz, zonasColapsadas, toggleZonaColapso, MACROZONAS_BASE
                         {t.notaWorker && <div style={{fontSize:11,color:t.estado==="no_pudo"?"#fca5a5":"#7aaa80",marginTop:2}}>💬 {t.notaWorker}</div>}
                       </div>
                       <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0,flexWrap:"wrap"}}>
+                        {esRiegoManualTarea(t) ? (
+                          <select value={claveRiegoManual(t)} onChange={e=>{const o=OPC_RIEGO_MANUAL.find(x=>x.k===e.target.value); if(o) updateTarea(t.id,o.patch);}}
+                            style={{background:est.bg,border:`1px solid ${est.color}40`,borderRadius:7,color:est.color,padding:"4px 7px",fontFamily:"'Georgia',serif",fontSize:12,outline:"none",cursor:"pointer"}}>
+                            {OPC_RIEGO_MANUAL.map(o=><option key={o.k} value={o.k}>{o.icon} {o.label}</option>)}
+                          </select>
+                        ) : (
                         <select value={t.estado} onChange={e=>updateTarea(t.id,{estado:e.target.value})}
                           style={{background:est.bg,border:`1px solid ${est.color}40`,borderRadius:7,color:est.color,padding:"4px 7px",fontFamily:"'Georgia',serif",fontSize:12,outline:"none",cursor:"pointer"}}>
                           {Object.entries(ESTADOS_TAREA).map(([k,v]) => <option key={k} value={k}>{v.icon} {v.label}</option>)}
                         </select>
+                        )}
                         <button onClick={()=>deleteTarea(t.id)} style={{background:"transparent",border:"none",color:"#7a5a5a",cursor:"pointer",fontSize:14,padding:"3px 5px"}}>🗑</button>
                       </div>
                     </div>
@@ -27492,7 +27518,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-28.7";
+const BUILD_STAMP = "2026-10-29.1";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
