@@ -6,7 +6,7 @@ import * as React from "react";
 
 // ─── FIREBASE ────────────────────────────────────────────────────────────────
 import { initializeApp } from "firebase/app";
-import { getDatabase, ref, onValue, set as fbSet, update as fbUpdate, push as fbPush, get } from "firebase/database";
+import { getDatabase, ref, onValue, set as fbSet, update as fbUpdate, push as fbPush, get, runTransaction } from "firebase/database";
 import { getAuth, signInWithEmailAndPassword, sendPasswordResetEmail, signInAnonymously, signOut, onAuthStateChanged } from "firebase/auth";
 import { getFunctions, httpsCallable } from "firebase/functions";
 
@@ -69,12 +69,52 @@ function avisoErrorGuardado(path, err) {
   } catch(e) {}
 }
 
+// ── Guardado de tareas por diferencias: cada dispositivo escribe SOLO lo que cambió, sobre la versión actual del servidor ──
+function escribirDiffProg(prev, next){
+  const norm = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+  const fechas = new Set([...Object.keys(prev||{}),...Object.keys(next||{})]);
+  fechas.forEach(f=>{
+    const a = norm(prev?.[f]), b = norm(next?.[f]);
+    if(JSON.stringify(a)===JSON.stringify(b)) return;
+    const sinId = a.some(t=>!t||t.id==null) || b.some(t=>!t||t.id==null) || new Set(b.map(t=>String(t.id))).size!==b.length;
+    if(sinId){ fbSet(ref(db,`${ROOT}/prog/${f}`), b.map(limpiarUndef)).catch(e=>console.error("prog",e)); return; }
+    const mapA = new Map(a.map(t=>[String(t.id),t]));
+    const idsB = new Set(b.map(t=>String(t.id)));
+    const eliminadas = a.filter(t=>!idsB.has(String(t.id))).map(t=>String(t.id));
+    const nuevas = [], parches = [];
+    b.forEach(tb=>{
+      const ta = mapA.get(String(tb.id));
+      if(!ta){ nuevas.push(tb); return; }
+      const p = {}, borr = [];
+      new Set([...Object.keys(ta),...Object.keys(tb)]).forEach(k=>{
+        if(JSON.stringify(ta[k])!==JSON.stringify(tb[k])){ if(tb[k]===undefined) borr.push(k); else p[k]=tb[k]; }
+      });
+      if(Object.keys(p).length||borr.length) parches.push({id:String(tb.id),p,borr});
+    });
+    if(!eliminadas.length&&!nuevas.length&&!parches.length) return; // solo cambió el orden
+    runTransaction(ref(db,`${ROOT}/prog/${f}`), cur=>{
+      let lista = norm(cur).slice();
+      if(eliminadas.length) lista = lista.filter(t=>!eliminadas.includes(String(t?.id)));
+      parches.forEach(({id,p,borr})=>{
+        const i = lista.findIndex(t=>String(t?.id)===id);
+        if(i<0) return; // otra persona la eliminó: no se vuelve a crear
+        const nt = {...lista[i], ...p}; borr.forEach(k=>{ delete nt[k]; });
+        lista[i] = nt;
+      });
+      nuevas.forEach(nt=>{ if(!lista.some(t=>String(t?.id)===String(nt.id))) lista.push(nt); });
+      return lista.map(limpiarUndef);
+    }).catch(e=>console.error("prog (transacción):",f,e));
+  });
+}
+
 function useFirebaseState(path, defaultValue) {
   const fullPath = `${ROOT}/${path}`;
   const [value, setValueLocal] = useState(defaultValue);
   const [ready,  setReady]     = useState(false);
   const valueRef = useRef(defaultValue); // referencia siempre actualizada
   const pendingRef = useRef(false); // hay una escritura pendiente
+  const timerRef = useRef(null);
+  const snapPendRef = useRef({hay:false,val:undefined}); // última actualización del servidor recibida mientras se guardaba
 
   useEffect(() => {
     // Esperar a que la autenticación (anónima o con email) esté realmente establecida antes
@@ -88,9 +128,9 @@ function useFirebaseState(path, defaultValue) {
       if(unsubValue) return; // ya suscrito, no duplicar
       const fbRef = ref(db, fullPath);
       unsubValue = onValue(fbRef, (snap) => {
-        if (pendingRef.current) return; // ignorar actualizaciones mientras escribimos
         const snapV = snap.val();
         const newVal = snapV !== null && snapV !== undefined ? snapV : defaultValue;
+        if (pendingRef.current) { snapPendRef.current = {hay:true,val:newVal}; return; } // se aplica al terminar de guardar
         valueRef.current = newVal;
         setValueLocal(newVal);
         setReady(true);
@@ -111,7 +151,15 @@ function useFirebaseState(path, defaultValue) {
     setValueLocal(resolved);
     pendingRef.current = true;
     return fbSet(ref(db, fullPath), resolved === undefined ? null : resolved)
-      .then(() => { setTimeout(() => { pendingRef.current = false; }, 3000); return true; })
+      .then(() => {
+        if(timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => {
+          pendingRef.current = false;
+          // Poner al día con lo último que llegó del servidor mientras se guardaba (evita quedar con una copia vieja)
+          if(snapPendRef.current.hay){ const v=snapPendRef.current.val; snapPendRef.current={hay:false,val:undefined}; valueRef.current=v; setValueLocal(v); }
+        }, 3000);
+        return true;
+      })
       .catch((err) => {
         pendingRef.current = false;
         console.error("Error al guardar en Firebase:", fullPath, err);
@@ -6074,7 +6122,11 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
                     alert("Hay tareas marcadas como 'No se pudo' sin causa o sin motivo. Elige la causa y escribe el motivo antes de cerrar el turno.");
                     return;
                   }
-                  if(window.confirm(`¿Cerrar turno del ${fechaVer}?
+                  const sinMarcar = misTargets.filter(t=>["pendiente","en_curso","por_designar"].includes(normalizarEstado(t.estado)));
+                  const avisoSinMarcar = sinMarcar.length>0
+                    ? `⚠️ Quedan ${sinMarcar.length} tarea(s) SIN MARCAR:\n`+sinMarcar.slice(0,8).map(t=>"  • "+(t.tarea||"").replace("⛳ ","")+(t.zona?" — "+t.zona:"")).join("\n")+(sinMarcar.length>8?`\n  … y ${sinMarcar.length-8} más`:"")+"\n\nSi alguna ya la hiciste, toca «Cancelar» y márcala antes de cerrar.\n\n"
+                    : "";
+                  if(window.confirm(`${avisoSinMarcar}¿Cerrar turno del ${fechaVer}?
 
 Una vez cerrado no podrás modificar las tareas. Solo la jefa puede reabrir el turno.`)){
                     onCerrarTurno?.(fechaVer,trabajador.nombre);
@@ -27518,7 +27570,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-29.2";
+const BUILD_STAMP = "2026-10-29.3";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
@@ -27741,7 +27793,17 @@ export default function App() {
   const [eppInspecciones, setEppInspecciones] = useFirebaseState("epp_inspecciones", []);
   const [eppFitTests, setEppFitTests] = useFirebaseState("epp_fit_tests", []);
   const [eppDisposiciones, setEppDisposiciones] = useFirebaseState("epp_disposiciones", []);
-  const [tareasProg,     setTareasProg,     progReady]     = useFirebaseState("prog",           {});
+  const [tareasProg,     _setTareasProgRaw, progReady, _setTareasProgLocal] = useFirebaseState("prog",           {});
+  const _setProgLocalRef = React.useRef(null); _setProgLocalRef.current = _setTareasProgLocal;
+  // setTareasProg: actualiza la copia local y guarda en Firebase solo las tareas/campos que cambiaron
+  const setTareasProg = React.useCallback((upd)=>{
+    _setProgLocalRef.current(prev=>{
+      const base = prev||{};
+      const next = typeof upd==="function" ? upd(base) : upd;
+      try{ escribirDiffProg(base, next||{}); }catch(e){ console.error("diff prog",e); }
+      return next;
+    });
+  },[]);
   const [climaActual, setClimaActual] = useFirebaseState("clima_actual", null);
   const [climaAlertaEnviada, setClimaAlertaEnviada] = useFirebaseState("clima_alerta_enviada", {});
   const [stockFito, setStockFito]  = useFirebaseState("fung-stock", {});
@@ -27841,7 +27903,6 @@ export default function App() {
       setTareasProg(prev=>{
         const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
         const lista=[...normArr(prev[fechaAlerta]||[]),nuevaTarea];
-        fbUpdate(ref(db,`${ROOT}/prog`),{[fechaAlerta]:lista}).catch(e=>console.error(e));
         return {...prev,[fechaAlerta]:lista};
       });
     });
@@ -29302,7 +29363,6 @@ export default function App() {
                     });
                     const estadoFinalTid = actualizadas.find(t=>String(t.id)===String(tid))?.estado;
                     const actualizadasConLote = cerrarLoteSiCorresponde(actualizadas, tid, {estado:estadoFinalTid});
-                    fbUpdate(ref(db,`${ROOT}/prog`),{[fecha]:actualizadasConLote.map(limpiarUndef)}).catch(e=>console.error(e));
                     return {...prev,[fecha]:actualizadasConLote};
                   });
                 }}
@@ -29316,7 +29376,6 @@ export default function App() {
                     const esDeAlerta = (t.tipoEvento||"").includes("alerta");
                     const tFinal = (esGolfT&&!t.responsable&&!esDeAlerta) ? {...t, responsable:"Osmar Bhalú Armijo Zúñiga", estado:"pendiente"} : t;
                     const lista=[...normArr(prev[tFinal.fecha]||[]),tFinal];
-                    fbUpdate(ref(db,`${ROOT}/prog`),{[tFinal.fecha]:lista}).catch(e=>console.error(e));
                     return {...prev,[tFinal.fecha]:lista};
                   });
                 }}
@@ -30605,9 +30664,6 @@ export default function App() {
                       const tareaVieja = tareasDelDia.find(t=>String(t.id)===String(tid));
                       const patchFrec = (patch.estado!==undefined && tareaVieja) ? aplicarCambioFrecuencia(tareaVieja, patch, getElemFrecs, setElemFrecs) : patch;
                       const actualizadas = cerrarLoteSiCorresponde(tareasDelDia, tid, patchFrec);
-                      // Escribir solo la ruta de esa fecha en Firebase
-                      fbUpdate(ref(db, `${ROOT}/prog`), {[fecha]: actualizadas.map(limpiarUndef)})
-                        .catch(e=>console.error("Error:", e));
                       if(patch.estado==="no_pudo"||patch.estado==="hecha"||patch.estado==="completada"||patch.estado==="haciendose"){
                         const tarea=tareasDelDia.find(t=>String(t.id)===String(tid));
                         if(tarea){
@@ -30644,7 +30700,6 @@ export default function App() {
                     setTareasProg(prev=>{
                       const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
                       const lista=[...normArr(prev[hoyKey]),{...nuevaTarea,fecha:hoyKey}];
-                      fbUpdate(ref(db,`${ROOT}/prog`),{[hoyKey]:lista}).catch(e=>console.error(e));
                       return {...prev,[hoyKey]:lista};
                     });
                     const propZ=MACROZONAS_BASE.find(zz=>zz.nombre===nuevaTarea.zona);
