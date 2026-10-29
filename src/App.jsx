@@ -5978,6 +5978,61 @@ const normalizar = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u030
         })()}
 
         {/* ══════════════════════════════════════════════════════════
+             SECCIÓN 4 — TAREA EMERGENTE
+             ══════════════════════════════════════════════════════════ */}
+        {fechaVer===hoy&&(
+          <div style={{marginBottom:14}}>
+            {!showEmergente?(
+              <button onClick={()=>setShowEmergente(true)}
+                style={{width:"100%",cursor:"pointer",border:"1px dashed rgba(255,255,255,0.15)",borderRadius:10,padding:"10px",background:"transparent",color:"#5a8a6a",fontFamily:"'Georgia',serif",fontSize:12}}>
+                ➕ Agregar tarea emergente del turno
+              </button>
+            ):(
+              <div style={{border:"1px solid rgba(251,191,36,0.25)",borderRadius:10,padding:"12px 14px",background:"rgba(251,191,36,0.04)"}}>
+                <div style={{fontSize:13,fontWeight:600,color:"#fbbf24",marginBottom:10}}>➕ Tarea emergente</div>
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  <div>
+                    <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px",textTransform:"uppercase"}}>Zona</label>
+                    <select style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.14)",borderRadius:8,color:"#ede9e0",padding:"8px 12px",fontFamily:"'Georgia',serif",fontSize:13,outline:"none"}}
+                      value={emergenteForm.zona} onChange={e=>setEmergenteForm(p=>({...p,zona:e.target.value,tarea:""}))}>
+                      <option value="">Seleccionar zona...</option>
+                      {[...new Set((Array.isArray(tareas)?tareas:Object.values(tareas||{}).flat()).map(t=>t.zona).filter(Boolean))].sort().map(z=><option key={z} value={z}>{z}</option>)}
+                      <option value="Otra">Otra zona</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px",textTransform:"uppercase"}}>Descripción</label>
+                    <input style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.14)",borderRadius:8,color:"#ede9e0",padding:"8px 12px",fontFamily:"'Georgia',serif",fontSize:13,outline:"none",boxSizing:"border-box"}}
+                      placeholder="¿Qué tarea surgió?"
+                      value={emergenteForm.tarea} onChange={e=>setEmergenteForm(p=>({...p,tarea:e.target.value}))}/>
+                  </div>
+                  <div>
+                    <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px",textTransform:"uppercase"}}>Observaciones (opcional)</label>
+                    <input style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.14)",borderRadius:8,color:"#ede9e0",padding:"8px 12px",fontFamily:"'Georgia',serif",fontSize:13,outline:"none",boxSizing:"border-box"}}
+                      placeholder="Detalles adicionales..."
+                      value={emergenteForm.obs||""} onChange={e=>setEmergenteForm(p=>({...p,obs:e.target.value}))}/>
+                  </div>
+                  <div style={{display:"flex",gap:8}}>
+                    <button onClick={()=>{
+                      if(!emergenteForm.tarea.trim()) return;
+                      onAddTarea({id:Date.now(),fecha:fechaVer,tarea:emergenteForm.tarea,responsable:trabajador.nombre,zona:emergenteForm.zona||"Sin zona",estado:"hecha",notas:emergenteForm.obs||"Tarea emergente del turno",auto:false,emergente:true});
+                      setEmergenteForm({zona:"",tarea:"",obs:""});
+                      setShowEmergente(false);
+                    }} style={{cursor:"pointer",border:"none",borderRadius:10,padding:"8px 18px",background:"#3d7a52",color:"#fff",fontSize:13,fontFamily:"'Georgia',serif",fontWeight:600}}>
+                      ✓ Guardar
+                    </button>
+                    <button onClick={()=>{setShowEmergente(false);setEmergenteForm({zona:"",tarea:"",obs:""});}}
+                      style={{cursor:"pointer",border:"1px solid rgba(255,255,255,0.15)",borderRadius:10,padding:"8px 14px",background:"transparent",color:"#6aaa7a",fontSize:13,fontFamily:"'Georgia',serif"}}>
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════
              CIERRE DE TURNO
              ══════════════════════════════════════════════════════════ */}
         {fechaVer===hoy&&(
@@ -6032,61 +6087,6 @@ Una vez cerrado no podrás modificar las tareas. Solo la jefa puede reabrir el t
                 </button>
                 <div style={{fontSize:10,color:"#4a7a5a",marginTop:8}}>
                   Al cerrar, la jefa podrá revisar y validar tus tareas.
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ══════════════════════════════════════════════════════════
-             SECCIÓN 4 — TAREA EMERGENTE
-             ══════════════════════════════════════════════════════════ */}
-        {fechaVer===hoy&&(
-          <div style={{marginBottom:14}}>
-            {!showEmergente?(
-              <button onClick={()=>setShowEmergente(true)}
-                style={{width:"100%",cursor:"pointer",border:"1px dashed rgba(255,255,255,0.15)",borderRadius:10,padding:"10px",background:"transparent",color:"#5a8a6a",fontFamily:"'Georgia',serif",fontSize:12}}>
-                ➕ Agregar tarea emergente del turno
-              </button>
-            ):(
-              <div style={{border:"1px solid rgba(251,191,36,0.25)",borderRadius:10,padding:"12px 14px",background:"rgba(251,191,36,0.04)"}}>
-                <div style={{fontSize:13,fontWeight:600,color:"#fbbf24",marginBottom:10}}>➕ Tarea emergente</div>
-                <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                  <div>
-                    <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px",textTransform:"uppercase"}}>Zona</label>
-                    <select style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.14)",borderRadius:8,color:"#ede9e0",padding:"8px 12px",fontFamily:"'Georgia',serif",fontSize:13,outline:"none"}}
-                      value={emergenteForm.zona} onChange={e=>setEmergenteForm(p=>({...p,zona:e.target.value,tarea:""}))}>
-                      <option value="">Seleccionar zona...</option>
-                      {[...new Set((Array.isArray(tareas)?tareas:Object.values(tareas||{}).flat()).map(t=>t.zona).filter(Boolean))].sort().map(z=><option key={z} value={z}>{z}</option>)}
-                      <option value="Otra">Otra zona</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px",textTransform:"uppercase"}}>Descripción</label>
-                    <input style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.14)",borderRadius:8,color:"#ede9e0",padding:"8px 12px",fontFamily:"'Georgia',serif",fontSize:13,outline:"none",boxSizing:"border-box"}}
-                      placeholder="¿Qué tarea surgió?"
-                      value={emergenteForm.tarea} onChange={e=>setEmergenteForm(p=>({...p,tarea:e.target.value}))}/>
-                  </div>
-                  <div>
-                    <label style={{fontSize:10,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px",textTransform:"uppercase"}}>Observaciones (opcional)</label>
-                    <input style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.14)",borderRadius:8,color:"#ede9e0",padding:"8px 12px",fontFamily:"'Georgia',serif",fontSize:13,outline:"none",boxSizing:"border-box"}}
-                      placeholder="Detalles adicionales..."
-                      value={emergenteForm.obs||""} onChange={e=>setEmergenteForm(p=>({...p,obs:e.target.value}))}/>
-                  </div>
-                  <div style={{display:"flex",gap:8}}>
-                    <button onClick={()=>{
-                      if(!emergenteForm.tarea.trim()) return;
-                      onAddTarea({id:Date.now(),fecha:fechaVer,tarea:emergenteForm.tarea,responsable:trabajador.nombre,zona:emergenteForm.zona||"Sin zona",estado:"hecha",notas:emergenteForm.obs||"Tarea emergente del turno",auto:false,emergente:true});
-                      setEmergenteForm({zona:"",tarea:"",obs:""});
-                      setShowEmergente(false);
-                    }} style={{cursor:"pointer",border:"none",borderRadius:10,padding:"8px 18px",background:"#3d7a52",color:"#fff",fontSize:13,fontFamily:"'Georgia',serif",fontWeight:600}}>
-                      ✓ Guardar
-                    </button>
-                    <button onClick={()=>{setShowEmergente(false);setEmergenteForm({zona:"",tarea:"",obs:""});}}
-                      style={{cursor:"pointer",border:"1px solid rgba(255,255,255,0.15)",borderRadius:10,padding:"8px 14px",background:"transparent",color:"#6aaa7a",fontSize:13,fontFamily:"'Georgia',serif"}}>
-                      Cancelar
-                    </button>
-                  </div>
                 </div>
               </div>
             )}
@@ -27518,7 +27518,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-29.1";
+const BUILD_STAMP = "2026-10-29.2";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
