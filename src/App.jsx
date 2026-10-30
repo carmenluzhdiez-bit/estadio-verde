@@ -12709,6 +12709,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   const [filtroCuenta, setFiltroCuenta] = React.useState("todas");
   const [filtroMes, setFiltroMes] = React.useState("todos");
   const [filtroCategoriaCompra, setFiltroCategoriaCompra] = React.useState("todas");
+  const [filtroItemCompra, setFiltroItemCompra] = React.useState("");
   const [seleccionadas, setSeleccionadas] = React.useState([]);
   const [rendForm, setRendForm] = React.useState({fecha:hoy.toISOString().slice(0,10),obs:""});
   const [reembolsoForm, setReembolsoForm] = React.useState({fecha:hoy.toISOString().slice(0,10),monto:"",banco:"",nTransferencia:"",obs:""});
@@ -13028,10 +13029,16 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
   const comprasFilt = compras.filter(c=>{
     const mc=filtroCuenta==="todas"||c.cuenta===filtroCuenta;
     const mm=filtroMes==="todos"||(c.fecha||"").slice(0,7)===filtroMes;
-    const mf=mostrarFacturadas||c.estado!=="facturada";
+    const itemQ=_normTxtRM(filtroItemCompra).trim();
+    const mf=mostrarFacturadas||c.estado!=="facturada"||!!itemQ; // al buscar un ítem se incluyen también las ya facturadas
+    const mIt=!itemQ||(c.items&&c.items.length?c.items:[{descripcion:c.descripcion}]).some(it=>_normTxtRM(it.descripcion).includes(itemQ));
     const mCat=filtroCategoriaCompra==="todas"||(c.items||[]).some(it=>(it.categoria||"").trim().toLowerCase()===filtroCategoriaCompra.trim().toLowerCase());
-    return mc&&mm&&mf&&mCat;
+    return mc&&mm&&mf&&mCat&&mIt;
   });
+  // Resumen de la búsqueda por ítem: cuándo se compró y a quién
+  const itemQBusca=_normTxtRM(filtroItemCompra).trim();
+  const filasItem=!itemQBusca?[]:comprasFilt.flatMap(c=>(c.items&&c.items.length?c.items:[{descripcion:c.descripcion,cantidad:c.cantidad,unidad:c.unidad,precioUnitario:c.precioUnitario}]).filter(it=>_normTxtRM(it.descripcion).includes(itemQBusca)).map(it=>({fecha:c.fecha||"",proveedor:c.proveedor||"Sin proveedor",doc:`${c.tipoDoc||""} ${c.nDocumento||""}`.trim(),desc:it.descripcion||"",cant:Number(it.cantidad)||0,unidad:it.unidad||"",pu:Number(it.precioUnitario)||0}))).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
+  const provsItem=Object.entries(filasItem.reduce((o,f)=>{o[f.proveedor]=(o[f.proveedor]||0)+1;return o;},{})).sort((a,b)=>cmpEs(a[0],b[0]));
   // Categorías realmente presentes en las compras registradas (evita mostrar opciones vacías)
   // Agrupa categorías que solo difieren en mayúsculas/minúsculas (datos antiguos
   // guardados de forma inconsistente, ej: "planta" y "Planta"), sin modificar lo
@@ -13481,6 +13488,7 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
               <option value="todos">Todos los meses</option>
               {mesesUnicos.map(m=><option key={m} value={m}>{m}</option>)}
             </select>
+            <input style={{...S.input,flex:"2 1 200px",minWidth:160,fontSize:12}} value={filtroItemCompra} onChange={e=>setFiltroItemCompra(e.target.value)} placeholder="🔎 Buscar ítem (ej: amonio cuaternario)"/>
             <select style={{...S.input,flex:1,minWidth:140,fontSize:12}} value={filtroCategoriaCompra} onChange={e=>setFiltroCategoriaCompra(e.target.value)}>
               <option value="todas">Todas las categorías</option>
               {categoriasCompraPresentes.map(cat=><option key={cat} value={cat}>{cat}</option>)}
@@ -13757,6 +13765,31 @@ function PanelCompras({ S, comprasData, setComprasData, personal, esJefa, data={
             </div>
           )}
 
+          {itemQBusca&&(
+            <div style={{...S.card,padding:14,marginBottom:12,borderLeft:"3px solid #60a5fa"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:6}}>
+                <div style={{fontSize:13,fontWeight:700,color:"#93c5fd"}}>🔎 «{filtroItemCompra.trim()}» — {filasItem.length} compra{filasItem.length!==1?"s":""} encontrada{filasItem.length!==1?"s":""}</div>
+                <button className="btn-g" style={{...S.btn,fontSize:11,padding:"3px 10px"}} onClick={()=>setFiltroItemCompra("")}>✕ Quitar búsqueda</button>
+              </div>
+              {filasItem.length===0?(
+                <div style={{fontSize:12,color:"#8aa89a"}}>No hay compras con ese ítem (revisa la ortografía o los filtros de cuenta, mes y categoría).</div>
+              ):(<>
+                <div style={{fontSize:12,color:"#c0dac0",marginBottom:6}}>
+                  Última compra: <b>{filasItem[0].fecha}</b> a <b>{filasItem[0].proveedor}</b> · Proveedores: {provsItem.map(([n,k])=>`${n} (${k})`).join(" · ")}
+                </div>
+                <div style={{overflowX:"auto"}}>
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
+                    <thead><tr style={{color:"#6aaa7a",textAlign:"left"}}><th style={{padding:"3px 6px"}}>Fecha</th><th style={{padding:"3px 6px"}}>Proveedor</th><th style={{padding:"3px 6px"}}>Documento</th><th style={{padding:"3px 6px"}}>Ítem</th><th style={{padding:"3px 6px",textAlign:"right"}}>Cant.</th><th style={{padding:"3px 6px",textAlign:"right"}}>P. unit.</th></tr></thead>
+                    <tbody>{filasItem.map((f,i)=>(
+                      <tr key={i} style={{borderTop:"1px solid rgba(255,255,255,0.06)",color:"#e5e7eb"}}>
+                        <td style={{padding:"3px 6px",whiteSpace:"nowrap"}}>{f.fecha}</td><td style={{padding:"3px 6px"}}>{f.proveedor}</td><td style={{padding:"3px 6px"}}>{f.doc}</td><td style={{padding:"3px 6px"}}>{f.desc}</td>
+                        <td style={{padding:"3px 6px",textAlign:"right",whiteSpace:"nowrap"}}>{f.cant||""} {f.unidad}</td><td style={{padding:"3px 6px",textAlign:"right",whiteSpace:"nowrap"}}>{f.pu?"$"+f.pu.toLocaleString("es-CL"):""}</td>
+                      </tr>))}</tbody>
+                  </table>
+                </div>
+              </>)}
+            </div>
+          )}
           {/* Lista */}
           {comprasFilt.length===0&&!showForm?(
             <div style={{...S.card,padding:36,textAlign:"center",color:"#4a8a5a"}}><div style={{fontSize:32,marginBottom:8}}>🛒</div><div>Sin compras registradas</div></div>
@@ -27570,7 +27603,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-29.3";
+const BUILD_STAMP = "2026-10-30.1";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
