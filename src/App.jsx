@@ -2390,7 +2390,27 @@ function PanelGestion({ S, tareasProg, setTareas=()=>{}, esJefa=false, personal=
   );
 }
 
-function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_BASE, personal, incidenciasFito=[], esJefa=false, frecEstado=[] }) {
+function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_BASE, personal, incidenciasFito=[], esJefa=false, frecEstado=[], zonasCat=[] }) {
+  // Resuelve el nombre de zona de una tarea a su macrozona (con nombres/categorías personalizados y sub‑zonas como «Piscina Exterior Poniente»)
+  const _nzR = x=>_normTxtRM(x).trim();
+  const resolverZona = (nombre)=>{
+    const n=_nzR(nombre); if(!n) return null;
+    const todas=[...(zonasCat||[]),...MACROZONAS_BASE];
+    let z=todas.find(x=>_nzR(x.nombre)===n);
+    if(!z) z=todas.filter(x=>_nzR(x.nombre).length>=4&&(n.startsWith(_nzR(x.nombre))||n.includes(_nzR(x.nombre)))).sort((a,b)=>b.nombre.length-a.nombre.length)[0];
+    if(!z){ // coincidencia por palabras (ej. «Plaza Miguel de Cervantes» ↔ «Plaza Cervantes»)
+      const stop=new Set(["de","del","la","las","el","los","y","en"]);
+      const pal=new Set(n.split(/[^a-z0-9]+/).filter(Boolean));
+      z=todas.filter(x=>{ const w=_nzR(x.nombre).split(/[^a-z0-9]+/).filter(w=>w&&!stop.has(w)); return w.length>=2&&w.every(k=>pal.has(k)); }).sort((a,b)=>b.nombre.length-a.nombre.length)[0];
+    }
+    return z||null;
+  };
+  const categoriaDe = (nombre)=>{
+    const z=resolverZona(nombre); if(z?.categoria) return z.categoria;
+    const n=_nzR(nombre);
+    const cats=[...new Set([...(zonasCat||[]),...MACROZONAS_BASE].map(x=>x.categoria).filter(Boolean))];
+    return cats.find(c=>_nzR(c)===n)||"Otras zonas";
+  };
 
   const IDS_DEPORTES = [31, 38];
   const IDS_GENERAL  = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,32,33,34,35,36,37];
@@ -2476,8 +2496,7 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
       porZona[hpZona].total++; if(esHecha(t)) porZona[hpZona].hechas++;
       else if(t.estado==="no_pudo") porZona[hpZona].noPudo++;
       porZona[hpZona].tareas.push(t);
-      const zonaObj=MACROZONAS_BASE.find(z2=>z2.nombre===t.zona);
-      const cat=zonaObj?.categoria||t.zona||"Sin categoría";
+      const cat=categoriaDe(t.zona);
       if(!porCategoria[cat]) porCategoria[cat]={total:0,hechas:0,noPudo:0,tareas:[]};
       porCategoria[cat].total++; if(esHecha(t)) porCategoria[cat].hechas++;
       else if(t.estado==="no_pudo") porCategoria[cat].noPudo++;
@@ -2501,12 +2520,12 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
   };
 
   const tareasDeportes = todasTareas.filter(t=>{
-    const hpZ=MACROZONAS_BASE.find(z2=>z2.nombre===t.zona);
+    const hpZ=resolverZona(t.zona);
     return hpZ&&IDS_DEPORTES.includes(hpZ.id);
   });
   const tareasGeneral = todasTareas.filter(t=>{
-    const hpZ=MACROZONAS_BASE.find(z2=>z2.nombre===t.zona);
-    return !hpZ||IDS_GENERAL.includes(hpZ.id);
+    const hpZ=resolverZona(t.zona);
+    return !hpZ||!IDS_DEPORTES.includes(hpZ.id);
   });
   const statsDeportes=calcStats(tareasDeportes), statsGeneral=calcStats(tareasGeneral), statsTotal=calcStats(todasTareas);
   const incFitoPeriodo=incidenciasFito.filter(i=>i.fecha>=(dias[0]||"")&&i.fecha<=(dias[dias.length-1]||""));
@@ -27624,7 +27643,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-30.3";
+const BUILD_STAMP = "2026-10-30.4";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
@@ -30512,7 +30531,7 @@ export default function App() {
               >🖨️ Imprimir Reporte</button>
             </div>
             {tabReporte==="semanal" && (
-              <ReporteSemanal frecEstado={tabReporte==="semanal"?calcFrecuenciasEstado():[]} S={S} tareasProg={tareasProg} semanaBase={semanaBase} setSemanaBase={setSemanaBase} MACROZONAS_BASE={MACROZONAS_BASE} personal={personal} incidenciasFito={incidenciasFito} esJefa={esJefa}/>
+              <ReporteSemanal frecEstado={tabReporte==="semanal"?calcFrecuenciasEstado():[]} S={S} tareasProg={tareasProg} semanaBase={semanaBase} setSemanaBase={setSemanaBase} MACROZONAS_BASE={MACROZONAS_BASE} zonasCat={zonasConCust} personal={personal} incidenciasFito={incidenciasFito} esJefa={esJefa}/>
             )}
             {tabReporte==="gestion" && esJefa && <PanelGestion S={S} tareasProg={tareasProg} setTareas={setTareasProg} esJefa={esJefa} personal={personal} comprasData={comprasData} configSemanal={configSemanal} setConfigSemanal={setConfigSemanal}/>}
             {tabReporte==="general" && <>
