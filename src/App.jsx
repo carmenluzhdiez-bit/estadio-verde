@@ -405,6 +405,13 @@ const CAUSAS_NO_PUDO = [
 // Solo las tareas «Riego manual» llevan la leyenda de revisión por lluvia («Llovió: revisa en terreno…»).
 // Otras tareas con la palabra riego (p. ej. «Adaptar riego») usan los estados normales.
 const _normTxtRM = x => (x||"").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+// ¿Es la jefa? (se excluye del rendimiento por trabajador)
+const esJefaNombre = (nombre, personal=[]) => {
+  const n=_normTxtRM(nombre).trim(); if(!n) return false;
+  if(n.startsWith("carmen luz")) return true;
+  const arr=Array.isArray(personal)?personal:Object.values(personal||{});
+  return arr.some(p=>/jefa/i.test(p?.cargo||"") && _normTxtRM(p.nombre).trim()===n);
+};
 const esRiegoManualTarea = t => /riego\s*manual/.test(_normTxtRM(t?.tarea));
 const flagRevisarRiego = t => esRiegoManualTarea(t) && !!(t.revisarRiego || (t.notas||"").includes("🌧️ Revisar riego"));
 const notasSinRevisarRiego = t => esRiegoManualTarea(t) ? (t.notas||"") : (t.notas||"").replace(/\s*\|?\s*🌧️ Revisar riego: ajustar a mano por lluvia/g,"").trim();
@@ -1932,6 +1939,7 @@ function PanelGestion({ S, tareasProg, setTareas=()=>{}, esJefa=false, personal=
   const porTrab = {};
   todas.forEach(t=>{
     const r=(t.responsable||"").trim(); if(!r) return;
+    if(esJefaNombre(r,personal)) return;
     const lluvia=esNoPudoLluvia(t);
     const est=normalizarEstado(t.estado);
     const movida=t.trasladadaA && est!=="hecha" && !lluvia;
@@ -2485,16 +2493,18 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
     const totTiempo=propias.length, hechasTiempo=propias.filter(esHecha).length;
     const pctTiempo=totTiempo?Math.round(hechasTiempo/totTiempo*100):0;
     const lluviaPorTrab={};
-    lluviaList.forEach(t=>{ const r=t.responsable||"Sin asignar"; lluviaPorTrab[r]=(lluviaPorTrab[r]||0)+1; });
+    lluviaList.forEach(t=>{ const r=t.responsable||"Sin asignar"; if(esJefaNombre(r,personal)) return; lluviaPorTrab[r]=(lluviaPorTrab[r]||0)+1; });
     const porTrab={}, porZona={}, porCategoria={}, porTipo={};
     Object.keys(CATS_TIPO).forEach(k=>{porTipo[k]={total:0,hechas:0};});
     tareas.forEach(t=>{
       const hpResp=t.responsable||"Sin asignar";
+      if(esJefaNombre(hpResp,personal)){ /* la jefa no entra al rendimiento por trabajador */ } else {
       if(!porTrab[hpResp]) porTrab[hpResp]={total:0,hechas:0,noPudo:0,pend:0};
       porTrab[hpResp].total++;
       if(esHecha(t)) porTrab[hpResp].hechas++;
       else if(normalizarEstado(t.estado)==="no_pudo") porTrab[hpResp].noPudo++;
       else porTrab[hpResp].pend++;
+      }
       const hpZona=t.zona||"Sin zona";
       if(!porZona[hpZona]) porZona[hpZona]={total:0,hechas:0,noPudo:0,tareas:[]};
       porZona[hpZona].total++; if(esHecha(t)) porZona[hpZona].hechas++;
@@ -27652,7 +27662,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-11-02.1";
+const BUILD_STAMP = "2026-11-02.2";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
