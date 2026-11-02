@@ -2480,6 +2480,10 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
           noPudo=tareas.filter(t=>normalizarEstado(t.estado)==="no_pudo").length,
           pend=tareas.filter(t=>["pendiente","por_designar","en_curso"].includes(normalizarEstado(t.estado))).length,
           pct=total?Math.round(hechas/total*100):0;
+    // A tiempo: tareas propias del día (sin copias traídas de otro día ni lluvia); las movidas cuentan como no cumplidas ese día
+    const propias = tareasTodas.filter(t=>!esNoPudoLluvia(t)&&!(t.movidoDesde||t.origenTareaId));
+    const totTiempo=propias.length, hechasTiempo=propias.filter(esHecha).length;
+    const pctTiempo=totTiempo?Math.round(hechasTiempo/totTiempo*100):0;
     const lluviaPorTrab={};
     lluviaList.forEach(t=>{ const r=t.responsable||"Sin asignar"; lluviaPorTrab[r]=(lluviaPorTrab[r]||0)+1; });
     const porTrab={}, porZona={}, porCategoria={}, porTipo={};
@@ -2505,7 +2509,7 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
       porTipo[tipo].total++; if(esHecha(t)) porTipo[tipo].hechas++;
     });
     Object.keys(lluviaPorTrab).forEach(r=>{ if(!porTrab[r]) porTrab[r]={total:0,hechas:0,noPudo:0,pend:0}; porTrab[r].lluvia=lluviaPorTrab[r]; });
-    return {total,hechas,noPudo,pend,pct,porTrab,porZona,porCategoria,porTipo,
+    return {total,hechas,noPudo,pend,pct,totTiempo,hechasTiempo,pctTiempo,porTrab,porZona,porCategoria,porTipo,
       lluviaList, movidasList, lluvia:lluviaList.length, movidas:movidasList.length,
       noPudoList:tareas.filter(t=>normalizarEstado(t.estado)==="no_pudo"),
       // Cierres sectoriales: fitosanitario, recuperación, evento/montaje
@@ -2568,7 +2572,7 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
   const bar=(p)=>`<div style="height:4px;background:#e5e7eb;border-radius:2px;margin-top:3px"><div style="height:4px;width:${Math.max(0,Math.min(100,p))}%;background:${colPct(p)};border-radius:2px"></div></div>`;
   const hEnc=(titulo,sub)=>`<div style="display:flex;align-items:center;gap:16px;border-bottom:4px solid ${V};padding-bottom:12px;margin-bottom:16px"><img src="${LOGO_AREAS_VERDES_B64}" style="height:62px"/><div style="flex:1"><div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#6b7280">Estadio Español de Las Condes · Departamento de Áreas Verdes</div><div style="font-size:23px;font-weight:700;color:${V};margin-top:2px">${titulo}</div><div style="font-size:13px;color:#374151;margin-top:3px"><b>Período:</b> ${sub||periodoLabel}</div></div><div style="text-align:right;font-size:10px;color:#6b7280;line-height:1.5">Generado el<br><b style="color:#374151">${new Date().toLocaleDateString("es-CL",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</b></div></div>`;
 
-  const hKpi=(st)=>`<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:14px;break-inside:avoid">${[["Total",st.total,"#1a5c35"],["Realizadas",st.hechas,"#166534"],["No realizadas",st.noPudo,"#991b1b"],["🌧️ Por lluvia",st.lluvia||0,"#1e40af"],["Pendientes",st.pend,"#92400e"],["Cumplimiento",st.pct+"%",colPct(st.pct)]].map(([l,v,c])=>`<div style="border:1px solid #d7e6dc;border-top:4px solid ${c};border-radius:8px;padding:9px 6px;text-align:center;background:#fafdfb"><div style="font-size:22px;font-weight:700;color:${c};line-height:1.1">${v}</div><div style="font-size:9.5px;color:#4b5563;text-transform:uppercase;letter-spacing:.4px;margin-top:3px">${l}</div></div>`).join("")}</div>`;
+  const hKpi=(st)=>`<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:14px;break-inside:avoid">${[["Total",st.total,"#1a5c35"],["Realizadas",st.hechas,"#166534"],["No realizadas",st.noPudo,"#991b1b"],["🌧️ Por lluvia",st.lluvia||0,"#1e40af"],["Pendientes",st.pend,"#92400e"],["Cumplim. final",st.pct+"%",colPct(st.pct)],["A tiempo",st.pctTiempo+"%",colPct(st.pctTiempo)]].map(([l,v,c])=>`<div style="border:1px solid #d7e6dc;border-top:4px solid ${c};border-radius:8px;padding:9px 6px;text-align:center;background:#fafdfb"><div style="font-size:22px;font-weight:700;color:${c};line-height:1.1">${v}</div><div style="font-size:9.5px;color:#4b5563;text-transform:uppercase;letter-spacing:.4px;margin-top:3px">${l}</div></div>`).join("")}</div>`;
 
   const hTrab=(st)=>`<h3 style="color:${V};border-bottom:2px solid ${V};padding-bottom:3px;margin:14px 0 8px;font-size:13px">Desempeño por trabajador</h3><table class="num" style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:8px"><tr style="background:${V};color:#fff"><th style="padding:5px 8px;text-align:left">Trabajador</th><th style="padding:5px;text-align:center">Total</th><th style="padding:5px;text-align:center">Realizadas</th><th style="padding:5px;text-align:center">No realizó</th><th style="padding:5px;text-align:center">🌧️ Lluvia</th><th style="padding:5px;text-align:center">%</th></tr>${Object.entries(st.porTrab).sort((a,b)=>b[1].hechas-a[1].hechas).map(([n,d],i)=>{const p=d.total?Math.round(d.hechas/d.total*100):0;return `<tr style="background:${i%2===0?"#fff":"#f5fbf5"}"><td style="padding:4px 8px;font-weight:600">${n}</td><td style="padding:4px;text-align:center">${d.total}</td><td style="padding:4px;text-align:center;color:#166534;font-weight:600">${d.hechas}</td><td style="padding:4px;text-align:center;color:${d.noPudo>0?"#991b1b":"#6b7280"}">${d.noPudo||"—"}</td><td style="padding:4px;text-align:center;color:${d.lluvia>0?"#1e40af":"#6b7280"}">${d.lluvia||"—"}</td><td style="padding:4px;text-align:center;font-weight:700;color:${p>=80?"#166534":p>=50?"#92400e":"#991b1b"};min-width:70px">${p}%${bar(p)}</td></tr>`;}).join("")}</table>`;
 
@@ -2588,11 +2592,13 @@ function ReporteSemanal({ S, tareasProg, semanaBase, setSemanaBase, MACROZONAS_B
       const h=ef.filter(esHecha).length, np=ef.filter(t=>normalizarEstado(t.estado)==="no_pudo").length;
       const pd=ef.filter(t=>["pendiente","por_designar","en_curso"].includes(normalizarEstado(t.estado))).length;
       const pc=ef.length?Math.round(h/ef.length*100):null;
-      return {d,total:ef.length,h,np,lluv,mov,pd,pc};
+      const prop=td.filter(t=>!esNoPudoLluvia(t)&&!(t.movidoDesde||t.origenTareaId));
+      const pt=prop.length?Math.round(prop.filter(esHecha).length/prop.length*100):null;
+      return {d,total:ef.length,h,np,lluv,mov,pd,pc,pt};
     }).filter(r=>r.total>0||r.lluv>0||r.mov>0);
     if(!filas.length) return "";
     const dn=d=>new Date(d+"T12:00:00").toLocaleDateString("es-CL",{weekday:"long",day:"numeric",month:"short"});
-    return `<h3 style="color:${V};border-bottom:2px solid ${V};padding-bottom:3px;margin:14px 0 8px;font-size:13px">Avance día por día</h3><table class="num" style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:8px"><tr style="background:${V};color:#fff"><th style="padding:5px 8px;text-align:left">Día</th><th style="padding:5px;text-align:center">Tareas</th><th style="padding:5px;text-align:center">Hechas</th><th style="padding:5px;text-align:center">Pendientes</th><th style="padding:5px;text-align:center">No se pudo</th><th style="padding:5px;text-align:center">🌧️ Lluvia</th><th style="padding:5px;text-align:center">Movidas</th><th style="padding:5px;text-align:center">%</th></tr>${filas.map((r,i)=>`<tr style="background:${i%2===0?"#fff":"#f5fbf5"}"><td style="padding:4px 8px;font-weight:600;text-transform:capitalize">${dn(r.d)}</td><td style="padding:4px;text-align:center">${r.total}</td><td style="padding:4px;text-align:center;color:#166534;font-weight:600">${r.h}</td><td style="padding:4px;text-align:center;color:${r.pd>0?"#92400e":"#6b7280"}">${r.pd||"—"}</td><td style="padding:4px;text-align:center;color:${r.np>0?"#991b1b":"#6b7280"}">${r.np||"—"}</td><td style="padding:4px;text-align:center;color:${r.lluv>0?"#1e40af":"#6b7280"}">${r.lluv||"—"}</td><td style="padding:4px;text-align:center;color:#6b7280">${r.mov||"—"}</td><td style="padding:4px;text-align:center;font-weight:700;color:${r.pc===null?"#6b7280":r.pc>=80?"#166534":r.pc>=50?"#92400e":"#991b1b"}">${r.pc===null?"—":r.pc+"%"}</td></tr>`).join("")}</table>`;
+    return `<h3 style="color:${V};border-bottom:2px solid ${V};padding-bottom:3px;margin:14px 0 8px;font-size:13px">Avance día por día</h3><table class="num" style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:8px"><tr style="background:${V};color:#fff"><th style="padding:5px 8px;text-align:left">Día</th><th style="padding:5px;text-align:center">Tareas</th><th style="padding:5px;text-align:center">Hechas</th><th style="padding:5px;text-align:center">Pendientes</th><th style="padding:5px;text-align:center">No se pudo</th><th style="padding:5px;text-align:center">🌧️ Lluvia</th><th style="padding:5px;text-align:center">Movidas</th><th style="padding:5px;text-align:center">% final</th><th style="padding:5px;text-align:center">% a tiempo</th></tr>${filas.map((r,i)=>`<tr style="background:${i%2===0?"#fff":"#f5fbf5"}"><td style="padding:4px 8px;font-weight:600;text-transform:capitalize">${dn(r.d)}</td><td style="padding:4px;text-align:center">${r.total}</td><td style="padding:4px;text-align:center;color:#166534;font-weight:600">${r.h}</td><td style="padding:4px;text-align:center;color:${r.pd>0?"#92400e":"#6b7280"}">${r.pd||"—"}</td><td style="padding:4px;text-align:center;color:${r.np>0?"#991b1b":"#6b7280"}">${r.np||"—"}</td><td style="padding:4px;text-align:center;color:${r.lluv>0?"#1e40af":"#6b7280"}">${r.lluv||"—"}</td><td style="padding:4px;text-align:center;color:#6b7280">${r.mov||"—"}</td><td style="padding:4px;text-align:center;font-weight:700;color:${r.pc===null?"#6b7280":r.pc>=80?"#166534":r.pc>=50?"#92400e":"#991b1b"}">${r.pc===null?"—":r.pc+"%"}</td><td style="padding:4px;text-align:center;font-weight:700;color:${r.pt===null?"#6b7280":r.pt>=80?"#166534":r.pt>=50?"#92400e":"#991b1b"}">${r.pt===null?"—":r.pt+"%"}</td></tr>`).join("")}</table>`;
   };
   // Desafíos pendientes: lo que sigue sin resolver al cierre del período + frecuencias vencidas + incidencias
   const desafiosPend=(tareas)=>{
@@ -2709,7 +2715,7 @@ h2{break-after:avoid;font-size:17px!important;background:#1a5c35;color:#fff!impo
     <div style={{...S.card,marginBottom:8,padding:"10px 14px"}}>
       <div style={{fontSize:12,fontWeight:600,color,marginBottom:8}}>{titulo}</div>
       <div style={{display:"flex",gap:16,flexWrap:"wrap"}}>
-        {[["Total",st.total],["✅ Realizadas",st.hechas],["🔴 No realizó",st.noPudo],["🌧️ Por lluvia",st.lluvia||0],["Cumplimiento",st.pct+"%"]].map(([l,v])=>(
+        {[["Total",st.total],["✅ Realizadas",st.hechas],["🔴 No realizó",st.noPudo],["🌧️ Por lluvia",st.lluvia||0],["Cumplim. final",st.pct+"%"],["A tiempo",(st.pctTiempo||0)+"%"]].map(([l,v])=>(
           <div key={l} style={{textAlign:"center",minWidth:70}}>
             <div style={{fontSize:18,fontWeight:700,color}}>{v}</div>
             <div style={{fontSize:10,color:"#5a9a7a"}}>{l}</div>
@@ -3027,7 +3033,8 @@ h2{break-after:avoid;font-size:17px!important;background:#1a5c35;color:#fff!impo
             const ef=td.filter(t=>!esNoPudoLluvia(t)&&!(t.trasladadaA&&!esHecha(t)));
             const h=ef.filter(esHecha).length, np=ef.filter(t=>normalizarEstado(t.estado)==="no_pudo").length;
             const pd=ef.filter(t=>["pendiente","por_designar","en_curso"].includes(normalizarEstado(t.estado))).length;
-            return {d,total:ef.length,h,np,lluv,pd,pc:ef.length?Math.round(h/ef.length*100):null};
+            const prop=td.filter(t=>!esNoPudoLluvia(t)&&!(t.movidoDesde||t.origenTareaId));
+            return {d,total:ef.length,h,np,lluv,pd,pc:ef.length?Math.round(h/ef.length*100):null,pt:prop.length?Math.round(prop.filter(esHecha).length/prop.length*100):null,mov:td.filter(t=>t.trasladadaA&&!esHecha(t)&&!esNoPudoLluvia(t)).length};
           }).filter(r=>r.total>0||r.lluv>0);
           const {pendLista,venc}=desafiosPend(todasTareas);
           return (<>
@@ -3036,7 +3043,7 @@ h2{break-after:avoid;font-size:17px!important;background:#1a5c35;color:#fff!impo
                 <div style={{fontSize:12,fontWeight:600,color:"#34d399",marginBottom:8}}>📅 Avance día por día</div>
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
                   <thead><tr style={{background:"rgba(52,211,153,0.08)"}}>
-                    {["Día","Tareas","✅ Hechas","⏳ Pend.","🔴 No se pudo","🌧️ Lluvia","%"].map(h=>(<th key={h} style={{padding:"4px 8px",textAlign:h==="Día"?"left":"center",color:"#34d399",fontSize:10}}>{h}</th>))}
+                    {["Día","Tareas","✅ Hechas","⏳ Pend.","🔴 No se pudo","🌧️ Lluvia","% final","↪ Movidas","% a tiempo"].map(h=>(<th key={h} style={{padding:"4px 8px",textAlign:h==="Día"?"left":"center",color:"#34d399",fontSize:10}}>{h}</th>))}
                   </tr></thead>
                   <tbody>{filas.map(r=>(
                     <tr key={r.d} style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
@@ -3047,6 +3054,8 @@ h2{break-after:avoid;font-size:17px!important;background:#1a5c35;color:#fff!impo
                       <td style={{padding:"4px",textAlign:"center",color:r.np>0?"#ef4444":"#4a7a5a"}}>{r.np||"—"}</td>
                       <td style={{padding:"4px",textAlign:"center",color:r.lluv>0?"#60a5fa":"#4a7a5a"}}>{r.lluv||"—"}</td>
                       <td style={{padding:"4px",textAlign:"center",fontWeight:700,color:r.pc===null?"#4a7a5a":r.pc>=80?"#22c55e":r.pc>=50?"#f59e0b":"#ef4444"}}>{r.pc===null?"—":r.pc+"%"}</td>
+                      <td style={{padding:"4px",textAlign:"center",color:r.mov>0?"#93c5fd":"#4a7a5a"}}>{r.mov||"—"}</td>
+                      <td style={{padding:"4px",textAlign:"center",fontWeight:700,color:r.pt===null?"#4a7a5a":r.pt>=80?"#22c55e":r.pt>=50?"#f59e0b":"#ef4444"}}>{r.pt===null?"—":r.pt+"%"}</td>
                     </tr>))}</tbody>
                 </table>
               </div>
@@ -27643,7 +27652,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-10-30.7";
+const BUILD_STAMP = "2026-11-02.1";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
