@@ -25225,10 +25225,6 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
     const esGestion = !!gestionandoAlertaId;
     const nuevaId = esGestion ? gestionandoAlertaId : Date.now()+Math.random();
     const nuevaAlerta = limpiarUndef({id:nuevaId,estado:"activa",tipo:af.tipo,tipoLabel:af.tipoLabel||tipoObj.label,tipoIcon:af.tipoIcon||tipoObj.icon,zonas:af.zonas,origen:af.origen,urgencia:af.urgencia,descripcion:af.descripcion||"(sin descripción)",responsable:af.responsable,fecha:af.fecha,hora:af.hora,fechaAplicacion:af.fechaAplicacion||af.fecha,elementoAfectado:af.elementoAfectado||"",agenteCausal:af.agenteCausal||"",fechaCreacion:new Date().toISOString(),tareas:tareasEditables.filter(t=>t.incluir).map(t=>({texto:t.texto,responsable:t.responsable,estado:"pendiente",esAplicacion:t.esAplicacion||false})),historial:[{accion:esGestion?"Tareas formalizadas por la jefa":"Alerta creada",fecha:af.fecha,hora:af.hora,responsable:af.responsable}]});
-    setIncidencias(prev=>{
-      const arr = Array.isArray(prev)?prev:Object.values(prev||{});
-      return esGestion ? arr.map(x=>String(x.id)===String(nuevaId)?nuevaAlerta:x) : [nuevaAlerta, ...arr];
-    });
     // Si se está formalizando una alerta ya reportada, quitar sus tareas
     // placeholder ("por_designar" genéricas) antes de crear las reales de abajo.
     if(esGestion) {
@@ -25248,11 +25244,14 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
     const zonaLabel = af.zonas.join(", ");
 
     const fechaTareas = af.fechaAplicacion || af.fecha;
+    // El cierre sectorial no debe quedar «sin asignar»: toma al responsable de la alerta o al más frecuente entre las tareas generadas
+    const respsGen = tareasEditables.filter(t=>t.incluir&&t.responsable).map(t=>t.responsable);
+    const respCierre = af.responsable || (respsGen.length?Object.entries(respsGen.reduce((o,r)=>{o[r]=(o[r]||0)+1;return o;},{})).sort((a,b)=>b[1]-a[1])[0][0]:"");
     const tareaCierre = limpiarUndef({
       id:Date.now()+Math.random(), fecha:fechaTareas,
       zona: esGolf ? "Golf" : zonaLabel, elemento:"",
       tarea:`🚫 CIERRE: ${zonaLabel} — ${tipoObj.icon} ${tipoObj.label}`,
-      responsable:"", estado:"por_designar",
+      responsable:respCierre, estado:respCierre?"pendiente":"por_designar",
       obs:af.descripcion, tipoEvento:"cierre_sectorial",
       origenAlerta: nuevaId,
     });
@@ -25287,6 +25286,12 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
       origenAlerta: nuevaId,
     }));
 
+    // La ficha de la alerta lista TODAS las tareas que se crean (cierre + tareas + avisos institucionales)
+    nuevaAlerta.tareas = [tareaCierre,...tareasGen,...tareasInst].map(t=>limpiarUndef({texto:t.tarea,responsable:t.responsable||"",estado:"pendiente",esAplicacion:t.esAplicacion||false}));
+    setIncidencias(prev=>{
+      const arr = Array.isArray(prev)?prev:Object.values(prev||{});
+      return esGestion ? arr.map(x=>String(x.id)===String(nuevaId)?nuevaAlerta:x) : [nuevaAlerta, ...arr];
+    });
     setTareasProg(prev=>{
       const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
       return {...prev,[fechaTareas]:[tareaCierre,...tareasGen,...tareasInst,...normArr(prev[fechaTareas]||[])].map(limpiarUndef)};
@@ -25305,9 +25310,21 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
     setAlertaSelId(null);
   };
 
+  // Estado y responsable vigentes de una tarea de la alerta, leídos de la programación (no de la copia guardada al crear la alerta)
+  const tareaAlertaReal = (inc,t) => {
+    try{
+      const normArr=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+      for(const d of Object.keys(tareasProg||{})){
+        const x=normArr(tareasProg[d]).find(y=>y&&String(y.origenAlerta)===String(inc.id)&&(y.tarea===t.texto||(t.texto&&(y.tarea||"").startsWith(t.texto))));
+        if(x) return {estado:normalizarEstado(x.estado),responsable:x.responsable||t.responsable||"",fecha:d,nota:x.notaWorker||""};
+      }
+    }catch(e){}
+    return {estado:t.estado==="hecha"?"hecha":"pendiente",responsable:t.responsable||"",fecha:"",nota:""};
+  };
+  const ETQ_EST_ALERTA = {hecha:["✅ Hecha","#16a34a"],no_pudo:["✗ No se pudo","#b91c1c"],en_curso:["◑ En curso","#2563eb"],por_designar:["– Por designar","#6b7280"],pendiente:["⏳ Pendiente","#ca8a04"]};
   const generarReporteAlerta = (inc) => {
     const win = window.open("","_blank","width=800,height=650");
-    const tareasHtml = (inc.tareas||[]).map(t=>`<tr><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0">${t.texto}</td><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;text-align:center;color:${t.estado==="hecha"?"#16a34a":"#ca8a04"}">${t.estado==="hecha"?"✅ Hecha":"⏳ Pendiente"}</td><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;color:#6b7280">${t.responsable||"—"}</td></tr>`).join("");
+    const tareasHtml = (inc.tareas||[]).map(t=>{const r=tareaAlertaReal(inc,t);const [lb,cl]=ETQ_EST_ALERTA[r.estado]||ETQ_EST_ALERTA.pendiente;return `<tr><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0">${t.texto}</td><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;text-align:center;color:${cl};font-weight:600">${lb}</td><td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;color:#6b7280">${r.responsable||"—"}</td></tr>`;}).join("");
     const histHtml = (inc.historial||[]).map(h=>`<tr><td style="padding:5px 10px;border-bottom:1px solid #f0f0f0;font-size:12px">${h.fecha} ${h.hora||""}</td><td style="padding:5px 10px;border-bottom:1px solid #f0f0f0;font-size:12px">${h.accion}</td><td style="padding:5px 10px;border-bottom:1px solid #f0f0f0;font-size:12px;color:#6b7280">${h.responsable||"—"}</td></tr>`).join("");
     win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Reporte Incidencia</title><style>body{font-family:Calibri,Arial,sans-serif;color:#222;padding:32px;font-size:13px}h1{font-size:19px;color:#14532d;margin-bottom:2px}h2{font-size:12px;color:#888;font-weight:normal;margin-top:0}h3{font-size:13px;color:#14532d;margin:16px 0 6px}table{width:100%;border-collapse:collapse}th{background:#14532d;color:#fff;padding:7px 10px;text-align:left;font-size:11px}tr:nth-child(even){background:#f9fafb}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:14px 0;background:#f9fafb;padding:14px;border-radius:8px}.campo strong{font-size:10px;color:#888;display:block;margin-bottom:2px}@media print{button{display:none}}</style></head><body>
     <div style="display:flex;align-items:center;gap:12px"><img src="${LOGO_AREAS_VERDES_B64}" style="height:42px"/><div><h1 style="margin:0">${inc.tipoIcon} Reporte de Incidencia — ${inc.tipoLabel}</h1>
@@ -25524,11 +25541,11 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
             )}
             {alertaSelId===inc.id&&(              <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
                 <div style={{fontSize:11,color:"#6aaa7a",marginBottom:5}}>TAREAS GENERADAS:</div>
-                {(inc.tareas||[]).map((t,i)=>(
+                {(inc.tareas||[]).map((t0,i)=>{ const rr=tareaAlertaReal(inc,t0); const t={...t0,estado:rr.estado,responsable:rr.responsable}; return (
                   <div key={i} style={{fontSize:12,padding:"4px 8px",marginBottom:3,background:"rgba(255,255,255,0.03)",borderRadius:5}}>
                     <div style={{display:"flex",justifyContent:"space-between"}}>
                       <span>{t.texto}</span>
-                      <span style={{color:t.estado==="hecha"?"#22c55e":"#f59e0b",fontSize:10}}>{t.estado==="hecha"?"✅":"⏳"} {t.responsable||""}</span>
+                      <span style={{color:t.estado==="hecha"?"#22c55e":t.estado==="no_pudo"?"#ef4444":"#f59e0b",fontSize:10}}>{t.estado==="hecha"?"✅":t.estado==="no_pudo"?"✗":"⏳"} {t.responsable||""}</span>
                     </div>
                     {t.esAplicacion&&(
                       <div style={{marginTop:4,padding:"5px 8px",background:"rgba(167,139,250,0.08)",border:"1px solid rgba(167,139,250,0.25)",borderRadius:5,display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
@@ -25538,7 +25555,7 @@ function PanelAlertas({ S, incidencias, setIncidencias, notificaciones, setNotif
                       </div>
                     )}
                   </div>
-                ))}
+                );})}
                 {(!inc.tareas||inc.tareas.length===0)&&<div style={{fontSize:11,color:"#4a7a5a",fontStyle:"italic"}}>Sin tareas generadas</div>}
               </div>
             )}
@@ -27729,7 +27746,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-11-03.3";
+const BUILD_STAMP = "2026-11-03.4";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
