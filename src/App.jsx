@@ -7081,7 +7081,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, bodegasData={}, getZD, g
         <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:900,marginBottom:3}}>Programación Diaria</h1>
         <p style={{color:"#6aaa7a",fontSize:14}}>Asignación y seguimiento de tareas por día</p>
       </div>
-      <ConfiguradorSemanal S={S} personal={(Array.isArray(personal)?personal:Object.values(personal||{})).filter(noRetirado)} configSemanal={configSemanal||{}} setConfigSemanal={setConfigSemanal} esJefa={esJefa}/>
+      <ConfiguradorSemanal S={S} personal={(Array.isArray(personal)?personal:Object.values(personal||{})).filter(noRetirado)} configSemanal={configSemanal||{}} setConfigSemanal={setConfigSemanal} esJefa={esJefa||esSupervisor}/>
 
       {/* ══════ Historial y Ver/editar turnos — accesos rápidos, uno al lado del otro ══════ */}
       <div style={{display:"flex",gap:14,marginBottom:14,flexWrap:"wrap"}}>
@@ -7131,7 +7131,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, bodegasData={}, getZD, g
               }));
               setShowAgregar(true);
             }} style={{...S.btn,background:"rgba(61,122,82,0.25)",color:"#90d0a0",border:"1px solid rgba(61,122,82,0.35)",fontSize:13}}>➕ Agregar tarea</button>
-            {esJefa&&(
+            {(esJefa||esSupervisor)&&(
               <button onClick={async()=>{
                 // MODO LLUVIA
                 // Qué hace (y qué NO hace) — se muestra completo en la confirmación:
@@ -19917,7 +19917,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             <div style={{display:"flex",gap:8,alignItems:"center"}}>
               <button className="btn-p" style={S.btn} onClick={proponerTareasGolf}>✨ Proponer para esta fecha</button>
               <input type="date" value={fechaProponerGolf} onChange={e=>setFechaProponerGolf(e.target.value)} style={{...S.input,fontSize:12,padding:"6px 10px",width:"auto"}}/>
-              {esJefa&&<button onClick={async()=>{ const ok=await aplicarModoLluviaGolf({fecha:fechaProponerGolf,tareas:tareasProg,setTareas:setTareasProg,configSemanal,setConfigSemanal}); if(ok) setPreviewGolfProp(null); }} title={"Posponer por lluvia las tareas de Golf del "+fechaProponerGolf} style={{...S.btn,fontSize:12,background:"rgba(96,165,250,0.12)",color:"#93c5fd",border:"1px solid rgba(96,165,250,0.3)"}}>🌧️ Modo lluvia</button>}
+              {(esJefa||rolLogueado==="supervisor")&&<button onClick={async()=>{ const ok=await aplicarModoLluviaGolf({fecha:fechaProponerGolf,tareas:tareasProg,setTareas:setTareasProg,configSemanal,setConfigSemanal}); if(ok) setPreviewGolfProp(null); }} title={"Posponer por lluvia las tareas de Golf del "+fechaProponerGolf} style={{...S.btn,fontSize:12,background:"rgba(96,165,250,0.12)",color:"#93c5fd",border:"1px solid rgba(96,165,250,0.3)"}}>🌧️ Modo lluvia</button>}
             </div>
           </div>
           <div style={{fontSize:12,color:"#5a9a7a",marginBottom:18}}>Responsables fijos de la semana y altura de corte objetivo por superficie.</div>
@@ -27729,7 +27729,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-11-03.2";
+const BUILD_STAMP = "2026-11-03.3";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
