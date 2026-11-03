@@ -10613,6 +10613,25 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
   const [expandIncid, setExpandIncid] = React.useState(null);
   const [mostrarArchivadasFito, setMostrarArchivadasFito] = React.useState(false);
   const [agenteRot, setAgenteRot] = React.useState("fusarium");
+  // Alternativas de producto según agente causal, con rotación FRAC y stock (se usa en el asistente de incidencia)
+  const calcRotacion = (agKey) => {
+    const apps = [...(Array.isArray(aplicaciones)?aplicaciones:Object.values(aplicaciones||{}))].filter(a=>a&&a.producto&&a.producto!=="—").sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
+    const hoyISO = new Date().toISOString().slice(0,10);
+    const diasDesde = f=>f?Math.round((new Date(hoyISO+"T12:00:00")-new Date(f+"T12:00:00"))/86400000):999;
+    const recientes = apps.slice(0,8).map(a=>({...a,ings:ingredientesDeProducto(a.producto),dias:diasDesde(a.fecha)}));
+    const fracRec = new Set(); recientes.forEach((a,i)=>{ if(i<2||a.dias<=21) a.ings.forEach(g=>{ if(!g.frac.startsWith("M")) fracRec.add(g.frac); }); });
+    const conteo = {}; apps.filter(a=>diasDesde(a.fecha)<=180).forEach(a=>ingredientesDeProducto(a.producto).forEach(g=>{ conteo[g.frac]=(conteo[g.frac]||0)+1; }));
+    const nombresStock = [];
+    try { Object.values(bodegasData||{}).forEach(bd=>(bd.items||[]).forEach(it=>{ if(it.nombre && Number(it.stockActual||0)>0) nombresStock.push(it.nombre); })); } catch(e) {}
+    (Array.isArray(STOCK_INICIAL)?STOCK_INICIAL:[]).forEach(it=>{ if(Number(it.stockActual||0)>0 && !nombresStock.some(n=>n.toLowerCase().includes((it.producto||"").toLowerCase().split(" ")[0]))) nombresStock.push(it.producto); });
+    const candidatos = INGREDIENTES_FITO_REF.filter(i=>i.agentes.includes(agKey)).map(i=>{
+      const stk = nombresStock.filter(n=>i.claves.some(c=>n.toLowerCase().includes(c)));
+      const multisitio = i.frac.startsWith("M")||i.frac.startsWith("P");
+      const repite = !multisitio && fracRec.has(i.frac);
+      return {...i, stk, multisitio, repite, usos:conteo[i.frac]||0, puntaje:(repite?0:2)+(stk.length?1:0)+(multisitio?0.5:0)};
+    }).sort((a,b)=>b.puntaje-a.puntaje || a.nombre.localeCompare(b.nombre,"es"));
+    return {candidatos, recientes};
+  };
 
   const RESPONSABLE_GOLF_DEFAULT = "Osmar Bhalú Armijo Zúñiga";
   const emptyIncid = {
@@ -10900,7 +10919,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
           const hayAlerta = t==="incidencias" && incidencias.some(i=>i.estado==="cerrada"||i.estado==="observacion");
           return (
             <button key={t} className={`tab${subTab===t?" on":""}`} onClick={()=>{setSubTab(t);setShowForm(false);}} style={{position:"relative"}}>
-              {l}
+              {l}{t==="incidencias"&&showIncidForm&&<span title="Tienes una incidencia a medio llenar: se conserva al cambiar de pestaña" style={{marginLeft:6,fontSize:9,fontWeight:700,color:"#fbbf24",background:"rgba(251,191,36,0.15)",border:"1px solid rgba(251,191,36,0.4)",borderRadius:6,padding:"0 5px"}}>✏️ borrador</span>}
               {hayAlerta&&<span style={{position:"absolute",top:2,right:2,width:7,height:7,borderRadius:"50%",background:"#ef4444"}}/>}
             </button>
           );
@@ -11173,6 +11192,34 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                       </select>
                     </div>
                     {incidForm.tratamiento!=="ninguno"&&(<>
+                      {(()=>{
+                        const txt=((incidForm.agenteCausal||"")+" "+(incidForm.diagnostico||"")).toLowerCase();
+                        const agKey=Object.entries(AGENTES_FITO_REF).find(([,v])=>v.match.some(m=>txt.includes(m)))?.[0];
+                        if(!agKey) return incidForm.tipoCierre==="fitosanitario"?<div style={{gridColumn:"1/-1",fontSize:11,color:"#8aa89a"}}>💡 Elige el <b>agente causal</b> en el paso anterior para ver aquí las alternativas de producto con rotación y stock.</div>:null;
+                        const {candidatos,recientes}=calcRotacion(agKey);
+                        const chip=(t,c)=><span style={{display:"inline-block",fontSize:10,fontWeight:700,padding:"1px 7px",borderRadius:6,background:c+"22",color:c,border:`1px solid ${c}55`,marginRight:4}}>{t}</span>;
+                        const elegir=(c)=>{ const k=Object.keys(REINGRESO_DIAS).find(x=>x!=="Otro"&&c.claves.some(cl=>x.toLowerCase().includes(cl))); setIncidForm(p=>({...p,productoAplicar:k||"Otro"})); };
+                        return (
+                          <div style={{gridColumn:"1/-1",border:"1px solid rgba(96,165,250,0.35)",borderRadius:10,padding:"10px 12px",background:"rgba(96,165,250,0.05)"}}>
+                            <div style={{fontSize:12,fontWeight:700,color:"#93c5fd",marginBottom:2}}>🔄 Alternativas para {AGENTES_FITO_REF[agKey].label}</div>
+                            <div style={{fontSize:10,color:"#7aa0c0",marginBottom:6}}>Últimas aplicaciones: {recientes.slice(0,3).map(a=>`${a.fecha} ${a.producto}`).join(" · ")||"sin registros"}</div>
+                            <div style={{display:"flex",flexDirection:"column",gap:5,maxHeight:260,overflowY:"auto"}}>
+                              {candidatos.map(c=>(
+                                <div key={c.id} style={{padding:"6px 9px",borderRadius:8,border:`1px solid ${c.repite?"rgba(245,158,11,0.35)":"rgba(34,197,94,0.3)"}`,background:c.repite?"rgba(245,158,11,0.06)":"rgba(34,197,94,0.05)"}}>
+                                  <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                                    <b style={{fontSize:12}}>{c.nombre}</b>{chip("FRAC "+c.frac,c.multisitio?"#94a3b8":"#60a5fa")}
+                                    {c.repite?chip("⚠️ repite grupo reciente","#f59e0b"):chip(c.multisitio?"✅ compatible":"✅ rota el grupo","#22c55e")}
+                                    {c.stk.length>0?chip("📦 En stock","#34d399"):chip("sin stock","#94a3b8")}
+                                    <button type="button" className="btn-g" style={{...S.btn,fontSize:10,padding:"2px 9px",marginLeft:"auto"}} onClick={()=>elegir(c)}>Elegir</button>
+                                  </div>
+                                  <div style={{fontSize:10.5,color:"#a0c0a0",marginTop:2}}>{c.comerciales}{c.stk.length>0&&<> · <b style={{color:"#34d399"}}>tienes: {c.stk.join(", ")}</b></>} — <i style={{color:"#6aaa7a"}}>{c.nota}</i></div>
+                                </div>
+                              ))}
+                            </div>
+                            <div style={{fontSize:9.5,color:"#5a8a6a",marginTop:5}}>Referencia técnica: confirma dosis, carencia y registro SAG vigente en la etiqueta y la hoja de seguridad.</div>
+                          </div>
+                        );
+                      })()}
                       <div style={{gridColumn:"1/-1"}}>
                         <label style={{fontSize:10,color:"#6aaa7a",letterSpacing:"0.6px",display:"block",marginBottom:3,textTransform:"uppercase"}}>Producto a aplicar</label>
                         <select style={S.input} value={incidForm.productoAplicar} onChange={e=>setIncidForm(p=>({...p,productoAplicar:e.target.value}))}>
@@ -27662,7 +27709,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-11-02.2";
+const BUILD_STAMP = "2026-11-03.1";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
