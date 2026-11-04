@@ -10705,15 +10705,36 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
     "Cancha completa","Todos los greens","Todos los fairways",
   ];
 
+  // Horas de reingreso de un producto: primero lo cargado en Bodega (coincidencia por nombre), si no la ficha de referencia
+  const horasReingresoProd = (producto) => {
+    if(!producto) return null;
+    const pn = _normTxtRM(producto), p1 = pn.split(" ")[0];
+    let ex=null, parcial=null;
+    try {
+      Object.values(bodegasData||{}).forEach(bd=>(bd.items||[]).forEach(it=>{
+        const n = Number(String(it.tiempoReingreso||"").replace(",","."));
+        if(!(n>0)||!it.nombre) return;
+        const h = /d[ií]a/i.test(it.tiempoReingresoUnidad||"") ? n*24 : n;
+        const inn = _normTxtRM(it.nombre);
+        if(inn===pn || pn.includes(inn) || inn.includes(pn)) { if(ex===null) ex=h; }
+        else if(inn.split(" ")[0]===p1) { if(parcial===null) parcial=h; }
+      }));
+    } catch(e) {}
+    if(ex!==null) return {horas:ex, origen:"Bodega"};
+    if(parcial!==null) return {horas:parcial, origen:"Bodega"};
+    const info = REINGRESO_DIAS[producto];
+    return info ? {horas:info.dias*24, origen:"ficha"} : null;
+  };
   const calcReapertura = (producto, fechaAplic, horaAplic) => {
     const info = REINGRESO_DIAS[producto];
-    if(!info||!fechaAplic) return { fechaISO:"", label:"", nota:"" };
+    const hr = horasReingresoProd(producto);
+    if(!(info||hr)||!fechaAplic) return { fechaISO:"", label:"", nota:"" };
     const base = new Date(`${fechaAplic}T${horaAplic||"14:00"}:00`);
-    base.setHours(base.getHours() + info.dias*24);
+    base.setHours(base.getHours() + (hr?hr.horas:info.dias*24));
     return {
       fechaISO: base.toISOString().slice(0,16),
       label: base.toLocaleDateString("es-CL",{weekday:"long",day:"numeric",month:"long"})+" a las "+base.toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"}),
-      nota: info.nota,
+      nota: (hr&&hr.origen==="Bodega"?`Reingreso ${hr.horas} h según Bodega. `+(info?.nota||"").replace(/Reingreso[^.]*?hrs?[^.]*\.?\s*/i,""):(info?.nota||"")),
     };
   };
 
@@ -10831,14 +10852,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
   const calcReingresoAplic = (producto, fecha, hora) => {
     if(!producto||!fecha) return null;
     let horas = null, nota = "";
-    try {
-      Object.values(bodegasData||{}).forEach(bd=>(bd.items||[]).forEach(it=>{
-        if(horas===null && it.nombre===producto && it.tiempoReingreso){
-          const n = Number(String(it.tiempoReingreso).replace(",","."));
-          if(n>0) horas = (it.tiempoReingresoUnidad||"horas")==="días" || (it.tiempoReingresoUnidad||"")==="dias" ? n*24 : n;
-        }
-      }));
-    } catch(e) {}
+    { const hr = horasReingresoProd(producto); if(hr) horas = hr.horas; }
     if(horas===null){
       const clave = Object.keys(REINGRESO_DIAS).find(k=>k!=="Otro" && (producto.toLowerCase().includes(k.split(" ")[0].toLowerCase())));
       if(clave){ horas = REINGRESO_DIAS[clave].dias*24; nota = REINGRESO_DIAS[clave].nota; }
@@ -11415,8 +11429,9 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
               const est = ESTADO_INC[inc.estado]||ESTADO_INC.observacion;
               const rr = inc.reaperturaReal;
               const infoReing = REINGRESO_DIAS[inc.productoAplicar];
+              const hrCard = horasReingresoProd(inc.productoAplicar);
               const reapert3 = rr&&rr.finISO ? {label:new Date(rr.finISO).toLocaleDateString("es-CL",{weekday:"long",day:"numeric",month:"long"})+" a las "+new Date(rr.finISO).toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"}), nota:`Según aplicación real del ${rr.desde} (${rr.horas} h de reingreso). ${infoReing?.nota||""}`, real:true}
-                : {label:"", nota:infoReing?.nota||"", pendiente:!!infoReing, horas:infoReing?infoReing.dias*24:0};
+                : {label:"", nota:infoReing?.nota||"", pendiente:!!hrCard, horas:hrCard?hrCard.horas:0};
               return (
                 <div key={inc.id} style={{...S.card,padding:16,borderLeft:`3px solid ${est.color}`}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:10}}>
@@ -27779,7 +27794,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-11-04.2";
+const BUILD_STAMP = "2026-11-04.3";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
