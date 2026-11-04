@@ -10724,10 +10724,15 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
       setIncidPaso(1);
       return;
     }
+    if(!(incidForm.sectoresCerrados||[]).length){
+      alert("⚠️ Falta indicar qué sector se cierra (paso 4). Marca al menos uno para registrar la incidencia y cerrar la cancha.");
+      setIncidPaso(4);
+      return;
+    }
     setGuardandoIncid(true);
     try {
     const reap = calcReapertura(incidForm.productoAplicar, incidForm.fechaAplicacion, incidForm.horaAplicacion);
-    const nueva = { ...incidForm, id:incidForm.id||Date.now(), fechaReaperturaISO:reap?.fechaISO||"", notaReingreso:reap?.nota||"", estado: (incidForm.sectoresCerrados||[]).length>0?"cerrada":"observacion" };
+    const nueva = { ...incidForm, id:incidForm.id||Date.now(), fechaReaperturaISO:reap?.fechaISO||"", notaReingreso:reap?.nota||"", estado: (incidForm.estado==="reabierta"?"reabierta":"cerrada") };
     setIncidenciasFito(prev=>{
       const arr=Array.isArray(prev)?prev:Object.values(prev||{});
       // Si se completó una observación ya existente (ej. enviada por el jardinero), se reemplaza en vez de duplicar
@@ -10852,6 +10857,13 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
     const reingAplic = calcReingresoAplic(productoFinal, form.fecha, form.horaAplicacion);
     const nueva = { ...form, producto:productoFinal, id:Date.now(), mes:mesActual, sectorFinal, reingresoHasta:reingAplic?.finISO||"", reingresoHoras:reingAplic?.horas||"" };
     setAplicaciones(prev=>[nueva, ...prev].slice(0,1000));
+    // Reapertura real de la incidencia vinculada
+    if(form.incidenciaId && reingAplic){
+      setIncidenciasFito(prev=>{
+        const arr=Array.isArray(prev)?prev:Object.values(prev||{});
+        return arr.map(x=>String(x.id)===String(form.incidenciaId)?{...x,reaperturaReal:{finISO:reingAplic.finISO,horas:reingAplic.horas,desde:`${form.fecha} ${form.horaAplicacion||""}`.trim()},fechaAplicacion:form.fecha,horaAplicacion:form.horaAplicacion||x.horaAplicacion}:x);
+      });
+    }
     // Descontar stock en bodegas reales si hay producto y cantidad usada
     if(form.producto && form.cantidadUsada && setBodegasData) {
       const cant = Number(form.cantidadUsada);
@@ -11255,7 +11267,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                         if(!reapert1.label) return null;
                         return (
                           <div style={{gridColumn:"1/-1",background:"rgba(34,197,94,0.08)",border:"1px solid rgba(34,197,94,0.25)",borderRadius:10,padding:"10px 14px"}}>
-                            <div style={{fontSize:12,color:"#86efac",fontWeight:600,marginBottom:4}}>📅 Reapertura estimada según ficha técnica</div>
+                            <div style={{fontSize:12,color:"#86efac",fontWeight:600,marginBottom:4}}>📅 Reapertura estimada (si se aplica a esa hora) — se recalcula con la aplicación real</div>
                             <div style={{fontSize:15,color:"#4ade80",fontWeight:700,marginBottom:4}}>{reapert1.label}</div>
                             <div style={{fontSize:11,color:"#5a9a7a",fontStyle:"italic"}}>{reapert1.nota}</div>
                           </div>
@@ -11269,7 +11281,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                   </div>
                   <div style={{display:"flex",gap:10}}>
                     <button className="btn-g" style={S.btn} onClick={()=>setIncidPaso(2)}>← Volver</button>
-                    <button className="btn-p" style={S.btn} onClick={()=>setIncidPaso(4)}>Siguiente → Cierre</button>
+                    <button className="btn-p" style={S.btn} onClick={()=>{ setIncidForm(p=>(p.sectoresCerrados||[]).length===0&&(p.sectoresObservados||[]).length>0?{...p,sectoresCerrados:[...p.sectoresObservados]}:p); setIncidPaso(4); }}>Siguiente → Cierre</button>
                   </div>
                 </div>
               )}
@@ -11331,7 +11343,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                     if(!reapert2.label) return null;
                     return (
                       <div style={{...S.card,padding:14,marginBottom:12,background:"rgba(34,197,94,0.08)",borderColor:"rgba(34,197,94,0.25)"}}>
-                        <div style={{fontSize:12,color:"#86efac",fontWeight:600,marginBottom:3}}>✅ Reapertura estimada</div>
+                        <div style={{fontSize:12,color:"#86efac",fontWeight:600,marginBottom:3}}>✅ Reapertura estimada (se recalcula con la hora real de aplicación)</div>
                         <div style={{fontSize:16,color:"#4ade80",fontWeight:700}}>{reapert2.label}</div>
                         <div style={{fontSize:11,color:"#5a9a7a",marginTop:4,fontStyle:"italic"}}>{reapert2.nota}</div>
                       </div>
@@ -11401,7 +11413,10 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
               };
               const TIPO_INC = {fitosanitario:"🦠",mantenimiento:"🔧",clima:"🌧️"};
               const est = ESTADO_INC[inc.estado]||ESTADO_INC.observacion;
-              const reapert3 = calcReapertura(inc.productoAplicar, inc.fechaAplicacion, inc.horaAplicacion) || {};
+              const rr = inc.reaperturaReal;
+              const infoReing = REINGRESO_DIAS[inc.productoAplicar];
+              const reapert3 = rr&&rr.finISO ? {label:new Date(rr.finISO).toLocaleDateString("es-CL",{weekday:"long",day:"numeric",month:"long"})+" a las "+new Date(rr.finISO).toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"}), nota:`Según aplicación real del ${rr.desde} (${rr.horas} h de reingreso). ${infoReing?.nota||""}`, real:true}
+                : {label:"", nota:infoReing?.nota||"", pendiente:!!infoReing, horas:infoReing?infoReing.dias*24:0};
               return (
                 <div key={inc.id} style={{...S.card,padding:16,borderLeft:`3px solid ${est.color}`}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:10}}>
@@ -11425,7 +11440,8 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                           {inc.sectoresCerrados.map(s=><span key={s} style={{...S.chip,background:"rgba(239,68,68,0.12)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.25)",fontSize:10}}>🚫 {s}</span>)}
                         </div>
                       )}
-                      {reapert3.label&&<div style={{fontSize:12,color:"#4ade80",marginBottom:2}}>📅 Reapertura estimada: <strong>{reapert3.label}</strong></div>}
+                      {reapert3.label&&<div style={{fontSize:12,color:"#4ade80",marginBottom:2}}>📅 Reapertura: <strong>{reapert3.label}</strong></div>}
+                      {!reapert3.label&&reapert3.pendiente&&<div style={{fontSize:12,color:"#fcd34d",marginBottom:2}}>⏳ Reingreso: {reapert3.horas} h después de la aplicación. Se calcula al registrar la aplicación real.</div>}
                       {reapert3.nota&&<div style={{fontSize:11,color:"#5a9a7a",fontStyle:"italic",marginBottom:4}}>{reapert3.nota}</div>}
                       {inc.productoAplicar&&<div style={{fontSize:12,color:"#a0c8a0"}}>🧪 {inc.productoAplicar}</div>}
                     </div>
@@ -11445,6 +11461,7 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                                   responsable:inc.observador||"",
                                   fecha:new Date().toISOString().slice(0,10),
                                   obs:"Tratamiento: "+(inc.agenteCausal||inc.diagnostico||""),
+                                  incidenciaId:inc.id,
                                 }));
                               },100);
                             }}>
@@ -11465,6 +11482,15 @@ function PanelFungicidas({ S, aplicaciones, setAplicaciones, personal, esJefa, t
                         <button style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(34,197,94,0.15)",color:"#86efac",border:"1px solid rgba(34,197,94,0.3)"}}
                           onClick={()=>setIncidenciasFito(prev=>prev.map(x=>x.id===inc.id?{...x,estado:"reabierta"}:x))}>
                           ✅ Marcar reabierta
+                        </button>
+                      )}
+                      {inc.estado==="cerrada"&&!inc.archivada&&(
+                        <button style={{...S.btn,fontSize:11,padding:"5px 12px",background:"rgba(52,211,153,0.15)",color:"#34d399",border:"1px solid rgba(52,211,153,0.3)"}}
+                          onClick={()=>{
+                            if(!window.confirm("¿Reabrir la cancha y dar por resuelta esta incidencia? Se archivará.")) return;
+                            setIncidenciasFito(prev=>prev.map(x=>x.id===inc.id?{...x,estado:"reabierta",archivada:true,fechaArchivada:fechaLocal()}:x));
+                          }}>
+                          📁 Reabrir y archivar
                         </button>
                       )}
                       {inc.estado==="reabierta"&&!inc.archivada&&(
@@ -27746,7 +27772,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-11-03.4";
+const BUILD_STAMP = "2026-11-04.1";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
