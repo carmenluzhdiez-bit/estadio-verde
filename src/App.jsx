@@ -24715,6 +24715,13 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
   // Productos disponibles en bodegas (Pesticidas)
   // Solo productos de la bodega de Pesticidas (b05)
   const productosBodega = [];
+  // Ajusta el tiempo de reingreso al producto elegido (si no tiene dato en Bodega, se limpia para no arrastrar el del producto anterior)
+  const aplicarReingresoProd = (prod) => {
+    if(prod?.tiempoReingreso){ setFito("tiempoReingreso",prod.tiempoReingreso); setFito("tiempoReingresoUnidad",prod.tiempoReingresoUnidad||"horas"); return; }
+    const k = prod?.nombre ? Object.keys(REINGRESO_DIAS).find(x=>x!=="Otro" && prod.nombre.toLowerCase().includes(x.split(" ")[0].toLowerCase())) : null;
+    if(k){ setFito("tiempoReingreso",String(REINGRESO_DIAS[k].dias*24)); setFito("tiempoReingresoUnidad","horas"); }
+    else { setFito("tiempoReingreso",""); setFito("tiempoReingresoUnidad","horas"); }
+  };
   const bodegaPest = bodegasData?.["b05"]||bodegasData?.b05||Object.values(bodegasData||{}).find(b=>b.nombre==="Pesticidas")||{};
   (bodegaPest.items||[]).forEach(it=>{
     if(it.nombre && Number(it.stockActual||0)>0) productosBodega.push({
@@ -24923,15 +24930,15 @@ function ModalNuevaAlerta({ S, alertaForm, setAlertaForm, TIPOS_ALERTA, MACROZON
                 <div style={{fontSize:13,fontWeight:600,color:"#fca5a5",marginBottom:4}}>🧪 Paso 2 — Decisión de tratamiento</div>
                 <AlternativasFitoPanel S={S} textoAgente={(fitoForm.agenteCausal||"")+" "+(fitoForm.sintomas||"")} aplicaciones={aplicaciones} bodegasData={bodegasData}
                   onElegir={c=>{
-                    const prod=productosBodega.find(p=>c.claves.some(cl=>(p.nombre||"").toLowerCase().includes(cl)));
+                    const coinciden=productosBodega.filter(p=>c.claves.some(cl=>(p.nombre||"").toLowerCase().includes(cl)));
+                    const prod=coinciden.find(p=>Number(p.stock)>0)||coinciden[0];
                     setFito("productoSel",prod?prod.nombre:"Por determinar");
-                    if(prod?.tiempoReingreso){setFito("tiempoReingreso",prod.tiempoReingreso);setFito("tiempoReingresoUnidad",prod.tiempoReingresoUnidad||"horas");}
+                    aplicarReingresoProd(prod);
                   }}/>
                 <div><label style={labelSt}>Producto a aplicar</label>
                   <select style={S.input} value={fitoForm.productoSel} onChange={e=>{
                     setFito("productoSel",e.target.value);
-                    const prod=productosBodega.find(p=>p.nombre===e.target.value);
-                    if(prod?.tiempoReingreso){setFito("tiempoReingreso",prod.tiempoReingreso);setFito("tiempoReingresoUnidad",prod.tiempoReingresoUnidad||"horas");}
+                    aplicarReingresoProd(productosBodega.find(p=>p.nombre===e.target.value));
                   }}>
                     <option value="">Seleccionar producto...</option>
                     {productosBodega.length>0?(()=>{
@@ -27772,7 +27779,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-11-04.1";
+const BUILD_STAMP = "2026-11-04.2";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
