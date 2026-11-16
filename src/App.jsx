@@ -23280,7 +23280,7 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
   const trabajadoresCon = personalArr.map(t=>{
     const eventosT = (t.eventos||[]).filter(e=>
       ["bonoConstruccion","bonoPesado","bonoEspecializado","horaExtra","permiso","vacaciones","licencia","otro","amonestacion","capacitacion"].includes(e.tipo) &&
-      e.estado!=="rendido" && e.estado!=="rechazado" &&
+      e.estado!=="rendido" &&
       !esEventoDeBonoMasivo(e)
     );
     if(!bonosPendientes.some(b=>(b.participantes||[]).some(p=>String(p.trabajadorId)===String(t.id)))&&!eventosT.length) return null;
@@ -23295,7 +23295,7 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
     const iniEv={};
     const personalArr2 = Array.isArray(personal)?personal:Object.values(personal||{});
     personalArr2.forEach(t=>{
-      (t.eventos||[]).filter(e=>e.estado!=="rendido"&&e.estado!=="rechazado").forEach(e=>{
+      (t.eventos||[]).filter(e=>e.estado!=="rendido").forEach(e=>{
         iniEv[`${t.id}_${e.id}`]=true;
       });
     });
@@ -23312,7 +23312,7 @@ function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, 
       const bonosT = bonosSel.filter(b=>(b.participantes||[]).some(p=>String(p.trabajadorId)===String(t.id)));
       // Eventos "bono" individuales que YA están representados por un bono masivo
       // pendiente — ver esEventoDeBonoMasivo definida arriba, junto a trabajadoresCon.
-      const eventosT = (t.eventos||[]).filter(e=>e.estado!=="rechazado"&&selEventos[`${t.id}_${e.id}`]&&!esEventoDeBonoMasivo(e)&&!excluirAhora.has(`${t.id}_${e.id}`));
+      const eventosT = (t.eventos||[]).filter(e=>selEventos[`${t.id}_${e.id}`]&&!esEventoDeBonoMasivo(e)&&!excluirAhora.has(`${t.id}_${e.id}`));
       if(!bonosT.length&&!eventosT.length) return "";
 
       const totalBonos = bonosT.reduce((a,b)=>{
@@ -27794,7 +27794,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-11-16.1";
+const BUILD_STAMP = "2026-11-04.3";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
