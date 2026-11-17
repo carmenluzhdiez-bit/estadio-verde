@@ -3451,6 +3451,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
     const porZona = {}; todas.forEach(t=>{ const z=t.zona||"(sin zona)"; (porZona[z] ||= []).push(t); });
     const filasZona = Object.entries(porZona).sort((a,b)=>b[1].length-a[1].length).map(([z,arr])=>{ const c=cuenta(arr); return `<tr><td>${esc(z)}</td><td>${arr.length}</td><td>${c.hecha}</td><td>${c.no_pudo}</td><td>${arr.length-c.hecha-c.no_pudo}</td><td>${pctDe(c,arr.length)}%</td></tr>`; }).join("");
     const nombreAmbito = zonaFijaActual==="golf"?"Golf":zonaFijaActual==="no-golf"?"Macrozonas (sin Golf)":"Todas las zonas";
+    const ambitoCorto = zonaFijaActual==="golf"?"· GOLF":zonaFijaActual==="no-golf"?"· MACROZONAS":"· TODAS LAS ZONAS";
     const filtrosAct = [filtroEstado!=="todos"&&`Estado: ${EC[filtroEstado]?.label||filtroEstado}`,filtroTarea&&`Tarea: ${filtroTarea}`,filtroZona!=="todas"&&`Zona: ${filtroZona}`,filtroResponsable!=="todos"&&`Responsable: ${filtroResponsable}`,filtroElemento.trim()&&`Elemento: ${filtroElemento}`].filter(Boolean).join(" · ");
     const nombreDia = d => new Date(d+"T12:00:00").toLocaleDateString("es-CL",{weekday:"long",day:"2-digit",month:"2-digit",year:"numeric"});
     const bloquesDia = porDia.map(({d,arr})=>{
@@ -3465,7 +3466,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
     }).join("");
     const win = window.open("","_blank","width=900,height=700");
     if(!win){ alert("El navegador bloqueó la ventana emergente. Permítela para imprimir."); return; }
-    win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Informe ${esc(etiqueta)} — Estadio Español</title>
+    win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Informe de actividad ${esc(ambitoCorto)} — ${esc(etiqueta)} — Estadio Español</title>
     <style>
       body{font-family:Georgia,serif;color:#1a2e1a;padding:28px;max-width:900px;margin:0 auto}
       h1{font-size:21px;margin:0;color:#0d3320} h2{font-size:15px;margin:18px 0 6px;color:#0d3320;border-bottom:1px solid #9bbf9b;padding-bottom:2px}
@@ -3479,7 +3480,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
       .dia{page-break-inside:auto} .pie{margin-top:20px;font-size:11px;color:#6b7280;border-top:1px solid #dce8dc;padding-top:10px}
       @media print{body{padding:12px} tr{page-break-inside:avoid} h3{page-break-after:avoid}}
     </style></head><body>
-    <div style="display:flex;align-items:center;gap:14px"><img src="${LOGO_AREAS_VERDES_B64}" style="height:46px"/><h1>📋 Informe de actividad — ${esc(etiqueta)}</h1></div>
+    <div style="display:flex;align-items:center;gap:14px"><img src="${LOGO_AREAS_VERDES_B64}" style="height:46px"/><h1>📋 Informe de actividad ${esc(ambitoCorto)} — ${esc(etiqueta)}</h1></div>
     <div class="sub">${esc(nombreAmbito)}${filtrosAct?" · "+esc(filtrosAct):""} · Generado: ${new Date().toLocaleDateString("es-CL")} ${new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"})}</div>
     <div class="stats"><span>Días con actividad: <b>${porDia.length}</b></span><span>Total tareas: <b>${todas.length}</b></span><span style="color:#166534">✅ Hechas: <b>${ct.hecha}</b></span><span>⏳ Pendientes: ${ct.pendiente}</span><span>🔵 En curso: ${ct.en_curso}</span><span>⬜ Por designar: ${ct.por_designar}</span><span style="color:#991b1b">🔴 No pudieron: <b>${ct.no_pudo}</b></span><span style="color:#1e40af"><b>${pctDe(ct,todas.length)}%</b> completado</span></div>
     <h2>Resumen por trabajador</h2><table><thead><tr><th>Trabajador</th><th>Tareas</th><th>Hechas</th><th>No pudo</th><th>Otras</th><th>% hecho</th></tr></thead><tbody>${filasResp}</tbody></table>
@@ -3886,7 +3887,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
       {(tabHist==="historial_macro"||tabHist==="historial_golf")&&(<>
       {/* Imprimir por semana / mes */}
       <div style={{...S.card,padding:14,marginBottom:14,display:"flex",flexWrap:"wrap",alignItems:"flex-end",gap:10}}>
-        <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:"#a0d8b0",width:"100%"}}>🖨️ Imprimir informe por período <span style={{fontSize:11,fontWeight:400,color:"#6a8a7a"}}>({tabHist==="historial_golf"?"solo Golf":"macrozonas, sin Golf"} · respeta los filtros de abajo)</span></div>
+        <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,color:"#a0d8b0",width:"100%"}}>🖨️ Imprimir informe por período — {tabHist==="historial_golf"?"⛳ GOLF":"🌿 MACROZONAS (sin Golf)"} <span style={{fontSize:11,fontWeight:400,color:"#6a8a7a"}}>(respeta los filtros de abajo)</span></div>
         <div style={{display:"flex",gap:6}}>
           <button className={modoPer==="semana"?"btn-p":"btn-g"} style={{...S.btn,fontSize:12,padding:"5px 14px"}} onClick={()=>setModoPer("semana")}>Semana</button>
           <button className={modoPer==="mes"?"btn-p":"btn-g"} style={{...S.btn,fontSize:12,padding:"5px 14px"}} onClick={()=>setModoPer("mes")}>Mes</button>
@@ -3894,7 +3895,7 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
         {modoPer==="semana"
           ? <input type="week" style={{...S.input,fontSize:13,width:190}} value={valSemana} onChange={e=>setValSemana(e.target.value)}/>
           : <input type="month" style={{...S.input,fontSize:13,width:190}} value={valMes} onChange={e=>setValMes(e.target.value)}/>}
-        <button className="btn-p" style={{...S.btn,fontSize:12,padding:"6px 16px"}} onClick={imprimirPeriodo}>🖨️ Imprimir {modoPer==="semana"?"semana":"mes"}</button>
+        <button className="btn-p" style={{...S.btn,fontSize:12,padding:"6px 16px"}} onClick={imprimirPeriodo}>🖨️ Imprimir {modoPer==="semana"?"semana":"mes"} — {tabHist==="historial_golf"?"Golf":"Macrozonas"}</button>
       </div>
       {/* Filtros */}
       <div style={{...S.card,padding:16,marginBottom:18}}>
@@ -27812,7 +27813,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-11-17.1";
+const BUILD_STAMP = "2026-11-17.2";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
