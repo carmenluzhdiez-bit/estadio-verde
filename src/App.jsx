@@ -70,14 +70,32 @@ function avisoErrorGuardado(path, err) {
 }
 
 // ── Guardado de tareas por diferencias: cada dispositivo escribe SOLO lo que cambió, sobre la versión actual del servidor ──
-function escribirDiffProg(prev, next){
+// Ejecuta una escritura con reintentos (2 s, 6 s, 15 s; si no hay conexión espera a que vuelva).
+// Si agota los intentos avisa con el cartel rojo y llama onFallo (para volver al estado real del servidor).
+function escribirConReintento(path, accion, onFallo, intento=0){
+  const esperas=[2000,6000,15000];
+  accion().catch(e=>{
+    console.error("guardado falló:",path,e);
+    if(intento>=esperas.length){
+      avisoErrorGuardado(path,e);
+      try{ onFallo&&onFallo(); }catch(_){}
+      return;
+    }
+    const reintentar=()=>escribirConReintento(path,accion,onFallo,intento+1);
+    if(typeof navigator!=="undefined"&&navigator.onLine===false){
+      const h=()=>{ window.removeEventListener("online",h); setTimeout(reintentar,1000); };
+      window.addEventListener("online",h);
+    } else setTimeout(reintentar,esperas[intento]);
+  });
+}
+function escribirDiffProg(prev, next, onFallo){
   const norm = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
   const fechas = new Set([...Object.keys(prev||{}),...Object.keys(next||{})]);
   fechas.forEach(f=>{
     const a = norm(prev?.[f]), b = norm(next?.[f]);
     if(JSON.stringify(a)===JSON.stringify(b)) return;
     const sinId = a.some(t=>!t||t.id==null) || b.some(t=>!t||t.id==null) || new Set(b.map(t=>String(t.id))).size!==b.length;
-    if(sinId){ fbSet(ref(db,`${ROOT}/prog/${f}`), b.map(limpiarUndef)).catch(e=>console.error("prog",e)); return; }
+    if(sinId){ escribirConReintento(`prog/${f}`, ()=>fbSet(ref(db,`${ROOT}/prog/${f}`), b.map(limpiarUndef)), onFallo); return; }
     const mapA = new Map(a.map(t=>[String(t.id),t]));
     const idsB = new Set(b.map(t=>String(t.id)));
     const eliminadas = a.filter(t=>!idsB.has(String(t.id))).map(t=>String(t.id));
@@ -92,7 +110,7 @@ function escribirDiffProg(prev, next){
       if(Object.keys(p).length||borr.length) parches.push({id:String(tb.id),p,borr});
     });
     if(!eliminadas.length&&!nuevas.length&&!parches.length) return; // solo cambió el orden
-    runTransaction(ref(db,`${ROOT}/prog/${f}`), cur=>{
+    escribirConReintento(`prog/${f}`, ()=>runTransaction(ref(db,`${ROOT}/prog/${f}`), cur=>{
       let lista = norm(cur).slice();
       if(eliminadas.length) lista = lista.filter(t=>!eliminadas.includes(String(t?.id)));
       parches.forEach(({id,p,borr})=>{
@@ -103,7 +121,7 @@ function escribirDiffProg(prev, next){
       });
       nuevas.forEach(nt=>{ if(!lista.some(t=>String(t?.id)===String(nt.id))) lista.push(nt); });
       return lista.map(limpiarUndef);
-    }).catch(e=>console.error("prog (transacción):",f,e));
+    }), onFallo);
   });
 }
 
@@ -27794,7 +27812,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-11-16.1";
+const BUILD_STAMP = "2026-11-17.1";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
@@ -28024,7 +28042,12 @@ export default function App() {
     _setProgLocalRef.current(prev=>{
       const base = prev||{};
       const next = typeof upd==="function" ? upd(base) : upd;
-      try{ escribirDiffProg(base, next||{}); }catch(e){ console.error("diff prog",e); }
+      try{
+        escribirDiffProg(base, next||{}, ()=>{
+          // Agotados los reintentos: se vuelve a leer lo que realmente hay en el servidor para que la pantalla no muestre como guardado lo que no lo está
+          get(ref(db,`${ROOT}/prog`)).then(sn=>{ _setProgLocalRef.current(()=>sn.val()||{}); }).catch(()=>{});
+        });
+      }catch(e){ console.error("diff prog",e); }
       return next;
     });
   },[]);
