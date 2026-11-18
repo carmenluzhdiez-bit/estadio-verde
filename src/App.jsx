@@ -7561,9 +7561,10 @@ function ProgramacionDiaria({ S, zonas, data, personal, bodegasData={}, getZD, g
         <VerPorTipoElemento S={S} zonas={zonas.filter(z=>String(z.id)!=="31"&&!(z.nombre||"").toLowerCase().includes("golf"))} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} getElemFrecs={getElemFrecs}/>
       )}
 
-      {tabProg==="correccion_gral"&&(
+      {tabProg==="correccion_gral"&&(<>
+        <AuditoriaUltimaRealizacion S={S} zonasAud={zonas.filter(z=>String(z.id)!=="31"&&!(z.nombre||"").toLowerCase().includes("golf")).map(z=>({id:z.id,nombre:z.nombre}))} getAllElems={getAllElems} getZD={getZD} setElemFrecsBulk={setElemFrecsBulk} tareas={tareas}/>
         <CorreccionMasivaFrecuenciasGeneral S={S} zonas={zonas.filter(z=>String(z.id)!=="31"&&!(z.nombre||"").toLowerCase().includes("golf"))} getAllElems={getAllElems} getZD={getZD} setElemFrecsBulk={setElemFrecsBulk}/>
-      )}
+      </>)}
 
       {tabProg==="simplificar_gral"&&(
         <SimplificarFrecuenciasGeneral S={S} zonas={zonas.filter(z=>String(z.id)!=="31"&&!(z.nombre||"").toLowerCase().includes("golf"))} getAllElems={getAllElems} getZD={getZD} setElemFrecsBulk={setElemFrecsBulk}/>
@@ -16964,6 +16965,93 @@ function TareasGolfPanel({ tareasGolfHoy, hoy, esJefa, setTareasProg, tareasProg
 }
 
 
+// ── Auditoría: compara la "Última realización" guardada en cada frecuencia con la última vez que la tarea
+// aparece como HECHA en el historial, y permite restaurar las que quedaron con una fecha más antigua. ──
+function AuditoriaUltimaRealizacion({ S, zonasAud, getAllElems, getZD, setElemFrecsBulk, tareas }) {
+  const [res, setRes] = React.useState(null);
+  const [sel, setSel] = React.useState({});
+  const [msg, setMsg] = React.useState("");
+  const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+  const fmt = f => f?f.split("-").reverse().join("-"):"—";
+  const auditar = () => {
+    const ultHecha = {};
+    Object.entries(tareas||{}).forEach(([dia,arr])=>{
+      normArr(arr).forEach(t=>{
+        if(!t||!t.origenFrecId||!t.origenZid) return;
+        const e = normalizarEstado(t.estado);
+        if(e!=="hecha"&&e!=="completada") return;
+        if(t.trasladadaA) return;
+        const fe = t.ultimaVezAplicada||t.fecha||dia;
+        const k = `${t.origenZid}|${t.origenEid}|${t.origenFrecId}`;
+        if(!ultHecha[k]||fe>ultHecha[k]) ultHecha[k]=fe;
+      });
+    });
+    const filas = [];
+    zonasAud.forEach(({id,nombre})=>{
+      const zdat = getZD(String(id))||{};
+      (getAllElems(String(id))||[]).forEach(el=>{
+        const frecs = el.isCustom ? (zdat.elementosCustom||[]).find(x=>x.id===el.id)?.frecuencias||[] : zdat.elementos?.[el.id]?.frecuencias||[];
+        frecs.forEach(f=>{
+          const real = ultHecha[`${id}|${el.id}|${f.id}`];
+          if(real && (!f.ultimaVez || f.ultimaVez<real)) filas.push({key:`${id}|${el.id}|${f.id}`,zid:String(id),zona:nombre,eid:el.id,isCustom:!!el.isCustom,frecId:f.id,elemento:el.nombre,tarea:f.tarea||"(sin nombre)",guardada:f.ultimaVez||"",real});
+        });
+      });
+    });
+    filas.sort((a,b)=>a.zona.localeCompare(b.zona,"es",{sensitivity:"base"})||a.elemento.localeCompare(b.elemento,"es",{sensitivity:"base"})||a.tarea.localeCompare(b.tarea,"es",{sensitivity:"base"}));
+    const s0={}; filas.forEach(r=>s0[r.key]=true);
+    setRes(filas); setSel(s0); setMsg("");
+  };
+  const restaurar = () => {
+    const ch = (res||[]).filter(r=>sel[r.key]);
+    if(!ch.length){ alert("No hay filas seleccionadas."); return; }
+    if(!window.confirm(`¿Restaurar la «Última realización» según el historial en ${ch.length} tarea(s)?`)) return;
+    const porZona = {};
+    ch.forEach(r=>{
+      const z = porZona[r.zid] ||= {};
+      const k = r.eid+"__"+(r.isCustom?"c":"b");
+      (z[k] ||= {eid:r.eid,isCustom:r.isCustom,map:new Map()}).map.set(r.frecId,r.real);
+    });
+    Object.entries(porZona).forEach(([zid,els])=>{
+      const zdat = getZD(zid)||{};
+      const updates = Object.values(els).map(({eid,isCustom,map})=>{
+        const actuales = isCustom ? (zdat.elementosCustom||[]).find(x=>x.id===eid)?.frecuencias||[] : zdat.elementos?.[eid]?.frecuencias||[];
+        return {eid,isCustom,frecuencias:actuales.map(f=>map.has(f.id)?{...f,ultimaVez:map.get(f.id)}:f)};
+      });
+      setElemFrecsBulk(zid, updates);
+    });
+    setMsg(`✅ Se restauró la última realización en ${ch.length} tarea(s).`);
+    setRes(null); setSel({});
+  };
+  return (
+    <div style={{...S.card,padding:14,marginBottom:16,border:"1px solid rgba(96,165,250,0.35)"}}>
+      <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,color:"#93c5fd",marginBottom:4}}>🔍 Auditar última realización</div>
+      <div style={{fontSize:12,color:"#7aaa80",marginBottom:10}}>Compara la fecha guardada en cada tarea con la última vez que aparece como <strong>hecha</strong> en el historial. Si la guardada es más antigua, la lista para que la restaures. No cambia nada hasta que aprietes «Restaurar».</div>
+      {msg&&<div style={{fontSize:12,color:"#22c55e",marginBottom:8}}>{msg}</div>}
+      <button onClick={auditar} style={{...S.btn,background:"rgba(96,165,250,0.15)",color:"#93c5fd",border:"1px solid rgba(96,165,250,0.4)",fontWeight:600}}>🔍 Auditar ahora</button>
+      {res&&(res.length===0
+        ? <div style={{marginTop:10,fontSize:13,color:"#22c55e"}}>✅ Todas las fechas guardadas coinciden con el historial (o son más recientes). No hay nada que restaurar.</div>
+        : <div style={{marginTop:12}}>
+            <div style={{fontSize:13,color:"#fbbf24",marginBottom:8}}>⚠️ {res.length} tarea(s) con fecha guardada más antigua que la del historial:</div>
+            <div style={{maxHeight:380,overflowY:"auto",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,marginBottom:10}}>
+              {res.map(r=>(
+                <label key={r.key} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 10px",borderBottom:"1px solid rgba(255,255,255,0.05)",fontSize:12,cursor:"pointer"}}>
+                  <input type="checkbox" checked={!!sel[r.key]} onChange={()=>setSel(p=>({...p,[r.key]:!p[r.key]}))}/>
+                  <span style={{flex:1}}><strong>{r.elemento}</strong> <span style={{color:"#5a8a6a"}}>· {r.tarea} · {r.zona}</span></span>
+                  <span style={{color:"#f87171"}}>guardada: {fmt(r.guardada)}</span>
+                  <span style={{color:"#4ade80"}}>historial: {fmt(r.real)}</span>
+                </label>
+              ))}
+            </div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              <button onClick={restaurar} style={{...S.btn,background:"rgba(34,197,94,0.15)",color:"#22c55e",border:"1px solid rgba(34,197,94,0.4)",fontWeight:600}}>♻️ Restaurar seleccionadas ({res.filter(r=>sel[r.key]).length})</button>
+              <button onClick={()=>{const n={};res.forEach(r=>n[r.key]=true);setSel(n);}} style={{...S.btn,background:"transparent",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)"}}>Marcar todas</button>
+              <button onClick={()=>setSel({})} style={{...S.btn,background:"transparent",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)"}}>Desmarcar</button>
+            </div>
+          </div>)}
+    </div>
+  );
+}
+
 function CorreccionMasivaFrecuenciasGolf({ S, getAllElems, getZD, setElemFrecs, setElemFrecsBulk }) {
   const ZID = "31";
   const [busqueda, setBusqueda] = React.useState("");
@@ -20150,7 +20238,10 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       })()}
 
       {subTab==="correccion_masiva"&&rolLogueado!=="trabajador"&&(
-        <CorreccionMasivaFrecuenciasGolf S={S} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} setElemFrecsBulk={setElemFrecsBulk}/>
+        <>
+          <AuditoriaUltimaRealizacion S={S} zonasAud={[{id:"31",nombre:"Golf"}]} getAllElems={getAllElems} getZD={getZD} setElemFrecsBulk={setElemFrecsBulk} tareas={tareasProg}/>
+          <CorreccionMasivaFrecuenciasGolf S={S} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs} setElemFrecsBulk={setElemFrecsBulk}/>
+        </>
       )}
 
       {subTab==="simplificar_frecs"&&rolLogueado!=="trabajador"&&(
@@ -27813,7 +27904,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-11-18.1";
+const BUILD_STAMP = "2026-11-18.2";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
