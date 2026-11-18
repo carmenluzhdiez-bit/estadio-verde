@@ -1469,11 +1469,11 @@ const MACROZONAS_BASE = [
       { id: "fw_08", nombre: "Fairway 08", tipo: "cesped", hoyo: "Hoyo 08" },
       { id: "fw_09", nombre: "Fairway 09", tipo: "cesped", hoyo: "Hoyo 09" },
       // ── BUNKERS (5) ──────────────────────────────────────────────
-      { id: "bk_01", nombre: "Búnker 01", tipo: "pavimentos" },
-      { id: "bk_02", nombre: "Búnker 02", tipo: "pavimentos" },
-      { id: "bk_03", nombre: "Búnker 03", tipo: "pavimentos" },
-      { id: "bk_04", nombre: "Búnker 04", tipo: "pavimentos" },
-      { id: "bk_05", nombre: "Búnker 05", tipo: "pavimentos" },
+      { id: "bk_01", nombre: "Búnker Hoyo 01", tipo: "pavimentos" },
+      { id: "bk_02", nombre: "Búnker Hoyo 02", tipo: "pavimentos" },
+      { id: "bk_03", nombre: "Búnker Hoyo 06", tipo: "pavimentos" },
+      { id: "bk_04", nombre: "Búnker Hoyo 09 Oriente", tipo: "pavimentos" },
+      { id: "bk_05", nombre: "Búnker Hoyo 09 Poniente", tipo: "pavimentos" },
       // ── OTRAS SUPERFICIES ────────────────────────────────────────
       { id: "antegreen_golf", nombre: "Ante-greens", tipo: "cesped" },
       { id: "lomas_golf", nombre: "Lomas", tipo: "cesped" },
@@ -28039,7 +28039,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-11-18.3";
+const BUILD_STAMP = "2026-11-18.4";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
