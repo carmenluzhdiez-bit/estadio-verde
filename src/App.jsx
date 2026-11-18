@@ -27813,7 +27813,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-11-17.2";
+const BUILD_STAMP = "2026-11-18.1";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
@@ -28529,20 +28529,43 @@ export default function App() {
   // varias en paralelo, pueden llegar desordenadas a Firebase y la última en llegar "gana", pisando a las demás.
   // updates: [{eid, isCustom, frecuencias}, ...]
   const setElemFrecsBulk = (zid, updates) => {
-    return setData(p => {
+    // Escritura DIRIGIDA y por diferencias: solo se envían los campos que realmente cambiaron
+    // (p. ej. "cada X días"). Así NO se pisa la "última realización" ni nada que otro dispositivo
+    // haya guardado mientras tanto — antes se reescribía todo el bloque "data" con la copia local.
+    let multi = {};
+    setDataLocal(p => {
+      multi = {};
       const zonaData = { ...(p[zid]||{}) };
       let elementos = { ...(zonaData.elementos||{}) };
       let elementosCustom = [...(zonaData.elementosCustom||[])];
       updates.forEach(({eid, isCustom, frecuencias}) => {
+        let base, cur;
         if(isCustom){
           const i = elementosCustom.findIndex(e=>e.id===eid);
-          if(i>=0) elementosCustom[i] = {...elementosCustom[i], frecuencias};
+          if(i<0) return;
+          base = `${zid}/elementosCustom/${i}`; cur = elementosCustom[i].frecuencias;
+          elementosCustom[i] = {...elementosCustom[i], frecuencias};
         } else {
+          base = `${zid}/elementos/${eid}`; cur = elementos[eid]?.frecuencias;
           elementos = {...elementos, [eid]: {...(elementos[eid]||{}), frecuencias}};
         }
+        const nuevas = Array.isArray(frecuencias) ? frecuencias : Object.values(frecuencias||{});
+        const mismosIds = Array.isArray(cur) && cur.length===nuevas.length && cur.every((c,k)=>c && nuevas[k] && String(c.id)===String(nuevas[k].id));
+        if(!mismosIds){ multi[`${base}/frecuencias`] = limpiarUndef(nuevas); return; }
+        nuevas.forEach((nf,k)=>{
+          const cf = cur[k];
+          new Set([...Object.keys(cf),...Object.keys(nf)]).forEach(key=>{
+            if(JSON.stringify(cf[key])!==JSON.stringify(nf[key])){
+              multi[`${base}/frecuencias/${k}/${key}`] = nf[key]===undefined ? null : limpiarUndef(nf[key]);
+            }
+          });
+        });
       });
       return {...p, [zid]: {...zonaData, elementos, elementosCustom}};
     });
+    if(!Object.keys(multi).length) return Promise.resolve(true);
+    const rutas = {}; Object.entries(multi).forEach(([k,v])=>{ rutas[k]=v; });
+    return fbUpdate(ref(db,`${ROOT}/data`), rutas).then(()=>true).catch(err=>{ console.error("Error al guardar frecuencias:",err); avisoErrorGuardado("data/frecuencias",err); return false; });
   };
 
   const zona = zonasConCust.find(z=>String(z.id)===String(zonaId));
