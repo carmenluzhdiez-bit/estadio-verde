@@ -9426,6 +9426,14 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
   bodegasData={}, setBodegasData=()=>{}, herramientasCustodia=[], setHerramientasCustodia=()=>{}, esJefa=false
 } ) {
   const [tab, setTab] = React.useState("ficha");
+  // ── Documentos informados (entrega de procedimientos / protocolos) ──
+  const [docsSegFT]  = useFirebaseState(`${ROOT}/protocolos_docs/seguridad`, []);
+  const [docsChkFT]  = useFirebaseState(`${ROOT}/protocolos_docs/checkin`, []);
+  const [memosFT]    = useFirebaseState(`${ROOT}/memos`, []);
+  const [showFormDocInf, setShowFormDocInf] = React.useState(false);
+  const [docInfSel, setDocInfSel] = React.useState({});
+  const [docInfLibre, setDocInfLibre] = React.useState("");
+  const [docInfForm, setDocInfForm] = React.useState({fecha:fechaLocal(), entregadoPor:"Carmen Luz Hermosilla Diez — Jefa Departamento de Áreas Verdes", obs:""});
   const [showNuevoEvento, setShowNuevoEvento] = React.useState(false);
   const [nuevoEvento, setNuevoEvento] = React.useState({ tipo:"permiso", fecha:"", fechaFin:"", horas:"", descripcion:"", estado:"pendiente" });
   const [editEventoId, setEditEventoId] = React.useState(null);
@@ -9504,7 +9512,7 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
       </div>
 
       <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
-        {[["ficha","📋 Ficha"],["eventos","📅 Eventos"],["bonos","💰 Bonos"],["epp","🦺 EPP"],["herramientas","🔧 Herramientas"],["resumen","📊 Resumen"]].map(([tb,lb])=>(
+        {[["ficha","📋 Ficha"],["eventos","📅 Eventos"],["bonos","💰 Bonos"],["epp","🦺 EPP"],["herramientas","🔧 Herramientas"],["docs","📄 Documentos informados"],["resumen","📊 Resumen"]].map(([tb,lb])=>(
           <button key={tb} className={`tab${tab===tb?" on":""}`} onClick={()=>setTab(tb)}>{lb}</button>
         ))}
       </div>
@@ -10019,6 +10027,133 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
                 ))
               }
             </div>
+          </div>
+        );
+      })()}
+
+      {tab==="docs"&&(()=>{
+        const puedeDocs = esJefa||esProgramador;
+        const registros = (Array.isArray(t.docsInformados)?t.docsInformados:[]).slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));
+        const fmtF = f=>f?String(f).split("-").reverse().join("-"):"—";
+        const esc = x=>String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+        const lista = (arr,tipo)=>(Array.isArray(arr)?arr:[]).map(d=>({key:tipo+"|"+d.id,origen:tipo,nombre:d.nombre||"(sin nombre)",fecha:d.fecha||d.fechaSubida||""}));
+        const disponibles = [
+          ...lista(docsSegFT,"Protocolo de seguridad"),
+          ...lista(docsChkFT,"Protocolo Check-In"),
+          ...(Array.isArray(memosFT)?memosFT:[]).map(m=>({key:"Memo|"+m.id,origen:"Memo",nombre:`Memo N° ${m.numero||"?"} — ${m.asunto||""}`,fecha:m.fecha||""})),
+        ].sort((a,b)=>a.origen.localeCompare(b.origen,"es")||a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+        const imprimirActaDocs = (r)=>{
+          const win = window.open("","_blank");
+          const filas = (r.docs||[]).map((d,i)=>`<tr><td style="padding:7px 10px;border-bottom:1px solid #d1d5db;text-align:center">${i+1}</td><td style="padding:7px 10px;border-bottom:1px solid #d1d5db">${esc(d.nombre)}</td><td style="padding:7px 10px;border-bottom:1px solid #d1d5db">${esc(d.origen)}</td><td style="padding:7px 10px;border-bottom:1px solid #d1d5db;text-align:center">${d.fecha?fmtF(d.fecha):"—"}</td></tr>`).join("");
+          win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Toma de conocimiento de documentos — ${esc(t.nombre)} — ${fmtF(r.fecha)}</title>
+            <style>
+              @page{size:A4;margin:16mm}
+              body{font-family:Calibri,Arial,sans-serif;color:#1a1a2e;margin:0;font-size:13px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+              .cab{border-bottom:3px solid #1a5c2a;padding-bottom:12px;margin-bottom:18px;display:flex;align-items:center;gap:14px}
+              .cab img{height:54px}
+              .titulo{font-size:17px;font-weight:700;color:#1a5c2a;line-height:1.25}
+              .sub{font-size:11px;color:#555}
+              .datos{display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;margin-bottom:16px}
+              .datos b{color:#1a5c2a}
+              table{width:100%;border-collapse:collapse;margin-bottom:16px}
+              th{background:#e8f5ec;color:#1a5c2a;text-align:left;padding:7px 10px;font-size:12px;border-bottom:2px solid #1a5c2a}
+              .decl{border:1px solid #1a5c2a;border-radius:6px;padding:12px 14px;margin-bottom:14px;line-height:1.5}
+              .casillas{margin:12px 0;font-size:14px}
+              .casillas span{display:inline-block;margin-right:34px}
+              .caja{display:inline-block;width:16px;height:16px;border:1.5px solid #111;vertical-align:-3px;margin-right:6px}
+              .lineas div{border-bottom:1px solid #777;height:24px}
+              .firmas{display:flex;gap:40px;margin-top:50px}
+              .fir{flex:1;text-align:center}
+              .lin{border-top:1px solid #111;padding-top:5px;font-size:12px}
+              .pie{margin-top:22px;font-size:10px;color:#666;border-top:1px solid #ccc;padding-top:6px}
+            </style></head><body>
+            <div class="cab"><img src="${LOGO_AREAS_VERDES_B64}" alt=""/><div><div class="titulo">REGISTRO DE ENTREGA Y TOMA DE CONOCIMIENTO<br/>DE PROCEDIMIENTOS, PROTOCOLOS Y DOCUMENTOS</div><div class="sub">Departamento de Áreas Verdes · Estadio Español de Las Condes</div></div></div>
+            <div class="datos">
+              <div><b>Trabajador/a:</b> ${esc(t.nombre)}</div><div><b>RUT:</b> ${esc(t.rut||"—")}</div>
+              <div><b>Cargo:</b> ${esc(t.cargo||"—")}</div><div><b>Fecha:</b> ${fmtF(r.fecha)}</div>
+              <div style="grid-column:1/-1"><b>Informa:</b> ${esc(r.entregadoPor||"—")}</div>
+            </div>
+            <table><thead><tr><th style="width:36px;text-align:center">N°</th><th>Documento</th><th style="width:150px">Tipo</th><th style="width:90px;text-align:center">Fecha doc.</th></tr></thead><tbody>${filas}</tbody></table>
+            ${r.obs?`<div style="margin-bottom:12px"><b>Observaciones de la jefatura:</b> ${esc(r.obs)}</div>`:""}
+            <div class="decl">Declaro haber sido informado/a de los documentos individualizados arriba, y de que se encuentran <b>disponibles en formato digital en la aplicación «Estadio Verde» del Departamento de Áreas Verdes</b> (secciones Protocolos y Memos), donde puedo consultarlos en cualquier momento. Quedo en conocimiento de su contenido y de la obligación de cumplirlos.</div>
+            <div class="casillas"><b>Copia impresa:</b> &nbsp; <span><span class="caja"></span>Solicito copia impresa</span><span><span class="caja"></span>No la requiero</span></div>
+            <div style="margin-bottom:4px"><b>Observaciones del trabajador/a:</b></div>
+            <div class="lineas"><div></div><div></div><div></div></div>
+            <div class="firmas"><div class="fir"><div class="lin">Firma trabajador/a · Nombre y RUT</div></div><div class="fir"><div class="lin">Firma quien informa · Jefatura Áreas Verdes</div></div></div>
+            <div class="pie">Este documento queda archivado en la hoja de vida del trabajador (Personal → Documentos informados).</div>
+            </body></html>`);
+          win.document.close(); setTimeout(()=>win.print(),400);
+        };
+        const guardarEntregaDocs = ()=>{
+          const elegidos = disponibles.filter(d=>docInfSel[d.key]).map(d=>({origen:d.origen,nombre:d.nombre,fecha:d.fecha}));
+          docInfLibre.split("\n").map(x=>x.trim()).filter(Boolean).forEach(n=>elegidos.push({origen:"Otro documento",nombre:n,fecha:""}));
+          if(elegidos.length===0){ alert("Elige al menos un documento (o escribe uno)."); return; }
+          const reg = {id:Date.now(), fecha:docInfForm.fecha||fechaLocal(), entregadoPor:docInfForm.entregadoPor, obs:docInfForm.obs, docs:elegidos, firmada:false, copia:"", obsTrabajador:"", fechaFirma:""};
+          onUpdate({docsInformados:[reg,...(Array.isArray(t.docsInformados)?t.docsInformados:[])]});
+          setDocInfSel({}); setDocInfLibre(""); setDocInfForm(p=>({...p,obs:""})); setShowFormDocInf(false);
+          imprimirActaDocs(reg);
+        };
+        const actualizarReg = (id,cambios)=>onUpdate({docsInformados:(Array.isArray(t.docsInformados)?t.docsInformados:[]).map(x=>x.id===id?{...x,...cambios}:x)});
+        return (
+          <div className="ein" style={{display:"flex",flexDirection:"column",gap:14}}>
+            <div style={{...S.card,padding:16}}>
+              <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#34d399",marginBottom:6}}>📄 Documentos informados ({registros.length})</div>
+              <div style={{fontSize:12,color:"#7aaa80",marginBottom:12}}>Registro de procedimientos, protocolos y memos que el trabajador recibió y sabe que están digitalizados en la app.</div>
+              {puedeDocs&&!showFormDocInf&&<button className="btn-p" style={S.btn} onClick={()=>setShowFormDocInf(true)}>➕ Nueva entrega de documentos</button>}
+              {puedeDocs&&showFormDocInf&&(
+                <div style={{border:"1px solid rgba(52,211,153,0.3)",borderRadius:8,padding:12}}>
+                  <div style={{display:"grid",gridTemplateColumns:"140px 1fr",gap:10,marginBottom:10}}>
+                    <div><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",display:"block",marginBottom:4}}>Fecha</label><input type="date" style={S.input} value={docInfForm.fecha} onChange={e=>setDocInfForm(p=>({...p,fecha:e.target.value}))}/></div>
+                    <div><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",display:"block",marginBottom:4}}>Informa</label><input style={S.input} value={docInfForm.entregadoPor} onChange={e=>setDocInfForm(p=>({...p,entregadoPor:e.target.value}))}/></div>
+                  </div>
+                  <div style={{fontSize:11,color:"#6aaa7a",textTransform:"uppercase",marginBottom:4}}>Documentos digitalizados en la app</div>
+                  <div style={{maxHeight:240,overflowY:"auto",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,marginBottom:10}}>
+                    {disponibles.length===0&&<div style={{padding:12,fontSize:12,color:"#5a8a6a"}}>No hay protocolos ni memos cargados todavía.</div>}
+                    {disponibles.map(d=>(
+                      <label key={d.key} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",borderBottom:"1px solid rgba(255,255,255,0.05)",fontSize:12,cursor:"pointer"}}>
+                        <input type="checkbox" checked={!!docInfSel[d.key]} onChange={()=>setDocInfSel(p=>({...p,[d.key]:!p[d.key]}))}/>
+                        <span style={{flex:1}}>{d.nombre}</span><span style={{color:"#5a8a6a",fontSize:11}}>{d.origen}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",display:"block",marginBottom:4}}>Otros documentos o procedimientos (uno por línea)</label>
+                  <textarea style={{...S.input,minHeight:60,marginBottom:10,width:"100%"}} value={docInfLibre} onChange={e=>setDocInfLibre(e.target.value)} placeholder="Ej: Procedimiento de uso de motosierra"/>
+                  <label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",display:"block",marginBottom:4}}>Observaciones (opcional)</label>
+                  <input style={{...S.input,marginBottom:12,width:"100%"}} value={docInfForm.obs} onChange={e=>setDocInfForm(p=>({...p,obs:e.target.value}))}/>
+                  <div style={{display:"flex",gap:8}}>
+                    <button className="btn-p" style={S.btn} onClick={guardarEntregaDocs}>💾 Guardar y generar acta</button>
+                    <button style={{...S.btn,background:"transparent",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)"}} onClick={()=>setShowFormDocInf(false)}>Cancelar</button>
+                  </div>
+                </div>
+              )}
+            </div>
+            {registros.length===0&&<div style={{...S.card,padding:16,fontSize:12,color:"#5a8a6a",textAlign:"center"}}>Aún no se registran entregas de documentos a este trabajador.</div>}
+            {registros.map(r=>(
+              <div key={r.id} style={{...S.card,padding:14,borderLeft:`3px solid ${r.firmada?"#4ade80":"#fbbf24"}`}}>
+                <div style={{display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap",marginBottom:6}}>
+                  <strong style={{fontSize:13}}>{fmtF(r.fecha)} · {(r.docs||[]).length} documento(s)</strong>
+                  <span style={{fontSize:11,color:r.firmada?"#4ade80":"#fbbf24"}}>{r.firmada?`✓ Acta firmada${r.fechaFirma?" el "+fmtF(r.fechaFirma):""}`:"⏳ Acta pendiente de firma"}</span>
+                </div>
+                <ul style={{margin:"0 0 8px 18px",padding:0,fontSize:12,color:"#cfe8d4"}}>
+                  {(r.docs||[]).map((d,i)=><li key={i}>{d.nombre} <span style={{color:"#5a8a6a"}}>· {d.origen}</span></li>)}
+                </ul>
+                {r.obs&&<div style={{fontSize:11,color:"#7aaa80",marginBottom:6}}>Obs. jefatura: {r.obs}</div>}
+                {r.firmada&&<div style={{fontSize:12,color:"#93c5fd",marginBottom:6}}>Copia impresa: {r.copia==="si"?"✅ Solicitó copia":r.copia==="no"?"No la requiere":"—"}{r.obsTrabajador?` · Obs. trabajador: ${r.obsTrabajador}`:""}</div>}
+                <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+                  <button style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>imprimirActaDocs(r)}>🖨️ Imprimir acta</button>
+                  {puedeDocs&&!r.firmada&&(<>
+                    <select style={{...S.input,fontSize:11,width:"auto"}} value={r._copiaTmp||""} onChange={e=>actualizarReg(r.id,{_copiaTmp:e.target.value})}>
+                      <option value="">¿Pidió copia impresa?</option><option value="si">Sí, solicita copia</option><option value="no">No la requiere</option>
+                    </select>
+                    <input style={{...S.input,fontSize:11,width:200}} placeholder="Obs. del trabajador (opcional)" value={r._obsTmp||""} onChange={e=>actualizarReg(r.id,{_obsTmp:e.target.value})}/>
+                    <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(34,197,94,0.15)",color:"#22c55e",border:"1px solid rgba(34,197,94,0.4)"}}
+                      onClick={()=>actualizarReg(r.id,{firmada:true,fechaFirma:fechaLocal(),copia:r._copiaTmp||"",obsTrabajador:r._obsTmp||"",_copiaTmp:null,_obsTmp:null})}>✓ Marcar acta firmada</button>
+                  </>)}
+                  {puedeDocs&&<button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(239,68,68,0.12)",color:"#f87171",border:"1px solid rgba(239,68,68,0.3)"}}
+                    onClick={()=>{ if(window.confirm("¿Eliminar este registro de entrega?")) onUpdate({docsInformados:(t.docsInformados||[]).filter(x=>x.id!==r.id)}); }}>🗑</button>}
+                </div>
+              </div>
+            ))}
           </div>
         );
       })()}
@@ -27904,7 +28039,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-11-18.2";
+const BUILD_STAMP = "2026-11-18.3";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
