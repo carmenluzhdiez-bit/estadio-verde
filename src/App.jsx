@@ -9421,6 +9421,82 @@ function TipoEventoSelector({ value, onChange, S, TIPO_EVENTO }) {
   );
 }
 
+// ── Sanciones RIOHS (art. 94 y art. 159) para eventos de tipo Amonestación ──
+const SANCIONES_RIOHS = {
+  verbal:   { label:"Amonestación verbal",                                              corta:"Verbal" },
+  escrita:  { label:"Amonestación escrita",                                             corta:"Escrita" },
+  escritaIT:{ label:"Amonestación escrita con constancia en hoja de vida y copia a la Inspección del Trabajo", corta:"Escrita + Insp. Trabajo" },
+  multa:    { label:"Multa de hasta el 25% de la remuneración diaria",                  corta:"Multa" },
+};
+function imprimirConstanciaSancion(t, ev) {
+  const esc = x=>String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const fmtF = f=>f?String(f).split("-").reverse().join(" / "):"____ / ____ / ________";
+  const sel = ev&&ev.sancion;
+  const caja = (on)=>`<span class="caja">${on?"&#10005;":""}</span>`;
+  const lin = (n)=>'<div class="lin"></div>'.repeat(n);
+  const monto = (sel==="multa"&&ev.multaMonto)?`$ ${esc(ev.multaMonto)}`:"$ ______________";
+  const win = window.open("","_blank");
+  if(!win){ alert("Permite ventanas emergentes para imprimir."); return; }
+  win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Constancia de medida disciplinaria — ${esc(t.nombre)}</title>
+<style>
+@page{size:Letter;margin:12mm 14mm}
+*{box-sizing:border-box}
+body{font-family:Calibri,Arial,Helvetica,sans-serif;color:#1a1a2e;font-size:11px;line-height:1.35;-webkit-print-color-adjust:exact;print-color-adjust:exact;margin:0}
+.cab{display:flex;align-items:center;gap:12px;border-bottom:3px solid #1a5c2a;padding-bottom:8px;margin-bottom:9px}
+.cab img{height:44px}
+.t1{font-size:15.5px;font-weight:700;color:#1a5c2a;line-height:1.2}
+.t2{font-size:10px;color:#555}
+h2{font-size:11.5px;color:#fff;background:#1a5c2a;padding:3px 9px;margin:9px 0 5px;border-radius:3px}
+table{width:100%;border-collapse:collapse;margin-bottom:4px}
+td{padding:4px 7px;border:1px solid #cfd8d2;vertical-align:top}
+td.l{background:#f2f8f4;font-weight:700;color:#1a5c2a;width:105px}
+.lin{border-bottom:1px solid #777;height:19px}
+.caja{display:inline-block;width:13px;height:13px;border:1.6px solid #111;vertical-align:-2px;margin-right:6px;flex:none;text-align:center;line-height:10px;font-size:12px;font-weight:700}
+.op{display:flex;align-items:flex-start;border:1px solid #b7d6bf;border-radius:5px;padding:6px 9px;margin-bottom:5px}
+.op.on{background:#eef8f1;border-color:#1a5c2a}
+.op b{color:#1a5c2a}
+.op small{color:#444;display:block;margin-top:2px}
+.nota{border-left:4px solid #d97706;background:#fff7e6;padding:5px 9px;margin:5px 0;font-size:10.5px}
+.firmas{display:flex;gap:26px;margin-top:34px}
+.fir{flex:1;text-align:center}
+.fl{border-top:1px solid #111;padding-top:3px;font-size:10.5px}
+.pie{font-size:9px;color:#666;margin-top:8px}
+</style></head><body>
+<div class="cab"><img src="${LOGO_AREAS_VERDES_B64}" alt=""/><div>
+<div class="t1">CONSTANCIA DE MEDIDA DISCIPLINARIA</div>
+<div class="t2">Departamento de Áreas Verdes · Estadio Español de Las Condes · Reglamento Interno de Orden, Higiene y Seguridad (RIOHS)</div></div></div>
+<table>
+<tr><td class="l">Trabajador/a</td><td colspan="3">${esc(t.nombre)}</td></tr>
+<tr><td class="l">RUT</td><td style="width:34%">${esc(t.rut||"")}</td><td class="l">Cargo</td><td>${esc(t.cargo||"")}</td></tr>
+<tr><td class="l">Fecha y hora del hecho</td><td>${fmtF(ev&&ev.fecha)} &nbsp; ____:____</td><td class="l">Lugar / zona</td><td>&nbsp;</td></tr>
+<tr><td class="l">Constancia emitida por</td><td colspan="3">Carmen Luz Hermosilla Diez — Jefa Departamento de Áreas Verdes &nbsp;·&nbsp; Fecha: ____ / ____ / ________</td></tr>
+</table>
+<h2>1. Hechos que motivan la medida</h2>
+${ev&&ev.descripcion?`<div style="padding:3px 2px;min-height:40px">${esc(ev.descripcion)}</div>${lin(2)}`:lin(4)}
+<h2>2. Norma o instrucción incumplida</h2>
+<div style="margin-bottom:3px">${caja(false)}Art. 159 RIOHS — incumplimiento de normas de higiene y seguridad o de instrucciones de Prevención de Riesgos</div>
+<div style="margin-bottom:3px">${caja(false)}Procedimiento / instrucción específica: ______________________________________________________________</div>
+<div>${caja(false)}Otro artículo del RIOHS: ____________________________________________________________________________</div>
+<h2>3. Medida aplicada (marcar una) — RIOHS art. 94</h2>
+<div class="op${sel==="verbal"?" on":""}">${caja(sel==="verbal")}<div><b>1. Amonestación verbal.</b></div></div>
+<div class="op${sel==="escrita"?" on":""}">${caja(sel==="escrita")}<div><b>2. Amonestación escrita.</b></div></div>
+<div class="op${sel==="escritaIT"?" on":""}">${caja(sel==="escritaIT")}<div><b>3. Amonestación escrita con constancia en la hoja de vida y copia a la Inspección del Trabajo.</b><small>Copia enviada a la Inspección del Trabajo el ____ / ____ / ________</small></div></div>
+<div class="op${sel==="multa"?" on":""}">${caja(sel==="multa")}<div><b>4. Multa de hasta el 25% de la remuneración diaria.</b><small>Monto: ${monto} &nbsp;·&nbsp; Remuneración diaria de referencia: $ ______________ &nbsp;·&nbsp; Porcentaje aplicado: ______ %</small></div></div>
+<div class="nota"><b>Derecho a reclamar:</b> en caso de multa, el trabajador puede reclamar ante la Inspección del Trabajo dentro de los <b>tres días siguientes</b> a que se le notifique.</div>
+<h2>4. Descargos u observaciones del trabajador/a</h2>
+${lin(3)}
+<h2>5. Notificación</h2>
+<div>${caja(false)}Entregada en persona &nbsp;&nbsp; ${caja(false)}Enviada por correo &nbsp;&nbsp; ${caja(false)}El trabajador/a se negó a firmar &nbsp;&nbsp;·&nbsp;&nbsp; Fecha de notificación: ____ / ____ / ________</div>
+<div class="firmas">
+<div class="fir"><div class="fl">Firma trabajador/a<br/>Nombre y RUT</div></div>
+<div class="fir"><div class="fl">Firma jefatura<br/>Carmen Luz Hermosilla Diez · Jefa DAV</div></div>
+<div class="fir"><div class="fl">Testigo (si el trabajador se negó a firmar)<br/>Nombre, RUT y firma</div></div>
+</div>
+<div class="pie">Original a la hoja de vida del trabajador (Estadio Verde → Personal → Eventos → Amonestación → «Adjuntar constancia»). Copia al trabajador.</div>
+</body></html>`);
+  win.document.close(); setTimeout(()=>win.print(),400);
+}
+
 // ── Constancia adjunta a un evento (foto o PDF). Se guarda en una ruta aparte (docs_personal/…) para no
 // inflar el nodo "personal" que leen todos los usuarios; solo se descarga al pulsar «Ver». ──
 function AdjuntoEvento({ S, trabId, ev, puedeVer, puedeSubir, onUpdateEvento }) {
@@ -9782,6 +9858,18 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
                     <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>DESCRIPCIÓN</label>
                     <textarea rows={2} style={{...S.input,resize:"vertical"}} value={nuevoEvento.descripcion} onChange={e=>setNuevoEvento(p=>({...p,descripcion:e.target.value}))}/>
                   </div>
+                  {nuevoEvento.tipo==="amonestacion"&&(
+                    <div style={{gridColumn:"1/-1"}}>
+                      <label style={{fontSize:11,color:"#6aaa7a",display:"block",marginBottom:4,letterSpacing:"0.5px"}}>SANCIÓN (RIOHS art. 94)</label>
+                      <select style={S.input} value={nuevoEvento.sancion||""} onChange={e=>setNuevoEvento(p=>({...p,sancion:e.target.value}))}>
+                        <option value="">— Sin definir —</option>
+                        {Object.entries(SANCIONES_RIOHS).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
+                      </select>
+                      {nuevoEvento.sancion==="multa"&&(
+                        <input type="number" min="0" style={{...S.input,marginTop:6}} placeholder="Monto de la multa ($)" value={nuevoEvento.multaMonto||""} onChange={e=>setNuevoEvento(p=>({...p,multaMonto:e.target.value}))}/>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div style={{display:"flex",gap:8}}>
                   <button className="btn-p" style={S.btn} onClick={()=>{
@@ -9817,6 +9905,18 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
                       </div>
                       <div style={{fontSize:12,color:"#5a8a6a"}}>{ev.fecha}{ev.fechaFin&&ev.fechaFin!==ev.fecha?" → "+ev.fechaFin:""}</div>
                       {ev.descripcion&&<div style={{fontSize:12,color:"#7aaa80",marginTop:3,fontStyle:"italic"}}>{ev.descripcion}</div>}
+                      {ev.tipo==="amonestacion"&&(
+                        <div style={{marginTop:6,display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                          {(esJefa||esProgramador)?(
+                            <select style={{...S.input,width:"auto",fontSize:11,padding:"4px 8px"}} value={ev.sancion||""} onChange={e=>onUpdateEvento(ev.id,{sancion:e.target.value})}>
+                              <option value="">Sanción: sin definir</option>
+                              {Object.entries(SANCIONES_RIOHS).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
+                            </select>
+                          ):(ev.sancion&&<span style={{fontSize:11,color:"#fca5a5"}}>Sanción: {SANCIONES_RIOHS[ev.sancion]?.label}</span>)}
+                          {ev.sancion==="multa"&&ev.multaMonto&&<span style={{fontSize:11,color:"#fca5a5"}}>Monto: ${ev.multaMonto}</span>}
+                          {(esJefa||esProgramador)&&<button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(239,68,68,0.12)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}} onClick={()=>imprimirConstanciaSancion(t,ev)}>🖨️ Imprimir constancia</button>}
+                        </div>
+                      )}
                       {ev.tipo==="amonestacion"&&<AdjuntoEvento S={S} trabId={t.id} ev={ev} puedeVer={puedeVerAdjuntos} puedeSubir={esJefa||esProgramador} onUpdateEvento={onUpdateEvento}/>}
                     </div>
                   </div>
@@ -28128,7 +28228,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-11-19.3";
+const BUILD_STAMP = "2026-11-19.4";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
