@@ -9421,9 +9421,85 @@ function TipoEventoSelector({ value, onChange, S, TIPO_EVENTO }) {
   );
 }
 
+// ── Constancia adjunta a un evento (foto o PDF). Se guarda en una ruta aparte (docs_personal/…) para no
+// inflar el nodo "personal" que leen todos los usuarios; solo se descarga al pulsar «Ver». ──
+function AdjuntoEvento({ S, trabId, ev, puedeVer, puedeSubir, onUpdateEvento }) {
+  const [cargando, setCargando] = React.useState(false);
+  const [msg, setMsg] = React.useState("");
+  const path = `${ROOT}/docs_personal/${trabId}_${ev.id}`;
+  const adj = ev.adjunto;
+  if(!puedeVer) return null;
+  const leerArchivo = (file) => new Promise((resolve,reject)=>{
+    const fr = new FileReader();
+    fr.onerror = ()=>reject(new Error("No se pudo leer el archivo"));
+    fr.onload = ()=>{
+      const url = fr.result;
+      if(file.type==="application/pdf"){
+        if(file.size>700*1024) return reject(new Error("El PDF pesa más de 700 KB. Reduce su tamaño o súbelo como foto."));
+        return resolve({dataUrl:url,tipo:file.type});
+      }
+      if(!file.type.startsWith("image/")) return reject(new Error("Solo se aceptan fotos o PDF."));
+      const img = new Image();
+      img.onerror = ()=>reject(new Error("No se pudo abrir la imagen"));
+      img.onload = ()=>{
+        const max=1600, k=Math.min(1,max/Math.max(img.width,img.height));
+        const c=document.createElement("canvas"); c.width=Math.round(img.width*k); c.height=Math.round(img.height*k);
+        c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+        resolve({dataUrl:c.toDataURL("image/jpeg",0.72),tipo:"image/jpeg"});
+      };
+      img.src = url;
+    };
+    fr.readAsDataURL(file);
+  });
+  const subir = async (file) => {
+    if(!file) return;
+    setCargando(true); setMsg("");
+    try{
+      const {dataUrl,tipo} = await leerArchivo(file);
+      const hoyA = new Date().toISOString().slice(0,10);
+      await fbSet(ref(db,path), {nombre:file.name, tipo, dataUrl, fecha:hoyA});
+      onUpdateEvento(ev.id,{adjunto:{nombre:file.name,tipo,fecha:hoyA,kb:Math.round(dataUrl.length*0.75/1024)}});
+      setMsg("✅ Constancia adjuntada.");
+    }catch(e){ setMsg("⚠️ "+(e.message||"No se pudo adjuntar")); }
+    setCargando(false);
+  };
+  const ver = async () => {
+    setCargando(true); setMsg("");
+    try{
+      const sn = await get(ref(db,path));
+      const d = sn.val();
+      if(!d||!d.dataUrl){ setMsg("⚠️ No se encontró el archivo."); setCargando(false); return; }
+      const b = await (await fetch(d.dataUrl)).blob();
+      window.open(URL.createObjectURL(b),"_blank");
+    }catch(e){ setMsg("⚠️ No se pudo abrir: "+(e.message||"")); }
+    setCargando(false);
+  };
+  const quitar = async () => {
+    if(!window.confirm("¿Quitar la constancia adjunta?")) return;
+    try{ await fbSet(ref(db,path), null); onUpdateEvento(ev.id,{adjunto:null}); setMsg(""); }catch(e){ setMsg("⚠️ No se pudo quitar"); }
+  };
+  return (
+    <div style={{marginTop:6,display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+      {adj
+        ? <>
+            <span style={{fontSize:11,color:"#86efac"}}>📎 Constancia adjunta: {adj.nombre} · {adj.fecha}{adj.kb?` · ${adj.kb} KB`:""}</span>
+            <button style={{...S.btn,fontSize:11,padding:"3px 10px"}} disabled={cargando} onClick={ver}>👁 Ver</button>
+            {puedeSubir&&<button className="btn-d" style={{...S.btn,fontSize:11,padding:"3px 8px"}} onClick={quitar}>Quitar</button>}
+          </>
+        : puedeSubir&&<label style={{...S.btn,fontSize:11,padding:"3px 10px",cursor:"pointer",background:"rgba(59,130,246,0.12)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}}>
+            {cargando?"Subiendo…":"📎 Adjuntar constancia (foto o PDF)"}
+            <input type="file" accept="image/*,application/pdf" style={{display:"none"}} disabled={cargando} onChange={e=>{subir(e.target.files&&e.target.files[0]); e.target.value="";}}/>
+          </label>}
+      {!adj&&!puedeSubir&&<span style={{fontSize:11,color:"#5a7a5a"}}>Sin constancia adjunta</span>}
+      {msg&&<span style={{fontSize:11,color:msg.startsWith("✅")?"#86efac":"#fca5a5"}}>{msg}</span>}
+    </div>
+  );
+}
+
 function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDeleteEvento, onUpdateEvento, esProgramador=false,
   eppEntregas=[], eppFiltros=[], eppVidaUtil=[], eppFitTests=[],
-  bodegasData={}, setBodegasData=()=>{}, herramientasCustodia=[], setHerramientasCustodia=()=>{}, esJefa=false
+  bodegasData={}, setBodegasData=()=>{}, herramientasCustodia=[], setHerramientasCustodia=()=>{}, esJefa=false,
+  puedeVerAdjuntos=false
 } ) {
   const [tab, setTab] = React.useState("ficha");
   // ── Documentos informados (entrega de procedimientos / protocolos) ──
@@ -9741,6 +9817,7 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
                       </div>
                       <div style={{fontSize:12,color:"#5a8a6a"}}>{ev.fecha}{ev.fechaFin&&ev.fechaFin!==ev.fecha?" → "+ev.fechaFin:""}</div>
                       {ev.descripcion&&<div style={{fontSize:12,color:"#7aaa80",marginTop:3,fontStyle:"italic"}}>{ev.descripcion}</div>}
+                      {ev.tipo==="amonestacion"&&<AdjuntoEvento S={S} trabId={t.id} ev={ev} puedeVer={puedeVerAdjuntos} puedeSubir={esJefa||esProgramador} onUpdateEvento={onUpdateEvento}/>}
                     </div>
                   </div>
                   <div style={{display:"flex",gap:6,flexShrink:0,flexWrap:"wrap",justifyContent:"flex-end"}}>
@@ -22498,10 +22575,21 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                     ⛽ <strong style={{color:"#f97316"}}>Seguimiento de Bencina</strong> — Registra las facturas en <em>Compras</em> con categoría "Combustible" y unidad "L" para verlas aquí.
                   </div>
                 );
-                const getLitros=(c)=>(c.items||[]).filter(i=>{const u=(i.unidad||"").toLowerCase();const cat=(i.categoria||"").toLowerCase();return(u==="l"||u==="litros"||u==="litro")&&cat.includes("combustib");}).reduce((a,i)=>a+Number(i.cantidad||0),0);
+                // Litros de una compra: ítem de combustible (por categoría O por descripción) con unidad litro (L, lt, lts, litros);
+                // si la unidad no es litro pero la descripción trae "20 L"/"5 lt", se usa ese volumen × cantidad.
+                const _esLt=u=>/^(l|lt|lts|litro|litros)\.?$/.test(String(u||"").toLowerCase().trim());
+                const _esComb=i=>(i.categoria||"").toLowerCase().includes("combustib")||/bencin|gasolin|combustib|diesel|petr[oó]leo|parafina/.test(String(i.descripcion||"").toLowerCase());
+                const getLitros=(c)=>{
+                  const its=(c.items&&c.items.length)?c.items:[{descripcion:c.descripcion,cantidad:c.cantidad,unidad:c.unidad,categoria:c.categoria}];
+                  return its.filter(_esComb).reduce((a,i)=>{
+                    if(_esLt(i.unidad)) return a+(Number(String(i.cantidad||0).replace(",","."))||0);
+                    const m=/(\d+(?:[.,]\d+)?)\s*(?:l|lt|lts|litros?)\b/i.exec(String(i.descripcion||""));
+                    return a+(m?(Number(m[1].replace(",","."))||0)*(Number(i.cantidad)||1):0);
+                  },0);
+                };
                 const getMonto=(c)=>montoCompra(c);
                 const porMes={};
-                comprasBenc.forEach(c=>{const mes=(c.fecha||"").slice(0,7);if(!mes)return;if(!porMes[mes])porMes[mes]={monto:0,litros:0,n:0};porMes[mes].monto+=getMonto(c);porMes[mes].litros+=getLitros(c);porMes[mes].n++;});
+                comprasBenc.forEach(c=>{const mes=(c.fecha||"").slice(0,7);if(!mes)return;if(!porMes[mes])porMes[mes]={monto:0,litros:0,n:0,sinLitros:0};porMes[mes].monto+=getMonto(c);const _l=getLitros(c);porMes[mes].litros+=_l;if(!(_l>0))porMes[mes].sinLitros++;porMes[mes].n++;});
                 const estesMes=comprasBenc.filter(c=>(c.fecha||"").startsWith(mesActual));
                 const totalMontoMes=estesMes.reduce((a,c)=>a+getMonto(c),0);
                 const totalLtsMes=estesMes.reduce((a,c)=>a+getLitros(c),0);
@@ -22575,6 +22663,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                         <span style={{minWidth:120}}>{lbl}</span>
                         <div style={{display:"flex",gap:10,alignItems:"center"}}>
                           {porMes[mes].litros>0&&<span style={{color:"#fbbf24"}}>{porMes[mes].litros.toFixed(1)} L</span>}
+                          {porMes[mes].sinLitros>0&&<span title="Compras de este mes sin litros detectables: en Compras, edita el ítem y pon unidad «L» y la cantidad en litros" style={{color:"#f87171",fontSize:10}}>⚠️ {porMes[mes].sinLitros} sin litros</span>}
                           <span style={{fontWeight:600,color:"#f97316"}}>${porMes[mes].monto.toLocaleString("es-CL")}</span>
                           {pxL&&<span style={{color:"#5a7a5a",fontSize:10}}>${pxL.toLocaleString("es-CL")}/L</span>}
                           <span style={{color:"#4a6a5a",fontSize:10}}>({porMes[mes].n})</span>
@@ -28039,7 +28128,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-11-19.1";
+const BUILD_STAMP = "2026-11-19.3";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
@@ -31533,6 +31622,7 @@ export default function App() {
             t={getTrabajador(personalId)}
             S={S}
             esProgramador={esProgramador}
+            puedeVerAdjuntos={esJefa||esProgramador||fbRol==="gerencia"}
             onVolver={()=>{setPersonalVista("lista");setPersonalId(null);}}
             onDelete={()=>{deleteTrabajador(personalId);setPersonalVista("lista");setPersonalId(null);}}
             onUpdate={(patch)=>updateTrabajador(personalId,patch)}
