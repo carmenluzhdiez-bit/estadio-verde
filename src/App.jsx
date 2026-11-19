@@ -9428,13 +9428,21 @@ const SANCIONES_RIOHS = {
   escritaIT:{ label:"Amonestación escrita con constancia en hoja de vida y copia a la Inspección del Trabajo", corta:"Escrita + Insp. Trabajo" },
   multa:    { label:"Multa de hasta el 25% de la remuneración diaria",                  corta:"Multa" },
 };
-function imprimirConstanciaSancion(t, ev) {
+function imprimirConstanciaSancion(t, ev, c0) {
+  const c = c0||{};
   const esc = x=>String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   const fmtF = f=>f?String(f).split("-").reverse().join(" / "):"____ / ____ / ________";
-  const sel = ev&&ev.sancion;
+  const sel = c.sancion!==undefined?c.sancion:(ev&&ev.sancion);
   const caja = (on)=>`<span class="caja">${on?"&#10005;":""}</span>`;
   const lin = (n)=>'<div class="lin"></div>'.repeat(n);
-  const monto = (sel==="multa"&&ev.multaMonto)?`$ ${esc(ev.multaMonto)}`:"$ ______________";
+  const monto = (sel==="multa"&&(c.multaMonto||ev.multaMonto))?`$ ${esc(c.multaMonto||ev.multaMonto)}`:"$ ______________";
+  const rem = c.remDiaria?`$ ${esc(c.remDiaria)}`:"$ ______________";
+  const pct = c.porcentaje?`${esc(c.porcentaje)}`:"______";
+  const subr = (v)=>v?`<u>${esc(v)}</u>`:"______________________________________________";
+  const hora = c.hora?esc(c.hora):"____:____";
+  const fechaH = fmtF(c.fechaHecho||(ev&&ev.fecha));
+  const fechaEm = fmtF(c.fechaEmision);
+  const hechos = c.hechos!==undefined?c.hechos:(ev&&ev.descripcion);
   const win = window.open("","_blank");
   if(!win){ alert("Permite ventanas emergentes para imprimir."); return; }
   win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Constancia de medida disciplinaria — ${esc(t.nombre)}</title>
@@ -9468,25 +9476,25 @@ td.l{background:#f2f8f4;font-weight:700;color:#1a5c2a;width:105px}
 <table>
 <tr><td class="l">Trabajador/a</td><td colspan="3">${esc(t.nombre)}</td></tr>
 <tr><td class="l">RUT</td><td style="width:34%">${esc(t.rut||"")}</td><td class="l">Cargo</td><td>${esc(t.cargo||"")}</td></tr>
-<tr><td class="l">Fecha y hora del hecho</td><td>${fmtF(ev&&ev.fecha)} &nbsp; ____:____</td><td class="l">Lugar / zona</td><td>&nbsp;</td></tr>
-<tr><td class="l">Constancia emitida por</td><td colspan="3">Carmen Luz Hermosilla Diez — Jefa Departamento de Áreas Verdes &nbsp;·&nbsp; Fecha: ____ / ____ / ________</td></tr>
+<tr><td class="l">Fecha y hora del hecho</td><td>${fechaH} &nbsp; ${hora}</td><td class="l">Lugar / zona</td><td>${esc(c.lugar||"")}</td></tr>
+<tr><td class="l">Constancia emitida por</td><td colspan="3">Carmen Luz Hermosilla Diez — Jefa Departamento de Áreas Verdes &nbsp;·&nbsp; Fecha: ${fechaEm}</td></tr>
 </table>
 <h2>1. Hechos que motivan la medida</h2>
-${ev&&ev.descripcion?`<div style="padding:3px 2px;min-height:40px">${esc(ev.descripcion)}</div>${lin(2)}`:lin(4)}
+${hechos?`<div style="padding:3px 2px;min-height:40px;white-space:pre-wrap">${esc(hechos)}</div>${lin(1)}`:lin(4)}
 <h2>2. Norma o instrucción incumplida</h2>
-<div style="margin-bottom:3px">${caja(false)}Art. 159 RIOHS — incumplimiento de normas de higiene y seguridad o de instrucciones de Prevención de Riesgos</div>
-<div style="margin-bottom:3px">${caja(false)}Procedimiento / instrucción específica: ______________________________________________________________</div>
-<div>${caja(false)}Otro artículo del RIOHS: ____________________________________________________________________________</div>
+<div style="margin-bottom:3px">${caja(!!c.art159)}Art. 159 RIOHS — incumplimiento de normas de higiene y seguridad o de instrucciones de Prevención de Riesgos</div>
+<div style="margin-bottom:3px">${caja(!!c.procedimiento)}Procedimiento / instrucción específica: ${subr(c.procedimiento)}</div>
+<div>${caja(!!c.otroArt)}Otro artículo del RIOHS: ${subr(c.otroArt)}</div>
 <h2>3. Medida aplicada (marcar una) — RIOHS art. 94</h2>
 <div class="op${sel==="verbal"?" on":""}">${caja(sel==="verbal")}<div><b>1. Amonestación verbal.</b></div></div>
 <div class="op${sel==="escrita"?" on":""}">${caja(sel==="escrita")}<div><b>2. Amonestación escrita.</b></div></div>
-<div class="op${sel==="escritaIT"?" on":""}">${caja(sel==="escritaIT")}<div><b>3. Amonestación escrita con constancia en la hoja de vida y copia a la Inspección del Trabajo.</b><small>Copia enviada a la Inspección del Trabajo el ____ / ____ / ________</small></div></div>
-<div class="op${sel==="multa"?" on":""}">${caja(sel==="multa")}<div><b>4. Multa de hasta el 25% de la remuneración diaria.</b><small>Monto: ${monto} &nbsp;·&nbsp; Remuneración diaria de referencia: $ ______________ &nbsp;·&nbsp; Porcentaje aplicado: ______ %</small></div></div>
+<div class="op${sel==="escritaIT"?" on":""}">${caja(sel==="escritaIT")}<div><b>3. Amonestación escrita con constancia en la hoja de vida y copia a la Inspección del Trabajo.</b><small>Copia enviada a la Inspección del Trabajo el ${fmtF(c.fechaCopiaIT)}</small></div></div>
+<div class="op${sel==="multa"?" on":""}">${caja(sel==="multa")}<div><b>4. Multa de hasta el 25% de la remuneración diaria.</b><small>Monto: ${monto} &nbsp;·&nbsp; Remuneración diaria de referencia: ${rem} &nbsp;·&nbsp; Porcentaje aplicado: ${pct} %</small></div></div>
 <div class="nota"><b>Derecho a reclamar:</b> en caso de multa, el trabajador puede reclamar ante la Inspección del Trabajo dentro de los <b>tres días siguientes</b> a que se le notifique.</div>
 <h2>4. Descargos u observaciones del trabajador/a</h2>
-${lin(3)}
+${c.descargos?`<div style="padding:3px 2px;min-height:30px;white-space:pre-wrap">${esc(c.descargos)}</div>${lin(1)}`:lin(3)}
 <h2>5. Notificación</h2>
-<div>${caja(false)}Entregada en persona &nbsp;&nbsp; ${caja(false)}Enviada por correo &nbsp;&nbsp; ${caja(false)}El trabajador/a se negó a firmar &nbsp;&nbsp;·&nbsp;&nbsp; Fecha de notificación: ____ / ____ / ________</div>
+<div>${caja(c.notif==="persona")}Entregada en persona &nbsp;&nbsp; ${caja(c.notif==="correo")}Enviada por correo &nbsp;&nbsp; ${caja(c.notif==="nego")}El trabajador/a se negó a firmar &nbsp;&nbsp;·&nbsp;&nbsp; Fecha de notificación: ${fmtF(c.fechaNotif)}</div>
 <div class="firmas">
 <div class="fir"><div class="fl">Firma trabajador/a<br/>Nombre y RUT</div></div>
 <div class="fir"><div class="fl">Firma jefatura<br/>Carmen Luz Hermosilla Diez · Jefa DAV</div></div>
@@ -9495,6 +9503,78 @@ ${lin(3)}
 <div class="pie">Original a la hoja de vida del trabajador (Estadio Verde → Personal → Eventos → Amonestación → «Adjuntar constancia»). Copia al trabajador.</div>
 </body></html>`);
   win.document.close(); setTimeout(()=>win.print(),400);
+}
+
+// ── Formulario previo a imprimir la constancia: precarga datos del trabajador/evento, se completa y se guarda en el evento ──
+function BotonConstancia({ S, t, ev, onUpdateEvento }) {
+  const [abierto, setAbierto] = React.useState(false);
+  const [f, setF] = React.useState({});
+  const abrir = ()=>{
+    const g = ev.constancia||{};
+    setF({
+      fechaHecho: g.fechaHecho||ev.fecha||"", hora: g.hora||"", lugar: g.lugar||"",
+      fechaEmision: g.fechaEmision||new Date().toISOString().slice(0,10),
+      hechos: g.hechos!==undefined?g.hechos:(ev.descripcion||""),
+      art159: g.art159!==undefined?g.art159:true, procedimiento: g.procedimiento||"", otroArt: g.otroArt||"",
+      sancion: g.sancion!==undefined?g.sancion:(ev.sancion||""), multaMonto: g.multaMonto||ev.multaMonto||"",
+      remDiaria: g.remDiaria||"", porcentaje: g.porcentaje||"", fechaCopiaIT: g.fechaCopiaIT||"",
+      descargos: g.descargos||"", notif: g.notif||"", fechaNotif: g.fechaNotif||"",
+    });
+    setAbierto(true);
+  };
+  const set = (k,v)=>setF(p=>({...p,[k]:v}));
+  const lbl = {fontSize:10,color:"#6aaa7a",textTransform:"uppercase",display:"block",marginBottom:3,letterSpacing:"0.5px"};
+  const guardarEImprimir = ()=>{
+    onUpdateEvento(ev.id,{constancia:f, sancion:f.sancion, multaMonto:f.sancion==="multa"?f.multaMonto:""});
+    imprimirConstanciaSancion(t,ev,f);
+    setAbierto(false);
+  };
+  if(!abierto) return <button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(239,68,68,0.12)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}} onClick={abrir}>🖨️ Constancia</button>;
+  return (
+    <div style={{flexBasis:"100%",width:"100%",border:"1px solid rgba(239,68,68,0.3)",borderRadius:8,padding:12,marginTop:6,background:"rgba(0,0,0,0.15)"}}>
+      <div style={{fontSize:13,fontWeight:700,color:"#fca5a5",marginBottom:8}}>Constancia de medida disciplinaria — {t.nombre}</div>
+      <div style={{fontSize:11,color:"#7aaa80",marginBottom:8}}>RUT: {t.rut||"(sin RUT en la ficha)"} · Cargo: {t.cargo||"(sin cargo en la ficha)"}</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:8}}>
+        <div><label style={lbl}>Fecha del hecho</label><input type="date" style={S.input} value={f.fechaHecho||""} onChange={e=>set("fechaHecho",e.target.value)}/></div>
+        <div><label style={lbl}>Hora</label><input type="time" style={S.input} value={f.hora||""} onChange={e=>set("hora",e.target.value)}/></div>
+        <div><label style={lbl}>Fecha de emisión</label><input type="date" style={S.input} value={f.fechaEmision||""} onChange={e=>set("fechaEmision",e.target.value)}/></div>
+      </div>
+      <label style={lbl}>Lugar / zona</label>
+      <input style={{...S.input,width:"100%",marginBottom:8}} value={f.lugar||""} onChange={e=>set("lugar",e.target.value)}/>
+      <label style={lbl}>Hechos que motivan la medida</label>
+      <textarea rows={3} style={{...S.input,width:"100%",resize:"vertical",marginBottom:8}} value={f.hechos||""} onChange={e=>set("hechos",e.target.value)}/>
+      <label style={lbl}>Norma o instrucción incumplida</label>
+      <label style={{display:"flex",alignItems:"center",gap:6,fontSize:12,marginBottom:4}}><input type="checkbox" checked={!!f.art159} onChange={e=>set("art159",e.target.checked)}/>Art. 159 RIOHS (normas de higiene y seguridad / instrucciones de Prevención de Riesgos)</label>
+      <input style={{...S.input,width:"100%",marginBottom:4}} placeholder="Procedimiento / instrucción específica" value={f.procedimiento||""} onChange={e=>set("procedimiento",e.target.value)}/>
+      <input style={{...S.input,width:"100%",marginBottom:8}} placeholder="Otro artículo del RIOHS" value={f.otroArt||""} onChange={e=>set("otroArt",e.target.value)}/>
+      <label style={lbl}>Medida aplicada (RIOHS art. 94)</label>
+      <select style={{...S.input,width:"100%",marginBottom:6}} value={f.sancion||""} onChange={e=>set("sancion",e.target.value)}>
+        <option value="">— Sin definir (se marca a mano) —</option>
+        {Object.entries(SANCIONES_RIOHS).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
+      </select>
+      {f.sancion==="escritaIT"&&<div style={{marginBottom:8}}><label style={lbl}>Fecha de copia a Inspección del Trabajo</label><input type="date" style={S.input} value={f.fechaCopiaIT||""} onChange={e=>set("fechaCopiaIT",e.target.value)}/></div>}
+      {f.sancion==="multa"&&(
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:8}}>
+          <div><label style={lbl}>Monto multa ($)</label><input type="number" min="0" style={S.input} value={f.multaMonto||""} onChange={e=>set("multaMonto",e.target.value)}/></div>
+          <div><label style={lbl}>Remuneración diaria ($)</label><input type="number" min="0" style={S.input} value={f.remDiaria||""} onChange={e=>set("remDiaria",e.target.value)}/></div>
+          <div><label style={lbl}>Porcentaje (máx. 25%)</label><input type="number" min="0" max="25" style={S.input} value={f.porcentaje||""} onChange={e=>set("porcentaje",e.target.value)}/></div>
+        </div>
+      )}
+      <label style={lbl}>Descargos u observaciones del trabajador (si ya los tienes)</label>
+      <textarea rows={2} style={{...S.input,width:"100%",resize:"vertical",marginBottom:8}} value={f.descargos||""} onChange={e=>set("descargos",e.target.value)}/>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
+        <div><label style={lbl}>Notificación</label>
+          <select style={S.input} value={f.notif||""} onChange={e=>set("notif",e.target.value)}>
+            <option value="">— Sin definir —</option><option value="persona">Entregada en persona</option><option value="correo">Enviada por correo</option><option value="nego">El trabajador se negó a firmar</option>
+          </select></div>
+        <div><label style={lbl}>Fecha de notificación</label><input type="date" style={S.input} value={f.fechaNotif||""} onChange={e=>set("fechaNotif",e.target.value)}/></div>
+      </div>
+      <div style={{display:"flex",gap:8}}>
+        <button className="btn-p" style={S.btn} onClick={guardarEImprimir}>💾 Guardar e imprimir</button>
+        <button className="btn-g" style={S.btn} onClick={()=>setAbierto(false)}>Cancelar</button>
+      </div>
+    </div>
+  );
 }
 
 // ── Constancia adjunta a un evento (foto o PDF). Se guarda en una ruta aparte (docs_personal/…) para no
@@ -9914,7 +9994,7 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
                             </select>
                           ):(ev.sancion&&<span style={{fontSize:11,color:"#fca5a5"}}>Sanción: {SANCIONES_RIOHS[ev.sancion]?.label}</span>)}
                           {ev.sancion==="multa"&&ev.multaMonto&&<span style={{fontSize:11,color:"#fca5a5"}}>Monto: ${ev.multaMonto}</span>}
-                          {(esJefa||esProgramador)&&<button style={{...S.btn,fontSize:11,padding:"4px 10px",background:"rgba(239,68,68,0.12)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}} onClick={()=>imprimirConstanciaSancion(t,ev)}>🖨️ Imprimir constancia</button>}
+                          {(esJefa||esProgramador)&&<BotonConstancia S={S} t={t} ev={ev} onUpdateEvento={onUpdateEvento}/>}
                         </div>
                       )}
                       {ev.tipo==="amonestacion"&&<AdjuntoEvento S={S} trabId={t.id} ev={ev} puedeVer={puedeVerAdjuntos} puedeSubir={esJefa||esProgramador} onUpdateEvento={onUpdateEvento}/>}
@@ -28228,7 +28308,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-11-19.4";
+const BUILD_STAMP = "2026-11-19.5";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
