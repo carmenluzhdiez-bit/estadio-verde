@@ -28039,7 +28039,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-11-18.4";
+const BUILD_STAMP = "2026-11-19.1";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
@@ -28641,6 +28641,10 @@ export default function App() {
 
   // PINes siguen en localStorage (son locales por dispositivo)
   const [personalVista, setPersonalVista] = useState("lista");
+  // Registro grupal de charlas de seguridad → queda en "Documentos informados" de cada asistente
+  const [showCharla, setShowCharla] = useState(false);
+  const [charlaSel, setCharlaSel] = useState({});
+  const [charlaForm, setCharlaForm] = useState({fecha:fechaLocal(), tema:"Charla de seguridad: re-instrucción de procedimientos de poda bajo y sobre 1,8 m", docs:"P-EE-AV-011 Poda bajo 1,8 m (Rev.3)\nP-EE-AV-019 Poda sobre 1,8 m (Rev.3)", relator:"Carmen Luz Hermosilla Diez — Jefa Departamento de Áreas Verdes", firmada:false, obs:""});
   const [newAccesoEmail, setNewAccesoEmail] = useState("");
   const [newAccesoRol, setNewAccesoRol] = useState("jefa");
   const [personalId, setPersonalId] = useState(null);
@@ -31273,9 +31277,60 @@ export default function App() {
                 <button style={{...S.btn,background:"rgba(59,130,246,0.15)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}} onClick={()=>setPersonalVista("informe-rrhh")}>📄 Informe RRHH</button>
                 <button style={{...S.btn,background:"rgba(196,181,253,0.15)",color:"#c4b5fd",border:"1px solid rgba(196,181,253,0.3)"}} onClick={()=>setPersonalVista("bono-masivo")}>💰 Bono por Tarea</button>
                 {esProgramador&&<button style={{...S.btn,background:"rgba(245,158,11,0.12)",color:"#fbbf24",border:"1px solid rgba(245,158,11,0.25)"}} onClick={()=>setPersonalVista("accesos")}>🔑 Gestión de Accesos</button>}
+                {(esJefa||esProgramador)&&!soloLectura&&<button style={{...S.btn,background:"rgba(52,211,153,0.15)",color:"#34d399",border:"1px solid rgba(52,211,153,0.3)"}} onClick={()=>setShowCharla(v=>!v)}>📢 Registrar charla de seguridad</button>}
                 <button className="btn-p" style={S.btn} onClick={()=>setPersonalVista("nuevo")}>➕ Nuevo Trabajador</button>
               </div>
             </div>
+            {showCharla&&(()=>{
+              const activos=[...personal].filter(noRetirado).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
+              const nSel=activos.filter(t=>charlaSel[t.id]).length;
+              const guardarCharla=()=>{
+                const ids=activos.filter(t=>charlaSel[t.id]).map(t=>String(t.id));
+                if(!charlaForm.tema.trim()){ alert("Falta el tema de la charla."); return; }
+                if(ids.length===0){ alert("Marca al menos un asistente."); return; }
+                const docs=[{origen:"Charla de seguridad",nombre:charlaForm.tema.trim(),fecha:charlaForm.fecha},
+                  ...charlaForm.docs.split("\n").map(x=>x.trim()).filter(Boolean).map(n=>({origen:"Procedimiento",nombre:n,fecha:""}))];
+                const base=Date.now();
+                setPersonal(p=>(Array.isArray(p)?p:Object.values(p||{})).map(t=>{
+                  if(!ids.includes(String(t.id))) return t;
+                  const reg={id:base+Math.floor(Math.random()*1000),tipo:"charla",fecha:charlaForm.fecha,entregadoPor:charlaForm.relator,obs:charlaForm.obs,docs,firmada:!!charlaForm.firmada,copia:"",obsTrabajador:"",fechaFirma:charlaForm.firmada?charlaForm.fecha:""};
+                  return {...t,docsInformados:[reg,...(Array.isArray(t.docsInformados)?t.docsInformados:[])]};
+                }));
+                setShowCharla(false); setCharlaSel({});
+                alert(`✅ Charla registrada en la hoja de vida de ${ids.length} trabajador(es).`);
+              };
+              return (
+                <div style={{...S.card,padding:16,marginBottom:18,border:"1px solid rgba(52,211,153,0.35)"}}>
+                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,color:"#34d399",marginBottom:10}}>📢 Registrar charla de seguridad</div>
+                  <div style={{display:"grid",gridTemplateColumns:"140px 1fr",gap:10,marginBottom:10}}>
+                    <div><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",display:"block",marginBottom:4}}>Fecha</label><input type="date" style={S.input} value={charlaForm.fecha} onChange={e=>setCharlaForm(p=>({...p,fecha:e.target.value}))}/></div>
+                    <div><label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",display:"block",marginBottom:4}}>Tema</label><input style={S.input} value={charlaForm.tema} onChange={e=>setCharlaForm(p=>({...p,tema:e.target.value}))}/></div>
+                  </div>
+                  <label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",display:"block",marginBottom:4}}>Procedimientos / documentos tratados (uno por línea)</label>
+                  <textarea style={{...S.input,minHeight:60,width:"100%",marginBottom:10}} value={charlaForm.docs} onChange={e=>setCharlaForm(p=>({...p,docs:e.target.value}))}/>
+                  <label style={{fontSize:10,color:"#6aaa7a",textTransform:"uppercase",display:"block",marginBottom:4}}>Relatora</label>
+                  <input style={{...S.input,width:"100%",marginBottom:10}} value={charlaForm.relator} onChange={e=>setCharlaForm(p=>({...p,relator:e.target.value}))}/>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                    <span style={{fontSize:11,color:"#6aaa7a",textTransform:"uppercase"}}>Asistentes ({nSel}/{activos.length})</span>
+                    <span><button style={{...S.btn,fontSize:11,padding:"3px 9px",marginRight:6}} onClick={()=>{const n={};activos.forEach(t=>n[t.id]=true);setCharlaSel(n);}}>Marcar todos</button><button style={{...S.btn,fontSize:11,padding:"3px 9px"}} onClick={()=>setCharlaSel({})}>Desmarcar</button></span>
+                  </div>
+                  <div style={{border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,marginBottom:10,maxHeight:220,overflowY:"auto"}}>
+                    {activos.map(t=>(
+                      <label key={t.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",borderBottom:"1px solid rgba(255,255,255,0.05)",fontSize:12,cursor:"pointer"}}>
+                        <input type="checkbox" checked={!!charlaSel[t.id]} onChange={()=>setCharlaSel(p=>({...p,[t.id]:!p[t.id]}))}/>
+                        <span style={{flex:1}}>{t.nombre}</span><span style={{color:"#5a8a6a",fontSize:11}}>{t.cargo||""}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <label style={{display:"flex",alignItems:"center",gap:8,fontSize:12,marginBottom:10,cursor:"pointer"}}><input type="checkbox" checked={charlaForm.firmada} onChange={e=>setCharlaForm(p=>({...p,firmada:e.target.checked}))}/>Ya tengo la lista de asistencia firmada (queda como «firmada»; si no, queda pendiente de firma)</label>
+                  <input style={{...S.input,width:"100%",marginBottom:12}} placeholder="Observaciones (opcional)" value={charlaForm.obs} onChange={e=>setCharlaForm(p=>({...p,obs:e.target.value}))}/>
+                  <div style={{display:"flex",gap:8}}>
+                    <button className="btn-p" style={S.btn} onClick={guardarCharla}>💾 Registrar en la hoja de vida de los asistentes</button>
+                    <button style={{...S.btn,background:"transparent",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.1)"}} onClick={()=>setShowCharla(false)}>Cancelar</button>
+                  </div>
+                </div>
+              );
+            })()}
             {personal.length===0&&(
               <div style={{...S.card,padding:48,textAlign:"center",color:"#4a8a5a"}}>
                 <div style={{fontSize:48,marginBottom:12}}>👷</div>
