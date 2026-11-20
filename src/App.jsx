@@ -9657,7 +9657,8 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
   bodegasData={}, setBodegasData=()=>{}, herramientasCustodia=[], setHerramientasCustodia=()=>{}, esJefa=false,
   puedeVerAdjuntos=false
 } ) {
-  const [tab, setTab] = React.useState("ficha");
+  const [tab, setTab] = React.useState("resumen");
+  const [editFicha, setEditFicha] = React.useState(false); // la Ficha se abre bloqueada para evitar ediciones accidentales
   // ── Documentos informados (entrega de procedimientos / protocolos) ──
   const [docsSegFT]  = useFirebaseState(`${ROOT}/protocolos_docs/seguridad`, []);
   const [docsChkFT]  = useFirebaseState(`${ROOT}/protocolos_docs/checkin`, []);
@@ -9745,12 +9746,17 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
 
       <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
         {[["ficha","📋 Ficha"],["eventos","📅 Eventos"],["bonos","💰 Bonos"],["epp","🦺 EPP"],["herramientas","🔧 Herramientas"],["docs","📄 Documentos informados"],["resumen","📊 Resumen"]].map(([tb,lb])=>(
-          <button key={tb} className={`tab${tab===tb?" on":""}`} onClick={()=>setTab(tb)}>{lb}</button>
+          <button key={tb} className={`tab${tab===tb?" on":""}`} onClick={()=>{setTab(tb);if(tb!=="ficha")setEditFicha(false);}}>{lb}</button>
         ))}
       </div>
 
       {tab==="ficha"&&(
         <div className="ein">
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,padding:"8px 12px",borderRadius:8,background:editFicha?"rgba(245,158,11,0.12)":"rgba(255,255,255,0.04)",border:editFicha?"1px solid rgba(245,158,11,0.4)":"1px solid rgba(255,255,255,0.08)"}}>
+            <span style={{fontSize:12,color:editFicha?"#fbbf24":"#7aaa80",flex:1}}>{editFicha?"✏️ Modo edición: los cambios se guardan al escribir.":"🔒 Ficha bloqueada para evitar cambios accidentales."}</span>
+            {(esJefa||esProgramador)&&<button className={editFicha?"btn-p":"btn-g"} style={{...S.btn,fontSize:12,padding:"5px 12px"}} onClick={()=>setEditFicha(v=>!v)}>{editFicha?"✓ Listo":"✏️ Editar"}</button>}
+          </div>
+          <fieldset disabled={!editFicha} style={{border:0,padding:0,margin:0,minWidth:0}}>
           {/* ── SECCIÓN 1: DATOS PERSONALES ── */}
           <div style={{...S.card,padding:18,marginBottom:12}}>
             <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:12,color:"#a0d8b0",borderBottom:"1px solid rgba(255,255,255,0.08)",paddingBottom:8}}>👤 Datos Personales</div>
@@ -9898,6 +9904,7 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
             <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:700,marginBottom:10,color:"#a0d8b0",borderBottom:"1px solid rgba(255,255,255,0.08)",paddingBottom:8}}>📝 Observaciones</div>
             <textarea rows={3} style={{...S.input,resize:"vertical"}} value={t.notas||""} onChange={e=>onUpdate({notas:e.target.value})} placeholder="Anotaciones generales del trabajador..."/>
           </div>
+          </fieldset>
         </div>
       )}
 
@@ -28308,7 +28315,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-11-19.5";
+const BUILD_STAMP = "2026-11-20.1";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
