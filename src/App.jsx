@@ -27095,7 +27095,7 @@ const protEmptyForm = () => ({
   rolesClaros:null, senalesAcordadas:null, perimetroDelimitado:null, planEmergencia:null,
   supervisorNombre:"", justificacion:"",
 });
-const protEmptyOp = (nombre) => ({nombre, descanso:null, preocupacion:null, confianzaExcesiva:null, nota:""});
+const protEmptyOp = (nombre) => ({nombre, presion:null, presionHora:"", descanso:null, preocupacion:null, confianzaExcesiva:null, nota:""});
 
 function ProtToggle({ value, onChange, labelYes="Sí", labelNo="No" }) {
   return (
@@ -27559,7 +27559,7 @@ function ProtocoloPodaAltura({ S, personal, esJefa, crearNotificacion, rolLoguea
   if(form.planEmergencia===false) flags.push("Sin plan de emergencia claro");
 
   const stepOk = (n) => {
-    if(n===1) return form.operadores.length>0&&form.sitio&&form.operadores.every(o=>o.descanso!==null&&o.preocupacion!==null&&o.confianzaExcesiva!==null);
+    if(n===1) return form.operadores.length>0&&form.sitio&&form.operadores.every(o=>o.presion===true&&o.descanso!==null&&o.preocupacion!==null&&o.confianzaExcesiva!==null);
     if(n===2) return form.historialFalla!==null&&form.grietasCavidades!==null&&form.viento!==""&&form.humedad!==null&&form.interferencias!==null;
     if(n===3) return [form.arnes,form.cuerdas,form.casco,form.certificacionVigente,form.comunicacion].every(v=>v!==null);
     if(n===4) return [form.rolesClaros,form.senalesAcordadas,form.perimetroDelimitado,form.planEmergencia].every(v=>v!==null);
@@ -27593,6 +27593,7 @@ function ProtocoloPodaAltura({ S, personal, esJefa, crearNotificacion, rolLoguea
     const ops = (r.operadores||[]).map(o=>`
       <tr style="border-bottom:1px solid #e5e7eb">
         <td style="padding:6px 10px;font-weight:600">${o.nombre}</td>
+        <td style="padding:6px 10px;text-align:center">${o.presion===true?"✅ Sí"+(o.presionHora?" · "+o.presionHora:""):o.presion===false?"⛔ No":"—"}</td>
         <td style="padding:6px 10px;text-align:center">${o.descanso===true?"✅ Sí":o.descanso===false?"⚠️ No":"—"}</td>
         <td style="padding:6px 10px;text-align:center">${o.preocupacion===true?"⚠️ Sí":o.preocupacion===false?"✅ No":"—"}</td>
         <td style="padding:6px 10px;text-align:center">${o.confianzaExcesiva===true?"⚠️ Sí":o.confianzaExcesiva===false?"✅ No":"—"}</td>
@@ -27630,7 +27631,7 @@ function ProtocoloPodaAltura({ S, personal, esJefa, crearNotificacion, rolLoguea
       <h2>1. Trabajadores</h2>
       <table>
         <thead><tr>
-          <th>Nombre</th><th>Descanso</th><th>Preocupación</th><th>Exceso confianza</th><th>Notas</th>
+          <th>Nombre</th><th>Control presión (sala 1° auxilios)</th><th>Descanso</th><th>Preocupación</th><th>Exceso confianza</th><th>Notas</th>
         </tr></thead>
         <tbody>${ops}</tbody>
       </table>
@@ -27786,6 +27787,11 @@ function ProtocoloPodaAltura({ S, personal, esJefa, crearNotificacion, rolLoguea
                 <div style={{fontWeight:700,color:"#34d399"}}>{o.nombre.split(" ")[0]} {o.nombre.split(" ")[1]||""}</div>
                 <button onClick={()=>quitarOp(o.nombre)} style={{fontSize:11,color:"#5a9a7a",background:"none",border:"none",cursor:"pointer"}}>✕ quitar</button>
               </div>
+              <ProtItem value={o.presion} onChange={v=>{setOpCampo(o.nombre,"presion",v);if(v&&!o.presionHora)setOpCampo(o.nombre,"presionHora",new Date().toTimeString().slice(0,5));}}>
+                ¿Acudió a la sala de primeros auxilios y se realizó el control de presión antes de subir? <b style={{color:"#fbbf24"}}>(obligatorio)</b>
+                {o.presion===true&&<div style={{marginTop:6,display:"flex",alignItems:"center",gap:8,fontSize:11,color:"#7aaa80"}}>Hora del control: <input type="time" value={o.presionHora||""} onChange={e=>setOpCampo(o.nombre,"presionHora",e.target.value)} style={{...S.input,width:110,padding:"4px 8px"}}/></div>}
+                {o.presion===false&&<div style={{marginTop:6,fontSize:11,color:"#fbbf24"}}>⛔ No puede subir ni continuar el protocolo hasta realizarse el control de presión.</div>}
+              </ProtItem>
               <ProtItem value={o.descanso} onChange={v=>setOpCampo(o.nombre,"descanso",v)}>¿Descansó bien anoche?</ProtItem>
               <ProtItem value={o.preocupacion} onChange={v=>setOpCampo(o.nombre,"preocupacion",v)} invert>¿Reporta preocupación personal o laboral que lo distraiga hoy?</ProtItem>
               <ProtItem value={o.confianzaExcesiva} onChange={v=>setOpCampo(o.nombre,"confianzaExcesiva",v)} invert>¿Se detecta exceso de confianza?</ProtItem>
@@ -28315,7 +28321,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-11-20.1";
+const BUILD_STAMP = "2026-11-20.2";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
