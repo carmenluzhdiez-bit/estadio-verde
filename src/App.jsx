@@ -6456,7 +6456,7 @@ function CorreccionMasivaFrecuenciasGeneral({ S, zonas, getAllElems, getZD, setE
 }
 
 // ── Frecuencia masiva por TAREA + TIPO de elemento (ej. «Riego manual» en todos los céspedes) ──
-function FrecuenciaPorTareaTipo({ S, zonas, getAllElems, getZD, setElemFrecsBulk }) {
+function FrecuenciaPorTareaTipo({ S, zonas, getAllElems, getZD, setElemFrecsBulk, esGolf=false }) {
   const [tipoSel, setTipoSel] = React.useState("");
   const [tareaSel, setTareaSel] = React.useState("");
   const [dias, setDias] = React.useState("");
@@ -6510,7 +6510,7 @@ function FrecuenciaPorTareaTipo({ S, zonas, getAllElems, getZD, setElemFrecsBulk
     <div className="ein">
       <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,marginBottom:8,color:"#fbbf24"}}>📌 Frecuencia por tarea y tipo de elemento</div>
       <div style={{fontSize:12,color:"#5a9a7a",marginBottom:14}}>
-        Elige un tipo de elemento (ej. césped) y una tarea (ej. riego manual) para fijar «cada X días» a todos los elementos que la tengan, en todas las macrozonas (sin Golf). Puedes desmarcar los que no quieras cambiar. No se aplica nada hasta que aprietes «Aplicar».
+        Elige un tipo de elemento (ej. césped) y una tarea (ej. riego manual) para fijar «cada X días» a todos los elementos que la tengan, {esGolf?"en Golf":"en todas las macrozonas (sin Golf)"}. Puedes desmarcar los que no quieras cambiar. No se aplica nada hasta que aprietes «Aplicar».
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 120px",gap:10,marginBottom:14}}>
         <div><label style={lbl}>Tipo de elemento</label>
@@ -20743,7 +20743,11 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
       )}
 
       {subTab==="simplificar_frecs"&&rolLogueado!=="trabajador"&&(
-        <SimplificarFrecuenciasGolf S={S} getAllElems={getAllElems} getZD={getZD} setElemFrecsBulk={setElemFrecsBulk}/>
+        <>
+          <SimplificarFrecuenciasGolf S={S} getAllElems={getAllElems} getZD={getZD} setElemFrecsBulk={setElemFrecsBulk}/>
+          <div style={{borderTop:"1px solid rgba(255,255,255,0.1)",margin:"24px 0"}}/>
+          <FrecuenciaPorTareaTipo S={S} esGolf zonas={[{id:"31",nombre:"Golf"}]} getAllElems={getAllElems} getZD={getZD} setElemFrecsBulk={setElemFrecsBulk}/>
+        </>
       )}
 
       {subTab==="comparar_nombres"&&rolLogueado!=="trabajador"&&(()=>{
@@ -28420,7 +28424,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-11-23.1";
+const BUILD_STAMP = "2026-11-23.2";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
