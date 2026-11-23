@@ -6455,6 +6455,101 @@ function CorreccionMasivaFrecuenciasGeneral({ S, zonas, getAllElems, getZD, setE
   );
 }
 
+// ── Frecuencia masiva por TAREA + TIPO de elemento (ej. «Riego manual» en todos los céspedes) ──
+function FrecuenciaPorTareaTipo({ S, zonas, getAllElems, getZD, setElemFrecsBulk }) {
+  const [tipoSel, setTipoSel] = React.useState("");
+  const [tareaSel, setTareaSel] = React.useState("");
+  const [dias, setDias] = React.useState("");
+  const [excluidos, setExcluidos] = React.useState({});
+  const [msg, setMsg] = React.useState("");
+  const coll = (a,b)=>String(a).localeCompare(String(b),"es",{sensitivity:"base"});
+
+  const todos = [];
+  zonas.forEach(z=>{
+    const zd = getZD?getZD(String(z.id)):{};
+    (getAllElems?getAllElems(String(z.id)):[]).forEach(e=>{
+      const frecs = e.isCustom
+        ? (zd.elementosCustom||[]).find(x=>x.id===e.id)?.frecuencias||[]
+        : zd.elementos?.[e.id]?.frecuencias||[];
+      todos.push({zonaId:String(z.id), zonaNombre:(zd&&zd.nombreCustom)||z.nombre, id:e.id, nombre:e.nombre, tipo:e.tipo||"otro", isCustom:!!e.isCustom, frecs});
+    });
+  });
+  const cont = {};
+  todos.forEach(e=>{cont[e.tipo]=(cont[e.tipo]||0)+1;});
+  const tipos = Object.keys(cont).sort(coll);
+  const delTipo = tipoSel?todos.filter(e=>e.tipo===tipoSel):[];
+  const tareasTipo = [...new Set(delTipo.flatMap(e=>e.frecs.map(f=>f.tarea).filter(Boolean)))].sort(coll);
+  const afectados = tareaSel
+    ? delTipo.filter(e=>e.frecs.some(f=>f.tarea===tareaSel)).sort((a,b)=>coll(a.zonaNombre,b.zonaNombre)||coll(a.nombre,b.nombre))
+    : [];
+  const keyE = e=>e.zonaId+"|"+e.id+"|"+(e.isCustom?"c":"b");
+  const marcados = afectados.filter(e=>!excluidos[keyE(e)]);
+  const actual = (e)=>{
+    const fs = e.frecs.filter(f=>f.tarea===tareaSel);
+    return fs.map(f=>f.intervaloDias?`cada ${f.intervaloDias} d`:"por estación (sin simplificar)").join(" · ");
+  };
+  const n = Number(dias);
+  const puede = tareaSel && n>0 && Number.isInteger(n) && marcados.length>0;
+
+  const aplicar = ()=>{
+    if(!puede) return;
+    if(!window.confirm(`¿Poner «${tareaSel}» cada ${n} día(s) en ${marcados.length} elemento(s) de tipo «${tipoSel}»?`)) return;
+    const porZona = {};
+    marcados.forEach(e=>{
+      (porZona[e.zonaId]=porZona[e.zonaId]||[]).push({
+        eid:e.id, isCustom:e.isCustom,
+        frecuencias:e.frecs.map(f=>f.tarea===tareaSel?{...f,intervaloDias:String(n)}:f),
+      });
+    });
+    Object.entries(porZona).forEach(([zid,updates])=>setElemFrecsBulk(zid,updates));
+    setMsg(`✅ «${tareaSel}» quedó cada ${n} día(s) en ${marcados.length} elemento(s). No se modificaron las fechas de última realización.`);
+    setDias(""); setExcluidos({});
+  };
+  const lbl = {fontSize:11,color:"#6aaa7a",display:"block",marginBottom:3,textTransform:"uppercase",letterSpacing:"0.5px"};
+  return (
+    <div className="ein">
+      <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,marginBottom:8,color:"#fbbf24"}}>📌 Frecuencia por tarea y tipo de elemento</div>
+      <div style={{fontSize:12,color:"#5a9a7a",marginBottom:14}}>
+        Elige un tipo de elemento (ej. césped) y una tarea (ej. riego manual) para fijar «cada X días» a todos los elementos que la tengan, en todas las macrozonas (sin Golf). Puedes desmarcar los que no quieras cambiar. No se aplica nada hasta que aprietes «Aplicar».
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 120px",gap:10,marginBottom:14}}>
+        <div><label style={lbl}>Tipo de elemento</label>
+          <select style={S.input} value={tipoSel} onChange={e=>{setTipoSel(e.target.value);setTareaSel("");setExcluidos({});setMsg("");}}>
+            <option value="">— Seleccionar tipo —</option>
+            {tipos.map(t=><option key={t} value={t}>{t} ({cont[t]})</option>)}
+          </select></div>
+        <div><label style={lbl}>Tarea</label>
+          <select style={S.input} value={tareaSel} disabled={!tipoSel} onChange={e=>{setTareaSel(e.target.value);setExcluidos({});setMsg("");}}>
+            <option value="">— Seleccionar tarea —</option>
+            {tareasTipo.map(t=><option key={t} value={t}>{t}</option>)}
+          </select></div>
+        <div><label style={lbl}>Cada (días)</label>
+          <input type="number" min="1" step="1" style={S.input} value={dias} onChange={e=>setDias(e.target.value)} disabled={!tareaSel}/></div>
+      </div>
+      {msg&&<div style={{fontSize:12,color:"#22c55e",marginBottom:12}}>{msg}</div>}
+      {tareaSel&&(
+        <>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8,fontSize:12,color:"#7aaa80"}}>
+            <span>{marcados.length} de {afectados.length} elemento(s) seleccionados</span>
+            <button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"transparent",border:"1px solid rgba(255,255,255,0.12)",color:"#7aaa80"}} onClick={()=>setExcluidos({})}>Marcar todos</button>
+            <button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"transparent",border:"1px solid rgba(255,255,255,0.12)",color:"#7aaa80"}} onClick={()=>{const o={};afectados.forEach(e=>{o[keyE(e)]=true;});setExcluidos(o);}}>Desmarcar todos</button>
+          </div>
+          <div style={{maxHeight:420,overflowY:"auto",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,marginBottom:14}}>
+            {afectados.map(e=>(
+              <label key={keyE(e)} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 10px",borderBottom:"1px solid rgba(255,255,255,0.05)",fontSize:12,cursor:"pointer"}}>
+                <input type="checkbox" checked={!excluidos[keyE(e)]} onChange={()=>setExcluidos(p=>({...p,[keyE(e)]:!p[keyE(e)]}))}/>
+                <span style={{flex:1}}><span style={{color:"#5a8a6a"}}>{e.zonaNombre}</span> — <b>{e.nombre}</b></span>
+                <span style={{fontSize:11,color:"#fbbf24"}}>Actual: {actual(e)}</span>
+              </label>
+            ))}
+          </div>
+          <button onClick={aplicar} disabled={!puede} style={{...S.btn,background:"rgba(34,197,94,0.15)",color:"#22c55e",border:"1px solid rgba(34,197,94,0.4)",fontWeight:600,opacity:puede?1:0.4}}>✅ Aplicar a {marcados.length} elemento(s)</button>
+        </>
+      )}
+    </div>
+  );
+}
+
 function SimplificarFrecuenciasGeneral({ S, zonas, getAllElems, getZD, setElemFrecsBulk }) {
   const [zonaSelId, setZonaSelId] = React.useState(zonas[0] ? String(zonas[0].id) : "");
   const [resultado, setResultado] = React.useState(null);
@@ -7126,7 +7221,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, bodegasData={}, getZD, g
           🌿 Programar — todas las macrozonas (excepto Golf)
         </div>
         <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
-          {[["programa","📆 Programar"],["frecuencias","🔄 Frecuencias"],["tipo_elemento","🔎 Ver por tipo"],["correccion_gral","🛠️ Corrección Fechas"],["simplificar_gral","🔧 Simplificar Frecuencias"]].map(([t,l])=>(
+          {[["programa","📆 Programar"],["frecuencias","🔄 Frecuencias"],["tipo_elemento","🔎 Ver por tipo"],["correccion_gral","🛠️ Corrección Fechas"],["simplificar_gral","🔧 Simplificar Frecuencias"],["frec_tarea_tipo","📌 Frecuencia por tarea"]].map(([t,l])=>(
             <button key={t} className={`tab${tabProg===t?" on":""}`} onClick={()=>setTabProg(t)}>{l}</button>
           ))}
         </div>
@@ -7565,6 +7660,10 @@ function ProgramacionDiaria({ S, zonas, data, personal, bodegasData={}, getZD, g
         <AuditoriaUltimaRealizacion S={S} zonasAud={zonas.filter(z=>String(z.id)!=="31"&&!(z.nombre||"").toLowerCase().includes("golf")).map(z=>({id:z.id,nombre:z.nombre}))} getAllElems={getAllElems} getZD={getZD} setElemFrecsBulk={setElemFrecsBulk} tareas={tareas}/>
         <CorreccionMasivaFrecuenciasGeneral S={S} zonas={zonas.filter(z=>String(z.id)!=="31"&&!(z.nombre||"").toLowerCase().includes("golf"))} getAllElems={getAllElems} getZD={getZD} setElemFrecsBulk={setElemFrecsBulk}/>
       </>)}
+
+      {tabProg==="frec_tarea_tipo"&&(
+        <FrecuenciaPorTareaTipo S={S} zonas={zonas.filter(z=>String(z.id)!=="31"&&!(z.nombre||"").toLowerCase().includes("golf"))} getAllElems={getAllElems} getZD={getZD} setElemFrecsBulk={setElemFrecsBulk}/>
+      )}
 
       {tabProg==="simplificar_gral"&&(
         <SimplificarFrecuenciasGeneral S={S} zonas={zonas.filter(z=>String(z.id)!=="31"&&!(z.nombre||"").toLowerCase().includes("golf"))} getAllElems={getAllElems} getZD={getZD} setElemFrecsBulk={setElemFrecsBulk}/>
@@ -28321,7 +28420,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-11-20.2";
+const BUILD_STAMP = "2026-11-23.1";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
