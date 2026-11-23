@@ -3346,7 +3346,7 @@ function PanelPapeleraTareas({ S, setTareas }) {
   );
 }
 
-function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa=false, esSupervisor=false, puedeCrear=false, cierresTurno={}, onReabrirTurno, onCerrarTurno, getElemFrecs, setElemFrecs, tabInicial=null }) {
+function HistorialProg({ tareas, setTareas, personal=[], MACROZONAS_BASE, zonas=[], S, esJefa=false, esSupervisor=false, puedeCrear=false, cierresTurno={}, onReabrirTurno, onCerrarTurno, getElemFrecs, setElemFrecs, tabInicial=null }) {
   const [diasAbiertosHist, setDiasAbiertosHist] = React.useState({});
   const [gruposHistAbiertos, setGruposHistAbiertos] = React.useState({}); // {"dia__nombreTarea": bool}
   const [fechaReprogramarHist, setFechaReprogramarHist] = React.useState({}); // {dia: fechaDestino}
@@ -4421,6 +4421,23 @@ function HistorialProg({ tareas, setTareas, MACROZONAS_BASE, zonas=[], S, esJefa
                                       style={{width:44,fontSize:10,background:"rgba(251,191,36,0.08)",border:"1px solid rgba(251,191,36,0.3)",borderRadius:5,color:"#fbbf24",padding:"2px 3px",textAlign:"center"}}/>
                                     <span style={{fontSize:9,color:"#fbbf24"}}>mm ✂️</span>
                                   </div>
+                                )}
+                                {(esJefa||esSupervisor)&&!esTrasl&&!["hecha","completada"].includes(hpTask.estado)&&(
+                                  <select title="Cambiar al jardinero de esta tarea" value={hpTask.responsable||""}
+                                    onChange={e=>{
+                                      const nuevo=e.target.value; if(nuevo===(hpTask.responsable||"")) return;
+                                      const nA2=v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+                                      if(!nuevo){ if(!window.confirm("¿Dejar esta tarea «Por designar»?")) return; }
+                                      setTareas(prev=>({...prev,[dia]:nA2(prev[dia]).map(x=>x.id===hpTask.id?{...x,responsable:nuevo,estado:nuevo?(x.estado==="por_designar"?"pendiente":x.estado):"por_designar",reasignadaDe:hpTask.responsable||"",reasignadaEn:fechaLocal()}:x)}));
+                                    }}
+                                    style={{fontSize:10,background:"rgba(59,130,246,0.1)",border:"1px solid rgba(59,130,246,0.3)",borderRadius:5,color:"#93c5fd",padding:"2px 3px",cursor:"pointer",flexShrink:0,maxWidth:130}}>
+                                    <option value="">👤 Por designar</option>
+                                    {(()=>{
+                                      const lista=(Array.isArray(personal)?personal:Object.values(personal||{})).filter(noRetirado).map(p=>p.nombre).filter(Boolean);
+                                      if(hpTask.responsable&&!lista.includes(hpTask.responsable)) lista.push(hpTask.responsable);
+                                      return lista.sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"})).map(n=><option key={n} value={n}>{n}</option>);
+                                    })()}
+                                  </select>
                                 )}
                                 {esJefa&&!esTrasl?(
                                 <select value={hpTask.estado}
@@ -7670,7 +7687,7 @@ function ProgramacionDiaria({ S, zonas, data, personal, bodegasData={}, getZD, g
       )}
 
       {tabProg==="historial" && (
-        <HistorialProg tareas={tareas} setTareas={setTareas} MACROZONAS_BASE={MACROZONAS_BASE} zonas={zonas} S={S} esJefa={esJefa} esSupervisor={esSupervisor} puedeCrear={puedeCrear} cierresTurno={cierresTurno} onReabrirTurno={onReabrirTurno} onCerrarTurno={onCerrarTurno} getElemFrecs={getElemFrecs} setElemFrecs={setElemFrecs} tabInicial={histTabInicial}/>
+        <HistorialProg tareas={tareas} setTareas={setTareas} personal={personal} MACROZONAS_BASE={MACROZONAS_BASE} zonas={zonas} S={S} esJefa={esJefa} esSupervisor={esSupervisor} puedeCrear={puedeCrear} cierresTurno={cierresTurno} onReabrirTurno={onReabrirTurno} onCerrarTurno={onCerrarTurno} getElemFrecs={getElemFrecs} setElemFrecs={setElemFrecs} tabInicial={histTabInicial}/>
       )}
 
       {/* ── PROGRAMAR ── */}
@@ -28424,7 +28441,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-11-23.2";
+const BUILD_STAMP = "2026-11-23.3";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
