@@ -23880,6 +23880,91 @@ function TareaPlantacion({ modo, zona, zonaId, bodegasData, setBodegasData, tare
 // ─── INFORME MENSUAL RRHH ─────────────────────────────────────────────────────
 // ─── INFORME MENSUAL RRHH ────────────────────────────────────────────────────
 // ─── INFORME MENSUAL RRHH ────────────────────────────────────────────────────
+// ── Exportar lista de trabajadores a Excel (CSV) con antecedentes seleccionados (ej. exámenes por exposición a plaguicidas) ──
+function ExportarListaPersonal({ S, personal, puede }) {
+  const [abierto, setAbierto] = React.useState(false);
+  const [sel, setSel] = React.useState(null);      // {id:true/false}; null = aún no inicializado
+  const [edit, setEdit] = React.useState({});      // {id:{nombres,apellidos}} correcciones manuales
+  const [msg, setMsg] = React.useState("");
+  if(!puede) return null;
+  const coll = (a,b)=>String(a).localeCompare(String(b),"es",{sensitivity:"base"});
+  const PART = ["de","del","la","las","los","san","santa","y"];
+  const separar = (full)=>{
+    const tk = String(full||"").trim().split(/\s+/).filter(Boolean);
+    if(tk.length<=1) return {nombres:tk.join(" "), apellidos:""};
+    let i = Math.max(1, tk.length-2);
+    while(i>1 && PART.includes(tk[i-1].toLowerCase())) i--;
+    return {nombres:tk.slice(0,i).join(" "), apellidos:tk.slice(i).join(" ")};
+  };
+  const fmtF = (f)=>f?String(f).split("-").reverse().join("-"):"";
+  const fmtTel = (t)=>String(t||"").replace(/^\+56\s*/,"(+56) ");
+  const arr = (Array.isArray(personal)?personal:Object.values(personal||{})).filter(noRetirado);
+  const filas = arr.map(p=>{
+    const sp = separar(p.nombre); const ed = edit[p.id]||{};
+    return {p, id:p.id, nombres:ed.nombres!==undefined?ed.nombres:sp.nombres, apellidos:ed.apellidos!==undefined?ed.apellidos:sp.apellidos};
+  }).sort((a,b)=>coll(a.apellidos,b.apellidos)||coll(a.nombres,b.nombres));
+  const seleccion = sel || Object.fromEntries(filas.map(f=>[f.id, !/jefa/i.test(f.p.cargo||"")]));
+  const marcados = filas.filter(f=>seleccion[f.id]);
+  const descargar = ()=>{
+    if(marcados.length===0){ setMsg("Marca al menos un trabajador."); return; }
+    const items = marcados.map(f=>({
+      "Nombres":f.nombres, "Apellidos":f.apellidos, "RUT":f.p.rut||"",
+      "Fecha de nacimiento":fmtF(f.p.fechaNacimiento), "Fecha de ingreso a Estadio Español":fmtF(f.p.fechaIngreso),
+      "Cargo":f.p.cargo||"", "Dirección particular":f.p.direccion||"", "Teléfono particular":fmtTel(f.p.telefono), "Correo electrónico":f.p.email||"",
+    }));
+    descargarListaCSV(`lista_trabajadores_${fechaLocal()}.csv`, items);
+    setMsg(`✅ Se descargó la lista de ${items.length} trabajador(es). Ábrela con Excel.`);
+  };
+  const vacios = marcados.filter(f=>!f.p.rut||!f.p.fechaNacimiento||!f.p.fechaIngreso||!f.p.direccion||!f.p.telefono||!f.p.email).length;
+  if(!abierto) return (
+    <div style={{marginBottom:14}}>
+      <button style={{...S.btn,background:"rgba(34,197,94,0.12)",color:"#4ade80",border:"1px solid rgba(34,197,94,0.3)"}} onClick={()=>setAbierto(true)}>📊 Exportar lista a Excel</button>
+    </div>
+  );
+  const th = {textAlign:"left",padding:"5px 8px",fontSize:10,color:"#6aaa7a",textTransform:"uppercase",borderBottom:"1px solid rgba(255,255,255,0.1)"};
+  const td = {padding:"4px 8px",fontSize:11,borderBottom:"1px solid rgba(255,255,255,0.05)",verticalAlign:"middle"};
+  return (
+    <div style={{...S.card,padding:16,marginBottom:16}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+        <div style={{fontSize:15,fontWeight:700,color:"#4ade80"}}>📊 Exportar lista a Excel</div>
+        <button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"transparent",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.12)"}} onClick={()=>setAbierto(false)}>Cerrar</button>
+      </div>
+      <div style={{fontSize:12,color:"#5a9a7a",marginBottom:10}}>
+        Marca a los trabajadores que irán en la lista (ej. los expuestos a plaguicidas). Columnas: nombres, apellidos, RUT, fecha de nacimiento, fecha de ingreso, cargo, dirección, teléfono y correo. Los nombres y apellidos se separan automáticamente (los dos últimos nombres son los apellidos): corrígelos aquí si hace falta.
+      </div>
+      <div style={{display:"flex",gap:8,marginBottom:8,fontSize:12,alignItems:"center",flexWrap:"wrap"}}>
+        <button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"transparent",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.12)"}} onClick={()=>setSel(Object.fromEntries(filas.map(f=>[f.id,true])))}>Marcar todos</button>
+        <button style={{...S.btn,fontSize:11,padding:"3px 10px",background:"transparent",color:"#7aaa80",border:"1px solid rgba(255,255,255,0.12)"}} onClick={()=>setSel(Object.fromEntries(filas.map(f=>[f.id,false])))}>Desmarcar todos</button>
+        <span style={{color:"#7aaa80"}}>{marcados.length} de {filas.length} seleccionados</span>
+      </div>
+      <div style={{overflowX:"auto",maxHeight:380,overflowY:"auto",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,marginBottom:10}}>
+        <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <thead><tr><th style={th}></th><th style={th}>Nombres</th><th style={th}>Apellidos</th><th style={th}>RUT</th><th style={th}>Nacimiento</th><th style={th}>Ingreso</th><th style={th}>Cargo</th><th style={th}>Dirección</th><th style={th}>Teléfono</th><th style={th}>Correo</th></tr></thead>
+          <tbody>
+            {filas.map(f=>(
+              <tr key={f.id} style={{opacity:seleccion[f.id]?1:0.45}}>
+                <td style={td}><input type="checkbox" checked={!!seleccion[f.id]} onChange={()=>setSel({...seleccion,[f.id]:!seleccion[f.id]})}/></td>
+                <td style={td}><input style={{...S.input,fontSize:11,padding:"2px 6px",minWidth:110}} value={f.nombres} onChange={e=>setEdit(p=>({...p,[f.id]:{...(p[f.id]||{}),nombres:e.target.value}}))}/></td>
+                <td style={td}><input style={{...S.input,fontSize:11,padding:"2px 6px",minWidth:110}} value={f.apellidos} onChange={e=>setEdit(p=>({...p,[f.id]:{...(p[f.id]||{}),apellidos:e.target.value}}))}/></td>
+                <td style={td}>{f.p.rut||<span style={{color:"#f87171"}}>falta</span>}</td>
+                <td style={td}>{fmtF(f.p.fechaNacimiento)||<span style={{color:"#f87171"}}>falta</span>}</td>
+                <td style={td}>{fmtF(f.p.fechaIngreso)||<span style={{color:"#f87171"}}>falta</span>}</td>
+                <td style={td}>{f.p.cargo||""}</td>
+                <td style={td}>{f.p.direccion||<span style={{color:"#f87171"}}>falta</span>}</td>
+                <td style={td}>{f.p.telefono||<span style={{color:"#f87171"}}>falta</span>}</td>
+                <td style={td}>{f.p.email||<span style={{color:"#f87171"}}>falta</span>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {vacios>0&&<div style={{fontSize:11,color:"#fbbf24",marginBottom:8}}>⚠️ {vacios} trabajador(es) seleccionados tienen datos que faltan (marcados «falta»). Complétalos en su ficha antes de enviar la lista.</div>}
+      {msg&&<div style={{fontSize:12,color:msg.startsWith("✅")?"#22c55e":"#fbbf24",marginBottom:8}}>{msg}</div>}
+      <button className="btn-p" style={S.btn} onClick={descargar}>⬇️ Descargar Excel ({marcados.length})</button>
+    </div>
+  );
+}
+
 function InformeRRHH({ S, personal, bonosMasivos, setBonosMasivos, setPersonal, rendicionesRRHH, setRendicionesRRHH, onVolver }) {
   const hoy = new Date();
   const fechaHoyStr = hoy.toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"});
@@ -28441,7 +28526,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-11-23.3";
+const BUILD_STAMP = "2026-11-24.1";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
@@ -31683,6 +31768,7 @@ export default function App() {
                 <button className="btn-p" style={S.btn} onClick={()=>setPersonalVista("nuevo")}>➕ Nuevo Trabajador</button>
               </div>
             </div>
+            <ExportarListaPersonal S={S} personal={personal} puede={(esJefa||esProgramador)&&!soloLectura}/>
             {showCharla&&(()=>{
               const activos=[...personal].filter(noRetirado).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es",{sensitivity:"base"}));
               const nSel=activos.filter(t=>charlaSel[t.id]).length;
