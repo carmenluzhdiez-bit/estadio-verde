@@ -24677,10 +24677,12 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
   // entre los roles presentes (según su peso relativo) para que siempre se
   // distribuya el 100% del fondo, en vez de perder el % del rol ausente.
   const nAyud       = form.ayudantes.filter(a=>a).length;
-  const pesoTotal   = pctEjecutor + (nAyud>0?pctAyudante:0) + (nApoyos>0?pctApoyo:0);
+  // Pesos POR PERSONA: cada ayudante pesa pctAyudante y cada apoyo pctApoyo (no se dividen por grupo),
+  // así un ayudante siempre recibe más que un apoyo si pctAyudante > pctApoyo.
+  const pesoTotal   = pctEjecutor + (nAyud*pctAyudante) + (nApoyos*pctApoyo);
   const montoEjec   = pesoTotal>0 ? Math.round(fondoTotal * pctEjecutor / pesoTotal) : 0;
-  const montoAyud   = (nAyud>0&&pesoTotal>0) ? Math.round((fondoTotal * pctAyudante / pesoTotal) / nAyud) : 0;
-  const montoApoyo  = (nApoyos>0&&pesoTotal>0) ? Math.round((fondoTotal * pctApoyo / pesoTotal) / nApoyos) : 0;
+  const montoAyud   = (nAyud>0&&pesoTotal>0) ? Math.round(fondoTotal * pctAyudante / pesoTotal) : 0;
+  const montoApoyo  = (nApoyos>0&&pesoTotal>0) ? Math.round(fondoTotal * pctApoyo / pesoTotal) : 0;
   const totalDistr  = montoEjec + (montoAyud * nAyud) + (montoApoyo * nApoyos);
 
   const imprimirBono = (bono) => {
@@ -24955,24 +24957,23 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
               <input type="number" style={S.input} value={bonosConfig.año||new Date().getFullYear()}
                 onChange={e=>setBonosConfig(p=>({...p,año:Number(e.target.value)}))}/>
             </div>
-            <div><label style={labelSt}>% Ejecutor (del fondo)</label>
+            <div><label style={labelSt}>Peso del Ejecutor</label>
               <input type="number" min={1} max={100} style={S.input} value={bonosConfig.pctEjecutor||50}
                 onChange={e=>setBonosConfig(p=>({...p,pctEjecutor:Number(e.target.value)}))}/>
             </div>
-            <div><label style={labelSt}>% Ayudante (del fondo)</label>
+            <div><label style={labelSt}>Peso de cada Ayudante</label>
               <input type="number" min={1} max={100} style={S.input} value={bonosConfig.pctAyudante||30}
                 onChange={e=>setBonosConfig(p=>({...p,pctAyudante:Number(e.target.value)}))}/>
             </div>
-            <div><label style={labelSt}>% Apoyo total (del fondo, se divide entre N)</label>
+            <div><label style={labelSt}>Peso de cada Apoyo</label>
               <input type="number" min={1} max={100} style={S.input} value={bonosConfig.pctApoyo||20}
                 onChange={e=>setBonosConfig(p=>({...p,pctApoyo:Number(e.target.value)}))}/>
-              <div style={{fontSize:10,color:"#5a8a6a",marginTop:3}}>Si hay 2 apoyos cada uno recibe {Math.round((bonosConfig.pctApoyo||20)/2)}%</div>
+              <div style={{fontSize:10,color:"#5a8a6a",marginTop:3}}>Cada apoyo recibe este peso, sin dividirlo entre los demás.</div>
             </div>
-            <div style={{display:"flex",alignItems:"end",paddingBottom:4}}>
-              <div style={{fontSize:13,color:pctEjecutor+pctAyudante+pctApoyo===100?"#86efac":"#ef4444",fontWeight:600}}>
-                Total distribuido: {pctEjecutor+pctAyudante+pctApoyo}%
-                {pctEjecutor+pctAyudante+pctApoyo!==100&&<span style={{fontSize:11}}> ⚠️ debe sumar 100%</span>}
-              </div>
+            <div style={{gridColumn:"1/-1",fontSize:12,color:pctAyudante>pctApoyo?"#86efac":"#ef4444"}}>
+              {pctAyudante>pctApoyo
+                ? `Cada ayudante (${pctAyudante}) recibe más que cada apoyo (${pctApoyo}). El fondo se reparte en proporción a estos pesos según cuántos participen; no necesitan sumar 100.`
+                : "⚠️ El peso del Ayudante debería ser mayor que el del Apoyo; si no, cada apoyo recibirá igual o más que un ayudante."}
             </div>
           </div>
           <button className="btn-g" style={S.btn} onClick={()=>setShowConfig(false)}>✓ Guardar configuración</button>
@@ -25037,11 +25038,11 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
                   <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#4ade80"}}>${montoEjec.toLocaleString("es-CL")}</div>
                 </div>
                 <div style={{background:"rgba(96,165,250,0.08)",borderRadius:7,padding:"8px 10px",border:"1px solid rgba(96,165,250,0.2)"}}>
-                  <div style={{fontSize:10,color:"#60a5fa",marginBottom:2}}>AYUDANTE c/u ({nAyud>0&&pesoTotal>0?Math.round(pctAyudante/pesoTotal*100):0}%÷{Math.max(nAyud,1)})</div>
+                  <div style={{fontSize:10,color:"#60a5fa",marginBottom:2}}>AYUDANTE c/u ({nAyud>0&&pesoTotal>0?Math.round(pctAyudante/pesoTotal*100):0}%)</div>
                   <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#60a5fa"}}>${montoAyud.toLocaleString("es-CL")}</div>
                 </div>
                 <div style={{background:"rgba(251,191,36,0.08)",borderRadius:7,padding:"8px 10px",border:"1px solid rgba(251,191,36,0.2)"}}>
-                  <div style={{fontSize:10,color:"#fbbf24",marginBottom:2}}>APOYO c/u ({nApoyos>0&&pesoTotal>0?Math.round(pctApoyo/pesoTotal*100):0}%÷{Math.max(nApoyos,1)})</div>
+                  <div style={{fontSize:10,color:"#fbbf24",marginBottom:2}}>APOYO c/u ({nApoyos>0&&pesoTotal>0?Math.round(pctApoyo/pesoTotal*100):0}%)</div>
                   <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#fbbf24"}}>${montoApoyo.toLocaleString("es-CL")}</div>
                 </div>
               </div>
@@ -25292,12 +25293,12 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
                         const rolesEdit=editBonoForm.participantes||[];
                         const nAyudEdit=rolesEdit.filter(x=>x.rol==="Ayudante").length;
                         const nApoyosEdit=rolesEdit.filter(x=>x.rol==="Apoyo").length;
-                        const pesoTotalEdit=pctEjecutor+(nAyudEdit>0?pctAyudante:0)+(nApoyosEdit>0?pctApoyo:0);
+                        const pesoTotalEdit=pctEjecutor+(nAyudEdit*pctAyudante)+(nApoyosEdit*pctApoyo);
                         const partic=rolesEdit.map(p=>({...p,
                           monto:pesoTotalEdit<=0?0:
                                 p.rol==="Ejecutor"?Math.round(ft*pctEjecutor/pesoTotalEdit):
-                                p.rol==="Ayudante"?Math.round((ft*pctAyudante/pesoTotalEdit)/Math.max(1,nAyudEdit)):
-                                Math.round((ft*pctApoyo/pesoTotalEdit)/Math.max(1,nApoyosEdit))
+                                p.rol==="Ayudante"?Math.round(ft*pctAyudante/pesoTotalEdit):
+                                Math.round(ft*pctApoyo/pesoTotalEdit)
                         }));
                         setEditBonoForm(p=>({...p,valorMercado:vm,fondoTotal:ft,participantes:partic}));
                       }}/>
@@ -28633,7 +28634,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-11-24.4";
+const BUILD_STAMP = "2026-11-24.5";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
