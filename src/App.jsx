@@ -24626,12 +24626,12 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
         valorMercado: "", tipoBono:"bonoEspecializado",
         ejecutor: trabajador?String(trabajador.id):"",
         ejecutorNombre: prefill.trabajadorNombre||"",
-        ayudante:"", ayudanteNombre:"", apoyos:[], obs:"⭐ Bono especializado — generado automáticamente al completar limpieza de Cancha de Fútbol Sintética"
+        ayudantes:[], apoyos:[], obs:"⭐ Bono especializado — generado automáticamente al completar limpieza de Cancha de Fútbol Sintética"
       };
     }
     return {
       fecha: hoy, descripcion:"", valorMercado:"", tipoBono:"bonoConstruccion",
-      ejecutor:"", ejecutorNombre:"", ayudante:"", ayudanteNombre:"", apoyos:[], obs:""
+      ejecutor:"", ejecutorNombre:"", ayudantes:[], apoyos:[], obs:""
     };
   });
   // Si llega prefill después del primer render, actualizar
@@ -24646,7 +24646,7 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
         valorMercado: "",
         ejecutor: trabajador?String(trabajador.id):"",
         ejecutorNombre: prefill.trabajadorNombre||"",
-        ayudante:"", ayudanteNombre:"", apoyos:[], obs:"⭐ Bono especializado — generado automáticamente al completar limpieza de Cancha de Fútbol Sintética"
+        ayudantes:[], apoyos:[], obs:"⭐ Bono especializado — generado automáticamente al completar limpieza de Cancha de Fútbol Sintética"
       });
     }
   // eslint-disable-next-line
@@ -24671,11 +24671,12 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
   // Reparto proporcional: si falta Ayudante y/o Apoyo, su % se redistribuye
   // entre los roles presentes (según su peso relativo) para que siempre se
   // distribuya el 100% del fondo, en vez de perder el % del rol ausente.
-  const pesoTotal   = pctEjecutor + (form.ayudante?pctAyudante:0) + (nApoyos>0?pctApoyo:0);
+  const nAyud       = form.ayudantes.filter(a=>a).length;
+  const pesoTotal   = pctEjecutor + (nAyud>0?pctAyudante:0) + (nApoyos>0?pctApoyo:0);
   const montoEjec   = pesoTotal>0 ? Math.round(fondoTotal * pctEjecutor / pesoTotal) : 0;
-  const montoAyud   = (form.ayudante&&pesoTotal>0) ? Math.round(fondoTotal * pctAyudante / pesoTotal) : 0;
+  const montoAyud   = (nAyud>0&&pesoTotal>0) ? Math.round((fondoTotal * pctAyudante / pesoTotal) / nAyud) : 0;
   const montoApoyo  = (nApoyos>0&&pesoTotal>0) ? Math.round((fondoTotal * pctApoyo / pesoTotal) / nApoyos) : 0;
-  const totalDistr  = montoEjec + montoAyud + (montoApoyo * nApoyos);
+  const totalDistr  = montoEjec + (montoAyud * nAyud) + (montoApoyo * nApoyos);
 
   const imprimirBono = (bono) => {
     const fechaHoy = new Date().toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"});
@@ -24756,7 +24757,7 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
     const apoyosValidos = form.apoyos.filter(a=>a);
     const participantes = [
       {trabajadorId:String(form.ejecutor), nombre:form.ejecutorNombre||getNombre(form.ejecutor), rol:"Ejecutor", pct:pesoTotal>0?Math.round(pctEjecutor/pesoTotal*100):0, monto:montoEjec},
-      ...(form.ayudante?[{trabajadorId:String(form.ayudante), nombre:form.ayudanteNombre||getNombre(form.ayudante), rol:"Ayudante", pct:pesoTotal>0?Math.round(pctAyudante/pesoTotal*100):0, monto:montoAyud}]:[]),
+      ...form.ayudantes.filter(a=>a).map(id=>({trabajadorId:String(id), nombre:listaPersonal.find(p=>String(p.id)===String(id))?.nombre||getNombre(id), rol:"Ayudante", pct:pesoTotal>0?Math.round(pctAyudante/pesoTotal*100):0, monto:montoAyud})),
       ...apoyosValidos.map(id=>({trabajadorId:String(id), nombre:listaPersonal.find(p=>String(p.id)===String(id))?.nombre||getNombre(id), rol:"Apoyo", pct:pesoTotal>0?Math.round(pctApoyo/pesoTotal*100):0, monto:montoApoyo})),
     ];
     const nuevoBono = {
@@ -24785,7 +24786,7 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
         return {...t, eventos:[...(t.eventos||[]),nuevaEntrada]};
       });
     });
-    setForm({fecha:hoy,descripcion:"",valorMercado:"",tipoBono:"bonoConstruccion",ejecutor:"",ejecutorNombre:"",ayudante:"",ayudanteNombre:"",apoyos:[],obs:""});
+    setForm({fecha:hoy,descripcion:"",valorMercado:"",tipoBono:"bonoConstruccion",ejecutor:"",ejecutorNombre:"",ayudantes:[],apoyos:[],obs:""});
     setShowForm(false);
   };
 
@@ -25031,7 +25032,7 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
                   <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#4ade80"}}>${montoEjec.toLocaleString("es-CL")}</div>
                 </div>
                 <div style={{background:"rgba(96,165,250,0.08)",borderRadius:7,padding:"8px 10px",border:"1px solid rgba(96,165,250,0.2)"}}>
-                  <div style={{fontSize:10,color:"#60a5fa",marginBottom:2}}>AYUDANTE ({form.ayudante&&pesoTotal>0?Math.round(pctAyudante/pesoTotal*100):0}%)</div>
+                  <div style={{fontSize:10,color:"#60a5fa",marginBottom:2}}>AYUDANTE c/u ({nAyud>0&&pesoTotal>0?Math.round(pctAyudante/pesoTotal*100):0}%÷{Math.max(nAyud,1)})</div>
                   <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#60a5fa"}}>${montoAyud.toLocaleString("es-CL")}</div>
                 </div>
                 <div style={{background:"rgba(251,191,36,0.08)",borderRadius:7,padding:"8px 10px",border:"1px solid rgba(251,191,36,0.2)"}}>
@@ -25039,7 +25040,7 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
                   <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,fontWeight:700,color:"#fbbf24"}}>${montoApoyo.toLocaleString("es-CL")}</div>
                 </div>
               </div>
-              {(!form.ayudante||nApoyos===0)&&<div style={{fontSize:11,color:"#86efac",marginTop:6}}>ℹ️ % redistribuido proporcionalmente entre los roles presentes — se reparte el 100% del fondo.</div>}
+              {(nAyud===0||nApoyos===0)&&<div style={{fontSize:11,color:"#86efac",marginTop:6}}>ℹ️ % redistribuido proporcionalmente entre los roles presentes — se reparte el 100% del fondo.</div>}
               {totalDistr!==fondoTotal&&<div style={{fontSize:11,color:"#f59e0b",marginTop:6}}>⚠️ Distribuido: ${totalDistr.toLocaleString("es-CL")} de ${fondoTotal.toLocaleString("es-CL")}</div>}
             </div>
           )}
@@ -25057,16 +25058,22 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
               </select>
               {form.ejecutorNombre&&<div style={{fontSize:11,color:"#4ade80",marginTop:3}}>✓ {form.ejecutorNombre}</div>}
             </div>
-            <div><label style={labelSt}>Ayudante</label>
-              <select style={S.input} value={form.ayudante} onChange={e=>{
-                const id=String(e.target.value);
-                const nombre=listaPersonal.find(p=>String(p.id)===id)?.nombre||"";
-                setForm(p=>({...p,ayudante:id,ayudanteNombre:nombre}));
-              }}>
-                <option value="">Sin ayudante</option>
-                {listaPersonal.filter(p=>String(p.id)!==form.ejecutor).map(p=><option key={p.id} value={String(p.id)}>{p.nombre}</option>)}
-              </select>
-              {form.ayudanteNombre&&<div style={{fontSize:11,color:"#60a5fa",marginTop:3}}>✓ {form.ayudanteNombre}</div>}
+            <div style={{gridColumn:"1/-1"}}>
+              <label style={labelSt}>Ayudantes</label>
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                {form.ayudantes.map((ay,idx)=>(
+                  <div key={idx} style={{display:"flex",gap:6,alignItems:"center"}}>
+                    <select style={{...S.input,flex:1}} value={ay} onChange={e=>setForm(p=>({...p,ayudantes:p.ayudantes.map((a,i)=>i===idx?String(e.target.value):a)}))}>
+                      <option value="">Seleccionar...</option>
+                      {listaPersonal.filter(p=>String(p.id)!==form.ejecutor&&!form.apoyos.includes(String(p.id))&&!form.ayudantes.filter((_,i)=>i!==idx).includes(String(p.id))).map(p=><option key={p.id} value={String(p.id)}>{p.nombre}</option>)}
+                    </select>
+                    {ay&&<span style={{fontSize:11,color:"#60a5fa",flexShrink:0}}>✓ {getNombre(ay)}</span>}
+                    <button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 8px"}} onClick={()=>setForm(p=>({...p,ayudantes:p.ayudantes.filter((_,i)=>i!==idx)}))}>✕</button>
+                  </div>
+                ))}
+                <button style={{...S.btn,fontSize:12,background:"rgba(96,165,250,0.1)",color:"#60a5fa",border:"1px solid rgba(96,165,250,0.2)",alignSelf:"flex-start"}}
+                  onClick={()=>setForm(p=>({...p,ayudantes:[...p.ayudantes,""]}))}>+ Agregar ayudante</button>
+              </div>
             </div>
             <div style={{gridColumn:"1/-1"}}>
               <label style={labelSt}>Apoyos</label>
@@ -25075,7 +25082,7 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
                   <div key={idx} style={{display:"flex",gap:6,alignItems:"center"}}>
                     <select style={{...S.input,flex:1}} value={ap} onChange={e=>setForm(p=>({...p,apoyos:p.apoyos.map((a,i)=>i===idx?String(e.target.value):a)}))}>
                       <option value="">Seleccionar...</option>
-                      {listaPersonal.filter(p=>String(p.id)!==form.ejecutor&&String(p.id)!==form.ayudante&&!form.apoyos.filter((_,i)=>i!==idx).includes(String(p.id))).map(p=><option key={p.id} value={String(p.id)}>{p.nombre}</option>)}
+                      {listaPersonal.filter(p=>String(p.id)!==form.ejecutor&&!form.ayudantes.includes(String(p.id))&&!form.apoyos.filter((_,i)=>i!==idx).includes(String(p.id))).map(p=><option key={p.id} value={String(p.id)}>{p.nombre}</option>)}
                     </select>
                     {ap&&<span style={{fontSize:11,color:"#fbbf24",flexShrink:0}}>✓ {getNombre(ap)}</span>}
                     <button className="btn-d" style={{...S.btn,fontSize:11,padding:"4px 8px"}} onClick={()=>setForm(p=>({...p,apoyos:p.apoyos.filter((_,i)=>i!==idx)}))}>✕</button>
@@ -25278,13 +25285,13 @@ function BonoMasivo({ S, personal, bonosConfig, setBonosConfig, bonosMasivos, se
                         const vm=Number(e.target.value);
                         const ft=Math.round(vm*pctFondo/100);
                         const rolesEdit=editBonoForm.participantes||[];
-                        const tieneAyudanteEdit=rolesEdit.some(x=>x.rol==="Ayudante");
+                        const nAyudEdit=rolesEdit.filter(x=>x.rol==="Ayudante").length;
                         const nApoyosEdit=rolesEdit.filter(x=>x.rol==="Apoyo").length;
-                        const pesoTotalEdit=pctEjecutor+(tieneAyudanteEdit?pctAyudante:0)+(nApoyosEdit>0?pctApoyo:0);
+                        const pesoTotalEdit=pctEjecutor+(nAyudEdit>0?pctAyudante:0)+(nApoyosEdit>0?pctApoyo:0);
                         const partic=rolesEdit.map(p=>({...p,
                           monto:pesoTotalEdit<=0?0:
                                 p.rol==="Ejecutor"?Math.round(ft*pctEjecutor/pesoTotalEdit):
-                                p.rol==="Ayudante"?Math.round(ft*pctAyudante/pesoTotalEdit):
+                                p.rol==="Ayudante"?Math.round((ft*pctAyudante/pesoTotalEdit)/Math.max(1,nAyudEdit)):
                                 Math.round((ft*pctApoyo/pesoTotalEdit)/Math.max(1,nApoyosEdit))
                         }));
                         setEditBonoForm(p=>({...p,valorMercado:vm,fondoTotal:ft,participantes:partic}));
@@ -28621,7 +28628,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-11-24.2";
+const BUILD_STAMP = "2026-11-24.3";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
