@@ -10358,7 +10358,10 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
         return (
           <div className="ein" style={{display:"flex",flexDirection:"column",gap:14}}>
             <div style={{...S.card,padding:16}}>
-              <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#38bdf8",marginBottom:10}}>📦 EPP entregados ({misEntregas.length})</div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,color:"#38bdf8"}}>📦 EPP entregados ({misEntregas.length})</div>
+                <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 10px"}} onClick={()=>imprimirInformeEpp([datosEppDeTrabajador(t,eppEntregas,eppVidaUtil,eppFiltros,eppFitTests,"","")],"","")}>📄 Informe de EPP</button>
+              </div>
               {misEntregas.length===0?<div style={{fontSize:12,color:"#4a7a5a"}}>Sin entregas registradas.</div>:
                 misEntregas.map(e=>{
                   const estVenc = e.fechaVencimiento?calcEstadoLocal(e.fechaVencimiento,7):null;
@@ -10366,6 +10369,8 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
                     <div key={e.id} style={{fontSize:12,padding:"6px 0",borderTop:"1px solid rgba(255,255,255,0.06)"}}>
                       <strong>{e.tipo}</strong> · {e.fechaEntrega} · {e.labor||"—"} · cant. {e.cantidad} {e.unidad||"unidad"} {e.firmaRecepcion?"· ✓ firmado":""}
                       {e.fechaVencimiento&&<span style={{color:colorEst[estVenc]}}> · vence {e.fechaVencimiento} ({labelEst[estVenc]})</span>}
+                      <button className="btn-g" title="Imprimir el formulario de entrega (comprobante para firma)" style={{...S.btn,fontSize:10,padding:"2px 8px",marginLeft:8}} onClick={()=>imprimirComprobanteEppGlobal(e,t)}>🖨️ Comprobante</button>
+                      {(e.modelo||e.talla||e.registroISP||e.proveedor||e.observaciones)&&<div style={{fontSize:11,color:"#6aaa7a",marginTop:2}}>{[e.modelo&&`Modelo: ${e.modelo}`,e.talla&&`Talla: ${e.talla}`,e.registroISP&&`ISP: ${e.registroISP}`,e.proveedor&&`Proveedor: ${e.proveedor}`,e.observaciones&&`Obs.: ${e.observaciones}`].filter(Boolean).join(" · ")}</div>}
                     </div>
                   );
                 })
@@ -21690,82 +21695,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
     setEppEntregas([...pendientesLimpios, ...otros]);
     alert(`✅ Se eliminaron ${eliminados} copia(s) duplicada(s).`);
   };
-  const imprimirEntregaEpp = (e) => {
-    const trab = personalArrEpp.find(p=>String(p.id)===String(e.trabajadorId));
-    const fechaHoy = new Date().toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"});
-    const fechaEnt = e.fechaEntrega ? new Date(e.fechaEntrega+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"}) : e.fechaEntrega;
-    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-    <title>Comprobante entrega EPP — ${trab?.nombre||"—"}</title>
-    <style>
-      body{font-family:Arial,sans-serif;margin:0;color:#1a1a1a;font-size:13px}
-      .pagina{padding:30px;max-width:700px;margin:0 auto}
-      h1{font-size:17px;color:#1a5c2a;margin:0 0 3px}
-      h2{font-size:12px;color:#444;margin:0;font-weight:normal}
-      .hdr{display:flex;justify-content:space-between;border-bottom:2px solid #1a5c2a;padding-bottom:10px;margin-bottom:16px}
-      table{width:100%;border-collapse:collapse;margin-bottom:18px}
-      td{padding:8px 10px;border:1px solid #ddd;font-size:13px}
-      td.lbl{background:#f8f9fa;font-weight:700;color:#555;width:38%}
-      @media print{.noprint{display:none}}
-    </style></head><body>
-    <div class="pagina">
-      <div class="hdr">
-        <div style="display:flex;align-items:center;gap:12px">
-          <img src="${LOGO_AREAS_VERDES_B64}" style="height:44px;flex-shrink:0"/>
-          <div>
-            <h1>Comprobante de Entrega de EPP</h1>
-            <h2>Programa de Protección Personal · Departamento de Áreas Verdes</h2>
-            <h2>Estadio Español de Las Condes</h2>
-          </div>
-        </div>
-        <div style="text-align:right;font-size:12px;color:#555">
-          <div>Fecha entrega: <strong>${fechaEnt}</strong></div>
-          <div>Emisión: <strong>${fechaHoy}</strong></div>
-        </div>
-      </div>
-      <table>
-        <tr><td class="lbl">Trabajador</td><td>${trab?.nombre||"—"}</td></tr>
-        <tr><td class="lbl">Cargo</td><td>${trab?.cargo||"—"}</td></tr>
-        <tr><td class="lbl">EPP entregado</td><td><strong>${e.tipo}</strong></td></tr>
-        <tr><td class="lbl">Agente de riesgo asociado</td><td>${AGENTES_RIESGO_EPP.find(a=>a.id===e.agente)?.label||"—"}</td></tr>
-        <tr><td class="lbl">Modelo</td><td>${e.modelo||"—"}</td></tr>
-        <tr><td class="lbl">Registro ISP</td><td>${e.registroISP||"—"}</td></tr>
-        <tr><td class="lbl">Fecha de vencimiento</td><td>${e.fechaVencimiento||"—"}</td></tr>
-        <tr><td class="lbl">Talla</td><td>${e.talla||"—"}</td></tr>
-        <tr><td class="lbl">Cantidad</td><td>${e.cantidad} ${e.unidad||"unidad"}</td></tr>
-        <tr><td class="lbl">Labor asociada</td><td>${e.labor||"—"}</td></tr>
-        <tr><td class="lbl">Proveedor</td><td>${e.proveedor||"—"}</td></tr>
-        <tr><td class="lbl">Observaciones</td><td>${e.observaciones||"—"}</td></tr>
-      </table>
-      <div style="background:#fff8e1;border:1px solid #f57f17;border-radius:8px;padding:14px;margin-bottom:30px;font-size:12px;color:#555">
-        Declaro haber recibido el Elemento de Protección Personal (EPP) descrito arriba, en buen estado y con las instrucciones
-        de uso, mantención y vida útil correspondientes. Me comprometo a utilizarlo en las labores para las que fue destinado
-        y a informar de inmediato cualquier daño, deterioro o pérdida.
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:50px">
-        <div style="text-align:center">
-          <div style="border-top:1px solid #333;padding-top:8px;margin-top:40px;font-size:12px">
-            <strong>${trab?.nombre||"—"}</strong><br>RUT: ${trab?.rut||"___________________"}<br>Firma trabajador y fecha recepción
-          </div>
-        </div>
-        <div style="text-align:center">
-          <div style="border-top:1px solid #333;padding-top:8px;margin-top:40px;font-size:12px">
-            <strong>Carmen Luz Hermosilla Diez</strong><br>Jefe Dpto. de Áreas Verdes<br>Responsable entrega
-          </div>
-        </div>
-      </div>
-      <div style="margin-top:20px;padding-top:8px;border-top:1px solid #ccc;font-size:10px;color:#888;text-align:center">
-        Estadio Español de Las Condes · Departamento de Áreas Verdes · Programa de Protección Personal
-      </div>
-    </div>
-    <div class="noprint" style="text-align:center;padding:20px;background:#f5f5f5">
-      <button onclick="window.print()" style="background:#1a5c2a;color:#fff;border:none;padding:10px 28px;border-radius:7px;font-size:13px;cursor:pointer">🖨️ Imprimir / Guardar PDF</button>
-    </div>
-    </body></html>`;
-    const blob = new Blob([html], {type:"text/html;charset=utf-8"});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href=url; a.target="_blank"; a.click();
-    setTimeout(()=>URL.revokeObjectURL(url), 5000);
-  };
+  const imprimirEntregaEpp = (e) => imprimirComprobanteEppGlobal(e, personalArrEpp.find(p=>String(p.id)===String(e.trabajadorId)));
 
   const guardarFiltroEpp = () => {
     if(!formFiltroEpp.trabajadorId||!formFiltroEpp.tipoFiltro){ alert("Selecciona trabajador y tipo de filtro."); return; }
@@ -22183,6 +22113,7 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
               </div>
             </div>
           )}
+          <InformeEppGrupal S={S} personal={personal} eppEntregas={eppEntregas} eppVidaUtil={eppVidaUtil} eppFiltros={eppFiltros} eppFitTests={eppFitTests}/>
           <div style={{overflowX:"auto"}}>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
               <thead><tr style={{color:"#6aaa7a",textAlign:"left"}}>
@@ -23880,6 +23811,170 @@ function TareaPlantacion({ modo, zona, zonaId, bodegasData, setBodegasData, tare
 // ─── INFORME MENSUAL RRHH ─────────────────────────────────────────────────────
 // ─── INFORME MENSUAL RRHH ────────────────────────────────────────────────────
 // ─── INFORME MENSUAL RRHH ────────────────────────────────────────────────────
+function imprimirComprobanteEppGlobal(e, trab) {
+    const fechaHoy = new Date().toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"});
+    const fechaEnt = e.fechaEntrega ? new Date(e.fechaEntrega+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"}) : e.fechaEntrega;
+    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+    <title>Comprobante entrega EPP — ${trab?.nombre||"—"}</title>
+    <style>
+      body{font-family:Arial,sans-serif;margin:0;color:#1a1a1a;font-size:13px}
+      .pagina{padding:30px;max-width:700px;margin:0 auto}
+      h1{font-size:17px;color:#1a5c2a;margin:0 0 3px}
+      h2{font-size:12px;color:#444;margin:0;font-weight:normal}
+      .hdr{display:flex;justify-content:space-between;border-bottom:2px solid #1a5c2a;padding-bottom:10px;margin-bottom:16px}
+      table{width:100%;border-collapse:collapse;margin-bottom:18px}
+      td{padding:8px 10px;border:1px solid #ddd;font-size:13px}
+      td.lbl{background:#f8f9fa;font-weight:700;color:#555;width:38%}
+      @media print{.noprint{display:none}}
+    </style></head><body>
+    <div class="pagina">
+      <div class="hdr">
+        <div style="display:flex;align-items:center;gap:12px">
+          <img src="${LOGO_AREAS_VERDES_B64}" style="height:44px;flex-shrink:0"/>
+          <div>
+            <h1>Comprobante de Entrega de EPP</h1>
+            <h2>Programa de Protección Personal · Departamento de Áreas Verdes</h2>
+            <h2>Estadio Español de Las Condes</h2>
+          </div>
+        </div>
+        <div style="text-align:right;font-size:12px;color:#555">
+          <div>Fecha entrega: <strong>${fechaEnt}</strong></div>
+          <div>Emisión: <strong>${fechaHoy}</strong></div>
+        </div>
+      </div>
+      <table>
+        <tr><td class="lbl">Trabajador</td><td>${trab?.nombre||"—"}</td></tr>
+        <tr><td class="lbl">Cargo</td><td>${trab?.cargo||"—"}</td></tr>
+        <tr><td class="lbl">EPP entregado</td><td><strong>${e.tipo}</strong></td></tr>
+        <tr><td class="lbl">Agente de riesgo asociado</td><td>${AGENTES_RIESGO_EPP.find(a=>a.id===e.agente)?.label||"—"}</td></tr>
+        <tr><td class="lbl">Modelo</td><td>${e.modelo||"—"}</td></tr>
+        <tr><td class="lbl">Registro ISP</td><td>${e.registroISP||"—"}</td></tr>
+        <tr><td class="lbl">Fecha de vencimiento</td><td>${e.fechaVencimiento||"—"}</td></tr>
+        <tr><td class="lbl">Talla</td><td>${e.talla||"—"}</td></tr>
+        <tr><td class="lbl">Cantidad</td><td>${e.cantidad} ${e.unidad||"unidad"}</td></tr>
+        <tr><td class="lbl">Labor asociada</td><td>${e.labor||"—"}</td></tr>
+        <tr><td class="lbl">Proveedor</td><td>${e.proveedor||"—"}</td></tr>
+        <tr><td class="lbl">Observaciones</td><td>${e.observaciones||"—"}</td></tr>
+      </table>
+      <div style="background:#fff8e1;border:1px solid #f57f17;border-radius:8px;padding:14px;margin-bottom:30px;font-size:12px;color:#555">
+        Declaro haber recibido el Elemento de Protección Personal (EPP) descrito arriba, en buen estado y con las instrucciones
+        de uso, mantención y vida útil correspondientes. Me comprometo a utilizarlo en las labores para las que fue destinado
+        y a informar de inmediato cualquier daño, deterioro o pérdida.
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:50px">
+        <div style="text-align:center">
+          <div style="border-top:1px solid #333;padding-top:8px;margin-top:40px;font-size:12px">
+            <strong>${trab?.nombre||"—"}</strong><br>RUT: ${trab?.rut||"___________________"}<br>Firma trabajador y fecha recepción
+          </div>
+        </div>
+        <div style="text-align:center">
+          <div style="border-top:1px solid #333;padding-top:8px;margin-top:40px;font-size:12px">
+            <strong>Carmen Luz Hermosilla Diez</strong><br>Jefe Dpto. de Áreas Verdes<br>Responsable entrega
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:20px;padding-top:8px;border-top:1px solid #ccc;font-size:10px;color:#888;text-align:center">
+        Estadio Español de Las Condes · Departamento de Áreas Verdes · Programa de Protección Personal
+      </div>
+    </div>
+    <div class="noprint" style="text-align:center;padding:20px;background:#f5f5f5">
+      <button onclick="window.print()" style="background:#1a5c2a;color:#fff;border:none;padding:10px 28px;border-radius:7px;font-size:13px;cursor:pointer">🖨️ Imprimir / Guardar PDF</button>
+    </div>
+    </body></html>`;
+    const blob = new Blob([html], {type:"text/html;charset=utf-8"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href=url; a.target="_blank"; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url), 5000);
+}
+
+
+// ── Informe de EPP por trabajador (una página por trabajador) ──
+function imprimirInformeEpp(items, desde, hasta) {
+  const esc = x=>String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const fmtF = f=>f?String(f).split("-").reverse().join("-"):"—";
+  const hoy = new Date().toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"});
+  const periodo = (desde||hasta)?`Período: ${desde?fmtF(desde):"inicio"} al ${hasta?fmtF(hasta):"hoy"}`:"Período: todas las entregas registradas";
+  const hoyIso = new Date().toISOString().slice(0,10);
+  const est = (f,um)=>{ if(!f) return ""; const d=Math.ceil((new Date(f+"T12:00:00")-new Date(hoyIso+"T12:00:00"))/86400000); return d<0?"Vencido":d<=um?"Por vencer":"Vigente"; };
+  const paginas = items.map(({trab,entregas,vidaUtil,filtros,fitTests},idx)=>{
+    const ents = [...entregas].sort((a,b)=>String(a.fechaEntrega).localeCompare(String(b.fechaEntrega)));
+    const filas = ents.map(e=>`<tr><td>${fmtF(e.fechaEntrega)}</td><td><b>${esc(e.tipo)}</b></td><td>${esc(e.modelo||"")}${e.registroISP?`<br><small>ISP ${esc(e.registroISP)}</small>`:""}</td><td>${esc(e.talla||"")}</td><td>${esc(e.cantidad)} ${esc(e.unidad||"un.")}</td><td>${esc(e.labor||"")}</td><td>${e.fechaVencimiento?fmtF(e.fechaVencimiento)+"<br><small>"+est(e.fechaVencimiento,7)+"</small>":"—"}</td><td style="text-align:center">${e.firmaRecepcion?"✓ "+fmtF(e.fechaFirma):"Pendiente"}</td></tr>`).join("");
+    const crit = vidaUtil.map(q=>`<tr><td>${esc(q.tipoEpp)}</td><td>${fmtF(q.fechaRenovacion)}</td><td>${q.estado==="fuera_de_servicio"?"Fuera de servicio":est(q.fechaRenovacion,60)}</td></tr>`).join("");
+    const fil = filtros.map(f=>`<tr><td>${esc(f.tipoFiltro)}</td><td>${fmtF(f.fechaVencimiento)}</td><td>${f.estado==="fuera_de_servicio"?"Fuera de servicio":est(f.fechaVencimiento,7)}</td></tr>`).join("");
+    const fit = fitTests.map(f=>`<tr><td>${fmtF(f.fechaFitTest)}</td><td>${f.resultado==="aprobado"?"Aprobado":"No aprobado"}</td><td>${fmtF(f.proximoFitTest)}</td></tr>`).join("");
+    const bloque = (tit,cab,filas2)=>filas2?`<h3>${tit}</h3><table><thead><tr>${cab.map(c=>`<th>${c}</th>`).join("")}</tr></thead><tbody>${filas2}</tbody></table>`:"";
+    return `<div class="pag" ${idx>0?'style="page-break-before:always"':""}>
+      <div class="hdr"><div style="display:flex;align-items:center;gap:12px"><img src="${LOGO_AREAS_VERDES_B64}" style="height:42px"/><div><h1>Informe de EPP entregados</h1><h2>Programa de Protección Personal · Departamento de Áreas Verdes · Estadio Español de Las Condes</h2></div></div><div style="text-align:right;font-size:11px;color:#555">Emisión: <b>${hoy}</b><br>${periodo}</div></div>
+      <table class="dat"><tr><td class="l">Trabajador</td><td>${esc(trab.nombre)}</td><td class="l">RUT</td><td>${esc(trab.rut||"")}</td></tr><tr><td class="l">Cargo</td><td>${esc(trab.cargo||"")}</td><td class="l">Fecha de ingreso</td><td>${fmtF(trab.fechaIngreso)}</td></tr></table>
+      <h3>EPP entregados (${ents.length})</h3>
+      ${ents.length?`<table><thead><tr><th>Fecha</th><th>EPP</th><th>Modelo</th><th>Talla</th><th>Cant.</th><th>Labor</th><th>Vence</th><th>Firma recepción</th></tr></thead><tbody>${filas}</tbody></table>`:"<p style='color:#777'>Sin entregas en el período.</p>"}
+      ${bloque("EPP crítico (vida útil)",["Equipo","Renovación","Estado"],crit)}
+      ${bloque("Filtros de respirador",["Filtro","Vence","Estado"],fil)}
+      ${bloque("Fit test de respirador",["Fecha","Resultado","Próximo"],fit)}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:46px"><div style="text-align:center;border-top:1px solid #333;padding-top:6px;font-size:11px"><b>${esc(trab.nombre)}</b><br>RUT: ${esc(trab.rut||"______________")}<br>Firma trabajador</div><div style="text-align:center;border-top:1px solid #333;padding-top:6px;font-size:11px"><b>Carmen Luz Hermosilla Diez</b><br>Jefa Dpto. de Áreas Verdes<br>Responsable</div></div>
+    </div>`;
+  }).join("");
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Informe EPP</title><style>
+    @page{size:Letter;margin:12mm}
+    body{font-family:Arial,sans-serif;margin:0;color:#1a1a1a;font-size:11.5px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .pag{padding:6px 4px}
+    h1{font-size:16px;color:#1a5c2a;margin:0 0 2px} h2{font-size:10.5px;color:#555;margin:0;font-weight:normal}
+    h3{font-size:12px;color:#1a5c2a;margin:14px 0 4px}
+    .hdr{display:flex;justify-content:space-between;border-bottom:2px solid #1a5c2a;padding-bottom:8px;margin-bottom:10px}
+    table{width:100%;border-collapse:collapse}
+    th{background:#1a5c2a;color:#fff;font-size:10px;text-align:left;padding:4px 6px}
+    td{border:1px solid #ccd;padding:4px 6px;font-size:11px;vertical-align:top}
+    td.l{background:#f2f8f4;font-weight:700;color:#1a5c2a;width:15%}
+    small{color:#666}
+    @media print{.noprint{display:none}}
+  </style></head><body>${paginas}
+  <div class="noprint" style="text-align:center;padding:20px;background:#f5f5f5"><button onclick="window.print()" style="background:#1a5c2a;color:#fff;border:none;padding:10px 28px;border-radius:7px;font-size:13px;cursor:pointer">🖨️ Imprimir / Guardar PDF</button></div></body></html>`;
+  const blob = new Blob([html],{type:"text/html;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href=url; a.target="_blank"; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),5000);
+}
+function datosEppDeTrabajador(trab, eppEntregas, eppVidaUtil, eppFiltros, eppFitTests, desde, hasta) {
+  const A = v=>Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
+  const mio = e=>String(e.trabajadorId)===String(trab.id);
+  return {
+    trab,
+    entregas:A(eppEntregas).filter(e=>mio(e)&&!e.borrador&&(!desde||String(e.fechaEntrega)>=desde)&&(!hasta||String(e.fechaEntrega)<=hasta)),
+    vidaUtil:A(eppVidaUtil).filter(mio), filtros:A(eppFiltros).filter(mio), fitTests:A(eppFitTests).filter(mio),
+  };
+}
+function InformeEppGrupal({ S, personal, eppEntregas, eppVidaUtil, eppFiltros, eppFitTests }) {
+  const [abierto, setAbierto] = React.useState(false);
+  const [desde, setDesde] = React.useState("");
+  const [hasta, setHasta] = React.useState("");
+  const [sel, setSel] = React.useState(null);
+  const coll = (a,b)=>String(a).localeCompare(String(b),"es",{sensitivity:"base"});
+  const arr = (Array.isArray(personal)?personal:Object.values(personal||{})).filter(noRetirado).sort((a,b)=>coll(a.nombre,b.nombre));
+  const seleccion = sel || Object.fromEntries(arr.map(p=>[p.id,!/jefa/i.test(p.cargo||"")]));
+  const marcados = arr.filter(p=>seleccion[p.id]);
+  if(!abierto) return <div style={{marginBottom:12}}><button className="btn-g" style={S.btn} onClick={()=>setAbierto(true)}>📄 Informe de EPP por trabajador</button></div>;
+  return (
+    <div style={{...S.card,padding:14,marginBottom:14}}>
+      <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+        <b style={{color:"#38bdf8"}}>📄 Informe de EPP por trabajador</b>
+        <button className="btn-g" style={{...S.btn,fontSize:11,padding:"3px 10px"}} onClick={()=>setAbierto(false)}>Cerrar</button>
+      </div>
+      <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:8,alignItems:"end"}}>
+        <div><label style={{fontSize:10,color:"#6aaa7a",display:"block"}}>DESDE (opcional)</label><input type="date" style={S.input} value={desde} onChange={e=>setDesde(e.target.value)}/></div>
+        <div><label style={{fontSize:10,color:"#6aaa7a",display:"block"}}>HASTA (opcional)</label><input type="date" style={S.input} value={hasta} onChange={e=>setHasta(e.target.value)}/></div>
+        <button className="btn-g" style={{...S.btn,fontSize:11}} onClick={()=>setSel(Object.fromEntries(arr.map(p=>[p.id,true])))}>Marcar todos</button>
+        <button className="btn-g" style={{...S.btn,fontSize:11}} onClick={()=>setSel(Object.fromEntries(arr.map(p=>[p.id,false])))}>Desmarcar todos</button>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(230px,1fr))",gap:4,marginBottom:10}}>
+        {arr.map(p=>(
+          <label key={p.id} style={{fontSize:12,display:"flex",gap:6,alignItems:"center"}}><input type="checkbox" checked={!!seleccion[p.id]} onChange={()=>setSel({...seleccion,[p.id]:!seleccion[p.id]})}/>{p.nombre}</label>
+        ))}
+      </div>
+      <button className="btn-p" style={S.btn} disabled={marcados.length===0} onClick={()=>imprimirInformeEpp(marcados.map(p=>datosEppDeTrabajador(p,eppEntregas,eppVidaUtil,eppFiltros,eppFitTests,desde,hasta)),desde,hasta)}>🖨️ Generar informe ({marcados.length}) — una página por trabajador</button>
+    </div>
+  );
+}
+
 // ── Exportar lista de trabajadores a Excel (CSV) con antecedentes seleccionados (ej. exámenes por exposición a plaguicidas) ──
 function ExportarListaPersonal({ S, personal, puede }) {
   const [abierto, setAbierto] = React.useState(false);
@@ -28526,7 +28621,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-11-24.1";
+const BUILD_STAMP = "2026-11-24.2";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
