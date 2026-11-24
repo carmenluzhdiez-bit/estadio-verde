@@ -9695,10 +9695,10 @@ function BotonConstancia({ S, t, ev, onUpdateEvento }) {
 
 // ── Constancia adjunta a un evento (foto o PDF). Se guarda en una ruta aparte (docs_personal/…) para no
 // inflar el nodo "personal" que leen todos los usuarios; solo se descarga al pulsar «Ver». ──
-function AdjuntoEvento({ S, trabId, ev, puedeVer, puedeSubir, onUpdateEvento }) {
+function AdjuntoEvento({ S, trabId, ev, puedeVer, puedeSubir, onUpdateEvento, pathOverride=null, rotulo="constancia" }) {
   const [cargando, setCargando] = React.useState(false);
   const [msg, setMsg] = React.useState("");
-  const path = `${ROOT}/docs_personal/${trabId}_${ev.id}`;
+  const path = pathOverride || `${ROOT}/docs_personal/${trabId}_${ev.id}`;
   const adj = ev.adjunto;
   if(!puedeVer) return null;
   const leerArchivo = (file) => new Promise((resolve,reject)=>{
@@ -9731,7 +9731,7 @@ function AdjuntoEvento({ S, trabId, ev, puedeVer, puedeSubir, onUpdateEvento }) 
       const hoyA = new Date().toISOString().slice(0,10);
       await fbSet(ref(db,path), {nombre:file.name, tipo, dataUrl, fecha:hoyA});
       onUpdateEvento(ev.id,{adjunto:{nombre:file.name,tipo,fecha:hoyA,kb:Math.round(dataUrl.length*0.75/1024)}});
-      setMsg("✅ Constancia adjuntada.");
+      setMsg(`✅ ${rotulo[0].toUpperCase()+rotulo.slice(1)} adjuntado.`);
     }catch(e){ setMsg("⚠️ "+(e.message||"No se pudo adjuntar")); }
     setCargando(false);
   };
@@ -9747,22 +9747,22 @@ function AdjuntoEvento({ S, trabId, ev, puedeVer, puedeSubir, onUpdateEvento }) 
     setCargando(false);
   };
   const quitar = async () => {
-    if(!window.confirm("¿Quitar la constancia adjunta?")) return;
+    if(!window.confirm(`¿Quitar el/la ${rotulo} adjunto/a?`)) return;
     try{ await fbSet(ref(db,path), null); onUpdateEvento(ev.id,{adjunto:null}); setMsg(""); }catch(e){ setMsg("⚠️ No se pudo quitar"); }
   };
   return (
     <div style={{marginTop:6,display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
       {adj
         ? <>
-            <span style={{fontSize:11,color:"#86efac"}}>📎 Constancia adjunta: {adj.nombre} · {adj.fecha}{adj.kb?` · ${adj.kb} KB`:""}</span>
+            <span style={{fontSize:11,color:"#86efac"}}>📎 {rotulo[0].toUpperCase()+rotulo.slice(1)} adjunto: {adj.nombre} · {adj.fecha}{adj.kb?` · ${adj.kb} KB`:""}</span>
             <button style={{...S.btn,fontSize:11,padding:"3px 10px"}} disabled={cargando} onClick={ver}>👁 Ver</button>
             {puedeSubir&&<button className="btn-d" style={{...S.btn,fontSize:11,padding:"3px 8px"}} onClick={quitar}>Quitar</button>}
           </>
         : puedeSubir&&<label style={{...S.btn,fontSize:11,padding:"3px 10px",cursor:"pointer",background:"rgba(59,130,246,0.12)",color:"#93c5fd",border:"1px solid rgba(59,130,246,0.3)"}}>
-            {cargando?"Subiendo…":"📎 Adjuntar constancia (foto o PDF)"}
+            {cargando?"Subiendo…":`📎 Adjuntar ${rotulo} (foto o PDF)`}
             <input type="file" accept="image/*,application/pdf" style={{display:"none"}} disabled={cargando} onChange={e=>{subir(e.target.files&&e.target.files[0]); e.target.value="";}}/>
           </label>}
-      {!adj&&!puedeSubir&&<span style={{fontSize:11,color:"#5a7a5a"}}>Sin constancia adjunta</span>}
+      {!adj&&!puedeSubir&&<span style={{fontSize:11,color:"#5a7a5a"}}>Sin {rotulo} adjunto</span>}
       {msg&&<span style={{fontSize:11,color:msg.startsWith("✅")?"#86efac":"#fca5a5"}}>{msg}</span>}
     </div>
   );
@@ -9771,7 +9771,7 @@ function AdjuntoEvento({ S, trabId, ev, puedeVer, puedeSubir, onUpdateEvento }) 
 function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDeleteEvento, onUpdateEvento, esProgramador=false,
   eppEntregas=[], eppFiltros=[], eppVidaUtil=[], eppFitTests=[],
   bodegasData={}, setBodegasData=()=>{}, herramientasCustodia=[], setHerramientasCustodia=()=>{}, esJefa=false,
-  puedeVerAdjuntos=false
+  puedeVerAdjuntos=false, puedeAdjuntarEpp=false, setEppEntregas=()=>{}
 } ) {
   const [tab, setTab] = React.useState("resumen");
   const [editFicha, setEditFicha] = React.useState(false); // la Ficha se abre bloqueada para evitar ediciones accidentales
@@ -10370,6 +10370,8 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
                       <strong>{e.tipo}</strong> · {e.fechaEntrega} · {e.labor||"—"} · cant. {e.cantidad} {e.unidad||"unidad"} {e.firmaRecepcion?"· ✓ firmado":""}
                       {e.fechaVencimiento&&<span style={{color:colorEst[estVenc]}}> · vence {e.fechaVencimiento} ({labelEst[estVenc]})</span>}
                       <button className="btn-g" title="Imprimir el formulario de entrega (comprobante para firma)" style={{...S.btn,fontSize:10,padding:"2px 8px",marginLeft:8}} onClick={()=>imprimirComprobanteEppGlobal(e,t)}>🖨️ Comprobante</button>
+                      <AdjuntoEvento S={S} trabId={t.id} ev={e} rotulo="comprobante firmado" pathOverride={pathAdjuntoEpp(e)} puedeVer={puedeAdjuntarEpp||puedeVerAdjuntos} puedeSubir={puedeAdjuntarEpp}
+                        onUpdateEvento={(id,patch)=>setEppEntregas((Array.isArray(eppEntregas)?eppEntregas:[]).map(x=>x.id===id?{...x,...patch,...(patch.adjunto?{firmaRecepcion:true,fechaFirma:patch.adjunto.fecha}:{})}:x))}/>
                       {(e.modelo||e.talla||e.registroISP||e.proveedor||e.observaciones)&&<div style={{fontSize:11,color:"#6aaa7a",marginTop:2}}>{[e.modelo&&`Modelo: ${e.modelo}`,e.talla&&`Talla: ${e.talla}`,e.registroISP&&`ISP: ${e.registroISP}`,e.proveedor&&`Proveedor: ${e.proveedor}`,e.observaciones&&`Obs.: ${e.observaciones}`].filter(Boolean).join(" · ")}</div>}
                     </div>
                   );
@@ -22133,7 +22135,9 @@ function PanelBodegas({ S, bodegasData, setBodegasData, personal, esJefa, soloLe
                       <td style={{padding:"6px 8px"}}>{e.labor}</td>
                       <td style={{padding:"6px 8px"}}>{e.cantidad} {e.unidad||"unidad"}</td>
                       <td style={{padding:"6px 8px",color:estVenc?ESTADO_EPP_COLOR[estVenc]:"#4a7a5a"}}>{e.fechaVencimiento?`${e.fechaVencimiento} · ${ESTADO_EPP_LABEL[estVenc]}`:"—"}</td>
-                      <td style={{padding:"6px 8px"}}>{e.firmaRecepcion?"✓":(puedeRegistrarBasicoEPP?<button className="btn-g" style={{...S.btn,fontSize:10,padding:"3px 8px"}} onClick={()=>marcarFirmaEntrega(e.id)}>Marcar firmada</button>:"—")}</td>
+                      <td style={{padding:"6px 8px"}}>{e.firmaRecepcion?"✓":(puedeRegistrarBasicoEPP?<button className="btn-g" style={{...S.btn,fontSize:10,padding:"3px 8px"}} onClick={()=>marcarFirmaEntrega(e.id)}>Marcar firmada</button>:"—")}
+                        <AdjuntoEvento S={S} trabId={e.trabajadorId} ev={e} rotulo="comprobante firmado" pathOverride={pathAdjuntoEpp(e)} puedeVer={true} puedeSubir={puedeRegistrarBasicoEPP&&!soloLectura}
+                          onUpdateEvento={(id,patch)=>setEppEntregas((Array.isArray(eppEntregas)?eppEntregas:[]).map(x=>x.id===id?{...x,...patch,...(patch.adjunto?{firmaRecepcion:true,fechaFirma:patch.adjunto.fecha}:{})}:x))}/></td>
                       <td style={{padding:"6px 8px",whiteSpace:"nowrap"}}>
                         <button className="btn-g" style={{...S.btn,fontSize:11,padding:"4px 8px",marginRight:4}} onClick={()=>imprimirEntregaEpp(e)} title="Imprimir comprobante para firma">🖨️</button>
                         {puedeRegistrarBasicoEPP&&<button style={{...S.btn,fontSize:11,padding:"4px 8px",background:"rgba(239,68,68,0.1)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.25)"}} onClick={()=>eliminarEntregaEpp(e.id)} title="Eliminar (deshacer)">🗑️</button>}
@@ -23811,6 +23815,7 @@ function TareaPlantacion({ modo, zona, zonaId, bodegasData, setBodegasData, tare
 // ─── INFORME MENSUAL RRHH ─────────────────────────────────────────────────────
 // ─── INFORME MENSUAL RRHH ────────────────────────────────────────────────────
 // ─── INFORME MENSUAL RRHH ────────────────────────────────────────────────────
+const pathAdjuntoEpp = (e) => `${ROOT}/docs_epp/${String(e.id).replace(/[.#$\[\]\/]/g,"_")}`;
 function imprimirComprobanteEppGlobal(e, trab) {
     const fechaHoy = new Date().toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"});
     const fechaEnt = e.fechaEntrega ? new Date(e.fechaEntrega+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"}) : e.fechaEntrega;
@@ -28628,7 +28633,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-11-24.3";
+const BUILD_STAMP = "2026-11-24.4";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
@@ -32124,6 +32129,8 @@ export default function App() {
             S={S}
             esProgramador={esProgramador}
             puedeVerAdjuntos={esJefa||esProgramador||fbRol==="gerencia"}
+            puedeAdjuntarEpp={(esJefa||esProgramador||esSupervisor)&&!soloLectura}
+            setEppEntregas={setEppEntregas}
             onVolver={()=>{setPersonalVista("lista");setPersonalId(null);}}
             onDelete={()=>{deleteTrabajador(personalId);setPersonalVista("lista");setPersonalId(null);}}
             onUpdate={(patch)=>updateTrabajador(personalId,patch)}
