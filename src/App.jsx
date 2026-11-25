@@ -16519,7 +16519,7 @@ const DECISIONES_HUM=[
   {value:"monitorear",      label:"👁️ Monitorear"},
 ];
 
-function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasProg, setTareasProg, showHumForm, setShowHumForm, humForm, setHumForm, emptyHumForm, onRegistroGuardado, crearNotificacion }) {
+function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasProg, setTareasProg, showHumForm, setShowHumForm, humForm, setHumForm, emptyHumForm, onRegistroGuardado, crearNotificacion, getAllElems, getZD, setElemFrecs }) {
   const humedadesFb = Array.isArray(golfData.humedades)?golfData.humedades:Object.values(golfData.humedades||{});
   // Registros guardados en este dispositivo que aún no llegan por Firebase (se muestran igual)
   const [humLocales, setHumLocales] = React.useState([]);
@@ -16543,6 +16543,39 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
     return "sin-cambio";
   };
 
+  // ── Frecuencia «Revisión humedad» de cada green: «última vez» ──
+  const normH = (x)=>String(x||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  const aplicarUltimaVezHumedad = (gid, fecha) => {
+    if(!getZD||!getAllElems||!setElemFrecs) return 0;
+    const eid = `green_${gid}`;
+    const el = getAllElems(31).find(e=>e.id===eid);
+    if(!el) return 0;
+    const zd = getZD(31)||{};
+    const frecs = (el.isCustom ? (zd.elementosCustom||[]).find(x=>x.id===eid)?.frecuencias : zd.elementos?.[eid]?.frecuencias) || [];
+    let n = 0;
+    const nuevas = frecs.map(f=>{
+      if(normH(f.tarea).includes("humedad") && (!f.ultimaVez || f.ultimaVez<fecha)){ n++; return {...f, ultimaVez:fecha, proximaFechaManual:""}; }
+      return f;
+    });
+    if(n>0) setElemFrecs("31", eid, !!el.isCustom, nuevas);
+    return n;
+  };
+  const regularizarFrecuenciasHumedad = () => {
+    // Última fecha medida de cada green según los registros guardados
+    const ultima = {};
+    humedades.forEach(r=>{
+      const f = r.fecha; if(!f) return;
+      GREENS_DEF.forEach(g=>{ if(String(r.valores?.[g.id]?.valor??"")!=="" && (!ultima[g.id]||ultima[g.id]<f)) ultima[g.id]=f; });
+      if(String(r.valorVivero||"")!=="" && (!ultima.vivero||ultima.vivero<f)) ultima.vivero=f;
+    });
+    const ids = Object.keys(ultima);
+    if(ids.length===0){ alert("No hay mediciones registradas para regularizar."); return; }
+    const resumen = ids.map(id=>`• ${id==="vivero"?"Vivero":"Green "+id.slice(1)}: ${ultima[id].split("-").reverse().join("-")}`).join("\n");
+    if(!window.confirm(`Se pondrá como «última vez» de Revisión humedad la fecha de la última medición registrada (solo si es más reciente que la actual):\n\n${resumen}\n\n¿Continuar?`)) return;
+    let n = 0;
+    ids.forEach(id=>{ n += aplicarUltimaVezHumedad(id, ultima[id]); });
+    alert(n>0?`✅ Se actualizó la frecuencia de ${n} tarea(s) de Revisión humedad.`:"Las frecuencias ya estaban al día; no hubo cambios.");
+  };
   const guardarHumedad = async () => {
     if(!humForm.responsable || guardandoHum) return;
     setGuardandoHum(true);
@@ -16582,23 +16615,36 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
         tarea:txt,responsable:humForm.responsable,estado:"pendiente",notas:humForm.obs||"",auto:false,
       }]}));
     }
-    // Marcar tarea de humedad/registro como hecha en el programa del día
+    // Marcar como hecha SOLO la tarea «Revisión humedad» (de los greens medidos) y actualizar su frecuencia («última vez»)
     const fechaHum = humForm.fecha || hoy;
     const respHum = (humForm.responsable||"").trim().toLowerCase();
+    const medidos = new Set([
+      ...GREENS_DEF.map(g=>g.id).filter(id=>String(humForm.valores?.[id]?.valor??"")!==""),
+      ...(String(humForm.valorVivero||"")!==""?["vivero"]:[]),
+    ]);
+    medidos.forEach(gid=>aplicarUltimaVezHumedad(gid, fechaHum));
+    const gidDeTarea = (t)=>{
+      if(t.origenEid && String(t.origenEid).startsWith("green_")) return String(t.origenEid).slice(6);
+      const m = normH(t.elemento).match(/green\s*0?(\d+)/);
+      if(m) return "g"+m[1];
+      if(normH(t.elemento).includes("vivero")) return "vivero";
+      return null;
+    };
     setTareasProg(prev => {
       const normArr = v => Array.isArray(v)?v:(v&&typeof v==="object"?Object.values(v):[]);
       const tareasDelDia = normArr(prev[fechaHum]);
       const actualizadas = tareasDelDia.map(t => {
         if(["hecha","completada"].includes(t.estado)) return t;
-        const tNom = (t.tarea||"").toLowerCase();
-        const esHumedad = tNom.includes("humedad") || tNom.includes("registr") ||
-                          tNom.includes("golf") || tNom.includes("medici");
+        if(t.esDiario||t.trasladadaA) return t;
+        if(!normH(t.tarea).includes("humedad")) return t;
+        const gid = gidDeTarea(t);
+        if(gid && !medidos.has(gid)) return t; // ese green no se midió
         const tResp = (t.responsable||"").trim().toLowerCase();
         const esDelResponsable = !t.responsable ||
           tResp===respHum ||
           (respHum && tResp.split(" ").some(w=>respHum.includes(w)&&w.length>3)) ||
           (tResp && respHum.split(" ").some(w=>tResp.includes(w)&&w.length>3));
-        if(esHumedad && (esDelResponsable || !respHum)) return {...t, estado:"hecha"};
+        if(esDelResponsable || !respHum) return {...t, estado:"hecha", ultimaVezAplicada:fechaHum};
         return t;
       });
       // Si no existía tarea de humedad, crear una como hecha
@@ -16640,6 +16686,11 @@ function SeccionHumedad({ S, golfData, setG, listaPersonal, hoy, esJefa, tareasP
 
   return (
     <div className="ein">
+      {esJefa&&(
+        <div style={{marginBottom:10}}>
+          <button className="btn-g" style={{...S.btn,fontSize:12}} onClick={regularizarFrecuenciasHumedad} title="Pone la «última vez» de Revisión humedad de cada green en la fecha de su última medición registrada">🔧 Regularizar frecuencia de Revisión humedad</button>
+        </div>
+      )}
       {/* Header con volver para trabajador */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:8}}>
         <div>
@@ -18625,7 +18676,7 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
             hoy={hoy} esJefa={false} tareasProg={tareasProg} setTareasProg={setTareasProg}
             showHumForm={true} setShowHumForm={()=>{}}
             humForm={humForm} setHumForm={setHumForm} emptyHumForm={emptyHumForm}
-            onRegistroGuardado={onRegistroGuardado} crearNotificacion={crearNotificacion}/>
+            onRegistroGuardado={onRegistroGuardado} crearNotificacion={crearNotificacion} getAllElems={getAllElems} getZD={getZD} setElemFrecs={setElemFrecs}/>
         )}
       </div>
     );
@@ -20040,6 +20091,9 @@ function PanelGolf({ S, golfData, setGolfData, personal, esJefa, tareasProg, set
           humForm={humForm}
           setHumForm={setHumForm}
           emptyHumForm={emptyHumForm}
+          getAllElems={getAllElems}
+          getZD={getZD}
+          setElemFrecs={setElemFrecs}
         />
       )}
 
@@ -28634,7 +28688,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-11-24.5";
+const BUILD_STAMP = "2026-11-25.1";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
