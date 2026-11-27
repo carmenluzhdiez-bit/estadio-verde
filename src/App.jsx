@@ -10798,6 +10798,7 @@ function FichaTrabajador({ t, S, onVolver, onDelete, onUpdate, onAddEvento, onDe
 
       {tab==="resumen"&&(
         <div className="ein">
+          <CapacitacionesFicha S={S} t={t}/>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12,marginBottom:20}}>
             {[
               {label:"Días vacaciones",val:vacAprobadas,color:"#3b82f6",icon:"🏖️"},
@@ -27039,6 +27040,614 @@ class ErrorBoundary extends React.Component {
 }
 
 // ─── PANEL PROTOCOLOS ─────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// MÓDULO CAPACITACIÓN (visible solo Jefa/Programador; evaluaciones para asignados)
+// Rutas Firebase: capacitaciones, cap_eval/<evalId>, cap_claves/<evalId>, cap_asignaciones/<id>, cap_registros/<capId>__<trabId>, cap_archivos/<capId>_<kind>
+// ═══════════════════════════════════════════════════════════════
+const capArr = v => Array.isArray(v) ? v.filter(x=>x!=null) : (v && typeof v==="object" ? Object.values(v) : []);
+const capSan = s => String(s).replace(/[.#$\[\]\/]/g,"_");
+const capAsigId = (evalId,trabId) => capSan(evalId)+"__"+capSan(trabId);
+const capRegId = (capId,trabId) => capSan(capId)+"__"+capSan(trabId);
+const capEsc = x => String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const capFechaCL = f => { if(!f) return "—"; const d=new Date(String(f).length<=10?f+"T12:00:00":f); return isNaN(d)?String(f):d.toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit",year:"numeric"}); };
+const capNombres = (personal) => capArr(personal).slice().sort((a,b)=>String(a.nombre||"").localeCompare(String(b.nombre||""),"es"));
+
+const PAUTA_EPP_PLAGUICIDAS = {
+  nombre:"Pauta de cotejo: ponerse y quitarse el EPP", minPasos:11, criticosObligatorios:true,
+  pasos:[
+    {n:1,g:"Ponerse el EPP",t:"Revisa que el traje, los guantes y las botas no tengan roturas",c:true},
+    {n:2,g:"Ponerse el EPP",t:"Revisa que el respirador tenga los filtros indicados en la etiqueta y que estén vigentes",c:true},
+    {n:3,g:"Ponerse el EPP",t:"Se pone el traje completo, cerrado hasta el cuello"},
+    {n:4,g:"Ponerse el EPP",t:"Se pone las botas con el pantalón por fuera de la caña"},
+    {n:5,g:"Ponerse el EPP",t:"Se pone el respirador y comprueba que ajusta bien, tapando los filtros e inspirando",c:true},
+    {n:6,g:"Ponerse el EPP",t:"Se pone las antiparras o el protector facial"},
+    {n:7,g:"Ponerse el EPP",t:"Se pone los guantes por dentro de la manga del traje"},
+    {n:8,g:"Quitarse el EPP",t:"Lava los guantes puestos con agua y jabón antes de sacarse cualquier elemento",c:true},
+    {n:9,g:"Quitarse el EPP",t:"Se saca el traje dándolo vuelta, sin que la cara externa toque su ropa o su piel"},
+    {n:10,g:"Quitarse el EPP",t:"Se saca las botas"},
+    {n:11,g:"Quitarse el EPP",t:"Se saca las antiparras y el respirador tomándolos por las tiras, sin tocar la cara"},
+    {n:12,g:"Quitarse el EPP",t:"Se saca los guantes al final, sin tocar su piel con la cara externa",c:true},
+    {n:13,g:"Quitarse el EPP",t:"Se lava las manos y la cara con agua y jabón",c:true},
+    {n:14,g:"Quitarse el EPP",t:"Lava el EPP reutilizable, lo deja secar y lo guarda lejos de los plaguicidas"},
+  ]
+};
+const EVAL_PLAG_BASE = [
+ ["¿Qué ley obliga al empleador a informar a quienes trabajan con plaguicidas sobre su uso correcto, sus riesgos y los síntomas de intoxicación?",["Ley 21.489","Ley 20.308","DS 157","Res. SAG 2.029"]],
+ ["¿Desde qué edad una persona puede manipular o aplicar plaguicidas?",["16 años","17 años","18 años","No hay edad mínima"]],
+ ["Un herbicida que se usa en el césped debe tener:",["Autorización del SAG","Registro del ISP","Permiso municipal","Ningún registro"]],
+ ["Un envase con banda de color roja indica un producto:",["Que normalmente no ofrece peligro","Poco peligroso","Moderadamente peligroso","Extremadamente o altamente peligroso"]],
+ ["¿Dónde se encuentran el EPP obligatorio y el período de reingreso de un producto?",["En la factura de compra","En la etiqueta del producto","En el libro de aplicaciones","Solo en la página web del fabricante"]],
+ ["¿Cuál es la vía más frecuente por la que un plaguicida entra al cuerpo del aplicador?",["La piel","La boca","Los oídos","El pelo"]],
+ ["¿Cuál de estos grupos de síntomas puede indicar una intoxicación?",["Hambre y sueño","Dolor de espalda después de cargar sacos","Dolor de cabeza, mareo, náuseas, sudoración y lagrimeo","Calambres por frío"]],
+ ["Durante una aplicación, ¿qué está permitido?",["Fumar si el viento está a favor","Beber agua sin sacarse los guantes","Destapar una boquilla soplando","Comer fuera del área, después de quitarse el EPP y lavarse las manos y la cara"]],
+ ["Al aplicar hacia abajo, los guantes de nitrilo se usan:",["Por dentro de la manga del traje","Por fuera de la manga del traje","Solo en la mano que sostiene la lanza","Solo al preparar la mezcla"]],
+ ["Al quitarse el EPP, ¿qué se saca al final?",["Las botas","El respirador","Los guantes","Las antiparras"]],
+ ["¿Dónde se guarda el EPP limpio?",["En la bodega, junto a los plaguicidas","En la casa del trabajador","En el vehículo de aplicación","En un lugar limpio y seco, separado de los plaguicidas"]],
+ ["La bodega de plaguicidas del DAV debe:",["Estar abierta para que cualquiera saque productos","Tener candado, acceso restringido y señalética de peligro","Servir también de comedor","Guardar los productos en envases de bebida rotulados"]],
+ ["¿Cuál de estas acciones está prohibida?",["Traspasar un producto a una botella de bebida","Mantener el producto en su envase original y tapado","Preparar la mezcla en la zona señalizada","Usar una probeta exclusiva para medir"]],
+ ["La etiqueta indica 30 ml por cada 10 L de agua. ¿Cuánto producto se agrega a una mochila de 20 L?",["15 ml","30 ml","60 ml","300 ml"]],
+ ["¿Para qué se calibra el equipo antes de aplicar?",["Para que suene menos","Para aplicar la dosis correcta, sin excesos ni faltas","Para gastar más rápido el producto","No es necesario si el equipo es nuevo"]],
+ ["¿En qué caso NO se debe aplicar?",["Temprano en la mañana y sin viento","Con el área cerrada y señalizada","Cuando el viento mueve las hojas de los árboles","Con el EPP completo"]],
+ ["¿Qué es el período de reingreso?",["El tiempo mínimo, según la etiqueta, antes de que alguien entre sin EPP al área tratada","El tiempo que tarda la mezcla en prepararse","Los días que dura el producto en la bodega","El descanso del aplicador entre dos estanques"]],
+ ["En el triple lavado, ¿qué se hace con el agua de lavado?",["Se bota al desagüe","Se vierte en el estanque de aplicación","Se usa para regar","Se tira en la pileta"]],
+ ["Hay un derrame de producto en la bodega. ¿Qué se hace primero?",["Lavar el piso con la manguera","Barrerlo hacia el desagüe","Aislar el área y ponerse el EPP antes de contenerlo","Esperar a que se seque"]],
+ ["A un compañero le salpica mezcla en los ojos. ¿Qué se hace?",["Lavarle los ojos con abundante agua durante 15 minutos, llamar al CITUC con la etiqueta en la mano y llevarlo a la Mutual","Frotarle los ojos con un paño","Ponerle gotas de leche","Esperar a ver si mejora"]],
+];
+const CLAVE_PLAG_BASE = "bcadbacdacdbacbcabca";
+const EVAL_PLAG_SUP = [
+ ["En el manejo integrado de plagas, ¿cuál es el primer paso antes de decidir una aplicación?",["Aplicar de manera preventiva todos los meses","Monitorear la plaga y compararla con un umbral","Comprar el producto más potente","Esperar reclamos de los socios"]],
+ ["¿Por qué se rotan productos con distintos modos de acción?",["Para evitar que la plaga se vuelva resistente","Para gastar el stock de la bodega","Porque lo exige el proveedor","Para que el césped crezca más rápido"]],
+ ["Si hay varios productos eficaces, ¿cuál se elige?",["El más barato, aunque no esté autorizado para ese uso","El de banda roja, porque actúa más rápido","El que está autorizado para ese uso y tiene menor toxicidad","Una mezcla de todos"]],
+ ["Si se aplica un producto tóxico para las abejas y hay apicultores cerca, la Ley 21.489 exige avisarles con:",["12 horas de anticipación","24 horas de anticipación","Una semana de anticipación","48 horas de anticipación"]],
+ ["Una empresa externa que controla roedores en los recintos debe estar autorizada por:",["La Seremi de Salud (DS 157)","El SAG","La municipalidad","Ninguna institución"]],
+ ["Un contratista que aplica un fungicida de uso agrícola en el césped debería presentar:",["Solo su cédula de identidad","La credencial SAG de aplicador vigente","Una carta de recomendación","Nada, si es una empresa conocida"]],
+ ["¿Para qué sirve el inventario de productos e ingredientes activos del DAV?",["Solo para hacer las compras","Para la publicidad del club","Para que la Mutual defina la vigilancia de salud de los trabajadores expuestos","No tiene uso legal"]],
+ ["¿Cuánto tiempo está vigente la credencial SAG de aplicador?",["1 año","2 años","5 años","Toda la vida"]],
+ ["Un aplicador presenta mareo y náuseas después de aplicar. ¿Qué hace el supervisor?",["Lo deriva a la Mutual con la etiqueta, hace la denuncia e investiga el incidente","Le da la tarde libre sin registrarlo","Le pide que termine el sector","Espera hasta el día siguiente"]],
+ ["Según la Guía Técnica de Capacitación (Res. Ex. 1.117/2026), ¿cuánto tiempo se recomienda guardar los registros de capacitación?",["6 meses","1 año","Al menos 5 años","No hace falta guardarlos"]],
+];
+const CLAVE_PLAG_SUP = "bacdabccac";
+const capClaveArr = s => s.split("").map(ch=>"abcd".indexOf(ch));
+
+async function cargarCapPlaguicidas(setCaps) {
+  const L = (arr)=>arr.map(([q,o])=>({q,o}));
+  await fbSet(ref(db,`${ROOT}/cap_eval/ev_plag_base`),{nombre:"Prueba escrita: curso base (aplicadores y supervisores)",minutos:30,pctAprob:70,preguntas:L(EVAL_PLAG_BASE)});
+  await fbSet(ref(db,`${ROOT}/cap_claves/ev_plag_base`),{k:capClaveArr(CLAVE_PLAG_BASE)});
+  await fbSet(ref(db,`${ROOT}/cap_eval/ev_plag_sup`),{nombre:"Prueba del módulo de supervisores",minutos:15,pctAprob:70,preguntas:L(EVAL_PLAG_SUP)});
+  await fbSet(ref(db,`${ROOT}/cap_claves/ev_plag_sup`),{k:capClaveArr(CLAVE_PLAG_SUP)});
+  setCaps(prev=>{
+    const a = capArr(prev).filter(c=>c.id!=="cap_plaguicidas");
+    return [...a,{id:"cap_plaguicidas",tipo:"Plaguicidas",nombre:"Uso seguro de plaguicidas",
+      evals:[
+        {id:"ev_plag_base",nombre:"Prueba escrita: curso base (aplicadores y supervisores)",minutos:30,pctAprob:70,n:20,requierePauta:true},
+        {id:"ev_plag_sup",nombre:"Prueba del módulo de supervisores",minutos:15,pctAprob:70,n:10,requierePauta:false}],
+      pauta:PAUTA_EPP_PLAGUICIDAS, reintentoDias:30, exigeAsistencia:true, archivos:{}}];
+  });
+}
+
+// ── Estado global de un trabajador en una capacitación ──
+function capEstado(cap, reg, asigsTrab) {
+  const evs = capArr(cap.evals);
+  const asignadas = asigsTrab.map(a=>evs.find(e=>e.id===a.evalId)).filter(Boolean);
+  const r = reg||{};
+  const pruebasOk = asignadas.every(e=>r.evals&&r.evals[e.id]&&r.evals[e.id].aprobado);
+  const pautaReq = !!cap.pauta && (asignadas.some(e=>e.requierePauta) || asignadas.length===0);
+  const pautaOk = !!(r.pauta&&r.pauta.aprobada);
+  const asisOk = !cap.exigeAsistencia || !!r.asistencia;
+  const ok = asisOk && pruebasOk && (!pautaReq||pautaOk) && (asignadas.length>0 || !!r.pauta);
+  return {ok, asisOk, pruebasOk, pautaReq, pautaOk};
+}
+
+// ── Informe imprimible por curso ──
+function imprimirInformeCapacitacion(cap, filas, extra) {
+  const evs = capArr(cap.evals);
+  const hoy = new Date().toLocaleDateString("es-CL",{day:"numeric",month:"long",year:"numeric"});
+  const rows = filas.map((f,i)=>`<tr><td style="text-align:center">${i+1}</td><td>${capEsc(f.nombre)}</td><td style="white-space:nowrap">${capEsc(f.rut||"")}</td>
+    <td style="text-align:center">${f.asistencia?"Sí":"No"}</td>
+    <td>${f.pruebas.map(p=>capEsc(p)).join("<br/>")||"—"}</td>
+    <td style="text-align:center">${f.pauta}</td>
+    <td style="text-align:center;font-weight:700;color:${f.ok?"#1a5c2a":"#a33"}">${f.ok?"Aprobado":"Pendiente"}</td>
+    <td style="width:130px"></td></tr>`).join("");
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Informe capacitación — ${capEsc(cap.nombre)}</title>
+  <style>@page{size:Letter landscape;margin:14mm}body{font-family:Arial,sans-serif;color:#1a1a1a;font-size:12px;margin:0}
+  .pg{padding:22px;max-width:1000px;margin:0 auto}h1{font-size:17px;color:#1a5c2a;margin:0 0 3px}h2{font-size:12px;color:#444;margin:0;font-weight:normal}
+  .hdr{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #1a5c2a;padding-bottom:10px;margin-bottom:12px}
+  table{width:100%;border-collapse:collapse}th,td{border:1px solid #bbb;padding:6px 7px;font-size:11.5px;vertical-align:top}th{background:#eef5ef;text-align:left}
+  .meta td{border:none;padding:2px 10px 2px 0;font-size:12px}.sf{display:flex;gap:60px;margin-top:46px}.sf div{border-top:1px solid #333;padding-top:4px;width:240px;font-size:11px;text-align:center}
+  @media print{.noprint{display:none}}</style></head><body><div class="pg">
+  <div class="hdr"><div style="display:flex;gap:12px;align-items:center"><img src="${LOGO_AREAS_VERDES_B64}" style="height:44px"/>
+  <div><h1>Registro de capacitación — ${capEsc(cap.nombre)}</h1><h2>Departamento de Áreas Verdes · Estadio Español de Las Condes</h2></div></div>
+  <div style="text-align:right;font-size:11px;color:#555">Emitido: ${hoy}</div></div>
+  <table class="meta"><tr><td><b>Tipo:</b> ${capEsc(cap.tipo)}</td><td><b>Fecha del curso:</b> ${capFechaCL(cap.fechaCurso)}</td><td><b>Relatora / evaluadora:</b> ${capEsc(cap.relatora||"")}</td></tr>
+  <tr><td colspan="3"><b>Criterios:</b> ${evs.map(e=>capEsc(e.nombre)+" ("+e.n+" preguntas, "+e.minutos+" min, aprueba ≥ "+e.pctAprob+"%)").join(" · ")}${cap.pauta?` · Pauta práctica: ${cap.pauta.pasos.filter(p=>p.c).length} pasos críticos obligatorios y al menos ${cap.pauta.minPasos} de ${cap.pauta.pasos.length}`:""}${cap.exigeAsistencia?" · Asistencia 100%":""} · Repetición dentro de ${cap.reintentoDias||30} días.</td></tr></table>
+  <table style="margin-top:8px"><thead><tr><th style="width:28px">N°</th><th>Nombre</th><th>RUN</th><th>Asistencia</th><th>Prueba(s)</th><th>Pauta EPP</th><th>Estado</th><th>Firma participante</th></tr></thead><tbody>${rows}</tbody></table>
+  <div class="sf"><div>Firma relatora / evaluadora</div><div>Firma jefa DAV</div></div>
+  <p style="font-size:10px;color:#666;margin-top:22px">Registro de capacitación para la Mutual de Seguridad. Conservar al menos 5 años (Guía Técnica de Capacitación, Res. Ex. 1.117/2026).</p>
+  <div class="noprint" style="text-align:center;margin-top:14px"><button onclick="window.print()" style="background:#1a5c2a;color:#fff;border:none;padding:10px 28px;border-radius:7px;font-size:13px;cursor:pointer">🖨️ Imprimir / Guardar PDF</button></div>
+  </div></body></html>`;
+  const blob = new Blob([html],{type:"text/html;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href=url; a.target="_blank"; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),5000);
+}
+
+function capFilasCurso(cap, personal, asigs, regs) {
+  const evs = capArr(cap.evals);
+  const asigsCap = capArr(asigs).filter(a=>a.capId===cap.id);
+  const regsCap = Object.entries(regs||{}).filter(([k,r])=>r&&r.capId===cap.id);
+  const ids = new Set([...asigsCap.map(a=>String(a.trabId)),...regsCap.map(([k,r])=>String(r.trabId))]);
+  return capNombres(personal).filter(p=>ids.has(String(p.id))).map(p=>{
+    const reg = (regs||{})[capRegId(cap.id,p.id)]||{};
+    const mias = asigsCap.filter(a=>String(a.trabId)===String(p.id));
+    const est = capEstado(cap,reg,mias);
+    const pruebas = evs.filter(e=>mias.some(a=>a.evalId===e.id)||(reg.evals&&reg.evals[e.id])).map(e=>{
+      const r = reg.evals&&reg.evals[e.id];
+      return r ? `${e.nombre.split(":").pop().trim()}: ${r.puntaje}/${r.total} (${capFechaCL(r.fecha)})` : `${e.nombre.split(":").pop().trim()}: sin rendir`;
+    });
+    const pauta = reg.pauta ? `${reg.pauta.aprobada?"Aprobada":"Pendiente"} (${reg.pauta.cumple}/${cap.pauta?cap.pauta.pasos.length:14})` : (est.pautaReq?"Sin evaluar":"—");
+    return {p, reg, mias, nombre:p.nombre, rut:p.rut, asistencia:!!reg.asistencia, pruebas, pauta, ok:est.ok, est};
+  });
+}
+
+// ── Editor de evaluación nueva ──
+function EditorEvaluacionCap({S, onGuardar, onCancelar}) {
+  const [nombre,setNombre]=React.useState("");
+  const [minutos,setMinutos]=React.useState(30);
+  const [pct,setPct]=React.useState(70);
+  const [reqPauta,setReqPauta]=React.useState(false);
+  const [pregs,setPregs]=React.useState([{q:"",o:["","","",""],c:0}]);
+  const upd=(i,patch)=>setPregs(p=>p.map((x,j)=>j===i?{...x,...patch}:x));
+  const valido = nombre.trim() && pregs.length>0 && pregs.every(p=>p.q.trim()&&p.o.every(o=>o.trim()));
+  return (
+    <div style={{...S.card,padding:14,marginTop:10}}>
+      <div style={{fontWeight:700,marginBottom:8}}>➕ Nueva evaluación</div>
+      <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr",gap:8,marginBottom:8}}>
+        <input style={S.input} placeholder="Nombre de la evaluación" value={nombre} onChange={e=>setNombre(e.target.value)}/>
+        <label style={{fontSize:12,color:"#7aaa80"}}>Minutos<input style={S.input} type="number" min="1" value={minutos} onChange={e=>setMinutos(e.target.value)}/></label>
+        <label style={{fontSize:12,color:"#7aaa80"}}>% para aprobar<input style={S.input} type="number" min="1" max="100" value={pct} onChange={e=>setPct(e.target.value)}/></label>
+      </div>
+      <label style={{fontSize:12,color:"#7aaa80",display:"block",marginBottom:8}}><input type="checkbox" checked={reqPauta} onChange={e=>setReqPauta(e.target.checked)}/> Esta evaluación exige además la pauta práctica de la capacitación</label>
+      {pregs.map((p,i)=>(
+        <div key={i} style={{border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,padding:8,marginBottom:8}}>
+          <div style={{display:"flex",gap:6,marginBottom:6}}>
+            <span style={{fontWeight:700}}>{i+1}.</span>
+            <input style={S.input} placeholder="Pregunta" value={p.q} onChange={e=>upd(i,{q:e.target.value})}/>
+            <button className="btn-g" style={{...S.btn,padding:"4px 10px",color:"#f87171"}} onClick={()=>setPregs(a=>a.filter((_,j)=>j!==i))}>✕</button>
+          </div>
+          {p.o.map((o,k)=>(
+            <div key={k} style={{display:"flex",gap:6,alignItems:"center",marginBottom:4}}>
+              <input type="radio" name={"c"+i} checked={p.c===k} onChange={()=>upd(i,{c:k})} title="Respuesta correcta"/>
+              <span style={{width:16}}>{"abcd"[k]})</span>
+              <input style={S.input} placeholder={"Alternativa "+"abcd"[k]} value={o} onChange={e=>upd(i,{o:p.o.map((x,j)=>j===k?e.target.value:x)})}/>
+            </div>
+          ))}
+          <div style={{fontSize:11,color:"#7aaa80"}}>El círculo marca la respuesta correcta.</div>
+        </div>
+      ))}
+      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+        <button className="btn-g" style={S.btn} onClick={()=>setPregs(a=>[...a,{q:"",o:["","","",""],c:0}])}>➕ Pregunta</button>
+        <button style={{...S.btn,background:valido?"#3d7a52":"#333",color:"#fff"}} disabled={!valido} onClick={()=>onGuardar({nombre:nombre.trim(),minutos:Number(minutos)||30,pctAprob:Number(pct)||70,requierePauta:reqPauta,preguntas:pregs})}>💾 Guardar evaluación</button>
+        <button className="btn-g" style={S.btn} onClick={onCancelar}>Cancelar</button>
+      </div>
+    </div>
+  );
+}
+
+// ── Detalle por pregunta (solo Jefa) ──
+function DetalleIntentoCap({S, asig, onCerrar}) {
+  const [d,setD]=React.useState(null);
+  const [sel,setSel]=React.useState(null);
+  const intentos = Object.values(asig.intentos||{}).sort((a,b)=>a.n-b.n);
+  React.useEffect(()=>{
+    (async()=>{
+      const [p,k]=await Promise.all([get(ref(db,`${ROOT}/cap_eval/${asig.evalId}`)),get(ref(db,`${ROOT}/cap_claves/${asig.evalId}`))]);
+      setD({ev:p.val(),k:capArr((k.val()||{}).k)});
+    })().catch(()=>setD({error:true}));
+    setSel(intentos.length?intentos[intentos.length-1].n:null);
+  },[asig.id]);
+  const it = intentos.find(x=>x.n===sel);
+  return (
+    <div style={{...S.card,padding:14,marginTop:10}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+        <b>🔍 Detalle por pregunta</b><button className="btn-g" style={{...S.btn,padding:"4px 12px"}} onClick={onCerrar}>Cerrar</button>
+      </div>
+      {!d?<div>Cargando…</div>:d.error||!d.ev?<div style={{color:"#f87171"}}>No se pudo leer la evaluación.</div>:(<>
+        <div style={{display:"flex",gap:6,marginBottom:8,flexWrap:"wrap"}}>
+          {intentos.map(x=><button key={x.n} className="btn-g" style={{...S.btn,padding:"4px 10px",background:x.n===sel?"rgba(61,122,82,0.35)":undefined}} onClick={()=>setSel(x.n)}>Intento {x.n} · {x.puntaje}/{x.total} · {capFechaCL(x.fin)}</button>)}
+        </div>
+        {it&&capArr(d.ev.preguntas).map((p,i)=>{
+          const r = capArr(it.resp)[i]; const ok = r===d.k[i];
+          return (<div key={i} style={{padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,0.07)",fontSize:13}}>
+            <div><b>{i+1}.</b> {p.q} <span style={{color:ok?"#34d399":"#f87171"}}>{ok?"✓":"✗"}</span></div>
+            <div style={{color:"#7aaa80"}}>Respondió: {r>=0&&p.o?"abcd"[r]+") "+p.o[r]:"sin responder"}</div>
+            {!ok&&<div style={{color:"#90d0a0"}}>Correcta: {"abcd"[d.k[i]]}) {p.o[d.k[i]]}</div>}
+          </div>);
+        })}
+      </>)}
+    </div>
+  );
+}
+
+// ── Pauta práctica (checklist) ──
+function PautaCap({S, cap, trab, reg, onGuardar, onCerrar}) {
+  const pauta = cap.pauta;
+  const [marc,setMarc]=React.useState(()=>({...((reg&&reg.pauta&&reg.pauta.pasos)||{})}));
+  const [eval_,setEval]=React.useState((reg&&reg.pauta&&reg.pauta.evaluadora)||cap.relatora||"");
+  const [fecha,setFecha]=React.useState((reg&&reg.pauta&&reg.pauta.fecha)||fechaLocal());
+  const cumple = pauta.pasos.filter(p=>marc[p.n]).length;
+  const critOk = pauta.pasos.filter(p=>p.c).every(p=>marc[p.n]);
+  const aprobada = critOk && cumple>=pauta.minPasos;
+  let grupo="";
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",zIndex:9999,overflowY:"auto",padding:12}}>
+      <div style={{...S.card,background:"#13241a",maxWidth:720,margin:"0 auto",padding:16}}>
+        <div style={{fontWeight:700,fontSize:16}}>🦺 {pauta.nombre}</div>
+        <div style={{fontSize:13,color:"#7aaa80",marginBottom:8}}>{trab.nombre} · {trab.rut||""}</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
+          <input style={S.input} placeholder="Evaluadora" value={eval_} onChange={e=>setEval(e.target.value)}/>
+          <input style={S.input} type="date" value={fecha} onChange={e=>setFecha(e.target.value)}/>
+        </div>
+        {pauta.pasos.map(p=>{
+          const h = p.g!==grupo ? (grupo=p.g, <div key={"g"+p.n} style={{fontWeight:700,margin:"10px 0 4px",color:"#90d0a0"}}>{p.g}</div>) : null;
+          return (<React.Fragment key={p.n}>{h}
+            <label style={{display:"flex",gap:8,alignItems:"flex-start",padding:"5px 0",fontSize:13,borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
+              <input type="checkbox" checked={!!marc[p.n]} onChange={e=>setMarc(m=>({...m,[p.n]:e.target.checked}))} style={{marginTop:3}}/>
+              <span><b>{p.n}.</b> {p.t} {p.c&&<span style={{color:"#fbbf24",fontSize:11}}>● crítico</span>}</span>
+            </label></React.Fragment>);
+        })}
+        <div style={{margin:"12px 0",padding:10,borderRadius:8,background:aprobada?"rgba(52,211,153,0.15)":"rgba(248,113,113,0.15)"}}>
+          <b>{cumple}/{pauta.pasos.length}</b> pasos · críticos {critOk?"cumplidos":"con fallas"} → <b>{aprobada?"APROBADA":"PENDIENTE (repite antes de "+(cap.reintentoDias||30)+" días)"}</b>
+          <div style={{fontSize:11,color:"#7aaa80"}}>Se aprueba con los {pauta.pasos.filter(p=>p.c).length} pasos críticos y al menos {pauta.minPasos} de {pauta.pasos.length}.</div>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <button style={{...S.btn,background:"#3d7a52",color:"#fff"}} onClick={()=>onGuardar({pasos:marc,evaluadora:eval_,fecha,cumple,criticosOk:critOk,aprobada})}>💾 Guardar pauta</button>
+          <button className="btn-g" style={S.btn} onClick={onCerrar}>Cancelar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══ PANEL JEFA / PROGRAMADOR ═══
+function PanelCapacitacion({ S, personal, esJefa }) {
+  const [capsRaw, setCaps] = useFirebaseState("capacitaciones", []);
+  const [asigsRaw] = useFirebaseState("cap_asignaciones", {});
+  const [regs] = useFirebaseState("cap_registros", {});
+  const caps = capArr(capsRaw);
+  const asigs = Object.values(asigsRaw||{}).filter(Boolean);
+  const [tab,setTab]=React.useState("cursos");
+  const [msg,setMsg]=React.useState("");
+  const [nuevo,setNuevo]=React.useState(false);
+  const [fTipo,setFTipo]=React.useState(""); const [fNombre,setFNombre]=React.useState("");
+  const [editEvalCap,setEditEvalCap]=React.useState(null);
+  const [capSel,setCapSel]=React.useState("");
+  const [evalSel,setEvalSel]=React.useState("");
+  const [marcados,setMarcados]=React.useState({});
+  const [detalle,setDetalle]=React.useState(null);
+  const [pautaDe,setPautaDe]=React.useState(null);
+  const [regCap,setRegCap]=React.useState("");
+  const [addTrab,setAddTrab]=React.useState("");
+  const lista = capNombres(personal);
+  const capActual = caps.find(c=>c.id===capSel)||null;
+  const capReg = caps.find(c=>c.id===regCap)||null;
+  const flash = t=>{setMsg(t);setTimeout(()=>setMsg(""),4000);};
+  if(!esJefa) return <div style={{padding:20}}>Sin acceso.</div>;
+
+  const subirArchivo = (cap,kind,file) => {
+    if(!file) return;
+    if(file.size>2*1024*1024) { flash("⚠️ El archivo pesa más de 2 MB."); return; }
+    const fr = new FileReader();
+    fr.onload = async()=>{
+      try{
+        await fbSet(ref(db,`${ROOT}/cap_archivos/${capSan(cap.id)}_${kind}`),{nombre:file.name,dataUrl:fr.result,tam:file.size,fecha:fechaLocal()});
+        setCaps(prev=>capArr(prev).map(c=>c.id===cap.id?{...c,archivos:{...(c.archivos||{}),[kind]:{nombre:file.name,tam:file.size,fecha:fechaLocal()}}}:c));
+        flash("✅ Archivo guardado");
+      }catch(e){ flash("❌ No se pudo guardar el archivo"); }
+    };
+    fr.readAsDataURL(file);
+  };
+  const bajarArchivo = async(cap,kind)=>{
+    try{
+      const s = await get(ref(db,`${ROOT}/cap_archivos/${capSan(cap.id)}_${kind}`));
+      const v = s.val(); if(!v) return flash("No hay archivo.");
+      const a=document.createElement("a"); a.href=v.dataUrl; a.download=v.nombre; document.body.appendChild(a); a.click(); a.remove();
+    }catch(e){ flash("❌ No se pudo descargar"); }
+  };
+  const guardarEval = async(cap,d)=>{
+    const id = "ev_"+Date.now();
+    try{
+      await fbSet(ref(db,`${ROOT}/cap_eval/${id}`),{nombre:d.nombre,minutos:d.minutos,pctAprob:d.pctAprob,preguntas:d.preguntas.map(p=>({q:p.q.trim(),o:p.o.map(o=>o.trim())}))});
+      await fbSet(ref(db,`${ROOT}/cap_claves/${id}`),{k:d.preguntas.map(p=>p.c)});
+      setCaps(prev=>capArr(prev).map(c=>c.id===cap.id?{...c,evals:[...capArr(c.evals),{id,nombre:d.nombre,minutos:d.minutos,pctAprob:d.pctAprob,n:d.preguntas.length,requierePauta:!!d.requierePauta}]}:c));
+      setEditEvalCap(null); flash("✅ Evaluación guardada");
+    }catch(e){ flash("❌ No se pudo guardar"); }
+  };
+  const quitarEval = async(cap,ev)=>{
+    if(!window.confirm(`¿Eliminar la evaluación «${ev.nombre}»? Las asignaciones y notas ya registradas se conservan en el registro.`)) return;
+    await fbSet(ref(db,`${ROOT}/cap_eval/${ev.id}`),null); await fbSet(ref(db,`${ROOT}/cap_claves/${ev.id}`),null);
+    setCaps(prev=>capArr(prev).map(c=>c.id===cap.id?{...c,evals:capArr(c.evals).filter(e=>e.id!==ev.id)}:c));
+  };
+  const crearCap = ()=>{
+    if(!fTipo.trim()||!fNombre.trim()) return;
+    setCaps(prev=>[...capArr(prev),{id:"cap_"+Date.now(),tipo:fTipo.trim(),nombre:fNombre.trim(),evals:[],archivos:{},reintentoDias:30,exigeAsistencia:true}]);
+    setNuevo(false); setFTipo(""); setFNombre("");
+  };
+  const eliminarCap = (cap)=>{
+    if(!window.confirm(`¿Eliminar la capacitación «${cap.nombre}»? Esto no borra los registros ya guardados de los trabajadores.`)) return;
+    setCaps(prev=>capArr(prev).filter(c=>c.id!==cap.id));
+  };
+  const asignar = async()=>{
+    if(!capActual||!evalSel) return flash("Elige capacitación y evaluación.");
+    const ids = Object.keys(marcados).filter(k=>marcados[k]);
+    if(!ids.length) return flash("Marca al menos una persona.");
+    let n=0;
+    for(const tid of ids){
+      const id = capAsigId(evalSel,tid);
+      if(asigs.find(a=>a.id===id)) continue;
+      await fbSet(ref(db,`${ROOT}/cap_asignaciones/${id}`),{id,capId:capActual.id,evalId:evalSel,trabId:String(tid),habilitada:true,creada:fechaLocal()});
+      n++;
+    }
+    setMarcados({}); flash(`✅ ${n} asignación(es) creada(s)`);
+  };
+  const habilitar = a=>fbUpdate(ref(db,`${ROOT}/cap_asignaciones/${a.id}`),{habilitada:true}).then(()=>flash("✅ Nuevo intento habilitado"));
+  const quitarAsig = a=>{ if(window.confirm("¿Quitar esta asignación?")) fbSet(ref(db,`${ROOT}/cap_asignaciones/${a.id}`),null); };
+  const toggleAsistencia = async(cap,p,val)=>{
+    const k = capRegId(cap.id,p.id);
+    await fbUpdate(ref(db,`${ROOT}/cap_registros/${k}`),{capId:cap.id,trabId:String(p.id),asistencia:val});
+  };
+  const guardarPauta = async(cap,p,data)=>{
+    const k = capRegId(cap.id,p.id);
+    await fbUpdate(ref(db,`${ROOT}/cap_registros/${k}`),{capId:cap.id,trabId:String(p.id),pauta:data});
+    setPautaDe(null); flash("✅ Pauta guardada");
+  };
+  const agregarARegistro = async()=>{
+    if(!addTrab||!capReg) return;
+    const k = capRegId(capReg.id,addTrab);
+    await fbUpdate(ref(db,`${ROOT}/cap_registros/${k}`),{capId:capReg.id,trabId:String(addTrab)});
+    setAddTrab("");
+  };
+  const setCapCampo = (id,patch)=>setCaps(prev=>capArr(prev).map(c=>c.id===id?{...c,...patch}:c));
+  const trabDe = id=>lista.find(p=>String(p.id)===String(id))||{nombre:"(eliminado)",rut:""};
+  const tipos = [...new Set(caps.map(c=>c.tipo))].sort((a,b)=>a.localeCompare(b,"es"));
+  const tabBtn=(k,l)=><button key={k} className="btn-g" style={{...S.btn,background:tab===k?"rgba(61,122,82,0.35)":undefined,color:tab===k?"#90d0a0":undefined}} onClick={()=>setTab(k)}>{l}</button>;
+
+  return (
+    <div className="ein" style={{maxWidth:1000,margin:"0 auto"}}>
+      <div style={{fontSize:20,fontWeight:700,marginBottom:4}}>🎓 Capacitación</div>
+      <div style={{fontSize:12,color:"#7aaa80",marginBottom:10}}>Solo visible para Jefa y Programador. Los trabajadores y supervisores ven únicamente la evaluación que les asignes.</div>
+      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>{tabBtn("cursos","📚 Capacitaciones")}{tabBtn("asignar","📝 Evaluaciones asignadas")}{tabBtn("registro","📋 Registro e informe")}</div>
+      {msg&&<div style={{padding:8,borderRadius:8,background:"rgba(61,122,82,0.25)",marginBottom:10,fontSize:13}}>{msg}</div>}
+
+      {tab==="cursos"&&(<div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
+          <button style={{...S.btn,background:"#3d7a52",color:"#fff"}} onClick={()=>setNuevo(v=>!v)}>➕ Nueva capacitación</button>
+          {!caps.find(c=>c.id==="cap_plaguicidas")&&<button className="btn-g" style={S.btn} onClick={async()=>{await cargarCapPlaguicidas(setCaps);flash("✅ Cargada «Uso seguro de plaguicidas». Ahora sube el programa y la presentación.");}}>📥 Cargar «Uso seguro de plaguicidas»</button>}
+        </div>
+        {nuevo&&(<div style={{...S.card,padding:12,marginBottom:12,display:"grid",gridTemplateColumns:"1fr 2fr auto",gap:8}}>
+          <input style={S.input} list="tiposCap" placeholder="Tipo (ej. Plaguicidas)" value={fTipo} onChange={e=>setFTipo(e.target.value)}/>
+          <datalist id="tiposCap">{tipos.map(t=><option key={t} value={t}/>)}</datalist>
+          <input style={S.input} placeholder="Nombre de la capacitación" value={fNombre} onChange={e=>setFNombre(e.target.value)}/>
+          <button style={{...S.btn,background:"#3d7a52",color:"#fff"}} onClick={crearCap}>Crear</button>
+        </div>)}
+        {caps.length===0&&<div style={{color:"#7aaa80"}}>Aún no hay capacitaciones.</div>}
+        {tipos.map(tp=>(<div key={tp} style={{marginBottom:16}}>
+          <div style={{fontSize:15,fontWeight:700,color:"#90d0a0",marginBottom:6}}>🗂️ {tp}</div>
+          {caps.filter(c=>c.tipo===tp).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es")).map(c=>(
+            <div key={c.id} style={{...S.card,padding:14,marginBottom:10}}>
+              <div style={{display:"flex",justifyContent:"space-between",gap:8}}>
+                <div style={{fontWeight:700,fontSize:15}}>{c.nombre}</div>
+                <button className="btn-g" style={{...S.btn,padding:"3px 10px",color:"#f87171"}} onClick={()=>eliminarCap(c)}>🗑️</button>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:10,margin:"10px 0"}}>
+                {[["programa","📄 Programa / documento (Word o PDF)",".doc,.docx,.pdf"],["ppt","📊 Presentación (PPT)",".ppt,.pptx,.pdf"]].map(([kind,lbl,acc])=>{
+                  const a = c.archivos&&c.archivos[kind];
+                  return (<div key={kind} style={{border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,padding:8,fontSize:13}}>
+                    <div style={{fontWeight:600,marginBottom:4}}>{lbl}</div>
+                    {a?<div style={{color:"#90d0a0",marginBottom:4}}>{a.nombre} <span style={{color:"#7aaa80"}}>({Math.round(a.tam/1024)} KB)</span> <button className="btn-g" style={{...S.btn,padding:"2px 8px",fontSize:12}} onClick={()=>bajarArchivo(c,kind)}>⬇️ Descargar</button></div>:<div style={{color:"#7aaa80",marginBottom:4}}>Sin archivo</div>}
+                    <input type="file" accept={acc} onChange={e=>{subirArchivo(c,kind,e.target.files[0]);e.target.value="";}} style={{fontSize:12}}/>
+                  </div>);
+                })}
+              </div>
+              <div style={{fontWeight:600,fontSize:13,marginBottom:4}}>📝 Evaluaciones (las únicas visibles para el personal asignado)</div>
+              {capArr(c.evals).length===0&&<div style={{color:"#7aaa80",fontSize:13}}>Sin evaluaciones.</div>}
+              {capArr(c.evals).map(e=>(<div key={e.id} style={{display:"flex",justifyContent:"space-between",gap:8,padding:"5px 0",borderBottom:"1px solid rgba(255,255,255,0.06)",fontSize:13}}>
+                <span>{e.nombre} — {e.n} preguntas · {e.minutos} min · aprueba ≥ {e.pctAprob}%{e.requierePauta?" · exige pauta práctica":""}</span>
+                <button className="btn-g" style={{...S.btn,padding:"2px 8px",fontSize:12,color:"#f87171"}} onClick={()=>quitarEval(c,e)}>🗑️</button>
+              </div>))}
+              {c.pauta&&<div style={{fontSize:12,color:"#7aaa80",marginTop:6}}>🦺 Pauta práctica: {c.pauta.nombre} ({c.pauta.pasos.length} pasos, {c.pauta.pasos.filter(p=>p.c).length} críticos, mínimo {c.pauta.minPasos})</div>}
+              <div style={{marginTop:8}}><button className="btn-g" style={S.btn} onClick={()=>setEditEvalCap(editEvalCap===c.id?null:c.id)}>➕ Agregar evaluación</button></div>
+              {editEvalCap===c.id&&<EditorEvaluacionCap S={S} onGuardar={d=>guardarEval(c,d)} onCancelar={()=>setEditEvalCap(null)}/>}
+            </div>
+          ))}
+        </div>))}
+      </div>)}
+
+      {tab==="asignar"&&(<div>
+        <div style={{...S.card,padding:12,marginBottom:12}}>
+          <div style={{fontWeight:700,marginBottom:8}}>Asignar una evaluación</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+            <select style={S.input} value={capSel} onChange={e=>{setCapSel(e.target.value);setEvalSel("");}}><option value="">Capacitación…</option>{caps.slice().sort((a,b)=>a.nombre.localeCompare(b.nombre,"es")).map(c=><option key={c.id} value={c.id}>{c.tipo} — {c.nombre}</option>)}</select>
+            <select style={S.input} value={evalSel} onChange={e=>setEvalSel(e.target.value)} disabled={!capActual}><option value="">Evaluación…</option>{capActual&&capArr(capActual.evals).map(e=><option key={e.id} value={e.id}>{e.nombre}</option>)}</select>
+          </div>
+          <div style={{maxHeight:240,overflowY:"auto",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,padding:6}}>
+            {lista.map(p=>{
+              const ya = evalSel && asigs.find(a=>a.id===capAsigId(evalSel,p.id));
+              return (<label key={p.id} style={{display:"flex",gap:8,padding:"3px 4px",fontSize:13,opacity:ya?0.5:1}}>
+                <input type="checkbox" disabled={!!ya} checked={!!marcados[p.id]} onChange={e=>setMarcados(m=>({...m,[p.id]:e.target.checked}))}/>{p.nombre} <span style={{color:"#7aaa80"}}>· {p.cargo||""}{ya?" · ya asignada":""}</span></label>);
+            })}
+          </div>
+          <button style={{...S.btn,background:"#3d7a52",color:"#fff",marginTop:8}} onClick={asignar}>✅ Asignar a los marcados</button>
+        </div>
+        <div style={{fontWeight:700,marginBottom:6}}>Asignaciones y resultados</div>
+        <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+          <thead><tr style={{textAlign:"left",color:"#7aaa80"}}><th style={{padding:6}}>Persona</th><th>Capacitación / evaluación</th><th>Estado</th><th>Último resultado</th><th></th></tr></thead>
+          <tbody>{asigs.slice().sort((a,b)=>trabDe(a.trabId).nombre.localeCompare(trabDe(b.trabId).nombre,"es")).map(a=>{
+            const cap = caps.find(c=>c.id===a.capId)||{nombre:"?",evals:[]}; const ev = capArr(cap.evals).find(e=>e.id===a.evalId)||{nombre:a.evalId};
+            const its = Object.values(a.intentos||{}).sort((x,y)=>x.n-y.n); const ult = its[its.length-1];
+            const est = a.enCurso?"⏳ Rindiendo": ult? (ult.aprobado?"✅ Aprobada":"🟡 Pendiente") : (a.habilitada?"Por rendir":"—");
+            return (<tr key={a.id} style={{borderTop:"1px solid rgba(255,255,255,0.07)"}}>
+              <td style={{padding:6}}>{trabDe(a.trabId).nombre}</td><td>{cap.nombre} — {ev.nombre}</td><td>{est}</td>
+              <td>{ult?`${ult.puntaje}/${ult.total} (${Math.round(ult.pct)}%) · intento ${ult.n}`:"—"}</td>
+              <td style={{whiteSpace:"nowrap"}}>
+                {ult&&<button className="btn-g" style={{...S.btn,padding:"2px 8px",fontSize:12}} onClick={()=>setDetalle(a.id)}>🔍 Detalle</button>}{" "}
+                {ult&&!ult.aprobado&&!a.habilitada&&!a.enCurso&&<button className="btn-g" style={{...S.btn,padding:"2px 8px",fontSize:12}} onClick={()=>habilitar(a)}>🔁 Habilitar nuevo intento</button>}{" "}
+                <button className="btn-g" style={{...S.btn,padding:"2px 8px",fontSize:12,color:"#f87171"}} onClick={()=>quitarAsig(a)}>✕</button>
+              </td></tr>);
+          })}</tbody></table></div>
+        {asigs.length===0&&<div style={{color:"#7aaa80",marginTop:6}}>Aún no hay asignaciones.</div>}
+        {detalle&&asigs.find(a=>a.id===detalle)&&<DetalleIntentoCap S={S} asig={asigs.find(a=>a.id===detalle)} onCerrar={()=>setDetalle(null)}/>}
+        <div style={{fontSize:11,color:"#7aaa80",marginTop:10}}>Quien queda Pendiente repite antes de 30 días y, mientras tanto, trabaja con plaguicidas solo bajo supervisión directa. Solo tú habilitas el nuevo intento.</div>
+      </div>)}
+
+      {tab==="registro"&&(<div>
+        <select style={{...S.input,marginBottom:10}} value={regCap} onChange={e=>setRegCap(e.target.value)}><option value="">Elige una capacitación…</option>{caps.slice().sort((a,b)=>a.nombre.localeCompare(b.nombre,"es")).map(c=><option key={c.id} value={c.id}>{c.tipo} — {c.nombre}</option>)}</select>
+        {capReg&&(()=>{
+          const filas = capFilasCurso(capReg,personal,asigs,regs);
+          return (<div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
+              <label style={{fontSize:12,color:"#7aaa80"}}>Fecha del curso<input style={S.input} type="date" value={capReg.fechaCurso||""} onChange={e=>setCapCampo(capReg.id,{fechaCurso:e.target.value})}/></label>
+              <label style={{fontSize:12,color:"#7aaa80"}}>Relatora / evaluadora<input style={S.input} value={capReg.relatora||""} onChange={e=>setCapCampo(capReg.id,{relatora:e.target.value})}/></label>
+            </div>
+            <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+              <thead><tr style={{textAlign:"left",color:"#7aaa80"}}><th style={{padding:6}}>Nombre</th><th>RUN</th><th>Asistió</th><th>Pruebas</th><th>Pauta práctica</th><th>Estado</th></tr></thead>
+              <tbody>{filas.map(f=>(<tr key={f.p.id} style={{borderTop:"1px solid rgba(255,255,255,0.07)"}}>
+                <td style={{padding:6}}>{f.nombre}</td><td>{f.rut||""}</td>
+                <td><input type="checkbox" checked={f.asistencia} onChange={e=>toggleAsistencia(capReg,f.p,e.target.checked)}/></td>
+                <td style={{fontSize:12}}>{f.pruebas.map((x,i)=><div key={i}>{x}</div>)}{f.pruebas.length===0&&"—"}</td>
+                <td>{capReg.pauta?<button className="btn-g" style={{...S.btn,padding:"2px 8px",fontSize:12}} onClick={()=>setPautaDe(f.p.id)}>🦺 {f.pauta}</button>:"—"}</td>
+                <td style={{fontWeight:700,color:f.ok?"#34d399":"#fbbf24"}}>{f.ok?"Aprobado":"Pendiente"}</td></tr>))}</tbody></table></div>
+            {filas.length===0&&<div style={{color:"#7aaa80"}}>Nadie en el registro todavía. Asigna evaluaciones o agrega personas abajo.</div>}
+            <div style={{display:"flex",gap:8,margin:"10px 0",flexWrap:"wrap"}}>
+              <select style={{...S.input,width:"auto",minWidth:220}} value={addTrab} onChange={e=>setAddTrab(e.target.value)}><option value="">Agregar persona al registro…</option>{lista.map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}</select>
+              <button className="btn-g" style={S.btn} onClick={agregarARegistro}>➕ Agregar</button>
+              <button style={{...S.btn,background:"#3d7a52",color:"#fff"}} onClick={()=>imprimirInformeCapacitacion(capReg,filas,{})}>🖨️ Informe imprimible</button>
+            </div>
+            {pautaDe&&(()=>{const f=filas.find(x=>String(x.p.id)===String(pautaDe)); return f?<PautaCap S={S} cap={capReg} trab={f.p} reg={f.reg} onGuardar={d=>guardarPauta(capReg,f.p,d)} onCerrar={()=>setPautaDe(null)}/>:null;})()}
+          </div>);
+        })()}
+      </div>)}
+    </div>
+  );
+}
+
+// ═══ VISTA DEL TRABAJADOR / SUPERVISOR: solo evaluaciones asignadas ═══
+function RendirEvaluacionCap({S, asig, evMeta, trabajador, onFin}) {
+  const [pregs,setPregs]=React.useState(null);
+  const [resp,setResp]=React.useState(()=>{ const r=(asig.enCurso&&asig.enCurso.resp)||{}; const o={}; Object.keys(r).forEach(k=>o[k]=r[k]); return o; });
+  const [left,setLeft]=React.useState(null);
+  const [enviando,setEnviando]=React.useState(false);
+  const enviadoRef = React.useRef(false);
+  const inicio = asig.enCurso.inicio;
+  const respRef = React.useRef(resp); respRef.current = resp;
+  React.useEffect(()=>{
+    get(ref(db,`${ROOT}/cap_eval/${asig.evalId}`)).then(s=>setPregs(capArr((s.val()||{}).preguntas))).catch(()=>setPregs([]));
+  },[]);
+  const enviar = React.useCallback(async(auto)=>{
+    if(enviadoRef.current||!pregs) return; enviadoRef.current=true; setEnviando(true);
+    try{
+      const k = capArr(((await get(ref(db,`${ROOT}/cap_claves/${asig.evalId}`))).val()||{}).k);
+      const r = pregs.map((_,i)=>{const v=respRef.current[i]; return v===undefined?-1:Number(v);});
+      const puntaje = r.filter((v,i)=>v===k[i]).length; const total = pregs.length;
+      const pct = total?puntaje/total*100:0; const aprobado = pct>=(evMeta.pctAprob||70);
+      const n = Object.keys(asig.intentos||{}).length+1;
+      const intento = {n,inicio,fin:Date.now(),resp:r,puntaje,total,pct,aprobado,auto:!!auto};
+      await fbUpdate(ref(db,`${ROOT}/cap_asignaciones/${asig.id}`),{enCurso:null,habilitada:false,[`intentos/i${n}`]:intento});
+      const rk = capRegId(asig.capId,asig.trabId);
+      await fbUpdate(ref(db,`${ROOT}/cap_registros/${rk}`),{capId:asig.capId,trabId:String(asig.trabId)});
+      await fbSet(ref(db,`${ROOT}/cap_registros/${rk}/evals/${capSan(asig.evalId)}`),{fecha:fechaLocal(),puntaje,total,pct,aprobado,intento:n});
+      onFin&&onFin();
+    }catch(e){ enviadoRef.current=false; setEnviando(false); alert("No se pudo enviar la evaluación. Revisa tu conexión y vuelve a intentar."); }
+  },[pregs]);
+  React.useEffect(()=>{
+    if(!pregs) return;
+    const tick=()=>{ const l=Math.ceil((inicio+(evMeta.minutos||30)*60000-Date.now())/1000); setLeft(l); if(l<=0) enviar(true); };
+    tick(); const t=setInterval(tick,1000); return ()=>clearInterval(t);
+  },[pregs,enviar]);
+  const marcar=(i,k)=>{ setResp(r=>({...r,[i]:k})); fbUpdate(ref(db,`${ROOT}/cap_asignaciones/${asig.id}/enCurso/resp`),{[i]:k}).catch(()=>{}); };
+  if(!pregs) return <div style={{padding:12}}>Cargando evaluación…</div>;
+  const m=Math.max(0,Math.floor((left||0)/60)), s=Math.max(0,(left||0)%60);
+  const resp_n = Object.keys(resp).length;
+  return (
+    <div style={{...S.card,padding:14,marginBottom:14}}>
+      <div style={{position:"sticky",top:0,background:"#13241a",padding:"6px 0",display:"flex",justifyContent:"space-between",zIndex:5}}>
+        <b>{evMeta.nombre}</b>
+        <b style={{color:left!=null&&left<120?"#f87171":"#90d0a0"}}>⏱ {String(m).padStart(2,"0")}:{String(s).padStart(2,"0")}</b>
+      </div>
+      <div style={{fontSize:12,color:"#7aaa80",marginBottom:8}}>Marca una sola alternativa por pregunta. Si se acaba el tiempo, se envía con lo respondido. Respondidas: {resp_n}/{pregs.length}</div>
+      {pregs.map((p,i)=>(
+        <div key={i} style={{padding:"8px 0",borderBottom:"1px solid rgba(255,255,255,0.08)"}}>
+          <div style={{fontWeight:600,marginBottom:4}}>{i+1}. {p.q}</div>
+          {capArr(p.o).map((o,k)=>(
+            <label key={k} style={{display:"flex",gap:8,padding:"4px 0",fontSize:14,cursor:"pointer"}}>
+              <input type="radio" name={"q"+i} checked={resp[i]===k} onChange={()=>marcar(i,k)} disabled={enviando}/><span>{"abcd"[k]}) {o}</span>
+            </label>))}
+        </div>))}
+      <button style={{...S.btn,background:"#3d7a52",color:"#fff",marginTop:12,width:"100%"}} disabled={enviando} onClick={()=>{ if(resp_n<pregs.length&&!window.confirm(`Te faltan ${pregs.length-resp_n} preguntas por responder. ¿Enviar igual?`)) return; enviar(false); }}>{enviando?"Enviando…":"✅ Enviar evaluación"}</button>
+    </div>
+  );
+}
+
+function EvaluacionesTrabajador({ S, trabajador }) {
+  const [capsRaw] = useFirebaseState("capacitaciones", []);
+  const [asigsRaw] = useFirebaseState("cap_asignaciones", {});
+  if(!trabajador) return null;
+  const caps = capArr(capsRaw);
+  const mias = Object.values(asigsRaw||{}).filter(a=>a&&String(a.trabId)===String(trabajador.id));
+  if(mias.length===0) return null;
+  const comenzar = a=>fbUpdate(ref(db,`${ROOT}/cap_asignaciones/${a.id}`),{enCurso:{inicio:Date.now()}});
+  return (
+    <div style={{marginBottom:16}}>
+      <div style={{fontSize:16,fontWeight:700,marginBottom:8}}>🎓 Mis evaluaciones</div>
+      {mias.map(a=>{
+        const cap = caps.find(c=>c.id===a.capId); const ev = cap&&capArr(cap.evals).find(e=>e.id===a.evalId);
+        if(!cap||!ev) return null;
+        const its = Object.values(a.intentos||{}).sort((x,y)=>x.n-y.n); const ult = its[its.length-1];
+        if(a.enCurso) return <RendirEvaluacionCap key={a.id} S={S} asig={a} evMeta={ev} trabajador={trabajador}/>;
+        return (
+          <div key={a.id} style={{...S.card,padding:12,marginBottom:8}}>
+            <div style={{fontWeight:600}}>{cap.nombre}</div>
+            <div style={{fontSize:13,color:"#7aaa80"}}>{ev.nombre} · {ev.n} preguntas · {ev.minutos} min · se aprueba con {ev.pctAprob}%</div>
+            {ult&&<div style={{marginTop:6,fontSize:14}}>Resultado: <b>{ult.puntaje}/{ult.total}</b> — <b style={{color:ult.aprobado?"#34d399":"#fbbf24"}}>{ult.aprobado?"Aprobado":"Pendiente"}</b>{!ult.aprobado&&<div style={{fontSize:12,color:"#fbbf24"}}>Quedó pendiente. Habla con la Jefa para repetirla antes de {cap.reintentoDias||30} días.</div>}</div>}
+            {a.habilitada&&<button style={{...S.btn,background:"#3d7a52",color:"#fff",marginTop:8}} onClick={()=>{ if(window.confirm(`Tienes ${ev.minutos} minutos. El cronómetro empieza al aceptar. ¿Comenzar ahora?`)) comenzar(a); }}>▶️ {ult?"Rendir nuevo intento":"Comenzar evaluación"}</button>}
+          </div>);
+      })}
+    </div>
+  );
+}
+
+// ═══ Ficha del trabajador: capacitaciones ═══
+function CapacitacionesFicha({ S, t }) {
+  const [capsRaw] = useFirebaseState("capacitaciones", []);
+  const [asigsRaw] = useFirebaseState("cap_asignaciones", {});
+  const [regs] = useFirebaseState("cap_registros", {});
+  const caps = capArr(capsRaw);
+  const asigs = Object.values(asigsRaw||{}).filter(a=>a&&String(a.trabId)===String(t.id));
+  const filas = caps.map(c=>{
+    const reg = (regs||{})[capRegId(c.id,t.id)];
+    const mias = asigs.filter(a=>a.capId===c.id);
+    if(!reg&&mias.length===0) return null;
+    const est = capEstado(c,reg,mias);
+    const evs = capArr(c.evals);
+    const pruebas = evs.filter(e=>reg&&reg.evals&&reg.evals[e.id]).map(e=>{const r=reg.evals[e.id]; return `${r.puntaje}/${r.total} (${capFechaCL(r.fecha)})`;});
+    const fechas = [ ...(reg&&reg.evals?Object.values(reg.evals).map(r=>r.fecha):[]), reg&&reg.pauta&&reg.pauta.fecha ].filter(Boolean).sort();
+    return {c,est,pruebas,reg,fecha:fechas[fechas.length-1]};
+  }).filter(Boolean);
+  return (
+    <div style={{...S.card,padding:14,marginBottom:16}}>
+      <div style={{fontWeight:700,marginBottom:8}}>🎓 Capacitaciones</div>
+      {filas.length===0?<div style={{fontSize:13,color:"#7aaa80"}}>Sin capacitaciones registradas.</div>:(
+        <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+          <thead><tr style={{textAlign:"left",color:"#7aaa80"}}><th style={{padding:5}}>Capacitación</th><th>Fecha</th><th>Nota prueba</th><th>Pauta práctica</th><th>Asistencia</th><th>Estado</th></tr></thead>
+          <tbody>{filas.map(f=>(<tr key={f.c.id} style={{borderTop:"1px solid rgba(255,255,255,0.07)"}}>
+            <td style={{padding:5}}>{f.c.tipo} — {f.c.nombre}</td><td>{capFechaCL(f.fecha)}</td>
+            <td>{f.pruebas.join(" · ")||"—"}</td>
+            <td>{f.reg&&f.reg.pauta?`${f.reg.pauta.aprobada?"Aprobada":"Pendiente"} (${f.reg.pauta.cumple}/${f.c.pauta?f.c.pauta.pasos.length:14})`:(f.est.pautaReq?"Sin evaluar":"—")}</td>
+            <td>{f.reg&&f.reg.asistencia?"Sí":"No"}</td>
+            <td style={{fontWeight:700,color:f.est.ok?"#34d399":"#fbbf24"}}>{f.est.ok?"Aprobado":"Pendiente"}</td></tr>))}</tbody></table></div>)}
+    </div>
+  );
+}
+
 function PanelMemos({ S, memosData=[], setMemosData, esJefa, personal=[] }) {
   const hoyMemo = fechaLocal();
   const emptyMemo = { fecha:hoyMemo, de:"Carmen Luz Hermosilla Diez — Jefa Departamento de Áreas Verdes", para:"Gerencia General y Administración", asunto:"", cuerpo:"" };
@@ -28688,7 +29297,7 @@ const instalarDescargaInformes = () => {
 };
 
 const normKeyTarea = (z,e,t)=>[z,e,t].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("_");
-const BUILD_STAMP = "2026-11-25.1";
+const BUILD_STAMP = "2026-11-27.1";
 // ── Turnos cerrados: aviso al agregar/asignar tareas y detección de tareas «agregadas después del cierre» ──
 const claveCierre = (fecha, nombre) => `${fecha}_${(nombre||"").split(" ")[0].toLowerCase()}`;
 const tareasTrasCierre = (listaTareas, cierre) => {
@@ -30266,7 +30875,7 @@ export default function App() {
         </div>
         <div style={S.headerNav} className="headerNav">
           {(fbRol==="jefa"||fbRol==="programador"
-            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["compras","🛒","Compras"],["bodegas","🏪","Bodegas"],["golf","🏌️","Golf"],["personal","👷","Personal"],["memos","📝","Memos"],["protocolos","📋","Protocolos"]]
+            ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["reporte","📋","Reporte"],["programacion","📆","Programa"],["compras","🛒","Compras"],["bodegas","🏪","Bodegas"],["golf","🏌️","Golf"],["personal","👷","Personal"],["memos","📝","Memos"],["protocolos","📋","Protocolos"],["capacitacion","🎓","Capacitación"]]
             : fbRol==="supervisor"
             ? [["dashboard","📊","Panel"],["zonas","🗺️","Macrozonas"],["programacion","📆","Programa"],["reporte","📋","Reporte"],["golf","🏌️","Golf"],["bodegas","🏪","Bodegas"],["memos","📝","Memos"],["protocolos","📋","Protocolos"],["notificaciones","🔔","Alertas"],["designacion","📋","Designación"],["miturno","🌿","Mi Turno"]]
             : fbRol==="gerencia"
@@ -31790,6 +32399,12 @@ export default function App() {
             })()?(
               <div>
                 <button className="btn-g" style={{...S.btn,marginBottom:16}} onClick={()=>{esLocalRef.current=false;signOut(auth).catch(()=>{});setVistaWorker(false);setWorkerLogueado(null);setFbRol(null);setFbUser(null);}}>← Salir</button>
+                <EvaluacionesTrabajador S={S} trabajador={(()=>{
+                    const arr=Array.isArray(personal)?personal:Object.values(personal||{});
+                    return workerLogueado
+                      ? arr.find(x=>String(x.id)===String(workerLogueado))
+                      : fbUser ? arr.find(x=>x.email?.toLowerCase()===fbUser.email?.toLowerCase()) : null;
+                  })()}/>
                 <VistaWorker
                   trabajador={(()=>{
                     const arr=Array.isArray(personal)?personal:Object.values(personal||{});
@@ -32202,6 +32817,9 @@ export default function App() {
         {/* ── ALERTAS / NOTIFICACIONES ── */}
           {vista==="memos"&&(
             <PanelMemos S={S} memosData={memosData} setMemosData={setMemosData} esJefa={esJefa&&!soloLectura} personal={personal}/>
+          )}
+          {vista==="capacitacion"&&esJefa&&(
+            <ErrorBoundary><PanelCapacitacion S={S} personal={personal} esJefa={esJefa&&!soloLectura}/></ErrorBoundary>
           )}
           {vista==="protocolos"&&(
             <PanelProtocolos S={S} personal={personal} esJefa={esJefa&&!soloLectura} crearNotificacion={crearNotificacion} rolLogueado={rolLogueado}/>
